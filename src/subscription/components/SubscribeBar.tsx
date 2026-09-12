@@ -12,7 +12,8 @@
 // helper `resolveSubscribeCta`, so the bar can never disagree with the server
 // guard that refuses the same order.
 
-import { BadgeCheck, BellRing, Lock, ShieldCheck, Loader2, XCircle } from "lucide-react";
+import { BadgeCheck, BellRing, Lock, ShieldCheck, XCircle } from "lucide-react";
+import { PaymentButton } from "../../components/ui/PaymentButton";
 import { resolveSubscribeCta, type SubscriptionSelectionState } from "../../../utils/subscriptionOwnership";
 
 interface Props {
@@ -26,6 +27,17 @@ interface Props {
   /** Ownership verdict for the current plan + cycle selection. */
   ownershipState?: SubscriptionSelectionState | null;
 }
+
+/**
+ * The reference button carries one colour (`--clr`): the icon plate and the
+ * colour that wipes in behind the label. The bar only re-points it where the
+ * app already used colour as MEANING — an already-owned plan keeps the
+ * emerald-600 identity, a downgrade-blocked selection goes neutral slate so
+ * it never reads as purchasable. A purchasable selection passes nothing and
+ * gets the Uiverse component's own green, identical to every other pay CTA.
+ */
+const OWNED_CLAIM_COLOR = "#059669"; /* emerald-600 — "this is active for you" */
+const BLOCKED_CLAIM_COLOR = "#64748b"; /* slate — disabled-looking, not buyable */
 
 const formatRupee = (paise: number): string =>
   `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
@@ -135,36 +147,34 @@ export default function SubscribeBar({
           </li>
         </ul>
       ) : null}
-      <button
+      {/* The plan CTA is the app-wide payment button (Uiverse
+          pretty-grasshopper-57), so it can never drift from the checkout,
+          cart or product-page pay button. Business logic is untouched: same
+          `onSubscribe`, same `isDisabled`, same `resolveSubscribeCta`
+          verdict (label + tone + disabled all still come from the shared
+          helper), same ownership data-attributes the server guard is paired
+          with. Meaning colour moves onto the reference's own --clr: an
+          owned plan paints the plate emerald, a blocked one neutral slate,
+          a purchasable one keeps the reference green. */}
+      <PaymentButton
+        block
+        size="md"
         type="button"
         onClick={onSubscribe}
         disabled={isDisabled}
-        data-subscription-subscribe
-        data-subscription-cta-tone={cta.tone}
-        className={`flex w-full items-center justify-center gap-2 rounded-full py-4 text-sm font-extrabold transition active:scale-[0.98] disabled:cursor-not-allowed ${
+        loading={loading}
+        color={
           isOwned
-            ? "bg-emerald-600 text-white disabled:opacity-100"
+            ? OWNED_CLAIM_COLOR
             : isDowngradeBlocked
-              ? "border border-white/15 text-white/55 disabled:opacity-100"
-              : "bg-indigo-600 text-white shadow-[var(--dc-elev-accent)] hover:bg-indigo-500 disabled:opacity-70"
-        }`}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Processing…
-          </>
-        ) : isOwned ? (
-          <>
-            <BadgeCheck className="h-4 w-4" /> {cta.label}
-          </>
-        ) : isDowngradeBlocked ? (
-          <>
-            <Lock className="h-4 w-4" /> {cta.label}
-          </>
-        ) : (
-          cta.label
-        )}
-      </button>
+              ? BLOCKED_CLAIM_COLOR
+              : undefined
+        }
+        icon={isOwned ? <BadgeCheck size={20} /> : isDowngradeBlocked ? <Lock size={20} /> : undefined}
+        label={loading ? "Processing…" : cta.label}
+        data-subscription-subscribe=""
+        data-subscription-cta-tone={cta.tone}
+      />
     </div>
   );
 }

@@ -71,12 +71,17 @@ test("checkout keeps its identity colours and gains only the gloss", () => {
   // money card: Phase A removed the gradient — solid brand indigo, rim + highlight
   assert.match(pg, /dc-quote rounded-2xl bg-indigo-600/);
   assert.doesNotMatch(pg, /from-indigo-600 to-violet-700/);
-  // pay button: emerald paint kept, pack gloss added *behind* the content
-  assert.match(pg, /bg-emerald-600/);
-  assert.match(pg, /<GlassSurface className="pointer-events-none absolute inset-0" \/>/); // pack defaults (websiteglass.com): tint 0.5, blur 14, radius 16
-  assert.match(pg, /<span className="relative z-10 flex items-center justify-center gap-2">/);
+  // pay button (2026-09-12): the money action is the app-wide payment CTA —
+  // the Uiverse "pretty-grasshopper-57" port in src/components/ui. The old
+  // hand-painted emerald plate + pack gloss are gone BY DESIGN; the green is
+  // now the reference's own --clr, and the busy gate is forwarded unchanged.
+  assert.match(pg, /<PaymentButton/);
   assert.match(pg, /disabled=\{busy\}/);
-  assert.match(pg, /disabled:cursor-wait/);
+  assert.match(pg, /loading=\{busy\}/);
+  assert.doesNotMatch(pg, /bg-emerald-600/);
+  const payCss = read("src/components/ui/payment-button.css");
+  assert.match(payCss, /\.uzp-pay\[data-uzp-state="loading"\] \{\s*cursor: progress;/);
+  assert.match(payCss, /--uzp-clr: #00ad54;/);
   // Wave 11: the secondary "Back" is the pack GlassButton capsule (no hand-painted plate)
   assert.match(pg, /<GlassButton variant="capsule" onClick=\{onGoBack\}/);
   assert.doesNotMatch(pg, /dc-glass-soft w-full rounded-2xl bg-white\/\[0\.06\]/);

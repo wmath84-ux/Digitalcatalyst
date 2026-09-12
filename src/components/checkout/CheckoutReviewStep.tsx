@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GlassCard } from "../ui/GlassCard";
 import { GlassButton } from "../ui/glass-button";
 import { GlassInput } from "../ui/glass-input";
+import { PaymentButton } from "../ui/PaymentButton";
 import {
   AlertCircle,
   ArrowLeft,
@@ -379,15 +380,19 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
 
       {/* Navigation */}
       <div className="space-y-2 pb-2" data-checkout-actions>
-        <button
-          type="button"
-          onClick={onProceed}
+        {/* The checkout CTA is the app's one payment button (Uiverse
+            pretty-grasshopper-57 port) — same handler, same quote, same
+            disabled-until-the-quote-settles rule. The label stays
+            contextual: a ₹0 order still says "Get free access". */}
+        <PaymentButton
+          block
+          size="lg"
+          loading={showLoading}
           disabled={showLoading}
-          className="dc-focusable flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {showLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ShoppingBag className="h-5 w-5" />}
-          {finalTotal === 0 ? "Get free access" : `Pay ${formatRupee(finalTotal)} securely`}
-        </button>
+          onClick={onProceed}
+          data-checkout-proceed=""
+          label={finalTotal === 0 ? "Get free access" : `Pay ${formatRupee(finalTotal)} securely`}
+        />
         {/* Transparency bias, placed at the exact point of commitment. */}
         <p className="flex items-center justify-center gap-1.5 pb-1 text-[11px] font-semibold dc-ink-2">
           <ShieldCheck size={13} className="shrink-0 text-emerald-400" aria-hidden="true" />

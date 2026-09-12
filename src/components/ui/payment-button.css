@@ -1,0 +1,218 @@
+/*
+ * src/components/ui/payment-button.css
+ *
+ * A faithful, self-contained port of Creatlydev's "pretty-grasshopper-57"
+ * payment button:
+ *   https://uiverse.io/Creatlydev/pretty-grasshopper-57
+ *
+ * It is THE app's payment CTA treatment — every button that starts or
+ * continues a payment/checkout (Pay, Buy, Subscribe, Renew, Upgrade,
+ * Secure checkout) is rendered through `PaymentButton.tsx`. Nothing else
+ * wears these classes, and nothing outside `.uzp-pay` is styled here, so the
+ * rules can never leak into navigation, footer, cards, forms or admin.
+ *
+ * Reference values kept EXACT (the Uiverse source is authored in px/rem at a
+ * 16px root; every number below is the same value expressed in `em` so the
+ * whole pill — plate, glyph box, radius, shadow, padding — scales as one unit
+ * with `font-size`, which is what makes the size variants possible without
+ * redrawing the component):
+ *   · pill           border-radius 1.5rem (24px, clamped to the 40px height →
+ *                    a capsule, exactly like the reference) · overflow hidden
+ *   · surface        background #fff · color #121212 · border none
+ *   · shadow         10px 10px 20px rgba(0,0,0,.05)
+ *   · decor layer    inset 0 · background var(--clr) · translateX(-100%)
+ *                    → translate(0) on hover over .3s
+ *   · content        flex · align-items center · font-weight 600 · overflow hidden
+ *   · icon plate     48×40px · background var(--clr) · display grid · place-items center
+ *   · text           2px 1.5rem 2px / padding-left .75rem · inline-block
+ *                    transition color .2s · nowrap + ellipsis · max-width 150px
+ *   · hover          decor slides in, text goes #fff
+ * The reference defines no :active rule (its whole interaction is the hover
+ * slide), so none is invented here.
+ */
+
+.uzp-pay {
+  /* The reference's own `style="--clr: #00ad54"` — the brand colour that
+     paints the icon plate and wipes in behind the label on hover. */
+  --uzp-clr: #00ad54;
+
+  text-decoration: none;
+  line-height: 1;
+  border-radius: 1.5em; /* 24px @16px */
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0.625em 0.625em 1.25em rgb(0 0 0 / 5%); /* 10px 10px 20px .05 */
+  background-color: #fff;
+  color: #121212;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+  padding: 0;
+  font-family: inherit;
+  /* The scale knob: 16px reproduces the reference at its authored size. */
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.uzp-pay__decor {
+  position: absolute;
+  inset: 0;
+  background-color: var(--uzp-clr);
+  transform: translateX(-100%);
+  transition: transform 0.3s;
+  z-index: 0;
+}
+
+.uzp-pay__content {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+.uzp-pay__icon {
+  width: 3em; /* 48px @16px */
+  height: 2.5em; /* 40px @16px */
+  background-color: var(--uzp-clr);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fff;
+}
+
+/* The reference inlines a 24px SVG inside the 48×40 plate. Expressed in em
+   it keeps that exact ratio (24/16) at every size variant. */
+.uzp-pay__glyph {
+  width: 1.5em; /* 24px @16px */
+  height: 1.5em;
+  display: block;
+}
+
+.uzp-pay__text {
+  display: inline-block;
+  transition: color 0.2s;
+  padding: 0.125em 1.5em 0.125em; /* 2px 24px @16px */
+  padding-left: 0.75em; /* 12px @16px */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 9.375em; /* 150px @16px — the reference's own ellipsis guard */
+  min-width: 0;
+}
+
+.uzp-pay:hover .uzp-pay__text {
+  color: #fff;
+}
+
+.uzp-pay:hover .uzp-pay__decor {
+  transform: translate(0);
+}
+
+/* Keyboard affordance. The reference ships none (a mouse-only demo); this is
+   the accessibility floor the app requires, drawn with the component's own
+   accent so the design still reads as the reference. */
+.uzp-pay:focus-visible {
+  outline: 2px solid var(--uzp-clr);
+  outline-offset: 2px;
+}
+
+/* ── Size variants ──────────────────────────────────────────────────────
+ * Pure `font-size` scaling: geometry, proportions, easing and timing are the
+ * reference's at every size (same trick as `.uzv-hero-cta`). */
+
+.uzp-pay--sm {
+  font-size: 13px;
+}
+
+.uzp-pay--md {
+  font-size: 16px;
+}
+
+.uzp-pay--lg {
+  font-size: 18px;
+}
+
+/* ── Fluid (full-width) placement ───────────────────────────────────────
+ * Several of the app's payment CTAs own a full-width row (checkout, the
+ * sticky subscribe bar, the cart bar). Only the OUTER BOX changes — the pill
+ * material, plate, glyph, radius, shadow, slide and hover behaviour are
+ * untouched. The label simply gets more room before the reference's ellipsis
+ * guard kicks in, and the [plate + label] group stays centred. */
+
+.uzp-pay--block {
+  display: block;
+  width: 100%;
+}
+
+.uzp-pay--block .uzp-pay__content {
+  justify-content: center;
+}
+
+.uzp-pay--block .uzp-pay__text {
+  max-width: min(100%, 20em);
+}
+
+/* ── Loading: the reference's filled (hover) state, held ─────────────────
+ * No new visual language: the brand plate is already the "in progress" look,
+ * so the decor stays slid in and the icon plate carries a spinner. */
+
+.uzp-pay[data-uzp-state="loading"] {
+  cursor: progress;
+}
+
+.uzp-pay[data-uzp-state="loading"] .uzp-pay__decor {
+  transform: translate(0);
+}
+
+.uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
+  color: #fff;
+}
+
+.uzp-pay__spinner {
+  width: 1.25em;
+  height: 1.25em;
+  animation: uzpSpin 0.9s linear infinite;
+}
+
+@keyframes uzpSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Disabled: the reference has no disabled state; this keeps the material
+ * and only removes the interaction (the slide is pinned off). */
+
+.uzp-pay:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.uzp-pay:disabled:hover .uzp-pay__decor {
+  transform: translateX(-100%);
+}
+
+.uzp-pay:disabled:hover .uzp-pay__text {
+  color: inherit;
+}
+
+.uzp-pay[data-uzp-state="loading"]:disabled .uzp-pay__text,
+.uzp-pay:disabled.uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
+  color: #fff;
+}
+
+/* ── Reduced motion: the slide resolves instantly, states unchanged. ──── */
+
+@media (prefers-reduced-motion: reduce) {
+  .uzp-pay__decor {
+    transition-duration: 0.01ms;
+  }
+  .uzp-pay__text {
+    transition-duration: 0.01ms;
+  }
+  .uzp-pay__spinner {
+    animation-duration: 1.6s;
+  }
+}

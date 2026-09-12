@@ -39,6 +39,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ShieldCheck, X } from "lucide-react";
 import { useOverlayBounds, useOverlayBox } from "./overlayBounds";
+import { PaymentButton } from "./PaymentButton";
 
 export interface GlassModalProps {
   open: boolean;
@@ -53,6 +54,16 @@ export interface GlassModalProps {
   primaryLabel?: ReactNode;
   onPrimary?: () => void;
   primaryDisabled?: boolean;
+  /**
+   * Wear the app's payment CTA (the Uiverse pretty-grasshopper-57 port that
+   * every pay/buy/checkout action in the product shares) instead of the
+   * upstream amber capsule. Opt-in per dialog: `payment` is only for CTAs
+   * that actually take money forward (the subscription confirmation), so no
+   * other modal's primary action changes.
+   */
+  primaryVariant?: "default" | "payment";
+  /** Payment-button busy state — the modal stays open and non-reentrant. */
+  primaryLoading?: boolean;
   /** Ghost button label — upstream: "Maybe Later". */
   secondaryLabel?: ReactNode;
   onSecondary?: () => void;
@@ -78,6 +89,8 @@ export default function GlassModal({
   primaryLabel,
   onPrimary,
   primaryDisabled = false,
+  primaryVariant = "default",
+  primaryLoading = false,
   secondaryLabel,
   onSecondary,
   icon,
@@ -278,7 +291,16 @@ export default function GlassModal({
               {/* 5) Buttons. */}
               {primaryLabel || secondaryLabel ? (
                 <div className="flex w-full flex-col gap-2">
-                  {primaryLabel ? (
+                  {primaryLabel && primaryVariant === "payment" ? (
+                    <PaymentButton
+                      block
+                      size="md"
+                      loading={primaryLoading}
+                      disabled={primaryDisabled}
+                      onClick={onPrimary}
+                      label={primaryLabel}
+                    />
+                  ) : primaryLabel ? (
                     <motion.button
                       type="button"
                       onClick={onPrimary}

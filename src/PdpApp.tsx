@@ -40,6 +40,7 @@ import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
 import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
+import { PaymentButton } from "./components/ui/PaymentButton";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
@@ -611,9 +612,17 @@ function PremiumProductContent({
                       <p className="mt-1 text-xs leading-5 text-white/85">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
                     </div>
                   </div>
-                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-full bg-indigo-600 py-3 text-sm font-black text-white transition hover:bg-indigo-500 active:scale-[0.99]">
-                    Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}
-                  </button>
+                  {/* Purchase CTA — the shared payment button (Uiverse
+                      pretty-grasshopper-57). Handler, price and route are the
+                      page's own `handleBuyUpgrade`, unchanged. */}
+                  <PaymentButton
+                    block
+                    className="relative mt-4"
+                    icon={<Zap size={18} />}
+                    onClick={handleBuyUpgrade}
+                    data-pdp-upgrade-checkout=""
+                    label={`Buy upgrade · ${formatPrice(availablePaidUpdates[0].cashPrice)}`}
+                  />
                   {onOpenCourse ? (
                     <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
                       <PlayCircle className="h-4 w-4" /> Open course in library
@@ -645,9 +654,19 @@ function PremiumProductContent({
                   </li>
                 </ul>
                 <div className="relative mt-5 flex gap-3">
-                  <button disabled={unavailable} onClick={primaryAction} className="dc-focusable group flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-amber-500/30 disabled:text-amber-200 active:scale-[0.98]">
-                    <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : `Get it for ${formatPrice(product.price)}`}
-                  </button>
+                  {/* The product page's money CTA is the app-wide payment
+                      button now: same `primaryAction` (onCheckout with the
+                      product price + applied coupon), same "unavailable"
+                      disabled rule, contextual label kept. */}
+                  <PaymentButton
+                    block
+                    className="min-w-0 flex-1"
+                    icon={<Zap size={18} />}
+                    disabled={unavailable}
+                    onClick={primaryAction}
+                    data-pdp-checkout=""
+                    label={unavailable ? "Coming soon" : `Get it for ${formatPrice(product.price)}`}
+                  />
                   <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex-1 disabled:opacity-60 [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-bold">
                     <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to my cart"}
                   </GlassButton>
@@ -680,13 +699,16 @@ function PremiumProductContent({
                     <span className="text-[10.5px] dc-anchor-price">{formatPrice(product.originalPrice)}</span>
                   ) : null}
                 </div>
-                <button
-                  type="button"
+                {/* Sticky thumb CTA — the same payment component, so the
+                    follow-the-thumb action can never drift from the buy box. */}
+                <PaymentButton
+                  block
+                  className="min-w-0 flex-1"
+                  icon={<Zap size={18} />}
                   onClick={primaryAction}
-                  className="dc-focusable flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]"
-                >
-                  <Zap className="h-4 w-4 fill-current" /> Get it now
-                </button>
+                  data-pdp-thumb-checkout=""
+                  label="Get it now"
+                />
               </div>
             ) : null}
 

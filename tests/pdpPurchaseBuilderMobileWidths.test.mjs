@@ -60,12 +60,23 @@ for (const width of widths) {
   });
 }
 
-test("CTA button uses min-w-0 + truncate so the price label can shrink instead of overflowing at any width", () => {
+test("CTA button shrinks instead of overflowing at any width", () => {
   // The CTA button is the most overflow-prone element on small viewports
-  // because it carries an icon + a (potentially long) price label.
+  // because it carries an icon + a (potentially long) price label. It is now
+  // the shared payment component (Uiverse pretty-grasshopper-57 port), so the
+  // shrink rule lives in that component instead of a `truncate` utility: the
+  // label is `overflow: hidden` + `text-overflow: ellipsis` with `min-w-0`,
+  // and the CTA stretches inside the flex column it already sat in.
   const ctaStart = componentSource.indexOf("data-pdp-cta");
   const ctaBlock = componentSource.slice(ctaStart, ctaStart + 2000);
-  assert.match(ctaBlock, /<button[\s\S]{0,1500}truncate/);
+  assert.match(ctaBlock, /<PaymentButton/);
+  assert.match(ctaBlock, /block/);
+  const css = fs.readFileSync(
+    path.join(__dirname, "..", "src", "components", "ui", "payment-button.css"),
+    "utf8",
+  );
+  assert.match(css, /\.uzp-pay__text \{[\s\S]*?overflow: hidden;[\s\S]*?white-space: nowrap;[\s\S]*?text-overflow: ellipsis;/);
+  assert.match(css, /\.uzp-pay__text \{[\s\S]*?min-width: 0;/);
 });
 
 test("purchase builder uses Tailwind responsive breakpoints (sm:/md:) on every layout-affecting class", () => {

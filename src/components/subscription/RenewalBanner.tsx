@@ -10,6 +10,7 @@
 
 import { AlertTriangle, CalendarClock, Clock, Lock, X } from "lucide-react";
 import { GlassButton } from "../ui/glass-button";
+import { PaymentButton } from "../ui/PaymentButton";
 import type { RenewalView } from "../../../utils/renewalPresentation";
 
 const ICONS = {
@@ -26,7 +27,7 @@ const TONE_STYLES = {
     icon: "bg-sky-500/20 text-sky-300",
     title: "text-sky-950",
     body: "text-sky-200",
-    cta: "bg-sky-600 text-white",
+    cta: "#0284c7",
     dismiss: "text-sky-500 hover:bg-sky-500/20",
   },
   warning: {
@@ -35,7 +36,7 @@ const TONE_STYLES = {
     icon: "bg-amber-500/20 text-amber-300",
     title: "text-amber-950",
     body: "text-amber-200",
-    cta: "bg-amber-600 text-white",
+    cta: "#d97706",
     dismiss: "text-amber-300 hover:bg-amber-500/20",
   },
   critical: {
@@ -44,7 +45,7 @@ const TONE_STYLES = {
     icon: "bg-rose-500/20 text-rose-300",
     title: "text-rose-950",
     body: "text-rose-200",
-    cta: "bg-rose-600 text-white",
+    cta: "#e11d48",
     dismiss: "text-rose-500 hover:bg-rose-500/20",
   },
 } as const;
@@ -93,14 +94,17 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
 
           <div className="mt-3 flex items-center gap-2">
             {view.canRenew ? (
-              <button
-                type="button"
+              /* Renewal CTA — the app-wide payment button, at the reference's
+                 compact scale so the banner row keeps its shape. `onRenew` and
+                 the urgency colour are the banner's own, unchanged: the tone
+                 simply rides the reference's --clr instead of a painted pill. */
+              <PaymentButton
+                size="sm"
+                color={tone.cta}
                 onClick={onRenew}
-                data-renewal-cta
-                className={`rounded-full px-3.5 py-2 text-xs font-black transition active:scale-[0.98] ${tone.cta}`}
-              >
-                {view.cta}
-              </button>
+                data-renewal-cta=""
+                label={view.cta}
+              />
             ) : null}
             {view.dismissible && onDismiss ? (
               <GlassButton

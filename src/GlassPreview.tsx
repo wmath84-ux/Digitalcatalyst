@@ -13,6 +13,7 @@
 // the remaining 19 items join this page as they land.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Glass, GlassLens, GlassSurface, useGlassDark } from "@/components/ui/glass";
+import { PaymentButton } from "@/components/ui/PaymentButton";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassAccordion, GlassAccordionContent, GlassAccordionItem, GlassAccordionTrigger } from "@/components/ui/glass-accordion";
@@ -656,16 +657,15 @@ export default function GlassPreviewPage() {
 
           <Row label="pay CTA">
             <div className="w-full max-w-sm">
-              <button
-                type="button"
-                className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg transition active:scale-[0.98]"
-              >
-                <GlassSurface tint={0.7} radius={16} className="pointer-events-none absolute inset-0" />
-                <span className="relative z-10 flex items-center gap-2">Pay securely — &#8377;1,499</span>
-              </button>
+              {/* Every money CTA in the app — checkout, cart, plans, renewals — is the
+                  one shared `PaymentButton` (the Uiverse `pretty-grasshopper-57` port),
+                  so the gallery shows that component rather than a rival treatment.
+                  Label, price, loading and disabled state all stay the caller's. */}
+              <PaymentButton block label={"Pay securely — ₹1,499"} />
               <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                Checkout's money button keeps its solid emerald — the frost sits *behind* the label, never under it.
-                The amount card above it gets a rim only (`.dc-quote`) for the same reason.
+                The frost lives in the component itself (its icon plate + the green wipe behind the label),
+                never in a hand-painted pill. The amount card above it gets a rim only (`.dc-quote`) for the
+                same reason.
               </p>
             </div>
           </Row>
