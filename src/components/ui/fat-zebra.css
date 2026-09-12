@@ -1,0 +1,243 @@
+/*
+ * src/components/ui/fat-zebra.css
+ *
+ * A faithful, self-contained port of Marcelo Dolza's "fat-zebra-11" button:
+ *   https://uiverse.io/marcelodolza/fat-zebra-11
+ *
+ * Used ONLY as a selected action-button treatment (User Query "Send reply",
+ * Revision "Generate revision plan") — never a global button replacement.
+ *
+ * Every geometric value is expressed in `em`, so the button scales as one
+ * unit from its inline font-size (set by <FatZebraButton size=… />). At the
+ * reference size (18px) the numbers are byte-for-byte the original:
+ *   68px tall · 200px min-width · 20px padding · 14px radius · 2.5px hairline
+ *   7px/6px inner-pill inset · 30px inner radius · 0.5px inner blur.
+ *
+ * Deliberately NOT glass: no backdrop-filter, no backdrop-blur, no
+ * translucency. The face is an opaque neutral gradient (neutral-1 → neutral-2)
+ * exactly like the reference. Do not convert this to the app's glass language.
+ */
+
+.uiverse-fat-zebra {
+  --uz-primary: #ff5569;
+  --uz-neutral-1: #f7f8f7;
+  --uz-neutral-2: #e7e7e7;
+  --uz-radius: 0.7778em; /* 14px @18px */
+  --uz-ink: #26292f;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 11.1111em; /* 200px @18px */
+  height: 3.7778em; /* 68px @18px */
+  padding: 1.1111em; /* 20px @18px */
+  border: none;
+  border-radius: var(--uz-radius);
+  cursor: pointer;
+  color: var(--uz-ink);
+  font-family: "Galano Grotesque", Poppins, Montserrat, ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  text-shadow: 0 0.0556em 0.0556em rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0.0278em 0.0278em 0.0556em rgba(255, 255, 255, 0.2),
+    0 0.5556em 1.1111em rgba(0, 0, 0, 0.2),
+    0 0.2222em 0.2778em 0 rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Face + gradient hairline border (the reference's ::after). */
+.uiverse-fat-zebra::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--uz-radius);
+  border: 0.1389em solid transparent; /* 2.5px @18px */
+  background:
+    linear-gradient(var(--uz-neutral-1), var(--uz-neutral-2)) padding-box,
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45)) border-box;
+  z-index: 0;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* The "fat" inner pill (the reference's ::before). */
+.uiverse-fat-zebra::before {
+  content: "";
+  position: absolute;
+  inset: 0.3889em 0.3333em 0.3333em 0.3333em; /* 7px 6px 6px 6px @18px */
+  background: linear-gradient(to top, var(--uz-neutral-1), var(--uz-neutral-2));
+  border-radius: 1.6667em; /* 30px @18px */
+  filter: blur(0.0278em); /* 0.5px @18px */
+  z-index: 2;
+}
+
+/* Conic rim shine (the reference's .outline). */
+.uiverse-fat-zebra .uz-outline {
+  position: absolute;
+  inset: -0.1111em -0.1944em; /* -2px -3.5px @18px */
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.uiverse-fat-zebra .uz-outline::before {
+  content: "";
+  position: absolute;
+  inset: -100%;
+  background: conic-gradient(from 180deg, transparent 60%, white 80%, transparent 100%);
+  animation: uz-spin 2s linear infinite;
+  animation-play-state: paused;
+}
+
+@keyframes uz-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── hover ─────────────────────────────────────────────────────────────── */
+
+.uiverse-fat-zebra:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow:
+    0 0 0.0556em 0.1111em rgba(255, 255, 255, 0.3),
+    0 0.8333em 1.6667em rgba(0, 0, 0, 0.3),
+    0 0.5556em 0.1667em -0.1667em rgba(0, 0, 0, 0.04);
+}
+
+.uiverse-fat-zebra:hover:not(:disabled)::after {
+  transform: scale(1.05, 1.1);
+  box-shadow: inset 0 -0.0556em 0.1667em 0 rgba(255, 255, 255, 1);
+}
+
+.uiverse-fat-zebra:hover:not(:disabled) .uz-outline {
+  opacity: 1;
+}
+
+.uiverse-fat-zebra:hover:not(:disabled) .uz-outline::before {
+  animation-play-state: running;
+}
+
+.uiverse-fat-zebra:hover:not(:disabled) .uz-label .uz-letter {
+  opacity: 1;
+  animation: uz-wave 0.5s ease forwards calc(var(--i) * 0.02s);
+}
+
+/* ── active / pressed ──────────────────────────────────────────────────── */
+
+.uiverse-fat-zebra:active:not(:disabled) {
+  transform: scale(1);
+  box-shadow:
+    0 0 0.0556em 0.1111em rgba(255, 255, 255, 0.3),
+    0 0.5556em 0.1667em -0.1667em rgba(0, 0, 0, 0.2);
+}
+
+/* ── state (icon + label) ──────────────────────────────────────────────── */
+
+.uiverse-fat-zebra .uz-state {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 1.6111em; /* 29px @18px */
+  white-space: nowrap;
+}
+
+.uiverse-fat-zebra .uz-state .uz-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  transform: scale(1.25);
+  transition: transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uiverse-fat-zebra .uz-state .uz-icon svg {
+  overflow: visible;
+}
+
+.uiverse-fat-zebra .uz-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+/* Per-letter entrance + hover wave. Spaces render as nbsp so they keep their
+   width inside the flex row. */
+.uiverse-fat-zebra .uz-label .uz-letter {
+  display: block;
+  opacity: 0;
+  animation: uz-slideDown 0.8s ease forwards calc(var(--i) * 0.03s);
+}
+
+@keyframes uz-wave {
+  30% { opacity: 1; transform: translateY(0.2222em) translateX(0) rotate(0); }
+  50% { opacity: 1; transform: translateY(-0.1667em) translateX(0) rotate(0); color: var(--uz-primary); }
+  100% { opacity: 1; transform: translateY(0) translateX(0) rotate(0); }
+}
+
+@keyframes uz-slideDown {
+  0% { opacity: 0; transform: translateY(-1.1111em) translateX(0.2778em) rotate(-90deg); color: var(--uz-primary); filter: blur(0.2778em); }
+  30% { opacity: 1; transform: translateY(0.2222em) translateX(0) rotate(0); filter: blur(0); }
+  50% { opacity: 1; transform: translateY(-0.1667em) translateX(0) rotate(0); }
+  100% { opacity: 1; transform: translateY(0) translateX(0) rotate(0); }
+}
+
+/* ── paper-plane icon behaviours (opt-in via data-plane="true") ─────────── */
+
+.uiverse-fat-zebra[data-plane="true"] .uz-state .uz-icon svg {
+  animation: uz-land 0.6s ease forwards;
+}
+
+.uiverse-fat-zebra[data-plane="true"]:hover:not(:disabled) .uz-state .uz-icon {
+  transform: rotate(45deg) scale(1.25);
+}
+
+@keyframes uz-land {
+  0% { transform: translateX(-3.3333em) translateY(1.6667em) rotate(-50deg) scale(2); opacity: 0; filter: blur(0.1667em); }
+  100% { transform: translateX(0) translateY(0) rotate(0) scale(1); opacity: 1; filter: blur(0); }
+}
+
+/* ── disabled + a11y ───────────────────────────────────────────────────── */
+
+.uiverse-fat-zebra:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: 0 0.2778em 0.5556em rgba(0, 0, 0, 0.15);
+}
+
+.uiverse-fat-zebra:focus-visible {
+  outline: 0.1389em solid var(--uz-primary);
+  outline-offset: 0.2222em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uiverse-fat-zebra,
+  .uiverse-fat-zebra::after,
+  .uiverse-fat-zebra .uz-outline,
+  .uiverse-fat-zebra .uz-state .uz-icon {
+    transition: none;
+  }
+  .uiverse-fat-zebra .uz-label .uz-letter {
+    opacity: 1;
+    animation: none;
+  }
+  .uiverse-fat-zebra[data-plane="true"] .uz-state .uz-icon svg {
+    animation: none;
+  }
+  .uiverse-fat-zebra .uz-outline::before {
+    animation: none;
+  }
+}

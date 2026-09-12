@@ -4,6 +4,7 @@ import { GlassTile } from "../../components/ui/glass-tile";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassCheckbox } from "../../components/ui/glass-checkbox";
 import { GlassCard } from "../../components/ui/GlassCard";
+import FatZebraButton from "../../components/ui/FatZebraButton";
 // Student-facing AI test generator.
 //
 // The learner picks Class → Subject → Chapter → Topic from four cascading
@@ -24,7 +25,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageShell from "../components/PageShell";
-import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
+import { Card, SecondaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, ClockIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { CURRICULUM, type CurriculumClass } from "../data/curriculum";
@@ -925,12 +926,14 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               </Card>
             ) : (
               <>
-                <PrimaryButton
+                <FatZebraButton
+                  size="md"
+                  className="w-full"
                   disabled={!canGenerate || generateBlockedByNoAi}
                   onClick={() => void runGenerate()}
-                >
-                  <SparklesIcon className="h-5 w-5" /> Generate revision plan
-                </PrimaryButton>
+                  icon={<SparklesIcon className="h-5 w-5" aria-hidden="true" />}
+                  label="Generate revision plan"
+                />
                 {!canGenerate && (
                   <p className="dc-scene-ink text-center text-[11px] text-white/55">
                     Select at least one class, subject, chapter and topic to generate.
