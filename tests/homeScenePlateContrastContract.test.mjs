@@ -54,6 +54,8 @@ const categories = read("src/home/components/CategoryNav.tsx");
 const home = read("src/home/App.tsx");
 const reviews = read("src/home/components/Reviews.tsx");
 const continueLearning = read("src/home/components/ContinueLearning.tsx");
+// The Home category empty state renders through the shared card component.
+const emptyState = read("src/components/ui/EmptyState.tsx");
 
 /* ------------------------------------------------------------------ */
 /* 1. The plate is one shared material, declared once                  */
@@ -179,7 +181,13 @@ test("copy with no surface under it carries the scene ink hook", () => {
   assert.match(home, /<h2 className="dc-scene-ink text-base font-bold text-white md:text-lg">/);
   assert.match(home, /dc-scene-ink text-xs font-semibold text-white\/55 hover:text-white\/85/);
   assert.match(home, /dc-scene-ink mt-1 text-xs text-white\/55/);
-  assert.match(home, /dc-scene-ink mt-8 text-center text-sm text-white\/55/);
+  // The category's "no products" line used to be bare scene copy; it now sits
+  // on the shared EmptyState glass card (2026-09-12 pass) — a plated surface,
+  // so the card's own content carries the ink hook (EmptyState.tsx pins
+  // `dc-empty dc-scene-ink` on its content) instead of the old bare
+  // `dc-scene-ink` paragraph.
+  assert.match(home, /<EmptyState\b/);
+  assert.match(emptyState, /dc-empty dc-scene-ink/);
   assert.match(reviews, /<h2 className="dc-scene-ink text-base font-bold text-white">Loved by Learners<\/h2>/);
   assert.match(reviews, /dc-scene-ink text-xs font-semibold text-white\/55/);
   assert.match(continueLearning, /<h2 className="dc-scene-ink text-base font-bold text-white">Continue Learning<\/h2>/);

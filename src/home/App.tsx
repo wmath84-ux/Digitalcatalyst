@@ -12,6 +12,8 @@ import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import DeferredVisible from "../components/DeferredVisible";
+import { EmptyState } from "../components/ui/EmptyState";
+import { BookOpenIcon } from "../components/icons";
 // Bottom-of-page feedback wall: matter.js physics + its own chunk, mounted
 // lazily by DeferredVisible below (see the section near the end of the page).
 const StickerWall = lazy(() => import("../components/StickerWall"));
@@ -371,9 +373,14 @@ export default function App({
                     {catalogError}
                   </div>
                 ) : categoryFiltered.length === 0 ? (
-                  <p className="dc-scene-ink mt-8 text-center text-sm text-white/55">
-                    No products in this category yet.
-                  </p>
+                  /* The category's "no products" line sits on the shared
+                     empty-state card (same glass + type as Store / My
+                     Purchases) instead of bare text on the background. */
+                  <EmptyState
+                    className="mt-6"
+                    icon={<BookOpenIcon className="h-7 w-7 text-indigo-300" />}
+                    title="No products in this category yet."
+                  />
                 ) : (
                   <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                     {categoryFiltered.map((product) => (

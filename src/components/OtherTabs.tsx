@@ -3,6 +3,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { BagIcon } from "./icons";
 import { GlassCard } from "./ui/GlassCard";
+import { EmptyState } from "./ui/EmptyState";
 
 export function PurchasesTab({
   purchased,
@@ -20,15 +21,17 @@ export function PurchasesTab({
   );
 
   if (items.length === 0) {
+    /* The empty message sits on the shared empty-state card (same glass +
+       type as Home and the Store) instead of loose text on the background.
+       Padding mirrors the populated list below, so the card lands where the
+       "Your purchases" heading does — no jump when the first purchase lands. */
     return (
-      <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-300">
-          <BagIcon className="h-7 w-7" />
-        </div>
-        <h2 className="text-xl font-extrabold text-white">No purchases yet</h2>
-        <p className="max-w-xs text-sm text-white/55">
-          Resources you buy or claim for free from the Store will appear here for lifetime access.
-        </p>
+      <div className="px-4 pb-8 pt-6">
+        <EmptyState
+          icon={<BagIcon className="h-7 w-7 text-indigo-300" />}
+          title="No purchases yet"
+          body="Resources you buy or claim for free from the Store will appear here for lifetime access."
+        />
       </div>
     );
   }

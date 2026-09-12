@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FlowPathView } from "./components/flowpath/FlowPathView";
 import Header from "./home/components/Header";
 import { useAuth } from "./context/AuthContext";
@@ -32,6 +32,10 @@ export default function FlowPathApp({
   const { user } = useAuth();
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
+  // The header settings gear → the SAME CurveSettingsModal the dock's gear
+  // opens. FlowPathView fills this handle with its own opener (the curve
+  // state and modal are owned there), so there is no duplicate settings page.
+  const openCurveRef = useRef<(() => void) | null>(null);
 
   return (
     <div className="flowpath-app relative min-h-screen text-fp-text">
@@ -42,7 +46,10 @@ export default function FlowPathApp({
       {/* Home-style greeting header, pinned above the flow ribbon. The sticky
           host keeps a constant height (`--dc-home-header-seat`, measured by
           the header) so the collapse animation never changes the document
-          height — that feedback loop was the flicker on slow scrolls. */}
+          height — that feedback loop was the flicker on slow scrolls.
+
+          `onOpenSettings` is what makes the gear Flow-page-only: the header
+          renders the gear just for the page that passes this callback. */}
       <div data-home-header-host className="sticky top-0 z-40">
         <Header
           userName={userName}
@@ -53,11 +60,12 @@ export default function FlowPathApp({
           favoritesCount={favoritesCount}
           onOpenFavorites={onOpenFavorites}
           onOpenNotifications={onOpenNotifications}
+          onOpenSettings={() => openCurveRef.current?.()}
         />
       </div>
 
       <div className="relative z-10">
-        <FlowPathView onNavigateToHome={onNavigateToHome} />
+        <FlowPathView onNavigateToHome={onNavigateToHome} openCurveRef={openCurveRef} />
       </div>
     </div>
   );

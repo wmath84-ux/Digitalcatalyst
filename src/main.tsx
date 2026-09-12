@@ -20,6 +20,11 @@ import "./glass.css";
 // store's type scale. AFTER glass.css on purpose — it has to out-rank the navy
 // contrast plate glass.css paints on `.dc-glass-card`.
 import "./store-glass.css";
+// The shared empty-state card material (Home / Store / My Purchases "no
+// content" cards): a quieter light-glacier lens worn via `.dc-empty-glass`.
+// AFTER glass.css + store-glass.css for the same cascade reason as the store
+// lens — it has to out-rank the navy plate glass.css paints on `.dc-glass-card`.
+import "./empty-state-glass.css";
 // The Course Player's panel language, ported from the removed 3D Classroom:
 // deep navy plates, one hairline, crisp white ink and the room's five surface
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come

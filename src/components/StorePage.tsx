@@ -6,6 +6,7 @@ import SearchBar from "./SearchBar";
 import FilterChips from "./FilterChips";
 import ProductCard from "./ProductCard";
 import TiltedCoverflow from "./TiltedCoverflow";
+import { EmptyState } from "./ui/EmptyState";
 import { GlassCard } from "./ui/GlassCard";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
@@ -391,30 +392,31 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        /* Educational empty state: says what happened, why, and gives the
-           user a one-tap way out instead of a dead end. */
-        <GlassCard className="mx-4 mt-6 lg:mx-0" contentClassName="dc-empty">
-          <span className="dc-empty-art" aria-hidden="true">
-            <BookOpenIcon className="h-7 w-7 text-indigo-300" />
-          </span>
-          <p className="dc-empty-title">
-            {search.trim() ? `Nothing matched “${search.trim()}”` : "No resources in this filter yet"}
-          </p>
-          <p className="dc-empty-body">
-            {search.trim()
+        /* Educational empty state, on the shared EmptyState card (same
+           light-glacier glass + type as Home and My Purchases): says what
+           happened, why, and gives the user a one-tap way out instead of a
+           dead end. */
+        <EmptyState
+          className="mx-4 mt-6 lg:mx-0"
+          icon={<BookOpenIcon className="h-7 w-7 text-indigo-300" />}
+          title={search.trim() ? `Nothing matched “${search.trim()}”` : "No resources in this filter yet"}
+          body={
+            search.trim()
               ? "We search titles, subjects, instructors and tags. Try a shorter keyword, or reset the filter to see the full catalog."
-              : "This category has no published resources right now. Switch back to All to browse everything available today."}
-          </p>
-          {(search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? (
-            <button
-              type="button"
-              onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
-              className="dc-focusable mt-1 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500"
-            >
-              Show all resources
-            </button>
-          ) : null}
-        </GlassCard>
+              : "This category has no published resources right now. Switch back to All to browse everything available today."
+          }
+          action={
+            (search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? (
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
+                className="dc-focusable mt-1 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500"
+              >
+                Show all resources
+              </button>
+            ) : null
+          }
+        />
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
         <div data-store-gutter data-store-list className="flex flex-col gap-2 px-3 pt-3 sm:px-4 sm:pt-4">

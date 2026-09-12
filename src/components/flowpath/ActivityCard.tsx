@@ -154,9 +154,19 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           `.glass-panel-strong` gradient plates + glow shadow removed. State
           (now / overdue) is a ring, because colour carries meaning there.
           Owner (post Wave 14): the card ink is plain white (title) / white
-          alpha (meta) in both FlowPath themes so it reads on the glass. */}
+          alpha (meta) in both FlowPath themes so it reads on the glass.
+          Owner brief (flow cards): ~15% translucent background + a subtle
+          backdrop blur. tint 0.36 lands the tint layer at 0.36 × 0.42 ≈ 15%
+          alpha (the pack's dark glass RGB, unchanged) and blur 10 resolves
+          to ≈ 6px of frost — the scene stays subtly visible behind the card
+          while title/meta ink stays sharp. Border, radius, spacing and
+          hierarchy are the surface's own, untouched. This is the ONE shared
+          card for every Flow state (now / upcoming / overdue / completed),
+          so the treatment lives here only. */}
       <GlassSurface
         radius={16}
+        tint={0.36}
+        blur={10}
         className={`rounded-2xl ${isCurrent ? "ring-1 ring-violet-400/50" : ""} ${isOverdue ? "ring-1 ring-rose-400/40" : ""}`}
         contentClassName="p-3.5 sm:p-4"
       >

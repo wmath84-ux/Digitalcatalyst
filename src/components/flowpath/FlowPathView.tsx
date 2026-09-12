@@ -222,9 +222,16 @@ function PulseLight({ d, onDone }: { d: string; onDone: () => void }) {
 
 interface FlowPathViewProps {
   onNavigateToHome?: () => void;
+  /**
+   * Optional mutable handle the page shell (FlowPathApp) passes so the
+   * HEADER's settings gear can open the same CurveSettingsModal the dock's
+   * gear opens. FlowPathView fills it with a stable opener — the curve state
+   * and the modal stay owned here, so no duplicate settings surface exists.
+   */
+  openCurveRef?: { current: (() => void) | null };
 }
 
-export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
+export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewProps = {}) {
   const {
     items,
     currentId,
@@ -283,6 +290,15 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   useEffect(() => {
     saveCurveOverride(curve);
   }, [curve]);
+
+  // Publish the curve-modal opener to the page shell (header gear).
+  useEffect(() => {
+    if (!openCurveRef) return;
+    openCurveRef.current = () => setCurveOpen(true);
+    return () => {
+      openCurveRef.current = null;
+    };
+  }, [openCurveRef]);
 
   const hasAutoScrolled = useRef(false);
   const isEmpty = mergedItems.length === 0;
