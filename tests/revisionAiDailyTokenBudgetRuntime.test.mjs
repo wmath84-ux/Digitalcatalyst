@@ -448,7 +448,7 @@ function fakeRes() {
 }
 
 /** One AI Mentor question, asked the way the course player asks it. */
-async function askMentor(uid = "learner-1") {
+async function askMentor(uid = "learner-1", overrides = {}) {
   const { res, out } = fakeRes();
   await personalAi.handlePersonalAi({
     method: "POST",
@@ -458,6 +458,7 @@ async function askMentor(uid = "learner-1") {
       action: "personalAi.ask",
       question: "Summarise what this module expects from me.",
       courseContext: { productId: "product-1", courseTitle: "Physics" },
+      ...overrides,
     },
   }, res);
   return out;
@@ -471,7 +472,7 @@ test("the mentor stays open while the school has not configured the feature", { 
   // only reaches after the entitlement check — a fresh database keeps working
   // exactly as it does today.
   assert.notEqual(out.body?.code, "AI_MENTOR_PLAN_REQUIRED", JSON.stringify(out.body));
-  assert.equal(out.body?.code, "AI_NOT_CONFIGURED");
+  assert.equal(out.body?.code, "AI_SCHOOL_NOT_PUBLISHED");
 });
 
 test("activating the feature gates the mentor on the server, not the browser", { skip: skipIfUnloaded }, async () => {
@@ -551,4 +552,55 @@ test("the gate runs before any provider call, and only for model calls", { skip:
     body: { action: "personalAi.context", courseContext: { productId: "product-1" } },
   }, ctxRes.res);
   assert.notEqual(ctxRes.out.body?.code, "AI_MENTOR_PLAN_REQUIRED");
+});
+
+test("Basic Mentor performs a real handler/provider round trip with current school model and ledger", { skip: skipIfUnloaded }, async () => {
+  clearLedger(); seedBasicPlan();
+  seed("subscriptionFeatures/ai-mentor", { active: true });
+  seed("subscriptionFeatures/revision", { active: true });
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ answer: "A force changes motion.", sources: [], grounded: false }) } }] }), { status: 200 });
+  };
+  try {
+    for (const model of ["configured-model-a", "configured-model-b"]) {
+      seed("settings/revisionCatalog", { aiSettings: { provider: "openai", model, sharedApiKey: "test-school-key", allowancePolicy: "token-budget" } });
+      const out = await askMentor();
+      assert.equal(out.status, 200, JSON.stringify(out.body));
+      assert.equal(out.body.data.answer, "A force changes motion.");
+      assert.equal(out.body.data.model, model);
+      assert.equal(calls.at(-1).model, model);
+    }
+    assert.ok(ledger().tokensUsedDay > 0);
+    assert.equal(Object.keys(ledger().reservations).length, 0);
+    const before = ledger().tokensUsedDay;
+    const own = await askMentor("learner-1", { source: "own", config: { provider: "openai", model: "own-model", apiKey: "test-own-key" } });
+    assert.equal(own.status, 200, JSON.stringify(own.body));
+    assert.equal(calls.at(-1).model, "own-model");
+    assert.equal(ledger().tokensUsedDay, before, "own key keeps existing unmetered policy");
+  } finally { globalThis.fetch = original; }
+});
+
+test("Mentor provider failures preserve categories, release reservations and never leak secrets", { skip: skipIfUnloaded }, async () => {
+  const original = globalThis.fetch;
+  seedBasicPlan();
+  seed("settings/revisionCatalog", { aiSettings: { provider: "openai", model: "configured-model", sharedApiKey: "test-key" } });
+  try {
+    for (const [status, source, expected] of [
+      [401, "own", "AI_PROVIDER_KEY_INVALID"], [401, "default", "AI_SCHOOL_KEY_INVALID"],
+      [404, "default", "AI_MODEL_UNAVAILABLE"], [429, "default", "AI_PROVIDER_QUOTA"],
+      [503, "default", "AI_PROVIDER_UNAVAILABLE"], [400, "own", "AI_PROVIDER_CONFIG_INVALID"],
+    ]) {
+      clearLedger();
+      globalThis.fetch = async () => new Response("secret-key https://internal.invalid stack", { status });
+      const out = await askMentor("learner-1", { source, config: { provider: "openai", model: "own-model", apiKey: "test-own-key" } });
+      assert.equal(out.body.code, expected, JSON.stringify(out.body));
+      assert.equal(out.body.ok, false);
+      assert.doesNotMatch(out.body.message, /secret-key|internal.invalid|stack/);
+      assert.equal(Object.keys(ledger().reservations).length, 0);
+      assert.equal(ledger().tokensUsedDay, 0);
+    }
+  } finally { globalThis.fetch = original; }
 });

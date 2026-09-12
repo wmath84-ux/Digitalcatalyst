@@ -1,7 +1,8 @@
+import { Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
 import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library";
 
 type BottomNavProps = {
   active: TabKey | null;
@@ -10,13 +11,14 @@ type BottomNavProps = {
   purchasesBadge?: number;
 };
 
-const TABS: { key: TabKey; label: string; icon: typeof HomeIcon; color: string }[] = [
+const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: string }[] = [
   { key: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
   { key: "myday", label: "My Day", icon: CalendarIcon, color: "#06D6A0" },
   { key: "store", label: "Store", icon: StoreIcon, color: "#FF7B54" },
   { key: "purchases", label: "Purchases", icon: BagIcon, color: "#C9A96E" },
   // Owner (post Wave 14): Revision sits where FlowPath used to be and
   // FlowPath is the last (right-most) slot of the dock.
+  { key: "study-library", label: "My Study Library", icon: Library, color: "#06D6A0" },
   { key: "revision", label: "Revision", icon: SparkBookIcon, color: "#3A86FF" },
   { key: "flowpath", label: "FlowPath", icon: FlowPathIcon, color: "#B388FF" },
 ];
@@ -46,6 +48,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
 
   return (
     <nav
+      data-primary-library-nav
       data-site-footer-nav
       className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
       aria-label="Primary"
@@ -56,7 +59,8 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
           items={items}
           onSelect={(id) => {
             const key = id as TabKey;
-            if (key === "flowpath") window.location.hash = "#/flowpath";
+            if (key === "study-library") window.location.hash = "#/study-library";
+            else if (key === "flowpath") window.location.hash = "#/flowpath";
             else if (key === "revision") window.location.hash = "#/revision";
             else onChange(key);
           }}

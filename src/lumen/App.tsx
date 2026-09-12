@@ -6,7 +6,8 @@ import Lightbox from "./components/Lightbox";
 import MessageList from "./components/MessageList";
 import ScreenshotOverlay, { type ShotRect } from "./components/ScreenshotOverlay";
 import Sidebar from "./components/Sidebar";
-import { MODELS } from "./lib/data";
+import { useRevisionAi } from "./useRevisionAi";
+import { PersonalAiApiError } from "../ai/personalAiClient";
 import { formatAnswerSheet, type GenerationSpec } from "./lib/engine";
 import { tierOf, useElementWidth } from "./lib/tier";
 import { buildCourseContext, gradeQuiz } from "./ai/tutor";
@@ -83,6 +84,7 @@ export default function LumenChat({
   notes = [],
   profile,
 }: LumenChatProps) {
+  const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
   const initialIdRef = useRef(uid());
   const [chats, setChats] = useState<Chat[]>(() => [
@@ -210,7 +212,7 @@ export default function LumenChat({
   );
   const draft = drafts[chat.id] ?? "";
 
-  const scopeOf = (modelId: string): LumenAiScope => {
+  const scopeOf = (): LumenAiScope => {
     const personal = Boolean(selectedFile && String(selectedFile.source || "") === "personal");
     return {
       uid: learnerUid,
@@ -227,7 +229,8 @@ export default function LumenChat({
       resourceName: resourceName || selectedFile?.name || null,
       resourceType: resourceType || selectedFile?.type || null,
       productId,
-      source: modelId === "own" ? "own" : "default",
+      // The client re-reads the saved source immediately before sending.
+      source: undefined,
     };
   };
 
@@ -260,10 +263,11 @@ export default function LumenChat({
   const runAssistant = (chatId: string, userText: string, atts: Attachment[], forcedSpec?: GenerationSpec) => {
     const c = chatsRef.current.find((x) => x.id === chatId);
     if (!c) return;
-    const model = MODELS.find((m) => m.id === c.modelId) ?? MODELS[0];
+    if (abortByMsg.current.size) return;
+    const model = revisionAi.models.find((m) => m.id === revisionAi.source) ?? { name: "AI disabled" };
     const id = uid();
     const quizSpec = forcedSpec;
-    const thinkingSpec = quizSpec ?? productionThinkingSpec(scopeOf(c.modelId), userText, atts);
+    const thinkingSpec = quizSpec ?? productionThinkingSpec(scopeOf(), userText, atts);
     const steps: ThinkingStep[] = thinkingSpec.steps.map((s) => ({ ...s, status: "pending" as const }));
     const msg: Message = {
       id,
@@ -296,7 +300,7 @@ export default function LumenChat({
           chat: c,
           text: userText,
           attachments: atts,
-          scope: scopeOf(c.modelId),
+          scope: scopeOf(),
           signal: controller.signal,
         })
           .then((run) => {
@@ -327,6 +331,9 @@ export default function LumenChat({
           if (productionError.name === "AbortError") return;
           patchMessage(chatId, id, (m) => ({
             status: "error",
+            errorMessage: productionError?.message,
+            errorRetryable: productionError instanceof PersonalAiApiError ? productionError.retryable : true,
+            errorKind: productionError instanceof PersonalAiApiError ? productionError.kind : "unknown",
             thinkingOpen: false,
             thinkingMs: Date.now() - m.createdAt,
           }));
@@ -402,7 +409,7 @@ export default function LumenChat({
   const send = (textIn?: string) => {
     const text = (textIn ?? draft).trim();
     const atts = attachments;
-    if (generating || (!text && atts.length === 0)) return;
+    if (generating || abortByMsg.current.size || (!text && atts.length === 0)) return;
     const userMsg: Message = {
       id: uid(),
       role: "user",
@@ -448,6 +455,7 @@ export default function LumenChat({
   };
 
   const retry = (msgId: string) => {
+    if (generating || abortByMsg.current.size) return;
     const msgs = chat.messages;
     const idx = msgs.findIndex((m) => m.id === msgId);
     if (idx < 0) return;
@@ -624,7 +632,10 @@ export default function LumenChat({
             onOpenSidebar={() => setDrawerOpen(true)}
             onTogglePin={() => patchChat(chat.id, (c) => ({ pinned: !c.pinned }))}
             onRename={(title) => patchChat(chat.id, { title })}
-            onSelectModel={(modelId) => patchChat(chat.id, { modelId })}
+            models={revisionAi.models}
+            selectedSource={revisionAi.source}
+            modelDisabled={generating}
+            onSelectModel={revisionAi.select}
           />
 
           <MessageList

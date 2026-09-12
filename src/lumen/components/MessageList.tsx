@@ -136,14 +136,15 @@ const AssistantMessage = memo(function AssistantMessage({
         <div className="flex max-w-[560px] items-start gap-3 rounded-[12px] border border-[--err-border] bg-[--err-bg] p-3.5" role="alert">
           <TriangleAlert size={17} className="mt-px flex-none text-[--err]" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-semibold text-[--err]">Couldn't generate a response</div>
+            <div className="text-[13.5px] font-semibold text-[--err]">AI request could not complete</div>
             <div className="mt-0.5 text-[12.5px] leading-snug text-[--ink-2]">
-              Something went wrong on our side. Your message is safe — try again.
+              {message.errorMessage || "The AI could not answer. Your message is safe."}
             </div>
-            <button type="button" onClick={() => onRetry(message.id)} disabled={generating} className="ghost-btn focus-ring mt-2.5 h-[30px] text-[12.5px]">
+            {message.errorRetryable !== false && <button type="button" onClick={() => onRetry(message.id)} disabled={generating} className="ghost-btn focus-ring mt-2.5 h-[30px] text-[12.5px]">
               <RotateCcw size={13.5} aria-hidden="true" />
               Retry
-            </button>
+            </button>}
+            {message.errorKind === "config" && <a className="block py-3 text-xs underline" href="#/revision/ai-settings">Revision → AI Configuration</a>}
           </div>
         </div>
       ) : (

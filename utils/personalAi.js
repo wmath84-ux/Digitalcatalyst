@@ -1203,6 +1203,26 @@ export const personalAiFailure = (input) => {
   const status = clampInt(options.status, 0, 599, 0);
   const switchOn = () => {
     switch (code) {
+      case "CANCELLED":
+        return { message: "Request cancelled.", retryable: false, upgrade: false, kind: "unknown" };
+      case "NO_PROXY":
+        return { message: "The AI service is not available in this environment.", retryable: true, upgrade: false, kind: "server" };
+      case "AI_DISABLED":
+        return { message: "AI is disabled in your saved preferences. Enable it in Revision → AI Configuration.", retryable: false, upgrade: false, kind: "config" };
+      case "AI_PROVIDER_KEY_INVALID":
+        return { message: "Your API key was rejected by the provider. Check or replace it in Revision → AI Configuration.", retryable: false, upgrade: false, kind: "config" };
+      case "AI_SCHOOL_KEY_INVALID":
+        return { message: "School Provided AI could not authenticate with its provider. Please contact your school; your own API key is not required.", retryable: false, upgrade: false, kind: "provider" };
+      case "AI_MODEL_UNAVAILABLE":
+        return { message: "The configured AI model is unavailable or unsupported. Check Revision → AI Configuration, or contact your school for School Provided AI.", retryable: false, upgrade: false, kind: "config" };
+      case "AI_MODEL_PRICE_MISSING":
+        return { message: "School AI pricing is not configured for this model. Ask your school to publish its model pricing.", retryable: false, upgrade: false, kind: "config" };
+      case "AI_PROVIDER_CONFIG_INVALID":
+        return { message: "The provider rejected the configured model or settings. Check Revision → AI Configuration.", retryable: false, upgrade: false, kind: "config" };
+      case "AI_PROVIDER_QUOTA":
+        return { message: "The AI provider's quota or rate limit was reached. Try later; this is not your subscription allowance. For your own key, check your provider account.", retryable: true, upgrade: false, kind: "provider" };
+      case "AI_PROVIDER_UNAVAILABLE":
+        return { message: "The configured AI provider is temporarily unavailable. Please try again.", retryable: true, upgrade: false, kind: "provider" };
       case "AUTH_REQUIRED":
         return { message: "Sign in again to use your module AI tutor.", retryable: false, upgrade: false, kind: "auth" };
       case "AI_ALLOWANCE_REACHED":
@@ -1236,7 +1256,7 @@ export const personalAiFailure = (input) => {
       case "AI_EMPTY":
       case "AI_INVALID_JSON":
       case "PROVIDER_ERROR":
-        return { message: message || "The AI didn't return a usable answer. Nothing was charged — please try again.", retryable: true, upgrade: false, kind: "provider" };
+        return { message: "The AI didn't return a usable answer. Please try again.", retryable: true, upgrade: false, kind: "provider" };
       case "NETWORK_ERROR":
         return { message: "Network problem — your device couldn't reach the AI service. Check your connection and try again.", retryable: true, upgrade: false, kind: "network" };
       // `/api/personal-ai` shares one deployed function with several features.
@@ -1251,10 +1271,10 @@ export const personalAiFailure = (input) => {
   };
   const mapped = switchOn();
   if (mapped) return { code: code || "AI_ERROR", ...mapped };
-  if (status === 429) return { code: code || "AI_ALLOWANCE_REACHED", message: message || "AI limit reached. Try again later or upgrade your plan.", retryable: false, upgrade: true, kind: "limit" };
-  if (status === 401 || status === 403) return { code: code || "AUTH_REQUIRED", message: message || "Your session needs refreshing before the AI can answer.", retryable: false, upgrade: false, kind: "auth" };
-  if (status >= 500 || status === 0) return { code: code || "SERVER_ERROR", message: message || "The AI service didn't respond. Nothing was charged — please try again.", retryable: true, upgrade: false, kind: "server" };
-  return { code: code || "AI_ERROR", message: message || "Something went wrong while asking the AI. Please try again.", retryable: status === 0 || status >= 500, upgrade: false, kind: "unknown" };
+  if (status === 429) return { code: code || "AI_ALLOWANCE_REACHED", message: "The AI service is rate limited. Please try again later.", retryable: true, upgrade: false, kind: "provider" };
+  if (status === 401 || status === 403) return { code: code || "AUTH_REQUIRED", message: "Your session needs refreshing before the AI can answer.", retryable: false, upgrade: false, kind: "auth" };
+  if (status >= 500 || status === 0) return { code: code || "SERVER_ERROR", message: "Unable to connect to AI service. Please try again.", retryable: true, upgrade: false, kind: "server" };
+  return { code: code || "AI_ERROR", message: "Something went wrong while asking the AI. Please try again.", retryable: status === 0 || status >= 500, upgrade: false, kind: "unknown" };
 };
 
 /** Copy for a resource the AI can see but not read. */

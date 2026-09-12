@@ -1286,6 +1286,15 @@ export async function handlePersonalCourse(req: VercelRequest, res: VercelRespon
       ? number((error as { statusCode?: unknown }).statusCode, 500)
       : 500;
     console.error("[personal-course] unexpected error", error);
+    // Collection-group equality queries require a collection-group field index.
+    // Keep infrastructure details in server logs, never expose index-console URLs.
+    const firestoreCode = String((error as { code?: unknown })?.code || "");
+    if ((firestoreCode === "9" || firestoreCode === "failed-precondition") && /index/i.test(String((error as Error)?.message))) {
+      return json(res, 503, { ok: false, code: "LIBRARY_INDEX_REQUIRED", message: "My Study Library is awaiting a server update. Please try again shortly." });
+    }
+    if (firestoreCode === "7" || firestoreCode === "permission-denied") {
+      return json(res, 503, { ok: false, code: "SERVER_PERMISSION_DENIED", message: "My Study Library is temporarily unavailable. Please contact support." });
+    }
     // A failed READ must never be described as a failed UPDATE. The library
     // screen and the course-player AI both reach this branch while merely
     // loading, and "couldn't be updated" sent learners hunting for a write that

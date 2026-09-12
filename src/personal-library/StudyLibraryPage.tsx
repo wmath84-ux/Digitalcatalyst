@@ -448,7 +448,7 @@ export default function StudyLibraryPage() {
             )}
           </div>
         </main>
-        <BottomNav active="profile" onChange={navigateFromBottom} purchasesBadge={purchasedIds.size} />
+        <BottomNav active="study-library" onChange={navigateFromBottom} purchasesBadge={purchasedIds.size} />
       </div>
 
       <CreateStudyPackDialog open={Boolean(packModule)} module={packModule} onClose={() => setPackModule(null)} />

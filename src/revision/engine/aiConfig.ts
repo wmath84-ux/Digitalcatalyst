@@ -317,15 +317,10 @@ function emptyAdminConfig(): UserAiConfig {
 function sanitizeConfig(raw: unknown): AiConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
   const provider = AI_PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as AIProviderId) : "gemini";
-  const known = mergeModelLists(provider, []);
   const apiKey = String(r.apiKey ?? "").trim();
-  // Own-key with no secret stays model-empty so the student form does not
-  // inherit the school's published model. A key without a model still gets a
-  // sensible fallback so generation can run. A stale model id that Google has
-  // retired (e.g. an old build persisting gemini-2.0-flash) is silently
-  // upgraded to a live one — otherwise every generation 404s and looks broken.
-  const modelRaw = String(r.model ?? "").trim() || (apiKey ? known[0]?.id || DEFAULT_MODEL : "");
-  const model = modelRaw && isRetiredModel(modelRaw) ? known[0]?.id || DEFAULT_MODEL : modelRaw;
+  // A saved selection is authoritative. Missing/retired models must be
+  // configured explicitly rather than replaced with a registry suggestion.
+  const model = String(r.model ?? "").trim();
   return {
     provider,
     apiKey,
@@ -357,12 +352,8 @@ export function loadUserAiConfig(uid: string): UserAiConfig {
   try {
     const raw = localStorage.getItem(userKey(uid));
     if (raw) return sanitizeUserConfig(JSON.parse(raw));
-    const legacy = legacyGeminiConfig();
-    if (legacy) {
-      const migrated: UserAiConfig = { source: "own", config: legacy };
-      saveUserAiConfig(uid, migrated);
-      return migrated;
-    }
+    // Unscoped legacy keys have no verifiable owner. Never import another
+    // browser user's key into a newly signed-in account; reconfigure explicitly.
   } catch {
     // fall through to defaults
   }
@@ -381,6 +372,7 @@ export function hasStoredUserAiConfig(uid: string): boolean {
 export function saveUserAiConfig(uid: string, cfg: UserAiConfig): void {
   try {
     localStorage.setItem(userKey(uid), JSON.stringify(cfg));
+    window.dispatchEvent(new CustomEvent("revision-ai-config-changed", { detail: { uid } }));
   } catch {
     // Persistence is best-effort — private mode etc.
   }

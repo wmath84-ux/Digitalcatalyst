@@ -1,29 +1,29 @@
 import { useState } from "react";
 import { Check, ChevronDown, Sparkles } from "lucide-react";
-import { MODELS } from "../lib/data";
-import { tierLte } from "../lib/tier";
-import type { Tier } from "../lib/types";
+import type { AIModel, Tier } from "../lib/types";
 import { cn } from "../utils/cn";
 import Dropdown from "./Dropdown";
 
 export default function ModelSelector({
-  modelId,
+  modelId, models, disabled,
   tier,
   onSelect,
 }: {
+  models: AIModel[];
+  disabled: boolean;
   modelId: string;
   tier: Tier;
   onSelect: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const model = MODELS.find((m) => m.id === modelId) ?? MODELS[0];
+  const model = models.find((m) => m.id === modelId) ?? { id: "offline", name: "AI disabled", short: "AI disabled" };
   const tiny = tier === "xxs";
-  const compact = tierLte(tier, "sm") && !tiny;
 
   return (
     <div className="relative flex-none">
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -36,13 +36,13 @@ export default function ModelSelector({
         )}
       >
         <Sparkles size={tiny ? 13 : 13.5} className="flex-none text-[--accent-ink]" aria-hidden="true" />
-        {!tiny && <span className="max-w-[110px] truncate">{compact ? model.short : model.name}</span>}
+        {!tiny && <span className="max-w-[110px] truncate">{model.short}</span>}
         {!tiny && <ChevronDown size={13.5} className={cn("flex-none text-[--ink-3] transition-transform duration-200", open && "rotate-180")} aria-hidden="true" />}
       </button>
 
-      <Dropdown open={open} onClose={() => setOpen(false)} align="right" ariaLabel="Choose model" className="w-[min(264px,calc(100vw-20px))]">
-        <div className="px-2.5 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-[--ink-3]">Model</div>
-        {MODELS.map((m) => {
+      <Dropdown open={open} onClose={() => setOpen(false)} align="right" ariaLabel="Choose AI source" className="w-[min(264px,calc(100vw-20px))]">
+        <div className="px-2.5 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-[--ink-3]">AI source · Revision configuration</div>
+        {models.map((m) => {
           const active = m.id === model.id;
           return (
             <button
@@ -73,12 +73,13 @@ export default function ModelSelector({
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 text-[12px] leading-snug text-[--ink-3]">{m.desc}</div>
+                <div className="mt-0.5 text-[12px] break-words leading-snug text-[--ink-3]">{m.desc}</div>
               </div>
               {active && <Check size={15} className="mt-0.5 flex-none text-[--accent-ink]" aria-hidden="true" />}
             </button>
           );
         })}
+        <a href="#/revision/ai-settings" className="block min-h-11 px-3 py-3 text-xs underline">Revision → AI Configuration</a>
       </Dropdown>
     </div>
   );
