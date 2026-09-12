@@ -7,6 +7,7 @@
 
 import { AlertTriangle, BellOff, BellRing, CalendarClock, Clock, Lock, ShieldCheck } from "lucide-react";
 import { GlassButton } from "../ui/glass-button";
+import { PaymentButton } from "../ui/PaymentButton";
 import type { RenewalView } from "../../../utils/renewalPresentation";
 
 const ICONS = {
@@ -17,9 +18,9 @@ const ICONS = {
 } as const;
 
 const TONE_STYLES = {
-  info: { shell: "border-sky-400/30 bg-sky-500/15", accent: "text-sky-200", bar: "bg-sky-500", chip: "bg-sky-500/15 text-sky-200", cta: "bg-sky-600" },
-  warning: { shell: "border-amber-400/30 bg-amber-500/15", accent: "text-amber-200", bar: "bg-amber-500", chip: "bg-amber-500/20 text-amber-200", cta: "bg-amber-600" },
-  critical: { shell: "border-rose-400/30 bg-rose-500/15", accent: "text-rose-200", bar: "bg-rose-500", chip: "bg-rose-500/20 text-rose-200", cta: "bg-rose-600" },
+  info: { shell: "border-sky-400/30 bg-sky-500/15", accent: "text-sky-200", bar: "bg-sky-500", chip: "bg-sky-500/15 text-sky-200", cta: "#0284c7" },
+  warning: { shell: "border-amber-400/30 bg-amber-500/15", accent: "text-amber-200", bar: "bg-amber-500", chip: "bg-amber-500/20 text-amber-200", cta: "#d97706" },
+  critical: { shell: "border-rose-400/30 bg-rose-500/15", accent: "text-rose-200", bar: "bg-rose-500", chip: "bg-rose-500/20 text-rose-200", cta: "#e11d48" },
 } as const;
 
 /** Full billing window used to scale the progress bar. */
@@ -98,14 +99,18 @@ export default function RenewalStatusCard({
 
       <div className="mt-3 flex items-center gap-2">
         {view.canRenew ? (
-          <button
-            type="button"
+          /* Renewal action — the shared payment button, stretched across the
+             row it already owned and keeping the card's urgency colour on the
+             reference's --clr. Same `onRenew`, same `data-renewal-card-cta`. */
+          <PaymentButton
+            block
+            size="md"
+            className="min-w-0 flex-1"
+            color={tone.cta}
             onClick={onRenew}
-            data-renewal-card-cta
-            className={`flex-1 rounded-full px-4 py-2.5 text-sm font-black text-white transition active:scale-[0.98] ${tone.cta}`}
-          >
-            {view.cta}
-          </button>
+            data-renewal-card-cta=""
+            label={view.cta}
+          />
         ) : null}
         {onToggleReminders ? (
           <GlassButton

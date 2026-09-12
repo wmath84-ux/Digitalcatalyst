@@ -22,6 +22,7 @@ import {
 } from "../engine/aiConfig";
 import { Spinner, SecondaryButton } from "./ui";
 import { GlassButton } from "../../components/ui/glass-button";
+import AiConfigButton from "../../components/ui/AiConfigButton";
 
 export type AiConfigFormProps = {
   value: AiConfig;
@@ -37,6 +38,15 @@ export type AiConfigFormProps = {
    * key actually loads live models. No school/admin known-model fallback.
    */
   liveModelsOnly?: boolean;
+  /**
+   * Visual treatment of the two configuration actions (load models / test
+   * connection). `uiverse` = the brutalist `AiConfigButton` tiles the student
+   * "AI Configuration" page uses; `capsule` = the pack Glass capsule every
+   * other host (the admin AI panel) keeps. UI only — both styles run the
+   * exact same `refreshModels` / `runTest` behaviour, with the same disabled
+   * and loading wiring.
+   */
+  actionStyle?: "capsule" | "uiverse";
 };
 
 function ProviderTile({
@@ -83,6 +93,7 @@ export default function AiConfigForm({
   description = "Choose a provider, paste your API key and all its available models will appear below. Your key is stored only in this browser and sent directly to the provider.",
   onModelsChange,
   liveModelsOnly = false,
+  actionStyle = "capsule",
 }: AiConfigFormProps) {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -293,23 +304,58 @@ export default function AiConfigForm({
       )}
 
       {/* Actions */}
-      <div className="flex gap-2">
-        {/* Wave 13: pack Glass Button capsule; the provider accent stays on
-            the ink only once a key is present (meaning colour). */}
-        <SecondaryButton
-          size="sm"
-          className={`flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px] ${hasKey ? provider.accentText : "text-white/55"}`}
-          onClick={() => void refreshModels(false)}
-          disabled={!hasKey || !hasCustomEndpoint || loadingModels}
-        >
-          {loadingModels ? <Spinner className="h-4 w-4" /> : "⟳"}
-          {loadingModels ? "Loading models…" : "Load available models"}
-        </SecondaryButton>
-        <SecondaryButton size="sm" className="flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px]" onClick={() => void runTest()} disabled={!hasKey || !hasCustomEndpoint || testing}>
-          {testing ? <Spinner className="h-4 w-4" /> : "✓"}
-          {testing ? "Testing…" : "Test connection"}
-        </SecondaryButton>
-      </div>
+      {actionStyle === "uiverse" ? (
+        /* The student "AI Configuration" page wears the brutalist provider
+           button (Uiverse quiet-dog-6 port) for the same two configuration
+           actions: one reusable component whose logo + both text lines follow
+           the live provider/model state, and whose click sequence (reference
+           press animation → existing handler → reference spin while the call
+           runs) replaces nothing else. The status line below still carries
+           the success / error copy, and the model dropdown, key box and save
+           path are untouched. */
+        <div className="uza-container -mx-1">
+          <AiConfigButton
+            provider={provider.id}
+            icon={provider.mark}
+            caption={provider.name}
+            label={loadingModels ? "Loading models" : "Load models"}
+            loading={loadingModels}
+            disabled={!hasKey || !hasCustomEndpoint}
+            onClick={() => void refreshModels(false)}
+            aria-label={`Load ${provider.name}'s available models`}
+            data-ai-config-action="load-models"
+          />
+          <AiConfigButton
+            provider={provider.id}
+            icon={provider.mark}
+            caption={value.model || provider.tagline}
+            label={testing ? "Testing…" : "Test connection"}
+            loading={testing}
+            disabled={!hasKey || !hasCustomEndpoint}
+            onClick={() => void runTest()}
+            aria-label={`Test the ${provider.name} connection`}
+            data-ai-config-action="test-connection"
+          />
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          {/* Wave 13: pack Glass Button capsule; the provider accent stays on
+              the ink only once a key is present (meaning colour). */}
+          <SecondaryButton
+            size="sm"
+            className={`flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px] ${hasKey ? provider.accentText : "text-white/55"}`}
+            onClick={() => void refreshModels(false)}
+            disabled={!hasKey || !hasCustomEndpoint || loadingModels}
+          >
+            {loadingModels ? <Spinner className="h-4 w-4" /> : "⟳"}
+            {loadingModels ? "Loading models…" : "Load available models"}
+          </SecondaryButton>
+          <SecondaryButton size="sm" className="flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px]" onClick={() => void runTest()} disabled={!hasKey || !hasCustomEndpoint || testing}>
+            {testing ? <Spinner className="h-4 w-4" /> : "✓"}
+            {testing ? "Testing…" : "Test connection"}
+          </SecondaryButton>
+        </div>
+      )}
 
       {/* Model dropdown — every available model appears here */}
       <div>

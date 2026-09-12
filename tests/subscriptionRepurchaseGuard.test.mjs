@@ -325,7 +325,12 @@ test("the subscribe bar renders the owned tone from the shared helper", () => {
   assert.match(bar, /resolveSubscribeCta/);
   assert.match(bar, /data-subscription-owned=/);
   assert.match(bar, /data-subscription-cta-tone=\{cta\.tone\}/);
-  assert.match(bar, /\? "bg-emerald-600 text-white/, "owned CTA must use a distinct colour");
+  // 2026-09-12: the bar's CTA is the shared payment button, so the owned
+  // distinction rides that component's own colour channel (--clr) instead of
+  // a hand-painted class list. Same meaning, same emerald-600 value.
+  assert.match(bar, /isOwned\s*\n?\s*\? OWNED_CLAIM_COLOR/, "owned CTA must use a distinct colour");
+  assert.match(bar, /const OWNED_CLAIM_COLOR = "#059669"/, "owned colour stays emerald-600");
+  assert.match(bar, /<PaymentButton/);
 });
 
 test("the plan picker marks which plan and cycle are already active", () => {

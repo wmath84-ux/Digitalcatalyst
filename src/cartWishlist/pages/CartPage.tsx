@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState";
 import { formatINR } from "../utils/format";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import { PaymentButton } from "@/components/ui/PaymentButton";
 
 interface CartPageProps {
   cartProducts: Product[];
@@ -47,7 +48,21 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
         </GlassSurface>
       </div>
       <div className="border-t border-white/10 bg-[var(--dc-chrome-glass)] p-4 pb-[calc(env(safe-area-inset-bottom)+12px)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
-        <button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-full bg-indigo-600 px-5 py-4 text-white transition hover:bg-indigo-500 active:scale-[0.98]"><span className="text-left"><span className="block text-[11px] text-indigo-100">Total payable</span><span className="text-base font-extrabold">{formatINR(finalTotal)}</span></span><span className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold">Secure checkout</span></button>
+        {/* The cart's money action is the app-wide payment button (Uiverse
+            pretty-grasshopper-57 port, see src/components/ui/PaymentButton.tsx).
+            The bar keeps showing the payable total — the CTA beside it now runs
+            the identical `handleCheckout` (auth guard + onCheckout) it ran
+            before, with the same contextual label. */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="min-w-0 text-left"><span className="block text-[11px] text-indigo-100">Total payable</span><span className="text-base font-extrabold text-white">{formatINR(finalTotal)}</span></span>
+          <PaymentButton
+            size="md"
+            onClick={handleCheckout}
+            ariaLabel={`Secure checkout — ${formatINR(finalTotal)}`}
+            data-cart-checkout=""
+            label="Secure checkout"
+          />
+        </div>
       </div>
     </div>
   );

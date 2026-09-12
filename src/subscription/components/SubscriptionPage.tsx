@@ -27,6 +27,7 @@ import FeatureSelectModal from "./FeatureSelectModal";
 import PriceSummary from "./PriceSummary";
 import { GlassButton } from "../../components/ui/glass-button";
 import SubscribeBar from "./SubscribeBar";
+import { PaymentButton } from "../../components/ui/PaymentButton";
 import HelpModal from "./HelpModal";
 import SubscriberActiveBadge from "../../components/subscription/SubscriberActiveBadge";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
@@ -1038,19 +1039,22 @@ export default function SubscriptionPage({
               higher plan. */}
           {upgradePlans.length > 0 ? (
             <div className="mx-5 mt-5 mb-4 flex flex-col items-stretch gap-2">
-              <button
-                type="button"
-                data-subscription-upgrade-button
+              {/* Upgrade CTA — the app-wide payment button, so the path into a
+                  higher plan looks and behaves like every other purchase entry
+                  point. Same handler, same plan pick, same manage-mode
+                  switch; the focus ring is the component's own. */}
+              <PaymentButton
+                block
+                size="md"
+                data-subscription-upgrade-button=""
                 onClick={() => {
                   const next = upgradePlans[0];
                   if (!next) return;
                   setSelectedPlanId(next.id);
                   setManageMode(true);
                 }}
-                className="w-full rounded-full bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-              >
-                Upgrade — view higher plans
-              </button>
+                label="Upgrade — view higher plans"
+              />
               <span className="text-center text-[11px] font-medium text-white/55">
                 Move to a higher plan anytime. Your current membership stays active until the cycle ends.
               </span>
@@ -1427,6 +1431,11 @@ export default function SubscriptionPage({
         ]}
         primaryLabel={isSubmitting ? "Processing…" : isFreeSelection ? "Activate now" : "Confirm and pay"}
         primaryDisabled={isSubmitting || !plan}
+        /* The final money action in the buy flow wears the same payment CTA as
+           every other pay surface (Uiverse pretty-grasshopper-57); `onPrimary`
+           still closes the modal and calls the page's own `handleSubscribe`. */
+        primaryVariant="payment"
+        primaryLoading={isSubmitting}
         onPrimary={() => {
           setConfirmOpen(false);
           void handleSubscribe();

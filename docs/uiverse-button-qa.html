@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Uiverse button QA — payment · purchases · AI configuration</title>
+<style>
+/*
+ * src/components/ui/payment-button.css
+ *
+ * A faithful, self-contained port of Creatlydev's "pretty-grasshopper-57"
+ * payment button:
+ *   https://uiverse.io/Creatlydev/pretty-grasshopper-57
+ *
+ * It is THE app's payment CTA treatment — every button that starts or
+ * continues a payment/checkout (Pay, Buy, Subscribe, Renew, Upgrade,
+ * Secure checkout) is rendered through `PaymentButton.tsx`. Nothing else
+ * wears these classes, and nothing outside `.uzp-pay` is styled here, so the
+ * rules can never leak into navigation, footer, cards, forms or admin.
+ *
+ * Reference values kept EXACT (the Uiverse source is authored in px/rem at a
+ * 16px root; every number below is the same value expressed in `em` so the
+ * whole pill — plate, glyph box, radius, shadow, padding — scales as one unit
+ * with `font-size`, which is what makes the size variants possible without
+ * redrawing the component):
+ *   · pill           border-radius 1.5rem (24px, clamped to the 40px height →
+ *                    a capsule, exactly like the reference) · overflow hidden
+ *   · surface        background #fff · color #121212 · border none
+ *   · shadow         10px 10px 20px rgba(0,0,0,.05)
+ *   · decor layer    inset 0 · background var(--clr) · translateX(-100%)
+ *                    → translate(0) on hover over .3s
+ *   · content        flex · align-items center · font-weight 600 · overflow hidden
+ *   · icon plate     48×40px · background var(--clr) · display grid · place-items center
+ *   · text           2px 1.5rem 2px / padding-left .75rem · inline-block
+ *                    transition color .2s · nowrap + ellipsis · max-width 150px
+ *   · hover          decor slides in, text goes #fff
+ * The reference defines no :active rule (its whole interaction is the hover
+ * slide), so none is invented here.
+ */
+
+.uzp-pay {
+  /* The reference's own `style="--clr: #00ad54"` — the brand colour that
+     paints the icon plate and wipes in behind the label on hover. */
+  --uzp-clr: #00ad54;
+
+  text-decoration: none;
+  line-height: 1;
+  border-radius: 1.5em; /* 24px @16px */
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0.625em 0.625em 1.25em rgb(0 0 0 / 5%); /* 10px 10px 20px .05 */
+  background-color: #fff;
+  color: #121212;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+  padding: 0;
+  font-family: inherit;
+  /* The scale knob: 16px reproduces the reference at its authored size. */
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.uzp-pay__decor {
+  position: absolute;
+  inset: 0;
+  background-color: var(--uzp-clr);
+  transform: translateX(-100%);
+  transition: transform 0.3s;
+  z-index: 0;
+}
+
+.uzp-pay__content {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+.uzp-pay__icon {
+  width: 3em; /* 48px @16px */
+  height: 2.5em; /* 40px @16px */
+  background-color: var(--uzp-clr);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fff;
+}
+
+/* The reference inlines a 24px SVG inside the 48×40 plate. Expressed in em
+   it keeps that exact ratio (24/16) at every size variant. */
+.uzp-pay__glyph {
+  width: 1.5em; /* 24px @16px */
+  height: 1.5em;
+  display: block;
+}
+
+.uzp-pay__text {
+  display: inline-block;
+  transition: color 0.2s;
+  padding: 0.125em 1.5em 0.125em; /* 2px 24px @16px */
+  padding-left: 0.75em; /* 12px @16px */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 9.375em; /* 150px @16px — the reference's own ellipsis guard */
+  min-width: 0;
+}
+
+.uzp-pay:hover .uzp-pay__text {
+  color: #fff;
+}
+
+.uzp-pay:hover .uzp-pay__decor {
+  transform: translate(0);
+}
+
+/* Keyboard affordance. The reference ships none (a mouse-only demo); this is
+   the accessibility floor the app requires, drawn with the component's own
+   accent so the design still reads as the reference. */
+.uzp-pay:focus-visible {
+  outline: 2px solid var(--uzp-clr);
+  outline-offset: 2px;
+}
+
+/* ── Size variants ──────────────────────────────────────────────────────
+ * Pure `font-size` scaling: geometry, proportions, easing and timing are the
+ * reference's at every size (same trick as `.uzv-hero-cta`). */
+
+.uzp-pay--sm {
+  font-size: 13px;
+}
+
+.uzp-pay--md {
+  font-size: 16px;
+}
+
+.uzp-pay--lg {
+  font-size: 18px;
+}
+
+/* ── Fluid (full-width) placement ───────────────────────────────────────
+ * Several of the app's payment CTAs own a full-width row (checkout, the
+ * sticky subscribe bar, the cart bar). Only the OUTER BOX changes — the pill
+ * material, plate, glyph, radius, shadow, slide and hover behaviour are
+ * untouched. The label simply gets more room before the reference's ellipsis
+ * guard kicks in, and the [plate + label] group stays centred. */
+
+.uzp-pay--block {
+  display: block;
+  width: 100%;
+}
+
+.uzp-pay--block .uzp-pay__content {
+  justify-content: center;
+}
+
+.uzp-pay--block .uzp-pay__text {
+  max-width: min(100%, 20em);
+}
+
+/* ── Loading: the reference's filled (hover) state, held ─────────────────
+ * No new visual language: the brand plate is already the "in progress" look,
+ * so the decor stays slid in and the icon plate carries a spinner. */
+
+.uzp-pay[data-uzp-state="loading"] {
+  cursor: progress;
+}
+
+.uzp-pay[data-uzp-state="loading"] .uzp-pay__decor {
+  transform: translate(0);
+}
+
+.uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
+  color: #fff;
+}
+
+.uzp-pay__spinner {
+  width: 1.25em;
+  height: 1.25em;
+  animation: uzpSpin 0.9s linear infinite;
+}
+
+@keyframes uzpSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Disabled: the reference has no disabled state; this keeps the material
+ * and only removes the interaction (the slide is pinned off). */
+
+.uzp-pay:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.uzp-pay:disabled:hover .uzp-pay__decor {
+  transform: translateX(-100%);
+}
+
+.uzp-pay:disabled:hover .uzp-pay__text {
+  color: inherit;
+}
+
+.uzp-pay[data-uzp-state="loading"]:disabled .uzp-pay__text,
+.uzp-pay:disabled.uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
+  color: #fff;
+}
+
+/* ── Reduced motion: the slide resolves instantly, states unchanged. ──── */
+
+@media (prefers-reduced-motion: reduce) {
+  .uzp-pay__decor {
+    transition-duration: 0.01ms;
+  }
+  .uzp-pay__text {
+    transition-duration: 0.01ms;
+  }
+  .uzp-pay__spinner {
+    animation-duration: 1.6s;
+  }
+}
+
+/*
+ * src/components/ui/watch-action-button.css
+ *
+ * A faithful, self-contained port of shah1345's "spicy-liger-32" Uiverse
+ * button:
+ *   https://uiverse.io/shah1345/spicy-liger-32
+ *
+ * It is the action-button treatment worn ABOVE every product on the
+ * My Purchases page (Watch Now / Open Now / Continue Learning). Scoped to
+ * `.uzw-btn` only — no element, card or button outside this class is touched,
+ * so the neumorphic material can never leak into the purchase card, the
+ * store, the footer or admin.
+ *
+ * Reference values kept verbatim (they are authored in `em` already, so the
+ * whole control — padding, radius, goo layers, inset press — scales as one
+ * unit from `font-size`):
+ *   · shell          inline-block · padding .7em 1.7em · font-size 18px ·
+ *                    radius .5em · background #e8e8e8 · border 1px solid
+ *                    #e8e8e8 · color #090909 · transition all .2s ease-in ·
+ *                    overflow hidden · z-index 1
+ *   · shadow         6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff
+ *   · :before        140%×180% ellipse, left 50%, top 100%,
+ *                    rgba(0,0,0,.05), z-index -1,
+ *                    transition all .5s .1s cubic-bezier(.55,0,.1,1)
+ *   · :after         160%×190% ellipse, left 55%, top 180%, #009087, same
+ *                    transition, translateX(-50%) scaleY(1) scaleX(1.45)
+ *   · :hover         color #fff · border 1px solid #009087 · :before →
+ *                    top -35% / #009087 / scaleY(1.3) scaleX(.8) · :after →
+ *                    top -45% / same
+ *   · :active        color #666 · inset 4px 4px 12px #c5c5c5,
+ *                    inset -4px -4px 12px #ffffff
+ *
+ * The two decorative ellipses are the component's own pseudo-elements, so the
+ * press animation also runs on touch: `[data-uzw-press="true"]` repeats the
+ * reference's `:active` declarations verbatim for devices that never paint it.
+ */
+
+.uzw-btn {
+  display: inline-block;
+  transition: all 0.2s ease-in;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  color: #090909;
+  padding: 0.7em 1.7em;
+  cursor: pointer;
+  font-size: 18px;
+  border-radius: 0.5em;
+  background: #e8e8e8;
+  border: 1px solid #e8e8e8;
+  box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  /* Overflow safety only: a long product action label must never push the
+     purchase card wider than the viewport. The reference never overflows
+     because its demo label is two words; the cap keeps it that way. */
+  max-width: 100%;
+}
+
+.uzw-btn__label {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* The brief asks for WATCH NOW; casing is content, not part of the
+     reference's material, so it is carried here and the design is untouched. */
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.uzw-btn::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.25);
+  top: 100%;
+  width: 140%;
+  height: 180%;
+  background-color: rgb(0 0 0 / 5%);
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.uzw-btn::after {
+  content: "";
+  position: absolute;
+  left: 55%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.45);
+  top: 180%;
+  width: 160%;
+  height: 190%;
+  background-color: #009087;
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.uzw-btn:hover {
+  color: #ffffff;
+  border: 1px solid #009087;
+}
+
+.uzw-btn:hover::before {
+  top: -35%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+}
+
+.uzw-btn:hover::after {
+  top: -45%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+}
+
+.uzw-btn:focus-visible {
+  outline: 2px solid #009087;
+  outline-offset: 2px;
+}
+
+.uzw-btn:active,
+.uzw-btn[data-uzw-press="true"] {
+  color: #666;
+  box-shadow:
+    inset 4px 4px 12px #c5c5c5,
+    inset -4px -4px 12px #ffffff;
+}
+
+/* Keyboard activation (Enter / Space) mirrors the pointer press. */
+.uzw-btn[data-uzw-press="true"]:not(:hover) {
+  color: #666;
+}
+
+.uzw-btn:disabled,
+.uzw-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.uzw-btn:disabled:hover,
+.uzw-btn[aria-disabled="true"]:hover {
+  color: #090909;
+  border: 1px solid #e8e8e8;
+}
+
+.uzw-btn:disabled:hover::before,
+.uzw-btn:disabled:hover::after,
+.uzw-btn[aria-disabled="true"]:hover::before,
+.uzw-btn[aria-disabled="true"]:hover::after {
+  top: 100%;
+  background-color: rgb(0 0 0 / 5%);
+  transform: translateX(-50%) scaleY(1) scaleX(1.25);
+}
+
+.uzw-btn:disabled:hover::after,
+.uzw-btn[aria-disabled="true"]:hover::after {
+  top: 180%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1) scaleX(1.45);
+}
+
+/* ── Small screens: the reference proportions hold, the type steps down one
+ * notch below 360px so a long label never wraps the card out of the viewport.
+ */
+
+@media (max-width: 359px) {
+  .uzw-btn {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uzw-btn,
+  .uzw-btn::before,
+  .uzw-btn::after {
+    transition-duration: 0.01ms;
+    transition-delay: 0s;
+  }
+}
+
+/*
+ * src/components/ui/ai-config-button.css
+ *
+ * A faithful, self-contained port of 0xnihilism's "quiet-dog-6" brutalist
+ * AI-provider button:
+ *   https://uiverse.io/0xnihilism/quiet-dog-6
+ *
+ * It is the Revision → AI Configuration page's configuration-action
+ * treatment (`AiConfigButton.tsx`). Every rule is scoped to `.uza-*`, so the
+ * brutalist material can never reach other buttons, the revision cards, the
+ * header, admin's AI panel or any other surface.
+ *
+ * Reference values kept exact. They are authored in px at a 16px tile font
+ * and are re-expressed in `em` here so the component scales as one unit
+ * (same technique as `vampirebat-button.css`): at `.uza-tile`'s default
+ * `font-size: 16px` every value resolves to the reference's own pixel number.
+ *
+ *   · container      flex · justify-content center · gap 20px · padding 20px
+ *   · tile           130×130 · border 3px solid #000 · radius 12px ·
+ *                    box-shadow 4px 4px 0 #000 · overflow hidden ·
+ *                    transition all .4s cubic-bezier(.175,.885,.32,1.275) ·
+ *                    background #356854 (the reference's `.openai` variant)
+ *   · ::before wave  300%×300% circle at left 50% / bottom -150% ·
+ *                    translateX(-50%) scale(0) → scale(1) on hover over
+ *                    .6s cubic-bezier(.19,1,.22,1) · background #316b58 · z-index 1
+ *   · :hover         translate(-4px,-4px) + 8px 8px 0 #000
+ *   · :active        translate(2px,2px) + 2px 2px 0 #000
+ *   · logo disc      90×90 · absolute centred · radius 50% · background
+ *                    #0f1715 · box-shadow 0 2px 10px rgba(0,0,0,.2) ·
+ *                    transition all .6s cubic-bezier(.68,-.55,.265,1.55)
+ *   · hover logo     `spin 5s linear infinite` · 50×50 · top 28%
+ *   · icon           54×54 · fill #fff · same bouncy transition ·
+ *                    scale(.6) on hover
+ *   · text           absolute bottom 18px · column · centred · line-height 1.3 ·
+ *                    opacity 0 → 1 with translateY(20px) → 0 on hover · z-index 2
+ *                    line 1 = 13px/500 · line 2 = 16px/800 uppercase +.8px,
+ *                    #fff, → #d3d3d3 / #d6cbbf on hover (the `.openai` pair)
+ *
+ * Dynamic content (Part 1A): ONLY the disc's glyph and the two text lines
+ * change with the AI configuration state. Tile, colours, spacing, pseudo
+ * element and every animation are fixed here, so one component serves every
+ * provider, model and label — no per-text variants exist.
+ */
+
+.uza-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px; /* the reference's own tile gap */
+  padding: 20px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.uza-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0.1875em solid #000000; /* 3px */
+  border-radius: 0.75em; /* 12px */
+  padding: 0;
+  text-decoration: none;
+  color: #000000;
+  font-weight: bold;
+  font-family: inherit;
+  font-size: 16px; /* reference scale — every em below resolves to its px value */
+  position: relative;
+  box-shadow: 0.25em 0.25em 0 #000000; /* 4px */
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  height: 8.125em; /* 130px */
+  width: 8.125em; /* 130px */
+  cursor: pointer;
+  background-color: #356854;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* The rising circle wipe (the reference's only decorative pseudo-element). */
+.uza-tile::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -150%;
+  width: 300%;
+  height: 300%;
+  border-radius: 50%;
+  transform: translateX(-50%) scale(0);
+  transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+  z-index: 1;
+  background-color: #316b58;
+}
+
+.uza-tile:hover::before {
+  transform: translateX(-50%) scale(1);
+}
+/* ── The reference's provider variants ────────────────────────────────────
+ * `quiet-dog-6` ships the tile in two painted variants: `.brutalist-button
+ * .openai` (green field #356854, #316b58 circle, #d3d3d3 / #d6cbbf hover
+ * text) and `.brutalist-button.claude` (the #e3d19c cream circle). The app's
+ * provider list is longer than two, so the OpenAI paint is ALSO the component
+ * default (every provider therefore always wears a complete tile, exactly the
+ * reference's own look) and `data-uza-provider` selects the reference variant
+ * for the providers it defines. Nothing else changes — same dimensions, same
+ * animation, only the two colours the reference itself swaps. */
+.uza-tile[data-uza-provider="openai"] {
+  background-color: #356854;
+}
+
+.uza-tile[data-uza-provider="openai"]::before {
+  background-color: #316b58;
+}
+
+.uza-tile[data-uza-provider="openai"]:hover .uza-text {
+  color: #d3d3d3;
+}
+
+.uza-tile[data-uza-provider="openai"]:hover .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile[data-uza-provider="anthropic"]::before {
+  background-color: #e3d19c;
+}
+
+
+.uza-tile:hover {
+  transform: translate(-0.25em, -0.25em); /* -4px */
+  box-shadow: 0.5em 0.5em 0 #000000; /* 8px */
+}
+
+.uza-tile:active,
+.uza-tile:focus-visible:active {
+  transform: translate(0.125em, 0.125em); /* 2px */
+  box-shadow: 0.125em 0.125em 0 #000000; /* 2px */
+}
+
+.uza-tile:focus-visible {
+  outline: 0.125em solid #000000;
+  outline-offset: 0.125em;
+}
+
+/* Keyboard / touch "click": the reference's `:active` transform and shadow,
+ * played as a full sequence with the reference's own 0.4s
+ * cubic-bezier(.175,.885,.32,1.275) timing, then reset — so a quick tap on a
+ * phone or a keyboard Enter sees the whole interaction, not a flicker. */
+.uza-tile[data-uza-click="true"] {
+  animation: uzaPress 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes uzaPress {
+  0% {
+    transform: translate(0, 0);
+    box-shadow: 0.25em 0.25em 0 #000000;
+  }
+  35%,
+  60% {
+    transform: translate(0.125em, 0.125em);
+    box-shadow: 0.125em 0.125em 0 #000000;
+  }
+  100% {
+    transform: translate(0, 0);
+    box-shadow: 0.25em 0.25em 0 #000000;
+  }
+}
+
+/* ── Logo disc + glyph ────────────────────────────────────────────────── */
+
+.uza-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 5.625em; /* 90px */
+  height: 5.625em;
+  border-radius: 50%;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow: 0 0.125em 0.625em rgb(0 0 0 / 20%); /* 0 2px 10px */
+  background-color: #0f1715;
+}
+
+.uza-icon {
+  width: 3.375em; /* 54px */
+  height: 3.375em;
+  fill: #ffffff;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.uza-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Provider marks are glyphs in this app (✦ ◐ ✳ ◈ ⚡ ⚙); they wear the same
+   slot and the same transition as the reference's SVG. */
+.uza-mark {
+  font-size: 2.125em; /* 34px inside the 90px disc */
+  line-height: 1;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+@keyframes uzaSpin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.uza-tile:hover .uza-logo {
+  animation: uzaSpin 5s linear infinite;
+  width: 3.125em; /* 50px */
+  height: 3.125em;
+  top: 28%;
+}
+
+.uza-tile:hover .uza-icon {
+  transform: scale(0.6);
+}
+
+/* Processing: the reference's hover choreography is held while the existing
+   AI call runs, so the animation never gets replaced by a generic spinner. */
+.uza-tile[data-uza-state="loading"] .uza-logo {
+  animation: uzaSpin 5s linear infinite;
+  width: 3.125em;
+  height: 3.125em;
+  top: 28%;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-icon {
+  transform: scale(0.6);
+}
+
+.uza-tile[data-uza-state="loading"]::before {
+  transform: translateX(-50%) scale(1);
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Two-line label ───────────────────────────────────────────────────── */
+
+.uza-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  text-align: center;
+  opacity: 0;
+  transform: translateY(1.25em); /* 20px */
+  z-index: 2;
+  position: absolute;
+  bottom: 1.125em; /* 18px */
+  left: 0;
+  right: 0;
+  padding-inline: 0.5em;
+  min-width: 0;
+}
+
+.uza-text span:first-child {
+  font-size: 0.8125em; /* 13px */
+  font-weight: 500;
+  margin-bottom: 0.125em; /* 2px */
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.uza-text span:last-child {
+  font-size: 1em; /* 16px */
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em; /* 0.8px */
+  color: #ffffff;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.uza-tile:hover .uza-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.uza-tile:hover .uza-text span:first-child {
+  color: #d3d3d3;
+}
+
+.uza-tile:hover .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text span:first-child {
+  color: #d3d3d3;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.uza-tile:disabled:hover {
+  transform: none;
+  box-shadow: 0.25em 0.25em 0 #000000;
+}
+
+.uza-tile:disabled:hover::before {
+  transform: translateX(-50%) scale(0);
+}
+
+.uza-tile:disabled:hover .uza-logo {
+  animation: none;
+  width: 5.625em;
+  height: 5.625em;
+  top: 50%;
+}
+
+.uza-tile:disabled:hover .uza-icon {
+  transform: none;
+}
+
+.uza-tile:disabled:hover .uza-text {
+  opacity: 0;
+  transform: translateY(1.25em);
+}
+
+/* ── Small phones: the 130px tile scales down as one unit (the em system
+ * above means nothing inside drifts); the reference proportions and the
+ * animation timings are untouched. ─────────────────────────────────────── */
+
+@media (max-width: 379px) {
+  .uza-container {
+    gap: 14px;
+    padding: 14px;
+    justify-content: space-between;
+  }
+  .uza-tile {
+    font-size: 14px; /* → 113.75px tile, everything else follows */
+  }
+}
+
+@media (hover: none) {
+  /* Touch devices never get `:hover`, so the reference's hover END state
+     (disc lifted to 28% at 50px, icon at .6, label revealed) becomes the
+     resting frame. Same geometry, same colours — nothing is redrawn, and the
+     spin still only runs on hover/processing. */
+  .uza-tile .uza-logo {
+    width: 3.125em;
+    height: 3.125em;
+    top: 28%;
+  }
+  .uza-tile .uza-icon {
+    transform: scale(0.6);
+  }
+  .uza-tile .uza-text {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .uza-tile .uza-text span:first-child {
+    color: #d3d3d3;
+  }
+  .uza-tile .uza-text span:last-child {
+    color: #d6cbbf;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uza-tile:hover .uza-logo,
+  .uza-tile[data-uza-state="loading"] .uza-logo,
+  .uza-tile[data-uza-click="true"] {
+    animation: none;
+  }
+}
+
+</style>
+<style>
+  /* QA page chrome only — nothing here is part of the app bundle. */
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 32px clamp(16px, 4vw, 48px) 96px; background: #f4f5f7; color: #101214;
+         font: 15px/1.55 ui-sans-serif, system-ui, "Segoe UI", Inter, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .qa-lede { max-width: 78ch; color: #4a5157; margin: 0 0 28px; }
+  .qa-section { background: #fff; border: 1px solid #e3e6ea; border-radius: 18px; padding: 22px; margin-bottom: 22px; }
+  .qa-section h2 { font-size: 15px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .1em; color: #26303a; }
+  .qa-note { margin: 0 0 18px; color: #5a636c; font-size: 13px; max-width: 90ch; }
+  .qa-grid { display: flex; flex-wrap: wrap; gap: 20px 26px; align-items: flex-start; }
+  .qa-cell { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+  .qa-stage { display: flex; padding: 14px; border-radius: 12px; background:
+      linear-gradient(45deg, #eceef1 25%, transparent 25%, transparent 75%, #eceef1 75%) 0 0/16px 16px,
+      linear-gradient(45deg, #eceef1 25%, #f7f8fa 25%, #f7f8fa 75%, #eceef1 75%) 8px 8px/16px 16px; }
+  .qa-stage--narrow { max-width: 320px; width: 320px; overflow-x: visible; }
+  .qa-cap { margin: 0; font-size: 12px; font-weight: 700; color: #3c454e; }
+  .qa-hint { margin: 0; font-size: 11.5px; color: #6b7480; }
+  table { border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 14px 6px 0; border-bottom: 1px solid #eceef1; }
+  .qa-ok { color: #046c34; font-weight: 700; }
+  .qa-mid { color: #92400e; font-weight: 700; }
+  .qa-swatches { display: inline-flex; gap: 2px; vertical-align: middle; }
+  .qa-swatches i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid #0002; }
+</style>
+</head>
+<body>
+  <h1>Uiverse buttons — visual + behavioural QA sheet</h1>
+  <p class="qa-lede">
+    Rendered from the shared components themselves (<code>PaymentButton</code>, <code>WatchActionButton</code>,
+    <code>AiConfigButton</code>) with the shipped stylesheets inlined verbatim, so every pixel on this page is what
+    the app paints. Hover, press, tab and zoom each control; nothing is faked except the two frames the browser
+    cannot hold still for a screenshot, which use the components' own <code>data-*-press</code> /
+    <code>data-*-click</code> mirrors.
+  </p>
+
+  
+    <section class="qa-section">
+      <h2>1 · Payment / purchase / checkout CTA — Creatlydev/pretty-grasshopper-57</h2>
+      <p class="qa-note">One component at every money CTA: checkout, cart, product detail, plan purchase, subscription, upgrade, renewal and the confirm modals. Only the label, the size, the meaning colour and the handler differ.</p>
+      <div class="qa-grid">
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" class="uzp-pay uzp-pay--md"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Pay securely — ₹1,499</span></span></button></div>
+          <p class="qa-cap">resting — the reference's own #00ad54 plate + hover wipe</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" class="uzp-pay uzp-pay--md"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Pay securely — ₹1,499</span></span></button></div>
+          <p class="qa-cap">hover</p>
+          <p class="qa-hint">hover it: the green plate wipes in behind the label</p>
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" class="uzp-pay uzp-pay--md"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Subscribe to Pro — 12 monthly modules at ₹1,099 incl. GST</span></span></button></div>
+          <p class="qa-cap">long contextual label (same component, ellipsis guard)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" disabled="" aria-busy="true" data-uzp-state="loading" class="uzp-pay uzp-pay--md"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.35" stroke-width="3"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg></span><span class="uzp-pay__text">Processing…</span></span></button></div>
+          <p class="qa-cap">loading (existing processing state)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" disabled="" class="uzp-pay uzp-pay--md" style="--uzp-clr:#059669"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Subscribed — renews 12 Oct</span></span></button></div>
+          <p class="qa-cap">disabled / already owned</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" disabled="" class="uzp-pay uzp-pay--md" style="--uzp-clr:#64748b"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Finish the current plan first</span></span></button></div>
+          <p class="qa-cap">blocked (downgrade / gated)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" class="uzp-pay uzp-pay--lg uzp-pay--block"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Secure checkout · ₹899</span></span></button></div>
+          <p class="qa-cap">checkout (block, lg)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" class="uzp-pay uzp-pay--sm" style="--uzp-clr:#d97706"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Renew now</span></span></button></div>
+          <p class="qa-cap">renewal banner (sm, urgency colour from the tier)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage qa-stage--narrow"><button type="button" class="uzp-pay uzp-pay--md uzp-pay--block"><span class="uzp-pay__decor" aria-hidden="true"></span><span class="uzp-pay__content"><span class="uzp-pay__icon"><svg class="uzp-pay__glyph" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle opacity="0.5" cx="25" cy="25" r="23" fill="url(#uzp-grad-_R_6_)"></circle><mask id="uzp-mask-_R_6_" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z"></path></mask><path fill-rule="evenodd" clip-rule="evenodd" d="M34.42 15.93c.382-1.145-.706-2.234-1.851-1.852l-18.568 6.189c-1.186.395-1.362 2-.29 2.644l5.12 3.072a1.464 1.464 0 001.733-.167l5.394-4.854a1.464 1.464 0 011.958 2.177l-5.154 4.638a1.464 1.464 0 00-.276 1.841l3.101 5.17c.644 1.072 2.25.896 2.645-.29L34.42 15.93z" fill="#fff"></path><path d="M25.958 20.962l-1.47-1.632 1.47 1.632zm2.067.109l-1.632 1.469 1.632-1.469zm-.109 2.068l-1.469-1.633 1.47 1.633zm-5.154 4.638l-1.469-1.632 1.469 1.632zm-.276 1.841l-1.883 1.13 1.883-1.13zM34.42 15.93l-2.084-.695 2.084.695zm-19.725 6.42l18.568-6.189-1.39-4.167-18.567 6.19 1.389 4.166zm5.265 1.75l-5.12-3.072-2.26 3.766 5.12 3.072 2.26-3.766zm2.072 3.348l5.394-4.854-2.938-3.264-5.394 4.854 2.938 3.264zm5.394-4.854a.732.732 0 01-1.034-.054l3.265-2.938a3.66 3.66 0 00-5.17-.272l2.939 3.265zm-1.034-.054a.732.732 0 01.054-1.034l2.938 3.265a3.66 3.66 0 00.273-5.169l-3.265 2.938zm.054-1.034l-5.154 4.639 2.938 3.264 5.154-4.638-2.938-3.265zm1.023 12.152l-3.101-5.17-3.766 2.26 3.101 5.17 3.766-2.26zm4.867-18.423l-6.189 18.568 4.167 1.389 6.19-18.568-4.168-1.389zm-8.633 20.682c1.61 2.682 5.622 2.241 6.611-.725l-4.167-1.39a.732.732 0 011.322-.144l-3.766 2.26zm-6.003-8.05a3.66 3.66 0 004.332-.419l-2.938-3.264a.732.732 0 01.866-.084l-2.26 3.766zm3.592-1.722a3.66 3.66 0 00-.69 4.603l3.766-2.26c.18.301.122.687-.138.921l-2.938-3.264zm11.97-9.984a.732.732 0 01-.925-.926l4.166 1.389c.954-2.861-1.768-5.583-4.63-4.63l1.39 4.167zm-19.956 2.022c-2.967.99-3.407 5.003-.726 6.611l2.26-3.766a.732.732 0 01-.145 1.322l-1.39-4.167z" fill="#fff" mask="url(#uzp-mask-_R_6_)"></path><defs><linearGradient id="uzp-grad-_R_6_" x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0.71"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs></svg></span><span class="uzp-pay__text">Secure checkout — ₹12,999</span></span></button></div>
+          <p class="qa-cap">cart summary on a 320px phone</p>
+          
+          <p class="qa-hint">container clamped to 320px</p>
+        </div></div>
+    </section>
+
+  
+    <section class="qa-section">
+      <h2>2 · My Purchases action — shah1345/spicy-liger-32</h2>
+      <p class="qa-note">One button above each purchased product card, bound to that card's own id; the label follows the product type (Watch Now / Open Now / Continue Learning).</p>
+      <div class="qa-grid">
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Watch Now" class="uzw-btn"><span class="uzw-btn__label">Watch Now</span></button></div>
+          <p class="qa-cap">watch now (the reference's exact button)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Open Now" class="uzw-btn"><span class="uzw-btn__label">Open Now</span></button></div>
+          <p class="qa-cap">contextual — document purchase</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Continue Learning" class="uzw-btn"><span class="uzw-btn__label">Continue Learning</span></button></div>
+          <p class="qa-cap">contextual — resume a course</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button class="uzw-btn" data-uzw-press="true" type="button">WATCH NOW</button></div>
+          <p class="qa-cap">press frame (mirrored :active for touch / keyboard)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage qa-stage--narrow"><button type="button" aria-label="Access Now" class="uzw-btn"><span class="uzw-btn__label">Access Now</span></button></div>
+          <p class="qa-cap">inside a 280px card — no overflow</p>
+          
+          <p class="qa-hint">container clamped to 320px</p>
+        </div></div>
+    </section>
+
+  
+    <section class="qa-section">
+      <h2>3 · Revision → AI Configuration — 0xnihilism/quiet-dog-6</h2>
+      <p class="qa-note">The same tile drives both configuration actions (load models / test connection). Logo = the live provider mark, line 1 = provider or model, line 2 = the action. Clicking plays the reference press and only then runs the existing handler.</p>
+      <div class="qa-grid">
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="OpenAI · Test connection" data-uza-provider="openai" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">◐</span></span></span><span class="uza-text"><span>OpenAI</span><span>Test connection</span></span></button></div>
+          <p class="qa-cap">OpenAI variant (resting)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="OpenAI · Test connection" data-uza-provider="openai" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">◐</span></span></span><span class="uza-text"><span>OpenAI</span><span>Test connection</span></span></button></div>
+          <p class="qa-cap">hover — disc shrinks to 50px, climbs to 28%, spins; text rises</p>
+          <p class="qa-hint">hover it</p>
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Anthropic · Load models" data-uza-provider="anthropic" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">✳</span></span></span><span class="uza-text"><span>Anthropic</span><span>Load models</span></span></button></div>
+          <p class="qa-cap">Anthropic variant (the reference's cream circle)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Groq · Load models" data-uza-provider="groq" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">⚡</span></span></span><span class="uza-text"><span>Groq</span><span>Load models</span></span></button></div>
+          <p class="qa-cap">any other provider — component default paint</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" aria-label="Google Gemini · gemini-3.5-flash-lite-exp-2026-09" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">✦</span></span></span><span class="uza-text"><span>Google Gemini</span><span>gemini-3.5-flash-lite-exp-2026-09</span></span></button></div>
+          <p class="qa-cap">long model name (no reflow, no clipping)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" disabled="" aria-busy="true" aria-label="OpenAI · Testing…" data-uza-state="loading" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">◐</span></span></span><span class="uza-text"><span>OpenAI</span><span>Testing…</span></span></button></div>
+          <p class="qa-cap">testing (existing loading state, animation intact)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button type="button" disabled="" aria-label="Custom API · Test connection" class="uza-tile"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">⚙</span></span></span><span class="uza-text"><span>Custom API</span><span>Test connection</span></span></button></div>
+          <p class="qa-cap">no API key yet (existing disabled state)</p>
+          
+          
+        </div>
+        <div class="qa-cell">
+          <div class="qa-stage"><button class="uza-tile" data-uza-click="true" type="button"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">◐</span></span></span><span class="uza-text"><span>OpenAI</span><span>Test connection</span></span></button></div>
+          <p class="qa-cap">click / press frame</p>
+          
+          
+        </div></div>
+    </section>
+
+  
+    <section class="qa-section">
+      <h2>4 · Measured contrast (WCAG relative luminance)</h2>
+      <p class="qa-note">Measured with WCAG relative luminance on the exact values the reference ships, because these three buttons are recreations, not approximations. Every resting state passes AA comfortably (≥4.5:1). The hover values below are the reference's own palette and are the one place an exact recreation trades contrast: they are transient (only while the pointer is on the control), the text is bold and never duplicated by a sibling, and the resting state — which is what a screenshot, a screen reader and a keyboard user's initial view all see — is the high-contrast one. If the team wants AA on hover too, the payment button's `color` prop and `--uzp-clr` are the single switch (one line, per call site, no new component); the ports themselves stay faithful to the published design.</p>
+      <div class="qa-grid">
+        <div class="qa-cell">
+          <div class="qa-stage"><table><thead><tr><th>pair</th><th>colours</th><th>ratio</th><th>AA (4.5:1 body / 3:1 large)</th></tr></thead><tbody><tr><td>payment label — resting (#121212 on the white pill)</td><td><span class="qa-swatches"><i style="background:#121212"></i><i style="background:#ffffff"></i></span> <code>#121212 / #ffffff</code></td><td><span class="qa-ok">18.73:1 · AA pass</span></td><td></td></tr><tr><td>payment label — hover (label turns #fff over the green wipe)</td><td><span class="qa-swatches"><i style="background:#ffffff"></i><i style="background:#00ad54"></i></span> <code>#ffffff / #00ad54</code></td><td><span class="qa-mid">2.96:1 · hover/decorative, reference palette</span></td><td></td></tr><tr><td>payment plate glyph — decorative (aria-hidden svg, white on green)</td><td><span class="qa-swatches"><i style="background:#ffffff"></i><i style="background:#00ad54"></i></span> <code>#ffffff / #00ad54</code></td><td><span class="qa-mid">2.96:1 · hover/decorative, reference palette</span></td><td></td></tr><tr><td>purchases label — resting (#090909 on #e8e8e8)</td><td><span class="qa-swatches"><i style="background:#090909"></i><i style="background:#e8e8e8"></i></span> <code>#090909 / #e8e8e8</code></td><td><span class="qa-ok">16.25:1 · AA pass</span></td><td></td></tr><tr><td>purchases label — hover (#fff on the teal fill)</td><td><span class="qa-swatches"><i style="background:#ffffff"></i><i style="background:#009087"></i></span> <code>#ffffff / #009087</code></td><td><span class="qa-mid">3.93:1 · hover state, reference palette</span></td><td></td></tr><tr><td>AI logo mark — always (white glyph on the #0f1715 disc)</td><td><span class="qa-swatches"><i style="background:#ffffff"></i><i style="background:#0f1715"></i></span> <code>#ffffff / #0f1715</code></td><td><span class="qa-ok">18.20:1 · AA pass</span></td><td></td></tr><tr><td>AI caption line — hover (#d3d3d3 on the #316b58 circle)</td><td><span class="qa-swatches"><i style="background:#d3d3d3"></i><i style="background:#316b58"></i></span> <code>#d3d3d3 / #316b58</code></td><td><span class="qa-mid">4.16:1 · hover state, reference palette</span></td><td></td></tr><tr><td>AI model line — hover (#d6cbbf on the #316b58 circle)</td><td><span class="qa-swatches"><i style="background:#d6cbbf"></i><i style="background:#316b58"></i></span> <code>#d6cbbf / #316b58</code></td><td><span class="qa-mid">3.90:1 · hover state, reference palette</span></td><td></td></tr></tbody></table></div>
+          <p class="qa-cap">ratio table</p>
+          
+          
+        </div></div>
+    </section>
+</body>
+</html>

@@ -26,7 +26,6 @@ import {
   PlayCircle,
   ShoppingBag,
   Sparkles,
-  Star,
   Unlock,
 } from "lucide-react";
 import type {
@@ -39,6 +38,7 @@ import type { Product } from "@/data/products";
 import ModuleSelectTrigger from "./ModuleSelectTrigger";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
+import { PaymentButton } from "../ui/PaymentButton";
 import { GlassCard } from "../ui/GlassCard";
 import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
@@ -828,19 +828,22 @@ function CtaBar({
           <p className="font-semibold">{previewNotice}</p>
         </div>
       ) : null}
-      <button
-        type="button"
+      {/* Purchase CTA — the app-wide payment button (Uiverse
+          pretty-grasshopper-57). Same onClick / disabled rule as before; the
+          mode icon moves into the reference's 48×40 icon plate and the price
+          label is the reference's own ellipsis guard (never an overflow). */}
+      <PaymentButton
+        block
+        size="md"
         onClick={onPreview}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <Star className="hidden sm:block" size={16} />
-        {icon ? (() => {
+        icon={icon ? (() => {
           const Icon = icon;
-          return <Icon size={18} />;
-        })() : null}
-        <span className="truncate">{label}</span>
-      </button>
+          return <Icon size={20} />;
+        })() : undefined}
+        data-pdp-cta-button=""
+        label={label}
+      />
       {helper ? <p className="px-1 text-center text-[11px] font-semibold text-white/55">{helper}</p> : null}
       <p className="px-1 text-center text-[10px] font-medium text-white/55">
         Preview-only — payment wiring is coming next.

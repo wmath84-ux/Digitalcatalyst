@@ -1,0 +1,183 @@
+/*
+ * src/components/ui/watch-action-button.css
+ *
+ * A faithful, self-contained port of shah1345's "spicy-liger-32" Uiverse
+ * button:
+ *   https://uiverse.io/shah1345/spicy-liger-32
+ *
+ * It is the action-button treatment worn ABOVE every product on the
+ * My Purchases page (Watch Now / Open Now / Continue Learning). Scoped to
+ * `.uzw-btn` only — no element, card or button outside this class is touched,
+ * so the neumorphic material can never leak into the purchase card, the
+ * store, the footer or admin.
+ *
+ * Reference values kept verbatim (they are authored in `em` already, so the
+ * whole control — padding, radius, goo layers, inset press — scales as one
+ * unit from `font-size`):
+ *   · shell          inline-block · padding .7em 1.7em · font-size 18px ·
+ *                    radius .5em · background #e8e8e8 · border 1px solid
+ *                    #e8e8e8 · color #090909 · transition all .2s ease-in ·
+ *                    overflow hidden · z-index 1
+ *   · shadow         6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff
+ *   · :before        140%×180% ellipse, left 50%, top 100%,
+ *                    rgba(0,0,0,.05), z-index -1,
+ *                    transition all .5s .1s cubic-bezier(.55,0,.1,1)
+ *   · :after         160%×190% ellipse, left 55%, top 180%, #009087, same
+ *                    transition, translateX(-50%) scaleY(1) scaleX(1.45)
+ *   · :hover         color #fff · border 1px solid #009087 · :before →
+ *                    top -35% / #009087 / scaleY(1.3) scaleX(.8) · :after →
+ *                    top -45% / same
+ *   · :active        color #666 · inset 4px 4px 12px #c5c5c5,
+ *                    inset -4px -4px 12px #ffffff
+ *
+ * The two decorative ellipses are the component's own pseudo-elements, so the
+ * press animation also runs on touch: `[data-uzw-press="true"]` repeats the
+ * reference's `:active` declarations verbatim for devices that never paint it.
+ */
+
+.uzw-btn {
+  display: inline-block;
+  transition: all 0.2s ease-in;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  color: #090909;
+  padding: 0.7em 1.7em;
+  cursor: pointer;
+  font-size: 18px;
+  border-radius: 0.5em;
+  background: #e8e8e8;
+  border: 1px solid #e8e8e8;
+  box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  /* Overflow safety only: a long product action label must never push the
+     purchase card wider than the viewport. The reference never overflows
+     because its demo label is two words; the cap keeps it that way. */
+  max-width: 100%;
+}
+
+.uzw-btn__label {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* The brief asks for WATCH NOW; casing is content, not part of the
+     reference's material, so it is carried here and the design is untouched. */
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.uzw-btn::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.25);
+  top: 100%;
+  width: 140%;
+  height: 180%;
+  background-color: rgb(0 0 0 / 5%);
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.uzw-btn::after {
+  content: "";
+  position: absolute;
+  left: 55%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.45);
+  top: 180%;
+  width: 160%;
+  height: 190%;
+  background-color: #009087;
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.uzw-btn:hover {
+  color: #ffffff;
+  border: 1px solid #009087;
+}
+
+.uzw-btn:hover::before {
+  top: -35%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+}
+
+.uzw-btn:hover::after {
+  top: -45%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+}
+
+.uzw-btn:focus-visible {
+  outline: 2px solid #009087;
+  outline-offset: 2px;
+}
+
+.uzw-btn:active,
+.uzw-btn[data-uzw-press="true"] {
+  color: #666;
+  box-shadow:
+    inset 4px 4px 12px #c5c5c5,
+    inset -4px -4px 12px #ffffff;
+}
+
+/* Keyboard activation (Enter / Space) mirrors the pointer press. */
+.uzw-btn[data-uzw-press="true"]:not(:hover) {
+  color: #666;
+}
+
+.uzw-btn:disabled,
+.uzw-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.uzw-btn:disabled:hover,
+.uzw-btn[aria-disabled="true"]:hover {
+  color: #090909;
+  border: 1px solid #e8e8e8;
+}
+
+.uzw-btn:disabled:hover::before,
+.uzw-btn:disabled:hover::after,
+.uzw-btn[aria-disabled="true"]:hover::before,
+.uzw-btn[aria-disabled="true"]:hover::after {
+  top: 100%;
+  background-color: rgb(0 0 0 / 5%);
+  transform: translateX(-50%) scaleY(1) scaleX(1.25);
+}
+
+.uzw-btn:disabled:hover::after,
+.uzw-btn[aria-disabled="true"]:hover::after {
+  top: 180%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1) scaleX(1.45);
+}
+
+/* ── Small screens: the reference proportions hold, the type steps down one
+ * notch below 360px so a long label never wraps the card out of the viewport.
+ */
+
+@media (max-width: 359px) {
+  .uzw-btn {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uzw-btn,
+  .uzw-btn::before,
+  .uzw-btn::after {
+    transition-duration: 0.01ms;
+    transition-delay: 0s;
+  }
+}

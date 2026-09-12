@@ -1,0 +1,393 @@
+/*
+ * src/components/ui/ai-config-button.css
+ *
+ * A faithful, self-contained port of 0xnihilism's "quiet-dog-6" brutalist
+ * AI-provider button:
+ *   https://uiverse.io/0xnihilism/quiet-dog-6
+ *
+ * It is the Revision → AI Configuration page's configuration-action
+ * treatment (`AiConfigButton.tsx`). Every rule is scoped to `.uza-*`, so the
+ * brutalist material can never reach other buttons, the revision cards, the
+ * header, admin's AI panel or any other surface.
+ *
+ * Reference values kept exact. They are authored in px at a 16px tile font
+ * and are re-expressed in `em` here so the component scales as one unit
+ * (same technique as `vampirebat-button.css`): at `.uza-tile`'s default
+ * `font-size: 16px` every value resolves to the reference's own pixel number.
+ *
+ *   · container      flex · justify-content center · gap 20px · padding 20px
+ *   · tile           130×130 · border 3px solid #000 · radius 12px ·
+ *                    box-shadow 4px 4px 0 #000 · overflow hidden ·
+ *                    transition all .4s cubic-bezier(.175,.885,.32,1.275) ·
+ *                    background #356854 (the reference's `.openai` variant)
+ *   · ::before wave  300%×300% circle at left 50% / bottom -150% ·
+ *                    translateX(-50%) scale(0) → scale(1) on hover over
+ *                    .6s cubic-bezier(.19,1,.22,1) · background #316b58 · z-index 1
+ *   · :hover         translate(-4px,-4px) + 8px 8px 0 #000
+ *   · :active        translate(2px,2px) + 2px 2px 0 #000
+ *   · logo disc      90×90 · absolute centred · radius 50% · background
+ *                    #0f1715 · box-shadow 0 2px 10px rgba(0,0,0,.2) ·
+ *                    transition all .6s cubic-bezier(.68,-.55,.265,1.55)
+ *   · hover logo     `spin 5s linear infinite` · 50×50 · top 28%
+ *   · icon           54×54 · fill #fff · same bouncy transition ·
+ *                    scale(.6) on hover
+ *   · text           absolute bottom 18px · column · centred · line-height 1.3 ·
+ *                    opacity 0 → 1 with translateY(20px) → 0 on hover · z-index 2
+ *                    line 1 = 13px/500 · line 2 = 16px/800 uppercase +.8px,
+ *                    #fff, → #d3d3d3 / #d6cbbf on hover (the `.openai` pair)
+ *
+ * Dynamic content (Part 1A): ONLY the disc's glyph and the two text lines
+ * change with the AI configuration state. Tile, colours, spacing, pseudo
+ * element and every animation are fixed here, so one component serves every
+ * provider, model and label — no per-text variants exist.
+ */
+
+.uza-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px; /* the reference's own tile gap */
+  padding: 20px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.uza-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0.1875em solid #000000; /* 3px */
+  border-radius: 0.75em; /* 12px */
+  padding: 0;
+  text-decoration: none;
+  color: #000000;
+  font-weight: bold;
+  font-family: inherit;
+  font-size: 16px; /* reference scale — every em below resolves to its px value */
+  position: relative;
+  box-shadow: 0.25em 0.25em 0 #000000; /* 4px */
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  height: 8.125em; /* 130px */
+  width: 8.125em; /* 130px */
+  cursor: pointer;
+  background-color: #356854;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* The rising circle wipe (the reference's only decorative pseudo-element). */
+.uza-tile::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -150%;
+  width: 300%;
+  height: 300%;
+  border-radius: 50%;
+  transform: translateX(-50%) scale(0);
+  transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+  z-index: 1;
+  background-color: #316b58;
+}
+
+.uza-tile:hover::before {
+  transform: translateX(-50%) scale(1);
+}
+/* ── The reference's provider variants ────────────────────────────────────
+ * `quiet-dog-6` ships the tile in two painted variants: `.brutalist-button
+ * .openai` (green field #356854, #316b58 circle, #d3d3d3 / #d6cbbf hover
+ * text) and `.brutalist-button.claude` (the #e3d19c cream circle). The app's
+ * provider list is longer than two, so the OpenAI paint is ALSO the component
+ * default (every provider therefore always wears a complete tile, exactly the
+ * reference's own look) and `data-uza-provider` selects the reference variant
+ * for the providers it defines. Nothing else changes — same dimensions, same
+ * animation, only the two colours the reference itself swaps. */
+.uza-tile[data-uza-provider="openai"] {
+  background-color: #356854;
+}
+
+.uza-tile[data-uza-provider="openai"]::before {
+  background-color: #316b58;
+}
+
+.uza-tile[data-uza-provider="openai"]:hover .uza-text {
+  color: #d3d3d3;
+}
+
+.uza-tile[data-uza-provider="openai"]:hover .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile[data-uza-provider="anthropic"]::before {
+  background-color: #e3d19c;
+}
+
+
+.uza-tile:hover {
+  transform: translate(-0.25em, -0.25em); /* -4px */
+  box-shadow: 0.5em 0.5em 0 #000000; /* 8px */
+}
+
+.uza-tile:active,
+.uza-tile:focus-visible:active {
+  transform: translate(0.125em, 0.125em); /* 2px */
+  box-shadow: 0.125em 0.125em 0 #000000; /* 2px */
+}
+
+.uza-tile:focus-visible {
+  outline: 0.125em solid #000000;
+  outline-offset: 0.125em;
+}
+
+/* Keyboard / touch "click": the reference's `:active` transform and shadow,
+ * played as a full sequence with the reference's own 0.4s
+ * cubic-bezier(.175,.885,.32,1.275) timing, then reset — so a quick tap on a
+ * phone or a keyboard Enter sees the whole interaction, not a flicker. */
+.uza-tile[data-uza-click="true"] {
+  animation: uzaPress 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes uzaPress {
+  0% {
+    transform: translate(0, 0);
+    box-shadow: 0.25em 0.25em 0 #000000;
+  }
+  35%,
+  60% {
+    transform: translate(0.125em, 0.125em);
+    box-shadow: 0.125em 0.125em 0 #000000;
+  }
+  100% {
+    transform: translate(0, 0);
+    box-shadow: 0.25em 0.25em 0 #000000;
+  }
+}
+
+/* ── Logo disc + glyph ────────────────────────────────────────────────── */
+
+.uza-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 5.625em; /* 90px */
+  height: 5.625em;
+  border-radius: 50%;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow: 0 0.125em 0.625em rgb(0 0 0 / 20%); /* 0 2px 10px */
+  background-color: #0f1715;
+}
+
+.uza-icon {
+  width: 3.375em; /* 54px */
+  height: 3.375em;
+  fill: #ffffff;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.uza-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Provider marks are glyphs in this app (✦ ◐ ✳ ◈ ⚡ ⚙); they wear the same
+   slot and the same transition as the reference's SVG. */
+.uza-mark {
+  font-size: 2.125em; /* 34px inside the 90px disc */
+  line-height: 1;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+@keyframes uzaSpin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.uza-tile:hover .uza-logo {
+  animation: uzaSpin 5s linear infinite;
+  width: 3.125em; /* 50px */
+  height: 3.125em;
+  top: 28%;
+}
+
+.uza-tile:hover .uza-icon {
+  transform: scale(0.6);
+}
+
+/* Processing: the reference's hover choreography is held while the existing
+   AI call runs, so the animation never gets replaced by a generic spinner. */
+.uza-tile[data-uza-state="loading"] .uza-logo {
+  animation: uzaSpin 5s linear infinite;
+  width: 3.125em;
+  height: 3.125em;
+  top: 28%;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-icon {
+  transform: scale(0.6);
+}
+
+.uza-tile[data-uza-state="loading"]::before {
+  transform: translateX(-50%) scale(1);
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Two-line label ───────────────────────────────────────────────────── */
+
+.uza-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  text-align: center;
+  opacity: 0;
+  transform: translateY(1.25em); /* 20px */
+  z-index: 2;
+  position: absolute;
+  bottom: 1.125em; /* 18px */
+  left: 0;
+  right: 0;
+  padding-inline: 0.5em;
+  min-width: 0;
+}
+
+.uza-text span:first-child {
+  font-size: 0.8125em; /* 13px */
+  font-weight: 500;
+  margin-bottom: 0.125em; /* 2px */
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.uza-text span:last-child {
+  font-size: 1em; /* 16px */
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em; /* 0.8px */
+  color: #ffffff;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.uza-tile:hover .uza-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.uza-tile:hover .uza-text span:first-child {
+  color: #d3d3d3;
+}
+
+.uza-tile:hover .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text span:first-child {
+  color: #d3d3d3;
+}
+
+.uza-tile[data-uza-state="loading"] .uza-text span:last-child {
+  color: #d6cbbf;
+}
+
+.uza-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.uza-tile:disabled:hover {
+  transform: none;
+  box-shadow: 0.25em 0.25em 0 #000000;
+}
+
+.uza-tile:disabled:hover::before {
+  transform: translateX(-50%) scale(0);
+}
+
+.uza-tile:disabled:hover .uza-logo {
+  animation: none;
+  width: 5.625em;
+  height: 5.625em;
+  top: 50%;
+}
+
+.uza-tile:disabled:hover .uza-icon {
+  transform: none;
+}
+
+.uza-tile:disabled:hover .uza-text {
+  opacity: 0;
+  transform: translateY(1.25em);
+}
+
+/* ── Small phones: the 130px tile scales down as one unit (the em system
+ * above means nothing inside drifts); the reference proportions and the
+ * animation timings are untouched. ─────────────────────────────────────── */
+
+@media (max-width: 379px) {
+  .uza-container {
+    gap: 14px;
+    padding: 14px;
+    justify-content: space-between;
+  }
+  .uza-tile {
+    font-size: 14px; /* → 113.75px tile, everything else follows */
+  }
+}
+
+@media (hover: none) {
+  /* Touch devices never get `:hover`, so the reference's hover END state
+     (disc lifted to 28% at 50px, icon at .6, label revealed) becomes the
+     resting frame. Same geometry, same colours — nothing is redrawn, and the
+     spin still only runs on hover/processing. */
+  .uza-tile .uza-logo {
+    width: 3.125em;
+    height: 3.125em;
+    top: 28%;
+  }
+  .uza-tile .uza-icon {
+    transform: scale(0.6);
+  }
+  .uza-tile .uza-text {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .uza-tile .uza-text span:first-child {
+    color: #d3d3d3;
+  }
+  .uza-tile .uza-text span:last-child {
+    color: #d6cbbf;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uza-tile:hover .uza-logo,
+  .uza-tile[data-uza-state="loading"] .uza-logo,
+  .uza-tile[data-uza-click="true"] {
+    animation: none;
+  }
+}

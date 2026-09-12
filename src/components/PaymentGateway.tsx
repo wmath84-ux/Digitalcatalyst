@@ -18,9 +18,10 @@
 // does not show extra close buttons of our own.
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
+import { CheckCircle2, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
+import { PaymentButton } from "./ui/PaymentButton";
 import { auth } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
 import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
@@ -374,16 +375,24 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
       {error && <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 p-4 text-sm font-semibold leading-6 text-rose-200"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
 
       {paymentState !== "success" && (
-        <button disabled={busy} onClick={startPayment} className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
-          {/* Checkout's money button keeps its emerald identity (it is the one
-              colour a user is told to trust) and wears the pack's specular
-              layer over it — frost + rim + sheen, content above the gloss. */}
-          <GlassSurface className="pointer-events-none absolute inset-0" />
-          <span className="relative z-10 flex items-center justify-center gap-2">
-            {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
-            {finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${displayAmount}`}
-          </span>
-        </button>
+        /* The money action now wears the app's single payment CTA — the
+         * Uiverse "pretty-grasshopper-57" port every pay/checkout surface in
+         * the product shares (src/components/ui/PaymentButton.tsx). Visual
+         * layer only: this still calls the same `startPayment` (quote-driven
+         * `/api/razorpay/create-order` → Razorpay Standard Checkout →
+         * `verify-payment`), keeps the same `disabled={busy}` gate, and the
+         * existing busy copy lands in the reference's filled/loading state.
+         * The plate is the reference's own green (#00ad54), so the app's
+         * "green = trusted money" signal survives unchanged. */
+        <PaymentButton
+          block
+          size="lg"
+          loading={busy}
+          disabled={busy}
+          onClick={startPayment}
+          data-payment-gateway-pay=""
+          label={finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${displayAmount}`}
+        />
       )}
       {!busy && paymentState !== "success" && <GlassButton variant="capsule" onClick={onGoBack} className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold">← Back to order summary</GlassButton>}
       <p className="text-center text-[11px] font-medium text-white/55">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>

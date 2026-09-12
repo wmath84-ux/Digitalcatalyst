@@ -271,6 +271,12 @@ export default function AiSettingsPage({ uid, route }: Props) {
               <AiConfigForm
                 card={false}
                 liveModelsOnly
+                /* The student AI Configuration page renders its two
+                   configuration actions as the brutalist provider button
+                   (Uiverse quiet-dog-6). Logo + text follow the live
+                   provider / model state; the admin panel keeps the pack
+                   capsule. */
+                actionStyle="uiverse"
                 value={ownFormValue}
                 onChange={(config: AiConfig) => updateConfig({ ...userCfg, source: "own", config })}
                 title=""
