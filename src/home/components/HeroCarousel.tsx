@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Banner } from "../types";
-import { GlassButton } from "../../components/ui/glass-button";
+import { VampirebatButton } from "../../components/ui/VampirebatButton";
 import { GlassSurface } from "../../components/ui/glass";
 
 interface HeroCarouselProps {
@@ -149,14 +149,19 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                       {banner.title}
                     </h3>
                     <p className="mt-1 text-xs text-white/85 leading-snug md:text-sm md:mt-2 md:max-w-md">{banner.subtitle}</p>
-                    <GlassButton variant="capsule" tabIndex={-1} className="mt-3 md:mt-4 [&_.h-12]:h-9 [&_.h-12]:px-4 md:[&_.h-12]:h-10 [&_.h-12]:text-xs md:[&_.h-12]:text-sm">
-                      <span className="inline-flex items-center gap-1.5 font-bold">{banner.cta}
-                      {linked && (
-                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                          <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </span></GlassButton>
+                    {/* Promotion CTA — the reference Uiverse treatment
+                        (stupid-vampirebat-24) at the capsule's exact slot
+                        footprint. Like the old capsule it is a visual
+                        affordance only: tabIndex -1, no onClick — the tap
+                        bubbles to the slide's banner handler below, and
+                        the press feedback is the same pointer scale the
+                        old GlassButton ran (inside the component). */}
+                    <VampirebatButton
+                      label={banner.cta}
+                      tabIndex={-1}
+                      className="uzv-hero-cta mt-3 md:mt-4"
+                      aria-label={banner.cta}
+                    />
                   </div>
                   {/* The first slide's artwork is the hero of the page — the
                       LCP candidate — so it is fetched eagerly at high priority.

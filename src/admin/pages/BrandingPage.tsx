@@ -39,6 +39,9 @@ import { PrimaryButton, SecondaryButton } from "@/components/admin/ui";
 import { useToast } from "@/components/admin/AdminProviders";
 import { useBranding } from "@/context/BrandingContext";
 import { attachOpeningSplash } from "@/utils/openingSplash";
+import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
+import SocialProfileCard from "@/home/components/SocialProfileCard";
+import { detectSocialPlatform, sanitizeSocialUrl } from "@/utils/socialPlatform";
 import {
   BRANDING_DOC_PATH,
   DEFAULT_BRANDING,
@@ -55,10 +58,12 @@ type BrandDraft = {
   homeGradientTo: string;
   supportEmail: string;
   supportPhone: string;
+  socialUrl: string;
 };
 
 type SectionKey =
   | "identity"
+  | "social"
   | "logo"
   | "gradient"
   | "behaviour"
@@ -76,6 +81,7 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   { key: "identity", label: "Identity", description: "App name + tagline shown across the app, the landing page, and notifications.", icon: "🪪", fieldCount: 2 },
+  { key: "social", label: "Social profile", description: "The profile card at the bottom of the Home page: its logo, name and bio come from Identity & Logo — the social URL links the card and sets its platform icon.", icon: "🔗", fieldCount: 1 },
   { key: "logo", label: "Logo", description: "Square PNG / JPG that becomes the installed PWA icon, splash logo and notification avatar.", icon: "🖼️", fieldCount: 1 },
   { key: "gradient", label: "Home gradient", description: "Background gradient behind the home greeting and search bar.", icon: "🎨", fieldCount: 2 },
   { key: "behaviour", label: "App behaviour", description: "App opening animation and the thin top / bottom border lines.", icon: "✨", fieldCount: 2 },
@@ -105,6 +111,7 @@ export default function BrandingPage() {
     homeGradientTo: branding.homeGradientTo,
     supportEmail: branding.supportEmail,
     supportPhone: branding.supportPhone,
+    socialUrl: branding.socialUrl,
   });
   const [saving, setSaving] = useState(false);
   // Which section is currently in focus. null = no section (the
@@ -123,6 +130,7 @@ export default function BrandingPage() {
       homeGradientTo: branding.homeGradientTo,
       supportEmail: branding.supportEmail,
       supportPhone: branding.supportPhone,
+      socialUrl: branding.socialUrl,
     });
   }, [
     branding.logoUrl,
@@ -134,6 +142,7 @@ export default function BrandingPage() {
     branding.homeGradientTo,
     branding.supportEmail,
     branding.supportPhone,
+    branding.socialUrl,
   ]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
@@ -161,14 +170,18 @@ export default function BrandingPage() {
     const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
     const supportEmail = merged.supportEmail.trim() || DEFAULT_BRANDING.supportEmail;
     const supportPhone = merged.supportPhone.trim() || DEFAULT_BRANDING.supportPhone;
+    // The admin's social URL is stored verbatim (no domain guessing);
+    // invalid / empty values persist as "" so the Home page card renders
+    // its clean non-clickable state.
+    const socialUrl = sanitizeSocialUrl(merged.socialUrl);
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, socialUrl, supportEmail, supportPhone, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone });
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, socialUrl });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -310,6 +323,65 @@ export default function BrandingPage() {
                     data-branding-tagline
                   />
                 </label>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSectionDef.key === "social" ? (
+            <div className="mt-1 space-y-3" data-branding-social-card>
+              {/* Live preview — the exact Home page card, fed by this
+                  page's draft values (logo/name/bio from Identity & Logo,
+                  URL from below). */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <p className="text-xs font-bold text-slate-700">Home page social card preview</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  The card at the very bottom of the Home page. Its logo, name and bio use the
+                  Identity &amp; Logo settings; the social URL below decides where the card links
+                  and which platform icon it shows.
+                </p>
+                <div className="mt-3 flex justify-center rounded-xl bg-slate-100/90 p-4">
+                  <SocialProfileCard
+                    logoUrl={draft.logoUrl || DEFAULT_BRANDING.logoUrl}
+                    name={draft.appName || DEFAULT_BRANDING.appName}
+                    bio={draft.tagline}
+                    socialUrl={draft.socialUrl}
+                    preview
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <label className="block text-xs font-semibold text-slate-600">
+                  Social media URL
+                  <input
+                    value={draft.socialUrl}
+                    onChange={(e) => update("socialUrl", e.target.value)}
+                    placeholder="https://instagram.com/yourbrand"
+                    inputMode="url"
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
+                    data-branding-social-url
+                  />
+                </label>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                  Any profile URL — https://instagram.com/yourbrand, https://youtube.com/@yourbrand,
+                  https://x.com/yourbrand, https://facebook.com/yourbrand, https://t.me/yourbrand,
+                  https://linkedin.com/in/yourbrand, discord.gg/…, github.com/…, tiktok.com/…,
+                  pinterest.com/…. The icon is detected from the URL's domain automatically; an
+                  unrecognised domain shows a generic link icon. Leave empty to show the card
+                  without a social link.
+                </p>
+                <div className="mt-2 flex items-center gap-2" data-branding-social-platform-preview>
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-800 text-white">
+                    <SocialPlatformIcon platform={detectSocialPlatform(draft.socialUrl)} size={14} />
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-600">
+                    {(draft.socialUrl || "").trim() && detectSocialPlatform(draft.socialUrl).id === "generic"
+                      ? "Unrecognised platform — generic link icon"
+                      : detectSocialPlatform(draft.socialUrl).id === "generic"
+                        ? "No URL yet — card stays non-clickable"
+                        : `${detectSocialPlatform(draft.socialUrl).label} icon`}
+                  </span>
+                </div>
               </div>
             </div>
           ) : null}
@@ -549,6 +621,7 @@ export default function BrandingPage() {
               homeGradientTo: DEFAULT_BRANDING.homeGradientTo,
               supportEmail: DEFAULT_BRANDING.supportEmail,
               supportPhone: DEFAULT_BRANDING.supportPhone,
+              socialUrl: DEFAULT_BRANDING.socialUrl,
             });
             void persist(DEFAULT_BRANDING);
           }}

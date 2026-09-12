@@ -200,7 +200,11 @@ export default function ImageViewer({ url, name, initialScale, initialOffset, on
               { id: "zoom-in", label: "Zoom in", icon: Plus, color: "#FFBE0B", dataAttrs: { "data-course-image-zoom-in": "" } },
               { id: "reset", label: "Reset", icon: RotateCcw, color: "#C9A96E", dataAttrs: { "data-course-image-zoom-reset": "" } },
               { id: "fit", label: "Fit", icon: Maximize, color: "#06D6A0", dataAttrs: { "data-course-image-zoom-fit": "" } },
-              { id: "download", label: "Download", icon: Download, color: "#FF5C8A", dataAttrs: { "data-course-image-download": "" } },
+              // The dock's download action wears the player's new download
+              // accent (the Uiverse "slippery-owl-85" green) so every
+              // download control in the player reads the same. The shared
+              // GlassDock itself is untouched — only this item's colour.
+              { id: "download", label: "Download", icon: Download, color: "#4CC713", dataAttrs: { "data-course-image-download": "" } },
             ] satisfies GlassDockItem[]
           }
           onSelect={(id) => {

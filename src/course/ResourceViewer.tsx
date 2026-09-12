@@ -36,7 +36,8 @@
 // opens the source in a new tab as a fallback.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, FileQuestion, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileQuestion, RefreshCw } from "lucide-react";
+import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
@@ -641,17 +642,15 @@ function MissingEmbedState({ file, download }: { file: CourseFile; download: Cou
           Add a public HTTPS URL in product management. Google files must be shared as “Anyone with the link”.
         </p>
         {download.url ? (
-          <a
-            href={download.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-block rounded-full text-xs font-bold outline-none focus-visible:brightness-110"
-          >
-            <GlassSurface radius={999} className="h-10 text-white" contentClassName="flex h-full items-center gap-1.5 px-4">
-              {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
-              {download.label}
-            </GlassSurface>
-          </a>
+          /* Same download action (href + new-tab target), now wearing the
+             Course Player's Uiverse "slippery-owl-85" button treatment. */
+          <div className="mt-5">
+            <CourseDownloadButton
+              label={download.label}
+              icon={download.downloadable ? "download" : "external"}
+              href={download.url}
+            />
+          </div>
         ) : null}
         <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">File type: {file.type}</p>
       </div>

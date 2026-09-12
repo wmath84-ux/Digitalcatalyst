@@ -26,8 +26,9 @@
 //      "player bars" hide toggles are gone too because there is no header
 //      left to hide.
 
-import { BookmarkPlus, Download, ExternalLink, FileStack, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { BookmarkPlus, ExternalLink, FileStack, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
+import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
 import { toast } from "../components/ui/glass-toast";
@@ -335,15 +336,23 @@ export default function PlayerPanel({
               />
             ) : null}
             {fileActions.download.url ? (
-              <PanelActionRow
-                icon={Download}
-                color="#3A86FF"
-                label={fileActions.download.label}
-                hint={fileActions.download.downloadable ? fileActions.download.fileName : "New tab"}
-                href={fileActions.download.url}
-                downloadableFileName={fileActions.download.downloadable ? fileActions.download.fileName : undefined}
-                dataAttrs={{ "data-course-viewer-download": "" }}
-              />
+              /* Download action — the Uiverse "slippery-owl-85" button
+                 treatment (CourseDownloadButton). Behaviour is untouched:
+                 same href, same `download` filename, same new-tab target;
+                 the row keeps its data hooks for the contract tests and
+                 the hint line keeps the filename visible. */
+              <div className="rounded-2xl px-2 py-2" data-course-panel-row="" data-course-viewer-download="">
+                <CourseDownloadButton
+                  label={fileActions.download.label}
+                  icon={fileActions.download.downloadable ? "download" : "external"}
+                  href={fileActions.download.url}
+                  downloadableFileName={fileActions.download.downloadable ? fileActions.download.fileName : undefined}
+                  ariaLabel={`${fileActions.download.label} — ${fileActions.download.downloadable ? fileActions.download.fileName : "new tab"}`}
+                />
+                <p className="mt-1 truncate pl-1 text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]">
+                  {fileActions.download.downloadable ? fileActions.download.fileName : "New tab"}
+                </p>
+              </div>
             ) : null}
             {fileActions.isMedia ? (
               <PanelActionRow
