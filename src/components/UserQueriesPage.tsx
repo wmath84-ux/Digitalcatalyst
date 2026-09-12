@@ -5,24 +5,29 @@
 // to the address the query came from (api/_lib/userQueries.ts) AND rendered
 // under the question so the thread reads as a conversation.
 //
-// Replied and unreplied queries are visually distinct on purpose:
-//   · unreplied → amber rail, "Awaiting reply" chip, reply composer open,
-//   · replied   → emerald rail, "Replied" chip, dimmed question and the
-//     reply shown in its own tinted answer card below it.
+// The card itself lives in ./QueryCard: an opaque feed card (avatar + author
+// + question + timestamp, with the answer as a separated secondary block).
+// It is deliberately NOT glass — no backdrop-filter, no translucent fill — so
+// the copy stays sharp over the winter scene. Replied and unreplied queries
+// are still visually distinct on purpose:
+//   · unreplied → amber "Awaiting reply" pill, reply composer open,
+//   · replied   → emerald rail + mark, dimmed question, answer in its own
+//     inset panel below it.
 //
 // The status filter (All / Unreplied / Replied) floats just above the footer
 // navigation, using the measured dock height (`--dc-footer-nav-h`) so it can
 // never sit under the dock.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, Mail, MessageSquare, Send } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Check, MessageSquare, RotateCcw } from "lucide-react";
 import Header from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
-import { GlassCard } from "./ui/GlassCard";
+import QueryCard from "./QueryCard";
 import Skeleton from "./ui/Skeleton";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
-import { listUserQueries, replyToUserQuery, type UserQuery } from "../utils/userQueries";
+import { cn } from "../utils/cn";
+import { listUserQueries, type UserQuery } from "../utils/userQueries";
 
 type FilterKey = "all" | "open" | "replied";
 
@@ -32,144 +37,31 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "replied", label: "Replied" },
 ];
 
-const formatWhen = (value: number) => {
-  if (!value) return "";
-  const date = new Date(value);
-  return date.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-};
+/**
+ * The same opaque shell the real card wears, for the page's two non-card
+ * surfaces (the failure panel and the loading placeholders) so the list never
+ * changes shape between states. Shared with QueryCard's palette on purpose.
+ */
+const SHELL = "w-full rounded-[22px] border border-[#263149] bg-[#101A2C]";
+const SHELL_PAD = "px-4 py-3.5 sm:px-5 sm:py-4";
 
-function QueryCard({
-  query,
-  canReply,
-  onReplied,
-}: {
-  query: UserQuery;
-  canReply: boolean;
-  onReplied: (next: UserQuery) => void;
-}) {
-  const replied = query.status === "replied";
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const submit = async () => {
-    const text = draft.trim();
-    if (!text || sending) return;
-    setSending(true);
-    setError(null);
-    try {
-      const result = await replyToUserQuery(query.id, text);
-      onReplied(result.query);
-      setDraft("");
-      setNotice(result.emailed ? `Emailed to ${query.email}` : result.emailStatus);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not send the reply.");
-    } finally {
-      setSending(false);
-    }
-  };
-
+/** Loading placeholder that mirrors QueryCard's geometry exactly. */
+function QueryCardSkeleton() {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ type: "spring", stiffness: 260, damping: 26 }}
-      data-user-query
-      data-status={query.status}
-    >
-      <GlassCard
-        className="overflow-hidden"
-        contentClassName="p-0"
-      >
-        {/* Status rail — the instant visual difference between the two kinds. */}
-        <div className="flex">
-          <span
-            aria-hidden
-            className="w-1 shrink-0"
-            style={{ background: replied ? "#06D6A0" : "#FFBE0B" }}
-          />
-          <div className="min-w-0 flex-1 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-black text-white">{query.name}</p>
-                <p className="truncate text-[11px] font-semibold text-white/45">
-                  {query.email || "no email"} · {formatWhen(query.createdAt)}
-                </p>
-              </div>
-              <span
-                className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider"
-                style={
-                  replied
-                    ? { background: "#06D6A018", borderColor: "#06D6A044", color: "#6EE7C0" }
-                    : { background: "#FFBE0B18", borderColor: "#FFBE0B44", color: "#FFD666" }
-                }
-              >
-                {replied ? "Replied" : "Awaiting reply"}
-              </span>
-            </div>
-
-            <p className={`mt-3 whitespace-pre-wrap text-sm font-medium ${replied ? "text-white/60" : "text-white/90"}`}>
-              {query.message}
-            </p>
-
-            {/* The owner's reply, shown UNDER the query as its own answer card. */}
-            {replied && query.reply ? (
-              <div
-                className="mt-3 rounded-2xl border p-3"
-                style={{ background: "#06D6A00f", borderColor: "#06D6A033" }}
-              >
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider" style={{ color: "#6EE7C0" }}>
-                  <Mail size={12} /> Your reply · {formatWhen(query.repliedAt || 0)}
-                </p>
-                <p className="mt-1.5 whitespace-pre-wrap text-sm font-medium text-white/85">{query.reply}</p>
-                {query.replyEmailStatus ? (
-                  <p className="mt-2 text-[10px] font-semibold text-white/35">{query.replyEmailStatus}</p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* Composer — only the owner sees it, and only until it is answered. */}
-            {canReply && !replied ? (
-              <div className="mt-3">
-                <textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void submit();
-                  }}
-                  rows={3}
-                  placeholder={`Reply to ${query.name}…`}
-                  className="w-full resize-y rounded-2xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm font-medium text-white outline-none placeholder:text-white/35 focus:border-white/30"
-                />
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-[10px] font-semibold text-white/35">
-                    Sends to {query.email || "— no email on this query"}
-                  </p>
-                  <motion.button
-                    type="button"
-                    onClick={() => void submit()}
-                    disabled={sending || !draft.trim()}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ type: "spring", stiffness: 320, damping: 20 }}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black text-white disabled:opacity-50"
-                    style={{ background: "linear-gradient(135deg, #8B5CF6, #6D28D9)" }}
-                  >
-                    {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                    {sending ? "Sending…" : "Send reply"}
-                  </motion.button>
-                </div>
-                {error ? <p className="mt-2 text-[11px] font-semibold text-rose-300">{error}</p> : null}
-                {notice ? <p className="mt-2 text-[11px] font-semibold text-emerald-300">{notice}</p> : null}
-              </div>
-            ) : null}
-          </div>
+    <div aria-hidden="true" className={cn(SHELL, SHELL_PAD)}>
+      <div className="flex items-start gap-3">
+        <Skeleton width={40} height={40} radius={999} />
+        <div className="min-w-0 flex-1">
+          <Skeleton width="58%" height={15} radius={6} />
+          <Skeleton width="82%" height={12} radius={6} className="mt-1.5" />
         </div>
-      </GlassCard>
-    </motion.div>
+        <Skeleton width={78} height={22} radius={999} />
+      </div>
+      <Skeleton width="100%" height={13} radius={6} className="mt-3" />
+      <Skeleton width="94%" height={13} radius={6} className="mt-1.5" />
+      <Skeleton width="62%" height={13} radius={6} className="mt-1.5" />
+      <Skeleton width={118} height={11} radius={6} className="mt-3" />
+    </div>
   );
 }
 
@@ -254,63 +146,66 @@ export default function UserQueriesPage({
         />
 
         <main data-user-queries-content data-footer-nav-space className="flex-1 overflow-y-auto px-4 pt-3 md:px-8">
-          {error ? (
-            <GlassCard contentClassName="p-4">
-              <p className="text-sm font-semibold text-rose-300">{error}</p>
-              <button
-                type="button"
-                onClick={() => void load()}
-                className="mt-3 rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white"
+          {/* Readable measure on wide screens: the card is a conversation, not
+              a banner, so it never stretches to the full desktop width. */}
+          <div className="mx-auto w-full min-w-0 max-w-2xl">
+            {error ? (
+              <div className={cn(SHELL, SHELL_PAD)} role="alert">
+                <p className="text-sm font-semibold text-[#FDA4AF]">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className={cn(
+                    "mt-3 inline-flex h-9 items-center gap-1.5 rounded-full border border-[#263149] bg-[#0A1120] px-4 text-[13px] font-bold text-white",
+                    "transition-colors duration-150 hover:border-[#3B4A6B]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7DD3FC] focus-visible:ring-offset-2 focus-visible:ring-offset-[#101A2C]",
+                  )}
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                  Try again
+                </button>
+              </div>
+            ) : null}
+
+            {loading ? (
+              <div
+                className="flex flex-col gap-3.5 pb-4 sm:gap-4"
+                aria-busy="true"
+                aria-label="Loading queries"
               >
-                Try again
-              </button>
-            </GlassCard>
-          ) : null}
-
-          {loading ? (
-            <div className="flex flex-col gap-3 pb-4" aria-busy="true" aria-label="Loading queries">
-              {/* The page's own dummy layout — query-card placeholders instead
-                  of a bare spinner, so a switch to Queries shows structure
-                  until the list loads. */}
-              {[0, 1, 2].map((index) => (
-                <GlassCard key={index} aria-hidden="true" className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Skeleton width={40} height={40} radius={999} />
-                    <div className="min-w-0 flex-1">
-                      <Skeleton width="72%" height={14} radius={6} />
-                      <Skeleton width="46%" height={11} radius={6} className="mt-1.5" />
-                    </div>
-                  </div>
-                  <Skeleton width="100%" height={12} radius={6} className="mt-3" />
-                  <Skeleton width="88%" height={12} radius={6} className="mt-1.5" />
-                </GlassCard>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 pb-4">
-              <AnimatePresence mode="popLayout">
-                {visible.map((query) => (
-                  <QueryCard key={query.id} query={query} canReply={owner} onReplied={handleReplied} />
+                {/* The page's own dummy layout — query-card placeholders instead
+                    of a bare spinner, so a switch to Queries shows structure
+                    until the list loads. */}
+                {[0, 1, 2].map((index) => (
+                  <QueryCardSkeleton key={index} />
                 ))}
-              </AnimatePresence>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3.5 pb-4 sm:gap-4">
+                <AnimatePresence mode="popLayout">
+                  {visible.map((query) => (
+                    <QueryCard key={query.id} query={query} canReply={owner} onReplied={handleReplied} />
+                  ))}
+                </AnimatePresence>
 
-              {visible.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-16 text-center">
-                  <Check size={26} className="text-white/20" />
-                  <p className="text-sm text-white/60">
-                    {filter === "replied"
-                      ? "No replied queries yet"
-                      : filter === "open"
-                        ? "Nothing waiting for a reply"
-                        : "No queries yet"}
-                  </p>
-                  <p className="max-w-xs text-xs text-white/30">
-                    Notes dropped on the home page's feedback wall show up here.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          )}
+                {visible.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-16 text-center">
+                    <Check size={26} className="text-white/20" aria-hidden="true" />
+                    <p className="text-sm text-white/60">
+                      {filter === "replied"
+                        ? "No replied queries yet"
+                        : filter === "open"
+                          ? "Nothing waiting for a reply"
+                          : "No queries yet"}
+                    </p>
+                    <p className="max-w-xs text-xs text-white/30">
+                      Notes dropped on the home page's feedback wall show up here.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
         </main>
 
         {/* Status filter — floats just above the footer navigation. */}
