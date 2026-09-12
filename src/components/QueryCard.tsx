@@ -33,6 +33,7 @@ import { motion } from "framer-motion";
 import { BadgeCheck, CornerUpLeft, Loader2, Mail, Send } from "lucide-react";
 import { cn } from "../utils/cn";
 import { replyToUserQuery, type UserQuery } from "../utils/userQueries";
+import FatZebraButton from "./ui/FatZebraButton";
 
 /**
  * The card's palette — all opaque, all local to this component.
@@ -345,25 +346,21 @@ export default function QueryCard({
                 >
                   Sends to {query.email || "— no email on this query"}
                 </p>
-                <button
+                <FatZebraButton
                   type="button"
+                  size="sm"
+                  plane={!sending}
                   onClick={() => void submit()}
                   disabled={sending || !draft.trim()}
-                  className={cn(
-                    "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold text-white",
-                    "transition-transform duration-150 active:scale-[0.97] sm:hover:scale-[1.03]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7DD3FC] focus-visible:ring-offset-2 focus-visible:ring-offset-[#101A2C]",
-                    "disabled:cursor-not-allowed disabled:opacity-50",
-                  )}
-                  style={{ backgroundImage: "linear-gradient(135deg,#7C3AED,#6D28D9)" }}
-                >
-                  {sending ? (
-                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Send size={14} aria-hidden="true" />
-                  )}
-                  {sending ? "Sending…" : "Send reply"}
-                </button>
+                  icon={
+                    sending ? (
+                      <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Send size={15} aria-hidden="true" />
+                    )
+                  }
+                  label={sending ? "Sending…" : "Send reply"}
+                />
               </div>
               {error ? (
                 <p role="alert" className="mt-2 text-[12px] font-semibold text-[#FDA4AF]">
