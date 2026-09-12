@@ -6898,3 +6898,29 @@ html[data-course-player-active="true"] {
     gap: 8px !important;
   }
 }
+
+/* Seven primary destinations. Only the shared primary nav opts into labels;
+   Flow and course-player docks retain their existing gesture/layout rules.
+   320px: 7 × 44px + 4px panel + 2px border + 4px outer = 318px. Tablet expands naturally. */
+@media (max-width: 959px) {
+  [data-primary-library-nav][data-site-footer-nav] { padding-inline: 2px; }
+  [data-primary-library-nav] > [data-site-footer] { width: 100%; max-width: 720px; }
+  [data-primary-library-nav] [data-glass-dock] {
+    width: 100%; max-width: 100%; gap: 0; padding-inline: 2px;
+    justify-content: space-between; align-items: stretch;
+  }
+  [data-primary-library-nav] [data-glass-dock-item] { flex: 1; min-width: 0; padding-bottom: 36px; }
+  [data-primary-library-nav] [data-glass-dock-item] > div:first-child {
+    top: auto; bottom: 0; opacity: 1; width: 100%; padding: 0 1px;
+    height: 34px; white-space: normal; overflow-wrap: anywhere;
+    font-size: 10px; line-height: 11px; text-align: center;
+    background: none !important; border: 0 !important; backdrop-filter: none !important;
+  }
+  [data-primary-library-nav] [data-glass-dock-item] > button {
+    width: 44px !important; height: 44px !important; transform: none !important;
+  }
+}
+@media (min-width: 600px) and (max-width: 959px) {
+  [data-primary-library-nav] [data-glass-dock] { padding-inline: 14px; }
+  [data-primary-library-nav] [data-glass-dock-item] > div:first-child { font-size: 12px; line-height: 15px; }
+}

@@ -113,14 +113,8 @@ export async function runProductionAssistant(input: {
     };
   } catch (error) {
     if (signal?.aborted) throw error;
-    const message = error instanceof PersonalAiApiError
-      ? error.message
-      : error instanceof Error
-        ? error.message
-        : "Something went wrong on our side. Your message is safe — try again.";
-    const err = new Error(message);
-    (err as Error & { lumenError?: true }).lumenError = true;
-    throw err;
+    if (error instanceof PersonalAiApiError) throw error;
+    throw new Error("Unable to connect to AI service. Please try again.");
   }
 }
 

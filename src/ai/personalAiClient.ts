@@ -92,7 +92,7 @@ export async function resolvePersonalAiProvider(uid: string): Promise<PersonalAi
   const userConfig = loadUserAiConfig(uid);
   const effective = resolveEffectiveAi(userConfig, settings);
   return {
-    source: effective.mode === "offline" ? "default" : effective.mode,
+    source: userConfig.source,
     config: effective.config,
     label: effective.label,
     available: effective.mode !== "offline" && Boolean(effective.config),
@@ -125,11 +125,13 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
   if (!user) {
     throw new PersonalAiApiError(personalAiFailure({ code: "AUTH_REQUIRED" }), 401);
   }
+  if (options.signal?.aborted) throw new PersonalAiApiError(personalAiFailure({ code: "CANCELLED" }), 0);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 75_000);
   const onAbort = () => controller.abort();
   options.signal?.addEventListener("abort", onAbort);
   let response: Response;
+  let raw: string;
   try {
     const token = await user.getIdToken();
     response = await apiFetch("/api/personal-ai", {
@@ -138,6 +140,7 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
       body: JSON.stringify({ action, ...payload, tzOffsetMinutes: new Date().getTimezoneOffset() }),
       signal: controller.signal,
     });
+    raw = await response.text();
   } catch (error) {
     const aborted = options.signal?.aborted === true;
     if (aborted) throw new PersonalAiApiError(personalAiFailure({ code: "CANCELLED", message: "Cancelled." }), 0);
@@ -149,7 +152,7 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
         message: offline
           ? "You're offline, so the AI couldn't be reached. Reconnect and try again."
           : timedOut
-            ? "The AI took too long to answer. Nothing was charged — please try again."
+            ? "The AI took too long to answer. Check your conversation before retrying."
             : undefined,
       }),
       0,
@@ -159,10 +162,10 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", onAbort);
   }
-  const raw = await response.text();
   let body: Envelope<T> = {};
   try {
     body = JSON.parse(raw) as Envelope<T>;
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid AI envelope");
   } catch {
     const html = /^\s*</.test(raw) || /text\/html/i.test(response.headers.get("content-type") || "");
     throw new PersonalAiApiError(
@@ -203,11 +206,19 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
 
 /** Attach the learner's resolved AI provider to a generation/ask request. */
 const withProvider = async (uid: string, payload: Record<string, unknown>, preferredSource?: "own" | "default") => {
-  const provider = await resolvePersonalAiProvider(uid);
-  const source = preferredSource === "own" || preferredSource === "default"
-    ? preferredSource
-    : (provider.source === "own" ? "own" : "default");
-  const ownConfig = provider.config;
+  if (auth.currentUser?.uid !== uid) {
+    throw new PersonalAiApiError(personalAiFailure({ code: "AUTH_REQUIRED" }), 401);
+  }
+  // Re-read Revision's saved preference at send time, never a per-chat copy.
+  const saved = loadUserAiConfig(uid);
+  const source = preferredSource ?? saved.source;
+  if (source === "offline") {
+    throw new PersonalAiApiError(personalAiFailure({ code: "AI_DISABLED" }));
+  }
+  const ownConfig = saved.config;
+  if (source === "own" && (!ownConfig.apiKey.trim() || !ownConfig.model.trim())) {
+    throw new PersonalAiApiError(personalAiFailure({ code: "AI_NOT_CONFIGURED" }));
+  }
   return {
     ...payload,
     source,
@@ -267,7 +278,11 @@ export const askModuleAi = async (input: AskModuleAiInput): Promise<PersonalAiAn
     history: (input.history || []).slice(-8),
     courseContext: input.courseContext || undefined,
   }, input.source);
-  return request<PersonalAiAnswerResult>("personalAi.ask", payload, { signal: input.signal, timeoutMs: 90_000 });
+  const answer = await request<PersonalAiAnswerResult>("personalAi.ask", payload, { signal: input.signal, timeoutMs: 90_000 });
+  if (!answer || typeof answer.answer !== "string" || !answer.answer.trim()) {
+    throw new PersonalAiApiError(personalAiFailure({ code: "AI_EMPTY" }), 502);
+  }
+  return answer;
 };
 
 export interface GenerateModuleAiInput extends PersonalAiScopeInput {

@@ -825,14 +825,19 @@ async function groundedCompletion(input: {
   const requestedSource = body.source === "own" ? "own" : "default";
   let config: RevisionAiConfig;
   if (requestedSource === "own") {
-    const own = parseOwnConfig(body.config);
+    let own: RevisionAiConfig | null;
+    try { own = parseOwnConfig(body.config, false); }
+    catch { fail(400, "AI_PROVIDER_CONFIG_INVALID", "Check your provider configuration."); }
     if (!own) fail(400, "AI_NOT_CONFIGURED", "Connect your own AI provider (key + model) in Revision → AI Configuration first.");
     config = own;
   } else {
     try {
-      config = await loadSchoolConfig();
+      config = await loadSchoolConfig(false);
     } catch (error) {
-      fail(409, "AI_NOT_CONFIGURED", (error as Error)?.message || "No AI provider is published yet. Connect your own key in Revision → AI Configuration.");
+      if (number((error as { statusCode?: unknown })?.statusCode) === 409) {
+        fail(409, "AI_SCHOOL_NOT_PUBLISHED", "School Provided AI is not configured. Please contact your school.");
+      }
+      throw error;
     }
   }
 
@@ -869,7 +874,7 @@ async function groundedCompletion(input: {
     const code = text((error as { code?: unknown })?.code);
     throw new ApiError(
       statusCode === 429 ? 429 : statusCode >= 500 ? 502 : statusCode,
-      code || "PROVIDER_ERROR",
+      code === "AI_PROVIDER_KEY_INVALID" && requestedSource === "default" ? "AI_SCHOOL_KEY_INVALID" : code || "PROVIDER_ERROR",
       (error as Error)?.message || "The AI provider didn't answer.",
     );
   }
@@ -950,7 +955,7 @@ async function handleContext(db: Db, uid: string, body: Body) {
   }
   const artifacts = await listArtifacts(db, uid, scope.storageModuleId);
   const source = body.source === "own" ? "own" : "default";
-  const configured = source === "own" ? Boolean(parseOwnConfig(body.config)) : Boolean(text(asRecord(aiSettings).sharedApiKey)) && Boolean(text(asRecord(aiSettings).model));
+  const configured = source === "own" ? Boolean(parseOwnConfig(body.config, false)) : Boolean(text(asRecord(aiSettings).sharedApiKey)) && Boolean(text(asRecord(aiSettings).model));
   return {
     scope: {
       moduleId: scope.moduleId,
@@ -1356,7 +1361,7 @@ export async function handlePersonalAi(req: VercelRequest, res: VercelResponse) 
   } catch (error) {
     if (error instanceof ApiError) {
       const mapped = personalAiFailure({ code: error.code, message: error.message, status: error.status });
-      return json(res, error.status, { ok: false, ...mapped, code: error.code, message: error.message || mapped.message, details: error.details });
+      return json(res, error.status, { ok: false, ...mapped, code: error.code, message: mapped.message, details: error.details });
     }
     const status = error && typeof error === "object" && "statusCode" in error
       ? number((error as { statusCode?: unknown }).statusCode, 500)

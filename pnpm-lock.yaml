@@ -147,6 +147,9 @@ importers:
       browserslist:
         specifier: ^4.28.8
         version: 4.28.8
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1

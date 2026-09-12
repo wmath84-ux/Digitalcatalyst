@@ -98,6 +98,9 @@ export interface Message {
   attachments?: Attachment[];
   createdAt: number;
   status: MsgStatus;
+  errorMessage?: string;
+  errorRetryable?: boolean;
+  errorKind?: string;
   thinking?: ThinkingStep[];
   thinkingOpen?: boolean;
   thinkingMs?: number;

@@ -135,18 +135,25 @@ const requestId = () => {
 };
 
 async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePayload>, "action"> = {}): Promise<T> {
+  await auth.authStateReady();
   const user = auth.currentUser;
   if (!user) throw new PersonalCourseApiError("Please log in to use My Study Library.", "AUTH_REQUIRED", 401);
   const isRead = READ_ACTIONS.has(action);
   const retryable = isRead;
+  const controller = new AbortController();
+  const timeout = isRead ? setTimeout(() => controller.abort(), 30_000) : undefined;
   let response: Response;
+  let body: Envelope<T>;
   try {
     const token = await user.getIdToken();
     response = await apiFetch("/api/personal-course", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, requestId: requestId(), ...payload }),
+      ...(isRead ? { signal: controller.signal } : {}),
     });
+    body = (await response.json().catch(() => ({}))) as Envelope<T>;
+    if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
   } catch (error) {
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     throw new PersonalCourseApiError(
@@ -162,8 +169,9 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
       error,
       { retryable },
     );
+  } finally {
+    clearTimeout(timeout);
   }
-  const body = (await response.json().catch(() => ({}))) as Envelope<T>;
   if (!response.ok || !body.ok || body.data === undefined) {
     // A gateway/function 5xx can arrive after the transaction committed but
     // before its response reached the browser. Treat it as unconfirmed rather
@@ -187,7 +195,13 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
       isRead
         ? foreign
           ? "My Study Library didn't answer this request — the shared API replied with a different service's result. Reload the page and try again."
-          : body.message || body.error || "Your library couldn't be loaded. Try again."
+          : response.status === 401
+            ? "Your sign-in session expired. Please sign in again to open your library."
+            : response.status === 403
+              ? "Your account does not have permission to open this library. Contact support if this is unexpected."
+              : body.code === "LIBRARY_INDEX_REQUIRED"
+                ? "My Study Library is awaiting a server update. Please contact support or try again shortly."
+                : "Your library couldn't be loaded. Please try again."
         : body.message || body.error || "My Study Library couldn't be updated.",
       foreign && isRead ? "LIBRARY_ROUTE_UNAVAILABLE" : body.code || "PERSONAL_COURSE_ERROR",
       response.status,
@@ -224,7 +238,7 @@ export const fetchPersonalCourseLibrary = async (): Promise<{
   // Shape-check the snapshot before it reaches React state. Anything else used
   // to surface as a render-time TypeError several frames later, which unmounted
   // the whole route instead of showing a recoverable error card.
-  if (!result || typeof result !== "object" || !result.access || !Array.isArray(result.modules) || !Array.isArray(result.savedResources)) {
+  if (!result || typeof result !== "object" || !result.access || !result.usage || !Array.isArray(result.modules) || !Array.isArray(result.savedResources)) {
     throw new PersonalCourseApiError(
       "My Study Library returned an incomplete snapshot. Try again to reload it.",
       "MALFORMED_SNAPSHOT",

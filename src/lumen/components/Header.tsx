@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
 import { tierLte } from "../lib/tier";
-import type { Chat, Tier } from "../lib/types";
+import type { AIModel, Chat, Tier } from "../lib/types";
 import { cn } from "../utils/cn";
 import Dropdown from "./Dropdown";
 import ModelSelector from "./ModelSelector";
@@ -13,8 +13,11 @@ function Header({
   onOpenSidebar,
   onTogglePin,
   onRename,
-  onSelectModel,
+  onSelectModel, models, selectedSource, modelDisabled,
 }: {
+  models: AIModel[];
+  selectedSource: string;
+  modelDisabled: boolean;
   chat: Chat;
   tier: Tier;
   showMenuButton: boolean;
@@ -111,7 +114,7 @@ function Header({
           )}
         </div>
 
-        <ModelSelector modelId={chat.modelId} tier={tier} onSelect={onSelectModel} />
+        <ModelSelector models={models} disabled={modelDisabled} modelId={selectedSource} tier={tier} onSelect={onSelectModel} />
 
         {directActions && (
           <>

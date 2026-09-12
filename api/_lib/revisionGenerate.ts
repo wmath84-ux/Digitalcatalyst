@@ -1,3 +1,4 @@
+import { aiProviderFailure } from "../../utils/aiProviderFailure.js";
 // api/_lib/revisionGenerate.ts
 //
 // Server-side revision-question generation. Browser calls to OpenAI /
@@ -534,14 +535,14 @@ function parseSyllabus(raw: unknown): RevisionSyllabus {
   };
 }
 
-function parseOwnConfig(raw: unknown): AiConfig | null {
+function parseOwnConfig(raw: unknown, allowModelMigration = true): AiConfig | null {
   const r = asRecord(raw);
   const provider = PROVIDERS.includes(r.provider as ProviderId) ? (r.provider as ProviderId) : null;
   const apiKey = String(r.apiKey ?? "").trim();
   // Upgrade a stale/retired Gemini id so an old saved config never 404s.
   const modelRaw = String(r.model ?? "").trim().replace(/^models\//i, "");
   const model =
-    provider === "gemini" && isRetiredGeminiModel(modelRaw)
+    allowModelMigration && provider === "gemini" && isRetiredGeminiModel(modelRaw)
       ? GEMINI_FALLBACK_MODEL
       : modelRaw;
   if (!provider || !apiKey || !model) return null;
@@ -549,14 +550,14 @@ function parseOwnConfig(raw: unknown): AiConfig | null {
   return { provider, apiKey, baseUrl, model };
 }
 
-async function loadSchoolConfig(): Promise<AiConfig> {
+async function loadSchoolConfig(allowModelMigration = true): Promise<AiConfig> {
   const snap = await adminDb().collection("settings").doc(REVISION_CATALOG_DOC).get();
   const settings = asRecord(asRecord(snap.data()).aiSettings);
   const provider = PROVIDERS.includes(settings.provider as ProviderId) ? (settings.provider as ProviderId) : "gemini";
   const apiKey = String(settings.sharedApiKey ?? "").trim();
   const modelRaw = String(settings.model ?? "").trim().replace(/^models\//i, "");
   const model =
-    provider === "gemini" && isRetiredGeminiModel(modelRaw)
+    allowModelMigration && provider === "gemini" && isRetiredGeminiModel(modelRaw)
       ? GEMINI_FALLBACK_MODEL
       : modelRaw;
   if (!apiKey || !model) {
@@ -1263,7 +1264,7 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
       }),
     });
     if (!gRes.ok) {
-      throw Object.assign(new Error(`Gemini returned ${gRes.status}. ${(await gRes.text().catch(() => "")).slice(0, 200)}`), { statusCode: 502 });
+      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(gRes.status, await gRes.text().catch(() => "")));
     }
     const text = extractGeminiText(await gRes.json());
     if (!text) throw Object.assign(new Error("Gemini returned an empty response."), { statusCode: 502 });
@@ -1277,7 +1278,7 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
       body: JSON.stringify({ model: config.model, max_tokens: 8192, system, messages: [{ role: "user", content: user }] }),
     });
     if (!aRes.ok) {
-      throw Object.assign(new Error(`Anthropic returned ${aRes.status}. ${(await aRes.text().catch(() => "")).slice(0, 200)}`), { statusCode: 502 });
+      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(aRes.status, await aRes.text().catch(() => "")));
     }
     const text = extractAnthropicText(await aRes.json());
     if (!text) throw Object.assign(new Error("Anthropic returned an empty response."), { statusCode: 502 });
@@ -1307,10 +1308,10 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
   if (oRes.status === 400) {
     const detail = await oRes.text().catch(() => "");
     if (/response_format|json_object/i.test(detail)) oRes = await call(false);
-    else throw Object.assign(new Error(`${config.provider} returned 400. ${detail.slice(0, 200)}`), { statusCode: 502 });
+    else throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(400, detail));
   }
   if (!oRes.ok) {
-    throw Object.assign(new Error(`${config.provider} returned ${oRes.status}. ${(await oRes.text().catch(() => "")).slice(0, 200)}`), { statusCode: 502 });
+    throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(oRes.status, await oRes.text().catch(() => "")));
   }
   const text = extractOpenAiText(await oRes.json());
   if (!text) throw Object.assign(new Error("The model returned an empty response."), { statusCode: 502 });
