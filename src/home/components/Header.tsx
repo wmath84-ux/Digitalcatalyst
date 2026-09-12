@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
+import { Bell, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
 import ExpandingTabs from "../../components/ui/ExpandingTabs";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
@@ -21,6 +21,14 @@ interface HeaderProps {
   favoritesCount: number;
   onOpenFavorites?: () => void;
   onOpenNotifications?: () => void;
+  /**
+   * Settings gear — rendered in the right-side action cluster ONLY when this
+   * callback is provided, so the gear appears exclusively on the pages that
+   * pass it (the Flow page). It opens the page's own existing settings
+   * surface — FlowPathApp wires it to the same CurveSettingsModal the dock's
+   * gear opens; no duplicate settings page is created here.
+   */
+  onOpenSettings?: () => void;
 }
 
 const typeLabel: Record<string, string> = {
@@ -52,7 +60,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -196,6 +204,12 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             ariaLabel="Home actions"
             activeId={homeActiveAction}
             onSelect={(id) => {
+              // The gear is a momentary action (opens the page's settings
+              // surface), never the expanded pill.
+              if (id === "settings") {
+                onOpenSettings?.();
+                return;
+              }
               setHomeActiveAction(id);
               if (id === "leaderboard") window.location.hash = "#/leaderboard";
               else if (id === "profile") window.location.hash = "#/profile";
@@ -222,6 +236,12 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
                 badgeTone: "rose",
               },
+              // Flow-page-only gear (same icon system / size as the other
+              // header actions): rendered just when the page passes the
+              // callback, so no other header ever shows it.
+              ...(onOpenSettings
+                ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={17} strokeWidth={2.4} /> }]
+                : []),
             ]}
           />
           {/* The "Dark mode" GlassSwitch moved off the header — appearance now

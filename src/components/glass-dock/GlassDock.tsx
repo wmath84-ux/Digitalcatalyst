@@ -63,6 +63,15 @@ export type GlassDockItem = {
   buttonRef?: Ref<HTMLButtonElement>
   buttonProps?: GlassDockButtonProps
   dataAttrs?: Record<string, string | undefined>
+  /**
+   * Wide PRIMARY text button (Flow dock's "Create"): renders the label text
+   * instead of the icon, noticeably wider than an icon plate, same height so
+   * the dock's baseline/alignment is unchanged, with the app's indigo→violet
+   * primary treatment. Opts OUT of the magnification wave (a wide pill
+   * stretching under the pointer reads as broken). Off everywhere else, so
+   * every existing dock is untouched.
+   */
+  wide?: boolean
 }
 
 function DockItem({
@@ -78,6 +87,7 @@ function DockItem({
   buttonRef,
   buttonProps,
   dataAttrs,
+  wide,
   onSelect,
   skipClickRef,
   plateSize,
@@ -125,21 +135,24 @@ function DockItem({
       transition={{ type: 'spring', stiffness: 200, damping: 18, delay: index * 0.04 }}
     >
       {/* Frosted tooltip (AI Canvas): visible on hover, pinned open for the
-          active tab so the current page keeps its label on touch devices. */}
-      <motion.div
-        className={`pointer-events-none absolute -top-10 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
-          active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}
-        style={{
-          background: DOCK_PANEL_BG,
-          backdropFilter: DOCK_PANEL_BLUR,
-          WebkitBackdropFilter: DOCK_PANEL_BLUR,
-          border: DOCK_PANEL_BORDER,
-          transition: 'opacity 0.15s',
-        }}
-      >
-        {label}
-      </motion.div>
+          active tab so the current page keeps its label on touch devices.
+          The wide primary button already shows its label, so it skips this. */}
+      {!wide && (
+        <motion.div
+          className={`pointer-events-none absolute -top-10 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
+            active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+          style={{
+            background: DOCK_PANEL_BG,
+            backdropFilter: DOCK_PANEL_BLUR,
+            WebkitBackdropFilter: DOCK_PANEL_BLUR,
+            border: DOCK_PANEL_BORDER,
+            transition: 'opacity 0.15s',
+          }}
+        >
+          {label}
+        </motion.div>
+      )}
 
       <motion.button
         ref={setButtonRef}
@@ -161,25 +174,46 @@ function DockItem({
           if (event.defaultPrevented) return
           onSelect()
         }}
-        style={{
-          width: size,
-          height: size,
-          y,
-          // Notification-style tinted badge (AI Canvas): every icon sits on
-          // its own colour-tinted plate; the active tab deepens the same
-          // tint and gains a soft glow instead of switching palettes.
-          background: active ? `${color}30` : `${color}18`,
-          border: active ? `1px solid ${color}55` : `1px solid ${color}22`,
-          borderRadius: 12,
-          boxShadow: active ? `0 0 16px ${color}44` : 'none',
-        }}
+        style={
+          wide
+            ? {
+                height: plateSize,
+                minWidth: 96,
+                y,
+                // Primary action: the app's indigo→violet, white bold label.
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                border: '1px solid rgba(255,255,255,0.22)',
+                borderRadius: 12,
+                boxShadow: '0 6px 18px -6px rgba(99,102,241,0.65), inset 0 1px 0 rgba(255,255,255,0.35)',
+              }
+            : {
+                width: size,
+                height: size,
+                y,
+                // Notification-style tinted badge (AI Canvas): every icon sits on
+                // its own colour-tinted plate; the active tab deepens the same
+                // tint and gains a soft glow instead of switching palettes.
+                background: active ? `${color}30` : `${color}18`,
+                border: active ? `1px solid ${color}55` : `1px solid ${color}22`,
+                borderRadius: 12,
+                boxShadow: active ? `0 0 16px ${color}44` : 'none',
+              }
+        }
         whileTap={{ scale: 0.82 }}
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
-        <span className="flex items-center justify-center" style={{ color }}>
-          <Icon size={glyph} className="shrink-0" style={{ color, width: glyph, height: glyph }} />
-        </span>
-        {extra}
+        {wide ? (
+          <span className="whitespace-nowrap px-4 text-[13px] font-extrabold tracking-wide text-white">
+            {label}
+          </span>
+        ) : (
+          <>
+            <span className="flex items-center justify-center" style={{ color }}>
+              <Icon size={glyph} className="shrink-0" style={{ color, width: glyph, height: glyph }} />
+            </span>
+            {extra}
+          </>
+        )}
         {!!badge && badge > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold text-white">
             {badge > 9 ? '9+' : badge}
