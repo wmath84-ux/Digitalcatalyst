@@ -9,9 +9,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Landmark,
-  Palette,
   Plus,
-  Settings,
   Sparkles,
   StickyNote,
   Sunrise,
@@ -128,7 +126,7 @@ const CREATE_SECTIONS: CreateMenuSection[] = [
  * fans never stack with the Create panel.
  *   · fan    — My Day / Revision: the vertical curved fan (FanMenu)
  *   · panel  — Create: the sectioned dropdown (CreateMenuPanel)
- *   · radial — Settings: the original radial (Flow Curve)
+ *   · radial — reserved (previously Settings/Flow Curve, now header-only)
  */
 type MenuKind = "fan" | "panel" | "radial";
 
@@ -165,14 +163,10 @@ export function BottomDock({
 }: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
 
+  void onOpenCurve; // P0-3: footer gear removed — header owns Flow Curve; prop kept for compatibility
   const mydayRef = useRef<HTMLButtonElement>(null);
   const createRef = useRef<HTMLButtonElement>(null);
-  const revisionRef = useRef<HTMLButtonElement>(null);
-  const settingsRef = useRef<HTMLButtonElement>(null);
-
-  const settingsItems: RadialItem[] = [
-    { id: "set-curve", label: "Flow Curve", icon: Palette, color: "#c084fc" },
-  ];
+  const revisionRef = useRef<HTMLButtonElement>(null);;
 
   /**
    * Open one surface, or close it when the same trigger is tapped again.
@@ -231,14 +225,13 @@ export function BottomDock({
   // uses (GlassDock), so the look (frost / refraction / transparency), the
   // pointer + finger magnify animation and the label tooltips all behave
   // identically. Home navigates; My Day / Revision expand as vertical curved
-  // fans; Create is a wide primary button opening the sectioned dropdown;
-  // Settings keeps its radial (Flow Curve).
+  // fans; Create is a wide primary button opening the sectioned dropdown.
+  // P0-3: Settings gear removed from footer (header gear is the single source for Flow Curve).
   const items: GlassDockItem[] = [
     { id: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
     { id: "myday", label: "My Day", icon: CalendarIcon, color: "#06D6A0", buttonRef: mydayRef },
     { id: "create", label: "Create", icon: Plus, color: "#8b7bff", wide: true, buttonRef: createRef },
     { id: "revision", label: "Revision", icon: SparkBookIcon, color: "#3A86FF", buttonRef: revisionRef },
-    { id: "settings", label: "Settings", icon: Settings, color: "#94a3b8", buttonRef: settingsRef },
   ];
 
   return (
@@ -263,9 +256,6 @@ export function BottomDock({
               if (id === "revision") {
                 toggleMenu("fan", "Revision", revisionRef, REVISION_ITEMS);
                 return;
-              }
-              if (id === "settings") {
-                toggleMenu("radial", "Settings", settingsRef, settingsItems);
               }
             }}
           />
@@ -310,12 +300,6 @@ export function BottomDock({
           onClose={() => setMenu(null)}
           onSelect={(id) => {
             setMenu(null);
-            // Settings gear options — Flow Curve opens the same
-            // CurveSettingsModal overlay it always did.
-            if (id === "set-curve") {
-              if (onOpenCurve) onOpenCurve();
-              return;
-            }
             const route = ROUTE_FOR_ITEM[id];
             if (route) {
               window.location.hash = route;
