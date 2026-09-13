@@ -1,0 +1,385 @@
+5function myFunction() {
+  
+}// === CONFIGURATION ===
+const SPREADSHEET_ID = "1hghBxWSY3ZkiFsduFzl0Q3YmH0E9L9nadgRzEBPvQso";
+const FORM_SHEET_NAME = "Form Responses 1";
+const DATA_SHEET_NAME = "Sheet2";
+const DOC_ID = "1ZqT6zxP1xBVHDsBnGK25TDOz5RyAfJjo-S01qJE_f1Y";
+const FOLDER_ID = "1fNHAPvkn338l5b30TyJka6leKijOHg8A";
+const ADMIN_EMAIL = "wmath84@gmail.com";
+
+// ** RAZORPAY API KEYS **
+const RAZORPAY_KEY_ID = "rzp_test_RIcz7LvvoMU57o";
+const RAZORPAY_KEY_SECRET = "NEYBowBCUmtZJeB96npmEEkt";
+
+// === COLUMN INDEXES (Sheet2) ===
+const TIMESTAMP_COL = 1; // Column A
+const NAME_COL = 2; // Column B
+const EMAIL_COL = 3; // Column C
+const PRICE_COL = 4; // Column D
+const SCREENSHOT_UPLOAD_COL = 5; // Column E
+const TRANSACTION_ID_COL = 6; // Column F
+const TRANSACTION_STATUS_COL = 7; // Column G
+const LINK_OF_SCREENSHOT_COL = 8; // Column H
+const ORIGINAL_DOC_FILENAME_COL = 9; // Column I
+const GRANT_ORIGINAL_CHECKBOX_COL = 10; // Column J
+const ORIGINAL_STATUS_COL = 11; // Column K
+const COPIED_DOC_FILENAME_COL = 12; // Column L
+const GRANT_COPY_CHECKBOX_COL = 13; // Column M
+const COPY_STATUS_COL = 14; // Column N
+const COPIED_DOC_LINK_COL = 15; // Column O
+
+// === HELPER FUNCTIONS ===
+
+/**
+ * Verifies a Razorpay payment using its API.
+ * @param {string} paymentId The Razorpay payment ID.
+ * @return {Object} The JSON response from the Razorpay API, or null if an error occurs.
+ */
+function verifyRazorpayPayment(paymentId) {
+  const url = `https://api.razorpay.com/v1/payments/${paymentId}`;
+  
+  const options = {
+    'method': 'get',
+    'headers': {
+      'Authorization': 'Basic ' + Utilities.base64Encode(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET)
+    }
+  };
+  
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const result = JSON.parse(response.getContentText());
+    return result;
+  } catch (e) {
+    Logger.log(`Razorpay verification failed: ${e.message}`);
+    return null;
+  }
+}
+
+
+/**
+ * Creates a copy with restricted editor access (only print allowed).
+ * @param {string} email The email of the user to grant access.
+ * @return {string} The URL of the newly created document.
+ */
+function createRestrictedEditorCopy(email) {
+  const originalFile = DriveApp.getFileById(DOC_ID);
+  const destinationFolder = DriveApp.getFolderById(FOLDER_ID);
+  
+  const copy = originalFile.makeCopy(`Personal Copy - ${email}`, destinationFolder);
+  
+  copy.addEditor(email);
+  
+  return copy.getUrl();
+}
+
+/**
+ * Generates a professional HTML button.
+ * @param {string} url The URL for the button.
+ * @param {string} text The text to display on the button.
+ * @return {string} The HTML string for the button.
+ */
+function getHtmlButton(url, text) {
+  return `<a href="${url}" style="background-color:#4CAF50;color:white;padding:12px 25px;text-align:center;text-decoration:none;display:inline-block;font-weight:bold;border-radius:5px;">${text}</a>`;
+}
+
+/**
+ * Handles the URL requests from the email buttons.
+ * This function is used when the script is deployed as a Web App.
+ * @param {Object} e The event object containing URL parameters.
+ * @return {HtmlOutput} An HTML page with a confirmation message.
+ */
+function doGet(e) {
+  const params = e.parameter;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME);
+  const row = parseInt(params.row);
+  const action = params.action;
+  
+  if (action === "grantOriginal" && row) {
+    const range = sheet.getRange(row, GRANT_ORIGINAL_CHECKBOX_COL);
+    range.setValue(true);
+    onGrantOriginalAccess({
+      range: range,
+      source: SpreadsheetApp.getActiveSpreadsheet()
+    });
+    return HtmlService.createHtmlOutput(`<h1 style="color: #4CAF50;">सफलता!</h1><p>Original दस्तावेज़ का एक्सेस दिया गया।</p>`);
+  }
+  
+  if (action === "grantCopy" && row) {
+    const range = sheet.getRange(row, GRANT_COPY_CHECKBOX_COL);
+    range.setValue(true);
+    onGrantCopyAccess({
+      range: range,
+      source: SpreadsheetApp.getActiveSpreadsheet()
+    });
+    return HtmlService.createHtmlOutput(`<h1 style="color: #4CAF50;">सफलता!</h1><p>कॉपी किए गए दस्तावेज़ का एक्सेस दिया गया।</p>`);
+  }
+
+  return HtmlService.createHtmlOutput(`<h1>त्रुटि!</h1><p>अवैध अनुरोध।</p>`);
+}
+
+
+// === FORM SUBMIT TRIGGER ===
+/**
+ * Handles form submissions and sends an email to the admin with buttons.
+ * @param {Object} e The event object from the form submission.
+ */
+function onFormSubmit(e) {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const formSheet = spreadsheet.getSheetByName(FORM_SHEET_NAME);
+    const dataSheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
+    
+    if (!dataSheet) {
+      throw new Error(`Sheet with name "${DATA_SHEET_NAME}" not found. Please check your sheet name.`);
+    }
+
+    const rowData = formSheet.getRange(e.range.getRow(), 1, 1, formSheet.getLastColumn()).getValues()[0];
+    dataSheet.appendRow(rowData);
+    const newRow = dataSheet.getLastRow();
+    
+    const name = dataSheet.getRange(newRow, NAME_COL).getValue();
+    const email = dataSheet.getRange(newRow, EMAIL_COL).getValue();
+    const price = dataSheet.getRange(newRow, PRICE_COL).getValue();
+    const transactionId = dataSheet.getRange(newRow, TRANSACTION_ID_COL).getValue();
+    
+    const screenshotCell = formSheet.getRange(e.range.getRow(), SCREENSHOT_UPLOAD_COL);
+    const screenshotLink = screenshotCell.getRichTextValue() ? screenshotCell.getRichTextValue().getLinkUrl() : null;
+    const screenshotStatus = screenshotLink ? "Yes" : "No";
+
+    dataSheet.getRange(newRow, SCREENSHOT_UPLOAD_COL).setValue(screenshotStatus);
+    dataSheet.getRange(newRow, LINK_OF_SCREENSHOT_COL).setValue(screenshotLink || "");
+    dataSheet.getRange(newRow, ORIGINAL_STATUS_COL).setValue("Pending");
+    dataSheet.getRange(newRow, COPY_STATUS_COL).setValue("Pending");
+    dataSheet.getRange(newRow, ORIGINAL_DOC_FILENAME_COL).setValue(DriveApp.getFileById(DOC_ID).getName());
+
+    let paymentStatus = "Pending";
+    if (transactionId) {
+      const paymentData = verifyRazorpayPayment(transactionId);
+      if (paymentData && paymentData.status === "captured") {
+        paymentStatus = "Verified - Success";
+      } else {
+        paymentStatus = "Verified - Failed";
+      }
+    } else {
+        paymentStatus = "No Transaction ID";
+    }
+
+    dataSheet.getRange(newRow, TRANSACTION_STATUS_COL).setValue(paymentStatus);
+
+    const scriptUrl = ScriptApp.getService().getUrl();
+    const sheetUrl = spreadsheet.getUrl();
+    const redirectUrl = `${scriptUrl}?action=checkStatus&row=${newRow}`;
+    const checkStatusButton = getHtmlButton(redirectUrl, "Check Status");
+
+    MailApp.sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `🆕 New Form Submission: ${name}`,
+      htmlBody: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+          <h2 style="color: #333;">एक नया फ़ॉर्म सबमिशन आया है</h2>
+          <p>नमस्ते एडमिन,</p>
+          <p>एक नया फ़ॉर्म सबमिट हुआ है। कृपया इसकी समीक्षा करें।</p>
+          <hr style="border: none; border-top: 1px solid #eee;">
+          <p><b>नाम:</b> ${name}<br>
+          <b>ईमेल:</b> ${email}<br>
+          <b>प्राइस:</b> ₹${price}</p>
+          <b>ट्रांसैक्शन आईडी:</b> ${transactionId}<br>
+          <b>ट्रांसैक्शन स्टेटस:</b> ${paymentStatus}</p>
+          <p style="text-align: center; margin-top: 20px;">
+            ${checkStatusButton}
+          </p>
+          <p style="margin-top: 30px; font-size: 12px; color: #999;">धन्यवाद,<br>फ़ॉर्म ऑटोमेशन</p>
+        </div>`
+    });
+  } catch (err) {
+    MailApp.sendEmail({
+      to: ADMIN_EMAIL,
+      subject: "❌ फ़ॉर्म सबमिशन में त्रुटि",
+      body: `Error: ${err.message}`
+    });
+  }
+}
+
+// --- ON EDIT TRIGGERS (Fallbacks for manual changes) ---
+/**
+ * Grants or revokes access to the original document based on checkbox state.
+ * @param {Object} e The event object from the sheet edit.
+ */
+function onGrantOriginalAccess(e) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
+  const row = e.range.getRow();
+  const col = e.range.getColumn();
+  
+  if (sheet.getName() !== DATA_SHEET_NAME) return;
+  if (col !== GRANT_ORIGINAL_CHECKBOX_COL) return;
+
+  const grantChecked = sheet.getRange(row, GRANT_ORIGINAL_CHECKBOX_COL).getValue();
+  const email = sheet.getRange(row, EMAIL_COL).getValue();
+  const price = sheet.getRange(row, PRICE_COL).getValue();
+  const docUrl = `https://docs.google.com/document/d/${DOC_ID}/edit`;
+  const file = DriveApp.getFileById(DOC_ID);
+
+  const name = sheet.getRange(row, NAME_COL).getValue();
+  const originalDocName = DriveApp.getFileById(DOC_ID).getName();
+  const transactionId = sheet.getRange(row, TRANSACTION_ID_COL).getValue();
+  
+  if (grantChecked === true) {
+    sheet.getRange(row, ORIGINAL_STATUS_COL).setValue("Granted");
+    
+    let accessRole, accessText, grantedAccess, extraAccess;
+    if (price == 99) {
+      accessRole = "viewer";
+      accessText = "view-only";
+      grantedAccess = "Original Document Access";
+      extraAccess = "No";
+    } else {
+      accessRole = "commenter";
+      accessText = "commenter";
+      grantedAccess = "Original Document Access";
+      extraAccess = "No";
+    }
+    
+    try {
+      if (accessRole === "viewer") {
+        file.addViewer(email);
+      } else if (accessRole === "commenter") {
+        file.addCommenter(email);
+      }
+      
+      const htmlBody = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+            <h2 style="color: #2d89ef;">🎉 Congratulations!</h2>
+            <p>Dear <b>${name}</b>,</p>
+            <p>
+              We are happy to inform you that your document access has been successfully granted.
+            </p>
+            
+            <p><b>Document Details:</b></p>
+            <ul>
+              <li><b>Price Paid:</b> ₹${price}</li>
+              <li><b>Original Document:</b> ${originalDocName}</li>
+              <li><b>Access Type:</b> ${accessText}</li>
+              <li><b>Original Document Link:</b> <a href="${docUrl}">Open Document</a></li>
+            </ul>
+            
+            <p>
+              You can now access your document as per the permissions granted.
+            </p>
+            
+            <p style="margin-top: 20px;">Thank you,<br>
+            <b>Team Admin</b></p>
+          </div>
+        </body>
+        </html>
+      `;
+      MailApp.sendEmail({
+        to: email,
+        subject: `Your Document Access is Ready!`,
+        htmlBody: htmlBody
+      });
+      
+    } catch (err) {
+      Logger.log(`Failed to add ${accessRole} permissions for ${email}: ${err.message}`);
+    }
+    
+  } else {
+    sheet.getRange(row, ORIGINAL_STATUS_COL).setValue("Pending");
+    const file = DriveApp.getFileById(DOC_ID);
+    try {
+      file.removeEditor(email);
+      file.removeViewer(email);
+      file.removeCommenter(email);
+    } catch (err) {
+      Logger.log(`Permission for ${email} on original doc already removed.`);
+    }
+  }
+}
+
+/**
+ * Grants or revokes access to the copied document based on checkbox state.
+ * @param {Object} e The event object from the sheet edit.
+ */
+function onGrantCopyAccess(e) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
+  const row = e.range.getRow();
+  const col = e.range.getColumn();
+  
+  if (sheet.getName() !== DATA_SHEET_NAME) return;
+  if (col !== GRANT_COPY_CHECKBOX_COL) return;
+  
+  const grantChecked = sheet.getRange(row, GRANT_COPY_CHECKBOX_COL).getValue();
+  const email = sheet.getRange(row, EMAIL_COL).getValue();
+  const name = sheet.getRange(row, NAME_COL).getValue();
+  const price = sheet.getRange(row, PRICE_COL).getValue(); // Corrected typo
+  const originalDocName = DriveApp.getFileById(DOC_ID).getName();
+  const transactionId = sheet.getRange(row, TRANSACTION_ID_COL).getValue();
+  
+  if (grantChecked === true) {
+    try {
+      const copyUrl = createRestrictedEditorCopy(email);
+      sheet.getRange(row, COPIED_DOC_LINK_COL).setValue(copyUrl);
+      sheet.getRange(row, COPIED_DOC_FILENAME_COL).setValue("Personal Copy");
+      sheet.getRange(row, COPY_STATUS_COL).setValue("Granted");
+      
+      const copiedDocName = sheet.getRange(row, COPIED_DOC_FILENAME_COL).getValue();
+      
+      const htmlBody = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+            <h2 style="color: #2d89ef;">🎉 Congratulations!</h2>
+            <p>Dear <b>${name}</b>,</p>
+            <p>
+              We are happy to inform you that your document access has been successfully granted.
+            </p>
+            
+            <p><b>Document Details:</b></p>
+            <ul>
+              <li><b>Price Paid:</b> ₹${price}</li>
+              <li><b>Original Document:</b> ${originalDocName}</li>
+              <li><b>Copy Document:</b> ${copiedDocName}</li>
+              <li><b>Copy Document Link:</b> <a href="${copyUrl}">Open Document</a></li>
+            </ul>
+            
+            <p>
+              You can now access your document as per the permissions granted.
+            </p>
+            
+            <p style="margin-top: 20px;">Thank you,<br>
+            <b>Team Admin</b></p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      MailApp.sendEmail({
+        to: email,
+        subject: `Your Personal Copy is Ready!`,
+        htmlBody: htmlBody
+      });
+
+    } catch (err) {
+      Logger.log(`Error in onGrantCopyAccess: ${err.message}`);
+      sheet.getRange(row, COPY_STATUS_COL).setValue("Error: " + err.message);
+    }
+  } else {
+    // When checkbox is unticked, remove access and clear fields
+    sheet.getRange(row, COPIED_DOC_LINK_COL).setValue("");
+    sheet.getRange(row, COPIED_DOC_FILENAME_COL).setValue("");
+    sheet.getRange(row, COPY_STATUS_COL).setValue("Pending");
+    
+    // This part is crucial for reverting the changes
+    const files = DriveApp.getFolderById(FOLDER_ID).getFilesByName(`Personal Copy - ${email}`);
+    while (files.hasNext()) {
+        const file = files.next();
+        file.setTrashed(true);
+    }
+  }
+}
