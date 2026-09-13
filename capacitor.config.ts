@@ -81,17 +81,13 @@ const config: CapacitorConfig = {
     FirebaseAuthentication: {
       skipNativeAuth: false,
       providers: ["google.com"],
+      webClientId: "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
     },
     LocalNotifications: {
       // Capacitor's LocalNotifications plugin can fire a notification
       // at an exact wall-clock time even when the app is closed and
       // the phone is locked. This is what gives us the "1 minute
       // delivery" guarantee that Web Push on Android can never make.
-    },
-    FirebaseAuthentication: {
-      skipNativeAuth: false,
-      providers: ["google.com"],
-      webClientId: "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
     },
   },
 };

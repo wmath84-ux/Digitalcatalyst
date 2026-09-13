@@ -459,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // popup is impossible at all (Google blocks embedded WebViews), so the
       // native Play Services picker is used there instead — both paths end in
       // the same web-SDK session, so the checks below are unchanged.
-      const credential = hasNativeGoogleAuth()
+      const credential = isCapacitorNative()
         ? await signInWithGoogleNatively()
         : await signInWithPopup(auth, googleProvider);
       const signedInEmail = normalizeEmail(credential.user.email);
@@ -515,7 +515,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // token to Firebase. Until that plugin is installed and registered, fail
     // LOUDLY and usefully rather than leaving the learner on a dead button.
     // Inside the APK, take the NATIVE path — the Play Services account picker.
-    if (hasNativeGoogleAuth()) {
+    // P0 FIX: if we are inside the Capacitor shell, always try native first,
+    // even if the Plugins map isn't ready yet (early tap). Guarantees picker opens.
+    if (isCapacitorNative()) {
       try {
         await setPersistence(auth, browserLocalPersistence);
         const credential = await signInWithGoogleNatively();
