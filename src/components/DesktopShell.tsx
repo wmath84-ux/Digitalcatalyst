@@ -471,7 +471,7 @@ export default function DesktopShell({
                   <p className="min-w-0 flex-1 truncate text-[11px] font-black text-white">{user.name}</p>
                   <button
                     type="button"
-                    onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
+                    onClick={() => void logout().finally(() => { window.location.hash = "#/auth?mode=login"; })}
                     aria-label="Log out"
                     className="shrink-0 rounded-lg p-1.5 text-white/60 transition hover:text-rose-300"
                   >
@@ -592,7 +592,7 @@ export default function DesktopShell({
                 <p className="truncate text-[10px] font-semibold text-white/55">{user.email}</p>
               </div>
               <GlassButton
-                onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
+                onClick={() => void logout().finally(() => { window.location.hash = "#/auth?mode=login"; })}
                 aria-label="Log out"
                 className="shrink-0 [&_.size-12]:size-8 [&_svg]:text-white/70 hover:[&_svg]:text-rose-300"
               >

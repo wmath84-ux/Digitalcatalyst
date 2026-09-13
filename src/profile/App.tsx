@@ -333,7 +333,7 @@ export default function ProfileApp() {
             onOpenSettings={() => setModal("settings")}
             saving={preferencesSaving}
             message={message}
-            onLogout={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
+            onLogout={() => void logout().finally(() => { window.location.hash = "#/auth?mode=login"; })}
             isAdmin={String(user.role || "") === "admin" && String(user.email || "").trim().toLowerCase() === APPROVED_ADMIN_EMAIL}
             onOpenDashboard={() => { window.location.hash = "#/admin-login"; }}
           />

@@ -670,10 +670,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // P0-2 FIX: logout must never leave a blank screen.
+    // Root cause: the old implementation only called web `signOut(auth)` and
+    // setUser(null) — on the APK the native FirebaseAuthentication session
+    // stayed alive, the 10 s sharedSnapshot grace window replayed the previous
+    // user's doc, and callers used `.then(navigate)` so a rejected signOut
+    // (flaky network / partitioned storage) left the hash on a protected route
+    // with user=null → protectedRoutePending skeleton or — on a slow chunk —
+    // a blank Suspense fallback. The fix:
+    // 1) clear native session when inside Capacitor,
+    // 2) always clear local caches and purge sharedSnapshot,
+    // 3) always setUser(null) + setLoading(false) even if signOut throws,
+    // 4) always navigate away from a protected route (finally guarantee).
+    const prevUid = auth.currentUser?.uid || user?.id || null;
     clearAdminSession();
-    await signOut(auth);
-    setUser(null);
-  }, []);
+    // Best-effort native sign-out (APK only) — web bundle never pays for it.
+    try {
+      if (isCapacitorNative()) {
+        try {
+          const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+          await FirebaseAuthentication.signOut().catch(() => {});
+        } catch {}
+      }
+    } catch {}
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.warn("[logout] signOut failed, clearing locally", error);
+    } finally {
+      // Purge per-user caches so the next sign-in never replays stale data.
+      if (prevUid) {
+        try {
+          const { purgeSharedDoc } = await import("../lib/sharedSnapshot");
+          purgeSharedDoc(`users/${prevUid}`);
+        } catch {}
+        try { localStorage.removeItem(`eduvora.myDaySystemNotifications.v1:${prevUid}`); } catch {}
+        try { localStorage.removeItem(`eduvora.myDayAlarmIds.v1:${prevUid}`); } catch {}
+        try { localStorage.removeItem(`eduvora.flowPathSystemNotifications.v1:${prevUid}`); } catch {}
+        try { localStorage.removeItem(`eduvora.flowPathAlarmIds.v1:${prevUid}`); } catch {}
+        try { sessionStorage.removeItem("authReturnHash"); } catch {}
+      }
+      // Clear any user-scoped session keys.
+      try { sessionStorage.removeItem("authReturnHash"); } catch {}
+      setUser(null);
+      setLoading(false);
+      // Guarantee navigation: if the caller forgot or signOut threw, we still
+      // leave a protected route. Use replace so Back doesn't land on a dead
+      // protected page. Protected prefixes are duplicated here to avoid an
+      // import cycle with utils/appRoutes.
+      try {
+        const hash = window.location.hash || "";
+        const protectedPrefixes = ["#/checkout", "#/my-day", "#/profile", "#/study-library", "#/course/", "#/subscription", "#/myday", "#/flowpath", "#/revision"];
+        const isProtected = protectedPrefixes.some((prefix) => hash.startsWith(prefix));
+        if (isProtected) {
+          sessionStorage.setItem("authReturnHash", hash);
+          window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(hash)}`;
+        }
+      } catch {}
+    }
+  }, [user?.id]);
 
   const value = useMemo(
     () => ({

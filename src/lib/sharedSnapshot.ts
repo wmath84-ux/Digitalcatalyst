@@ -169,6 +169,26 @@ export function subscribeSharedDoc(
   };
 }
 
+/** Purge a cached doc entry immediately — used on logout so the next sign-in
+ * never replays the previous user's stale snapshot from the 10 s grace window. */
+export function purgeSharedDoc(key: string) {
+  const entry = docRegistry.get(key);
+  if (entry) {
+    try { entry.stop?.(); } catch {}
+    if (entry.teardown) clearTimeout(entry.teardown);
+    docRegistry.delete(key);
+  }
+}
+
+export function purgeSharedCollection(key: string) {
+  const entry = registry.get(key);
+  if (entry) {
+    try { entry.stop?.(); } catch {}
+    if (entry.teardown) clearTimeout(entry.teardown);
+    registry.delete(key);
+  }
+}
+
 /** React binding for {@link subscribeShared}. */export function useSharedSnapshot(
   key: string | null,
   makeQuery: () => Query<DocumentData>,
