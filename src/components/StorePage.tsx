@@ -311,7 +311,8 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           glass is on. (On desktop, `top` is lifted below the shell's top bar
           by a shell-scoped rule in index.css — the class list stays `top-0`
           for the mobile scroller.) */}
-      <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 mt-4 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+      {/* P2-8: HOLD — store blur/color only to revision+PDP. Store filter bar stays flat chrome (no glass blur), cards keep blur={0}. Revision/PDP retain chrome blur. */}
+      <div data-store-filter-bar className="sticky top-0 z-20 mt-4 border-b border-slate-200/60 bg-white/85 py-2.5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
           {/* Mobile overlap fix: the view-mode toggle is a normal flex
               sibling (shrink-0) instead of an absolutely-positioned overlay,
               so the scrolling chip row and the button can never paint on top
