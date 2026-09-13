@@ -25,6 +25,7 @@ import CourseSelectModal from "./CourseSelectModal";
 import FeatureSelectTrigger from "./FeatureSelectTrigger";
 import FeatureSelectModal from "./FeatureSelectModal";
 import PriceSummary from "./PriceSummary";
+import PricingGlassCard from "./PricingGlassCard";
 import { GlassButton } from "../../components/ui/glass-button";
 import SubscribeBar from "./SubscribeBar";
 import { PaymentButton } from "../../components/ui/PaymentButton";
@@ -1349,6 +1350,10 @@ export default function SubscriptionPage({
               minPayablePaise={minPayablePaise}
               totalPaise={totalPaise}
             />
+            </div>
+            {/* P1-2: alag card below Summary — exactly mobile_pricing_page.html colors — keep existing summary */}
+            <div className="px-5 pt-3">
+              <PricingGlassCard />
             </div>
             </Step>
 
