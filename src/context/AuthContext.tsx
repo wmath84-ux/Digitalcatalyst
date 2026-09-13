@@ -563,9 +563,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await setPersistence(auth, browserLocalPersistence);
 
-      // The native path is handled above by `hasNativeGoogleAuth()`, which
-      // dynamically imports the plugin. Reaching here means we are in a real
-      // browser, so the web popup/redirect flow is the correct one.
+      // P0-6: open picker in same tab (same-window redirect) instead of a
+      // separate popup tab. On phones / installed PWAs the chooser must stay
+      // in the current window (signInWithRedirect) — the old code tried
+      // signInWithPopup first and only fell back to redirect when the popup
+      // was blocked, so the learner briefly saw a separate Chrome tab.
+      // Desktop keeps the popup for better UX; any popup-blocked case there
+      // also falls back to redirect.
+      if (isMobileOrStandalone()) {
+        await signInWithRedirect(auth, googleProvider);
+        return { success: true, message: "Google login started." };
+      }
       let credential;
       try {
         credential = await signInWithPopup(auth, googleProvider);
@@ -574,7 +582,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (popupCode !== "auth/popup-blocked" && popupCode !== "auth/cancelled-popup-request") {
           throw popupError;
         }
-        if (!isMobileOrStandalone()) throw popupError;
         await signInWithRedirect(auth, googleProvider);
         return { success: true, message: "Google login started." };
       }
