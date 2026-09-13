@@ -31,6 +31,7 @@ import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
+import GatePersonalAccess from "./GatePersonalAccess";
 import { toast } from "../components/ui/glass-toast";
 import { useHomeHold } from "../hooks/useHomeHold";
 import type { CourseFileActions } from "./ResourceViewer";
@@ -176,6 +177,10 @@ export interface PlayerPanelProps {
    */
   legacyFooterDock: boolean;
   onLegacyFooterDockChange: (next: boolean) => void;
+  /** P1: Gate personal access — the file the learner is currently viewing */
+  gateFile?: { id?: string | null; url?: string | null; name?: string | null } | null;
+  productId?: string | null;
+  moduleId?: string | null;
 }
 
 export default function PlayerPanel({
@@ -203,6 +208,9 @@ export default function PlayerPanel({
   onHideStatusBarChange,
   legacyFooterDock,
   onLegacyFooterDockChange,
+  gateFile = null,
+  productId = null,
+  moduleId = null,
 }: PlayerPanelProps) {
   // Holding the logo opens the main app (Home); a normal tap returns the
   // learner to Purchases — the exact contract the old player header had.
@@ -375,18 +383,13 @@ export default function PlayerPanel({
                 dataAttrs={{ "data-course-viewer-edit-toggle": "", "data-doc-mode": fileActions.editMode ? "edit" : "preview" }}
               />
             ) : null}
-            {fileActions.personalCopyEnabled ? (
-              <PanelActionRow
-                icon={FileStack}
-                color="#FFBE0B"
-                label={fileActions.personalCopyActive ? "Back to the master file" : "My copy"}
-                hint={fileActions.personalCopyActive ? "Close your personal copy" : "Your own editable copy in Google Drive"}
-                active={fileActions.personalCopyActive}
-                busy={fileActions.personalCopyBusy}
-                disabled={fileActions.personalCopyBusy}
-                onPress={fileActions.onTogglePersonalCopy}
-                dataAttrs={{ "data-course-viewer-copy-toggle": "", "data-copy-active": fileActions.personalCopyActive ? "true" : "false" }}
-              />
+            {/* P1: Personal copy via OAuth killed — replaced by Gate personal access (email) below.
+                The old drive.file OAuth flow required Google verification and is no
+                longer shown. Learners now use the Gate form to receive a service-account copy. */}
+            {fileActions?.personalCopyEnabled ? (
+              <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-200">
+                Personal copy via Google OAuth is disabled. Use Gate personal access below.
+              </div>
             ) : null}
           </div>
         </div>
@@ -409,6 +412,18 @@ export default function PlayerPanel({
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
         </p>
+      </div>
+
+      {/* P1: Gate personal access — simple email gate, no OAuth */}
+      <SectionLabel>Gate personal access</SectionLabel>
+      <div className="px-2 pb-2">
+        <GatePersonalAccess
+          fileId={gateFile?.id || null}
+          fileUrl={gateFile?.url || null}
+          fileName={gateFile?.name || null}
+          productId={productId}
+          moduleId={moduleId}
+        />
       </div>
     </div>
   );

@@ -1079,6 +1079,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
+      gateFile={selectedFile ? { id: String(selectedFile.id), url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
+      productId={product.id}
+      moduleId={selectedFile ? String(owningModuleForFile(modules, String(selectedFile.id))?.id || "") : null}
     />
   );
 

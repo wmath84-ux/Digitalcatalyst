@@ -209,19 +209,16 @@ export default function AppContentPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Personal copies (Google Drive)">
-        <p className="text-xs text-slate-500">
-          Give every student their <strong>own private copy</strong> of a Google file, cloned into the
-          student&apos;s own Google Drive with one tap. The student owns the copy — they can always edit it,
-          and the master file stays untouched. Works per file type below.
+      <SectionCard title="Personal copies (Google Drive) — DEPRECATED">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900">
+          <span className="font-black">P1: OAuth personal-copy flow killed.</span> Google OAuth consent screen + <code>drive.file</code> scope is no longer used (avoids Google verification). The player now shows a simple <strong>Gate personal access</strong> email field — no permission is requested. Copies are made by a service-account (inside Vercel via <code>GATE_DRIVE_SERVICE_ACCOUNT</code>) or by the outside Apps Script Web App (<code>gatePersonalAccess.gs</code> → <code>GATE_APPS_SCRIPT_URL</code>). The toggles below are kept for rollback but are ignored while the gate is active.
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Old flow (kept for reference): one-tap personal Drive copy via OAuth. New flow: learner fills email in Course Player → confirmation → server/Apps Script copies and shares.
         </p>
-        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
-          <span className="font-bold text-slate-600">Setup:</span> paste your Google OAuth <strong>Client ID</strong> (Web application)
-          below — from Google Cloud Console → APIs &amp; Services → Credentials. The Drive API must be enabled in the same
-          project, and your site&apos;s domain added to the client&apos;s <em>Authorized JavaScript origins</em>. The client
-          <em> secret</em> is <strong>not</strong> needed (browser token flow). Masters only need
-          &ldquo;Anyone with the link → Viewer&rdquo; sharing. Google Forms are excluded — copying a form would hand the
-          student your form <em>builder</em>, not a fillable form.
+        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500 opacity-60">
+          <span className="font-bold text-slate-600">Legacy OAuth setup (deprecated):</span> paste your Google OAuth <strong>Client ID</strong> below — from Google Cloud Console → APIs &amp; Services → Credentials. Masters only need
+          &ldquo;Anyone with the link → Viewer&rdquo; sharing.
         </div>
         <Field label="Google OAuth Client ID" hint="Leave blank to use the VITE_GOOGLE_CLIENT_ID the app already uses for Google sign-in">
           <input
@@ -243,6 +240,8 @@ export default function AppContentPage() {
               <button
                 key={type.key}
                 type="button"
+                disabled
+                title="OAuth personal copy disabled — gate (email) is now the only path. Clear this toggle to keep it off."
                 onClick={() => setPersonalCopy(type.key, !enabled)}
                 data-personal-copy-type={type.key}
                 aria-pressed={enabled}
