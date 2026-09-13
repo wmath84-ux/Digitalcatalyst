@@ -68,6 +68,18 @@ export function apiUrl(path: string): string {
     if (isNativeShell()) {
       return `${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${path}`;
     }
+    // P0-7 FIX: Firebase Hosting (firebaseapp.com / web.app) rewrites ** → /index.html,
+    // so a relative /api/* there returns HTML (personalAiClient → NO_PROXY HTML fallback).
+    // Vercel serves the real /api/* functions. When the site is loaded off Firebase
+    // Hosting, route API calls to the production origin so the same bundle works on
+    // both hosts and in production (eduvora.shop is the Vercel deployment).
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      const isFirebaseHosting = host.endsWith(".firebaseapp.com") || host.endsWith(".web.app");
+      if (isFirebaseHosting) {
+        return `${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${path}`;
+      }
+    }
   } catch {
     // No window (should never happen for client code) — use relative path.
   }
@@ -78,25 +90,70 @@ export function apiUrl(path: string): string {
  * fetch() wrapper that routes "/api/..." requests through apiUrl(). Every
  * argument is forwarded untouched so callers behave identically on the web;
  * only the native shell gains the absolute origin.
+ * P0-7: if a relative /api/* fetch on Firebase Hosting (or any host where ** → index.html)
+ * returns HTML instead of JSON (content-type text/html), retry once against the
+ * production origin (Vercel) so AI Mentor / My Day / catalog APIs work in
+ * production even when the frontend is served from Firebase Hosting.
  */
-export function apiFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+export async function apiFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  const isApiPath = (url: string) => {
+    try {
+      const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://eduvora.shop");
+      return u.pathname.startsWith("/api/");
+    } catch { return typeof url === "string" && url.startsWith("/api/"); }
+  };
+  const shouldRetryHtml = (res: Response, originalUrl: string) => {
+    if (!isApiPath(originalUrl)) return false;
+    const ct = res.headers.get("content-type") || "";
+    return /text\/html/i.test(ct) && res.ok;
+  };
+  const absoluteFor = (pathname: string, search: string) =>
+    `${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${pathname}${search}`;
+
   if (typeof input === "string") {
-    return fetch(apiUrl(input), init);
+    const url = apiUrl(input);
+    const res = await fetch(url, init);
+    if (shouldRetryHtml(res, input) && url === input) {
+      // Was relative and got HTML (Firebase rewrite) — retry on production origin.
+      try {
+        const u = new URL(input, typeof window !== "undefined" ? window.location.origin : PRODUCTION_ORIGIN);
+        const absolute = absoluteFor(u.pathname, u.search);
+        // Avoid infinite loop: only retry if absolute differs from original attempt.
+        if (absolute !== url) return fetch(absolute, init);
+      } catch {}
+    }
+    return res;
   }
   if (input instanceof URL) {
-    // URL objects are already absolute; rewrite only the /api paths on a
-    // non-production origin (e.g. constructed from window.location).
     if (isNativeShell() && input.pathname.startsWith("/api/")) {
-      return fetch(`${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${input.pathname}${input.search}`, init);
+      return fetch(absoluteFor(input.pathname, input.search), init);
     }
-    return fetch(input, init);
-  }
-  // Request object: re-point it when running in the native shell.
-  if (typeof Request !== "undefined" && input instanceof Request && isNativeShell()) {
-    const url = new URL(input.url);
-    if (url.pathname.startsWith("/api/")) {
-      return fetch(new Request(`${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${url.pathname}${url.search}`, input), init);
+    const res = await fetch(input, init);
+    if (shouldRetryHtml(res, input.pathname + input.search)) {
+      // HTML fallback on a URL object — retry on production origin if not already there.
+      if (input.origin !== new URL(PRODUCTION_ORIGIN).origin) {
+        return fetch(absoluteFor(input.pathname, input.search), init);
+      }
     }
+    return res;
   }
-  return fetch(input, init);
+  if (typeof Request !== "undefined" && input instanceof Request) {
+    if (isNativeShell()) {
+      const url = new URL(input.url);
+      if (url.pathname.startsWith("/api/")) {
+        return fetch(new Request(absoluteFor(url.pathname, url.search), input), init);
+      }
+    }
+    const res = await fetch(input, init);
+    if (shouldRetryHtml(res, input.url)) {
+      try {
+        const url = new URL(input.url);
+        if (url.origin !== new URL(PRODUCTION_ORIGIN).origin) {
+          return fetch(new Request(absoluteFor(url.pathname, url.search), input), init);
+        }
+      } catch {}
+    }
+    return res;
+  }
+  return fetch(input as string, init);
 }
