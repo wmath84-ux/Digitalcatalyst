@@ -242,9 +242,10 @@ const PAGE_SKELETON_BLOCKS: Record<string, PageSkeletonBlock[]> = {
   ],
   revision: [
     { width: "76%", height: 22 },
-    { width: "100%", height: 104 },
-    { width: "100%", height: 104 },
-    { width: "100%", height: 104 },
+    { width: "100%", height: 220, radius: 24 },
+    { width: "100%", height: 64, radius: 16 },
+    { width: "100%", height: 160, radius: 20 },
+    { width: "100%", height: 140, radius: 20 },
   ],
   subscription: [
     { width: "80%", height: 22 },

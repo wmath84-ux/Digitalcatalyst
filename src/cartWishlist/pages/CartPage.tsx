@@ -36,7 +36,8 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
       <PageHeader title="My Cart" subtitle={`${cartProducts.length} item${cartProducts.length > 1 ? "s" : ""}`} right={<GlassButton variant="capsule" onClick={onClearAll} className="[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-bold [&>span>div]:text-rose-300"><span className="flex items-center gap-1"><Trash2 size={12} /> Clear</span></GlassButton>} />
       <div data-cart-row className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
         <div className="flex flex-col gap-2.5">{cartProducts.map((product) => <CartItemCard key={product.id} product={product} onRemove={onRemove} onOpen={onOpenProduct} />)}</div>
-        <GlassSurface radius={24} className="mt-4 text-white" contentClassName="p-4">
+        {/* P2-9: cart price summary — align glass with PricingGlassCard (tint 0.1 blur16) for consistency */}
+        <GlassSurface radius={24} tint={0.12} blur={14} className="mt-4 text-white" contentClassName="p-4">
           <div className="flex items-center gap-2 pb-3"><ShieldCheck size={16} className="text-indigo-300" /><h3 className="text-sm font-bold text-white">Server-verified price</h3></div>
           <div className="space-y-2 text-[13px]">
             <div className="flex justify-between text-white/55"><span>Catalog total</span><span>{formatINR(originalTotal)}</span></div>

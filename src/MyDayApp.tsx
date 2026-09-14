@@ -719,6 +719,7 @@ export default function App() {
         <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-8 md:px-8 lg:px-10">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
+          {/* P3-13: MyDay overview — data hook + hover lift for quick actions (lens budget intact) */}
           <main ref={contentColumnRef} className="min-w-0 flex-1 pb-6">
             {/* The free-creation allowance summary is deliberately NOT rendered
                 here. It is account/usage information, so it lives on the
@@ -748,7 +749,7 @@ export default function App() {
             )}
             <div key={activeSection} data-page-enter-panel="">
             {activeSection === "overview" && (
-              <section className="myday-overview">
+              <section className="myday-overview" data-p3-13="myday-overview-polish">
                 <GreetingHeader
                   name={userName}
                   completed={completedCount}

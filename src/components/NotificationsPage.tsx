@@ -41,6 +41,50 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, CheckIcon } from "./icons";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
+import { ensureExactAlarmPermission, getExactAlarmPermissionStatus, isAndroidNative } from "../utils/capacitorBridge";
+
+function ExactAlarmCard() {
+  const [status, setStatus] = useState<"granted" | "denied" | "prompt" | "unsupported" | "loading">("loading");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    getExactAlarmPermissionStatus().then((s) => {
+      if (alive) setStatus(s as any);
+    });
+    return () => { alive = false; };
+  }, []);
+  const request = async () => {
+    setBusy(true);
+    try {
+      const ok = await ensureExactAlarmPermission();
+      const next = await getExactAlarmPermissionStatus();
+      setStatus(ok ? "granted" : (next as any));
+      if (ok) toast({ title: "Exact alarms allowed", description: "Reminders will now fire at the exact minute, even when the app is closed.", variant: "success" });
+      else toast({ title: "Not granted", description: "Enable Alarms & reminders in system settings to get exact-time delivery.", variant: "warning" });
+    } finally { setBusy(false); }
+  };
+  if (status === "unsupported") return null;
+  const granted = status === "granted";
+  return (
+    <div className="mx-4 mt-2 rounded-2xl border border-white/15 bg-white/[0.07] p-4 backdrop-blur-md">
+      <p className="text-sm font-bold text-white">Exact-time reminders (Android)</p>
+      <p className="mt-1 text-xs leading-relaxed text-white/60">
+        On Android 14+ the system denies exact alarms by default. Without <span className="font-semibold text-white/80">Alarms &amp; reminders</span> (SCHEDULE_EXACT_ALARM) your My Day reminders can drift by minutes. We use the native AlarmManager — not inexact WorkManager — so each reminder fires on the dot even when the app is closed. We never declare <code className="rounded bg-white/10 px-1 py-0.5 text-[10px]">USE_EXACT_ALARM</code> (Play Store restricts it to alarm/calendar apps).
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${granted ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30" : "bg-amber-500/20 text-amber-200 border border-amber-400/30"}`}>
+          {granted ? "Allowed" : status === "denied" ? "Denied" : "Needs permission"}
+        </span>
+        {!granted && (
+          <button type="button" onClick={() => void request()} disabled={busy} className="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-indigo-500 disabled:opacity-50">
+            {busy ? "Opening…" : "Allow exact alarms"}
+          </button>
+        )}
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed text-white/35">Tap Allow → system Settings opens → toggle Eduvora → Allow setting exact alarms. No extra permission is stored by us.</p>
+    </div>
+  );
+}
 
 type NotificationsPageProps = {
   cartCount: number;
@@ -463,6 +507,9 @@ export default function NotificationsPage({
               <p className="mt-0.5 text-xs text-amber-200/80">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
             </div>
           )}
+
+          {/* P1-3: Android exact-time explain setup — SCHEDULE_EXACT_ALARM */}
+          {isAndroidNative() ? <ExactAlarmCard /> : null}
 
           {/* AI Canvas glass-notification stack: header row with counter
               badge, then swipe-to-dismiss glass cards with spring-animated

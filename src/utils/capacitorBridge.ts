@@ -233,7 +233,17 @@ export type LocalAlarmItem = {
  *  ACTION_REQUEST_SCHEDULE_EXACT_ALARM settings screen so the user can grant
  *  it manually. Returns true when exact alarms are (or become) allowed.
  *  On older Android / plugin versions without the API, assumes allowed. */
-async function ensureExactAlarmPermission(): Promise<boolean> {
+export async function getExactAlarmPermissionStatus(): Promise<"granted" | "denied" | "prompt" | "unsupported"> {
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
+    if (exact_alarm === "granted" || exact_alarm === "denied" || exact_alarm === "prompt") return exact_alarm as any;
+    return "unsupported";
+  } catch {
+    return "unsupported";
+  }
+}
+
+export async function ensureExactAlarmPermission(): Promise<boolean> {
   try {
     const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
     if (exact_alarm === "granted") return true;

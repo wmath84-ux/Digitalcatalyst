@@ -457,7 +457,8 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
       const hasOverride = Boolean(data && data.id);
       pricing.delete(productId);
       pricing.delete(item.id);
-      const productIdKey = String(productId);
+      const _productIdKey = String(productId);
+  void _productIdKey;
       return {
         id: data.id || productId,
         productId,

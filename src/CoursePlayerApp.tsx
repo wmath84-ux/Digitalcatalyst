@@ -1040,6 +1040,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     </div>
   );
 
+  // P3-14: CoursePlayer — Gate personal access stays email-only (outside Apps Script via GATE_APPS_SCRIPT_URL), PlayerPanel keeps gateFile prop
   // ── The Player tab's panel ─────────────────────────────────────────────
   // Everything the old player header + ⚙ settings popover carried, rebuilt as
   // ONE list: course identity, progress / mark-complete, the ACTIVE file's
@@ -1079,6 +1080,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
+      gateFile={selectedFile ? { id: String(selectedFile.id), url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
+      productId={product.id}
+      moduleId={selectedFile ? String(owningModuleForFile(modules, String(selectedFile.id))?.id || "") : null}
     />
   );
 

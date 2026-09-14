@@ -48,6 +48,7 @@ const registry = new Map<string, Entry>();
  * Subscribe to `makeQuery()` under `key`. Identical keys share one listener.
  * The callback fires immediately with the cached snapshot when one exists.
  */
+// P3-18: sharedSnapshot — bell badge + NotificationsPage share one listener via subscribeShared (no duplicate on users/{uid}/notifications)
 export function subscribeShared(
   key: string,
   makeQuery: () => Query<DocumentData>,
@@ -118,6 +119,7 @@ type DocEntry = {
 const docRegistry = new Map<string, DocEntry>();
 
 /** Subscribe to a single document, sharing one listener per `key`. */
+// P3-18: sharedSnapshot — bell badge + NotificationsPage share one listener via subscribeShared (no duplicate on users/{uid}/notifications)
 export function subscribeSharedDoc(
   key: string,
   makeRef: () => DocumentReference<DocumentData>,
@@ -167,6 +169,26 @@ export function subscribeSharedDoc(
       docRegistry.delete(key);
     }, TEARDOWN_GRACE_MS);
   };
+}
+
+/** Purge a cached doc entry immediately — used on logout so the next sign-in
+ * never replays the previous user's stale snapshot from the 10 s grace window. */
+export function purgeSharedDoc(key: string) {
+  const entry = docRegistry.get(key);
+  if (entry) {
+    try { entry.stop?.(); } catch {}
+    if (entry.teardown) clearTimeout(entry.teardown);
+    docRegistry.delete(key);
+  }
+}
+
+export function purgeSharedCollection(key: string) {
+  const entry = registry.get(key);
+  if (entry) {
+    try { entry.stop?.(); } catch {}
+    if (entry.teardown) clearTimeout(entry.teardown);
+    registry.delete(key);
+  }
 }
 
 /** React binding for {@link subscribeShared}. */export function useSharedSnapshot(

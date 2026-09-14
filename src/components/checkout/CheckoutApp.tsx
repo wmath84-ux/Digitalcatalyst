@@ -168,7 +168,8 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
             <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
             <span className="text-[10px] font-mono text-white/55">Step {step}/3</span>
           </div>
-          <div className="px-4 pb-2">
+          {/* P2-10: checkout step bar — sticky glass parity with store/pdp chrome */}
+          <div className="px-4 pb-2" data-checkout-stepbar data-step={step}>
             <StepIndicator currentStep={step} steps={STEPS} />
           </div>
         </div>

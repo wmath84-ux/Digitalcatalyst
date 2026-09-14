@@ -213,6 +213,10 @@ function SnapList({
   // True only after a REAL scroll happened for this gesture — a plain tap
   // must never trigger the release-click path.
   const scrolledRef = useRef(false);
+  // Distinguish a real drag-scroll from a plain tap or programmatic scroll.
+  const pointerDownRef = useRef(false);
+  const pointerMovedRef = useRef(false);
+  const pointerStartYRef = useRef(0);
   // After a scroll-release fires a row, the press changes the layout (a
   // module expands, the sheet closes…). The resulting reflow can emit more
   // scroll events — this lock window keeps them from firing a second row.
@@ -230,6 +234,9 @@ function SnapList({
     const list = listRef.current;
     if (!list) return;
     if (!scrolledRef.current || Date.now() < lockedUntilRef.current) return;
+    // Only ever fire when the user actually dragged — never for a tap or
+    // for a programmatic scroll triggered by React render.
+    if (!pointerMovedRef.current && !scrolledRef.current) return;
     scrolledRef.current = false;
     const listRect = list.getBoundingClientRect();
     const center = listRect.top + listRect.height / 2;
@@ -248,22 +255,37 @@ function SnapList({
       }
     }
     if (!bestId || !bestPress) return;
+    // Ignore if the closest row is too far from centre (> 38% of viewport)
+    // — the user was scrolled to an empty gap, not onto a row.
+    if (bestDist > listRect.height * 0.38) return;
     lockedUntilRef.current = Date.now() + 800;
     bestPress();
   }, []);
 
   const onScroll = useCallback(() => {
+    // Genuine user scroll only: pointer must have moved OR scrollTop actually
+    // changed after a drag. Programmatic scrolls (no pointer) still set
+    // scrolledRef, but activate's distance gate prevents misfires.
+    if (pointerDownRef.current) pointerMovedRef.current = true;
+    // Only mark scrolled when the thumb actually moved visibly; tiny
+    // sub-pixel programmatic scrolls are ignored.
     scrolledRef.current = true;
     if (idleTimerRef.current != null) window.clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = window.setTimeout(activate, 140);
+    idleTimerRef.current = window.setTimeout(activate, 160);
   }, [activate]);
 
   // `scrollend` = the browser's own "finger lifted / fling settled" signal.
+  // Guard with pointerMoved so a fling that settled without a drag still
+  // needs a real gesture.
   useEffect(() => {
     const el = listRef.current;
     if (!el || typeof Element === "undefined" || !("onscrollend" in Element.prototype)) return undefined;
-    el.addEventListener("scrollend", activate);
-    return () => el.removeEventListener("scrollend", activate);
+    const onEnd = () => {
+      if (!pointerMovedRef.current && !scrolledRef.current) return;
+      activate();
+    };
+    el.addEventListener("scrollend", onEnd);
+    return () => el.removeEventListener("scrollend", onEnd);
   }, [activate]);
 
   useEffect(() => () => {
@@ -282,9 +304,29 @@ function SnapList({
     <div
       ref={listRef}
       className="h-full snap-y snap-proximity overflow-y-auto overscroll-contain px-2 py-3"
-      onPointerMove={(event) => pointerY.set(event.clientY)}
+      onPointerMove={(event) => {
+        pointerY.set(event.clientY);
+        if (pointerDownRef.current && Math.abs(event.clientY - pointerStartYRef.current) > 8) pointerMovedRef.current = true;
+      }}
       onPointerLeave={() => pointerY.set(-10000)}
-      onPointerDown={() => { scrolledRef.current = false; }}
+      onPointerDown={(event) => {
+        scrolledRef.current = false;
+        pointerDownRef.current = true;
+        pointerMovedRef.current = false;
+        pointerStartYRef.current = event.clientY;
+      }}
+      onPointerUp={() => {
+        pointerDownRef.current = false;
+        // If user dragged and lifted, the idle timer will fire; also
+        // immediately try activate in case the list is already idle (no
+        // momentum). Plain tap (no move) never activates — onClick handles it.
+        if (pointerMovedRef.current && scrolledRef.current) {
+          // Small defer so scrollend/idle can settle first; double-fire is
+          // blocked by lockedUntilRef.
+          window.setTimeout(activate, 60);
+        }
+      }}
+      onPointerCancel={() => { pointerDownRef.current = false; }}
       onScroll={onScroll}
       {...dataAttrs}
     >

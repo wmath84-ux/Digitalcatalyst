@@ -2,6 +2,7 @@
 /* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
    utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
 @import "tw-animate-css";
+/* P3-16: lens budget — scrolling grids (Store, Home ProductCard) stay frost-only, no per-card GlassLens; claimLens/releaseLens remain available-but-unused (pinned by test) */
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
@@ -6924,3 +6925,26 @@ html[data-course-player-active="true"] {
   [data-primary-library-nav] [data-glass-dock] { padding-inline: 14px; }
   [data-primary-library-nav] [data-glass-dock-item] > div:first-child { font-size: 12px; line-height: 15px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * P0-5 FIX: prevent shrink on resize (My Day & other pages)
+ * The tablet fluid scaling used clamp(0.85, ...) + zoom:0.88 which made
+ * cards/text physically shrink when the window was narrowed inside the
+ * 640-1024 / 350px bands — the reported "pages shrink on resize".
+ * Lock the scale to 1 and keep the frame at full width with min-width:0
+ * so flex/grid tracks don't collapse to a sliver.
+ * ════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 640px) and (max-width: 1366px) {
+  :root { --tablet-scale: 1 !important; --tablet-scale-factor: 1 !important; }
+  [data-home-grid] > *,
+  [data-pdp-grid] > * { transform: none !important; }
+}
+@media (max-width: 350px) {
+  [data-course-dock] [data-glass-dock] { zoom: 1 !important; }
+}
+[data-app-frame] { min-width: 0 !important; width: 100% !important; }
+[data-app-frame] > main,
+[data-myday-content] > main,
+[data-revision-page-main],
+[data-profile-content],
+[data-pdp-scroll] { min-width: 0 !important; width: 100% !important; }
