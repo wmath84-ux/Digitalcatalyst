@@ -35,6 +35,7 @@ const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: st
  */
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
   const items: GlassDockItem[] = TABS.map(({ key, label, icon, color }) => {
+    // P3-15: BottomNav badge — purchases uses same emerald ring as profile, keep 99+ cap
     const badge = key === "store" ? storeBadge : key === "purchases" ? purchasesBadge : undefined;
     return {
       id: key,
@@ -47,7 +48,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
   });
 
   return (
-    <nav
+    <nav data-p3-15="bottomnav-polish"
       data-primary-library-nav
       data-site-footer-nav
       className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"

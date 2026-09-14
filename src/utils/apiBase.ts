@@ -91,7 +91,7 @@ export function apiUrl(path: string): string {
  * argument is forwarded untouched so callers behave identically on the web;
  * only the native shell gains the absolute origin.
  * P0-7: if a relative /api/* fetch on Firebase Hosting (or any host where ** → index.html)
- * returns HTML instead of JSON (content-type text/html), retry once against the
+ * returns HTML instead of JSON (content-type text/html // P3-17 retry), retry once against the
  * production origin (Vercel) so AI Mentor / My Day / catalog APIs work in
  * production even when the frontend is served from Firebase Hosting.
  */

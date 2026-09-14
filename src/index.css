@@ -2,6 +2,7 @@
 /* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
    utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
 @import "tw-animate-css";
+/* P3-16: lens budget — scrolling grids (Store, Home ProductCard) stay frost-only, no per-card GlassLens; claimLens/releaseLens remain available-but-unused (pinned by test) */
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
