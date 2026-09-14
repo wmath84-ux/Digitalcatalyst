@@ -27,7 +27,6 @@ function SubscriberOnlyPriceBadgeImpl({ price, basePrice, currency, cycleLabel, 
   const isDiscounted = basePrice > 0 && price < basePrice;
   return (
     <div
-      data-subscriber-only-price-badge
       data-subscriber-only-price-badge="true"
       role="note"
       className={

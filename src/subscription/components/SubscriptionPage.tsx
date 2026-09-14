@@ -31,7 +31,6 @@ import SubscribeBar from "./SubscribeBar";
 import { PaymentButton } from "../../components/ui/PaymentButton";
 import HelpModal from "./HelpModal";
 import SubscriberActiveBadge from "../../components/subscription/SubscriberActiveBadge";
-import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";

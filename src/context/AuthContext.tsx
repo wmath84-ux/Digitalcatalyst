@@ -31,7 +31,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
-import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView } from "../utils/nativeRuntime";
+import { isCapacitorNative, isEmbeddedWebView } from "../utils/nativeRuntime";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 

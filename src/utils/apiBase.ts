@@ -155,5 +155,5 @@ export async function apiFetch(input: string | URL | Request, init?: RequestInit
     }
     return res;
   }
-  return fetch(input as string, init);
+  return fetch(input as unknown as string, init); // P0-7: keep Request|URL|string union safe
 }

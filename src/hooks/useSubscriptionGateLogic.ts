@@ -119,7 +119,7 @@ function normaliseSettings(input: any): SubscriptionGateSettings {
   }
   const planVisibility: Record<string, SubscriptionGatePlanRow> = {};
   if (input.planVisibility && typeof input.planVisibility === "object") {
-    for (const [k, v] of Object.entries(planVisibility)) ;  // satisfy TS-lint w/o effect
+    for (const [_k, _v] of Object.entries(planVisibility)) { void _k; void _v; } // satisfy TS-lint w/o effect
     for (const [k, v] of Object.entries(input.planVisibility)) planVisibility[k] = normalisePlanRow(v);
   }
   const subscriberPricing: Record<string, { monthly: number | null; yearly: number | null; lifetime: number | null }> = {};

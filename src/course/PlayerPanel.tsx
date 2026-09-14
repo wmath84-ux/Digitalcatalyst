@@ -26,7 +26,7 @@
 //      "player bars" hide toggles are gone too because there is no header
 //      left to hide.
 
-import { BookmarkPlus, ExternalLink, FileStack, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { BookmarkPlus, ExternalLink, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";

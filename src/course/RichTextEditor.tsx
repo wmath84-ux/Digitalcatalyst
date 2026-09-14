@@ -146,13 +146,13 @@ export default function RichTextEditor({
   // puts it afterwards — no focus stealing, no lost selection.
   useEffect(() => {
     if (openMenu === null) return undefined;
-    const onPointerDown = (event: PointerEvent) => {
+    const onPointerDown = (event: globalThis.PointerEvent) => {
       const node = event.target instanceof Node ? event.target : null;
       if (node && toolbarRef.current?.contains(node)) return;
       if (node && richMenuRef.current?.contains(node)) return;
       setOpenMenu(null);
     };
-    const onKeyDown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setOpenMenu(null);
     };
     document.addEventListener("pointerdown", onPointerDown, true);

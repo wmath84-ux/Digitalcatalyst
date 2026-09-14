@@ -6,7 +6,6 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/apiBase";
 import { auth } from "../../firebase";
 import { GlassButton } from "@/components/ui/glass-button";
-import { GlassSurface } from "@/components/ui/glass";
 
 interface GatePersonalAccessProps {
   fileId?: string | null;
