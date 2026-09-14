@@ -423,8 +423,9 @@ function MembershipCard({
   subscription: SubscriptionSnapshot | null;
   onOpenPlans: () => void;
 }) {
+  // P3-11: profile membership card — subtle hover lift aligns with pricing glass motion
   return (
-    <GlassCard data-profile-membership-tier={tier} data-profile-membership-card>
+    <GlassCard data-profile-membership-tier={tier} data-profile-membership-card className="relative overflow-hidden transition duration-300 hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>

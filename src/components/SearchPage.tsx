@@ -364,7 +364,7 @@ export default function SearchPage({
             </GlassSelect>
             <span
               data-search-result-count
-              className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/55"
+              className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/55 backdrop-blur"
             >
               {loading ? "Loading…" : `${results.length} result${results.length === 1 ? "" : "s"}`}
             </span>
