@@ -29,7 +29,7 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
           alt={product.title}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
       </button>
       <div className="relative flex min-w-0 flex-1 flex-col justify-between py-0.5">
