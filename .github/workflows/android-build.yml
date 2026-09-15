@@ -29,6 +29,15 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's DEFAULT packages are 'tools platform-tools'.
+          # Google removed the deprecated 'tools' package from the SDK
+          # repository, and the current sdkmanager (cmdline-tools 16.x)
+          # exits 1 on the missing package, so the job dies in SDK setup
+          # before any gradle work runs. Request exactly what this build
+          # needs instead: platform 35 (compileSdkVersion 35 in
+          # android/variables.gradle) + matching build-tools.
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -99,6 +108,15 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's DEFAULT packages are 'tools platform-tools'.
+          # Google removed the deprecated 'tools' package from the SDK
+          # repository, and the current sdkmanager (cmdline-tools 16.x)
+          # exits 1 on the missing package, so the job dies in SDK setup
+          # before any gradle work runs. Request exactly what this build
+          # needs instead: platform 35 (compileSdkVersion 35 in
+          # android/variables.gradle) + matching build-tools.
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
