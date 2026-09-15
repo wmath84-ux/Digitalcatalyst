@@ -223,16 +223,33 @@ export type LocalAlarmItem = {
  *  alarm fires even when the app is closed and the device is locked
  *  because Android AlarmManager is the kernel-level scheduler.
  *
- *  Permission: the LocalNotifications plugin prompts the user for
- *  POST_NOTIFY on first schedule. If the user denied, this is a
- *  no-op and the caller should fall back to in-app rendering. */
+ *  Permissions:
+ *  • POST_NOTIFICATIONS — the plugin prompts the user for it on first
+ *    schedule. If the user denied, this returns false and the caller
+ *    falls back to in-app rendering.
+ *  • SCHEDULE_EXACT_ALARM — CHECKED here, never requested: this function
+ *    runs from onSnapshot callbacks, 15-second ticks and 5-minute
+ *    reschedule intervals, so it must not open the system settings screen
+ *    (ensureExactAlarmPermission does — that stays the explicit
+ *    "Allow exact alarms" button in NotificationsPage). Until the user
+ *    grants exact alarms this returns false and FCM + the foreground
+ *    clock remain the delivery path. (If we scheduled anyway, the plugin
+ *    would silently downgrade to an INEXACT alarm on Android 12+,
+ *    reintroducing the original "reminder fires minutes late" bug and
+ *    double-notifying alongside the FCM wake-up.) */
 /** Android 14+ denies SCHEDULE_EXACT_ALARM by default (and we deliberately
  *  do NOT declare USE_EXACT_ALARM — Play policy restricts it to alarm-clock/
  *  calendar apps). This helper checks AlarmManager.canScheduleExactAlarms()
  *  via the LocalNotifications plugin and, if denied, opens the system
  *  ACTION_REQUEST_SCHEDULE_EXACT_ALARM settings screen so the user can grant
  *  it manually. Returns true when exact alarms are (or become) allowed.
- *  On older Android / plugin versions without the API, assumes allowed. */
+ *  On older Android / plugin versions without the API, assumes allowed.
+ *
+ *  ⚠ EXPLICIT USER GESTURE ONLY — the "Allow exact alarms" button in
+ *  NotificationsPage (ExactAlarmCard). It opens the system settings screen
+ *  and resolves only after the user returns from it, so it must NEVER be
+ *  called from onSnapshot callbacks, timers or any other background/
+ *  programmatic path (see scheduleLocalAlarm, which checks instead). */
 export async function getExactAlarmPermissionStatus(): Promise<"granted" | "denied" | "prompt" | "unsupported"> {
   try {
     const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
@@ -263,9 +280,18 @@ export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean>
   try {
     // Android 8+ drops notifications posted to a non-existent channel.
     await ensureReminderChannel();
-    // Android 14+: SCHEDULE_EXACT_ALARM must be user-granted; without it the
-    // schedule() call below would either throw or silently fire inexactly.
-    if (!(await ensureExactAlarmPermission())) return false;
+    // Android 12+: SCHEDULE_EXACT_ALARM must be user-granted (Android 14+
+    // denies it by default). CHECK-ONLY — never call
+    // ensureExactAlarmPermission() from here: this path runs from
+    // onSnapshot callbacks, 15-second ticks and 5-minute reschedule
+    // intervals (one call per upcoming item). Auto-opening the system
+    // settings screen would yank the user into Settings on every doc
+    // change while denied, and in the background the activity launch is
+    // blocked (Android 10+) so the pending result never arrives and this
+    // call would hang, leaving the alarm silently never armed. Denied →
+    // skip the local tick; FCM + the foreground clock keep delivering,
+    // and the user grants exact alarms explicitly (ExactAlarmCard).
+    if ((await getExactAlarmPermissionStatus()) === "denied") return false;
     let granted = await LocalNotifications.checkPermissions();
     if (granted.display !== "granted") {
       granted = await LocalNotifications.requestPermissions();
