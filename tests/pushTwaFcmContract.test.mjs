@@ -71,6 +71,44 @@ test("capacitor bridge: schedules a local alarm at the exact wall-clock time", (
   assert.match(bridge, /channelId: REMINDER_CHANNEL_ID/);
 });
 
+test("capacitor bridge: scheduleLocalAlarm CHECKS (never auto-requests) the exact-alarm setting", () => {
+  // scheduleLocalAlarm runs from onSnapshot callbacks, 15-second ticks and
+  // 5-minute reschedule intervals — one call per upcoming item. It must
+  // checkExactNotificationSetting and skip when denied, NEVER open the
+  // system ACTION_REQUEST_SCHEDULE_EXACT_ALARM settings screen:
+  //   • foreground: the user gets yanked into Settings on every doc
+  //     change while exact alarms are still denied (the Android 14+
+  //     default — i.e. every fresh install until the user opts in);
+  //   • background: the activity launch is blocked (Android 10+), the
+  //     pending activity result never arrives, and the schedule promise
+  //     hangs — the alarm silently never gets armed.
+  // The settings screen stays owned by the explicit "Allow exact alarms"
+  // button (ExactAlarmCard → ensureExactAlarmPermission).
+  const fnStart = bridge.indexOf("export async function scheduleLocalAlarm");
+  const fnEnd = bridge.indexOf("export async function cancelLocalAlarm");
+  assert.ok(fnStart > 0 && fnEnd > fnStart, "scheduleLocalAlarm must exist");
+  // Strip comments so only the executable code is inspected (the doc
+  // comment intentionally names the forbidden helper).
+  const body = bridge
+    .slice(fnStart, fnEnd)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  assert.match(body, /getExactAlarmPermissionStatus/);
+  assert.match(body, /=== "denied"\) return false/);
+  assert.doesNotMatch(body, /ensureExactAlarmPermission/);
+});
+
+test("capacitor bridge: ensureExactAlarmPermission stays the explicit-gesture grant flow", () => {
+  // The auto-open variant must still exist (it opens
+  // ACTION_REQUEST_SCHEDULE_EXACT_ALARM and resolves after the user
+  // returns) and be used by the notifications page button — the only
+  // sanctioned place the settings screen can be launched from.
+  assert.match(bridge, /changeExactNotificationSetting/);
+  const page = fs.readFileSync("src/components/NotificationsPage.tsx", "utf8");
+  assert.match(page, /ensureExactAlarmPermission/);
+  assert.match(page, /Allow exact alarms/);
+});
+
 test("capacitor bridge: dedupes local alarms by stable item id", () => {
   // The My Day scheduler computes a 31-bit hash from the
   // item key so re-scheduling the same item just updates the
