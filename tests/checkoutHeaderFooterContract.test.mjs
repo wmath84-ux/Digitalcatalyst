@@ -14,6 +14,8 @@ const paymentGateway = read("src/components/PaymentGateway.tsx");
 const chrome = read("src/utils/razorpayCheckoutChrome.ts");
 const header = read("src/components/Header.tsx");
 const footer = read("src/components/BottomNav.tsx");
+// The footer markup every screen shares (owner brief 2026-09-16: one design).
+const footerShell = read("src/components/SiteFooterNav.tsx");
 const css = read("src/index.css");
 
 test("checkout page renders the shared Eduvora header and footer", () => {
@@ -23,7 +25,9 @@ test("checkout page renders the shared Eduvora header and footer", () => {
   assert.match(checkoutApp, /<BottomNav active=\{null\} onChange=\{handleFooterChange\}/);
   assert.match(checkoutApp, /data-checkout-shell/);
   assert.match(header, /data-site-header/);
-  assert.match(footer, /data-site-footer/);
+  assert.match(footer, /<SiteFooterNav/);
+  assert.match(footerShell, /data-site-footer-nav/);
+  assert.match(footerShell, /data-site-footer/);
 });
 
 test("checkout footer routes to the same store destinations as other pages", () => {

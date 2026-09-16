@@ -426,8 +426,14 @@ test("the vendored registry, the dock and every bottom nav are untouched", () =>
   // Revision's bottom pill IS the shared dock, so the store pass already
   // plated it and fitted it to 320px — pinned here so this pass cannot
   // double-plate it.
-  assert.match(bottomNav, /<GlassDock/);
-  assert.match(bottomNav, /md:hidden/);
+  assert.match(bottomNav, /<SiteFooterNav/);
+  assert.match(read("src/components/SiteFooterNav.tsx"), /<GlassDock siteFooter/);
+  // 2026-09-16 owner brief: the floating capsule is the ONE footer design and it
+  // shows on tablets too, so Revision no longer carries `md:hidden` — the hard
+  // `@media (min-width: 960px)` rule in src/index.css is what releases it on
+  // desktop, exactly as for every other screen.
+  assert.doesNotMatch(bottomNav, /md:hidden/);
+  assert.match(indexCss, /@media \(min-width: 960px\) \{\s*\[data-site-footer-nav\]/);
   // Dock glyphs must honour GlassDock's `size` + inline width/height —
   // className-only SVGs paint as empty plates on phone and tablet.
   const revisionIcons = read("src/revision/components/icons.tsx");

@@ -14,6 +14,10 @@ const footer = fs.readFileSync("src/components/BottomNav.tsx", "utf8");
 const cartFooter = fs.readFileSync("src/cartWishlist/components/BottomNav.tsx", "utf8");
 const myDayFooter = fs.readFileSync("src/components/myday/BottomNav.tsx", "utf8");
 const revisionFooter = fs.readFileSync("src/revision/components/BottomNav.tsx", "utf8");
+// Every one of those four renders the SAME wrapper, and the wrapper is the
+// only place the tags live now (owner brief 2026-09-16: one footer design,
+// on every screen) — so the tags are asserted once, on the shared component.
+const siteFooterNav = fs.readFileSync("src/components/SiteFooterNav.tsx", "utf8");
 
 test("every site footer nav is tagged so CSS can hide the whole bar", () => {
   for (const [label, source] of [
@@ -22,8 +26,19 @@ test("every site footer nav is tagged so CSS can hide the whole bar", () => {
     ["myday", myDayFooter],
     ["revision", revisionFooter],
   ]) {
-    assert.match(source, /data-site-footer-nav/, `${label} BottomNav must tag the wrapping nav`);
-    assert.match(source, /data-site-footer/, `${label} BottomNav must keep data-site-footer on the pill`);
+    assert.match(source, /<SiteFooterNav/, `${label} BottomNav must render the shared site footer`);
+  }
+  assert.match(siteFooterNav, /data-site-footer-nav/, "the shared wrapper must tag the nav");
+  assert.match(siteFooterNav, /data-site-footer/, "the shared wrapper must keep data-site-footer on the pill");
+  assert.match(siteFooterNav, /<GlassDock siteFooter/);
+  // Nothing may re-introduce a per-screen copy of the wrapper markup.
+  for (const [label, source] of [
+    ["main", footer],
+    ["cart", cartFooter],
+    ["myday", myDayFooter],
+    ["revision", revisionFooter],
+  ]) {
+    assert.doesNotMatch(source, /data-site-footer-nav/, `${label} BottomNav must not hand-roll the footer nav`);
   }
 });
 

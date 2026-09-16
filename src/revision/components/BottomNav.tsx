@@ -1,6 +1,7 @@
 import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
-import GlassDock, { type GlassDockItem } from "../../components/glass-dock/GlassDock";
+import SiteFooterNav from "../../components/SiteFooterNav";
+import { type GlassDockItem } from "../../components/glass-dock/GlassDock";
 
 // The revision footer mirrors the main app footer
 // (src/components/BottomNav.tsx) exactly: same glass dock magnification,
@@ -42,25 +43,19 @@ export default function BottomNav({ route }: { route: string }) {
     };
   });
 
+  // The shared site footer capsule (src/components/SiteFooterNav.tsx) — the
+  // same design and material as Home / Store / My Day. This nav used to be
+  // hidden from 768 px up, which left Revision without any footer on a tablet
+  // in portrait; the text tab row (src/components/ui/PageTabs.tsx) stays the
+  // desktop nav and steps aside in the 768–959 px portrait band where this
+  // capsule is now visible, so the two never stack.
   return (
-    // `md:hidden` — same rule as the My Day footer: from 768 px up (tablet +
-    // desktop) the floating phone pill is the wrong chrome, and the pages are
-    // reached from the text-only tab row under the header instead
-    // (src/components/ui/PageTabs.tsx). Below 768 px nothing changes.
-    <nav
-      data-site-footer-nav
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:hidden"
-      aria-label="Bottom navigation"
-    >
-      <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
-        <GlassDock
-          siteFooter
-          items={items}
-          onSelect={(href) => {
-            navigate(href);
-          }}
-        />
-      </div>
-    </nav>
+    <SiteFooterNav
+      label="Bottom navigation"
+      items={items}
+      onSelect={(href) => {
+        navigate(href);
+      }}
+    />
   );
 }

@@ -14,6 +14,7 @@ const subscriptionApp = read("src/subscription/App.tsx");
 const main = read("src/main.tsx");
 const header = read("src/components/Header.tsx");
 const footer = read("src/components/BottomNav.tsx");
+const footerShell = read("src/components/SiteFooterNav.tsx");
 
 test("subscription page renders the shared Eduvora header and footer", () => {
   assert.match(subscriptionPage, /import Header from "\.\.\/\.\.\/components\/Header"/);
@@ -21,7 +22,9 @@ test("subscription page renders the shared Eduvora header and footer", () => {
   assert.match(subscriptionPage, /<Header[\s\S]*cartCount=\{cartCount\}/);
   assert.match(subscriptionPage, /<BottomNav active=\{null\} onChange=\{onNavigateFooter\}/);
   assert.match(header, /data-site-header/);
-  assert.match(footer, /data-site-footer/);
+  assert.match(footer, /<SiteFooterNav/);
+  assert.match(footerShell, /data-site-footer-nav/);
+  assert.match(footerShell, /data-site-footer/);
 });
 
 test("subscription loading and catalog-error states keep the header and footer", () => {
