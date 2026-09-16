@@ -18,12 +18,12 @@
  * 1.1rem icons with a 15px gap · -10px lift over 0.3s · dark #262626
  * tooltip with the 10px arrow.
  *
- * SIZE — the one deliberate change from the reference: the reference
- * card is a fixed 13rem tile, while this card takes the exact geometry of
- * the feedback wall box above it (same width AND the same height at every
- * breakpoint — 420px phone / 520px small / 600px desktop, see
- * src/home/App.tsx), with the profile block centred in it. The card's
- * palette, radii, borders, type and spacing are untouched.
+ * SIZE — the deliberate change from the reference: the reference card is a
+ * fixed 13rem tile, while this card takes the exact geometry of the feedback
+ * wall box above it (same width AND the same height at every breakpoint —
+ * 420px phone / 520px small / 600px desktop, see src/home/App.tsx), with the
+ * profile block centred in it. The reference values remain the 420px baseline;
+ * above that step, the card's internal scale now grows with the box.
  */
 
 .dc-social-card {
@@ -200,6 +200,133 @@
    exactly what a learner gets) but never navigates. */
 .dc-social-card--preview {
   cursor: default;
+}
+
+/* ── Internal scaling ─────────────────────────────────────────────────
+   The 420px card above is the untouched reference baseline. The Home slot
+   grows to 520px and 600px at the same CSS breakpoints, so the card's
+   internal metrics step by the matching factors (box height / 420):
+   1.00 → 1.238 → 1.4286. Literal values keep Home and the Admin preview
+   comparable without viewport or container units. */
+
+@media (min-width: 640px) {
+  .dc-social-card {
+    padding: 31px 25px;
+    border-width: 5px;
+    border-radius: 12px;
+  }
+
+  .dc-social-card:hover {
+    transform: translateY(-12px);
+  }
+
+  /* A no-account live card remains calm at every size. */
+  .dc-social-card--static:hover {
+    transform: none;
+  }
+
+  .dc-social-pic {
+    width: 6.2rem;
+    height: 6.2rem;
+    border-width: 5px;
+  }
+
+  .dc-social-name {
+    margin-top: 25px;
+    font-size: 22px;
+  }
+
+  .dc-social-name span {
+    font-size: 20px;
+  }
+
+  .dc-social-media {
+    row-gap: 15px;
+  }
+
+  .dc-social-media::before {
+    height: 2.5px;
+    margin: 25px 0;
+  }
+
+  .dc-social-icon svg,
+  .dc-social-icon img {
+    width: 1.36rem;
+    height: 1.36rem;
+  }
+
+  .dc-social-icon {
+    margin-right: 19px;
+  }
+
+  .dc-social-tooltip {
+    font-size: 0.99rem;
+    padding: 0.62rem 0.5rem;
+  }
+
+  .dc-social-tooltip::after {
+    border-width: 12px 12px 0 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .dc-social-card {
+    padding: 36px 29px;
+    border-width: 6px;
+    border-radius: 14px;
+  }
+
+  .dc-social-card:hover {
+    transform: translateY(-14px);
+  }
+
+  /* A no-account live card remains calm at every size. */
+  .dc-social-card--static:hover {
+    transform: none;
+  }
+
+  .dc-social-pic {
+    width: 7.15rem;
+    height: 7.15rem;
+    border-width: 6px;
+  }
+
+  .dc-social-name {
+    margin-top: 29px;
+    font-size: 26px;
+  }
+
+  .dc-social-name span {
+    font-size: 23px;
+  }
+
+  .dc-social-media {
+    row-gap: 17px;
+  }
+
+  .dc-social-media::before {
+    height: 3px;
+    margin: 29px 0;
+  }
+
+  .dc-social-icon svg,
+  .dc-social-icon img {
+    width: 1.57rem;
+    height: 1.57rem;
+  }
+
+  .dc-social-icon {
+    margin-right: 21px;
+  }
+
+  .dc-social-tooltip {
+    font-size: 1.14rem;
+    padding: 0.71rem 0.57rem;
+  }
+
+  .dc-social-tooltip::after {
+    border-width: 14px 14px 0 14px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
