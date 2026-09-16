@@ -143,11 +143,11 @@ export default function ModuleAiWorkspace({
               Ask the whole module
             </button>
           ) : null}
-          {ai.snapshot?.ai.planName ? <AiPill tone={ai.snapshot.ai.hasAccess ? "emerald" : "amber"}>{ai.snapshot.ai.planName}</AiPill> : null}
+          {ai.snapshot?.ai?.planName ? <AiPill tone={ai.snapshot?.ai?.hasAccess ? "emerald" : "amber"}>{ai.snapshot?.ai?.planName}</AiPill> : null}
         </div>
       }
     />
-  ), [ai.snapshot?.ai.hasAccess, ai.snapshot?.ai.planName, ai.snapshot?.coverage, onExpandToModule, onClose, provenance, resourceId, resourceTitle, scope?.resourceId, title]);
+  ), [ai.snapshot?.ai?.hasAccess, ai.snapshot?.ai?.planName, ai.snapshot?.coverage, onExpandToModule, onClose, provenance, resourceId, resourceTitle, scope?.resourceId, title]);
 
   return (
     <AiOverlay open={open} onClose={onClose} label={`AI study workspace for ${title}`}>

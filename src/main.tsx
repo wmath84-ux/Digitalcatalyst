@@ -75,6 +75,7 @@ const SearchPage = lazyRoute(() => import("./components/SearchPage"));
 const RenewalPreviewPage = lazyRoute(() => import("./components/subscription/RenewalPreviewPage"));
 const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/OpeningAnimationPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
+import { StudyLibraryErrorBoundary } from "./personal-library/StudyLibraryErrorBoundary";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
@@ -1710,7 +1711,17 @@ function RootPage(): ReactNode {
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
-  if (hash.startsWith(STUDY_LIBRARY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyLibraryPage /></PageEnter>;
+  if (hash.startsWith(STUDY_LIBRARY_HASH)) {
+    // The boundary keeps a Study Library render crash contained to this route:
+    // instead of the whole app unmounting to a bare black canvas (with dead
+    // navigation), the user gets a recoverable screen with working Try again /
+    // Go back / Go to Home actions — the same protection FlowPath already has.
+    return (
+      <StudyLibraryErrorBoundary>
+        <PageEnter pageKey={pageEnterAppKey(hash)}><StudyLibraryPage /></PageEnter>
+      </StudyLibraryErrorBoundary>
+    );
+  }
   if (hash.startsWith(PROFILE_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><ProfileApp /></PageEnter>;
   if (hash.startsWith(MY_DAY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><MyDayApp /></PageEnter>;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
