@@ -428,6 +428,12 @@ test("the vendored registry, the dock and every bottom nav are untouched", () =>
   // double-plate it.
   assert.match(bottomNav, /<GlassDock/);
   assert.match(bottomNav, /md:hidden/);
+  // Dock glyphs must honour GlassDock's `size` + inline width/height —
+  // className-only SVGs paint as empty plates on phone and tablet.
+  const revisionIcons = read("src/revision/components/icons.tsx");
+  assert.match(revisionIcons, /size\?: number/);
+  assert.match(revisionIcons, /style\?: CSSProperties/);
+  assert.match(revisionIcons, /function svgProps/);
   assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{/);
 });
 

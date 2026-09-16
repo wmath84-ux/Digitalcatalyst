@@ -158,7 +158,7 @@ const base = metricSet(baseCss, { base: true });
 const at640 = metricSet(mediaBlock(640));
 const at768 = metricSet(mediaBlock(768));
 const steps = [base, at640, at768];
-const boxes = [420, 520, 600];
+const boxes = [520, 640, 740];
 
 const metricKeys = [
   "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "radius", "border", "hoverLift",
@@ -175,10 +175,10 @@ function expectedTolerance(target) {
 test("the 640px and 768px scaling media blocks are present", () => {
   assert.match(css, /@media \(min-width: 640px\)\s*\{/);
   assert.match(css, /@media \(min-width: 768px\)\s*\{/);
-  assert.match(css, /Internal scaling[\s\S]*?box height \/ 420/);
+  assert.match(css, /Internal scaling[\s\S]*?box height \/ 520/);
 });
 
-test("the 420px step keeps every reference declaration unchanged", () => {
+test("the 520px phone step pins the enlarged brand metrics", () => {
   assert.equal(base.paddingTop, 25);
   assert.equal(base.paddingRight, 20);
   assert.equal(base.paddingBottom, 25);
@@ -186,25 +186,25 @@ test("the 420px step keeps every reference declaration unchanged", () => {
   assert.equal(base.border, 4);
   assert.equal(base.radius, 10);
   assert.equal(base.hoverLift, 10);
-  assert.equal(base.logo, 80);
+  assert.equal(base.logo, 144);
   assert.equal(base.logoBorder, 4);
-  assert.equal(base.name, 18);
-  assert.equal(base.bio, 16);
-  assert.equal(base.nameMarginTop, 20);
+  assert.equal(base.name, 22);
+  assert.equal(base.bio, 18);
+  assert.equal(base.nameMarginTop, 16);
   assert.equal(base.divider, 2);
-  assert.equal(base.dividerMarginTop, 20);
-  assert.equal(base.dividerMarginBottom, 20);
-  assert.equal(base.icon, 17.6);
-  assert.equal(base.iconGap, 15);
-  assert.equal(base.iconRowGap, 12);
-  assert.equal(base.tooltip, 12.8);
+  assert.equal(base.dividerMarginTop, 16);
+  assert.equal(base.dividerMarginBottom, 16);
+  assert.equal(base.icon, 24);
+  assert.equal(base.iconGap, 18);
+  assert.equal(base.iconRowGap, 14);
+  assert.equal(base.tooltip, 14.4);
   assert.deepEqual(
     [base.tooltipPaddingTop, base.tooltipPaddingRight, base.tooltipPaddingBottom, base.tooltipPaddingLeft],
-    [8, 6.4, 8, 6.4],
+    [10, 8, 10, 8],
   );
   assert.deepEqual(
     [base.tooltipArrowTop, base.tooltipArrowRight, base.tooltipArrowBottom, base.tooltipArrowLeft],
-    [10, 10, 0, 10],
+    [12, 12, 0, 12],
   );
   assert.match(baseCss, /background: #2cb5a0;/);
   assert.match(baseCss, /border: 4px solid #7cdacc;/);
@@ -217,9 +217,9 @@ test("the 420px step keeps every reference declaration unchanged", () => {
   assert.match(baseCss, /transform: translate\(-50%, -130%\);/);
 });
 
-test("every stepped metric is within five percent or one pixel of boxHeight / 420", () => {
+test("every stepped metric is within five percent or one pixel of boxHeight / 520", () => {
   for (const [stepIndex, metric] of steps.entries()) {
-    const scale = boxes[stepIndex] / 420;
+    const scale = boxes[stepIndex] / 520;
     for (const key of metricKeys) {
       const target = base[key] * scale;
       const difference = Math.abs(metric[key] - target);
@@ -292,11 +292,11 @@ test("the ramp is CSS-only and contains no forbidden viewport/container sizing",
   assert.doesNotMatch(css.slice(scaleStart), /\b(?:javascript|onclick)\b/i);
 });
 
-test("Home and Admin keep the matching 420 / 520 / 600 boxes", () => {
-  const homeBoxes = homeApp.match(/h-\[420px\][^"`]*sm:h-\[520px\][^"`]*md:h-\[600px\]/g) || [];
+test("Home and Admin keep the matching 520 / 640 / 740 boxes", () => {
+  const homeBoxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
   assert.equal(homeBoxes.length, 2, "Home wall and social slot each keep the height ladder");
   assert.ok(homeBoxes.every((box) => box.includes("w-full")));
-  assert.match(brandingPage, /h-\[420px\] w-full sm:h-\[520px\] md:h-\[600px\]/);
+  assert.match(brandingPage, /h-\[520px\] w-full sm:h-\[640px\] md:h-\[740px\]/);
   assert.match(homeApp, /data-home-social-slot/);
 });
 

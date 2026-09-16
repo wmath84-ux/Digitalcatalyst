@@ -20,6 +20,7 @@ import { useBranding } from "../context/BrandingContext";
 // lazily by DeferredVisible below (see the section near the end of the page).
 const StickerWall = lazy(() => import("../components/StickerWall"));
 import { createUserQuery } from "../utils/userQueries";
+import { prefetchRoute } from "../utils/lazyRoute";
 import { categories, reviews as fallbackReviews } from "./data/mockData";
 import type { Banner, Product } from "./types";
 import { useCatalog } from "../context/CatalogContext";
@@ -413,7 +414,7 @@ export default function App({
                   layout under 640 px (fewer seeded stickers, smaller cards,
                   compact copy) so it fits without spilling. */}
               <section data-home-sticker-wall className="mt-8 px-4 md:px-8">
-                <div className="h-[420px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0F0F12] sm:h-[520px] md:h-[600px]">
+                <div className="h-[520px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0F0F12] sm:h-[640px] md:h-[740px]">
                   {/* The wall boots a matter.js world + a rAF render loop, and
                       it is the LAST section on Home. `DeferredVisible` keeps
                       the reserved box (no layout shift) but only mounts — and
@@ -427,7 +428,10 @@ export default function App({
                         footer={
                           <button
                             type="button"
-                            onClick={() => { window.location.hash = "#/queries"; }}
+                            onClick={() => {
+                              prefetchRoute("#/queries");
+                              window.location.hash = "#/queries";
+                            }}
                             className="rounded-full border border-white/15 bg-white/[0.07] px-5 py-2 text-sm font-black text-white backdrop-blur transition hover:bg-white/[0.14]"
                             data-home-explore-queries
                           >
@@ -455,7 +459,7 @@ export default function App({
               <section data-home-social-card-section className="mt-8 px-4 pb-4 md:px-8">
                 <div
                   data-home-social-slot
-                  className="h-[420px] w-full sm:h-[520px] md:h-[600px]"
+                  className="h-[520px] w-full sm:h-[640px] md:h-[740px]"
                 >
                   <SocialProfileCard
                     logoUrl={branding.logoUrl}

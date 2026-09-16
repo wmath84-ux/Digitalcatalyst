@@ -16,25 +16,21 @@ type ProductCardProps = {
 };
 
 /**
- * The store's product card — owner brief 2026-09-10:
+ * The store's product card — same length/width stack as Home's trending
+ * tiles (`src/home/components/ProductCard.tsx`): a 4:3 artwork band, then
+ * natural-height copy. The card itself is NOT a square; width comes from
+ * the auto-fill grid (`[data-store-grid]`), height from 4:3 art + copy, so
+ * the ratio tracks Home on every phone / tablet / desktop width.
  *
- *   "card ka ratio exact square hona chahiye … card per bhi ek heading text
- *    hona chahiye bada sa … transparent glass card use karna hai, background
- *    density blur 42 to 50%, color light blue, color density 22 to 30%."
+ * Material stays the store lens: `.dc-store-glass` light-blue glass
+ * (src/store-glass.css). The product title is still the card's heading —
+ * `.dc-store-card-title` is the biggest type on the card at every
+ * breakpoint, clamped to two lines.
  *
- * So: an EXACT square (`aspect-square` + `min-h-0`, so a long title can never
- * stretch the track and break the ratio), the same `.dc-store-glass` light-blue
- * lens the hero card wears (src/store-glass.css), and the product title as the
- * card's heading — `.dc-store-card-title` is the biggest type on the card at
- * every breakpoint, clamped to two lines so the price and the CTA always fit
- * inside the square.
+ * The rating and the subject ride on the artwork so the glass area stays
+ * type-only. The byline and the save pill wait for `sm:` where the track
+ * is wide enough.
  *
- * Space budget (worst case, a 320px phone → 145px card): artwork 40%, then the
- * heading (2 lines) and the CTA. Everything that does not fit that budget —
- * the byline, the struck reference price, the save pill — is `sm:` and up,
- * where a two-column tablet card is ~370px wide. The rating and the subject
- * ride on the artwork instead, so the glass area stays type-only.
- */
 export default function ProductCard({
   product,
   wishlisted,
@@ -72,17 +68,12 @@ export default function ProductCard({
          under the title. Making the wrapper the flex column fixes the card
          without touching `contentClassName="p-0"` — the artwork stays
          edge-to-edge, which liquidGlassWaveThreeContract pins. */
-      className="dc-store-glass dc-scene-ink group relative flex aspect-square w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col"
+      className="dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col"
     >
-      {/* Artwork — 40% of the square (46% from `sm:`), but as a GROW/SHRINK
-          flex item rather than a fixed percentage height: on a 320px phone the
-          copy needs more of the card than 60% leaves, and a `shrink-0` band
-          pushed the CTA out of the square where `overflow-hidden` clipped it.
-          Now the copy keeps its natural height and the artwork gives way (and
-          on a big tablet card it grows to fill). `absolute inset-0` on the
-          <img> keeps it cropped to the box: index.css's unlayered
+      {/* Artwork — same 4:3 box Home's trending card uses. `absolute inset-0`
+          on the <img> keeps it cropped to the box: index.css's unlayered
           `img { height: auto }` (640–1366px) would beat a Tailwind `h-full`. */}
-      <div className="relative w-full basis-[40%] min-h-0 grow shrink overflow-hidden sm:basis-[46%]">
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
         <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         {/* Bottom scrim: the rating chip sits on the artwork, so it needs the
             same edge the copy gets from `.dc-scene-ink`. */}
@@ -138,12 +129,10 @@ export default function ProductCard({
         </span>
       </div>
 
-      {/* `shrink-0`: the copy never compresses, so the artwork above is what
-          absorbs a tight square. No auto top margin any more — the artwork's
-          `grow` is what pins this block to the card's bottom edge. (Braces
-          matter here: between JSX children a bare slash-star comment is
-          literal TEXT and paints itself onto the card.) */}
-      <div className="relative z-20 flex shrink-0 flex-col gap-1 px-1.5 pb-1.5 pt-2 sm:gap-1.5 sm:px-3 sm:pb-3 sm:pt-2.5">
+      {/* `flex-1` + `p-3`: same copy stack Home's trending card uses under
+          the 4:3 art. (Braces matter here: between JSX children a bare
+          slash-star comment is literal TEXT and paints itself onto the card.) */}
+      <div className="relative z-20 flex flex-1 flex-col gap-1 p-3">
         {/* The card's heading: title first, biggest and heaviest. */}
         <h3 className="dc-store-card-title line-clamp-2">{product.title}</h3>
 

@@ -66,6 +66,7 @@ test("the wrapper is display:contents so overlay headers are not transformed by 
 
 test("app keys stay stable for Revision and My Day, follow id for product and course", () => {
   assert.equal(pageEnterAppKey("#/home"), "#/home");
+  assert.equal(pageEnterAppKey("#/queries"), "#/queries");
   assert.equal(pageEnterAppKey("#/store/purchases"), "#/store");
   assert.equal(pageEnterAppKey("#/product/abc?section=reviews"), "#/product/abc");
   assert.equal(pageEnterAppKey("#/subscription?renew=1"), "#/subscription");
@@ -99,6 +100,7 @@ test("RootPage wraps only the listed apps in PageEnter", () => {
   assert.match(main, /<CourseRouteGuard/);
   assert.match(main, /<MyDayApp/);
   assert.match(main, /<RevisionApp/);
+  assert.match(main, /<UserQueriesPage/);
 
   const slice = (from, to) => main.slice(main.indexOf(from), main.indexOf(to));
   assert.doesNotMatch(slice("hash.startsWith(SEARCH_HASH)", "PROFILE_SUBSCRIBER_EXPERIENCE_HASH"), /PageEnter/);

@@ -8,7 +8,7 @@
 // for and are easy to break by accident:
 //
 //  1. SIZE — the card takes the exact geometry of the feedback wall box
-//     above it (same width, same 420 / 520 / 600 height steps, same
+//     above it (same width, same 520 / 640 / 740 height steps, same
 //     section padding), at every screen size.
 //  2. DESIGN — every visual value of the reference card
 //     (https://uiverse.io/abrahamcalsin/grumpy-ape-40) is kept verbatim.
@@ -46,7 +46,7 @@ const brandingUtil = fs.readFileSync("src/utils/branding.ts", "utf8");
 test("the social card box matches the feedback wall box at every breakpoint", () => {
   // Same height steps, in the same order, on both the wall and the slot
   // the social card lives in (one for each).
-  const boxes = homeApp.match(/h-\[420px\][^"`]*sm:h-\[520px\][^"`]*md:h-\[600px\]/g) || [];
+  const boxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
   assert.equal(boxes.length, 2, "the wall and the social slot share the same height steps");
   // Same full width on both.
   assert.equal(boxes.filter((box) => box.includes("w-full")).length, 2);
@@ -84,28 +84,29 @@ test("every visual value of the reference card is kept", () => {
   assert.match(css, /font-family: "Poppins",/);
   assert.match(css, /transition: all 0\.3s ease;/);
   assert.match(css, /\.dc-social-card:hover \{\n  transform: translateY\(-10px\);/);
-  // Picture: 5rem circle with the same 4px ring, centred.
-  assert.match(css, /width: 5rem;/);
-  assert.match(css, /height: 5rem;/);
+  // Picture: 9rem circle with the same 4px ring, centred — large enough
+  // to read the brand logo on every phone / tablet / desktop size.
+  assert.match(css, /width: 9rem;/);
+  assert.match(css, /height: 9rem;/);
   assert.match(css, /border-radius: 999px;/);
   assert.match(css, /\.dc-social-pic \{[\s\S]*?margin: auto;/);
-  // Type scale: 18px name, 16px weight-200 bio line.
-  assert.match(css, /\.dc-social-name \{[\s\S]*?font-size: 18px;/);
-  assert.match(css, /\.dc-social-name span \{[\s\S]*?font-size: 16px;/);
+  // Type scale: 22px name, 18px weight-200 bio line.
+  assert.match(css, /\.dc-social-name \{[\s\S]*?font-size: 22px;/);
+  assert.match(css, /\.dc-social-name span \{[\s\S]*?font-size: 18px;/);
   assert.match(css, /\.dc-social-name span \{[\s\S]*?font-weight: 200;/);
-  // Divider: 2px #7cdacc rule with 20px above and below.
+  // Divider: 2px #7cdacc rule with 16px above and below.
   assert.match(css, /\.dc-social-media::before \{[\s\S]*?height: 2px;/);
-  assert.match(css, /\.dc-social-media::before \{[\s\S]*?margin: 20px 0;/);
+  assert.match(css, /\.dc-social-media::before \{[\s\S]*?margin: 16px 0;/);
   assert.match(css, /\.dc-social-media::before \{[\s\S]*?background: #7cdacc;/);
-  // Icons: 1.1rem, currentColor, 15px apart.
-  assert.match(css, /\.dc-social-icon svg,\n\.dc-social-icon img \{[\s\S]*?width: 1\.1rem;/);
+  // Icons: 1.5rem, currentColor, 18px apart.
+  assert.match(css, /\.dc-social-icon svg,\n\.dc-social-icon img \{[\s\S]*?width: 1\.5rem;/);
   assert.match(css, /fill: currentColor;/);
-  assert.match(css, /margin-right: 15px;/);
-  // Tooltip: dark plate, 0.8rem/600, 10px arrow, -130% on hover.
+  assert.match(css, /margin-right: 18px;/);
+  // Tooltip: dark plate, 0.9rem/600, 12px arrow, -130% on hover.
   assert.match(css, /\.dc-social-tooltip \{[\s\S]*?background: #262626;/);
-  assert.match(css, /\.dc-social-tooltip \{[\s\S]*?font-size: 0\.8rem;/);
+  assert.match(css, /\.dc-social-tooltip \{[\s\S]*?font-size: 0\.9rem;/);
   assert.match(css, /\.dc-social-tooltip \{[\s\S]*?font-weight: 600;/);
-  assert.match(css, /border-width: 10px 10px 0 10px;/);
+  assert.match(css, /border-width: 12px 12px 0 12px;/);
   assert.match(css, /border-top-color: #262626;/);
   assert.match(css, /transform: translate\(-50%, -130%\);/);
 });
@@ -296,7 +297,7 @@ test("the branding editor can add, edit and remove social accounts", () => {
   assert.match(brandingPage, /SOCIAL_PLATFORMS\[id\]\.label/);
   // The preview is the real card, at the real Home size.
   assert.match(brandingPage, /<SocialProfileCard[\s\S]*?preview/);
-  assert.match(brandingPage, /h-\[420px\] w-full sm:h-\[520px\] md:h-\[600px\]/);
+  assert.match(brandingPage, /h-\[520px\] w-full sm:h-\[640px\] md:h-\[740px\]/);
   // Saving persists the list (plus the legacy mirror).
   assert.match(brandingPage, /socialUrl, socialLinks, supportEmail/);
   assert.match(brandingPage, /const socialUrl = socialLinks\[0\]\?\.url \|\| "";/);
