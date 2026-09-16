@@ -144,14 +144,38 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
   const timeout = isRead ? setTimeout(() => controller.abort(), 30_000) : undefined;
   let response: Response;
   let body: Envelope<T>;
-  try {
+  const requestPayload = JSON.stringify({ action, requestId: requestId(), ...payload });
+  const doFetch = async () => {
     const token = await user.getIdToken();
-    response = await apiFetch("/api/personal-course", {
+    return apiFetch("/api/personal-course", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action, requestId: requestId(), ...payload }),
+      body: requestPayload,
       ...(isRead ? { signal: controller.signal } : {}),
     });
+  };
+  try {
+    response = await doFetch();
+    // Auto-retry once on transient server errors (502/503/504) — Vercel
+    // cold starts and temporary timeouts are the #1 cause of "library
+    // couldn't load" errors on first visit.
+    if (isRead && (response.status === 502 || response.status === 503 || response.status === 504) && !controller.signal.aborted) {
+      await new Promise((r) => setTimeout(r, 1500));
+      if (!controller.signal.aborted) {
+        try { response = await doFetch(); } catch { /* fall through to original error */ }
+      }
+    }
+    // Detect HTML SPA fallback (same issue the AI endpoints had) — the
+    // shared serverless function wasn't reached, so retry against the
+    // production origin via apiFetch's own retry (already built in), but
+    // also detect it here so we don't try to parse HTML as JSON.
+    const contentType = response.headers.get("content-type") || "";
+    if (isRead && /text\/html/i.test(contentType) && !controller.signal.aborted) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (!controller.signal.aborted) {
+        try { response = await doFetch(); } catch { /* fall through */ }
+      }
+    }
     body = (await response.json().catch(() => ({}))) as Envelope<T>;
     if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
   } catch (error) {

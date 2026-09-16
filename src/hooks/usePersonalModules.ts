@@ -155,7 +155,7 @@ export function usePersonalModules(
     setSavedResources(next);
   }, []);
 
-  const load = useCallback((showLoading = false): Promise<boolean> => {
+  const load = useCallback((showLoading = false, retryCount = 0): Promise<boolean> => {
     if (!active || !userId) return Promise.resolve(false);
     if (inflightRef.current) return inflightRef.current;
     const epoch = ++epochRef.current;
@@ -181,8 +181,19 @@ export function usePersonalModules(
       })
       .catch((reason: unknown) => {
         if (epochRef.current !== epoch) return false;
+        // Auto-retry once on initial load failure — Vercel cold starts
+        // and transient 502/503/504 errors are the #1 cause of "library
+        // couldn't load" on first visit. The retry runs after a 2-second
+        // delay and only when there's no previously cached data.
+        if (retryCount === 0 && !accessRef.current) {
+          setError("Loading your library… retrying automatically.");
+          setTimeout(() => {
+            if (epochRef.current === epoch) void load(showLoading, retryCount + 1);
+          }, 2000);
+          return false;
+        }
         const result = errorOf(reason);
-        setError(result.message || "Could not load My Study Library.");
+        setError(result.message || "Could not load My Study Library. Please check your connection and try again.");
         setState(accessRef.current ? "ready" : "error");
         return false;
       })
