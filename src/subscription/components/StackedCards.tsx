@@ -127,7 +127,7 @@ export default function StackedCards({ cards }: { cards: ShowcaseCard[] }) {
   const visible = deck.slice(0, 3);
 
   return (
-    <div className="overflow-x-clip px-5 pt-5">
+    <div className="overflow-hidden px-5 pt-5">
       <div className="relative h-[300px] w-full">
         <AnimatePresence initial={false} custom={exitDirection}>
           {visible.map((card, pos) => {

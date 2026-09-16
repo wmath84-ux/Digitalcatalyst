@@ -185,6 +185,9 @@ function Header({
 // Field-level comparison: stream commits swap the chat object identity
 // constantly, but the header only cares about these fields — so it never
 // re-renders during generation, typing, or streaming.
+// NOTE: selectedSource, models, and modelDisabled MUST be compared here
+// or the ModelSelector dropdown will not reflect changes after the user
+// picks a different AI source.
 export default memo(
   Header,
   (a, b) =>
@@ -194,5 +197,8 @@ export default memo(
     a.chat.title === b.chat.title &&
     a.chat.course === b.chat.course &&
     a.chat.pinned === b.chat.pinned &&
-    a.chat.modelId === b.chat.modelId
+    a.chat.modelId === b.chat.modelId &&
+    a.selectedSource === b.selectedSource &&
+    a.modelDisabled === b.modelDisabled &&
+    a.models === b.models
 );

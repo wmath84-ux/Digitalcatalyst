@@ -159,6 +159,9 @@ export function usePersonalModules(
     if (!active || !userId) return Promise.resolve(false);
     if (inflightRef.current) return inflightRef.current;
     const epoch = ++epochRef.current;
+    // Stay in "loading" state throughout the entire attempt (including the
+    // internal retries inside fetchPersonalCourseLibrary). The error screen
+    // must only appear AFTER all retries have been exhausted — not during.
     if (showLoading || !accessRef.current) setState("loading");
     setRefreshing(true);
     let task: Promise<boolean>;
@@ -182,7 +185,7 @@ export function usePersonalModules(
       .catch((reason: unknown) => {
         if (epochRef.current !== epoch) return false;
         const result = errorOf(reason);
-        setError(result.message || "Could not load My Study Library.");
+        setError(result.message || "Could not load My Study Library. Please check your connection and try again.");
         setState(accessRef.current ? "ready" : "error");
         return false;
       })

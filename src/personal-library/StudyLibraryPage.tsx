@@ -344,7 +344,20 @@ export default function StudyLibraryPage() {
 
             {personal.state === "loading" && !personal.loaded ? <LibrarySkeleton /> : personal.state === "error" && !personal.loaded ? (
               <div className="grid min-h-72 place-items-center rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8 text-center">
-                <div><RefreshCw className="mx-auto h-8 w-8 text-rose-200" /><p className="mt-3 font-black">Your library couldn't load</p><p className="mt-1 text-sm text-white/60">{personal.error}</p><button type="button" onClick={personal.reload} className="mt-5 min-h-11 rounded-full bg-white/10 px-5 text-sm font-black">Try again</button></div>
+                <div>
+                  <RefreshCw className="mx-auto h-8 w-8 text-rose-200" />
+                  <p className="mt-3 font-black">Your library couldn't load</p>
+                  <p className="mt-1 text-sm text-white/60">{personal.error || "The server is temporarily unavailable. This usually resolves within a few seconds."}</p>
+                  <p className="mt-2 text-xs text-white/40">This is a temporary issue — your data is safe.</p>
+                  <div className="mt-5 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    <button type="button" onClick={personal.reload} className="min-h-11 rounded-full bg-white/10 px-5 text-sm font-black ring-1 ring-white/20 transition hover:bg-white/15 active:scale-95">
+                      <RefreshCw className="mr-1.5 inline h-4 w-4" /> Try again
+                    </button>
+                    <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-full px-5 text-xs font-bold text-white/50 underline-offset-2 hover:text-white/70 hover:underline">
+                      Reload page
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <>

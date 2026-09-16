@@ -954,8 +954,8 @@ export default function SubscriptionPage({
   // ---------- Render ----------
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
-    <div className="min-h-screen sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
+    <div className="min-h-screen overflow-x-hidden sm:py-6">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-x-hidden sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
           cartCount={cartCount}
           notifCount={0}
@@ -965,7 +965,7 @@ export default function SubscriptionPage({
           onHelpClick={() => setHelpOpen(true)}
         />
 
-        <main ref={contentColumnRef} className="flex-1 overflow-y-auto">
+        <main ref={contentColumnRef} className="flex-1 overflow-x-hidden overflow-y-auto">
           <div className="flex min-h-full w-full flex-col">
             {catalogLoading ? (
               <div data-subscription-loading className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/55">
@@ -1128,15 +1128,8 @@ export default function SubscriptionPage({
             ) : null}
           </div>
         ) : null}
-        {usingFallback && (
-          <div className="mx-5 mt-4 flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
-            <span aria-hidden="true">⚠️</span>
-            <span>
-              Showing default plans because the live catalog isn&apos;t available
-              yet. Final pricing is always confirmed at checkout.
-            </span>
-          </div>
-        )}
+        {/* Fallback catalog banner removed — default plans are always shown
+            with accurate pricing, so the warning added noise without value. */}
         {/* Already-owned selection: the entire buy flow below is replaced by
             a single statement of what is active. Nothing purchasable is
             rendered, so the same subscription type cannot be bought twice —

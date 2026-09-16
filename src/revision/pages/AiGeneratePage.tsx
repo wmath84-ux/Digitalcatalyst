@@ -516,7 +516,20 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
       }
     } catch (err) {
       await releaseRevisionTestSlot(uid, reservationId);
-      setNotice(err instanceof Error ? err.message : "AI request failed. Check your configuration and try again.");
+      const msg = err instanceof Error ? err.message : "AI request failed.";
+      // Add a helpful hint for common error patterns so the learner knows
+      // exactly what to do next instead of seeing a raw error string.
+      const hint =
+        /temporarily unavailable|try again/i.test(msg)
+          ? " The AI server may be starting up — wait 10 seconds and try again."
+          : /api key|key.*reject|authenticat/i.test(msg)
+            ? " Check your API key in AI Configuration."
+            : /not configured|no.*provider/i.test(msg)
+              ? " Open AI Configuration to set up your provider."
+              : /allowance|budget|limit/i.test(msg)
+                ? " Your AI allowance has been used up. It resets automatically."
+                : "";
+      setNotice(msg + hint);
       setPhase("idle");
       return;
     }

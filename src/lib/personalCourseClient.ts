@@ -140,76 +140,126 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
   if (!user) throw new PersonalCourseApiError("Please log in to use My Study Library.", "AUTH_REQUIRED", 401);
   const isRead = READ_ACTIONS.has(action);
   const retryable = isRead;
+  // Vercel Hobby functions allow up to 60 seconds. The previous 30-second
+  // timeout caused cold-start requests to abort before the server could
+  // finish — the #1 reason the library showed "couldn't load" on first visit.
   const controller = new AbortController();
-  const timeout = isRead ? setTimeout(() => controller.abort(), 30_000) : undefined;
-  let response: Response;
-  let body: Envelope<T>;
+  const timeout = isRead ? setTimeout(() => controller.abort(), 60_000) : undefined;
   try {
-    const token = await user.getIdToken();
-    response = await apiFetch("/api/personal-course", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action, requestId: requestId(), ...payload }),
-      ...(isRead ? { signal: controller.signal } : {}),
-    });
-    body = (await response.json().catch(() => ({}))) as Envelope<T>;
-    if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
-  } catch (error) {
-    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-    throw new PersonalCourseApiError(
-      isRead
-        ? offline
-          ? "You're offline, so your library couldn't be loaded. Reconnect and try again."
-          : "Your library couldn't be loaded. Nothing was changed — try again."
-        : offline
-          ? "You're offline, so the result couldn't be confirmed. Reconnect and refresh your library before retrying."
-          : "The server result couldn't be confirmed. Refresh your library before retrying so you don't repeat a completed action.",
-      "NETWORK_ERROR",
-      0,
-      error,
-      { retryable },
-    );
+  const requestPayload = JSON.stringify({ action, requestId: requestId(), ...payload });
+
+  // Retry loop: reads get up to 3 attempts with exponential backoff.
+  // Vercel cold starts + Firestore collection-group queries can take 10-20s
+  // on the first request; a single attempt is not enough.
+  const MAX_ATTEMPTS = isRead ? 3 : 1;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (controller.signal.aborted) break;
+
+    let response: Response;
+    let body: Envelope<T>;
+    try {
+      const token = await user.getIdToken();
+      response = await apiFetch("/api/personal-course", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: requestPayload,
+        ...(isRead ? { signal: controller.signal } : {}),
+      });
+
+      // Detect transient server errors (502/503/504) — retry on next iteration.
+      if (isRead && (response.status === 502 || response.status === 503 || response.status === 504) && attempt < MAX_ATTEMPTS) {
+        lastError = new Error(`Server returned ${response.status}`);
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        continue;
+      }
+
+      // Detect HTML SPA fallback — the serverless function wasn't reached.
+      const contentType = response.headers.get("content-type") || "";
+      if (isRead && /text\/html/i.test(contentType) && attempt < MAX_ATTEMPTS) {
+        lastError = new Error("Server returned HTML instead of JSON");
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        continue;
+      }
+
+      body = (await response.json().catch(() => ({}))) as Envelope<T>;
+      if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
+    } catch (error) {
+      if (controller.signal.aborted) {
+        lastError = error;
+        break; // Don't retry after abort
+      }
+      // Network error — retry if we have attempts left
+      if (isRead && attempt < MAX_ATTEMPTS) {
+        lastError = error;
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        continue;
+      }
+      lastError = error;
+      break;
+    }
+
+    // If we got here, we have a response to process
+    if (!response!.ok || !body!.ok || body!.data === undefined) {
+      const unconfirmed = !isRead && (response!.status >= 500 || (response!.ok && (body!.data === undefined || body!.ok !== true)));
+      const foreign = !unconfirmed && body!.ok === true && body!.data === undefined;
+
+      // Server 503 with LIBRARY_INDEX_REQUIRED or SERVER_CONFIGURATION — retry
+      if (isRead && response!.status === 503 && attempt < MAX_ATTEMPTS) {
+        lastError = new Error(body!.message || "Server temporarily unavailable");
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        continue;
+      }
+
+      if (unconfirmed) {
+        throw new PersonalCourseApiError(
+          "The server result couldn't be confirmed. Refresh your library before retrying.",
+          "UNCONFIRMED_RESULT",
+          response!.status,
+          body!.details,
+          { unconfirmed: true },
+        );
+      }
+      throw new PersonalCourseApiError(
+        isRead
+          ? foreign
+            ? "My Study Library didn't answer this request — the shared API replied with a different service's result. Reload the page and try again."
+            : response!.status === 401
+              ? "Your sign-in session expired. Please sign in again to open your library."
+              : response!.status === 403
+                ? "Your account does not have permission to open this library. Contact support if this is unexpected."
+                : body!.code === "LIBRARY_INDEX_REQUIRED"
+                  ? "My Study Library is awaiting a server update. Please contact support or try again shortly."
+                  : "Your library couldn't be loaded. Please try again."
+          : body!.message || body!.error || "My Study Library couldn't be updated.",
+        foreign && isRead ? "LIBRARY_ROUTE_UNAVAILABLE" : body!.code || "PERSONAL_COURSE_ERROR",
+        response!.status,
+        body!.details,
+        { retryable },
+      );
+    }
+    return body!.data;
+  }
+
+  // All retries exhausted — throw the last error
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  throw new PersonalCourseApiError(
+    isRead
+      ? offline
+        ? "You're offline, so your library couldn't be loaded. Reconnect and try again."
+        : "Your library couldn't be loaded after multiple attempts. The server may be starting up — wait a few seconds and try again."
+      : offline
+        ? "You're offline, so the result couldn't be confirmed. Reconnect and refresh your library before retrying."
+        : "The server result couldn't be confirmed. Refresh your library before retrying so you don't repeat a completed action.",
+    "NETWORK_ERROR",
+    0,
+    lastError,
+    { retryable },
+  );
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok || !body.ok || body.data === undefined) {
-    // A gateway/function 5xx can arrive after the transaction committed but
-    // before its response reached the browser. Treat it as unconfirmed rather
-    // than claiming the mutation failed and inviting an unsafe immediate retry.
-    const unconfirmed = !isRead && (response.status >= 500 || (response.ok && (body.data === undefined || body.ok !== true)));
-    // `ok: true` with no `data` is not a library answer at all: this API shares
-    // one deployed function with several features, and an undispatched request
-    // used to be answered by another one. Say so instead of blaming the user's
-    // connection or their library.
-    const foreign = !unconfirmed && body.ok === true && body.data === undefined;
-    if (unconfirmed) {
-      throw new PersonalCourseApiError(
-        "The server result couldn't be confirmed. Refresh your library before retrying.",
-        "UNCONFIRMED_RESULT",
-        response.status,
-        body.details,
-        { unconfirmed: true },
-      );
-    }
-    throw new PersonalCourseApiError(
-      isRead
-        ? foreign
-          ? "My Study Library didn't answer this request — the shared API replied with a different service's result. Reload the page and try again."
-          : response.status === 401
-            ? "Your sign-in session expired. Please sign in again to open your library."
-            : response.status === 403
-              ? "Your account does not have permission to open this library. Contact support if this is unexpected."
-              : body.code === "LIBRARY_INDEX_REQUIRED"
-                ? "My Study Library is awaiting a server update. Please contact support or try again shortly."
-                : "Your library couldn't be loaded. Please try again."
-        : body.message || body.error || "My Study Library couldn't be updated.",
-      foreign && isRead ? "LIBRARY_ROUTE_UNAVAILABLE" : body.code || "PERSONAL_COURSE_ERROR",
-      response.status,
-      body.details,
-      { retryable },
-    );
-  }
-  return body.data;
 }
 
 const id = (value: string | undefined | null, label: string) => {
