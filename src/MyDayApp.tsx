@@ -716,7 +716,12 @@ export default function App() {
             swap, so dropping the strip removes a duplicate row of buttons
             without stranding any page. */}
 
-        <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-8 md:px-8 lg:px-10">
+        {/* Shell gutter. The column below (the section page) is what must
+            never be squeezed: with the compact rail at md/lg the page keeps
+            ~636px at 768px and ~872px at 1024px — the old `md:px-8 md:gap-8`
+            plus the 224px panel left only ~448px there, i.e. narrower than a
+            phone, which is the shrink that was reported on small tablets. */}
+        <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-5 lg:px-8 xl:gap-8 xl:px-10">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
           {/* P3-13: MyDay overview — data hook + hover lift for quick actions (lens budget intact) */}
@@ -795,9 +800,11 @@ export default function App() {
                   </div>
                   <div className="myday-area-side">
                     <StreakCard streak={streak} onOpen={() => handleNavigate("tasks")} />
-                    {/* The side navigation already carries the quote from md
-                        up — the in-content card is the mobile edition. */}
-                    <QuoteCard className="md:hidden" />
+                    {/* The side rail carries the quote only in its full-panel
+                        form (1280px up) — until then the panel is a compact
+                        icon rail with no room for it, so the in-content card
+                        is the edition every smaller screen sees. */}
+                    <QuoteCard className="xl:hidden" />
                   </div>
                 </div>
 

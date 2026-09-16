@@ -973,6 +973,16 @@ export default function Reminders({
           </section>
 
           <section className="myrem-banner" aria-label="Stay consistent">
+            {/* Snowman companion. It is a SIBLING of the banner card (not a
+                child of it any more): it used to be absolutely positioned
+                inside the banner and lifted `bottom: calc(100% - 1.4rem)`
+                with `z-index: 5`, so it was painted over the Quick-add card
+                above — text hidden, taps landing on decoration. In flow it
+                gets its own row above the banner and overlaps nothing. */}
+            <div className="myrem-snow" aria-hidden="true">
+              <span className="myrem-snow-bubble">Set reminders today, achieve your dreams! ✨</span>
+              <span className="myrem-snow-body">⛄</span>
+            </div>
             <div className="myrem-banner-inner">
               <span className="myrem-banner-book" aria-hidden="true">
                 <BookOpenText className="h-7 w-7" />
@@ -985,10 +995,6 @@ export default function Reminders({
                 Create Your First Reminder
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
-              <div className="myrem-snow" aria-hidden="true">
-                <span className="myrem-snow-bubble">Set reminders today, achieve your dreams! ✨</span>
-                <span className="myrem-snow-body">⛄</span>
-              </div>
             </div>
           </section>
         </div>

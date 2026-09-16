@@ -48,7 +48,12 @@
   .myrem-layout { padding-bottom: 0; }
 }
 
-@media (min-width: 1024px) {
+/* Two columns only from 1180px. The rail is 284px + the gap, so at 1024px the
+   main list would be left ~370px wide on a small tablet — narrower than a
+   phone, and a reminder row (tile + time + text + actions) needs more than
+   that. Below 1180px the page keeps the phone layout: the list first, then the
+   rail cards stacked under it, in the same order. */
+@media (min-width: 1180px) {
   .myrem-layout {
     gap: 1.1rem;
     grid-template-columns: minmax(0, 1fr) 284px;
@@ -148,7 +153,9 @@
 
 /* ── Mobile search row (the mobile mockup's search + sliders pair) ───────── */
 .myrem-msearch { display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; }
-@media (min-width: 1024px) { .myrem-msearch { display: none; } }
+/* The chips-row magnifier replaces this row exactly when the rail becomes a
+   side column (see .myrem-layout) — same 1180px, so the two never disagree. */
+@media (min-width: 1180px) { .myrem-msearch { display: none; } }
 .myrem-searchbox {
   display: flex;
   align-items: center;
@@ -238,7 +245,7 @@
 
 /* Desktop expanding search inside the chips row (mockup's magnifier). */
 .myrem-dsearch { display: none; }
-@media (min-width: 1024px) {
+@media (min-width: 1180px) {
   .myrem-dsearch { display: inline-flex; align-items: center; }
 }
 .myrem-dsearch-btn {
@@ -663,9 +670,9 @@ button.myrem-cal-day:hover { background: rgba(255, 255, 255, 0.08); }
   background: var(--myrem-violet);
 }
 .myrem-cal-day[data-selected="true"][data-dot="true"]::after { background: #fff; }
-/* Mobile collapse for the calendar body (desktop rail always shows it). */
+/* Mobile collapse for the calendar body (the side rail always shows it). */
 .myrem-rail-cal[data-open="false"] .myrem-cal-body { display: none; }
-@media (min-width: 1024px) {
+@media (min-width: 1180px) {
   .myrem-rail-cal .myrem-cal-body { display: block; }
 }
 
@@ -783,19 +790,34 @@ button.myrem-cal-day:hover { background: rgba(255, 255, 255, 0.08); }
 }
 .myrem-banner-cta:hover { background: rgba(255, 255, 255, 0.24); }
 .myrem-banner-cta:active { transform: scale(0.97); }
-/* Snowman companion (desktop decor, non-interactive — mirrors the mockup). */
+/* Snowman companion (desktop decor, non-interactive — mirrors the mockup).
+ * It is IN FLOW above the banner card: it used to be absolutely positioned and
+ * lifted clear over the banner's top edge with `z-index: 5`, which painted it
+ * (and its "Set reminders today…" bubble) across the Quick-add card above, so
+ * that card's tiles were obscured and awkward to hit. The banner area is a
+ * flex column, so the companion takes its own row and overlaps nothing; it is
+ * non-interactive at every depth so decoration can never eat a tap. */
 .myrem-snow { display: none; }
 @media (min-width: 1280px) {
+  .myrem-banner {
+    display: flex;
+    flex-direction: column;
+  }
+  .myrem-banner-inner { flex: 1 1 auto; }
   .myrem-snow {
-    position: absolute;
-    right: 1.6rem;
-    bottom: calc(100% - 1.4rem);
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    align-self: flex-end;
+    /* Fixed-size companion: the banner card is the flexible element, so the
+       snowman can never be squeezed into the quick-add row underneath. */
+    flex: 0 0 auto;
+    margin: 0 1.6rem 0.35rem 0;
     pointer-events: none;
-    z-index: 5;
+    user-select: none;
+    -webkit-user-select: none;
   }
+  .myrem-snow * { pointer-events: none; }
   .myrem-snow-bubble {
     max-width: 10.5rem;
     margin-bottom: 0.35rem;
