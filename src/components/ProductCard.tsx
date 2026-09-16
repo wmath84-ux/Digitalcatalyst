@@ -30,7 +30,7 @@ type ProductCardProps = {
  * The rating and the subject ride on the artwork so the glass area stays
  * type-only. The byline and the save pill wait for `sm:` where the track
  * is wide enough.
- *
+ */
 export default function ProductCard({
   product,
   wishlisted,
