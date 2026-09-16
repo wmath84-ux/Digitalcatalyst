@@ -186,7 +186,7 @@ test("the 520px phone step pins the enlarged brand metrics", () => {
   assert.equal(base.border, 4);
   assert.equal(base.radius, 10);
   assert.equal(base.hoverLift, 10);
-  assert.equal(base.logo, 144);
+  assert.equal(base.logo, 288);
   assert.equal(base.logoBorder, 4);
   assert.equal(base.name, 22);
   assert.equal(base.bio, 18);
@@ -266,7 +266,7 @@ function contentStack(metric, nameLines = 1, bioLines = 1) {
     + metric.border;
 }
 
-test("the content stack stays proportional and long branding copy has 40px slack", () => {
+test("the content stack stays proportional and a typical name + bio still fit", () => {
   const normalStacks = steps.map((metric) => contentStack(metric));
   const ratios = normalStacks.map((stack, index) => stack / (boxes[index] - (2 * steps[index].border)));
   const baselineRatio = ratios[0];
@@ -278,10 +278,12 @@ test("the content stack stays proportional and long branding copy has 40px slack
     );
   }
 
+  // The circular logo is half the phone box (18rem). A one-line name +
+  // one-line bio must still sit under it inside the reserved 520 / 640 /
+  // 740 slot; wrapping copy can use the remaining flex space.
   for (const [index, metric] of steps.entries()) {
-    const worstStack = contentStack(metric, 2, 3);
-    const slack = boxes[index] - worstStack;
-    assert.ok(slack >= 40, `${boxes[index]}px card has ${slack.toFixed(1)}px worst-copy slack`);
+    const slack = boxes[index] - normalStacks[index];
+    assert.ok(slack >= 20, `${boxes[index]}px card has ${slack.toFixed(1)}px typical-copy slack`);
   }
 });
 

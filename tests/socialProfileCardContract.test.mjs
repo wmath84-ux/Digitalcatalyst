@@ -84,10 +84,11 @@ test("every visual value of the reference card is kept", () => {
   assert.match(css, /font-family: "Poppins",/);
   assert.match(css, /transition: all 0\.3s ease;/);
   assert.match(css, /\.dc-social-card:hover \{\n  transform: translateY\(-10px\);/);
-  // Picture: 9rem circle with the same 4px ring, centred — large enough
-  // to read the brand logo on every phone / tablet / desktop size.
-  assert.match(css, /width: 9rem;/);
-  assert.match(css, /height: 9rem;/);
+  // Picture: 18rem circle (double the previous Home 9rem) with the same
+  // 4px ring, centred — the brand logo is the card's hero on every
+  // phone / tablet / desktop size.
+  assert.match(css, /width: 18rem;/);
+  assert.match(css, /height: 18rem;/);
   assert.match(css, /border-radius: 999px;/);
   assert.match(css, /\.dc-social-pic \{[\s\S]*?margin: auto;/);
   // Type scale: 22px name, 18px weight-200 bio line.
