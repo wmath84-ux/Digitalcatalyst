@@ -1,4 +1,6 @@
-import { sanitizeSocialUrl } from "./socialPlatform";
+import { normalizeSocialLinks, sanitizeSocialUrl, type SocialLink } from "./socialPlatform";
+
+export type { SocialLink };
 
 export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as const;
 export const DEFAULT_LOGO_URL = "/icons/icon-512x512.png";
@@ -45,8 +47,21 @@ export type Branding = {
    * (valid http(s) only); the card links to it and the platform icon is
    * detected from its hostname. Empty = the card renders its clean
    * non-clickable state.
+   *
+   * Kept in sync with `socialLinks[0]` — see below. New code should read
+   * `socialLinks`; this field is the legacy single-account mirror so any
+   * older reader (and older branding documents) keep working.
    */
   socialUrl: string;
+  /**
+   * Every social account the owner linked (Branding → Social profile),
+   * in the order they are shown on the Home page card. Each row carries
+   * its own URL plus an optional forced platform and custom icon URL, so
+   * a NEW url pasted by the admin immediately gets its own icon — a brand
+   * glyph when the host is known, otherwise that site's own favicon.
+   * An empty list = the card renders its clean non-clickable state.
+   */
+  socialLinks: SocialLink[];
 };
 
 export const DEFAULT_BRANDING: Branding = {
@@ -62,6 +77,7 @@ export const DEFAULT_BRANDING: Branding = {
   // No social profile by default — the Home page card renders its clean
   // non-clickable state until the admin saves a URL.
   socialUrl: "",
+  socialLinks: [],
 };
 
 // v2 cache stores the full branding object (v1 only stored the logo URL).
@@ -84,6 +100,11 @@ function sanitizeColor(value: unknown, fallback: string): string {
 export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>> | null | undefined): Branding {
   const logoRaw = typeof data?.logoUrl === "string" ? data.logoUrl.trim() : "";
   const logoUrl = /^https?:\/\//.test(logoRaw) || logoRaw.startsWith("/") ? logoRaw : DEFAULT_LOGO_URL;
+  // Keep the admin's URL verbatim; anything that is not a valid absolute
+  // http(s) URL degrades to "" (clean non-clickable card). The legacy
+  // single `socialUrl` is migrated into the multi-account list, then
+  // mirrored back so both readers agree on the same first account.
+  const socialLinks = normalizeSocialLinks(data?.socialLinks, data?.socialUrl);
   return {
     logoUrl,
     appName: sanitize(data?.appName, DEFAULT_APP_NAME),
@@ -98,9 +119,8 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     homeGradientTo: sanitizeColor(data?.homeGradientTo, DEFAULT_HOME_GRADIENT_TO),
     supportEmail: sanitize(data?.supportEmail, DEFAULT_SUPPORT_EMAIL, 120),
     supportPhone: sanitize(data?.supportPhone, DEFAULT_SUPPORT_PHONE, 160),
-    // Keep the admin's URL verbatim; anything that is not a valid
-    // absolute http(s) URL degrades to "" (clean non-clickable card).
-    socialUrl: sanitizeSocialUrl(data?.socialUrl),
+    socialUrl: sanitizeSocialUrl(data?.socialUrl) || socialLinks[0]?.url || "",
+    socialLinks,
   };
 }
 

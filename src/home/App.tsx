@@ -443,17 +443,27 @@ export default function App({
               {/* ── Social profile card (admin Branding → Social profile) ──
                   The LAST home page content, before the bottom nav: the
                   Uiverse-style profile card (grumpy-ape-40). Every value is
-                  branding data — logo, app name, tagline (bio) and the
-                  social URL, whose hostname also selects the platform icon.
-                  With no URL configured the card renders its clean
-                  non-clickable state (never a broken link or icon). */}
-              <section data-home-social-card-section className="mt-8 px-5 pb-2 md:px-8">
-                <SocialProfileCard
-                  logoUrl={branding.logoUrl}
-                  name={branding.appName}
-                  bio={branding.tagline}
-                  socialUrl={branding.socialUrl}
-                />
+                  branding data — logo, app name, tagline (bio) and the list
+                  of social accounts, each of which links out with its own
+                  icon (platform glyph, or the URL's own icon for a host we
+                  don't know). With no account configured the card renders
+                  its clean non-clickable state (never a broken link/icon).
+
+                  GEOMETRY: same section padding and the same reserved box
+                  height as the feedback wall above it, so the two cards
+                  measure exactly the same at every screen size. */}
+              <section data-home-social-card-section className="mt-8 px-4 pb-4 md:px-8">
+                <div
+                  data-home-social-slot
+                  className="h-[420px] w-full sm:h-[520px] md:h-[600px]"
+                >
+                  <SocialProfileCard
+                    logoUrl={branding.logoUrl}
+                    name={branding.appName}
+                    bio={branding.tagline}
+                    links={branding.socialLinks}
+                  />
+                </div>
               </section>
             </>
           )}

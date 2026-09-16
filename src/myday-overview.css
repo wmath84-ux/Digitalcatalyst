@@ -105,6 +105,23 @@
 
 .myday-area-tasks { grid-area: tasks; min-width: 0; }
 .myday-area-schedule { grid-area: schedule; min-width: 0; position: relative; }
+
+/* Desktop companions: the snowman column and the schedule card share the
+   `schedule` area — the card keeps filling the grid row (flex: 1) and the
+   decor gets its own row underneath it, so the speech bubble can never be
+   painted over the card's own "Add to schedule" button or over the streak
+   card in the row below (`> *:not(...)` keeps this independent of whichever
+   element the glass card renders). */
+@media (min-width: 1280px) {
+  .myday-area-schedule {
+    display: flex;
+    flex-direction: column;
+  }
+  .myday-area-schedule > *:not(.myday-snowman) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
 .myday-area-side {
   grid-area: side;
   min-width: 0;
@@ -681,15 +698,32 @@
   box-shadow: 0 8px 22px -8px rgba(59, 130, 246, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-/* ── Snowman companion (desktop decor, matches the reference) ───────────── */
+/* ── Snowman companion (desktop decor, matches the reference) ─────────────
+ * The companion lives IN FLOW under the schedule card (see the flex column
+ * above) instead of being absolutely positioned on top of it: it used to hang
+ * 2.5rem below / 0.5rem outside the card with `z-index: 5`, which painted its
+ * speech bubble — "You can do it! / Stay consistent" — straight over the
+ * schedule card's own call to action and over the Study-streak card in the
+ * row below, so that content was both hard to read and hard to click.
+ * It is now a normal, right-aligned column: nothing overlaps, and it is
+ * non-interactive at every depth (`.myday-snowman *`) — decoration must never
+ * be a tap target. */
 .myday-snowman {
-  position: absolute;
-  right: -0.5rem;
-  bottom: -2.5rem;
-  z-index: 5;
   display: none;
   flex-direction: column;
   align-items: center;
+  align-self: flex-end;
+  /* Never flexed away: the schedule card above absorbs the free space (and
+     shrinks) instead, so the companion always gets its full box and can never
+     spill into the row below. */
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.myday-snowman * {
   pointer-events: none;
 }
 
@@ -731,7 +765,22 @@
 /* ── Internal side navigation ────────────────────────────────────────────
  * Tasks-reference pass: the rows grow slightly, the selected entry wears the
  * reference's violet-gradient pill with its frosted icon tile + check dot, and
- * every unselected row keeps the quiet translucent plate (never a solid box). */
+ * every unselected row keeps the quiet translucent plate (never a solid box).
+ *
+ * COMPACT RAIL (768–1279px): the panel is only 68px wide there, so a row is
+ * just its icon, centred — the label text is hidden by the component and the
+ * active row keeps the violet pill (the check dot needs the label's row, so it
+ * is not drawn on the rail). From 1280px the full panel returns and the rows
+ * go back to icon + label + dot. */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  .myday-snav-item {
+    justify-content: center;
+    padding: 0.6rem 0.4rem;
+  }
+  .myday-snav-label { display: none; }
+  .myday-snav-dot { display: none; }
+}
+
 .myday-snav-item {
   position: relative;
   display: flex;
