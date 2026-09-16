@@ -13,9 +13,34 @@ import {
   browserPopupRedirectResolver,
 } from 'firebase/auth';
 
+/**
+ * Which domain serves Firebase's sign-in helper (`__/auth/handler`, `__/auth/iframe`).
+ *
+ * Defaults to the project's own `firebaseapp.com` domain, which is what every
+ * Firebase project gets. That default is the reason `signInWithRedirect()` is
+ * unreliable for THIS app: the helper then lives on a different origin from the
+ * app, so its storage is third-party — and browsers that partition or block
+ * third-party storage hand `getRedirectResult()` nothing on the way back. The
+ * learner picks their Google account, returns to the app, and is still signed
+ * out with no error (docs/google-signin-web.md).
+ *
+ * The app therefore signs in with `signInWithPopup()` by default. To ALSO make
+ * the redirect flow first-party (Firebase's Option 3), set
+ * `VITE_FIREBASE_AUTH_DOMAIN` to the domain that serves the app — but only
+ * after BOTH of these are done, or Google rejects the flow outright:
+ *   1. `/__/auth/*` is proxied to `<project>.firebaseapp.com` on that domain
+ *      (vercel.json already ships the rewrite), and
+ *   2. `https://<that-domain>/__/auth/handler` is added to the Google OAuth
+ *      client's authorized redirect URIs (Google Cloud Console → APIs &
+ *      Services → Credentials → the web client `930483750234-…`).
+ */
+const AUTH_DOMAIN =
+  ((import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_FIREBASE_AUTH_DOMAIN || "").trim() ||
+  "my-website-761e9.firebaseapp.com";
+
 const firebaseConfig = {
   apiKey: "AIzaSyD0F0vSGMNnUc8Oac96jDQuYLcyLcyyFuE",
-  authDomain: "my-website-761e9.firebaseapp.com",
+  authDomain: AUTH_DOMAIN,
   projectId: "my-website-761e9",
   storageBucket: "my-website-761e9.firebasestorage.app",
   messagingSenderId: "930483750234",

@@ -102,7 +102,7 @@ import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
-import { requiresAuthentication } from "./utils/appRoutes";
+import { requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
 import AppShell from "./components/AppShell";
@@ -1188,6 +1188,24 @@ function RootPage(): ReactNode {
     if (loading || user || !requiresAuthentication(hash)) return;
     sessionStorage.setItem("authReturnHash", hash);
     window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(hash)}`;
+  }, [hash, loading, user]);
+
+  // Leave the login screen the moment a session exists.
+  //
+  // Every "logged in but still looking at the login page" report came from a
+  // path where the session is restored OUTSIDE this form: the Google redirect
+  // fallback (the browser comes back, `getRedirectResult()` signs the learner
+  // in during boot) and a session restored from IndexedDB/localStorage on a
+  // cold open of `#/auth`. `AuthForm.completeSuccess()` only navigates for the
+  // flows IT started, so nothing used to move the learner off this screen and
+  // a perfectly good sign-in looked like a failure.
+  useEffect(() => {
+    if (loading || !user) return;
+    if (!hash.startsWith(AUTH_HASH)) return;
+    const destination = resolveAuthSuccessDestination(hash, window.sessionStorage, HOME_HASH);
+    if (destination === hash) return;
+    sessionStorage.removeItem("authReturnHash");
+    window.location.hash = destination;
   }, [hash, loading, user]);
 
   useEffect(() => {

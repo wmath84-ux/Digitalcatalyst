@@ -32,11 +32,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
-    "android:sync": "npm run verify:google-signin && npm run build && cap sync android",
+    "ensure:google-services": "node scripts/ensure-google-services.mjs",
+    "android:sync": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android",
     "android:open": "cap open android",
-    "android:assemble:debug": "npm run verify:google-signin && npm run build && cap sync android && cd android && ./gradlew assembleDebug",
-    "android:bundle:release": "npm run verify:google-signin && npm run build && cap sync android && cd android && ./gradlew bundleRelease",
-    "android:run": "cap run android"
+    "android:assemble:debug": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android && cd android && ./gradlew assembleDebug",
+    "android:bundle:release": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android && cd android && ./gradlew bundleRelease",
+    "android:run": "npm run ensure:google-services && cap run android"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^7.5.0",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -9,17 +9,27 @@ import BrandMark from "@/components/BrandMark";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
-import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView } from "@/utils/nativeRuntime";
+import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView, warmNativeGoogleAuth } from "@/utils/nativeRuntime";
+import { resolveAuthSuccessDestination } from "@/utils/appRoutes";
 
 type Mode = "login" | "signup";
 
 const readAuthParams = () =>
   new URLSearchParams(typeof window === "undefined" ? "" : window.location.hash.split("?")[1] || "");
 
-const destinationAfterAuth = (fallback = "#/store") => {
-  const returnTo = readAuthParams().get("return");
-  return returnTo && returnTo.startsWith("#/") ? returnTo : fallback;
-};
+/**
+ * One shared answer for "where does a successful login land?" — the `?return=`
+ * on this hash, then the route the auth guard parked in sessionStorage, then
+ * the store. (`resolveAuthSuccessDestination` is the same helper the app shell
+ * uses when a Google redirect signs the learner in without this form being
+ * involved, so the two can never disagree.)
+ */
+const destinationAfterAuth = (fallback = "#/store") =>
+  resolveAuthSuccessDestination(
+    typeof window === "undefined" ? "" : window.location.hash,
+    typeof window === "undefined" ? null : window.sessionStorage,
+    fallback,
+  );
 
 export default function AuthForm() {
   const { appName } = useBranding();
@@ -37,16 +47,32 @@ export default function AuthForm() {
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [highlightGoogle, setHighlightGoogle] = useState(false);
-  const { login, signup, loginWithGoogle, resetPassword } = useAuth();
+  const { login, signup, loginWithGoogle, resetPassword, restoringSession, googleNotice, dismissGoogleNotice } = useAuth();
 
   // Google sign-in cannot complete inside an embedded WebView unless a native
-  // plugin is registered — Google's Secure Browser Policy blocks the OAuth
-  // page there. The APK now ships that plugin, so the button works normally
-  // inside the app; this guard is what remains for OTHER embedded browsers
+  // plugin takes over — Google's Secure Browser Policy blocks the OAuth page
+  // there. This guard is therefore ONLY for other apps' in-app browsers
   // (Instagram / Facebook / Line), where no native fallback exists.
+  //
+  // Inside the Capacitor shell the button must stay live: `loginWithGoogle()`
+  // always takes the native Play Services path there, and `hasNativeGoogleAuth()`
+  // can still read FALSE on a cold screen because the plugin's JS module — the
+  // thing that registers the proxy on `Capacitor.Plugins` — is imported lazily.
+  // Greying the button out on that reading is exactly what made the APK show
+  // "Google sign-in उपलब्ध नहीं है" and never open the account picker at all.
   // See src/utils/nativeRuntime.ts.
-  const [googleBlocked] = useState(() => isEmbeddedWebView() && !hasNativeGoogleAuth());
   const [insideApp] = useState(() => isCapacitorNative());
+  const [googleBlocked, setGoogleBlocked] = useState(
+    () => !isCapacitorNative() && isEmbeddedWebView() && !hasNativeGoogleAuth(),
+  );
+
+  useEffect(() => {
+    if (!insideApp) return;
+    setGoogleBlocked(false);
+    // Register the native plugin proxy now so the first tap goes straight to
+    // the Play Services account picker instead of waiting on the import.
+    void warmNativeGoogleAuth();
+  }, [insideApp]);
 
   const clearMessages = () => {
     setError(null);
@@ -114,6 +140,9 @@ export default function AuthForm() {
 
   const handleGoogleLogin = async () => {
     clearMessages();
+    dismissGoogleNotice();
+    // The redirect fallback navigates the tab away and never returns control,
+    // so this only completes for the popup / native-picker paths.
     setGoogleSubmitting(true);
     try {
       const result = await loginWithGoogle();
@@ -151,7 +180,11 @@ export default function AuthForm() {
     clearMessages();
   };
 
-  const busy = submitting || googleSubmitting;
+  const busy = submitting || googleSubmitting || restoringSession;
+  // While the return leg of a Google redirect is being resolved the button
+  // keeps its spinner: showing a normal, tappable "Continue with Google" for
+  // that second is what made learners tap again and report a broken login.
+  const googleBusy = googleSubmitting || restoringSession;
 
   return (
     <motion.div
@@ -211,7 +244,7 @@ export default function AuthForm() {
         style={highlightGoogle ? { boxShadow: "0 0 0 2px rgba(66,133,244,0.85), 0 0 26px rgba(66,133,244,0.55)", borderRadius: 999 } : undefined}
       >
         <span className="flex items-center justify-center gap-3">
-        {googleSubmitting ? (
+        {googleBusy ? (
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
         ) : (
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
@@ -221,15 +254,42 @@ export default function AuthForm() {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.6 10.6 0 0 0 12 1a11 11 0 0 0-9.82 6.07L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38Z" />
           </svg>
         )}
-        {googleSubmitting ? "Google से connect हो रहा है…" : "Continue with Google"}
+        {googleBusy
+          ? restoringSession
+            ? "Google session wapas aa रहा है…"
+            : "Google से connect हो रहा है…"
+          : "Continue with Google"}
         </span>
       </GlassButton>
 
+      {googleNotice && !googleBusy && (
+        <div
+          role="status"
+          className="mt-3 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-100"
+        >
+          <p>{googleNotice}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white underline-offset-2 transition hover:bg-white/25"
+            >
+              Google से फिर कोशिश करें
+            </button>
+            <button
+              type="button"
+              onClick={dismissGoogleNotice}
+              className="rounded-full px-3 py-1.5 text-[11px] font-bold text-amber-100/70 underline underline-offset-2 transition hover:text-amber-50"
+            >
+              ठीक है
+            </button>
+          </div>
+        </div>
+      )}
+
       {googleBlocked && (
         <p className="mt-2 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-100">
-          {insideApp
-            ? "Google sign-in इस app version के अंदर उपलब्ध नहीं है (Google embedded WebView में OAuth allow नहीं करता). नीचे email + password से login करें — या eduvora.shop को Chrome में खोलकर Google से sign in करें।"
-            : "यह in-app browser Google sign-in block करता है। ऊपर ⋮ menu से \u201COpen in Chrome\u201D चुनें, या नीचे email + password इस्तेमाल करें।"}
+          यह in-app browser Google sign-in block करता है। ऊपर ⋮ menu से “Open in Chrome” चुनें, या नीचे email + password इस्तेमाल करें।
         </p>
       )}
 

@@ -78,7 +78,15 @@ try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
+    } else {
+        // LOUD on purpose. Without this file the build still succeeds, but the
+        // resulting APK has no `default_web_client_id`, so
+        // @capacitor-firebase/authentication cannot request a Google ID token
+        // (the account picker never opens) and FCM never registers. The npm
+        // android:* scripts run scripts/ensure-google-services.mjs first, which
+        // copies the repo-root file into place — a raw `./gradlew` skips that.
+        logger.warn("android/app/google-services.json is EMPTY — google-services plugin NOT applied. Google Sign-In and Push Notifications will not work in this APK. Run: npm run ensure:google-services")
     }
 } catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.warn("android/app/google-services.json not found — google-services plugin NOT applied. Google Sign-In and Push Notifications will not work in this APK. Run: npm run ensure:google-services (or copy the repo-root google-services.json into android/app/). Cause: ${e}")
 }
