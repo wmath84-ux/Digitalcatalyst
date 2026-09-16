@@ -174,7 +174,7 @@ export function useModuleAi(input: UseModuleAiInput): ModuleAiController {
         signal: controller.signal,
       }));
     if (controller.signal.aborted) return;
-    if (!result) {
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
       setPhase(snapshotRef.current ? "ready" : "error");
       return;
     }

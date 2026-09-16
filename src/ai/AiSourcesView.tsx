@@ -92,7 +92,7 @@ export default function AiSourcesView({ ai, onOpenUpgrade, onConfigureAi, onOpen
             <ul className="space-y-1.5 text-[11px] font-medium leading-4 text-white/55">
               <li className="flex gap-2"><AiPill tone="violet">Owner</AiPill><span className="min-w-0 flex-1">Only your account can read this module's AI data — the server derives the owner from your sign-in token.</span></li>
               <li className="flex gap-2"><AiPill tone="cyan">Scope</AiPill><span className="min-w-0 flex-1">Context contains this module only: {ai.snapshot.unitCount} grounding unit(s) from {ai.snapshot.coverage.total} resource(s). No official course content is mixed in.</span></li>
-              <li className="flex gap-2"><AiPill tone="emerald">Allowance</AiPill><span className="min-w-0 flex-1">{ai.snapshot.ai.planName} · {ai.snapshot.ai.hasAccess ? "AI active" : "AI not active"} — the same plan allowance the rest of the app uses.</span></li>
+              <li className="flex gap-2"><AiPill tone="emerald">Allowance</AiPill><span className="min-w-0 flex-1">{ai.snapshot.ai?.planName || "Current plan"} · {ai.snapshot.ai?.hasAccess ? "AI active" : "AI not active"} — the same plan allowance the rest of the app uses.</span></li>
             </ul>
           </AiSectionCard>
         ) : null}

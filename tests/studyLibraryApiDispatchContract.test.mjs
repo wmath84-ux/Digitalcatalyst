@@ -79,11 +79,14 @@ test("loading the library is a read: retryable, and never called an unconfirmed 
   assert.match(client, /const READ_ACTIONS = new Set\(\["personalCourse\.library", "personalCourse\.status", "personalCourse\.list"\]\)/);
   // A failed read must not inherit the mutation-safety warning.
   assert.match(client, /const unconfirmed = !isRead &&/);
-  assert.match(client, /Your library couldn't be loaded\. Nothing was changed — try again\./);
+  // A failed library load is always retryable (reads change nothing), keeps
+  // the write-safety warning OFF the read path, and never reroutes the
+  // learner while the page's own error card offers Try again.
+  assert.match(client, /retryable: boolean;[\s\S]*unconfirmed: boolean;/);
+  assert.match(client, /\{ retryable \}/);
   // Writes keep the deliberate warning verbatim.
   assert.match(client, /The server result couldn't be confirmed\. Refresh your library before retrying\./);
   assert.match(client, /so you don't repeat a completed action/);
-  assert.match(client, /retryable: boolean;[\s\S]*unconfirmed: boolean;/);
   // A foreign envelope is diagnosed as such.
   assert.match(client, /LIBRARY_ROUTE_UNAVAILABLE/);
   assert.match(client, /didn't answer this request — the shared API replied with a different service's result/);
@@ -120,6 +123,7 @@ test("server and client agree on which actions are reads, and the server says so
   assert.match(api, /const reading = LIBRARY_READ_ACTIONS\.has\(action\)/);
   assert.match(api, /Your library couldn't be loaded\. Nothing was changed — please try again\./);
   assert.match(api, /My Study Library couldn't be updated\. Please try again\./, "writes keep the update wording");
+  assert.match(api, /reading\s*\?\s*\"Your library couldn't be loaded/, "the read wording is selected by the READ classification, not hard-coded");
   // `action` is hoisted out of the try so the catch branch can classify the request.
   assert.match(api, /let action = "";\n  try \{/);
 });
