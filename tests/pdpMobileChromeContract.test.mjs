@@ -144,7 +144,9 @@ test("the dock's narrow-phone fit tightens the rhythm, not the tap targets", () 
 test("the dock's mobile clearance and safe-area gutter are still in place", () => {
   assert.match(indexCss, /--dc-footer-nav-h: 0px;/);
   assert.match(indexCss, /height: var\(--dc-footer-nav-h, 0px\);/);
-  assert.match(read("src/components/BottomNav.tsx"), /pb-\[max\(env\(safe-area-inset-bottom\),10px\)\]/);
+  // The gutter lives on the shared footer wrapper every screen renders now.
+  assert.match(read("src/components/BottomNav.tsx"), /<SiteFooterNav/);
+  assert.match(read("src/components/SiteFooterNav.tsx"), /pb-\[max\(env\(safe-area-inset-bottom\),10px\)\]/);
   // The mobile CTA parks above that measured height, never under the dock.
   assert.match(indexCss, /bottom: calc\(var\(--dc-footer-nav-h, 0px\) \+ 8px\);/);
 });

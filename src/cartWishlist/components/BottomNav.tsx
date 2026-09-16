@@ -1,6 +1,7 @@
 import { Heart, Home, ShoppingBag } from "lucide-react";
 import { TabKey } from "../types";
-import GlassDock, { type GlassDockItem } from "../../components/glass-dock/GlassDock";
+import SiteFooterNav from "../../components/SiteFooterNav";
+import { type GlassDockItem } from "../../components/glass-dock/GlassDock";
 
 interface BottomNavProps {
   active: TabKey;
@@ -10,8 +11,10 @@ interface BottomNavProps {
 }
 
 /**
- * Same glass-dock footer as the main app footer (src/components/BottomNav.tsx):
- * nearby icons magnify and lift as the pointer moves across the dock.
+ * Cart / Favourites wear the shared site footer capsule
+ * (src/components/SiteFooterNav.tsx) — the same design, gutters, safe-area
+ * padding and frost material as Home, Store and My Day. Only the three tabs
+ * and their badges are local.
  *
  * The Home / Discover button is a plain tap (the old long-press → FlowPath
  * shortcut was removed on the owner's direction).
@@ -42,20 +45,12 @@ export default function BottomNav({
   });
 
   return (
-    <nav
-      data-site-footer-nav
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
-      aria-label="Cart and wishlist"
-    >
-      <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
-        <GlassDock
-          siteFooter
-          items={dockItems}
-          onSelect={(id) => {
-            onChange(id as TabKey);
-          }}
-        />
-      </div>
-    </nav>
+    <SiteFooterNav
+      label="Cart and wishlist"
+      items={dockItems}
+      onSelect={(id) => {
+        onChange(id as TabKey);
+      }}
+    />
   );
 }

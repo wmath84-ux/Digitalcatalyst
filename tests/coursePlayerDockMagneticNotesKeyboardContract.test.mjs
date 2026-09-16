@@ -41,6 +41,7 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const bottomNav = readSource("src/components/BottomNav.tsx");
+const siteFooterNav = readSource("src/components/SiteFooterNav.tsx");
 const glassSheet = readSource("src/components/ui/glass-sheet.tsx");
 const studyPanels = readSource("src/course/studyPanels.tsx");
 const splitMotion = readSource("src/course/splitMotion.ts");
@@ -55,7 +56,10 @@ test("The course footer IS the home footer component (same GlassDock)", () => {
   assert.match(overlay, /import GlassDock, \{ type GlassDockItem \} from "\.\.\/components\/glass-dock\/GlassDock"/);
   // …and mounts it the same way BottomNav does (site footer variant).
   assert.match(overlay, /<GlassDock[\s\S]*?siteFooter[\s\S]*?items=\{dockItems\}[\s\S]*?onSelect=\{\(id\) => props\.onTabChange\(id as DockTab\)\}/);
-  assert.match(bottomNav, /<GlassDock\s+siteFooter/);
+  // The home footer renders the shared site-footer capsule, which is what
+  // mounts the same GlassDock site-footer variant as the course dock.
+  assert.match(bottomNav, /<SiteFooterNav/);
+  assert.match(siteFooterNav, /<GlassDock siteFooter/);
 });
 
 test("The dock tabs keep their data hooks and select through onTabChange", () => {

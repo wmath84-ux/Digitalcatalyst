@@ -31,18 +31,24 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
-import { isCapacitorNative, isEmbeddedWebView } from "../utils/nativeRuntime";
+import { isCapacitorNative, isEmbeddedWebView, warmNativeGoogleAuth } from "../utils/nativeRuntime";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-// On phones and installed PWAs, `signInWithPopup` opens the Google account
-// chooser inside a full Chrome tab (blue header + three-dot menu with
-// "Desktop site"). Firebase recommends `signInWithRedirect` there instead —
-// the account chooser stays in the current window and returns automatically.
-const isMobileOrStandalone = () =>
-  typeof window !== "undefined" &&
-  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    window.matchMedia("(display-mode: standalone)").matches);
+// NOTE ON `signInWithRedirect` (kept here so nobody "optimises" it back):
+// an earlier revision preferred the redirect flow on phones / installed PWAs
+// because the popup opens the Google account chooser in a separate Chrome tab.
+// That flow is broken by design for this app — Firebase's own guidance
+// (https://firebase.google.com/docs/auth/web/redirect-best-practices) is that
+// `signInWithRedirect()` needs cross-origin storage on the way BACK, and only
+// works unchanged when the app itself is hosted on `<project>.firebaseapp.com`.
+// This app is served from its own domain, so the returning page's auth iframe
+// lands in a different storage partition, `getRedirectResult()` resolves with
+// nothing, and the learner arrives back signed out with NO error at all — the
+// exact "Google picker khula, id select ki, wapas aaya, login nahin hua"
+// report. Popup is the documented fix (Option 2) and needs no console change;
+// redirect survives only as a fallback when a popup is blocked, with a marker
+// so the return leg can explain itself. See docs/google-signin-web.md.
 
 export interface AuthUser {
   id: string;
@@ -73,6 +79,21 @@ export type SignupDetails = {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
+  /**
+   * True while a Google sign-in that left the page (the redirect fallback) is
+   * still being resolved on this boot. The auth screen shows a spinner instead
+   * of a dead button during that window — otherwise the learner is looking at
+   * a normal login form for the second it takes `getRedirectResult()` to come
+   * back and taps Google a second time.
+   */
+  restoringSession: boolean;
+  /**
+   * Actionable message for a Google sign-in that returned to the app WITHOUT a
+   * session (browsers that partition/block the auth helper's cross-origin
+   * storage swallow the result silently). `null` in the normal case.
+   */
+  googleNotice: string | null;
+  dismissGoogleNotice: () => void;
   refresh: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthResult>;
   signup: (details: SignupDetails) => Promise<AuthResult>;
@@ -86,6 +107,51 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+// ── "We left the page for Google" marker ────────────────────────────────────
+// `loginWithGoogle()` uses `signInWithPopup()` as its primary web path, but a
+// blocked popup still falls back to `signInWithRedirect()`, which navigates the
+// whole tab away. This marker is what lets the NEXT boot tell "the learner is
+// coming back from Google" apart from "the learner just opened the app".
+//
+// Without it the failure is completely silent: browsers that partition or block
+// the auth helper's cross-origin storage (the documented `signInWithRedirect`
+// breakage — see docs/google-signin-web.md) hand `getRedirectResult()` nothing
+// at all, so the learner lands back on the login screen signed out with no
+// error, no message and no idea what to do next. With the marker we can say
+// exactly that, and offer the popup path as a retry.
+const GOOGLE_REDIRECT_MARKER_KEY = "eduvora.googleRedirectPending.v1";
+
+const writeGoogleRedirectMarker = (): void => {
+  try {
+    sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, String(Date.now()));
+  } catch {
+    // Storage blocked — the redirect still works, we just lose the diagnosis.
+  }
+};
+
+const readGoogleRedirectMarker = (): string | null => {
+  try {
+    return sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const clearGoogleRedirectMarker = (): void => {
+  try {
+    sessionStorage.removeItem(GOOGLE_REDIRECT_MARKER_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+};
+
+/** Popup failures that are worth one redirect retry (as opposed to a cancel). */
+const POPUP_FALLBACK_CODES = new Set([
+  "auth/popup-blocked",
+  "auth/cancelled-popup-request",
+  "auth/operation-not-supported-in-this-environment",
+]);
 
 const normalizeEmail = (email?: string | null) => String(email || "").trim().toLowerCase();
 
@@ -132,6 +198,33 @@ const authErrorMessage = (error: unknown): string => {
 
 const getProviderIds = (firebaseUser: FirebaseUser) =>
   Array.from(new Set(firebaseUser.providerData.map((provider) => provider.providerId).filter(Boolean)));
+
+/**
+ * A profile built from the Firebase Auth record alone — no Firestore read.
+ *
+ * Used when the session is real but the `users/{uid}` read/write could not
+ * complete (offline boot, slow network right after the Google picker closes, a
+ * rules rejection). Without it a Firestore hiccup turned a SUCCESSFUL Google
+ * sign-in into "login nahin hua": the learner picked their account, came back,
+ * and the app threw the profile write away along with the session. The
+ * shared-doc listener (below) replaces these fields with the stored ones as
+ * soon as the network answers.
+ */
+const authRecordUser = (firebaseUser: FirebaseUser): AuthUser => {
+  const email = normalizeEmail(firebaseUser.email);
+  return {
+    id: firebaseUser.uid,
+    name: String(firebaseUser.displayName || email.split("@")[0] || "Learner"),
+    email,
+    mobile: String(firebaseUser.phoneNumber || ""),
+    bio: "",
+    createdAt: "",
+    subscriptionTier: "basic",
+    photoURL: String(firebaseUser.photoURL || ""),
+    role: "user",
+    providerIds: getProviderIds(firebaseUser),
+  };
+};
 
 const readAppUser = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
   const profileRef = doc(db, "users", firebaseUser.uid);
@@ -227,7 +320,18 @@ const signInWithGoogleNatively = async () => {
   const result = await FirebaseAuthentication.signInWithGoogle();
   const idToken = result.credential?.idToken;
   if (!idToken) {
-    // The picker was dismissed, or Play Services returned nothing usable.
+    // Two different situations land here and they need different wording, so
+    // they get different codes:
+    //   · the learner backed out of the Play Services picker → a cancel,
+    //   · the picker returned an account but no ID token was bridged to the
+    //     web SDK (`result.user` is set) → a build/config problem, and saying
+    //     "you cancelled" would send the learner tapping forever.
+    const nativeUser = result.user as { uid?: string } | null | undefined;
+    if (nativeUser?.uid) {
+      throw Object.assign(new Error("Native Google sign-in returned a user but no ID token"), {
+        code: "auth/native-google-no-id-token",
+      });
+    }
     throw Object.assign(new Error("No Google ID token returned"), {
       code: "auth/native-google-no-token",
     });
@@ -266,11 +370,34 @@ const isGoogleOnlyAccount = async (email: string): Promise<boolean> => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // True only when THIS boot is the return leg of a Google redirect (the
+  // marker is written in the same tick the tab navigates away), so a normal
+  // app open never shows the "session aa raha hai" state.
+  const [restoringSession, setRestoringSession] = useState<boolean>(
+    () => readGoogleRedirectMarker() !== null,
+  );
+  const [googleNotice, setGoogleNotice] = useState<string | null>(null);
+
+  // Inside the Capacitor shell, register the native auth plugin's JS proxy as
+  // early as possible. The module is imported lazily (the website must never
+  // pay for it), and that import is what puts `FirebaseAuthentication` on
+  // `Capacitor.Plugins` — so until it runs, every runtime check reads "no
+  // native Google sign-in here" even in a perfectly built APK.
+  useEffect(() => {
+    if (isCapacitorNative()) void warmNativeGoogleAuth();
+  }, []);
 
   const commitFirebaseUser = useCallback(async (firebaseUser: FirebaseUser) => {
-    const appUser = await ensureUserProfile(firebaseUser);
-    setUser(appUser);
-    return appUser;
+    try {
+      const appUser = await ensureUserProfile(firebaseUser);
+      setUser(appUser);
+      return appUser;
+    } catch (error) {
+      console.warn("[auth] profile sync failed — publishing the auth record instead", error);
+      const appUser = authRecordUser(firebaseUser);
+      setUser(appUser);
+      return appUser;
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -317,21 +444,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [commitFirebaseUser]);
 
-  // Consume any leftover redirect result. Missing sessionStorage state is
-  // expected after a partitioned-browser bounce — ignore it so login UI works.
+  /**
+   * Consume the return leg of a Google redirect on boot.
+   *
+   * Three outcomes, and only the first used to be handled:
+   *   1. a session came back → commit it (the app shell then moves the learner
+   *      off `#/auth`; see the `user`-watching effect in src/main.tsx),
+   *   2. NOTHING came back → with a redirect marker this is the storage-
+   *      partitioning failure, so say so and offer the popup retry instead of
+   *      leaving a silent, permanently stuck login screen,
+   *   3. an error → same treatment, with Firebase's own wording when it has one.
+   *
+   * `getRedirectResult()` resolves to `null` (not a rejection) for outcome 2,
+   * which is exactly why the old code could only `console.warn` and the learner
+   * saw nothing happen.
+   */
   useEffect(() => {
+    const marker = readGoogleRedirectMarker();
+    // A marker older than the redirect could plausibly take is stale (the
+    // learner abandoned Google and reopened the app in the same tab) — never
+    // turn that into a scary message on an ordinary app open.
+    const markerAge = Number(marker || 0);
+    const markerIsFresh = Boolean(marker) && (!markerAge || Date.now() - markerAge < 10 * 60 * 1000);
+    if (marker && !markerIsFresh) clearGoogleRedirectMarker();
+
+    let cancelled = false;
+    const fail = (message: string) => {
+      if (cancelled || !markerIsFresh) return;
+      setGoogleNotice(message);
+    };
+
     getRedirectResult(auth)
       .then((result) => {
-        if (result?.user) return commitFirebaseUser(result.user);
+        if (result?.user) {
+          clearGoogleRedirectMarker();
+          return commitFirebaseUser(result.user);
+        }
+        fail(
+          "Google se wapas aa gaye, lekin browser ne session wapas नहीं दिया (is browser में third-party storage blocked/partitioned है)। नीचे “Continue with Google” से एक बार फिर कोशिश करें — यह popup से login करेगा, या email + password से login करें।",
+        );
         return undefined;
       })
       .catch((error) => {
-        const raw = typeof error === "object" && error && "message" in error
-          ? String((error as { message?: unknown }).message || "")
-          : "";
-        if (/missing initial state/i.test(raw)) return;
-        console.warn("Google redirect sign-in failed", authErrorMessage(error));
+        console.warn("Google redirect sign-in failed", error);
+        fail(authErrorMessage(error));
+        return undefined;
+      })
+      .finally(() => {
+        clearGoogleRedirectMarker();
+        if (!cancelled) setRestoringSession(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [commitFirebaseUser]);
 
   useEffect(() => {
@@ -494,6 +660,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
+    setGoogleNotice(null);
 
     // ── Why Google login fails inside the APK ───────────────────────────────
     // The Android build is a Capacitor WebView running this exact same web
@@ -521,6 +688,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await setPersistence(auth, browserLocalPersistence);
         const credential = await signInWithGoogleNatively();
+        clearGoogleRedirectMarker();
         await commitFirebaseUser(credential.user);
         return { success: true, message: "Google login successful." };
       } catch (error) {
@@ -533,13 +701,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (code === "auth/native-google-no-token" || /cancel/i.test(raw)) {
           return { success: false, code: "auth/popup-closed-by-user", message: "Google sign-in cancel कर दिया गया।" };
         }
+        if (code === "auth/native-google-no-id-token") {
+          return {
+            success: false,
+            code,
+            message: "Google account select हो गया, लेकिन app को ID token नहीं मिला — यह build Google sign-in के लिए ठीक से configure नहीं है। कृपया email aur password से login करें।",
+          };
+        }
+        // The plugin's JS is in the bundle but its NATIVE half is not in this
+        // APK: built before the plugin was added, `cap sync android` skipped, or
+        // android/app/google-services.json missing at build time (Gradle then
+        // silently skips the google-services plugin — see scripts/ensure-google-services.mjs).
+        // Capacitor reports that as an unimplemented/unavailable plugin. Name
+        // the real remedy: retrying inside the same build can never work.
+        if (/not implemented on|unimplemented|unavailable|no web implementation|FirebaseAuthentication/i.test(raw)) {
+          return {
+            success: false,
+            code: "auth/native-google-plugin-missing",
+            message: "इस APK build में Google sign-in का native plugin मौजूद नहीं है (build पुराना है या google-services.json के बिना बना था)। नया build install करें — `npm run android:assemble:debug` — या अभी email + password से login करें।",
+          };
+        }
         // A missing google-services.json / unregistered SHA-1 surfaces here
         // (DEVELOPER_ERROR / ApiException 10), so say what to actually fix.
         if (/DEVELOPER_ERROR|ApiException:?\s*10\b/i.test(raw)) {
           return {
             success: false,
             code: "auth/native-google-misconfigured",
-            message: "Google sign-in इस build में configure नहीं है (app का SHA-1 fingerprint Firebase में registered नहीं है)। कृपया email aur password से login करें।",
+            message: "Google sign-in इस build में configure नहीं है — android/app/google-services.json build के समय मौजूद नहीं था, या इस signing key का SHA-1 fingerprint Firebase में registered नहीं है। `npm run verify:google-signin` चलाकर देखें, नया build बनाएँ — या अभी email + password से login करें।",
           };
         }
         return { success: false, message: authErrorMessage(error), code };
@@ -562,33 +750,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await setPersistence(auth, browserLocalPersistence);
+      setGoogleNotice(null);
 
-      // P0-6: open picker in same tab (same-window redirect) instead of a
-      // separate popup tab. On phones / installed PWAs the chooser must stay
-      // in the current window (signInWithRedirect) — the old code tried
-      // signInWithPopup first and only fell back to redirect when the popup
-      // was blocked, so the learner briefly saw a separate Chrome tab.
-      // Desktop keeps the popup for better UX; any popup-blocked case there
-      // also falls back to redirect.
-      if (isMobileOrStandalone()) {
-        await signInWithRedirect(auth, googleProvider);
-        return { success: true, message: "Google login started." };
-      }
-      let credential;
+      // POPUP FIRST — on every device, phones and installed PWAs included.
+      //
+      // This is Firebase's documented Option 2 for apps that are NOT hosted on
+      // `<project>.firebaseapp.com` (redirect-best-practices): the popup hands
+      // the result back through `postMessage`, so it never depends on the auth
+      // helper's cross-origin storage on the return leg. `signInWithRedirect`
+      // DOES depend on it, and in a storage-partitioned browser the learner
+      // picks their Google account, comes back to the app… and is still signed
+      // out, with `getRedirectResult()` resolving to `null` and no error to
+      // show. Redirect now only runs when a popup genuinely cannot open.
       try {
-        credential = await signInWithPopup(auth, googleProvider);
+        const credential = await signInWithPopup(auth, googleProvider);
+        clearGoogleRedirectMarker();
+        await commitFirebaseUser(credential.user);
+        return { success: true, message: "Google login successful." };
       } catch (popupError) {
         const popupCode = authErrorCode(popupError);
-        if (popupCode !== "auth/popup-blocked" && popupCode !== "auth/cancelled-popup-request") {
-          throw popupError;
-        }
+        // A learner closing the popup is a cancel, not a reason to reload the
+        // whole tab — only blocked / unsupported popups fall through.
+        if (!POPUP_FALLBACK_CODES.has(popupCode)) throw popupError;
+        writeGoogleRedirectMarker();
+        setRestoringSession(true);
+        // `signInWithRedirect()` deliberately never resolves: Firebase returns a
+        // pending promise right after `window.location.assign()`, so nothing
+        // after this line runs in the normal case. The return below only covers
+        // the (rare) build where it does resolve.
         await signInWithRedirect(auth, googleProvider);
         return { success: true, message: "Google login started." };
       }
-      await commitFirebaseUser(credential.user);
-      return { success: true, message: "Google login successful." };
     } catch (error) {
-      return { success: false, message: authErrorMessage(error) };
+      clearGoogleRedirectMarker();
+      setRestoringSession(false);
+      return { success: false, message: authErrorMessage(error), code: authErrorCode(error) };
     }
   }, [commitFirebaseUser]);
 
@@ -719,6 +915,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Clear any user-scoped session keys.
       try { sessionStorage.removeItem("authReturnHash"); } catch {}
+      // A pending Google redirect that never completed must not greet the NEXT
+      // learner with "session wapas नहीं आया" on an unrelated app open.
+      clearGoogleRedirectMarker();
       setUser(null);
       setLoading(false);
       // Guarantee navigation: if the caller forgot or signOut threw, we still
@@ -741,6 +940,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      restoringSession,
+      googleNotice,
+      dismissGoogleNotice: () => setGoogleNotice(null),
       refresh,
       login,
       signup,
@@ -752,7 +954,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       setUser,
     }),
-    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, loginAdminWithGoogle, resetPassword, updateAccount, logout],
+    [user, loading, restoringSession, googleNotice, refresh, login, signup, loginWithGoogle, loginAdmin, loginAdminWithGoogle, resetPassword, updateAccount, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

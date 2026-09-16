@@ -1,6 +1,7 @@
 import { Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
-import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
+import SiteFooterNav from "./SiteFooterNav";
+import { type GlassDockItem } from "./glass-dock/GlassDock";
 
 export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library";
 
@@ -24,8 +25,18 @@ const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: st
 ];
 
 /**
- * The app footer — glass dock of labeled icons on tablet and mobile.
- * Nearby icons magnify and lift as the pointer moves across the dock.
+ * The app footer — the SAME floating glass-dock capsule every other screen
+ * wears (src/components/SiteFooterNav.tsx): it hugs its icons, nearby icons
+ * magnify and lift as the pointer/finger moves across, and the label floats
+ * above the active tab.
+ *
+ * It used to render a different footer from the rest of the app: a
+ * `data-primary-library-nav` hook in src/index.css stretched this dock into a
+ * full-width bar with a permanent label under all seven tabs and froze the
+ * magnification wave. The owner's 2026-09-16 brief made My Day's capsule the
+ * one design, so that hook is gone and the seven tabs now fit the capsule by
+ * tightening the rhythm only (`[data-dock-count="7"]` rules in index.css) —
+ * tap targets stay 44 px, 38 px below 350 px.
  *
  * The Home button is a plain tap target: the former 1-second long-press →
  * FlowPath shortcut (hold ring, pulse dot, liquid-expand overlay) was removed
@@ -48,25 +59,16 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
   });
 
   return (
-    <nav data-p3-15="bottomnav-polish"
-      data-primary-library-nav
-      data-site-footer-nav
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
-      aria-label="Primary"
-    >
-      <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
-        <GlassDock
-          siteFooter
-          items={items}
-          onSelect={(id) => {
-            const key = id as TabKey;
-            if (key === "study-library") window.location.hash = "#/study-library";
-            else if (key === "flowpath") window.location.hash = "#/flowpath";
-            else if (key === "revision") window.location.hash = "#/revision";
-            else onChange(key);
-          }}
-        />
-      </div>
-    </nav>
+    <SiteFooterNav
+      label="Primary"
+      items={items}
+      onSelect={(id) => {
+        const key = id as TabKey;
+        if (key === "study-library") window.location.hash = "#/study-library";
+        else if (key === "flowpath") window.location.hash = "#/flowpath";
+        else if (key === "revision") window.location.hash = "#/revision";
+        else onChange(key);
+      }}
+    />
   );
 }

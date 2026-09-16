@@ -333,7 +333,8 @@ test("the vendored registry, the dock and both bottom navs are untouched", () =>
   }
   // My Day's bottom pill IS the shared dock, so Phase 2/3 already plated it and
   // fitted it to 320px — pinned here so this pass cannot double-plate it.
-  assert.match(read("src/components/myday/BottomNav.tsx"), /<GlassDock/);
+  assert.match(read("src/components/myday/BottomNav.tsx"), /<SiteFooterNav/);
+  assert.match(read("src/components/SiteFooterNav.tsx"), /<GlassDock siteFooter/);
   assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{/);
   // The PremiumGate (subscription access, the daily free limit, Premium) is a
   // GlassCard, which Phase 1 plates on every route.

@@ -5363,6 +5363,23 @@ html[data-course-player-active="true"] {
   }
 }
 
+/* Below 350px the plates themselves shrink: SiteFooterNav passes GlassDock's
+   `compact` size (38px) from the SAME breakpoint, so every footer — seven tabs
+   or three — tightens its rhythm together and keeps one look at one width.
+   7·38 + 6·2 + 2·6 = 290px and 6·38 + 5·2 + 2·6 = 250px both fit a 320px
+   column with slack, and the magnification wave survives because the plate size
+   is driven in JS rather than frozen by a CSS `width: … !important`. */
+@media (max-width: 349px) {
+  [data-site-footer-nav]:has([data-glass-dock]) {
+    padding-inline: 6px;
+  }
+
+  [data-glass-dock] {
+    gap: 2px;
+    padding-inline: 6px;
+  }
+}
+
 [data-site-footer]:has([data-glass-dock]),
 [data-site-footer][data-glass-dock] {
   background: transparent !important;
@@ -6894,30 +6911,83 @@ html[data-course-player-active="true"] {
   }
 }
 
-/* Seven primary destinations. Only the shared primary nav opts into labels;
-   Flow and course-player docks retain their existing gesture/layout rules.
-   320px: 7 × 44px + 4px panel + 2px border + 4px outer = 318px. Tablet expands naturally. */
-@media (max-width: 959px) {
-  [data-primary-library-nav][data-site-footer-nav] { padding-inline: 2px; }
-  [data-primary-library-nav] > [data-site-footer] { width: 100%; max-width: 720px; }
-  [data-primary-library-nav] [data-glass-dock] {
-    width: 100%; max-width: 100%; gap: 0; padding-inline: 2px;
-    justify-content: space-between; align-items: stretch;
-  }
-  [data-primary-library-nav] [data-glass-dock-item] { flex: 1; min-width: 0; padding-bottom: 36px; }
-  [data-primary-library-nav] [data-glass-dock-item] > div:first-child {
-    top: auto; bottom: 0; opacity: 1; width: 100%; padding: 0 1px;
-    height: 34px; white-space: normal; overflow-wrap: anywhere;
-    font-size: 10px; line-height: 11px; text-align: center;
-    background: none !important; border: 0 !important; backdrop-filter: none !important;
-  }
-  [data-primary-library-nav] [data-glass-dock-item] > button {
-    width: 44px !important; height: 44px !important; transform: none !important;
+/* ════════════════════════════════════════════════════════════════════════
+ * ONE FOOTER DESIGN — the floating capsule, on every screen (owner brief
+ * 2026-09-16: "footer navigation ka jo design My Day per hai exactly vahi
+ * design har jagah… tablet aur mobile check karke fix karo, aur sabhi jagah
+ * background blur aur transparency vahi apply karo jo product store mein hai")
+ * ────────────────────────────────────────────────────────────────────────
+ * Every site footer renders src/components/SiteFooterNav.tsx, so the capsule
+ * (hugging its icons, magnifying under the finger, label floating above the
+ * active tab) is the same component on Home, Store, PDP, Profile, Study
+ * Library, Checkout, Cart, Favourites, Notifications, Search, Queries,
+ * Leaderboard, My Day and Revision. Its MATERIAL — the light-blue frost and
+ * its transparency — is not set per page either: it is the single
+ * `html[data-glass="on"] :where([data-glass-dock])` rule in src/glass.css,
+ * i.e. the product store's tokens (--dc-footer-nav-tint rgba(173,216,255,.18)
+ * + --dc-footer-nav-blur 16px). Same design, same glass, everywhere.
+ *
+ * This block replaced the old primary-library-nav rules, which gave
+ * the seven-tab primary nav a DIFFERENT footer: a full-width bar, a permanent
+ * label under every tab, and `transform: none` that froze the magnification
+ * wave. What is left here is arithmetic, not design — 7 × 44 px plates plus
+ * gaps is wider than a phone, so the RHYTHM tightens as the viewport narrows
+ * and the plates drop to GlassDock's compact size below 350 px (SiteFooterNav
+ * passes `compact` from that same breakpoint, so the wave keeps working):
+ *
+ *   viewport   plates  gap  panel pad  capsule   available (nav gutter)
+ *   ≥ 430 px    44      8      16       388       ≥ 406   ✓ default rhythm
+ *   380–429     44      4       8       348       356–405 ✓
+ *   350–379     44      2       8       336       326–355 ✓ (a 350 px column
+ *                                          absorbs 10 px in its own gutter)
+ *   320–349     38      2       6       290       296–325 ✓
+ *   ≤ 319       38      0       2       270       ≤ 295   ✓ edge to edge
+ *
+ * Six-tab docks (My Day, Revision) and smaller fit the generic rhythm below,
+ * so nothing here touches them — `[data-dock-count="7"]` keeps their spacing
+ * exactly as designed.
+ * ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 429px) {
+  [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
+    gap: 4px;
+    padding-inline: 8px;
   }
 }
-@media (min-width: 600px) and (max-width: 959px) {
-  [data-primary-library-nav] [data-glass-dock] { padding-inline: 14px; }
-  [data-primary-library-nav] [data-glass-dock-item] > div:first-child { font-size: 12px; line-height: 15px; }
+@media (max-width: 379px) {
+  [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
+    gap: 2px;
+    padding-inline: 8px;
+  }
+}
+@media (max-width: 349px) {
+  [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
+    gap: 2px;
+    padding-inline: 6px;
+  }
+}
+/* Fold-cover and split-screen columns: seven plates cannot keep a gap, so the
+   capsule spans its gutter and spreads them edge to edge. */
+@media (max-width: 319px) {
+  [data-site-footer-nav][data-dock-count="7"] { padding-inline: 2px; }
+  [data-site-footer-nav][data-dock-count="7"] > [data-site-footer] { width: 100%; }
+  [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
+    width: 100%;
+    gap: 0;
+    padding-inline: 2px;
+    justify-content: space-between;
+  }
+}
+
+/* The text tab row (src/components/ui/PageTabs.tsx) exists because Revision's
+   floating pill used to be `md:hidden`, and it is still the nav on desktop
+   (≥960 px, where the hard rule below hides every footer). In the 768–959 px
+   PORTRAIT band the capsule is now visible on every screen, so the row steps
+   aside there — one footer nav, never two stacked. Tablet landscape runs the
+   desktop shell (footer hidden), so the row stays. */
+@media (min-width: 768px) and (max-width: 959px) and (orientation: portrait) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-page-tabs] {
+    display: none !important;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════

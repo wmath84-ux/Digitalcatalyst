@@ -15,6 +15,10 @@
   },
   "rewrites": [
     {
+      "source": "/__/auth/:path*",
+      "destination": "https://my-website-761e9.firebaseapp.com/__/auth/:path*"
+    },
+    {
       "source": "/api/manifest",
       "destination": "/api/referral-leaderboard?route=manifest"
     },

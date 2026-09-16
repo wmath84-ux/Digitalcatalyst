@@ -55,6 +55,15 @@ export const isEmbeddedWebView = (): boolean => {
  * is served to the website and packaged into the APK, and only the APK has the
  * native plugin registered on `Capacitor.Plugins`. On the website this returns
  * false and the web popup/redirect flow is used, exactly as before.
+ *
+ * ⚠ This only becomes true AFTER the plugin's JS module has been imported,
+ * because that module is what calls `registerPlugin('FirebaseAuthentication')`
+ * and therefore what puts the proxy on `Capacitor.Plugins`. The app imports it
+ * lazily (the website must never pay for it), so on a cold auth screen this can
+ * still read false inside a perfectly good APK — which is why the auth form no
+ * longer uses it to DISABLE the button (it would grey out a working sign-in and
+ * show "Google sign-in उपलब्ध नहीं है" forever), and why `warmNativeGoogleAuth()`
+ * below is fired as soon as the auth provider mounts inside the shell.
  */
 export const hasNativeGoogleAuth = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -62,4 +71,29 @@ export const hasNativeGoogleAuth = (): boolean => {
   const plugins = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } })
     .Capacitor?.Plugins;
   return Boolean(plugins && plugins.FirebaseAuthentication);
+};
+
+let warmStarted: Promise<boolean> | null = null;
+
+/**
+ * Import the native auth plugin's JS module early (inside the Capacitor shell
+ * only) so `Capacitor.Plugins.FirebaseAuthentication` exists before the learner
+ * taps "Continue with Google".
+ *
+ * Fire-and-forget and idempotent: the website never calls it, a failed import
+ * resolves to `false` instead of throwing, and the sign-in path imports the same
+ * module again anyway (so this is purely about making the runtime check honest
+ * and the first tap fast).
+ */
+export const warmNativeGoogleAuth = (): Promise<boolean> => {
+  if (warmStarted) return warmStarted;
+  if (!isCapacitorNative()) return Promise.resolve(false);
+  warmStarted = import("@capacitor-firebase/authentication")
+    .then(() => hasNativeGoogleAuth())
+    .catch((error) => {
+      console.warn("[auth] native Google sign-in plugin unavailable", error);
+      warmStarted = null;
+      return false;
+    });
+  return warmStarted;
 };

@@ -2,8 +2,10 @@
 //
 // Contract for how My Day and Revision reach their own pages on a wide screen:
 //
-//   1. On a phone both features use the floating bottom pill, hidden from
-//      768 px up.
+//   1. On a phone AND on a tablet in portrait both features use the floating
+//      bottom capsule — the one footer design the whole app shares
+//      (src/components/SiteFooterNav.tsx). It is released only from 960 px up
+//      (and in tablet-landscape desktop mode), where the rail is the nav.
 //   2. REVISION — its page buttons (Dashboard · Test Bank · Weak Topics ·
 //      Progress · Profile) live in the DESKTOP HEADER: the feature publishes
 //      them into the desktop shell's top bar through
@@ -12,12 +14,15 @@
 //      unmount, the row exists ONLY while Revision is mounted — no other page
 //      shows it. Where the phone header is still the chrome (768–959 px tablet
 //      portrait) the same destinations render as the in-body text row
-//      (`src/components/ui/PageTabs.tsx`), never both at once.
+//      (`src/components/ui/PageTabs.tsx`) — which CSS hides in that band now
+//      that the shared capsule is visible there, so never both at once.
 //   3. MY DAY — no horizontal strip at all. Its pages are reached from the
 //      side rail (`SideNav`, md+) and the phone bottom pill, which drive the
 //      same `handleNavigate` section swap.
-//   4. The bottom footer pill is hidden for wide screens on BOTH features
-//      (`md:hidden`), which is what the desktop/tablet ask was.
+//   4. SUPERSEDED 2026-09-16: the pill used to be hidden from 768 px up on both
+//      features. The owner's brief made My Day's capsule the app's only footer
+//      design and asked for it on tablets too, so the row now yields in the
+//      768–959 px portrait band instead of the pill yielding.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -128,11 +133,34 @@ test("My Day renders no horizontal tab strip", () => {
   assert.match(myDayFooter, /id: "overview", label: "Day"/);
 });
 
-test("the footer pill is hidden on tablet + desktop for both features", () => {
-  // My Day already released the pill at 768 px; Revision now does the same, so
-  // no desktop / tablet user gets a phone-style floating bar.
-  assert.match(myDayFooter, /className="pointer-events-none absolute inset-x-0 bottom-0[^"]*md:hidden"/);
-  assert.match(revisionFooter, /className="pointer-events-none absolute inset-x-0 bottom-0[^"]*md:hidden"/);
+test("the footer capsule is the ONE footer on phone + tablet, released only on desktop", () => {
+  // 2026-09-16 owner brief: "footer navigation ka jo design My Day per hai
+  // exactly vahi design har jagah honi chahiye … jahan-jahan footer navigation
+  // hai, jis screen per, jaise tablet aur mobile check karke fix karo". Both
+  // features render the shared capsule (src/components/SiteFooterNav.tsx) and
+  // neither hides it at 768 px any more — a tablet in portrait used to lose the
+  // footer completely here while Home / Store / Cart kept theirs.
+  const shared = read("src/components/SiteFooterNav.tsx");
+  assert.match(myDayFooter, /<SiteFooterNav/);
+  assert.match(revisionFooter, /<SiteFooterNav/);
+  assert.doesNotMatch(myDayFooter, /md:hidden/);
+  assert.doesNotMatch(revisionFooter, /md:hidden/);
+  assert.doesNotMatch(shared, /md:hidden/);
+  assert.match(shared, /data-site-footer-nav/);
+
+  // Desktop still releases it: >=960 px, tablet-landscape-as-desktop and any
+  // page inside the desktop shell, where the left rail is the nav.
+  assert.match(css, /HARD RULE: Footer navigation never appears on desktop/);
+  assert.match(css, /@media \(min-width: 960px\) \{\s*\[data-site-footer-nav\]/);
+  assert.match(css, /html\[data-tablet-landscape-desktop="true"\] \[data-site-footer-nav\]/);
+  assert.match(css, /\.dc-desktop-shell \[data-site-footer-nav\]/);
+
+  // And in the 768–959 px PORTRAIT band, where the capsule is now visible, the
+  // in-body text row steps aside — one footer nav, never two stacked. Tablet
+  // landscape runs the desktop shell (capsule hidden), so the row survives
+  // there, as it does on desktop through the shell's top bar.
+  assert.match(css, /@media \(min-width: 768px\) and \(max-width: 959px\) and \(orientation: portrait\)/);
+  assert.match(css, /\[data-page-tabs\] \{\s*display: none !important/);
 });
 
 test("the in-body row stays text-only, phone-hidden and revision-only", () => {

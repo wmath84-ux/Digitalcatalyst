@@ -1,5 +1,6 @@
 import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
-import GlassDock, { type GlassDockItem } from "../glass-dock/GlassDock";
+import SiteFooterNav from "../SiteFooterNav";
+import { type GlassDockItem } from "../glass-dock/GlassDock";
 
 interface BottomNavProps {
   active: string;
@@ -16,8 +17,16 @@ const items = [
 ];
 
 /**
- * Same glass-dock footer as the main app footer (src/components/BottomNav.tsx):
- * nearby icons magnify and lift as the pointer moves across the dock.
+ * My Day's footer — the design every other screen now copies, because this is
+ * the one the owner pointed at ("footer navigation ka jo design My Day per hai
+ * exactly vahi design har jagah"). It is the shared SiteFooterNav capsule, so
+ * the gutters, safe-area padding, magnification wave, label tooltip and the
+ * store's frost material are identical on every screen.
+ *
+ * It is no longer hidden from 768 px up: a tablet in portrait used to lose
+ * the footer completely on this feature while Home/Store kept theirs. Tablets
+ * now get the same capsule; only the desktop shell (>=960 px, or
+ * tablet-landscape desktop mode) hides it, where the left rail is the nav.
  *
  * The Home button is a plain tap (the old long-press → FlowPath shortcut was
  * removed on the owner's direction).
@@ -38,20 +47,12 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
   });
 
   return (
-    <nav
-      data-site-footer-nav
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:hidden"
-      aria-label="My day"
-    >
-      <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
-        <GlassDock
-          siteFooter
-          items={dockItems}
-          onSelect={(id) => {
-            onNavigate(id);
-          }}
-        />
-      </div>
-    </nav>
+    <SiteFooterNav
+      label="My day"
+      items={dockItems}
+      onSelect={(id) => {
+        onNavigate(id);
+      }}
+    />
   );
 }
