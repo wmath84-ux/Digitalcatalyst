@@ -55,12 +55,47 @@ try {
   const cardLive = renderToStaticMarkup(React.createElement(SocialProfileCard, { ...brand, links: accounts }));
   const cardEmpty = renderToStaticMarkup(React.createElement(SocialProfileCard, { ...brand, links: [] }));
 
-  const shot = (height, caption, markup) => `
+  // Media queries use the viewport, not the outer QA page's width. Render
+  // each shot in a fixed-width iframe so 420px is below the ramp, 520px is
+  // genuinely at/above 640px, and 600px is genuinely at/above 768px.
+  const escapeAttribute = (value) => value
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+  const shotDocument = (height, markup) => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+${css}
+  html, body { margin: 0; padding: 0; width: 100%; background: #08080c; color: #e6e8f0; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;
+         width: 100%; height: ${height}px; }
+  .wall { display: grid; place-items: center; min-width: 0; height: 100%; border-radius: 2rem;
+          border: 1px solid rgba(255,255,255,.12); background: #0F0F12; color: #626a80;
+          font: 600 12px/1.4 Inter, ui-sans-serif, system-ui, sans-serif; }
+  .slot { position: relative; min-width: 0; height: 100%; }
+  .slot > .dc-social-card { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="wall"><span>feedback wall box · ${height}px</span></div>
+    <div class="slot">${markup}</div>
+  </div>
+${fallbackScript}
+</body>
+</html>`;
+
+  const shot = (height, viewportWidth, caption, markup) => `
   <figure class="shot">
-    <figcaption>${caption}</figcaption>
-    <div class="row">
-      <div class="wall" style="height:${height}px"><span>feedback wall box · ${height}px</span></div>
-      <div class="slot" style="height:${height}px">${markup}</div>
+    <figcaption>${caption} · fixed ${viewportWidth}px viewport</figcaption>
+    <div class="frame-shell">
+      <iframe class="shot-frame" title="${caption}" width="${viewportWidth}" height="${height}"
+        srcdoc="${escapeAttribute(shotDocument(height, markup))}"></iframe>
     </div>
   </figure>`;
 
@@ -109,12 +144,9 @@ ${css}
   figure.shot { margin: 0 0 28px; }
   figcaption { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
                color: #9aa1b4; margin-bottom: 8px; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
-  .wall { display: grid; place-items: center; border-radius: 2rem; border: 1px solid rgba(255,255,255,.12);
-          background: #0F0F12; color: #626a80; font-size: 12px; font-weight: 600; }
-  .slot { position: relative; }
-  .slot > .dc-social-card { position: absolute; inset: 0; }
+  .frame-shell { overflow-x: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
+                 background: #08080c; padding: 0; }
+  .shot-frame { display: block; max-width: none; border: 0; background: #08080c; }
   .note { border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 14px 16px; margin-bottom: 24px;
           background: rgba(255,255,255,.03); font-size: 12px; line-height: 1.7; color: #b6bccd; }
   .note b { color: #fff; }
@@ -133,9 +165,13 @@ ${css}
     <b>Size parity</b> — both boxes use the height steps the page uses
     (<code>h-[420px] sm:h-[520px] md:h-[600px]</code>) and the same full width, so the two cards
     measure exactly the same at every screen size; the profile block is centred inside the box.<br />
-    <b>Design</b> — every value of the reference card is kept: <code>#2cb5a0</code> fill, 4px
-    <code>#7cdacc</code> ring, 10px radius, <code>0 6px 10px rgba(207,212,222,1)</code> shadow, 5rem
-    circular logo, 18px/16px type, 2px divider with 20px gaps, 1.1rem icons 15px apart,
+    <b>Internal scaling</b> — the fixed-width frames deliberately use 390px (420 step), 700px
+    (520 step, triggering <code>min-width: 640px</code>) and 900px (600 step, triggering
+    <code>min-width: 768px</code>) viewports. The internals follow <code>s = boxHeight / 420</code>:
+    1.00 → 1.238 → 1.4286.<br />
+    <b>Design</b> — every value of the reference card is kept at the 420px baseline: <code>#2cb5a0</code>
+    fill, 4px <code>#7cdacc</code> ring, 10px radius, <code>0 6px 10px rgba(207,212,222,1)</code>
+    shadow, 5rem circular logo, 18px/16px type, 2px divider with 20px gaps, 1.1rem icons 15px apart,
     <code>#262626</code> tooltip with the 10px arrow, −10px hover lift over 0.3s.<br />
     <b>Icons</b> — one link + one icon per account. Instagram, YouTube, WhatsApp, X, LinkedIn, Telegram
     and Facebook render their brand glyph; the last account (<code>mybrand.example</code>) is a brand-new
@@ -143,11 +179,10 @@ ${css}
     uniform white (and falls back to the globe glyph if that image fails). Hover an icon for its tooltip,
     hover the card for the reference lift.
   </div>
-${shot(420, "Phone · 420px", cardLive)}
-${shot(520, "Small / tablet · 520px", cardLive)}
-${shot(600, "Desktop · 600px", cardLive)}
-${shot(420, "No account configured · card stays clickable-free", cardEmpty)}
-${fallbackScript}
+${shot(420, 390, "Phone · 420px", cardLive)}
+${shot(520, 700, "Small / tablet · 520px", cardLive)}
+${shot(600, 900, "Desktop · 600px", cardLive)}
+${shot(420, 390, "No account configured · card stays clickable-free", cardEmpty)}
 </body>
 </html>
 `;

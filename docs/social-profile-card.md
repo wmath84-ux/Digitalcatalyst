@@ -29,6 +29,32 @@ tooltip) is the reference card's value, verbatim — see
 `tests/socialProfileCardContract.test.mjs` fails if the two boxes ever drift
 apart, or if any reference value changes.
 
+### Internal scaling
+
+The 420px step is the unchanged reference card. At the same CSS breakpoints as
+the slot, the internals use `s = boxHeight / 420`: `1.00` at 420px, `1.238`
+at 520px (`min-width: 640px`), and `1.4286` at 600px (`min-width: 768px`).
+The values below are literal CSS overrides; the logo dimensions include its
+ring because the app's border-box sizing keeps the border inside the declared
+width and height.
+
+| Metric | 420px | 520px / ≥640px | 600px / ≥768px |
+| --- | ---: | ---: | ---: |
+| Card padding | 25px × 20px | 31px × 25px | 36px × 29px |
+| Card radius / border | 10px / 4px | 12px / 5px | 14px / 6px |
+| Hover lift | −10px | −12px | −14px |
+| Logo / logo ring | 5rem / 4px | 6.2rem / 5px | 7.15rem / 6px |
+| Name / bio | 18px / 16px | 22px / 20px | 26px / 23px |
+| Name top margin | 20px | 25px | 29px |
+| Divider / vertical margin | 2px / 20px | 2.5px / 25px | 3px / 29px |
+| Icon / icon gap / row-gap | 1.1rem / 15px / 12px | 1.36rem / 19px / 15px | 1.57rem / 21px / 17px |
+| Tooltip type | 0.8rem | 0.99rem | 1.14rem |
+| Tooltip padding | 0.5rem × 0.4rem | 0.62rem × 0.5rem | 0.71rem × 0.57rem |
+| Tooltip arrow | 10px / 10px / 0 / 10px | 12px / 12px / 0 / 12px | 14px / 14px / 0 / 14px |
+
+This is CSS-only and shared by Home and the Admin preview, so both compute the
+same metrics without viewport or container units.
+
 ## What the admin edits
 
 `Branding → Social profile` (the "🔗 Social profile" section in the pill rail)
