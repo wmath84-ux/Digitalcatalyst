@@ -1,0 +1,44 @@
+# API health check — "is the serverless layer still alive?"
+#
+# Why this exists: the SPA and the API are hosted separately (Firebase
+# Hosting can serve the site while the 12 Vercel serverless functions run
+# the API). On 2026-09-16 the Vercel production deployment went missing and
+# eduvora.shop kept serving the static SPA for EVERY path — so every /api/*
+# request came back as index.html and My Study Library (plus My Day sync,
+# AI Mentor, the subscription gate, …) showed load errors. The outage was
+# only caught because a user reported it.
+#
+# This job polls both production API origins every 30 minutes with the same
+# probe the client falls back to (GET /api/referral-leaderboard, public,
+# unauthenticated, cheap). If NEITHER answers with JSON `ok:true`, the run
+# goes RED in the Actions tab — the repository owner sees it in the
+# scheduled-workflow list and fixes the deployment (see
+# docs/deployment-checklist.md §6).
+#
+# The repository is public, so scheduled runs use free GitHub-hosted
+# runner minutes. NOTE: GitHub disables scheduled workflows after ~60 days
+# without repository activity — any commit to the default branch
+# re-enables them.
+
+name: API health check
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: api-health-check
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Probe the production API origins
+        run: node scripts/api-health-check.mjs

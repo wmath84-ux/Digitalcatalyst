@@ -16,6 +16,7 @@ import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.j
 import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
 import { normalizePlanPersonalModules } from "../../../utils/personalCourse.js";
 import { normalizePlanStudyPacks } from "../../../utils/studyPacks.js";
+import { apiFetch } from "../../utils/apiBase";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
@@ -62,7 +63,9 @@ async function notifyProductChange(productId: string, action: "product-created" 
     const user = auth.currentUser;
     if (!user) return;
     const token = await user.getIdToken(true);
-    const response = await fetch("/api/push/send", {
+    // apiFetch (not raw fetch) so this call also gets the multi-origin /api/*
+    // fallback when the page's origin does not run the serverless functions.
+    const response = await apiFetch("/api/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, productId }),

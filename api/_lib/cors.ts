@@ -23,12 +23,22 @@ import type { VercelRequest, VercelResponse } from "./firebaseAdmin.js";
 
 // Origins the app legitimately runs from. Anything else gets no CORS headers
 // (the response simply can't be read cross-origin by other websites).
+//
+// `web.app` / `firebaseapp.com` are needed because the SPA can be served from
+// Firebase Hosting while the API stays on Vercel: the client (apiBase.ts)
+// then retries /api/* calls cross-origin against these Vercel origins, and
+// the browser's preflight must be accepted for the retry to be readable.
+// Every handler still verifies the Firebase ID token server-side, so an
+// extra allowed origin never grants access — it only lets the app's own
+// static host talk to the API.
 const ALLOWED_ORIGIN_SUFFIXES = [
   "eduvora.shop",
   "eduvora.app",
   "localhost",
   "127.0.0.1",
   "vercel.app",
+  "web.app",
+  "firebaseapp.com",
 ] as const;
 
 function allowedOrigin(request: VercelRequest): string {
