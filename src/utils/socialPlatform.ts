@@ -1,118 +1,182 @@
 // Social platform detection — the single source of truth for the
 // Home page social profile card (and the Admin Branding preview).
 //
-// Given the social URL an admin enters in Branding → Social profile,
-// the platform is resolved by HOSTNAME (never by guessing at the path
-// text), and the resolved platform drives:
+// The admin links ANY number of accounts in Branding → Social profile.
+// For every stored URL this module resolves:
 //   · which brand icon the Home page card shows
 //   · the label used in the icon tooltip / aria text
 //
-// Unknown hosts fall back to a generic link glyph — the card never
-// shows the wrong platform icon.
+// Resolution is by HOSTNAME (never by guessing at the path text), or by
+// URL scheme for `mailto:` / `tel:` links. Adding a new URL in the admin
+// panel therefore adds a new icon to the card automatically; unknown
+// hosts fall back to a generic globe glyph so the card never shows the
+// wrong brand.
+//
+// Glyph path data lives in ./socialPlatformIcons (Font Awesome Free,
+// CC BY 4.0) — the same brand set the reference card uses:
+// https://uiverse.io/abrahamcalsin/grumpy-ape-40
+
+import { SOCIAL_GLYPHS, type SocialGlyph, type SocialGlyphId } from "./socialPlatformIcons";
+
+export type { SocialGlyph };
 
 export interface SocialPlatform {
   /** Stable id, used as a data-attribute / style hook. */
   id: string;
-  /** Human label ("Instagram", "X/Twitter", …). */
+  /** Human label ("Instagram", "X (Twitter)", …). */
   label: string;
-  /** Filled brand glyph, 16×16 viewBox (Bootstrap Icons brand set). */
-  path: string;
-  /** Set when the glyph needs an even-odd fill (cut-out shapes). */
-  fillRule?: "evenodd";
+  /** Brand glyph (official viewBox + path), filled with currentColor. */
+  glyph: SocialGlyph;
+  /** Hosts / schemes that resolve to this platform. */
+  hosts: string[];
+  /** Example URL shown as the admin field's placeholder. */
+  template: string;
+  /** Shown in the admin quick-add rail. */
+  popular?: boolean;
 }
 
-export const SOCIAL_PLATFORMS = {
-  instagram: {
-    id: "instagram",
-    label: "Instagram",
-    path: "M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.9 3.9 0 0 0-1.417.923A3.9 3.9 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.9 3.9 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.9 3.9 0 0 0-.923-1.417A3.9 3.9 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599s.453.546.598.92c.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.5 2.5 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.5 2.5 0 0 1-.92-.598 2.5 2.5 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233s.008-2.388.046-3.231c.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92s.546-.453.92-.598c.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92m-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217m0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334",
-  },
-  youtube: {
-    id: "youtube",
-    label: "YouTube",
-    path: "M8.051 1.999h.089c.822.003 4.987.033 6.11.335a2.01 2.01 0 0 1 1.415 1.42c.101.38.172.883.22 1.402l.01.104.022.26.008.104c.065.914.073 1.77.074 1.957v.075c-.001.194-.01 1.108-.082 2.06l-.008.105-.009.104c-.05.572-.124 1.14-.235 1.558a2.01 2.01 0 0 1-1.415 1.42c-1.16.312-5.569.334-6.18.335h-.142c-.309 0-1.587-.006-2.927-.052l-.17-.006-.087-.004-.171-.007-.171-.007c-1.11-.049-2.167-.128-2.654-.26a2.01 2.01 0 0 1-1.415-1.419c-.111-.417-.185-.986-.235-1.558L.09 9.82l-.008-.104A31 31 0 0 1 0 7.68v-.123c.002-.215.01-.958.064-1.778l.007-.103.003-.052.008-.104.022-.26.01-.104c.048-.519.119-1.023.22-1.402a2.01 2.01 0 0 1 1.415-1.42c.487-.13 1.544-.21 2.654-.26l.17-.007.172-.006.086-.003.171-.007A100 100 0 0 1 7.858 2zM6.4 5.209v4.818l4.157-2.408z",
-  },
-  facebook: {
-    id: "facebook",
-    label: "Facebook",
-    path: "M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951",
-  },
-  x: {
-    id: "x",
-    label: "X (Twitter)",
-    path: "M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z",
-  },
-  linkedin: {
-    id: "linkedin",
-    label: "LinkedIn",
-    path: "M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z",
-  },
-  telegram: {
-    id: "telegram",
-    label: "Telegram",
-    path: "M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.287 5.906q-1.168.486-4.666 2.01-.567.225-.595.442c-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294q.39.01.868-.32 3.269-2.206 3.374-2.23c.05-.012.12-.026.166.016s.042.12.037.141c-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8 8 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629q.14.092.27.187c.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.4 1.4 0 0 0-.013-.315.34.34 0 0 0-.114-.217.53.53 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09",
-    fillRule: "evenodd",
-  },
-  discord: {
-    id: "discord",
-    label: "Discord",
-    path: "M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612",
-  },
-  github: {
-    id: "github",
-    label: "GitHub",
-    path: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8",
-  },
-  tiktok: {
-    id: "tiktok",
-    label: "TikTok",
-    path: "M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3 0 1 0 3 3z",
-  },
-  pinterest: {
-    id: "pinterest",
-    label: "Pinterest",
-    path: "M8 0a8 8 0 0 0-2.915 15.452c-.07-.633-.134-1.606.027-2.297.146-.625.938-3.977.938-3.977s-.239-.479-.239-1.187c0-1.113.645-1.943 1.448-1.943.682 0 1.012.512 1.012 1.127 0 .686-.437 1.712-.663 2.663-.188.796.4 1.446 1.185 1.446 1.422 0 2.515-1.5 2.515-3.664 0-1.915-1.377-3.254-3.342-3.254-2.276 0-3.612 1.707-3.612 3.471 0 .688.265 1.425.595 1.826a.24.24 0 0 1 .056.23c-.061.252-.196.796-.222.907-.035.146-.116.177-.268.107-1-.465-1.624-1.926-1.624-3.1 0-2.523 1.834-4.84 5.286-4.84 2.775 0 4.932 1.977 4.932 4.62 0 2.757-1.739 4.976-4.151 4.976-.811 0-1.573-.421-1.834-.919l-.498 1.902c-.181.695-.669 1.566-.995 2.097A8 8 0 1 0 8 0",
-  },
-  /** Unknown / unsupported host — a neutral link glyph, never a wrong brand. */
-  generic: {
-    id: "generic",
-    label: "Social profile",
-    path: "M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m7.5-6.923c-.67.204-1.335.82-1.887 1.855A8 8 0 0 0 5.145 4H7.5zM4.09 4a9.3 9.3 0 0 1 .64-1.539 7 7 0 0 1 .597-.933A7.03 7.03 0 0 0 2.255 4zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a7 7 0 0 0-.656 2.5zM4.847 5a12.5 12.5 0 0 0-.338 2.5H7.5V5zM8.5 5v2.5h2.99a12.5 12.5 0 0 0-.337-2.5zM4.51 8.5a12.5 12.5 0 0 0 .337 2.5H7.5V8.5zm3.99 0V11h2.653c.187-.765.306-1.608.338-2.5zM5.145 12q.208.58.468 1.068c.552 1.035 1.218 1.65 1.887 1.855V12zm.182 2.472a7 7 0 0 1-.597-.933A9.3 9.3 0 0 1 4.09 12H2.255a7 7 0 0 0 3.072 2.472M3.82 11a13.7 13.7 0 0 1-.312-2.5h-2.49c.062.89.291 1.733.656 2.5zm6.853 3.472A7 7 0 0 0 13.745 12H11.91a9.3 9.3 0 0 1-.64 1.539 7 7 0 0 1-.597.933M8.5 12v2.923c.67-.204 1.335-.82 1.887-1.855q.26-.487.468-1.068zm3.68-1h2.146c.365-.767.594-1.61.656-2.5h-2.49a13.7 13.7 0 0 1-.312 2.5m2.802-3.5a7 7 0 0 0-.656-2.5H12.18c.174.782.282 1.623.312 2.5zM11.27 2.461c.247.464.462.98.64 1.539h1.835a7 7 0 0 0-3.072-2.472c.218.284.418.598.597.933M10.855 4a8 8 0 0 0-.468-1.068C9.835 1.897 9.17 1.282 8.5 1.077V4z",
-  },
-} as const;
+interface PlatformDef {
+  id: string;
+  glyph: SocialGlyphId;
+  label: string;
+  template: string;
+  hosts: string[];
+  popular?: boolean;
+}
+
+/**
+ * Curated order = the order of the admin's platform picker and quick-add
+ * rail (most-used first). Every entry keeps its real brand hosts so a
+ * pasted URL is recognised without the admin picking anything.
+ */
+const PLATFORM_DEFS: PlatformDef[] = [
+  { id: "instagram", glyph: "instagram", label: "Instagram", template: "https://instagram.com/yourbrand", hosts: ["instagram.com", "instagr.am"], popular: true },
+  { id: "youtube", glyph: "youtube", label: "YouTube", template: "https://youtube.com/@yourbrand", hosts: ["youtube.com", "youtu.be"], popular: true },
+  { id: "whatsapp", glyph: "whatsapp", label: "WhatsApp", template: "https://wa.me/919999999999", hosts: ["whatsapp.com", "wa.me", "wa.link"], popular: true },
+  { id: "facebook", glyph: "facebook", label: "Facebook", template: "https://facebook.com/yourbrand", hosts: ["facebook.com", "fb.com", "fb.me", "fb.watch", "m.me"], popular: true },
+  { id: "x", glyph: "x", label: "X (Twitter)", template: "https://x.com/yourbrand", hosts: ["x.com", "twitter.com", "t.co"], popular: true },
+  { id: "telegram", glyph: "telegram", label: "Telegram", template: "https://t.me/yourbrand", hosts: ["t.me", "telegram.me", "telegram.org", "telegram.dog"], popular: true },
+  { id: "linkedin", glyph: "linkedin", label: "LinkedIn", template: "https://linkedin.com/in/yourbrand", hosts: ["linkedin.com", "lnkd.in"], popular: true },
+  { id: "tiktok", glyph: "tiktok", label: "TikTok", template: "https://tiktok.com/@yourbrand", hosts: ["tiktok.com", "vm.tiktok.com"], popular: true },
+  { id: "discord", glyph: "discord", label: "Discord", template: "https://discord.gg/yourserver", hosts: ["discord.com", "discord.gg", "discordapp.com"], popular: true },
+  { id: "snapchat", glyph: "snapchat", label: "Snapchat", template: "https://snapchat.com/add/yourbrand", hosts: ["snapchat.com"] },
+  { id: "reddit", glyph: "reddit", label: "Reddit", template: "https://reddit.com/r/yourcommunity", hosts: ["reddit.com", "redd.it"] },
+  { id: "threads", glyph: "threads", label: "Threads", template: "https://threads.net/@yourbrand", hosts: ["threads.net", "threads.com"] },
+  { id: "pinterest", glyph: "pinterest", label: "Pinterest", template: "https://pinterest.com/yourbrand", hosts: ["pinterest.com", "pinterest.in", "pinterest.co.uk", "pin.it"] },
+  { id: "github", glyph: "github", label: "GitHub", template: "https://github.com/yourbrand", hosts: ["github.com", "gist.github.com"] },
+  { id: "bluesky", glyph: "bluesky", label: "Bluesky", template: "https://bsky.app/profile/yourbrand.bsky.social", hosts: ["bsky.app", "bsky.social"] },
+  { id: "mastodon", glyph: "mastodon", label: "Mastodon", template: "https://mastodon.social/@yourbrand", hosts: ["mastodon.social", "mastodon.online", "fosstodon.org", "hachyderm.io", "mstdn.social", "infosec.exchange", "mastodon.cloud"] },
+  { id: "medium", glyph: "medium", label: "Medium", template: "https://medium.com/@yourbrand", hosts: ["medium.com"] },
+  { id: "twitch", glyph: "twitch", label: "Twitch", template: "https://twitch.tv/yourbrand", hosts: ["twitch.tv"] },
+  { id: "spotify", glyph: "spotify", label: "Spotify", template: "https://open.spotify.com/artist/…", hosts: ["spotify.com", "spotify.link"] },
+  { id: "linktree", glyph: "linktree", label: "Linktree", template: "https://linktr.ee/yourbrand", hosts: ["linktr.ee"] },
+  { id: "appstore", glyph: "appstore", label: "App Store", template: "https://apps.apple.com/app/id…", hosts: ["apps.apple.com", "itunes.apple.com", "apple.co", "testflight.apple.com"] },
+  { id: "googleplay", glyph: "googleplay", label: "Google Play", template: "https://play.google.com/store/apps/…", hosts: ["play.google.com"] },
+  { id: "google", glyph: "google", label: "Google", template: "https://g.page/yourbrand", hosts: ["google.com", "g.page", "goo.gl", "business.google.com", "maps.app.goo.gl"] },
+  { id: "tumblr", glyph: "tumblr", label: "Tumblr", template: "https://yourbrand.tumblr.com", hosts: ["tumblr.com", "tumblr.co", "t.umblr.com"] },
+  { id: "vimeo", glyph: "vimeo", label: "Vimeo", template: "https://vimeo.com/yourbrand", hosts: ["vimeo.com"] },
+  { id: "behance", glyph: "behance", label: "Behance", template: "https://behance.net/yourbrand", hosts: ["behance.net"] },
+  { id: "dribbble", glyph: "dribbble", label: "Dribbble", template: "https://dribbble.com/yourbrand", hosts: ["dribbble.com"] },
+  { id: "slack", glyph: "slack", label: "Slack", template: "https://yourworkspace.slack.com", hosts: ["slack.com"] },
+  { id: "skype", glyph: "skype", label: "Skype", template: "https://join.skype.com/invite/…", hosts: ["skype.com"] },
+  { id: "quora", glyph: "quora", label: "Quora", template: "https://quora.com/profile/Yourbrand", hosts: ["quora.com", "qr.ae"] },
+  { id: "stackoverflow", glyph: "stackoverflow", label: "Stack Overflow", template: "https://stackoverflow.com/users/…", hosts: ["stackoverflow.com", "stackexchange.com"] },
+  { id: "wordpress", glyph: "wordpress", label: "WordPress", template: "https://yourbrand.wordpress.com", hosts: ["wordpress.com", "wordpress.org", "wp.me"] },
+  { id: "blogger", glyph: "blogger", label: "Blogger", template: "https://yourbrand.blogspot.com", hosts: ["blogger.com", "blogspot.com"] },
+  { id: "notion", glyph: "notion", label: "Notion", template: "https://yourbrand.notion.so", hosts: ["notion.so", "notion.site"] },
+  { id: "figma", glyph: "figma", label: "Figma", template: "https://figma.com/@yourbrand", hosts: ["figma.com"] },
+  { id: "hashnode", glyph: "hashnode", label: "Hashnode", template: "https://yourbrand.hashnode.dev", hosts: ["hashnode.com", "hashnode.dev"] },
+  { id: "devto", glyph: "devto", label: "DEV", template: "https://dev.to/yourbrand", hosts: ["dev.to"] },
+  { id: "codepen", glyph: "codepen", label: "CodePen", template: "https://codepen.io/yourbrand", hosts: ["codepen.io"] },
+  { id: "signal", glyph: "signal", label: "Signal", template: "https://signal.me/#p/+91…", hosts: ["signal.me", "signal.art", "signal.group"] },
+  { id: "wechat", glyph: "wechat", label: "WeChat", template: "https://wechat.com/", hosts: ["wechat.com", "weixin.qq.com"] },
+  { id: "line", glyph: "line", label: "LINE", template: "https://line.me/ti/p/~yourbrand", hosts: ["line.me", "lin.ee"] },
+  { id: "patreon", glyph: "patreon", label: "Patreon", template: "https://patreon.com/yourbrand", hosts: ["patreon.com"] },
+  { id: "kickstarter", glyph: "kickstarter", label: "Kickstarter", template: "https://kickstarter.com/projects/…", hosts: ["kickstarter.com"] },
+  { id: "etsy", glyph: "etsy", label: "Etsy", template: "https://etsy.com/shop/yourbrand", hosts: ["etsy.com"] },
+  { id: "shopify", glyph: "shopify", label: "Shopify store", template: "https://yourbrand.myshopify.com", hosts: ["myshopify.com", "shopify.com"] },
+  { id: "amazon", glyph: "amazon", label: "Amazon", template: "https://amazon.in/shop/yourbrand", hosts: ["amazon.com", "amazon.in", "amazon.co.uk", "amzn.to"] },
+  { id: "steam", glyph: "steam", label: "Steam", template: "https://steamcommunity.com/id/yourbrand", hosts: ["steampowered.com", "steamcommunity.com", "s.team"] },
+  // Scheme-based (not host-based) — the admin can link a mail address or a
+  // phone number from the very same row, with the matching icon.
+  { id: "email", glyph: "email", label: "Email", template: "mailto:hello@yourbrand.com", hosts: ["mailto:"] },
+  { id: "phone", glyph: "phone", label: "Phone call", template: "tel:+919999999999", hosts: ["tel:"] },
+  /** Unknown / unsupported host — a neutral globe, never a wrong brand. */
+  { id: "generic", glyph: "website", label: "Website", template: "https://your-website.com", hosts: [] },
+];
+
+export const SOCIAL_PLATFORMS: Record<string, SocialPlatform> = Object.fromEntries(
+  PLATFORM_DEFS.map((def) => [
+    def.id,
+    {
+      id: def.id,
+      label: def.label,
+      glyph: SOCIAL_GLYPHS[def.glyph],
+      hosts: def.hosts,
+      template: def.template,
+      popular: def.popular,
+    } satisfies SocialPlatform,
+  ]),
+);
+
+/** Every platform in curated order (admin picker + quick-add rail). */
+export const SOCIAL_PLATFORM_LIST: SocialPlatform[] = PLATFORM_DEFS.map((def) => SOCIAL_PLATFORMS[def.id]);
+
+/** The quick-add rail: the platforms most admins link first. */
+export const POPULAR_SOCIAL_PLATFORMS: SocialPlatform[] = SOCIAL_PLATFORM_LIST.filter((platform) => platform.popular);
 
 export type SocialPlatformId = keyof typeof SOCIAL_PLATFORMS;
 
+export function isSocialPlatformId(value: unknown): value is string {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(SOCIAL_PLATFORMS, value);
+}
+
 /**
- * Hostname → platform map. Extended by appending an entry; matching is
- * exact-host or subdomain (`endsWith(".host")`), so `instagram.com`,
- * `www.instagram.com` and `reel.instagram.com` all resolve, while
- * `notinstagram.com` does not.
+ * One linked account. `url` is the admin's URL verbatim (valid http(s),
+ * mailto: or tel:); `platform` optionally pins an icon (empty = detected
+ * from the URL); `label` optionally overrides the tooltip text.
  */
-const HOSTNAME_RULES: Array<{ platform: Exclude<SocialPlatformId, "generic">; hosts: string[] }> = [
-  { platform: "instagram", hosts: ["instagram.com", "instagr.am"] },
-  { platform: "youtube", hosts: ["youtube.com", "youtu.be"] },
-  { platform: "facebook", hosts: ["facebook.com", "fb.com", "fb.watch"] },
-  { platform: "x", hosts: ["x.com", "twitter.com", "t.co"] },
-  { platform: "linkedin", hosts: ["linkedin.com"] },
-  { platform: "telegram", hosts: ["t.me", "telegram.me", "telegram.org"] },
-  { platform: "discord", hosts: ["discord.com", "discord.gg", "discord.app"] },
-  { platform: "github", hosts: ["github.com", "gist.github.com"] },
-  { platform: "tiktok", hosts: ["tiktok.com"] },
-  { platform: "pinterest", hosts: ["pinterest.com", "pinterest.co.uk", "pin.it"] },
-];
+export interface SocialLink {
+  /** Stable id (React key + admin reorder handle). */
+  id: string;
+  url: string;
+  /** Admin-pinned platform id; "" = auto-detect from the URL. */
+  platform: string;
+  /** Admin tooltip override; "" = the platform's own label. */
+  label: string;
+}
+
+/** Most a card can carry before it stops reading like the reference. */
+export const MAX_SOCIAL_LINKS = 12;
 
 function hostnameMatches(hostname: string, host: string): boolean {
   return hostname === host || hostname.endsWith(`.${host}`);
 }
 
+/** Hosts that resolve by pattern instead of a fixed domain list. */
+function matchesByPattern(hostname: string): SocialPlatform | null {
+  // Fediverse instances are self-hosted under thousands of domains
+  // (mastodon.social, fosstodon.org, mstdn.jp, …). Match per LABEL so
+  // `notmastodon.com` can never borrow the icon.
+  if (hostname.split(".").some((label) => label.startsWith("mastodon") || label.startsWith("mstdn"))) {
+    return SOCIAL_PLATFORMS.mastodon;
+  }
+  return null;
+}
+
 /**
- * Resolve the platform for a social URL by hostname. Never throws —
- * an unparseable URL resolves to the generic link glyph.
+ * Resolve the platform for a social URL by hostname (or scheme for
+ * mailto:/tel:). Never throws — an unparseable URL resolves to the
+ * generic globe glyph.
  */
 export function detectSocialPlatform(url: string): SocialPlatform {
   const raw = typeof url === "string" ? url.trim() : "";
   if (!raw) return SOCIAL_PLATFORMS.generic;
+
+  const lower = raw.toLowerCase();
+  if (lower.startsWith("mailto:")) return SOCIAL_PLATFORMS.email;
+  if (lower.startsWith("tel:")) return SOCIAL_PLATFORMS.phone;
+
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -120,28 +184,208 @@ export function detectSocialPlatform(url: string): SocialPlatform {
     return SOCIAL_PLATFORMS.generic;
   }
   const hostname = parsed.hostname.toLowerCase();
-  for (const rule of HOSTNAME_RULES) {
-    if (rule.hosts.some((host) => hostnameMatches(hostname, host))) {
-      return SOCIAL_PLATFORMS[rule.platform];
-    }
+  for (const platform of SOCIAL_PLATFORM_LIST) {
+    if (platform.hosts.some((host) => hostnameMatches(hostname, host))) return platform;
   }
-  return SOCIAL_PLATFORMS.generic;
+  return matchesByPattern(hostname) ?? SOCIAL_PLATFORMS.generic;
+}
+
+/* ------------------------------------------------------------------ */
+/* URL sanitising                                                       */
+/* ------------------------------------------------------------------ */
+
+const BARE_DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+([/?#][^\s]*)?$/i;
+const MAIL_ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_NUMBER = /^\+?[0-9 ()[.\]-]{6,24}$/;
+
+/**
+ * Add the scheme the admin probably meant: `instagram.com/brand` and
+ * `discord.gg/abc` are stored as real https URLs instead of being thrown
+ * away. Anything that already carries a scheme is left untouched.
+ */
+function withImplicitScheme(text: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
+  const bare = text.replace(/^\/\//, "");
+  return BARE_DOMAIN.test(bare) ? `https://${bare}` : text;
 }
 
 /**
  * Validate + normalise a social URL for storage. Returns the admin's URL
- * (trimmed, never rewritten) when it is a valid absolute http(s) URL,
- * otherwise the empty string — the card then renders its clean
- * non-clickable state instead of a broken link.
+ * (trimmed, never rewritten beyond an implied https://) when it is a
+ * valid http(s) / mailto: / tel: URL, otherwise the empty string — the
+ * card then skips the row instead of rendering a broken link.
  */
 export function sanitizeSocialUrl(value: unknown): string {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return "";
+
+  const candidate = withImplicitScheme(text);
+  const lower = candidate.toLowerCase();
+
+  if (lower.startsWith("mailto:")) {
+    const address = candidate.slice("mailto:".length).split("?")[0];
+    return MAIL_ADDRESS.test(address) ? `mailto:${address}` : "";
+  }
+  if (lower.startsWith("tel:")) {
+    const number = candidate.slice("tel:".length).split("?")[0];
+    return PHONE_NUMBER.test(number) ? `tel:${number.replace(/[^\d+]/g, "")}` : "";
+  }
+
   try {
-    const parsed = new URL(text);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") return text;
+    const parsed = new URL(candidate);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return candidate;
   } catch {
     /* not a URL */
   }
   return "";
+}
+
+/* ------------------------------------------------------------------ */
+/* Link lists (Branding → Social profile)                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Deterministic id for a link with none (legacy `socialUrl` docs, pasted
+ * arrays). Deriving it from the URL keeps React keys — and the admin's
+ * input focus — stable across every Firestore snapshot.
+ */
+export function stableSocialLinkId(url: string): string {
+  const text = (url || "").trim().toLowerCase().replace(/\/+$/, "");
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return `s${(hash >>> 0).toString(36)}`;
+}
+
+/** A fresh, empty row for the admin's "+ Add social account" button. */
+export function createSocialLink(partial: Partial<SocialLink> = {}): SocialLink {
+  const url = typeof partial.url === "string" ? partial.url.trim() : "";
+  return {
+    id:
+      typeof partial.id === "string" && partial.id.trim()
+        ? partial.id.trim()
+        : `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    url,
+    platform: isSocialPlatformId(partial.platform) ? (partial.platform as string) : "",
+    label: typeof partial.label === "string" ? partial.label.trim().slice(0, 40) : "",
+  };
+}
+
+function coerceSocialLink(value: unknown): SocialLink | null {
+  // Firestore stores maps; a plain array of URL strings is also accepted
+  // (hand-edited docs, imports, older shapes).
+  if (typeof value === "string") {
+    const url = sanitizeSocialUrl(value);
+    return url ? { id: stableSocialLinkId(url), url, platform: "", label: "" } : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const url = sanitizeSocialUrl(record.url);
+  if (!url) return null;
+  const id = typeof record.id === "string" && record.id.trim() ? record.id.trim() : stableSocialLinkId(url);
+  return {
+    id,
+    url,
+    platform: isSocialPlatformId(record.platform) ? (record.platform as string) : "",
+    label: typeof record.label === "string" ? record.label.trim().slice(0, 40) : "",
+  };
+}
+
+/** Same link, ignoring case / trailing slash — used to drop duplicates. */
+function linkKey(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
+/**
+ * Parse + clean the admin's list of linked accounts: invalid URLs drop
+ * out, duplicates collapse, the list is capped, and every entry keeps a
+ * stable id. Empty list in → empty list out (the card renders its clean
+ * non-clickable state).
+ */
+export function normalizeSocialLinks(value: unknown): SocialLink[] {
+  if (!Array.isArray(value)) return [];
+  const out: SocialLink[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (out.length >= MAX_SOCIAL_LINKS) break;
+    const link = coerceSocialLink(entry);
+    if (!link) continue;
+    const key = linkKey(link.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
+}
+
+/** A link, resolved for rendering (platform object + tooltip text). */
+export interface ResolvedSocialLink {
+  id: string;
+  url: string;
+  /** The resolved platform — pinned by the admin, else detected from the URL. */
+  platform: SocialPlatform;
+  /** The admin's pinned platform id ("" = auto-detected from the hostname). */
+  pinnedPlatformId: string;
+  /** Tooltip / aria text: the admin's label, else the platform's name. */
+  tooltip: string;
+  /** The admin's tooltip override ("" = none). */
+  label: string;
+}
+
+/**
+ * Resolve a whole list for the card / admin preview: a pinned platform wins,
+ * otherwise the hostname decides. Invalid rows are dropped so the card can
+ * never render an empty icon or a dead link.
+ */
+export function resolveSocialLinks(links: SocialLink[] | undefined | null): ResolvedSocialLink[] {
+  if (!Array.isArray(links)) return [];
+  const out: ResolvedSocialLink[] = [];
+  const seen = new Set<string>();
+  for (const link of links) {
+    const url = sanitizeSocialUrl(link?.url);
+    if (!url) continue;
+    const key = linkKey(url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const pinned = link?.platform;
+    const platform = isSocialPlatformId(pinned) ? SOCIAL_PLATFORMS[pinned as string] : detectSocialPlatform(url);
+    const custom = (link?.label || "").trim();
+    let tooltip = custom || platform.label;
+    // An unrecognised host is far more useful as its own domain than as
+    // the generic word "Website".
+    if (!custom && platform.id === "generic") {
+      try {
+        tooltip = new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        tooltip = platform.label;
+      }
+    }
+    out.push({
+      id: link?.id || stableSocialLinkId(url),
+      url,
+      platform,
+      pinnedPlatformId: isSocialPlatformId(pinned) ? (pinned as string) : "",
+      tooltip,
+      label: custom,
+    });
+  }
+  return out;
+}
+
+/**
+ * Host (or address) shown next to a row in the admin panel — lets the
+ * admin see at a glance where a link actually points.
+ */
+export function socialUrlHost(url: string): string {
+  const text = (url || "").trim();
+  if (!text) return "";
+  if (text.toLowerCase().startsWith("mailto:")) return text.slice("mailto:".length);
+  if (text.toLowerCase().startsWith("tel:")) return text.slice("tel:".length);
+  try {
+    return new URL(text).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }

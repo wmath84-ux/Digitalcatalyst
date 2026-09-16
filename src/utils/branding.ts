@@ -1,4 +1,6 @@
-import { sanitizeSocialUrl } from "./socialPlatform";
+import { normalizeSocialLinks, sanitizeSocialUrl, stableSocialLinkId, type SocialLink } from "./socialPlatform";
+
+export type { SocialLink };
 
 export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as const;
 export const DEFAULT_LOGO_URL = "/icons/icon-512x512.png";
@@ -40,11 +42,18 @@ export type Branding = {
   supportEmail: string;
   supportPhone: string;
   /**
-   * Social media URL for the Home page bottom profile card
-   * (Branding → Social profile). The admin's URL is stored verbatim
-   * (valid http(s) only); the card links to it and the platform icon is
-   * detected from its hostname. Empty = the card renders its clean
-   * non-clickable state.
+   * Every social media account the admin linked in Branding → Social
+   * profile, in the admin's own order. Each entry is a real URL (stored
+   * verbatim, valid http(s) / mailto: / tel: only) plus an optional
+   * platform pin and tooltip label. The Home page bottom card renders one
+   * icon per entry — so adding a URL in the admin panel adds an icon to
+   * the card automatically, and the icon follows the URL's hostname.
+   */
+  socialLinks: SocialLink[];
+  /**
+   * Legacy single-URL field, kept in the Firestore doc for older clients.
+   * Always mirrors `socialLinks[0].url` ("" when nothing is linked) — read
+   * `socialLinks` for anything new.
    */
   socialUrl: string;
 };
@@ -59,8 +68,9 @@ export const DEFAULT_BRANDING: Branding = {
   homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
   supportEmail: DEFAULT_SUPPORT_EMAIL,
   supportPhone: DEFAULT_SUPPORT_PHONE,
-  // No social profile by default — the Home page card renders its clean
-  // non-clickable state until the admin saves a URL.
+  // No social accounts by default — the Home page card renders its clean
+  // non-clickable state until the admin links one.
+  socialLinks: [],
   socialUrl: "",
 };
 
@@ -84,6 +94,17 @@ function sanitizeColor(value: unknown, fallback: string): string {
 export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>> | null | undefined): Branding {
   const logoRaw = typeof data?.logoUrl === "string" ? data.logoUrl.trim() : "";
   const logoUrl = /^https?:\/\//.test(logoRaw) || logoRaw.startsWith("/") ? logoRaw : DEFAULT_LOGO_URL;
+  // Linked social accounts. Docs written before multi-account support (and
+  // old caches) only carry the single `socialUrl` string — migrate it into
+  // the list so an existing link keeps working, then mirror the first link
+  // back onto `socialUrl` for any older reader.
+  const storedLinks = normalizeSocialLinks(data?.socialLinks);
+  const legacySocialUrl = sanitizeSocialUrl(data?.socialUrl);
+  const socialLinks: SocialLink[] = storedLinks.length
+    ? storedLinks
+    : legacySocialUrl
+      ? [{ id: stableSocialLinkId(legacySocialUrl), url: legacySocialUrl, platform: "", label: "" }]
+      : [];
   return {
     logoUrl,
     appName: sanitize(data?.appName, DEFAULT_APP_NAME),
@@ -98,9 +119,11 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     homeGradientTo: sanitizeColor(data?.homeGradientTo, DEFAULT_HOME_GRADIENT_TO),
     supportEmail: sanitize(data?.supportEmail, DEFAULT_SUPPORT_EMAIL, 120),
     supportPhone: sanitize(data?.supportPhone, DEFAULT_SUPPORT_PHONE, 160),
-    // Keep the admin's URL verbatim; anything that is not a valid
-    // absolute http(s) URL degrades to "" (clean non-clickable card).
-    socialUrl: sanitizeSocialUrl(data?.socialUrl),
+    // Keep the admin's URLs verbatim; anything that is not a valid absolute
+    // http(s) / mailto: / tel: URL drops out of the list (the card then
+    // renders its clean non-clickable state).
+    socialLinks,
+    socialUrl: socialLinks[0]?.url ?? "",
   };
 }
 

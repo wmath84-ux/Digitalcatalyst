@@ -31,8 +31,9 @@
 // `persist({ hideFrameBorders: checked })` shortcut, and the
 // Cloudinary upload with folder="branding".
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { ArrowDown, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { db } from "../../../firebase";
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/ui";
@@ -41,7 +42,18 @@ import { useBranding } from "@/context/BrandingContext";
 import { attachOpeningSplash } from "@/utils/openingSplash";
 import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
 import SocialProfileCard from "@/home/components/SocialProfileCard";
-import { detectSocialPlatform, sanitizeSocialUrl } from "@/utils/socialPlatform";
+import {
+  MAX_SOCIAL_LINKS,
+  POPULAR_SOCIAL_PLATFORMS,
+  SOCIAL_PLATFORM_LIST,
+  createSocialLink,
+  detectSocialPlatform,
+  normalizeSocialLinks,
+  resolveSocialLinks,
+  sanitizeSocialUrl,
+  socialUrlHost,
+  type SocialLink,
+} from "@/utils/socialPlatform";
 import {
   BRANDING_DOC_PATH,
   DEFAULT_BRANDING,
@@ -58,7 +70,8 @@ type BrandDraft = {
   homeGradientTo: string;
   supportEmail: string;
   supportPhone: string;
-  socialUrl: string;
+  /** Every linked social account, in the order the card shows them. */
+  socialLinks: SocialLink[];
 };
 
 type SectionKey =
@@ -81,7 +94,7 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   { key: "identity", label: "Identity", description: "App name + tagline shown across the app, the landing page, and notifications.", icon: "🪪", fieldCount: 2 },
-  { key: "social", label: "Social profile", description: "The profile card at the bottom of the Home page: its logo, name and bio come from Identity & Logo — the social URL links the card and sets its platform icon.", icon: "🔗", fieldCount: 1 },
+  { key: "social", label: "Social profile", description: "The profile card at the bottom of the Home page: link every social account you want — each URL adds its own brand icon, tooltip and link to the card.", icon: "🔗", fieldCount: 0 },
   { key: "logo", label: "Logo", description: "Square PNG / JPG that becomes the installed PWA icon, splash logo and notification avatar.", icon: "🖼️", fieldCount: 1 },
   { key: "gradient", label: "Home gradient", description: "Background gradient behind the home greeting and search bar.", icon: "🎨", fieldCount: 2 },
   { key: "behaviour", label: "App behaviour", description: "App opening animation and the thin top / bottom border lines.", icon: "✨", fieldCount: 2 },
@@ -111,13 +124,16 @@ export default function BrandingPage() {
     homeGradientTo: branding.homeGradientTo,
     supportEmail: branding.supportEmail,
     supportPhone: branding.supportPhone,
-    socialUrl: branding.socialUrl,
+    socialLinks: branding.socialLinks,
   });
   const [saving, setSaving] = useState(false);
   // Which section is currently in focus. null = no section (the
   // pill rail is the only thing on screen). Default to the first
   // section so the page never lands on a blank state.
   const [activeSection, setActiveSection] = useState<SectionKey | null>("identity");
+  // Content signature of the saved social list — the re-seed effect below
+  // watches this instead of the array identity.
+  const socialSignature = useMemo(() => JSON.stringify(branding.socialLinks), [branding.socialLinks]);
 
   useEffect(() => {
     setDraft({
@@ -130,8 +146,12 @@ export default function BrandingPage() {
       homeGradientTo: branding.homeGradientTo,
       supportEmail: branding.supportEmail,
       supportPhone: branding.supportPhone,
-      socialUrl: branding.socialUrl,
+      socialLinks: branding.socialLinks,
     });
+    // The social list is compared by CONTENT (a Firestore snapshot always
+    // carries a fresh array identity — re-seeding on identity would throw
+    // away whatever the admin is typing in a row).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     branding.logoUrl,
     branding.appName,
@@ -142,11 +162,73 @@ export default function BrandingPage() {
     branding.homeGradientTo,
     branding.supportEmail,
     branding.supportPhone,
-    branding.socialUrl,
+    socialSignature,
   ]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
+
+  /* ---------------------------------------------------------------- */
+  /* Social accounts (Branding → Social profile)                        */
+  /* ---------------------------------------------------------------- */
+
+  /** Row URL inputs, so a freshly added row is focused immediately. */
+  const socialUrlInputs = useRef(new Map<string, HTMLInputElement | null>());
+  const focusSocialUrl = (id: string) => {
+    requestAnimationFrame(() => socialUrlInputs.current.get(id)?.focus());
+  };
+
+  /** What the Home page card will actually render for the current draft. */
+  const resolvedSocialLinks = useMemo(
+    () => resolveSocialLinks(draft.socialLinks),
+    [draft.socialLinks],
+  );
+  const resolvedByUrl = useMemo(
+    () => new Map(resolvedSocialLinks.map((link) => [link.url, link])),
+    [resolvedSocialLinks],
+  );
+  /** URLs typed more than once — the card only ever shows the first. */
+  const duplicateUrls = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const link of draft.socialLinks) {
+      const clean = sanitizeSocialUrl(link.url);
+      if (!clean) continue;
+      const key = clean.toLowerCase().replace(/\/+$/, "");
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    return new Set(Array.from(seen.entries()).filter(([, count]) => count > 1).map(([key]) => key));
+  }, [draft.socialLinks]);
+
+  const addSocialLink = (platformId = "") => {
+    if (draft.socialLinks.length >= MAX_SOCIAL_LINKS) {
+      notify("error", `The card carries up to ${MAX_SOCIAL_LINKS} accounts — remove one first.`);
+      return;
+    }
+    const link = createSocialLink({ platform: platformId });
+    setDraft((prev) => ({ ...prev, socialLinks: [...prev.socialLinks, link] }));
+    setActiveSection("social");
+    focusSocialUrl(link.id);
+  };
+
+  const updateSocialLink = (id: string, patch: Partial<SocialLink>) =>
+    setDraft((prev) => ({
+      ...prev,
+      socialLinks: prev.socialLinks.map((link) => (link.id === id ? { ...link, ...patch } : link)),
+    }));
+
+  const removeSocialLink = (id: string) =>
+    setDraft((prev) => ({ ...prev, socialLinks: prev.socialLinks.filter((link) => link.id !== id) }));
+
+  const moveSocialLink = (id: string, direction: -1 | 1) =>
+    setDraft((prev) => {
+      const list = [...prev.socialLinks];
+      const from = list.findIndex((link) => link.id === id);
+      const to = from + direction;
+      if (from < 0 || to < 0 || to >= list.length) return prev;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return { ...prev, socialLinks: list };
+    });
 
   // The colour preview works even while the admin is typing, but a half-typed
   // hex must never be persisted — `normalizeBranding` on the client falls
@@ -170,19 +252,31 @@ export default function BrandingPage() {
     const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
     const supportEmail = merged.supportEmail.trim() || DEFAULT_BRANDING.supportEmail;
     const supportPhone = merged.supportPhone.trim() || DEFAULT_BRANDING.supportPhone;
-    // The admin's social URL is stored verbatim (no domain guessing);
-    // invalid / empty values persist as "" so the Home page card renders
-    // its clean non-clickable state.
-    const socialUrl = sanitizeSocialUrl(merged.socialUrl);
+    // Every linked account is stored verbatim (no domain guessing); rows
+    // whose URL is empty or unusable drop out here so the Home page card can
+    // never render a dead icon. `socialUrl` stays in the doc as a mirror of
+    // the first account for older readers.
+    const socialLinks = normalizeSocialLinks(merged.socialLinks);
+    const socialUrl = socialLinks[0]?.url ?? "";
+    const skippedLinks = merged.socialLinks.filter((link) => link.url.trim() !== "").length - socialLinks.length;
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, socialUrl, supportEmail, supportPhone, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, socialLinks, socialUrl, supportEmail, supportPhone, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, socialUrl });
-      notify("success", "Branding updated. It now applies live across the app and PWA.");
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, socialLinks, socialUrl });
+      // Show the admin exactly what was stored (dropped rows disappear).
+      setDraft((prev) => ({ ...prev, socialLinks }));
+      if (skippedLinks > 0) {
+        notify(
+          "error",
+          `Saved, but ${skippedLinks} social row${skippedLinks === 1 ? "" : "s"} were skipped — use a full address such as https://instagram.com/yourbrand, and no duplicates.`,
+        );
+      } else {
+        notify("success", "Branding updated. It now applies live across the app and PWA.");
+      }
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
     } finally {
@@ -247,7 +341,8 @@ export default function BrandingPage() {
                     active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  {section.fieldCount}
+                  {/* The social pill counts the icons the card will show. */}
+                  {section.key === "social" ? resolvedSocialLinks.length : section.fieldCount}
                 </span>
               </button>
             );
@@ -329,58 +424,289 @@ export default function BrandingPage() {
 
           {activeSectionDef.key === "social" ? (
             <div className="mt-1 space-y-3" data-branding-social-card>
-              {/* Live preview — the exact Home page card, fed by this
+              {/* ── Live preview — the exact Home page card, fed by this
                   page's draft values (logo/name/bio from Identity & Logo,
-                  URL from below). */}
+                  one icon per linked account from below). ── */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                <p className="text-xs font-bold text-slate-700">Home page social card preview</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                  The card at the very bottom of the Home page. Its logo, name and bio use the
-                  Identity &amp; Logo settings; the social URL below decides where the card links
-                  and which platform icon it shows.
-                </p>
-                <div className="mt-3 flex justify-center rounded-xl bg-slate-100/90 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-700">Home page social card preview</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                      The card at the very bottom of the Home page — a 1:1 port of the Uiverse
+                      “grumpy-ape-40” profile card (teal card, circular logo, name + bio, divider,
+                      brand icons with tooltips). Logo, name and bio come from Identity &amp; Logo;
+                      every account linked below becomes one icon in the row under the divider.
+                    </p>
+                  </div>
+                  <span
+                    className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-white"
+                    data-branding-social-link-count
+                  >
+                    {resolvedSocialLinks.length} icon{resolvedSocialLinks.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div
+                  className="mt-3 flex justify-center rounded-xl bg-slate-100/90 p-4 pb-7"
+                  data-branding-social-card-preview
+                >
                   <SocialProfileCard
                     logoUrl={draft.logoUrl || DEFAULT_BRANDING.logoUrl}
                     name={draft.appName || DEFAULT_BRANDING.appName}
                     bio={draft.tagline}
-                    socialUrl={draft.socialUrl}
+                    socialLinks={draft.socialLinks}
                     preview
                   />
                 </div>
+                <p className="mt-1 text-center text-[10px] text-slate-400">
+                  Hover an icon to see its tooltip, exactly like a learner does on the Home page.
+                </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                <label className="block text-xs font-semibold text-slate-600">
-                  Social media URL
-                  <input
-                    value={draft.socialUrl}
-                    onChange={(e) => update("socialUrl", e.target.value)}
-                    placeholder="https://instagram.com/yourbrand"
-                    inputMode="url"
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
-                    data-branding-social-url
-                  />
-                </label>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                  Any profile URL — https://instagram.com/yourbrand, https://youtube.com/@yourbrand,
-                  https://x.com/yourbrand, https://facebook.com/yourbrand, https://t.me/yourbrand,
-                  https://linkedin.com/in/yourbrand, discord.gg/…, github.com/…, tiktok.com/…,
-                  pinterest.com/…. The icon is detected from the URL's domain automatically; an
-                  unrecognised domain shows a generic link icon. Leave empty to show the card
-                  without a social link.
+              {/* ── Linked accounts — one row per social media account ── */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3" data-branding-social-links>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-slate-700">Linked social media accounts</p>
+                  <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                    {draft.socialLinks.length}/{MAX_SOCIAL_LINKS}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  One row per account. The icon is picked from the URL's domain automatically (you can
+                  also pin one), every icon links straight to that URL, and its name shows in the
+                  card's tooltip. The order here is the order on the card.
                 </p>
-                <div className="mt-2 flex items-center gap-2" data-branding-social-platform-preview>
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-800 text-white">
-                    <SocialPlatformIcon platform={detectSocialPlatform(draft.socialUrl)} size={14} />
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-600">
-                    {(draft.socialUrl || "").trim() && detectSocialPlatform(draft.socialUrl).id === "generic"
-                      ? "Unrecognised platform — generic link icon"
-                      : detectSocialPlatform(draft.socialUrl).id === "generic"
-                        ? "No URL yet — card stays non-clickable"
-                        : `${detectSocialPlatform(draft.socialUrl).label} icon`}
-                  </span>
+
+                {draft.socialLinks.length === 0 ? (
+                  <div
+                    className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-center"
+                    data-branding-social-empty
+                  >
+                    <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-teal-50 text-lg text-[#12897a]">
+                      🔗
+                    </span>
+                    <p className="mt-2 text-xs font-bold text-slate-700">No social account linked yet</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                      The card shows only the logo, name and tagline. Add your first account below —
+                      its brand icon appears in the preview above at once, and on the Home page as
+                      soon as you save.
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 space-y-2.5">
+                  {draft.socialLinks.map((link, index) => {
+                    const clean = sanitizeSocialUrl(link.url);
+                    const resolved = clean ? resolvedByUrl.get(clean) : undefined;
+                    const pinned = SOCIAL_PLATFORM_LIST.find((platform) => platform.id === link.platform) ?? null;
+                    const detected = detectSocialPlatform(link.url);
+                    const shown = resolved?.platform ?? pinned ?? detected;
+                    const invalid = link.url.trim() !== "" && !clean;
+                    const duplicate = clean ? duplicateUrls.has(clean.toLowerCase().replace(/\/+$/, "")) : false;
+                    return (
+                      <div
+                        key={link.id}
+                        data-branding-social-link-row
+                        data-branding-social-link-id={link.id}
+                        data-branding-social-link-platform-id={shown.id}
+                        className={`rounded-2xl border bg-white p-3 ${
+                          invalid ? "border-rose-300" : "border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#2cb5a0] text-white"
+                            data-branding-social-link-icon
+                          >
+                            <SocialPlatformIcon platform={shown} size={15} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-black text-slate-800">
+                              {index === 0 ? "Account 1 · primary" : `Account ${index + 1}`}
+                            </p>
+                            <p className="truncate text-[10px] leading-tight text-slate-500">
+                              {clean
+                                ? `${shown.label}${socialUrlHost(clean) ? ` · ${socialUrlHost(clean)}` : ""}`
+                                : "Waiting for a URL"}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveSocialLink(link.id, -1)}
+                              disabled={index === 0}
+                              aria-label={`Move ${shown.label || "account"} up`}
+                              data-branding-social-link-up
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-30 active:bg-slate-100"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveSocialLink(link.id, 1)}
+                              disabled={index === draft.socialLinks.length - 1}
+                              aria-label={`Move ${shown.label || "account"} down`}
+                              data-branding-social-link-down
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-30 active:bg-slate-100"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeSocialLink(link.id)}
+                              aria-label={`Remove ${shown.label || "account"} link`}
+                              data-branding-social-link-remove
+                              className="grid h-7 w-7 place-items-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 active:bg-rose-100"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <label className="mt-2.5 block text-[11px] font-semibold text-slate-600">
+                          Profile URL
+                          <input
+                            ref={(el) => {
+                              if (el) socialUrlInputs.current.set(link.id, el);
+                              else socialUrlInputs.current.delete(link.id);
+                            }}
+                            value={link.url}
+                            onChange={(e) => updateSocialLink(link.id, { url: e.target.value })}
+                            placeholder={(pinned ?? detected).template}
+                            inputMode="url"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
+                            data-branding-social-link-url
+                            {...(index === 0 ? { "data-branding-social-url": "" } : {})}
+                          />
+                        </label>
+
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <label className="block text-[11px] font-semibold text-slate-600">
+                            Icon / platform
+                            <select
+                              value={link.platform}
+                              onChange={(e) => updateSocialLink(link.id, { platform: e.target.value })}
+                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-normal text-slate-800"
+                              data-branding-social-link-platform
+                            >
+                              <option value="">Auto-detect from the URL</option>
+                              {SOCIAL_PLATFORM_LIST.map((platform) => (
+                                <option key={platform.id} value={platform.id}>
+                                  {platform.id === "generic" ? "Website (plain globe)" : platform.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block text-[11px] font-semibold text-slate-600">
+                            Tooltip text (optional)
+                            <input
+                              value={link.label}
+                              maxLength={40}
+                              onChange={(e) => updateSocialLink(link.id, { label: e.target.value })}
+                              placeholder={shown.label}
+                              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-800"
+                              data-branding-social-link-label
+                            />
+                          </label>
+                        </div>
+
+                        {invalid ? (
+                          <p
+                            className="mt-2 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] font-semibold leading-relaxed text-rose-600"
+                            data-branding-social-link-error
+                          >
+                            This row will be skipped — use a full address such as{" "}
+                            <span className="font-mono">https://instagram.com/yourbrand</span> (a bare
+                            domain like <span className="font-mono">instagram.com/yourbrand</span> is
+                            fine too), or <span className="font-mono">mailto:</span> /{" "}
+                            <span className="font-mono">tel:</span>.
+                          </p>
+                        ) : null}
+
+                        {!invalid && duplicate ? (
+                          <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-700">
+                            This URL is already linked in another row — the card shows it only once.
+                          </p>
+                        ) : null}
+
+                        {!invalid && clean ? (
+                          <div
+                            className="mt-2 flex flex-wrap items-center gap-2"
+                            data-branding-social-platform-preview
+                          >
+                            <span className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
+                              Card shows the{" "}
+                              <span className="font-bold text-slate-700">{shown.label}</span> icon
+                              {link.label ? (
+                                <>
+                                  {" "}
+                                  tooltip “<span className="font-bold text-slate-700">{link.label}</span>”
+                                </>
+                              ) : null}{" "}
+                              → opens this account
+                            </span>
+                            <a
+                              href={clean}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 active:bg-slate-100"
+                              data-branding-social-link-open
+                            >
+                              Test link <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Add another account: quick-add rail + custom row ── */}
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Add an account
+                  </p>
+                  <div
+                    className="scrollbar-hide -mx-1 mt-1.5 flex gap-1.5 overflow-x-auto px-1 pb-1"
+                    data-branding-social-quick-add
+                  >
+                    {POPULAR_SOCIAL_PLATFORMS.map((platform) => (
+                      <button
+                        key={platform.id}
+                        type="button"
+                        onClick={() => addSocialLink(platform.id)}
+                        disabled={draft.socialLinks.length >= MAX_SOCIAL_LINKS}
+                        data-branding-social-quick-add-pill
+                        data-social-platform={platform.id}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 disabled:opacity-40 active:bg-slate-100"
+                      >
+                        <SocialPlatformIcon platform={platform} size={12} />
+                        <span>{platform.label}</span>
+                        <Plus className="h-3 w-3 text-slate-400" />
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addSocialLink()}
+                      disabled={draft.socialLinks.length >= MAX_SOCIAL_LINKS}
+                      data-branding-social-link-add
+                      className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-1.5 text-[11px] font-bold text-indigo-700 disabled:opacity-40 active:bg-indigo-100"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Any other URL</span>
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                    Any profile URL works — Instagram, YouTube, WhatsApp, Facebook, X, Telegram,
+                    LinkedIn, TikTok, Discord, Snapchat, Reddit, Threads, Pinterest, GitHub, Bluesky,
+                    Mastodon, Medium, Twitch, Spotify, Linktree, the App Store, Google Play and more.
+                    An unrecognised domain still gets an icon (a globe with the domain as its tooltip)
+                    and still links correctly; a <span className="font-mono">mailto:</span> address or{" "}
+                    <span className="font-mono">tel:</span> number gets the email / phone icon. Up to{" "}
+                    {MAX_SOCIAL_LINKS} accounts.
+                  </p>
                 </div>
               </div>
             </div>
@@ -621,7 +947,9 @@ export default function BrandingPage() {
               homeGradientTo: DEFAULT_BRANDING.homeGradientTo,
               supportEmail: DEFAULT_BRANDING.supportEmail,
               supportPhone: DEFAULT_BRANDING.supportPhone,
-              socialUrl: DEFAULT_BRANDING.socialUrl,
+              // Reset unlinks every social account — the Home page card goes
+              // back to its clean non-clickable state.
+              socialLinks: DEFAULT_BRANDING.socialLinks,
             });
             void persist(DEFAULT_BRANDING);
           }}

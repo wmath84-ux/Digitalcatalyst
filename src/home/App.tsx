@@ -442,17 +442,21 @@ export default function App({
 
               {/* ── Social profile card (admin Branding → Social profile) ──
                   The LAST home page content, before the bottom nav: the
-                  Uiverse-style profile card (grumpy-ape-40). Every value is
-                  branding data — logo, app name, tagline (bio) and the
-                  social URL, whose hostname also selects the platform icon.
-                  With no URL configured the card renders its clean
-                  non-clickable state (never a broken link or icon). */}
+                  Uiverse profile card (grumpy-ape-40) ported 1:1 — teal
+                  card, circular logo, name + bio, divider and the brand
+                  icon row with tooltips. Every value is branding data:
+                  logo, app name, tagline (bio) and EVERY linked social
+                  account. One icon per account, each icon detected from
+                  its own URL's hostname and each one opening that account
+                  — so a URL added in the admin panel appears here as a new
+                  working icon. With nothing linked the card renders its
+                  clean non-clickable state (never a broken link or icon). */}
               <section data-home-social-card-section className="mt-8 px-5 pb-2 md:px-8">
                 <SocialProfileCard
                   logoUrl={branding.logoUrl}
                   name={branding.appName}
                   bio={branding.tagline}
-                  socialUrl={branding.socialUrl}
+                  socialLinks={branding.socialLinks}
                 />
               </section>
             </>

@@ -6,16 +6,24 @@
  *
  * The Home page's bottom social-media profile card. The card's LOGO,
  * NAME and BIO come from the admin Branding settings (Identity + Logo);
- * the SOCIAL URL (Branding → Social profile) drives the link target and
- * the platform icon (auto-detected from the URL's hostname).
+ * every LINKED ACCOUNT (Branding → Social profile) adds one brand icon
+ * to the row below the divider — its URL drives the link target and its
+ * hostname picks the icon.
  *
  * Reference values are kept exact: 13rem card · #2cb5a0 fill · 4px
  * #7cdacc border · 10px radius · 0 6px 10px rim shadow · 5rem circular
- * picture with the same 4px #7cdacc ring · 18px/16px type · 2px #7cdacc
- * divider · 1.1rem icons · hover lift -10px / 0.3s · dark #262626
- * tooltip with the 10px arrow.
+ * picture with the same 4px #7cdacc ring · 18px/16px Poppins type ·
+ * 2px #7cdacc divider (the .social-media:before bar) · 1.1rem icons ·
+ * 15px icon gap · hover lift -10px / 0.3s · dark #262626 tooltip with
+ * the 10px arrow, shown per icon on hover/focus.
+ *
+ * The only additions to the reference are the ones a real, data-driven
+ * card needs: the image inside the circular picture, wrapping when the
+ * admin links more icons than fit one row, focus rings, reduced motion
+ * and the clean non-clickable state.
  */
 
+/* .card-client */
 .dc-social-card {
   display: block;
   margin: 0 auto;
@@ -44,20 +52,38 @@
   outline-offset: 3px;
 }
 
-/* Circular profile / logo area — stays circular, no distortion. */
+/* .user-picture — circular logo area; stays circular, never distorted. */
 .dc-social-pic {
   overflow: hidden;
   object-fit: cover;
-  object-position: center;
   width: 5rem;
   height: 5rem;
   border: 4px solid #7cdacc;
   border-radius: 999px;
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   margin: auto;
+}
+
+/* The admin's logo image, filling the reference's picture circle. */
+.dc-social-pic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
   background: transparent;
 }
 
+/* .user-picture svg — the reference's own person glyph (last-resort logo). */
+.dc-social-pic svg {
+  width: 2.5rem;
+  height: auto;
+  fill: currentColor;
+}
+
+/* .name-client */
 .dc-social-name {
   margin: 0;
   margin-top: 20px;
@@ -67,6 +93,7 @@
   overflow-wrap: break-word;
 }
 
+/* .name-client span */
 .dc-social-name span {
   display: block;
   font-weight: 200;
@@ -75,10 +102,14 @@
   overflow-wrap: break-word;
 }
 
-/* Divider + icon row (the reference's .social-media :before). */
+/* .social-media — a block container: the ::before divider takes the full
+   width and the icon links flow inline underneath it (and wrap when the
+   admin links more than one row of icons). */
 .dc-social-media {
-  display: flex;
-  justify-content: center;
+  display: block;
+  /* Wrapped icon rows need air; this pulls the extra back so a
+     single-row card stays pixel-identical to the reference. */
+  margin-bottom: -12px;
 }
 
 .dc-social-media::before {
@@ -90,25 +121,38 @@
   background: #7cdacc;
 }
 
-.dc-social-icon {
+/* .social-media a */
+.dc-social-link {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  vertical-align: middle;
   margin-right: 15px;
+  margin-bottom: 12px;
+  text-decoration: none;
   color: inherit;
 }
 
-.dc-social-icon:last-child {
+.dc-social-link:last-child {
   margin-right: 0;
 }
 
-.dc-social-icon svg {
+/* .social-media a svg */
+.dc-social-link svg {
   width: 1.1rem;
-  height: 1.1rem;
+  height: auto;
   fill: currentColor;
+  display: block;
 }
 
-/* Tooltip — the reference's .tooltip-social, shown on card hover/focus. */
+.dc-social-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/*-- Tooltip Social Media --*/
 .dc-social-tooltip {
   background: #262626;
   display: block;
@@ -125,6 +169,9 @@
   transition: all 0.2s ease;
   z-index: 1;
   white-space: nowrap;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dc-social-tooltip::after {
@@ -138,24 +185,39 @@
   transform: translate(-50%, 100%);
 }
 
-.dc-social-icon .dc-social-tooltip::after {
+.dc-social-link .dc-social-tooltip::after {
   border-top-color: #262626;
 }
 
-.dc-social-card:hover .dc-social-tooltip,
-.dc-social-card:focus-visible .dc-social-tooltip {
+/* .social-media a:hover .tooltip-social — per icon, exactly like the
+   reference (touch users tap the icon and go straight to the profile). */
+.dc-social-link:hover .dc-social-tooltip,
+.dc-social-link:focus-visible .dc-social-tooltip {
   opacity: 1;
   transform: translate(-50%, -130%);
 }
 
-/* Clean non-clickable state (no social URL configured / admin preview):
-   no lift, no tooltip, no link cursor — the card never looks broken. */
+/* Clean non-clickable state (no account linked yet / admin preview):
+   no lift, no link cursor — the card never looks broken. */
 .dc-social-card--static {
   cursor: default;
 }
 
 .dc-social-card--static:hover {
   transform: none;
+}
+
+/* One linked account: the card itself is the <a> — one big tap target on a
+   phone — so its single icon is a span and the tooltip follows the card's
+   hover/focus instead of the icon's (same paint, same rise). */
+.dc-social-card--linked {
+  cursor: pointer;
+}
+
+.dc-social-card--linked:hover .dc-social-tooltip,
+.dc-social-card--linked:focus-visible .dc-social-tooltip {
+  opacity: 1;
+  transform: translate(-50%, -130%);
 }
 
 @media (prefers-reduced-motion: reduce) {

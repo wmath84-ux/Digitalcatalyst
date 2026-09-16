@@ -24,6 +24,8 @@ try {
   const { PaymentButton } = await vite.ssrLoadModule("/src/components/ui/PaymentButton.tsx");
   const { WatchActionButton } = await vite.ssrLoadModule("/src/components/ui/WatchActionButton.tsx");
   const { default: AiConfigButton } = await vite.ssrLoadModule("/src/components/ui/AiConfigButton.tsx");
+  const { default: SocialProfileCard } = await vite.ssrLoadModule("/src/home/components/SocialProfileCard.tsx");
+  const { SOCIAL_PLATFORM_LIST } = await vite.ssrLoadModule("/src/utils/socialPlatform.ts");
 
   const h = (node) => renderToStaticMarkup(node);
   const cssOf = (file) => readFileSync(path.join(root, file), "utf8");
@@ -90,6 +92,49 @@ try {
     ["click / press frame", '<button class="uza-tile" data-uza-click="true" type="button"><span class="uza-logo"><span class="uza-icon"><span class="uza-mark">◐</span></span></span><span class="uza-text"><span>OpenAI</span><span>Test connection</span></span></button>'],
   ];
 
+  /* ── Home page social profile card (abrahamcalsin/grumpy-ape-40) ─────── */
+  const card = (props) =>
+    h(
+      React.createElement(SocialProfileCard, {
+        logoUrl: "/icons/icon-512x512.png",
+        name: "Eduvora",
+        bio: "Learn smarter. Prepare better.",
+        ...props,
+      }),
+    );
+  const rows = (list) => list.map(([url, platform = "", label = ""], i) => ({ id: `qa-${i}`, url, platform, label }));
+  const REFERENCE_FOUR = [["https://facebook.com/eduvora"], ["https://instagram.com/eduvora"], ["https://x.com/eduvora"], ["https://linkedin.com/company/eduvora"]];
+  const EIGHT = [
+    ...REFERENCE_FOUR,
+    ["https://youtube.com/@eduvora"],
+    ["https://wa.me/919999999999"],
+    ["https://t.me/eduvora"],
+    ["https://tiktok.com/@eduvora"],
+  ];
+  const SOCIAL_ROWS = [
+    [
+      "the reference's own four accounts — Facebook · Instagram · X · LinkedIn",
+      card({ socialLinks: rows(REFERENCE_FOUR) }),
+      "hover an icon: its #262626 tooltip rises over it. Hover the card: it lifts 10px in 0.3s.",
+    ],
+    ["eight linked accounts — the icon row wraps, gaps stay 15px", card({ socialLinks: rows(EIGHT) })],
+    ["one account — the whole card is the tap target", card({ socialUrl: "https://instagram.com/eduvora" })],
+    ["an unrecognised domain — globe icon, the domain becomes the tooltip", card({ socialLinks: rows([["https://eduvora.example.com/about"]]) })],
+    ["mailto: + tel: rows get the email / phone icons and no new-tab target", card({ bio: "", socialLinks: rows([["mailto:hello@eduvora.app"], ["tel:+919999999999"]]) })],
+    ["pinned platform + custom tooltip text (both beat hostname detection)", card({ socialLinks: rows([["https://linktr.ee/eduvora", "instagram"], ["https://eduvora.in", "", "Our website"]]) })],
+    ["admin preview — icons shown, no live links", card({ socialLinks: rows(REFERENCE_FOUR), preview: true })],
+    ["nothing linked yet — clean non-clickable card", card({ socialLinks: [] })],
+    ["eight accounts on a 320px phone", card({ socialLinks: rows(EIGHT) }), "narrow"],
+    [
+      "every platform the admin can link — the exact glyph the card draws for it",
+      `<span style="display:inline-flex;flex-wrap:wrap;gap:8px;max-width:520px">${SOCIAL_PLATFORM_LIST.map(
+        (platform) =>
+          `<span title="${platform.label}" aria-label="${platform.label}" style="display:inline-grid;place-items:center;width:30px;height:30px;border-radius:999px;background:#2cb5a0;color:#fff;border:2px solid #7cdacc"><svg viewBox="${platform.glyph.viewBox}" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="${platform.glyph.d}"/></svg></span>`,
+      ).join("")}</span>`,
+      `${SOCIAL_PLATFORM_LIST.length} platforms, all Font Awesome Free brand marks — the same set as the reference card`,
+    ],
+  ];
+
   /* Measured on the exact colours the shipped CSS paints for each state. */
   const contrast = [
     ["payment label — resting (#121212 on the white pill)", "#121212", "#ffffff"],
@@ -100,6 +145,8 @@ try {
     ["AI logo mark — always (white glyph on the #0f1715 disc)", "#ffffff", "#0f1715"],
     ["AI caption line — hover (#d3d3d3 on the #316b58 circle)", "#d3d3d3", "#316b58"],
     ["AI model line — hover (#d6cbbf on the #316b58 circle)", "#d6cbbf", "#316b58"],
+    ["social card name/bio — always (#fff on the reference's #2cb5a0 teal)", "#ffffff", "#2cb5a0"],
+    ["social card tooltip — hover (#fff on the reference's #262626 pill)", "#ffffff", "#262626"],
   ];
 
   const html = `<!doctype html>
@@ -107,11 +154,17 @@ try {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Uiverse button QA — payment · purchases · AI configuration</title>
+<title>Uiverse QA — payment · purchases · AI configuration · home social card</title>
+<!-- The social card's reference specifies Poppins; the app loads it from the
+     same Google Fonts URL in index.html. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@200;400;600;700&display=swap" rel="stylesheet" />
 <style>
 ${cssOf("src/components/ui/payment-button.css")}
 ${cssOf("src/components/ui/watch-action-button.css")}
 ${cssOf("src/components/ui/ai-config-button.css")}
+${cssOf("src/home/components/social-profile-card.css")}
 </style>
 <style>
   /* QA page chrome only — nothing here is part of the app bundle. */
@@ -140,13 +193,13 @@ ${cssOf("src/components/ui/ai-config-button.css")}
 </style>
 </head>
 <body>
-  <h1>Uiverse buttons — visual + behavioural QA sheet</h1>
+  <h1>Uiverse ports — visual + behavioural QA sheet</h1>
   <p class="qa-lede">
     Rendered from the shared components themselves (<code>PaymentButton</code>, <code>WatchActionButton</code>,
-    <code>AiConfigButton</code>) with the shipped stylesheets inlined verbatim, so every pixel on this page is what
-    the app paints. Hover, press, tab and zoom each control; nothing is faked except the two frames the browser
-    cannot hold still for a screenshot, which use the components' own <code>data-*-press</code> /
-    <code>data-*-click</code> mirrors.
+    <code>AiConfigButton</code>, <code>SocialProfileCard</code>) with the shipped stylesheets inlined verbatim, so
+    every pixel on this page is what the app paints. Hover, press, tab and zoom each control; nothing is faked except
+    the two frames the browser cannot hold still for a screenshot, which use the components' own
+    <code>data-*-press</code> / <code>data-*-click</code> mirrors.
   </p>
 
   ${section(
@@ -168,8 +221,14 @@ ${cssOf("src/components/ui/ai-config-button.css")}
   )}
 
   ${section(
-    "4 · Measured contrast (WCAG relative luminance)",
-    "Measured with WCAG relative luminance on the exact values the reference ships, because these three buttons are recreations, not approximations. Every resting state passes AA comfortably (≥4.5:1). The hover values below are the reference's own palette and are the one place an exact recreation trades contrast: they are transient (only while the pointer is on the control), the text is bold and never duplicated by a sibling, and the resting state — which is what a screenshot, a screen reader and a keyboard user's initial view all see — is the high-contrast one. If the team wants AA on hover too, the payment button's `color` prop and `--uzp-clr` are the single switch (one line, per call site, no new component); the ports themselves stay faithful to the published design.",
+    "4 · Home page social profile card — abrahamcalsin/grumpy-ape-40",
+    "The card at the very bottom of the Home page, rendered from the shipped component with the shipped stylesheet. Logo, name and bio come from Branding → Identity &amp; Logo; every account linked in Branding → Social profile becomes one icon in the row under the divider, linking to that account and named in its own tooltip. Add a URL in the admin panel and its brand icon appears here automatically — an unrecognised domain still gets an icon (a globe, with the domain as its tooltip) and still links correctly.",
+    SOCIAL_ROWS,
+  )}
+
+  ${section(
+    "5 · Measured contrast (WCAG relative luminance)",
+    "Measured with WCAG relative luminance on the exact values the reference ships, because these ports are recreations, not approximations. Every resting state passes AA comfortably (≥4.5:1). The hover values below are the reference's own palette and are the one place an exact recreation trades contrast: they are transient (only while the pointer is on the control), the text is bold and never duplicated by a sibling, and the resting state — which is what a screenshot, a screen reader and a keyboard user's initial view all see — is the high-contrast one. If the team wants AA on hover too, the payment button's `color` prop and `--uzp-clr` are the single switch (one line, per call site, no new component); the ports themselves stay faithful to the published design.",
     [
       [
         "ratio table",
