@@ -90,8 +90,8 @@ export default function SocialProfileCard({
         className="dc-social-pic"
         src={visibleLogo}
         alt=""
-        width={80}
-        height={80}
+        width={288}
+        height={288}
         loading="lazy"
         decoding="async"
         draggable={false}

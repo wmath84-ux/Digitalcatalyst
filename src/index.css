@@ -972,18 +972,15 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   /* Grids: cards auto-fit the full desktop area, so they scale with
-     the monitor instead of leaving empty wallpaper on wide screens. */
+     the monitor instead of leaving empty wallpaper on wide screens.
+     Store uses the same 220 px track as Home so a store tile and a
+     Home trending tile share width (and the 4:3 art ratio) at every
+     desktop size. */
   [data-home-grid],
+  [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
-  }
-
-  /* The store grid steps at 240 px, not 220: at 1920+ that is the
-     difference between a wall of tiny cards (7–9 columns) and a
-     browsable catalogue (6–8 columns) with readable card copy. */
-  [data-store-grid] {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
   }
 
   /* Store "Mixed" view: the flat grid auto-fits like the grid view; the
@@ -6848,7 +6845,7 @@ html[data-course-player-active="true"] {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * STORE PRODUCT GRID · exact-square glass cards (owner brief 2026-09-10)
+ * STORE PRODUCT GRID · Home trending-card ratio + auto-fill tracks
  * ──────────────────────────────────────────────────────────────────────────
  * "product ka by default mobile, tablet aur desktop ke liye grid square card
  *  ratio set karo … card ka ratio exact square hona chahiye aur ek row mein do
@@ -6877,26 +6874,23 @@ html[data-course-player-active="true"] {
 [data-store-grid] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 12px;
   align-items: stretch;
 }
 
-/* Phones and tablets: two per row, whatever the width. */
+/* Tablets: same auto-fill floor Home uses in the 640–1023 portrait band. */
 @media (min-width: 640px) and (max-width: 959px) {
   [data-store-grid] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+    gap: 12px !important;
   }
 }
 
-/* Desktop shell: as many as fit — 4 at 960px, 5 around 1280–1600, 6 on a
-   1920 screen. The track minimum grows with the viewport (`14vw`, capped) so
-   the column count stays in that band instead of running away on wide
-   monitors. */
+/* Desktop shell: same 220 px track Home trending cards use. */
 @media (min-width: 960px) {
   [data-store-grid] {
-    grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 14vw, 260px), 1fr)) !important;
-    gap: 8px !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+    gap: 16px !important;
   }
 }
 

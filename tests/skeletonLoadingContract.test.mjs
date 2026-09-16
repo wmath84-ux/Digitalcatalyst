@@ -99,10 +99,10 @@ test("error state still renders on Home — skeletons never mask failures", () =
 
 test("Store page loading state uses skeleton geometry instead of pulse blocks", () => {
   assert.match(storePage, /Skeleton/);
-  // 2026-09-10: the store defaults to the square glass grid, so the
-  // placeholders are squares in the SAME grid container the live cards use —
-  // `data-store-grid` is the layout hook (column counts and gaps live in
-  // index.css), so the skeleton cannot drift from the real grid.
+  // The store defaults to the Home-ratio glass grid, so the placeholders
+  // are the same 4:3 art + copy stack in the SAME grid container the live
+  // cards use — `data-store-grid` is the layout hook (column counts and
+  // gaps live in index.css), so the skeleton cannot drift from the real grid.
   assert.match(storePage, /data-store-grid-loading/);
   assert.doesNotMatch(storePage, /data-store-list-loading/);
   const gridHooks = storePage.match(/data-store-gutter data-store-grid\b/g) || [];
@@ -110,8 +110,10 @@ test("Store page loading state uses skeleton geometry instead of pulse blocks", 
     gridHooks.length >= 2,
     `the skeleton and the live grid must share the data-store-grid hook, found ${gridHooks.length}`,
   );
-  // Each placeholder is the same exact square as a live card.
-  assert.match(storePage, /dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden/);
+  // Each placeholder is the same 4:3 stack as a live card.
+  assert.match(storePage, /dc-store-glass flex w-full min-h-0 flex-col overflow-hidden/);
+  assert.match(storePage, /aspect-\[4\/3\]/);
+  assert.doesNotMatch(storePage, /aspect-square/);
   // The old fixed-height pulse placeholders are gone.
   assert.doesNotMatch(storePage, /h-72 animate-pulse/);
 });

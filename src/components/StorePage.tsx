@@ -196,9 +196,9 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
-  /* Default = the square glass GRID (owner brief 2026-09-10: "product ka by
-     default … grid square card ratio set karo"). "Cards" (rectangular rows)
-     and "Mixed" stay one tap away in the layout dropdown. */
+  /* Default = the Home-ratio glass GRID (4:3 art + copy, auto-fill tracks).
+     "Cards" (rectangular rows) and "Mixed" stay one tap away in the layout
+     dropdown. */
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -370,19 +370,17 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       {error ? (
         <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
-        /* Dimension-matched skeletons: the store defaults to the SQUARE grid,
-           so each placeholder is the same exact square in the same grid
-           container (`data-store-grid`) the live cards use — zero layout shift
-           when the real list replaces them, at every breakpoint. Inside, the
-           blocks mirror the live card's own budget: artwork on top, the
-           heading, then the CTA. */
-        <div data-store-gutter data-store-grid data-store-grid-loading aria-busy="true" aria-label="Loading products" className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
+        /* Dimension-matched skeletons: the store defaults to the Home-ratio
+           grid, so each placeholder is the same 4:3 art + copy stack in the
+           same grid container (`data-store-grid`) the live cards use — zero
+           layout shift when the real list replaces them, at every breakpoint. */
+        <div data-store-gutter data-store-grid data-store-grid-loading aria-busy="true" aria-label="Loading products" className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
           {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
-            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col">
-              <div className="relative w-full basis-[40%] min-h-0 grow shrink overflow-hidden sm:basis-[46%]">
+            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex w-full min-h-0 flex-col overflow-hidden [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col">
+              <div className="relative aspect-[4/3] w-full overflow-hidden">
                 <Skeleton width="100%" height="100%" radius={0} />
               </div>
-              <div className="flex shrink-0 flex-col gap-1 px-1.5 pb-1.5 pt-2 sm:gap-1.5 sm:px-3 sm:pb-3 sm:pt-2.5">
+              <div className="flex flex-1 flex-col gap-1 p-3">
                 <Skeleton width="92%" height="0.9rem" radius={6} />
                 <Skeleton width="64%" height="0.9rem" radius={6} />
                 <div className="mt-auto">
@@ -442,7 +440,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
            Mobile: grid-cols-2 with the featured card spanning both tracks —
            identical to the old pair behaviour. Desktop (index.css): the same
            auto-fill columns as the grid view. */
-        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
+        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
           {filtered.map((product, index) =>
             index % 3 === 0 ? (
               /* Featured card. The wrapper is `flex` so the horizontal card
@@ -475,13 +473,12 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           )}
         </div>
       ) : (
-        /* ── Default grid view: exact-square glass cards ──
-           Two per row on phones AND tablets, and as many as fit (4–6) on
-           desktop; the gaps are the tightest the tap targets allow. The
-           column counts and gaps are pinned in index.css under
-           `[data-store-grid]` — the tablet auto-fill rules there used to win
-           the cascade, so the class list alone cannot hold this contract. */
-        <div data-store-gutter data-store-grid className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
+        /* ── Default grid view: Home-ratio glass cards ──
+           Same column/gap rhythm as Home trending (`grid-cols-2 gap-3
+           sm:grid-cols-3 md:gap-4`). Tablet/desktop auto-fill lives in
+           index.css under `[data-store-grid]` so it stays in lockstep with
+           `[data-home-grid]`. */
+        <div data-store-gutter data-store-grid className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
           {filtered.map((product) => (
             <ProductCard
               key={product.id}

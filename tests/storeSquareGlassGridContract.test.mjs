@@ -20,10 +20,9 @@
 //      background (nothing floats on the scene any more);
 //   2. "Top rated" is heading-sized, and every product card carries a heading
 //      that is the biggest type on that card;
-//   3. every product card is an EXACT square (`aspect-ratio: 1/1`, and
-//      `min-height: 0` so long copy can never stretch the track);
-//   4. the grid is two-up on phones and tablets, 4–6 across on desktop, with
-//      the tightest gaps the tap targets allow;
+//   3. every product card uses Home's 4:3 artwork + copy stack (not a square);
+//   4. the grid auto-fills like Home: 2-up on phones, minmax(180px) on tablet,
+//      minmax(220px) on desktop;
 //   5. the store glass is the owner's material — blur 42–50% of the 40px
 //      ceiling, light blue rgb(173,216,255) at 22–30%;
 //   6. the footer navigation (the main app dock AND FlowPath's dock, which is
@@ -42,6 +41,7 @@ const storeCss = read("src/store-glass.css");
 const indexCss = read("src/index.css");
 const hero = read("src/components/Hero.tsx");
 const card = read("src/components/ProductCard.tsx");
+const homeCard = read("src/home/components/ProductCard.tsx");
 const storePage = read("src/components/StorePage.tsx");
 const dock = read("src/components/glass-dock/GlassDock.tsx");
 const flowpathDock = read("src/components/flowpath/BottomDock.tsx");
@@ -188,20 +188,23 @@ test("every product card carries a heading that is its biggest type", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* 3. The cards are exact squares                                      */
+/* 3. The cards match Home's 4:3 art + copy stack                      */
 /* ------------------------------------------------------------------ */
 
-test("every product card is an exact square", () => {
-  // aspect-ratio 1/1, and min-height:0 so the grid item's automatic minimum
-  // size cannot let long copy stretch the row and break the ratio.
-  assert.match(card, /dc-store-glass dc-scene-ink group relative flex aspect-square w-full min-h-0 flex-col overflow-hidden/);
-  // The artwork is a flex item sized off the square, and the <img> is
-  // absolutely positioned so index.css's unlayered `img { height: auto }`
-  // (640–1366px) cannot stretch it out of the crop.
-  assert.match(card, /className="relative w-full basis-\[40%\] min-h-0 grow shrink overflow-hidden sm:basis-\[46%\]"/);
+test("every product card uses Home's 4:3 artwork ratio", () => {
+  // Same 4:3 media box Home trending cards use — the card itself is not a
+  // square; height is art + copy so the length/width stack tracks Home.
+  assert.match(homeCard, /aspect-\[4\/3\]/);
+  assert.match(card, /dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden/);
+  assert.doesNotMatch(card, /aspect-square/);
+  assert.match(card, /className="relative aspect-\[4\/3\] w-full overflow-hidden"/);
+  // The <img> is absolutely positioned so index.css's unlayered
+  // `img { height: auto }` (640–1366px) cannot stretch it out of the crop.
   assert.match(card, /className="absolute inset-0 h-full w-full object-cover/);
-  // The loading placeholders are the same square in the same grid.
-  assert.match(storePage, /dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden/);
+  // The loading placeholders are the same 4:3 stack in the same grid.
+  assert.match(storePage, /dc-store-glass flex w-full min-h-0 flex-col overflow-hidden/);
+  assert.match(storePage, /className="relative aspect-\[4\/3\] w-full overflow-hidden"/);
+  assert.doesNotMatch(storePage, /aspect-square/);
 });
 
 test("the card's flex column reaches its children, so the CTA sits at the bottom", () => {
@@ -216,18 +219,16 @@ test("the card's flex column reaches its children, so the CTA sits at the bottom
     assert.match(source, /\[&>div:last-child\]:flex \[&>div:last-child\]:min-h-0 \[&>div:last-child\]:flex-col/);
   }
   assert.match(card, /contentClassName="p-0"/, "the artwork stays edge-to-edge");
-  // The copy block never compresses — the artwork is what gives way on a tight
-  // square, so no line of copy can be clipped by the card's overflow-hidden.
-  assert.match(card, /className="relative z-20 flex shrink-0 flex-col gap-1 px-1\.5 pb-1\.5 pt-2 sm:gap-1\.5 sm:px-3 sm:pb-3 sm:pt-2\.5"/);
-  // Comments are stripped first: the fix is documented in a comment that
-  // quotes the old class.
+  // Same copy padding Home uses under the 4:3 art.
+  assert.match(card, /className="relative z-20 flex flex-1 flex-col gap-1 p-3"/);
+  assert.match(homeCard, /flex flex-1 flex-col gap-1 p-3/);
+  // Comments are stripped first: the CTA must not float on auto margins.
   const bareCard = card.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.doesNotMatch(bareCard, /mt-auto/, "nothing floats on auto margins in a block box any more");
-  assert.doesNotMatch(bareCard, /flex-1/, "no leftover flex-1 that the block wrapper would ignore");
   // Between JSX children a bare slash-star comment is literal TEXT — it painted
   // the comment onto the card. The copy block's comment must stay braced.
-  assert.match(card, /\{\/\* `shrink-0`: the copy never compresses/);
-  assert.doesNotMatch(card, /\n\s*\/\* `shrink-0`/);
+  assert.match(card, /\{\/\* `flex-1` \+ `p-3`: same copy stack/);
+  assert.doesNotMatch(card, /\n\s*\/\* `flex-1`/);
 });
 
 test("the price is on the card at every breakpoint, not only from sm:", () => {
@@ -245,69 +246,53 @@ test("the price is on the card at every breakpoint, not only from sm:", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* 4. Two-up on phone + tablet, 4–6 on desktop, minimal spacing        */
+/* 4. Auto-fill like Home on phone / tablet / desktop                  */
 /* ------------------------------------------------------------------ */
 
-test("the store grid is two-up below the desktop shell", () => {
-  // Base (phones): two equal tracks.
+test("the store grid is two-up on phones and auto-fills like Home on tablet", () => {
+  // Base (phones): two equal tracks, Home's 12px gap-3.
   const base = /\n\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
   assert.ok(base, "expected the base [data-store-grid] rule");
   assert.match(base, /display: grid/);
   assert.match(base, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(base, /gap: 6px/);
+  assert.match(base, /gap: 12px/);
 
-  // Tablets: still exactly two, restated later in the file with !important so
-  // the older tablet auto-fill rules (180px / clamp(160px,18vw,220px)) cannot
-  // tile the store into 3–8 columns.
+  // Tablets: the same 180px auto-fill Home uses, restated later so an older
+  // 2-up override cannot pin the store to a different column count.
   const tabletBlock = /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
   assert.ok(tabletBlock, "expected the 640–959 [data-store-grid] rule");
-  assert.match(tabletBlock, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important/);
-  assert.match(tabletBlock, /gap: 8px !important/);
+  assert.match(tabletBlock, /grid-template-columns: repeat\(auto-fill, minmax\(180px, 1fr\)\) !important/);
+  assert.match(tabletBlock, /gap: 12px !important/);
 
-  // And the cards are no longer shrunk inside their track on tablets, which is
-  // what left dead space around every square.
+  // Store cards are not transform-scaled inside their track on tablets.
   const scale = /\[data-home-grid\] > \*,\n\s*\[data-pdp-grid\] > \* \{\s*\n\s*transform: scale\(var\(--tablet-scale\)\)/.exec(indexCss);
   assert.ok(scale, "expected the tablet card-scale rule without [data-store-grid]");
 });
 
-test("the store grid auto-fills 4–6 across on desktop", () => {
+test("the store grid auto-fills the same 220px track Home uses on desktop", () => {
   const desktop = /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
   assert.ok(desktop, "expected the desktop [data-store-grid] rule");
-  assert.match(desktop, /grid-template-columns: repeat\(auto-fill, minmax\(clamp\(150px, 14vw, 260px\), 1fr\)\) !important/);
-  assert.match(desktop, /gap: 8px !important/);
+  assert.match(desktop, /grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important/);
+  assert.match(desktop, /gap: 16px !important/);
 
-  // The column count the track maths actually produces for a desktop shell
-  // (content = viewport − rail − gutters): 4 at 960, 5 in the middle of the
-  // range, 6 on a 1920 screen — the owner's "4-5-6 jitna adjust ho jaaye".
-  const columnsAt = (viewport, rail) => {
-    const content = viewport - rail - 48; // shell padding both sides
-    const min = Math.min(260, Math.max(150, viewport * 0.14));
-    return Math.floor((content + 8) / (min + 8));
-  };
-  assert.equal(columnsAt(960, 220), 4);
-  assert.equal(columnsAt(1280, 280), 5);
-  assert.equal(columnsAt(1600, 320), 5);
-  assert.equal(columnsAt(1920, 320), 5);
-  for (const viewport of [960, 1024, 1280, 1440, 1600, 1920]) {
-    const n = columnsAt(viewport, viewport >= 1280 ? 320 : 220);
-    assert.ok(n >= 4 && n <= 6, `${viewport}px yields ${n} columns, outside the 4–6 band`);
-  }
+  // Home's desktop grid uses the same 220px floor.
+  assert.match(indexCss, /\[data-home-grid\],\s*\n\s*\[data-store-grid\],\s*\n\s*\[data-pdp-grid\],\s*\n\s*\[data-search-grid\] \{\s*\n\s*grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important;/);
 });
 
-test("the store's spacing stays minimal everywhere", () => {
-  // No store grid rule may exceed an 8px gap.
-  for (const [, body] of indexCss.matchAll(/\[data-store-grid\] \{([^}]*)\}/g)) {
-    const gap = /gap: (\d+)px/.exec(body)?.[1];
-    if (gap) assert.ok(Number(gap) <= 8, `a store grid gap is ${gap}px, the brief says minimal`);
+test("the store grid JSX matches Home's column/gap rhythm", () => {
+  const homeApp = read("src/home/App.tsx");
+  assert.match(homeApp, /grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4/);
+  const gridHooks = storePage.match(/data-store-grid[^\n]*className="[^"]+"/g) || [];
+  assert.ok(gridHooks.length >= 2, `expected skeleton + live store grids, found ${gridHooks.length}`);
+  for (const hook of gridHooks) {
+    assert.match(hook, /grid-cols-2 gap-3/, `${hook} keeps Home's 2-up + gap-3`);
+    assert.match(hook, /sm:grid-cols-3/, `${hook} steps to 3-up at sm like Home`);
+    assert.match(hook, /md:gap-4/, `${hook} uses Home's md:gap-4`);
   }
-  // The containers carry the same tight gutters in the JSX (zeroed inside the
-  // desktop shell by [data-store-gutter]).
-  for (const hook of ["data-store-grid", "data-store-mixed", "data-store-list"]) {
-    assert.match(storePage, new RegExp(`${hook} className="[^"]*gap-(1\\.5|2) px-3`), `${hook} keeps the tight gap + gutter`);
-  }
+  assert.match(storePage, /data-store-list className="[^"]*px-3/);
 });
 
-test("the store opens on the square grid, and the skeleton matches it", () => {
+test("the store opens on the Home-ratio grid, and the skeleton matches it", () => {
   assert.match(storePage, /useState<ViewMode>\("grid"\)/);
   assert.match(storePage, /data-store-grid-loading/);
   // The three layouts are all still one tap away in the dropdown.

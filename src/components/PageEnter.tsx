@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 export function pageEnterAppKey(hash: string): string | null {
   const path = (hash || "").split("?")[0];
   if (path.startsWith("#/home")) return "#/home";
+  if (path.startsWith("#/queries")) return "#/queries";
   if (path.startsWith("#/store")) return "#/store";
   if (path.startsWith("#/product/")) return path;
   if (path.startsWith("#/subscription")) return "#/subscription";

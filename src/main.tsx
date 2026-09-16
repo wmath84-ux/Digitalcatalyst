@@ -278,6 +278,12 @@ const PAGE_SKELETON_BLOCKS: Record<string, PageSkeletonBlock[]> = {
     { width: "100%", height: 140 },
     { width: "100%", height: 140 },
   ],
+  queries: [
+    { width: "72%", height: 20 },
+    { width: "100%", height: 160 },
+    { width: "100%", height: 160 },
+    { width: "100%", height: 160 },
+  ],
   library: [
     { width: "62%", height: 24 },
     { width: "100%", height: 120 },
@@ -297,6 +303,7 @@ const PAGE_SKELETON_FOOTER = new Set([
   "flowpath",
   "notifications",
   "search",
+  "queries",
   "library",
 ]);
 
@@ -316,6 +323,7 @@ const pageSkeletonVariant = (hash: string) => {
   if (hash.startsWith(FLOWPATH_HASH)) return "flowpath";
   if (hash.startsWith(NOTIFICATIONS_HASH)) return "notifications";
   if (hash.startsWith(SEARCH_HASH)) return "search";
+  if (hash.startsWith(QUERIES_HASH)) return "queries";
   return "default";
 };
 
@@ -1576,6 +1584,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(QUERIES_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <UserQueriesPage
         cartCount={cartIds.size}
         purchasesBadge={purchasedIds.size}
@@ -1596,6 +1605,7 @@ function RootPage(): ReactNode {
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(NOTIFICATIONS_HASH)) {

@@ -125,10 +125,10 @@ export default function UserQueriesPage({
     setQueries((current) => current.map((item) => (item.id === next.id ? next : item)));
 
   return (
-    <div className="min-h-screen sm:py-6">
+    <div className="dc-app-shell min-h-screen sm:py-6" data-queries-page>
       <div
         data-app-frame
-        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none"
+        className="dc-app-frame relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none"
       >
         <Header
           cartCount={cartCount}

@@ -453,7 +453,7 @@ export default function BrandingPage() {
                   Identity &amp; Logo settings; every account below adds one link + one icon.
                 </p>
                 <div className="mt-3 rounded-xl bg-slate-100/90 p-3">
-                  <div className="h-[420px] w-full sm:h-[520px] md:h-[600px]">
+                  <div className="h-[520px] w-full sm:h-[640px] md:h-[740px]">
                     <SocialProfileCard
                       logoUrl={draft.logoUrl || DEFAULT_BRANDING.logoUrl}
                       name={draft.appName || DEFAULT_BRANDING.appName}
