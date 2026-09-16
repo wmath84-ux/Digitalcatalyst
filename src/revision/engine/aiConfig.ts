@@ -756,27 +756,39 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) throw Object.assign(new Error("Please log in to generate with AI."), { code: "auth" });
   const token = await firebaseUser.getIdToken(true);
-  const res = await apiFetch("/api/revision/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      action: "revision.generate",
-      source: args.source === "own" ? "own" : "default",
-      config: args.source === "own" && args.config
-        ? {
-            provider: args.config.provider,
-            apiKey: args.config.apiKey,
-            baseUrl: args.config.baseUrl,
-            model: args.config.model,
-          }
-        : undefined,
-      syllabus: args.syllabus,
-      tzOffsetMinutes: new Date().getTimezoneOffset(),
-    }),
+  const body = JSON.stringify({
+    action: "revision.generate",
+    source: args.source === "own" ? "own" : "default",
+    config: args.source === "own" && args.config
+      ? {
+          provider: args.config.provider,
+          apiKey: args.config.apiKey,
+          baseUrl: args.config.baseUrl,
+          model: args.config.model,
+        }
+      : undefined,
+    syllabus: args.syllabus,
+    tzOffsetMinutes: new Date().getTimezoneOffset(),
   });
+  const doFetch = () =>
+    apiFetch("/api/revision/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body,
+    });
+  let res = await doFetch();
+  // Retry once on transient server errors (502/503/504) — Vercel cold
+  // starts or temporary timeouts are common on the first request.
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try { res = await doFetch(); } catch { /* fall through */ }
+  }
   const raw = await res.text();
   if (isSpaFallback(res, raw)) {
-    throw Object.assign(new Error("AI proxy is not available in this environment."), { code: "no_proxy" });
+    throw Object.assign(
+      new Error("The AI server is temporarily unavailable. Please wait a moment and try again."),
+      { code: "no_proxy" },
+    );
   }
   let payload: { ok?: boolean; error?: string; questions?: unknown } = {};
   try {
@@ -802,16 +814,37 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
  * Real generation path used by the student generator.
  * Prefers the server proxy (no CORS, school key stays server-side, custom
  * OpenAI-compatible endpoints work). Falls back to a direct browser call
- * only when the serverless route is missing (local Vite).
+ * when the serverless route is missing (local Vite) or the proxy is
+ * temporarily unavailable — so the learner is never stuck on "AI service
+ * is not available" when their own key works fine from the browser.
  */
 export async function generateRevisionQuestions(args: RevisionGenerateArgs): Promise<ParsedQuestion[]> {
   const count = Math.max(1, Math.min(20, Math.round(args.syllabus.count || 10)));
   const syllabus = { ...args.syllabus, count };
-  // Always send the learner's full generation request through the server API.
-  // This keeps school-provided and user-owned providers on the same path,
-  // avoids CORS/client leakage issues, and lets the server pass the complete
-  // class/subject/chapter/topic/date/count details to the model.
-  return generateViaServer({ ...args, syllabus });
+  try {
+    // Always try the server API first. This keeps school-provided and
+    // user-owned providers on the same path, avoids CORS/client leakage
+    // issues, and lets the server pass the complete class/subject/chapter/
+    // topic/date/count details to the model.
+    return await generateViaServer({ ...args, syllabus });
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
+    // Only fall back for proxy-unavailable errors (local dev, Vercel timeout,
+    // SPA HTML fallback). Auth errors, provider rejections, allowance limits
+    // and other real failures must surface to the learner as-is.
+    if (code !== "no_proxy") throw err;
+    // Direct browser fallback requires a usable API key — the school's shared
+    // key is intentionally never exposed to the browser here (CORS would also
+    // block many providers from the client). Only the learner's own key can
+    // be used directly.
+    if (args.source !== "own" || !args.config?.apiKey?.trim() || !args.config?.model?.trim()) {
+      throw new Error(
+        "The AI server is temporarily unavailable. Please try again in a moment. " +
+        "If this keeps happening, check your internet connection and reload the page.",
+      );
+    }
+    return generateQuestionsWithAi(args.config, syllabusToInput(syllabus));
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -938,7 +971,7 @@ async function completeJsonViaServer(config: AiConfig, system: string, user: str
     }),
   });
   const raw = await res.text();
-  if (isSpaFallback(res, raw)) throw Object.assign(new Error("AI proxy is not available in this environment."), { code: "no_proxy" });
+  if (isSpaFallback(res, raw)) throw Object.assign(new Error("The AI server is temporarily unavailable. Please wait a moment and try again."), { code: "no_proxy" });
   let payload: { ok?: boolean; error?: string; json?: unknown; class?: unknown } = {};
   try {
     payload = JSON.parse(raw) as typeof payload;

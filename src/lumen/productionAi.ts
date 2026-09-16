@@ -114,7 +114,9 @@ export async function runProductionAssistant(input: {
   } catch (error) {
     if (signal?.aborted) throw error;
     if (error instanceof PersonalAiApiError) throw error;
-    throw new Error("Unable to connect to AI service. Please try again.");
+    throw new Error(
+      "The AI mentor couldn't connect right now. Please wait a moment and try again — your message is saved.",
+    );
   }
 }
 

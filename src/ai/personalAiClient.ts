@@ -132,14 +132,31 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
   options.signal?.addEventListener("abort", onAbort);
   let response: Response;
   let raw: string;
-  try {
+  const requestBody = JSON.stringify({ action, ...payload, tzOffsetMinutes: new Date().getTimezoneOffset() });
+  const doFetch = async () => {
     const token = await user.getIdToken();
-    response = await apiFetch("/api/personal-ai", {
+    return apiFetch("/api/personal-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action, ...payload, tzOffsetMinutes: new Date().getTimezoneOffset() }),
+      body: requestBody,
       signal: controller.signal,
     });
+  };
+  try {
+    response = await doFetch();
+    // Retry once on transient server errors (502/503/504) — Vercel cold
+    // starts or temporary timeouts. Only retry if the signal hasn't been
+    // aborted and we haven't used too much time already.
+    if ((response.status === 502 || response.status === 503 || response.status === 504) && !controller.signal.aborted) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (!controller.signal.aborted) {
+        try {
+          response = await doFetch();
+        } catch {
+          // Retry failed — fall through to original error handling.
+        }
+      }
+    }
     raw = await response.text();
   } catch (error) {
     const aborted = options.signal?.aborted === true;
@@ -172,8 +189,8 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
       personalAiFailure({
         code: html ? "NO_PROXY" : "AI_INVALID_JSON",
         message: html
-          ? "The AI service isn't available in this environment."
-          : `The AI service returned an unreadable response (${response.status}).`,
+          ? "The AI server didn't respond correctly. This is usually temporary — please wait a moment and retry. If it persists, reload the page."
+          : `The AI service returned an unreadable response (${response.status}). Please try again.`,
         status: response.status,
       }),
       response.status,

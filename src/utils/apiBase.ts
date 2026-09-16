@@ -102,24 +102,48 @@ export async function apiFetch(input: string | URL | Request, init?: RequestInit
       return u.pathname.startsWith("/api/");
     } catch { return typeof url === "string" && url.startsWith("/api/"); }
   };
+  // Detect when an /api/* response is actually an HTML SPA fallback page
+  // (Firebase Hosting rewrites, Vercel error pages, or any host that serves
+  // HTML instead of JSON for API routes). ANY HTML response on an API path
+  // is wrong — removed the res.ok requirement so 404/502 HTML error pages
+  // from Vercel or hosting platforms also trigger a retry.
+  const isHtmlResponse = (res: Response): boolean => {
+    const ct = res.headers.get("content-type") || "";
+    if (/text\/html/i.test(ct)) return true;
+    // Some error pages lack a content-type header but still return HTML.
+    return false;
+  };
   const shouldRetryHtml = (res: Response, originalUrl: string) => {
     if (!isApiPath(originalUrl)) return false;
-    const ct = res.headers.get("content-type") || "";
-    return /text\/html/i.test(ct) && res.ok;
+    return isHtmlResponse(res);
   };
   const absoluteFor = (pathname: string, search: string) =>
     `${PRODUCTION_ORIGIN.replace(/\/+$/, "")}${pathname}${search}`;
+  // Clone init for retry since fetch() may consume the body/headers.
+  const cloneInit = (): RequestInit | undefined => {
+    if (!init) return init;
+    return { ...init };
+  };
 
   if (typeof input === "string") {
     const url = apiUrl(input);
     const res = await fetch(url, init);
-    if (shouldRetryHtml(res, input) && url === input) {
-      // Was relative and got HTML (Firebase rewrite) — retry on production origin.
+    if (shouldRetryHtml(res, input)) {
+      // Got HTML for an API path — retry against the production origin
+      // (Vercel) if we haven't already tried it.
       try {
-        const u = new URL(input, typeof window !== "undefined" ? window.location.origin : PRODUCTION_ORIGIN);
+        const u = new URL(url, typeof window !== "undefined" ? window.location.origin : PRODUCTION_ORIGIN);
         const absolute = absoluteFor(u.pathname, u.search);
-        // Avoid infinite loop: only retry if absolute differs from original attempt.
-        if (absolute !== url) return fetch(absolute, init);
+        // Avoid infinite loop: only retry if the target differs from what we already fetched.
+        if (absolute !== url) {
+          const retryRes = await fetch(absolute, cloneInit());
+          // If the retry ALSO returns HTML, the server truly can't handle this
+          // request — return the retry result so the caller gets a clear error.
+          if (!isHtmlResponse(retryRes)) return retryRes;
+          // Both attempts returned HTML — return the absolute result (likely
+          // more informative status code from Vercel than the SPA fallback).
+          return retryRes;
+        }
       } catch {}
     }
     return res;
@@ -132,7 +156,9 @@ export async function apiFetch(input: string | URL | Request, init?: RequestInit
     if (shouldRetryHtml(res, input.pathname + input.search)) {
       // HTML fallback on a URL object — retry on production origin if not already there.
       if (input.origin !== new URL(PRODUCTION_ORIGIN).origin) {
-        return fetch(absoluteFor(input.pathname, input.search), init);
+        const retryRes = await fetch(absoluteFor(input.pathname, input.search), cloneInit());
+        if (!isHtmlResponse(retryRes)) return retryRes;
+        return retryRes;
       }
     }
     return res;
@@ -149,7 +175,9 @@ export async function apiFetch(input: string | URL | Request, init?: RequestInit
       try {
         const url = new URL(input.url);
         if (url.origin !== new URL(PRODUCTION_ORIGIN).origin) {
-          return fetch(new Request(absoluteFor(url.pathname, url.search), input), init);
+          const retryRes = await fetch(new Request(absoluteFor(url.pathname, url.search), input), cloneInit());
+          if (!isHtmlResponse(retryRes)) return retryRes;
+          return retryRes;
         }
       } catch {}
     }

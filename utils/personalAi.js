@@ -1206,7 +1206,7 @@ export const personalAiFailure = (input) => {
       case "CANCELLED":
         return { message: "Request cancelled.", retryable: false, upgrade: false, kind: "unknown" };
       case "NO_PROXY":
-        return { message: "The AI service is not available in this environment.", retryable: true, upgrade: false, kind: "server" };
+        return { message: "The AI server couldn't be reached right now. This is usually temporary — please wait a moment and try again. If it keeps happening, reload the page or check your internet connection.", retryable: true, upgrade: false, kind: "server" };
       case "AI_DISABLED":
         return { message: "AI is disabled in your saved preferences. Enable it in Revision → AI Configuration.", retryable: false, upgrade: false, kind: "config" };
       case "AI_PROVIDER_KEY_INVALID":

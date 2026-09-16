@@ -3,6 +3,7 @@ import "./index.css";
 import Composer from "./components/Composer";
 import Header from "./components/Header";
 import Lightbox from "./components/Lightbox";
+import LumenErrorBoundary from "./components/LumenErrorBoundary";
 import MessageList from "./components/MessageList";
 import ScreenshotOverlay, { type ShotRect } from "./components/ScreenshotOverlay";
 import Sidebar from "./components/Sidebar";
@@ -71,7 +72,7 @@ function fallbackShot(r: ShotRect): Attachment {
   return makeScreenshotAttachment(canvas.toDataURL("image/png"), Math.round(r.w), Math.round(r.h));
 }
 
-export default function LumenChat({
+function LumenChatInner({
   uid: learnerUid,
   productId,
   courseTitle,
@@ -229,8 +230,10 @@ export default function LumenChat({
       resourceName: resourceName || selectedFile?.name || null,
       resourceType: resourceType || selectedFile?.type || null,
       productId,
-      // The client re-reads the saved source immediately before sending.
-      source: undefined,
+      // Pass the currently selected source explicitly so the AI call uses
+      // the exact source the user sees in the dropdown — no localStorage
+      // round-trip race condition.
+      source: revisionAi.source === "own" ? "own" : revisionAi.source === "default" ? "default" : undefined,
     };
   };
 
@@ -697,5 +700,18 @@ export default function LumenChat({
       {shotMode && <ScreenshotOverlay onCancel={() => setShotMode(false)} onCapture={captureRegion} />}
       {lightbox && <Lightbox attachment={lightbox} onClose={() => setLightbox(null)} />}
     </div>
+  );
+}
+
+/**
+ * Public entry point — wraps the chat in an error boundary so a render crash
+ * in the AI chat never takes down the entire course player. The boundary
+ * catches the error, shows a recovery UI, and lets the learner reload.
+ */
+export default function LumenChat(props: LumenChatProps) {
+  return (
+    <LumenErrorBoundary>
+      <LumenChatInner {...props} />
+    </LumenErrorBoundary>
   );
 }
