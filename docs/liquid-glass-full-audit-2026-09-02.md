@@ -102,7 +102,7 @@ Hash router lives in `src/main.tsx`. **19 user routes + 4 dev routes + 2 admin r
 | `CoursePlayerApp.tsx` | 1378 | 10 | 10 | 0 | header (logo/back, title, subscription badge, progress bar), **8 toolbar toggles**: file-bars, player-chrome, fullscreen, viewport (desktop/mobile), theme (sun/moon), snow, secondary-strip, chrome-restore pill; mark-complete button; portrait + landscape shells | none |
 | `course/CourseOverlay.tsx` | 1060 | 11 | 2 | 0 | bottom **dock with 5 tabs** (Module / Resource / Note / Mind map / Paid), drag handle, split handle, module list with wire rail, resource list, buy-module / buy-update CTAs, close, scrim | none |
 | `course/CourseSidebar.tsx` | 247 | 6 | 0 | 0 | desktop sidebar: module groups, lock rows, file rows, buy CTAs | none |
-| `course/ResourceViewer.tsx` | 980 | 7 | 14 | 0 | viewer toolbar: personal-copy toggle, edit toggle, fullscreen, download, external, retry; zoom in/out/pct; empty / missing / error states | none |
+| `course/ResourceViewer.tsx` | 980 | 7 | 14 | 0 | viewer actions: edit toggle, fullscreen, download, external, retry; zoom in/out/pct; empty / missing / error states | none |
 | `course/AudioPlayer.tsx` | 265 | 4 | 2 | 0 | play, mute, loop, restart + seek slider | `glass-slider` ✔ |
 | `course/ImageViewer.tsx` | 219 | 0 | 0 | 0 | zoom in / out / fit / reset / download (rendered via parent) | none |
 | `course/MindMapPanel.tsx` | 2279 | 19 | 14 | 1 (`role=menu` portal) | toolbar: new, add-child, auto-arrange, **Align menu** (arrangement ×3 + text-fit ×2 radio items), fit, theme, delete, **Save menu** (save-now / label), library overlay (map grid, rename input, rename-save, delete-map, open-map), close, stats/status | none |

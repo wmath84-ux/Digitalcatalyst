@@ -28,9 +28,6 @@ export interface PricingGlassCardProps {
   features?: Array<{ name: string; included: boolean }>;
 }
 
-const rupees = (paise: number) =>
-  `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
-
 export default function PricingGlassCard({
   planName,
   planBadge = null,

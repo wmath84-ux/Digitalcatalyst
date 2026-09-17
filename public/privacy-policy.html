@@ -524,7 +524,7 @@
       <h1>Privacy Policy</h1>
       <p>How Eduvora collects, uses, stores and protects your information — and exactly how we handle your Google data.</p>
       <div class="meta-row">
-        <span class="chip">Last updated: 16 August 2026</span>
+        <span class="chip">Last updated: 17 September 2026</span>
         <span class="chip">Applies to: eduvora.shop</span>
       </div>
     </div>
@@ -573,9 +573,9 @@
       <h3>Push-notification subscription</h3>
       <p>If you enable notifications, we store a <strong>Web Push subscription token</strong> for your device so we can send you reminders and service updates. You can switch this off in your profile settings at any time.</p>
       <h3>Technical &amp; usage data</h3>
-      <p>We collect basic technical information such as device type, browser, operating system and coarse usage analytics through Firebase, to keep the Service reliable and secure.</p>
-      <h3>Google Drive data</h3>
-      <p>We request limited access to your Google Drive only for the personal-copy feature. This is explained in detail in the next section.</p>
+      <p>Separately from Google account data, we collect basic technical information such as device type, browser, operating system and coarse usage analytics through Firebase, to keep the Service reliable and secure. We do not combine that technical measurement with Google user data for unrelated analytics.</p>
+      <h3>Personal-copy request information</h3>
+      <p>If you choose <strong>Gate personal access</strong> inside a course player, we collect the email address you enter and the course-file identifier needed to fulfil that request. This is not a Google Drive OAuth grant: we do <strong>not</strong> ask you to connect your Google Drive, and we do not receive a Google Drive access token from you.</p>
     </section>
 
     <section class="card card--google" id="google-data">
@@ -587,16 +587,17 @@
         <span class="pill">Important</span>
         <span>This section describes how Eduvora uses information received from Google APIs. It is the most important part of this policy.</span>
       </div>
-      <p>Eduvora requests the Google Drive scope <span class="scope">https://www.googleapis.com/auth/drive</span> for <strong>one purpose only</strong>: when you tap &ldquo;My copy&rdquo; on a course file, we use Google Drive&rsquo;s <code>files.copy</code> method to create a copy of the master course file <strong>in your own Google Drive</strong>, at your request. The copy is created under your own account and is owned by you.</p>
+      <p><strong>Google Sign-In:</strong> if you choose to sign in with Google, Firebase Authentication receives your Google account's basic identity information — your name, email address, profile photo and provider identifier — so Eduvora can create and maintain your account, show your profile and return you to your learning workspace. Eduvora does not request Google Drive, Gmail, Calendar or other Google Workspace API access for sign-in.</p>
+      <p><strong>Course-player personal access:</strong> the optional Gate personal access feature accepts an email address that you enter yourself. After you confirm, our authenticated server may send the course-file ID and the requested email address to an owner-controlled Google Apps Script so it can copy the course resource from the owner's Drive and share the resulting file with the address you supplied. The script acts as the course operator, not as your Google account.</p>
       <ul>
-        <li>We <strong>never store or transfer</strong> the content of your Drive files to our servers.</li>
-        <li>We <strong>never share</strong> your Drive data with any third party.</li>
-        <li>We <strong>never use</strong> your Drive data for advertising, analytics or marketing.</li>
-        <li>Apart from creating that one copy, we perform <strong>no read, write or delete</strong> operations on your Drive.</li>
-        <li>The Google access token is kept <strong>only in your browser</strong> (in memory and session storage) and is never transmitted to our servers.</li>
-        <li>We only store a small reference so your copy opens instantly next time: the source file ID and the ID of the copy we created for you (in <code>users/{uid}/driveCopies/</code>). The actual file contents remain in Google Drive.</li>
+        <li>We do <strong>not</strong> request or receive a Google Drive OAuth token from the learner for this feature.</li>
+        <li>We do <strong>not</strong> read, search, download or manage files in the learner's Google Drive.</li>
+        <li>The feature uses the email address and selected course resource only to fulfil the personal-copy request and send the requested Drive share/invite.</li>
+        <li>We do not use Google account data for targeted or unrelated advertising, unrelated analytics, profiling, data brokerage, credit decisions, resale, or unrelated databases.</li>
+        <li>We do not use Google user data to train generalized or non-personalized AI/ML models.</li>
+        <li>We store only the account/profile fields and operational request record needed to provide, secure and support the Service. The actual course file remains in Google Drive.</li>
       </ul>
-      <p class="compliance">This use is compliant with the Google API Services User Data Policy, including the Limited Use requirements.</p>
+      <p class="compliance">Google user data is used only to provide or improve visible Eduvora features that you request: secure sign-in, profile display and the optional course-file access workflow. Any Google-side processing is subject to Google's own terms and privacy policy.</p>
     </section>
 
     <section class="card" id="use">
@@ -607,7 +608,7 @@
       <p>We use the information we collect to:</p>
       <ul>
         <li>Create and manage your account and authenticate you securely.</li>
-        <li>Provide the Service — courses, subscriptions, notes, progress tracking and your personal Google Drive copies.</li>
+        <li>Provide the Service — courses, subscriptions, notes, progress tracking and, when you request it, the course-file sharing workflow.</li>
         <li>Process orders and subscriptions and deliver what you have paid for.</li>
         <li>Send service notices, renewal reminders and (if you have enabled them) notifications.</li>
         <li>Respond to your support and deletion requests.</li>
@@ -620,8 +621,11 @@
         <span class="section-icon">04</span>
         <h2>Data storage &amp; retention</h2>
       </div>
-      <p>Your data is stored on <strong>Google Firebase</strong> services — Cloud Firestore for your account and learning data, Firebase Authentication for credentials, and Firebase Storage for any uploaded files.</p>
-      <p>We keep your information only for as long as needed to provide the Service and to meet our legal and tax obligations. Account and learning data is retained while your account is active. If your account is closed or you request deletion, we remove or anonymise your data within a reasonable time, unless we are required by law to retain it.</p>
+      <p>Your data is stored on <strong>Google Firebase</strong> services — Cloud Firestore for your account and learning data, Firebase Authentication for credentials, and Firebase Storage for any uploaded files. The optional gate request record contains the email address you supplied, the selected course resource and delivery status; it does not contain a learner Drive token or the contents of the learner&rsquo;s Drive.</p>
+      <h3>Security measures</h3>
+      <p>We protect Google-related and account data using <strong>HTTPS/TLS in transit</strong>, encryption at rest provided by Google Firebase/Google Cloud, Firebase Authentication ID-token checks for authenticated API calls, Firestore security rules that restrict account records to the account owner or authorised administrators, and server-side environment secrets that are never shipped in the browser. Administrative and Apps Script Drive credentials are kept separate from learner sessions and are not exposed to learners. Access to operational data is limited to the people and services that need it to provide, secure or support the Service. No security method is perfect, so we also monitor for abuse and ask you to protect your account credentials.</p>
+      <h3>Retention &amp; deletion</h3>
+      <p>We keep your information only for as long as needed to provide the Service and to meet our legal and tax obligations. Account and learning data is retained while your account is active. Gate request records are retained only as long as needed to fulfil, audit or support the requested delivery, then deleted or anonymised according to our operational retention process. If your account is closed or you request deletion, we remove or anonymise your data within a reasonable time, unless we are required by law to retain it. You may request deletion by contacting us below.</p>
     </section>
 
     <section class="card" id="sharing">
@@ -631,9 +635,10 @@
       </div>
       <p>We <strong>do not sell</strong> your personal information. We share data only with the service providers that are strictly necessary to operate the Service:</p>
       <ul>
-        <li><strong>Google</strong> — for sign-in and, only at your request, to create your personal Drive copy.</li>
-        <li><strong>Google Firebase</strong> — authentication, database, storage and hosting.</li>
+        <li><strong>Google / Firebase</strong> — basic Google sign-in, authentication, database, storage and hosting.</li>
+        <li><strong>Google Apps Script / Google Drive</strong> — only when you submit a Gate personal access request; the course operator's script uses the selected course resource and the email address you supplied to prepare and share the requested file. It does not receive access to your Drive.</li>
         <li><strong>Razorpay</strong> — payment processing (see Payments below).</li>
+        <li><strong>Web Push service providers</strong> — only when you enable browser notifications, to deliver service reminders and updates to your device subscription.</li>
       </ul>
       <p>We may also disclose information where required to comply with applicable law or to protect the rights, property or safety of Eduvora, our users or the public.</p>
     </section>
@@ -652,8 +657,8 @@
         <h2>Your rights &amp; data deletion</h2>
       </div>
       <p>You can review and update your name, mobile number and bio from your in-app profile at any time.</p>
-      <p>You can revoke Eduvora&rsquo;s access to your Google account at any time from your Google account permissions page (<a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a>). Revoking access does not delete the copy already in your Drive — that file belongs to you.</p>
-      <p>To request <strong>deletion of your account and all associated data</strong>, email us at the contact address below. We will action verified requests within a reasonable time, subject to any retention required by law.</p>
+      <p>You can manage or revoke Eduvora&rsquo;s basic Google sign-in connection at any time from your Google account permissions page (<a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a>). Eduvora does not hold a learner Drive token. A file already shared to an email address through a Gate personal access request remains subject to the Google Drive owner&rsquo;s sharing settings; you can remove that file or access from Google Drive.</p>
+      <p>To request <strong>deletion of your account, profile information and associated operational records</strong>, email us at the contact address below. We will action verified requests within a reasonable time, subject to any retention required by law. Account deletion does not automatically delete files that have already been shared in Google Drive, because those files are controlled by the course operator and Google Drive permissions.</p>
     </section>
 
     <section class="card" id="cookies">
@@ -661,7 +666,7 @@
         <span class="section-icon">07</span>
         <h2>Cookies &amp; local storage</h2>
       </div>
-      <p>We use browser cookies and local/session storage to keep you signed in, remember your preferences and cache the Google access token for your current session. These are required for the Service to function. We do not use third-party advertising trackers or sell data derived from cookies.</p>
+      <p>We use browser cookies and local/session storage to keep you signed in, remember your preferences, preserve course progress and maintain the app interface. Firebase Authentication manages the sign-in session. We do <strong>not</strong> cache a Google Drive access token, use third-party advertising trackers, or sell data derived from cookies.</p>
     </section>
 
     <section class="card" id="children">

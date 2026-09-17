@@ -17,9 +17,9 @@
 //      bar + the center charging control — src/CoursePlayerApp.tsx), so the
 //      panel no longer hosts a second bar or the circular control.
 //   3. ACTIVE FILE — the buttons the file's own viewer header provided
-//      (open original, download, fullscreen, Google editor, personal copy),
-//      reported live by the active ResourceViewer, so the list always
-//      matches the module the learner is on.
+//      (open original, download, fullscreen and Google editor), plus the
+//      email-only personal-access gate, reported live by the active
+//      ResourceViewer, so the list always matches the module the learner is on.
 //   4. PLAYER SETTINGS — the preference rows the ⚙ popover held (theme,
 //      snowfall, desktop view, hide status bar). Split mode is the player's
 //      only layout now, so its toggle is gone; the old "file bars" /
@@ -383,14 +383,8 @@ export default function PlayerPanel({
                 dataAttrs={{ "data-course-viewer-edit-toggle": "", "data-doc-mode": fileActions.editMode ? "edit" : "preview" }}
               />
             ) : null}
-            {/* P1: Personal copy via OAuth killed — replaced by Gate personal access (email) below.
-                The old drive.file OAuth flow required Google verification and is no
-                longer shown. Learners now use the Gate form to receive a service-account copy. */}
-            {fileActions?.personalCopyEnabled ? (
-              <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-200">
-                Personal copy via Google OAuth is disabled. Use Gate personal access below.
-              </div>
-            ) : null}
+            {/* Personal access is handled by the email-only Gate form below.
+                The learner never receives a Drive OAuth consent request. */}
           </div>
         </div>
       ) : (
@@ -415,10 +409,10 @@ export default function PlayerPanel({
         </p>
       </div>
 
-      {/* P1: Gate personal access — simple email gate, no OAuth.
+      {/* Gate personal access — simple email gate, no learner OAuth.
           Only shown for Google file types (Docs, Sheets, Slides, PDF/Drive)
-          that support duplication via Drive files.copy. Other types (YouTube,
-          embeds, direct files) have no Drive source to clone. */}
+          that the owner-side workflow can prepare and share. Other types
+          (YouTube, embeds, direct files) have no Drive source for this gate. */}
       {gateFile ? (
         <>
           <SectionLabel>Gate personal access</SectionLabel>

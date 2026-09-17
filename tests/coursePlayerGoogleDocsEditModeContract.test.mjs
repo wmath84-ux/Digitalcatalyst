@@ -113,7 +113,7 @@ test("the Player tab carries the edit toggle for editable Google files", () => {
   assert.match(playerPanel, /data-course-viewer-edit-toggle/);
   assert.match(playerPanel, /fileActions\.canEditInline \? \(/);
   assert.match(resourceViewer, /isEditableGoogleFile\(file\)/);
-  assert.match(resourceViewer, /canEditInline: canEditInline && !showPersonalCopy/);
+  assert.match(resourceViewer, /canEditInline,/);
   assert.match(resourceViewer, /onToggleEditMode: toggleEditMode/);
 });
 
@@ -158,7 +158,7 @@ test("normalizeDocsEditorAccessMap gives every type its own value with legacy in
 });
 
 test("the viewer passes the mode + admin chrome into getCourseEmbed and tags the stage", () => {
-  assert.match(resourceViewer, /mode: canEditInline && editMode && !showPersonalCopy \? "edit" : "preview", editorChrome/);
+  assert.match(resourceViewer, /mode: canEditInline && editMode \? "edit" : "preview",/);
   assert.match(resourceViewer, /data-doc-mode=/);
 });
 

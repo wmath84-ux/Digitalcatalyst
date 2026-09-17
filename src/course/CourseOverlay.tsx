@@ -35,7 +35,7 @@
 //   - Paid      → purchasable updates + locked paid modules.
 //   - Player    → the course identity, progress / mark-complete, the ACTIVE
 //                 file's own buttons (open / download / fullscreen / editor /
-//                 personal copy) and every player preference — everything the
+//                 personal-access gate) and every player preference — everything the
 //                 old player header + ⚙ settings popover carried, in one list.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";

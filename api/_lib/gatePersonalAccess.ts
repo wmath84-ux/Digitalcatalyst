@@ -1,7 +1,7 @@
 // api/_lib/gatePersonalAccess.ts
 //
 // P1: Gate personal access — kills Google OAuth personal-copy flow.
-// The learner no longer grants drive.file access via OAuth consent screen.
+// The learner no longer grants any Drive access via an OAuth consent screen.
 // Instead they fill ONE email field in the Course Player settings
 // (heading "Gate personal access") and confirm on submit. The server
 // records the request and — when a Drive service-account is configured —
@@ -133,10 +133,10 @@ export async function handleGatePersonalAccess(req: VercelRequest, res: VercelRe
       fileId: resolvedFileId,
       status: record.status,
       message: (automation as Record<string, unknown>).shared
-        ? `Personal copy shared with ${email}. Check your email / Drive for the invite.`
+        ? `Personal copy shared with ${email}. Check your email / Google Drive for the invite.`
         : (automation as Record<string, unknown>).copiedId
-        ? `Copy created and queued for ${email}. You'll get the Drive invite shortly.`
-        : `Request received for ${email}. Your personal copy will be prepared and emailed shortly.`,
+        ? `Copy created and queued for ${email}. You'll get the Google Drive invite shortly.`
+        : `Request received for ${email}. The course operator will prepare and share the copy shortly.`,
       automation,
     },
   });
