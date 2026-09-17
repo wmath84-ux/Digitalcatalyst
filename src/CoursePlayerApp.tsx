@@ -43,7 +43,7 @@ import {
   syncCourseLandscapeChromeColor,
 } from "./utils/courseStatusBar";
 import { enterCoursePlayerRotation, exitCoursePlayerRotation } from "./utils/appOrientation";
-import { getCourseEmbed, VIEWPORT_AWARE_KINDS } from "./utils/courseEmbed";
+import { getCourseEmbed, VIEWPORT_AWARE_KINDS, getDriveSourceFileId, personalCopyKind } from "./utils/courseEmbed";
 import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
 import {
   loadPlaybackStore,
@@ -1080,7 +1080,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
-      gateFile={selectedFile ? { id: String(selectedFile.id), url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
+      gateFile={selectedFile && personalCopyKind(selectedFile) ? { id: getDriveSourceFileId(selectedFile) || null, url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
       productId={product.id}
       moduleId={selectedFile ? String(owningModuleForFile(modules, String(selectedFile.id))?.id || "") : null}
     />
