@@ -46,7 +46,7 @@ export default class LumenErrorBoundary extends Component<Props, State> {
             <AlertTriangle size={28} />
           </div>
           <div className="max-w-[380px]">
-            <h2 className="text-[16px] font-bold text-white">AI Mentor encountered an error</h2>
+            <h2 className="text-[16px] font-bold text-white">Roman AI Pro encountered an error</h2>
             <p className="mt-2 text-[13px] leading-relaxed text-white/70">
               {this.state.errorMessage}
             </p>
@@ -60,7 +60,7 @@ export default class LumenErrorBoundary extends Component<Props, State> {
             className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-indigo-500 active:scale-95"
           >
             <RotateCcw size={15} />
-            Reload AI Mentor
+            Reload Roman AI Pro
           </button>
           <a
             href="#/home"

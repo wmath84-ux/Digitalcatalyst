@@ -29,9 +29,34 @@
 import { normalisePlanPricing, resolveFeaturePrice } from "./featurePricing.js";
 import { normalizeRevisionTestBankLimits } from "./revisionLimits.js";
 import { normalizePlanAiAllowances } from "./aiAllowances.js";
+import { normaliseVisibleCycles } from "./subscriptionVisibility.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined) : []);
+const asArray = (v) => (Array.isArray(v) ? v : []);
+
+/** `{ monthly, yearly, lifetime }` of nullable numbers — the admin's shape. */
+const normaliseOverridePrices = (raw) => {
+  if (!isObject(raw)) return null;
+  const pick = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const next = { monthly: pick(raw.monthly), yearly: pick(raw.yearly), lifetime: pick(raw.lifetime) };
+  if (next.monthly === null && next.yearly === null && next.lifetime === null) return null;
+  return next;
+};
+
+/** `{ aiQuestionsPerDay }` — the per-feature cap the admin can set. */
+const normaliseUserLimit = (raw) => {
+  if (!isObject(raw)) return null;
+  const value = raw.aiQuestionsPerDay;
+  if (value === null || value === undefined || value === "") return { aiQuestionsPerDay: null };
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { aiQuestionsPerDay: null };
+  return { aiQuestionsPerDay: Math.max(-1, Math.min(10_000, Math.round(n))) };
+};
 
 const PAISE_PER_RUPEE = 100;
 
@@ -89,6 +114,17 @@ export const normalisePlanDoc = (raw, id) => {
     // token budget inherits its tier's default (basic 2M, premium 5M, pro 10M)
     // instead of one global number.
     aiAllowances: normalizePlanAiAllowances(raw.aiAllowances, planId),
+    // ── Admin display/visibility fields (previously dropped here) ──────────
+    // `visibleCycles` = the cycles a NON-subscriber may pick this plan on;
+    // `subscriberPricingOverride` = the plan-doc copy of the subscriber-only
+    // price (the live reader is `settings/subscriptionGate.subscriberPricing`,
+    // surfaced so the admin's own editor round-trips what it wrote);
+    // the rest is display metadata the admin already stores.
+    visibleCycles: normaliseVisibleCycles(raw.visibleCycles),
+    subscriberPricingOverride: normaliseOverridePrices(raw.subscriberPricingOverride),
+    featured: raw.featured === true,
+    cta: typeof raw.cta === "string" ? raw.cta : null,
+    accessTier: typeof raw.accessTier === "string" ? raw.accessTier : null,
   };
 };
 
@@ -129,6 +165,17 @@ export const normaliseFeatureDoc = (raw, id) => {
     badge: typeof raw.badge === "string" ? raw.badge : null,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Math.floor(Number(raw.sortOrder)) : 0,
     freeItemsPerDay: featureId === "my-day" ? Math.max(0, Math.min(100, Math.round(Number(raw.freeItemsPerDay ?? 1) || 0))) : null,
+    // ── Admin visibility / limit fields ────────────────────────────────────
+    // These were written by the admin panel and then DROPPED here, so the page
+    // never received them: switching Monthly ↔ Yearly could not change the
+    // feature table because the catalog simply did not carry the per-cycle
+    // lists. They are passed through (normalised) so the page and the quote
+    // engine resolve visibility from one shape.
+    visibleCycles: normaliseVisibleCycles(raw.visibleCycles),
+    hiddenPlanIds: asArray(raw.hiddenPlanIds).map(String).filter(Boolean),
+    visibilityMode: raw.visibilityMode === "hide" ? "hide" : "gate",
+    subscriberPricingOverride: normaliseOverridePrices(raw.subscriberPricingOverride),
+    userLimit: normaliseUserLimit(raw.userLimit),
   };
 };
 
@@ -250,7 +297,7 @@ export const isActiveSubscriptionRecord = (record, now = Date.now()) => {
  *
  * The explicit list (record.features) wins. For the two core subscription
  * features an active membership is the entitlement itself — they are what
- * every plan sells (My Day cloud saving, Revision Studio) and the admin
+ * every plan sells (My Day cloud saving, Roman AI Pro) and the admin
  * tunes their per-plan pricing, not their availability. This keeps the
  * profile allowance, My Day, Revision and the server gates perfectly in
  * sync even for memberships whose stored `features` list is older or was

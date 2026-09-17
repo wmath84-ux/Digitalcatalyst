@@ -76,7 +76,7 @@ const UserMessage = memo(function UserMessage({
 /* ── assistant message (isolated render cell) ───────────────── */
 
 const AssistantMessage = memo(function AssistantMessage({
-  message, tier, isLast, generating, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp,
+  message, tier, isLast, generating, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp, onOpenPlans,
 }: {
   message: Message;
   tier: Tier;
@@ -88,6 +88,8 @@ const AssistantMessage = memo(function AssistantMessage({
   onQuizAnswer: (msgId: string, qIdx: number, optIdx: number) => void;
   onQuizSubmit: (msgId: string) => void;
   onFollowUp: (text: string) => void;
+  /** Opens the subscription page — the only useful action for a plan error. */
+  onOpenPlans?: () => void;
 }) {
   perf.bump("messageRenders");
   const [copied, setCopied] = useState(false);
@@ -109,7 +111,7 @@ const AssistantMessage = memo(function AssistantMessage({
           className={cn("lumen-orb", live && "is-thinking", tier === "xxs" ? "h-[15px] w-[15px]" : "h-[18px] w-[18px]")}
           aria-hidden="true"
         />
-        <span className={cn("font-semibold tracking-[-0.01em] text-[--ink] ", tier === "xxs" ? "text-[12px]" : "text-[12.5px]")}>Lumen</span>
+        <span className={cn("font-semibold tracking-[-0.01em] text-[--ink] ", tier === "xxs" ? "text-[12px]" : "text-[12.5px]")}>Roman AI Pro</span>
         {message.format && message.status !== "thinking" && (
           <span className="fmt-chip" title={`Answer structured as: ${FORMAT_LABEL[message.format]}`}>
             {message.format === "visual" && <ImagePlay size={9.5} aria-hidden="true" />}
@@ -138,12 +140,18 @@ const AssistantMessage = memo(function AssistantMessage({
           <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-semibold text-[--err]">
               {message.errorKind === "server" || message.errorKind === "network"
-                ? "AI Mentor is temporarily unavailable"
+                ? "Roman AI Pro is temporarily unavailable"
                 : message.errorKind === "config" || message.errorKind === "provider"
                   ? "AI configuration needs attention"
-                  : message.errorKind === "entitlement" || message.errorKind === "limit"
-                    ? "AI access limit reached"
-                    : "AI request could not complete"}
+                  // A plan problem and a used-up allowance are different
+                  // situations, so they can no longer share one heading. The
+                  // old "AI access limit reached" told a learner with no
+                  // subscription that they had crossed a limit they never had.
+                  : message.errorKind === "entitlement"
+                    ? "AI needs an active subscription"
+                    : message.errorKind === "limit"
+                      ? "AI limit reached for now"
+                      : "AI request could not complete"}
             </div>
             <div className="mt-0.5 text-[12.5px] leading-snug text-[--ink-2]">
               {message.errorMessage || "The AI could not answer. Your message is safe — you can retry."}
@@ -152,6 +160,17 @@ const AssistantMessage = memo(function AssistantMessage({
               <RotateCcw size={13.5} aria-hidden="true" />
               Retry
             </button>}
+            {(message.errorKind === "entitlement" || message.errorKind === "limit") && onOpenPlans && (
+              <button
+                type="button"
+                onClick={onOpenPlans}
+                className="ghost-btn focus-ring mt-2.5 h-[30px] text-[12.5px]"
+                data-lumen-open-plans=""
+              >
+                <ArrowUpRight size={13.5} aria-hidden="true" />
+                {message.errorKind === "entitlement" ? "View subscription plans" : "Upgrade for a bigger limit"}
+              </button>
+            )}
             {(message.errorKind === "config" || message.errorKind === "provider") && (
               <a className="mt-2 block text-xs font-medium underline underline-offset-2" href="#/revision/ai-settings">
                 Open AI Configuration →
@@ -349,7 +368,7 @@ function Sentinel({
 /* ── the scrollable conversation ────────────────────────────── */
 
 export default function MessageList({
-  chat, tier, generating, onSuggestion, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp,
+  chat, tier, generating, onSuggestion, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp, onOpenPlans,
 }: {
   chat: Chat;
   tier: Tier;
@@ -361,6 +380,7 @@ export default function MessageList({
   onQuizAnswer: (msgId: string, qIdx: number, optIdx: number) => void;
   onQuizSubmit: (msgId: string) => void;
   onFollowUp: (text: string) => void;
+  onOpenPlans?: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const { visible, hasMore, isLoadingMore, loadError, loadMore, retry } = usePagedMessages(chat, listRef);
@@ -495,6 +515,7 @@ export default function MessageList({
                         onQuizAnswer={onQuizAnswer}
                         onQuizSubmit={onQuizSubmit}
                         onFollowUp={onFollowUp}
+                        onOpenPlans={onOpenPlans}
                       />
                     )}
                   </MessageCell>

@@ -1193,6 +1193,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               selectedFile={selectedFile}
               notes={notes}
               profile={{ name: user.name, photoURL: user.photoURL }}
+              // A plan error inside the chat used to be a dead end (no Retry
+              // either, because it is not retryable). The card now carries the
+              // one action that fixes it.
+              onOpenSubscription={() => { window.location.hash = "#/subscription"; }}
             />
           </Suspense>
         ) : undefined

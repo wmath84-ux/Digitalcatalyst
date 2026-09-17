@@ -30,7 +30,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
         <GlassSurface className="dc-glass-hero dc-scene-plate relative overflow-hidden text-white lg:col-span-12" contentClassName="p-5 lg:p-4">
           <div className="relative lg:flex lg:items-center lg:justify-between lg:gap-4">
             <div className="lg:flex-1">
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-100/80 lg:text-[10px]">Revision Studio</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-100/80 lg:text-[10px]">Roman AI Pro</p>
               <h2 className="mt-1.5 text-2xl font-extrabold leading-tight lg:text-xl">Hi {userName}</h2>
               <p className="mt-1 text-xs leading-relaxed text-violet-50/90 lg:text-[11px] lg:mt-0.5">
                 Build focused revision plans, connect AI and track how you are improving.

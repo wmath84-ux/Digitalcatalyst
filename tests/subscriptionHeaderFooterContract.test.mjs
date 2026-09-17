@@ -33,7 +33,12 @@ test("subscription loading and catalog-error states keep the header and footer",
   assert.match(subscriptionPage, /data-subscription-catalog-error/);
   // The main is also the page's overlay-bounds column (My Day's pattern):
   // every picker opened from this page clamps to it on tablet / desktop.
-  assert.match(subscriptionPage, /<main ref=\{contentColumnRef\} className="flex-1 overflow-y-auto">/);
+  // The content column is also `overflow-x-hidden` so a wide plan table
+  // cannot leak a horizontal scrollbar onto the whole page.
+  assert.match(
+    subscriptionPage,
+    /<main ref=\{contentColumnRef\} className="flex-1 overflow-x-hidden overflow-y-auto">/,
+  );
   assert.match(subscriptionPage, /<OverlayBoundsProvider value=\{contentColumnRef\}>/);
 });
 

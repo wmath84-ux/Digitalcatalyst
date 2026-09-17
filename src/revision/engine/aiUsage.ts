@@ -211,7 +211,7 @@ export function computeUsageSnapshot(
   if (tokenBudgetEnabled && !tokensUnlimited && tokensUsedDay >= dailyTokenBudget) {
     blockedReason = "Today's AI token budget is used up. It resets at midnight your local time.";
   } else if (!record.hasAccess) {
-    blockedReason = "An active Revision Studio subscription is required for new AI tests.";
+    blockedReason = "An active Roman AI Pro subscription is required for new AI tests.";
   } else if (!tokenBudgetEnabled && !dailyUnlimited && dayCount >= dailyLimit) {
     blockedReason = `Daily school-AI allowance reached (${dailyLimit} successful tests). It resets tomorrow.`;
   } else if (!tokenBudgetEnabled && !windowUnlimited && inWindow.length >= windowLimit) {

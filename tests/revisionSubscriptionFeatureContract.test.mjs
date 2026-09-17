@@ -71,9 +71,9 @@ test("RevisionApp gates paywalled actions with the floating premium gate", () =>
 });
 
 test("the premium gate pushes buyers to the subscription page", () => {
-  // The unified gate carries the Revision Studio branding and hands the
+  // The unified gate carries the Roman AI Pro branding and hands the
   // navigation decision to its caller.
-  assert.match(premiumGate, /Revision Studio/);
+  assert.match(premiumGate, /Roman AI Pro/);
   assert.match(premiumGate, /onClick=\{onViewSubscription\}/);
   assert.match(premiumGate, /View subscription/);
   // Modal mode stays dismissible ("Maybe later") so browsing is never blocked.
@@ -129,7 +129,7 @@ test("quote + grant flow carries any catalog feature id through generically", ()
 
 test("fallback catalog ships Revision so the page works offline", () => {
   assert.match(fallback, /id: "revision"/);
-  assert.match(fallback, /name: "Revision Studio"/);
+  assert.match(fallback, /name: "Roman AI Pro"/);
   assert.match(fallback, /icon: "brain"/);
   assert.match(fallback, /badge: "PAID"/);
   // The legacy My Day entry stays intact beside it.

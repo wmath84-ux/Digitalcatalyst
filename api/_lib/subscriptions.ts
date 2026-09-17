@@ -18,6 +18,8 @@
 //      Razorpay capture.
 
 import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { isFeatureHiddenForPlan, isFeatureVisibleForCycle, isPlanVisibleForCycle } from "../../utils/subscriptionVisibility.js";
+import { resolveEffectiveSubscriberPrice } from "../../utils/subscriptionPricing.js";
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin.js";
 import { getRenewalBaseTime } from "../../utils/subscriptionRenewal.js";
 import { resolveFeaturePrice } from "../../utils/featurePricing.js";
@@ -141,7 +143,7 @@ const DEFAULT_SUBSCRIPTION_FEATURES: Array<Record<string, unknown>> = [
   },
   {
     id: "revision",
-    name: "Revision Studio",
+    name: "Roman AI Pro",
     description: "Daily tests, smart revision sessions, weak-topic detection and progress analytics.",
     icon: "brain",
     price: 149,
@@ -177,6 +179,15 @@ export const ensureDefaultSubscriptionPlans = async (db: Firestore): Promise<voi
 };
 
 /**
+ * Labels this codebase previously seeded. A stored document whose name still
+ * matches one of these is an untouched default, so it can be renamed to the
+ * current product name; anything the admin typed is left exactly as it is.
+ */
+const LEGACY_FEATURE_LABELS: Record<string, string> = {
+  revision: "Revision Studio",
+};
+
+/**
  * One-time seed for the default subscription features. The marker doc keeps
  * track of what has already been seeded, so an admin who deliberately
  * deletes the Revision feature (to remove its gate) is never overridden by a
@@ -190,19 +201,37 @@ export const ensureDefaultSubscriptionFeatures = async (db: Firestore): Promise<
       ? marker.data()!.seededFeatures.map(String)
       : [];
     const pending = DEFAULT_SUBSCRIPTION_FEATURES.filter((feature) => !seeded.includes(String(feature.id)));
-    if (pending.length === 0) return;
-    await Promise.all(
-      pending.map((feature) =>
-        db.collection(FEATURES_COLLECTION).doc(String(feature.id)).set(
-          { ...feature, updatedAt: Timestamp.now() },
-          { merge: true },
+    if (pending.length > 0) {
+      await Promise.all(
+        pending.map((feature) =>
+          db.collection(FEATURES_COLLECTION).doc(String(feature.id)).set(
+            { ...feature, updatedAt: Timestamp.now() },
+            { merge: true },
+          ),
         ),
-      ),
+      );
+      await markerRef.set({
+        seededFeatures: Array.from(new Set([...seeded, ...pending.map((feature) => String(feature.id))])),
+        updatedAt: Timestamp.now(),
+      }, { merge: true });
+    }
+    // Display-name repair. The feature KEEPS its id (`revision`) because that id
+    // is the entitlement key already written into every paid membership, but the
+    // label moved to the product name (Roman AI Pro). Only a document that still
+    // carries the old default label is renamed, so an admin's own wording — and
+    // anyone who renamed it deliberately — is never overwritten.
+    await Promise.all(
+      Object.entries(LEGACY_FEATURE_LABELS).map(async ([id, legacyLabel]) => {
+        const ref = db.collection(FEATURES_COLLECTION).doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) return null;
+        if (String(snap.data()?.name || "").trim() !== legacyLabel) return null;
+        const currentName = DEFAULT_SUBSCRIPTION_FEATURES.find((feature) => String(feature.id) === id)?.name;
+        if (!currentName || currentName === legacyLabel) return null;
+        await ref.set({ name: currentName, updatedAt: Timestamp.now() }, { merge: true });
+        return id;
+      }),
     );
-    await markerRef.set({
-      seededFeatures: Array.from(new Set([...seeded, ...pending.map((feature) => String(feature.id))])),
-      updatedAt: Timestamp.now(),
-    }, { merge: true });
   } catch (error) {
     // Seeding is best-effort — never let a seed failure break a catalog read.
     console.warn("[subscriptions] default feature seeding skipped", error);
@@ -617,6 +646,62 @@ export const loadSubscriptionSelectionContext = async (
     }
     features.push(f);
   }
+  // ── Per-cycle / per-plan visibility — the admin's rule, ENFORCED ──────────
+  // The subscription page already hides what the admin hid (`visibleCycles`,
+  // `hiddenPlanIds`, the gate's duration matrix). Until now nothing on the
+  // server read those fields, so a hidden feature could still be bought by
+  // calling the API directly. Both sides now use `utils/subscriptionVisibility`
+  // so what the buyer is shown and what the server accepts are the same rule.
+  const buyerIsSubscriber = Boolean(
+    options.existingSubscription && isOwnedSubscriptionActive(options.existingSubscription as never, now),
+  );
+  let gateSettings: {
+    features?: Record<string, unknown>;
+    planVisibility?: Record<string, unknown>;
+    subscriberPricing?: Record<string, { monthly?: number | null; yearly?: number | null; lifetime?: number | null }>;
+  } = {};
+  try {
+    const { getSubscriptionGateSettings } = await import("./subscriptionGate.js");
+    gateSettings = await getSubscriptionGateSettings();
+  } catch {
+    // A settings read failure must never block a legitimate purchase; the
+    // document-level fields are still enforced below.
+    gateSettings = {};
+  }
+  const subscriberViewsAllCycles = buyerIsSubscriber;
+  if (!isPlanVisibleForCycle(plan as never, cycle, {
+    isSubscriber: subscriberViewsAllCycles,
+    gateRows: (gateSettings.planVisibility || {}) as never,
+  })) {
+    return {
+      ok: false,
+      status: 400,
+      code: "SUBSCRIPTION_CYCLE_NOT_OFFERED",
+      error: `This plan is not offered on the ${cycle} billing cycle right now.`,
+    };
+  }
+  for (const feature of features) {
+    if (isFeatureHiddenForPlan(feature as never, planId)) {
+      return {
+        ok: false,
+        status: 400,
+        code: "SUBSCRIPTION_FEATURE_NOT_OFFERED",
+        error: `${feature.name} is not available on this plan.`,
+      };
+    }
+    if (!isFeatureVisibleForCycle(feature as never, planId, cycle, {
+      isSubscriber: subscriberViewsAllCycles,
+      gateRows: (gateSettings.features || {}) as never,
+    })) {
+      return {
+        ok: false,
+        status: 400,
+        code: "SUBSCRIPTION_FEATURE_NOT_OFFERED",
+        error: `${feature.name} is not offered on the ${cycle} billing cycle right now.`,
+      };
+    }
+  }
+
   const productUnlocks = await loadPlanProductUnlocks(planId, options);
   const moduleUnlocks = await loadPlanModuleUnlocks(planId, options);
   const validation = validateSubscriptionSelection({
@@ -636,6 +721,39 @@ export const loadSubscriptionSelectionContext = async (
     productUnlocks,
     moduleUnlocks,
   });
+
+  // ── Subscriber-only price: display AND charge ─────────────────────────────
+  // The page shows the admin's subscriber override for an active member. The
+  // quote used to charge the public price anyway, so a member could be shown
+  // ₹X and billed ₹Y. The override is stored in RUPEES per plan + cycle, the
+  // plan line is paise, so it is converted exactly once here on the
+  // authoritative side. A non-subscriber never reaches this branch.
+  if (buyerIsSubscriber) {
+    const subscriberPricing = (gateSettings as {
+      subscriberPricing?: Record<string, { monthly?: number | null; yearly?: number | null; lifetime?: number | null }>;
+    }).subscriberPricing || {};
+    const baseRupees = (cycle === "yearly" ? plan.yearlyPricePaise : plan.monthlyPricePaise) / 100;
+    // BOTH admin surfaces are read here: the plan sheet's own
+    // `subscriberPricingOverride` (the specific edit) and the gate matrix's
+    // `subscriberPricing[planId]` (the fallback). The shared resolver owns that
+    // precedence, so the page and the charge can never disagree.
+    const resolvedRupees = resolveEffectiveSubscriberPrice(
+      planId,
+      cycle,
+      baseRupees,
+      true,
+      plan.subscriberPricingOverride ?? null,
+      subscriberPricing as never,
+    );
+    const resolvedPaise = Math.max(0, Math.round(Number(resolvedRupees) * 100));
+    if (Number.isFinite(resolvedPaise) && resolvedPaise !== (cycle === "yearly" ? plan.yearlyPricePaise : plan.monthlyPricePaise)) {
+      const planLine = lineItems.find((item) => item.kind === "subscription");
+      if (planLine) {
+        planLine.regularPrice = resolvedPaise;
+        planLine.effectivePrice = resolvedPaise;
+      }
+    }
+  }
   // Buyer-selected bonus products are loaded from the live server catalog.
   // Their IDs and prices are never trusted from the client. Keep both the
   // public id and Firestore document id as access aliases: CatalogContext and

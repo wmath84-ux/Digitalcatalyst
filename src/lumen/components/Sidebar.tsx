@@ -92,7 +92,7 @@ function Sidebar({
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-semibold tracking-[-0.01em] text-[--ink]">Brightpath</div>
-          <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-[--ink-3]">Lumen Assistant</div>
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-[--ink-3]">Roman AI Pro</div>
         </div>
         {mode === "drawer" && (
           <button type="button" onClick={onClose} aria-label="Close chat list" className="icon-btn is-sm focus-ring">

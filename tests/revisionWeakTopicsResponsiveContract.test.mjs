@@ -58,7 +58,7 @@ test("recommended cards go two-up from the desktop threshold (960px)", () => {
 });
 
 test("desktop split lives in the desktop-shell CSS block with the 7-5 columns", () => {
-  const desktopBlock = css.slice(css.indexOf("Revision Studio desktop experience"), css.indexOf("Tablet portrait revision optimization"));
+  const desktopBlock = css.slice(css.indexOf("Roman AI Pro desktop experience"), css.indexOf("Tablet portrait revision optimization"));
   assert.match(desktopBlock, /\.dc-desktop-shell \[data-rev-layout="weak"\] \{[^}]*grid-template-columns: repeat\(12, minmax\(0, 1fr\)\)/);
   assert.match(desktopBlock, /\.dc-desktop-shell \[data-rev-col="weak-primary"\] \{[^}]*grid-column: span 7/);
   assert.match(desktopBlock, /\.dc-desktop-shell \[data-rev-col="weak-secondary"\] \{[^}]*grid-column: span 5/);

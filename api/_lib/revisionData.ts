@@ -151,7 +151,7 @@ async function resolveAccess(db: Firestore, uid: string): Promise<Access> {
   const featureConfigured = feature.exists && feature.data()?.active !== false;
   const sub = asRecord(subscription.data());
   // Same single-source entitlement rule as My Day: the explicit feature list
-  // wins, but any active membership unlocks the core Revision Studio feature.
+  // wins, but any active membership unlocks the core Roman AI Pro feature.
   const paid = subscriptionUnlocksFeature(sub, "revision");
   const hasAccess = !featureConfigured || paid;
   // Keep the last purchased plan/cycle visible after expiry so status and
@@ -361,7 +361,7 @@ export async function handleRevisionData(req: VercelRequest, res: VercelResponse
     const access = await resolveAccess(db, user.uid);
     const creationActions = new Set(["revision.data.reserve", "revision.data.create", "revision.data.migrate"]);
     if (creationActions.has(action) && !access.hasAccess) {
-      return res.status(403).json({ ok: false, code: "PLAN_REQUIRED", error: "Creating a new Revision test requires an active Revision Studio subscription. Your saved tests and results remain available." });
+      return res.status(403).json({ ok: false, code: "PLAN_REQUIRED", error: "Creating a new Revision test requires an active Roman AI Pro subscription. Your saved tests and results remain available." });
     }
 
     if (action === "revision.data.status") {

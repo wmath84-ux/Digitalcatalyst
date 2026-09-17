@@ -2932,7 +2932,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 @media (max-width: 767px) { [data-app-frame] { overscroll-behavior: none; } [data-revision-content] { overflow: hidden; } }
 
-/* Revision Studio scroll frame -------------------------------------------
+/* Roman AI Pro scroll frame -------------------------------------------
    Every revision page scrolls inside its own PageShell main
    (`[data-revision-page-main]` is `flex-1 min-h-0 overflow-y-auto`). For
    that container to actually scroll, the whole chain above it needs a
@@ -2973,7 +2973,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   padding-bottom: 0 !important;
 }
 
-/* Revision Studio desktop experience - OPTIMIZED compact, no empty space */
+/* Roman AI Pro desktop experience - OPTIMIZED compact, no empty space */
 @media (min-width: 960px) {
   .dc-desktop-shell:has([data-revision-app]) {
     height: 100dvh;

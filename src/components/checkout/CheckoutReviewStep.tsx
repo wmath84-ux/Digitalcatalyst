@@ -458,7 +458,7 @@ const FALLBACK_PLAN_NAMES: Record<string, string> = {
 };
 const FALLBACK_FEATURE_NAMES: Record<string, string> = {
   "my-day": "My Day cloud saving",
-  revision: "Revision Studio",
+  revision: "Roman AI Pro",
 };
 
 export function SubscriptionUnlocksCard({
