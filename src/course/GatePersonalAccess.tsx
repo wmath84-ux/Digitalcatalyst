@@ -40,8 +40,17 @@ export default function GatePersonalAccess({ fileId, fileUrl, fileName, productI
     }
     const resolvedFileId = String(fileId || "").trim() || (() => {
       const url = String(fileUrl || "");
-      const m = url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/i) || url.match(/[?&]id=([^&#]+)/i);
-      return m ? m[1] : "";
+      // Handle all Google file URL patterns:
+      //   docs.google.com/document/d/<id>/...
+      //   docs.google.com/spreadsheets/d/<id>/...
+      //   docs.google.com/presentation/d/<id>/...
+      //   docs.google.com/forms/d/<id>/...  (or /d/e/<id>/...)
+      //   drive.google.com/file/d/<id>/...
+      //   ?id=<id>  (query param fallback)
+      const m = url.match(/docs\.google\.com\/(document|spreadsheets|presentation|forms)\/d\/(?:e\/)?([^/?#]+)/i)
+        || url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/i)
+        || url.match(/[?&]id=([^&#]+)/i);
+      return m ? (m[2] || m[1]) : "";
     })();
     if (!resolvedFileId) {
       setError("No file to gate — open a lesson file first.");

@@ -414,17 +414,24 @@ export default function PlayerPanel({
         </p>
       </div>
 
-      {/* P1: Gate personal access — simple email gate, no OAuth */}
-      <SectionLabel>Gate personal access</SectionLabel>
-      <div className="px-2 pb-2">
-        <GatePersonalAccess
-          fileId={gateFile?.id || null}
-          fileUrl={gateFile?.url || null}
-          fileName={gateFile?.name || null}
-          productId={productId}
-          moduleId={moduleId}
-        />
-      </div>
+      {/* P1: Gate personal access — simple email gate, no OAuth.
+          Only shown for Google file types (Docs, Sheets, Slides, PDF/Drive)
+          that support duplication via Drive files.copy. Other types (YouTube,
+          embeds, direct files) have no Drive source to clone. */}
+      {gateFile ? (
+        <>
+          <SectionLabel>Gate personal access</SectionLabel>
+          <div className="px-2 pb-2">
+            <GatePersonalAccess
+              fileId={gateFile?.id || null}
+              fileUrl={gateFile?.url || null}
+              fileName={gateFile?.name || null}
+              productId={productId}
+              moduleId={moduleId}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

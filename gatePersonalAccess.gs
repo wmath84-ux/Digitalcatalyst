@@ -37,7 +37,7 @@ function doPost(e) {
     var fileName = String(body.fileName || body.name || "").trim().slice(0, 240);
     var folderId = String(body.folderId || body.folder || "").trim();
 
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json_({ ok: false, error: "Invalid email" }, 400);
     }
     if (!fileId) {
