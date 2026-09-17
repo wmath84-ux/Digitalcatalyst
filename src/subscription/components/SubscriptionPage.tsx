@@ -1402,9 +1402,22 @@ export default function SubscriptionPage({
               totalPaise={totalPaise}
             />
             </div>
-            {/* P1-2: alag card below Summary — exactly mobile_pricing_page.html colors — keep existing summary */}
+            {/* P1-2: alag card below Summary — exactly mobile_pricing_page.html colors — keep existing summary.
+                Now driven by the live selection: plan name, cycle, prices and
+                features update the instant the buyer changes anything. */}
             <div className="px-5 pt-3">
-              <PricingGlassCard />
+              <PricingGlassCard
+                planName={plan?.name ?? null}
+                planBadge={plan?.badge ?? null}
+                planDescription={plan?.description ?? null}
+                monthlyPricePaise={plan?.monthlyPricePaise ?? 0}
+                yearlyPricePaise={plan?.yearlyPricePaise ?? 0}
+                cycle={cycle}
+                features={offeredFeatures.map((f) => ({
+                  name: f.name,
+                  included: includedFeatureIds.has(f.id),
+                }))}
+              />
             </div>
             </Step>
 

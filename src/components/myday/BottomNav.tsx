@@ -1,4 +1,4 @@
-import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
+import { Bell, CalendarClock, ClipboardList, Home, NotebookPen } from "lucide-react";
 import SiteFooterNav from "../SiteFooterNav";
 import { type GlassDockItem } from "../glass-dock/GlassDock";
 
@@ -9,7 +9,6 @@ interface BottomNavProps {
 
 const items = [
   { id: "home", label: "Home", icon: Home, color: "#FFBE0B" },
-  { id: "overview", label: "Day", icon: LayoutGrid, color: "#06D6A0" },
   { id: "tasks", label: "Tasks", icon: ClipboardList, color: "#FF7B54" },
   { id: "schedule", label: "Schedule", icon: CalendarClock, color: "#C9A96E" },
   { id: "reminders", label: "Remind", icon: Bell, color: "#FF5C8A" },

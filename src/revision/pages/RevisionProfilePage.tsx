@@ -138,7 +138,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <GlassSurface tint={0.4} radius={20} className="rev-card dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3 text-center lg:rounded-xl lg:py-2.5 lg:gap-0.5">
+    <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className="rev-card dc-rev-glass text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3 text-center lg:rounded-xl lg:py-2.5 lg:gap-0.5">
       {icon}
       <span className="text-base font-bold text-white lg:text-sm">{value}</span>
       <span className="text-[10px] font-medium text-white/55 lg:text-[9px]">{label}</span>
