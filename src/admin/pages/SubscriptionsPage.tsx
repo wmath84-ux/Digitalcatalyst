@@ -803,6 +803,11 @@ export default function SubscriptionsPage() {
                         }}
                       />
                     </Field>
+                    <p className="mt-1 text-[10px] text-slate-500" data-admin-ai-cap-note>
+                      Value yahan save hoti hai. Aaj ka AI limit plan ki AI allowance se lagta hai —
+                      daily token budget + daily generation limit (Step C) aur catalog ke
+                      <code className="mx-1">aiSettings</code> window/daily caps.
+                    </p>
                   </div>
                 );
               })}
@@ -1204,7 +1209,11 @@ export default function SubscriptionsPage() {
 
               <div className="mt-3 space-y-2">
                 <p className="text-[11px] font-semibold text-slate-700">Subscriber-only price (₹)</p>
-                <p className="text-[10px] text-slate-500">Blank = use the public price above. Set ₹0 to make the renewal/upgrade free for active members.</p>
+                <p className="text-[10px] text-slate-500">
+                  Blank = use the public price above. Only active subscribers ever see (and pay) this
+                  price. Leave a cycle blank to keep the public price for it; ₹0 is treated as blank.
+                  This plan-sheet value wins over the gate matrix below.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Subscriber monthly (₹)">
                     <input
@@ -1521,6 +1530,10 @@ export default function SubscriptionsPage() {
               <div className="mt-3 space-y-2">
                 <p className="text-[11px] font-semibold text-slate-700">User limit (per billing cycle)</p>
                 <p className="text-[10px] text-slate-500">Subscriber ke liye is feature ka cap. -1 = unlimited. Profile page par dikhega.</p>
+                <p className="text-[10px] text-slate-500" data-admin-feature-ai-cap-note>
+                  Value save hoti hai. AI ka asli cap plan ki daily token budget / daily generation
+                  limit (Step C) aur catalog ke <code className="mx-1">aiSettings</code> se lagta hai.
+                </p>
                 <Field label="AI questions per day" hint="Revision feature ke liye">
                   <input
                     className={inputClass}

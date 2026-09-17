@@ -228,12 +228,25 @@ test("useRevisionAccess exposes a `hidden` flag driven by visibilityMode", () =>
   assert.match(
     revisionHook,
     /setHidden\(visibilityMode\s*===\s*"hide"\s*&&\s*!paid\)/,
-    "useRevisionAccess returns hidden=true only when hide mode AND not paid",
+    "the per-doc mode still drives the legacy hidden flag",
+  );
+  // ...and the gate matrix (per-feature `gated` / `hideFromNonSubscribers`, the
+  // global kill switch, the per-plan `tiers` toggle) is folded in through the
+  // SAME shared rule the server uses, so the admin's toggle reaches the rail.
+  assert.match(
+    revisionHook,
+    /import \{ isFeatureHiddenForAudience \} from "\.\.\/\.\.\/utils\/subscriptionVisibility\.js"/,
   );
   assert.match(
     revisionHook,
-    /return\s*\{\s*hasAccess,\s*hidden,\s*loading/,
-    "useRevisionAccess returns { hasAccess, hidden, loading }",
+    /const hiddenByGate = isFeatureHiddenForAudience\(/,
+    "useRevisionAccess consults the shared audience rule",
+  );
+  assert.match(revisionHook, /currentPlanId/, "the per-plan tier needs the learner's plan");
+  assert.match(
+    revisionHook,
+    /return\s*\{\s*hasAccess,\s*hidden:\s*hidden\s*\|\|\s*hiddenByGate,\s*loading/,
+    "useRevisionAccess returns { hasAccess, hidden, loading } with the gate applied",
   );
 });
 
@@ -269,8 +282,8 @@ test("api myday endpoint returns the `hidden` flag computed from the feature's v
   );
   assert.match(
     myDayServer,
-    /const\s+hidden\s*=\s*visibilityMode\s*===\s*"hide"\s*&&\s*!paid/,
-    "api/_lib/myDay.ts returns hidden=true only when hide mode AND not paid",
+    /const\s+hidden\s*=\s*!paid\s*&&\s*\(tierFlag\s*===\s*true\s*\|\|\s*\(tierFlag\s*!==\s*false\s*&&\s*visibilityMode\s*===\s*"hide"\)\)/,
+    "api/_lib/myDay.ts returns hidden=true for a non-paid learner when the mode says hide, with the per-plan tier override applied",
   );
   assert.match(
     myDayServer,

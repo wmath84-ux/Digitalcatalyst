@@ -37,6 +37,12 @@ export interface LumenChatProps {
   selectedFile?: CourseFile | null;
   notes?: CoursePlayerNote[];
   profile?: { name: string; photoURL?: string };
+  /**
+   * Opens the subscription page. Passed down to the error card so a plan
+   * problem ("needs an active subscription") offers the one action that
+   * actually fixes it instead of a dead end.
+   */
+  onOpenSubscription?: () => void;
 }
 
 const asPersonalId = (value?: string | null): string | undefined => {
@@ -84,6 +90,7 @@ function LumenChatInner({
   selectedFile = null,
   notes = [],
   profile,
+  onOpenSubscription,
 }: LumenChatProps) {
   const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
@@ -652,6 +659,7 @@ function LumenChatInner({
             onQuizAnswer={cbQuizAnswer}
             onQuizSubmit={cbQuizSubmit}
             onFollowUp={cbFollowUp}
+            onOpenPlans={onOpenSubscription}
           />
 
           <Composer

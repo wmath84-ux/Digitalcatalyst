@@ -11,6 +11,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { defaultAiDailyTokensForPlan, formatAiDailyTokens } from "../../../utils/aiAllowances.js";
+import { planVisibleCycles, type VisibilityGateRow } from "../../../utils/subscriptionVisibility";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
@@ -48,6 +49,12 @@ interface Props {
   subscriberPriceRupees?: number | null;
   /** True when the visitor has an active subscription. */
   isSubscriber?: boolean;
+  /**
+   * `settings/subscriptionGate.planVisibility` — the admin's per-plan,
+   * per-cycle switch. Passed in so the Monthly/Yearly toggle offers exactly
+   * the cycles the page (and the quote) will accept.
+   */
+  gatePlanRows?: Record<string, VisibilityGateRow> | null;
 }
 
 export default function PlanOverview({
@@ -63,11 +70,15 @@ export default function PlanOverview({
   ownedCycle = null,
   subscriberPriceRupees = null,
   isSubscriber = false,
+  gatePlanRows = null,
 }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const activePlan = plans.find((p) => p.id === selectedPlanId) || null;
+  // The admin's per-cycle visibility for this plan (non-subscribers only) —
+  // the same helper the page and the server use, so the toggle can never offer
+  // a cycle the quote would refuse.
   const supportedCycles: BillingCycle[] = activePlan
-    ? activePlan.allowedCycles.filter((c): c is BillingCycle => c === "monthly" || c === "yearly")
+    ? planVisibleCycles(activePlan, { isSubscriber, gateRows: gatePlanRows })
     : ["monthly", "yearly"];
   const totalRupees = (totalPaise / 100).toFixed(2);
 
@@ -221,8 +232,8 @@ export default function PlanOverview({
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-sm">🧠</span>
             <span>
               {activePlan.revisionTestBankLimits?.[cycle] === -1
-                ? "With Revision Studio: unlimited cloud-saved tests"
-                : `With Revision Studio: save up to ${activePlan.revisionTestBankLimits?.[cycle] ?? 20} tests in your cloud Test Bank`}
+                ? "With Roman AI Pro: unlimited cloud-saved tests"
+                : `With Roman AI Pro: save up to ${activePlan.revisionTestBankLimits?.[cycle] ?? 20} tests in your cloud Test Bank`}
             </span>
           </div>
         ) : null}
@@ -235,15 +246,21 @@ export default function PlanOverview({
                 const allowance = activePlan.aiAllowances?.[cycle];
                 const tokens = allowance?.dailyTokenBudget ?? defaultAiDailyTokensForPlan(activePlan.id);
                 const generations = allowance?.dailyGenerationLimit ?? 20;
+                // Plain language on purpose: the old line ("… tokens/day counted
+                // from real model usage … when hybrid metering is enabled") was
+                // written for an engineer, not for the buyer.
                 return (
-                  <>
-                    School AI: {tokens < 0 ? "unlimited tokens" : `${formatAiDailyTokens(tokens)} tokens`}/day, counted from real model usage and reset at your midnight
+                  <span data-plan-ai-allowance>
+                    <strong className="font-black">Roman AI Pro is included</strong>
+                    {" — "}
+                    {tokens < 0 ? "unlimited questions" : `about ${formatAiDailyTokens(tokens)} tokens of AI help`} every day
                     {" · "}
-                    {generations === 0 ? "unlimited" : `${generations} successful tests/day`} when the school counts generations
-                    {(allowance?.costBudgetMicros ?? -1) >= 0
-                      ? ` · $${((allowance?.costBudgetMicros ?? 0) / 1_000_000).toFixed(2)} model-cost budget per term when hybrid metering is enabled`
-                      : ""}
-                  </>
+                    {generations === 0 ? "unlimited" : `${generations} AI tests`} per day
+                    {(allowance?.costBudgetMicros ?? -1) >= 0 ? " · fair-use cost limit applies for the term" : ""}
+                    <span className="block text-[10px] font-semibold text-violet-200/80">
+                      Everything resets at midnight (your local time). Failed or cancelled requests are never counted.
+                    </span>
+                  </span>
                 );
               })()}
             </span>

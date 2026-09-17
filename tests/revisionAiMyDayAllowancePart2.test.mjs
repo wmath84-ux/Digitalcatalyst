@@ -97,9 +97,12 @@ test("every layer that states the limit states the same one", () => {
   assert.match(fallback, /dailyTokenBudget: 2_000_000/);
   assert.match(fallback, /dailyTokenBudget: 5_000_000/);
   assert.match(fallback, /dailyTokenBudget: 10_000_000/);
-  // The learner-facing plan overview leads with the active allowance.
+  // The learner-facing plan overview leads with the active allowance, in plain
+  // language (the old "counted from real model usage … hybrid metering" line was
+  // engineering jargon the owner asked to replace).
   const overview = read("../src/subscription/components/PlanOverview.tsx");
-  assert.match(overview, /\/day, counted from real model usage and reset at your midnight/);
+  assert.match(overview, /formatAiDailyTokens\(tokens\)/);
+  assert.match(overview, /Everything resets at midnight \(your local time\)\. Failed or cancelled requests are never counted\./);
   // The profile card follows the enforced kind instead of assuming the count.
   const card = read("../src/components/AiQuotaCard.tsx");
   assert.match(card, /snap\.tokensEnabled/);

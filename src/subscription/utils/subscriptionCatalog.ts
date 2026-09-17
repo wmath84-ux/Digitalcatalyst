@@ -49,6 +49,18 @@ export interface SubscriptionPlanDoc {
   /** Cloud Test Bank capacity per billing duration (-1 = unlimited). */
   revisionTestBankLimits: { monthly: number; yearly: number };
   /**
+   * Cycles a NON-subscriber may pick this plan on. The admin sets this per
+   * plan; the page hides the other cycle from the toggle and the quote engine
+   * refuses it, so display and charge agree.
+   */
+  visibleCycles?: import("../../../utils/subscriptionVisibility").SubscriptionVisibilityCycle[] | null;
+  /** Plan-doc copy of the subscriber-only price (null when unset). */
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null } | null;
+  /** Display metadata the admin stores on the plan. */
+  featured?: boolean;
+  cta?: string | null;
+  accessTier?: string | null;
+  /**
    * School-AI allowances for this plan: the daily successful-test count, the
    * per-term model-cost budget, and the active daily real-token budget
    * (`dailyTokenBudget`, counted server-side from the provider's usage report
@@ -89,6 +101,16 @@ export interface SubscriptionFeatureDoc {
   sortOrder: number;
   /** Non-subscriber daily free creations (My Day only). */
   freeItemsPerDay?: number | null;
+  /** Cycles a NON-subscriber may pick this feature on (admin visibility control). */
+  visibleCycles?: import("../../../utils/subscriptionVisibility").SubscriptionVisibilityCycle[] | null;
+  /** Plans this feature is removed from outright. */
+  hiddenPlanIds?: string[] | null;
+  /** "gate" keeps the feature behind the paywall; "hide" removes the row. */
+  visibilityMode?: "gate" | "hide";
+  /** Subscriber-only price from the feature doc, when the admin set one. */
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null } | null;
+  /** Per-feature usage cap, when the admin set one. */
+  userLimit?: { aiQuestionsPerDay: number | null } | null;
 }
 
 /** Server-normalised plan-to-product unlock (Firestore

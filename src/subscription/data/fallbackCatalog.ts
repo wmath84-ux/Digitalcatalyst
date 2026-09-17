@@ -85,7 +85,7 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
     },
     {
       id: "revision",
-      name: "Revision Studio",
+      name: "Roman AI Pro",
       description: "Daily tests, smart revision sessions, weak-topic detection and progress analytics.",
       icon: "brain",
       pricePaise: 14900,

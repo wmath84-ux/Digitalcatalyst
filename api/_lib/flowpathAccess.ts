@@ -91,7 +91,7 @@ export async function resolveFlowPathAccess(
       return {
         status: 403,
         code: "PLAN_REQUIRED",
-        error: "Revision Studio is not configured on this account. Subscribers can create revision tests; the public preview is browse-only.",
+        error: "Roman AI Pro is not configured on this account. Subscribers can create revision tests; the public preview is browse-only.",
         canCreate: true,
         planId: "basic",
         planName: "Basic",
@@ -108,7 +108,7 @@ export async function resolveFlowPathAccess(
       return {
         status: 403,
         code: "PLAN_REQUIRED",
-        error: "Creating a Revision test requires an active Revision Studio subscription. Subscribe from the Subscription page to continue.",
+        error: "Creating a Revision test requires an active Roman AI Pro subscription. Subscribe from the Subscription page to continue.",
         canCreate: false,
         planId: text(sub.planId, 100) || "basic",
         planName: text(sub.planName, 100) || text(sub.planId, 100) || "Basic",

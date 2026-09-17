@@ -735,7 +735,7 @@ function usageSnapshot(
   // this single request is simply bigger than what is left.
   let blockedCode: string | null = null;
   if (!policy.hasAccess) {
-    blockedReason = "An active Revision Studio subscription is required to generate a new test.";
+    blockedReason = "An active Roman AI Pro subscription is required to generate a new test.";
     blockedCode = "REVISION_SUBSCRIPTION_REQUIRED";
   }
   else if (policy.tokenBudgetEnabled && tokensBudget >= 0 && tokensUsedDay >= tokensBudget) {
@@ -831,7 +831,7 @@ async function reserveUsage(
   estimatedOutputTokens: number,
   tzOffsetMinutes: number,
 ): Promise<UsageReservation> {
-  if (!policy.hasAccess) throw Object.assign(new Error("An active Revision Studio subscription is required to generate a new test."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
+  if (!policy.hasAccess) throw Object.assign(new Error("An active Roman AI Pro subscription is required to generate a new test."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
   if (policy.costEnabled && !price) {
     throw Object.assign(new Error("School AI pricing is not configured for this model. Ask Admin to publish input/output token pricing, or use your own API key."), { statusCode: 409, code: "AI_MODEL_PRICE_MISSING" });
   }
@@ -1386,7 +1386,7 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
     const aiSettings = asRecord(asRecord(catalogSnap.data()).aiSettings);
     const policy = await resolveEffectiveAiPolicy(user.uid, aiSettings);
     if (!policy.hasAccess) {
-      throw Object.assign(new Error("An active Revision Studio subscription is required to generate a new test. Your saved tests and results remain available."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
+      throw Object.assign(new Error("An active Roman AI Pro subscription is required to generate a new test. Your saved tests and results remain available."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
     }
 
     const origin = firstHeader(req.headers, "origin") || firstHeader(req.headers, "referer") || "";

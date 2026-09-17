@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 
+// The gate module delegates its price arithmetic to the shared runtime helper
+// (`utils/subscriptionPricing.js`) so the server, the quote and the client page
+// keep one implementation. The transpile harness below hands it this import.
+import { resolveSubscriberOnlyPrice as sharedResolveSubscriberOnlyPrice } from "../utils/subscriptionPricing.js";
+
 const require = createRequire(import.meta.url);
 const source = fs.readFileSync(new URL("../api/_lib/subscriptionGate.ts", import.meta.url), "utf8");
 
@@ -30,6 +35,9 @@ async function loadGate(t, getSnapshot) {
   }).outputText;
   new Function("require", "exports", output)((specifier) => {
     if (specifier === "./firebaseAdmin.js") return { adminDb: () => ({ doc }) };
+    if (specifier === "../../utils/subscriptionPricing.js") {
+      return { resolveSubscriberOnlyPrice: sharedResolveSubscriberOnlyPrice };
+    }
     return require(specifier);
   }, exports);
   return { ...exports, doc, get };

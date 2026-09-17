@@ -1,7 +1,7 @@
 // src/components/subscription/PremiumGate.tsx
 //
 // Unified premium subscription gate – same beautiful design used for
-// Revision Studio and My Day. Supports two modes:
+// Roman AI Pro and My Day. Supports two modes:
 //   - page  : full-screen flex-1 scroll (legacy lock screen)
 //   - modal : centered overlay with backdrop, closable
 //
@@ -217,7 +217,7 @@ function GateContent({
                 <>
                   {userName ? `${userName}, ` : ""}aapki{" "}
                   <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-                    Revision Studio
+                    Roman AI Pro
                   </span>{" "}
                   membership Plus+ me hai
                 </>
@@ -312,8 +312,8 @@ function GateContent({
             </h2>
             <p className="mt-1.5 text-[clamp(11px,2vw,13px)] leading-relaxed text-white/75">
               {isMyDay
-                ? "Subscribe karte hi My Day fully unlock — unlimited tasks, smart schedule, reminders aur notes ka cloud save. Plus Revision Studio ka full access."
-                : "Subscribe karte hi Revision Studio fully unlock — daily tests, smart sessions, weak-topic analytics, plus My Day ka full access."}
+                ? "Subscribe karte hi My Day fully unlock — unlimited tasks, smart schedule, reminders aur notes ka cloud save. Plus Roman AI Pro ka full access."
+                : "Subscribe karte hi Roman AI Pro fully unlock — daily tests, smart sessions, weak-topic analytics, plus My Day ka full access."}
             </p>
 
             {/* Tier comparison */}
@@ -433,7 +433,7 @@ export default function PremiumGate({
     <GlassSheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <GlassSheetContent
         side="bottom"
-        aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
+        aria-label={variant === "myday" ? "My Day Premium" : "Roman AI Pro subscription"}
         data-premium-gate-modal
         className="dc-scene-plate dc-premium-modal-inner right-0 mx-auto flex h-auto min-h-0 w-full [width:min(100vw,640px)] flex-col text-white"
       >

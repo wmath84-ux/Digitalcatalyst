@@ -267,7 +267,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             ) : (
               <p className="mt-4 text-xs leading-5 text-white/75">
                 {snap.tokensEnabled
-                  ? "Tokens are counted from the provider's own usage report for every school-AI request you make — Revision tests and the AI Mentor alike. Failed or incomplete requests are not charged, and the budget resets at midnight your local time."
+                  ? "Tokens are counted from the provider's own usage report for every school-AI request you make — Revision tests and Roman AI Pro alike. Failed or incomplete requests are not charged, and the budget resets at midnight your local time."
                   : "One complete school-AI test uses one generation. Provider failure, incomplete output and your own API key do not use this allowance."}
               </p>
             )}

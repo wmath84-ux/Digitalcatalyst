@@ -40,6 +40,51 @@ export function resolveSubscriberOnlyPrice(
   return Number(candidate);
 }
 
+/**
+ * Two admin surfaces may carry a subscriber-only price for the same plan:
+ * the plan sheet (`plan.subscriberPricingOverride`) and the gate matrix
+ * (`settings/subscriptionGate.subscriberPricing[planId]`). Before this helper
+ * only the gate value was ever read, so a number typed in the plan sheet did
+ * nothing. The plan's own field is the more specific edit, so it wins per
+ * cycle and the gate value is the fallback. An empty box means "not set" —
+ * never "free" — so it never erases the other surface's number.
+ */
+
+export function mergeSubscriberPricing(
+  planOverride: Partial<SubscriberPricingOverride> | null | undefined,
+  gateOverride: Partial<SubscriberPricingOverride> | null | undefined,
+): SubscriberPricingOverride {
+  const positive = (value: number | null | undefined): number | null => {
+    if (value === null || value === undefined) return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : null;
+  };
+  const plan = planOverride && typeof planOverride === "object" ? planOverride : {};
+  const gate = gateOverride && typeof gateOverride === "object" ? gateOverride : {};
+  return {
+    monthly: positive(plan.monthly) ?? positive(gate.monthly) ?? null,
+    yearly: positive(plan.yearly) ?? positive(gate.yearly) ?? null,
+    lifetime: positive(plan.lifetime) ?? positive(gate.lifetime) ?? null,
+  };
+}
+
+/**
+ * The effective subscriber price for one plan + cycle, resolving BOTH admin
+ * surfaces. Non-subscribers always get the public price (rule 1 above).
+ */
+export function resolveEffectiveSubscriberPrice(
+  planId: string,
+  cycle: Cycle,
+  basePrice: number,
+  isSubscriber: boolean,
+  planOverride: Partial<SubscriberPricingOverride> | null | undefined,
+  gatePricing: Record<string, Partial<SubscriberPricingOverride> | undefined> | null | undefined,
+): number {
+  const gateForPlan = gatePricing && typeof gatePricing === "object" ? gatePricing[planId] : null;
+  const merged = mergeSubscriberPricing(planOverride, gateForPlan);
+  return resolveSubscriberOnlyPrice(planId, cycle, basePrice, isSubscriber, { [String(planId)]: merged });
+}
+
 export function isPlanVisibleForAudience(
   planId: string,
   isSubscriber: boolean,

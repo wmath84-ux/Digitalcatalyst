@@ -757,11 +757,11 @@ interface ModelCall {
  * charged for an error.
  */
 /**
- * The AI Mentor subscription feature (`subscriptionFeatures/ai-mentor`).
+ * The Roman AI Pro subscription feature (`subscriptionFeatures/ai-mentor`).
  *
  * Until now the mentor inherited its entitlement from the Revision feature
- * alone, and the "AI Mentor" row on the subscription page was pure marketing
- * copy: `aiMentorLocked` is normalised in utils/subscriptionAccess.ts and read
+ * alone, and the "Roman AI Pro" row on the subscription page was pure marketing
+ * copy: `aiMentorLocked` is derived from the feature catalog and read
  * by nothing, so no plan actually gated it — any signed-in learner could use it
  * for free. This closes the loop without breaking anyone who already paid:
  *
@@ -770,12 +770,63 @@ interface ModelCall {
  *     accident.
  *   · feature doc present and active → the caller's subscription must unlock
  *     `ai-mentor`. A plan that unlocks `revision` also qualifies, so no
- *     Revision Studio subscriber loses the mentor mid-term.
+ *     Roman AI Pro subscriber loses the mentor mid-term.
  *
  * Checked here, at the single choke point every model call passes through, so a
  * client cannot skip it by choosing a different action.
  */
 const AI_MENTOR_FEATURE_ID = "ai-mentor";
+
+/** "12 Sep 2026" — the date a lapsed membership ended, for the copy below. */
+const readableDate = (ms: number): string => {
+  try {
+    return new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * What to tell a learner the subscription gate refused.
+ *
+ * The old copy said the plan's AI allowance wasn't active and told the learner
+ * to renew or upgrade to use the study engine on the modules. Every tester read
+ * that (correctly!) as "you used up your limit", and the player titled it
+ * "AI access limit reached".
+ * A learner with no subscription at all had never reached any limit, so the
+ * message has to name the real state instead:
+ *
+ *   · no membership on the account        → AI is a subscription feature
+ *   · membership cancelled / paused       → reactivate
+ *   · membership expired (with the date)  → renew
+ *   · active membership without the AI feature row → not included in that plan
+ *
+ * The error CODE stays `REVISION_SUBSCRIPTION_REQUIRED` so every existing
+ * client mapping (kind `entitlement`, `upgrade: true`) keeps working.
+ */
+export async function describeAiSubscriptionBlock(db: Db, uid: string, planName = ""): Promise<string> {
+  const fallback = "AI needs an active subscription. Start or renew a plan to use the AI assistant in this course — everything else in your account keeps working.";
+  try {
+    const snap = await db.collection("users").doc(uid).collection("subscription").doc("current").get();
+    if (!snap.exists) {
+      return "AI is a subscription feature, and this account has no active plan yet. Choose a plan to start asking questions about this course — your course access is not affected.";
+    }
+    const record = asRecord(snap.data());
+    const status = (text(record.status) || "active").toLowerCase();
+    const expiresAt = timestampMs(record.expiresAt);
+    if (status !== "active") {
+      return `Your subscription is ${status}. Reactivate a plan to use the AI assistant again — your saved chats, notes and course access are safe.`;
+    }
+    if (expiresAt > 0 && expiresAt <= Date.now()) {
+      return `Your subscription ended on ${readableDate(expiresAt)}. Renew it to use the AI assistant again — your saved chats, notes and course access are safe.`;
+    }
+    const plan = (planName || text(record.planName) || text(record.planId) || "your current plan").trim();
+    return `AI isn't included in ${plan}. Upgrade your plan to unlock the AI assistant for this course.`;
+  } catch {
+    // A read failure must never replace an honest paywall with a crash.
+    return fallback;
+  }
+}
 
 async function assertAiMentorEntitlement(db: Db, uid: string): Promise<void> {
   const [featureSnap, subscriptionSnap] = await Promise.all([
@@ -801,7 +852,7 @@ async function assertAiMentorEntitlement(db: Db, uid: string): Promise<void> {
   fail(
     403,
     "AI_MENTOR_PLAN_REQUIRED",
-    `AI Mentor isn't included in ${planName}. Upgrade your plan to unlock the AI study partner for your modules and course.`,
+    `Roman AI Pro isn't included in ${planName}. Upgrade your plan to unlock the AI study partner for your courses and modules.`,
   );
 }
 
@@ -818,11 +869,20 @@ async function groundedCompletion(input: {
   const { uid, req, body, prompt, grounding } = input;
   const aiSettings = await loadAiSettings();
   const policy: RevisionAiPolicy = await resolveEffectiveAiPolicy(uid, aiSettings);
-  if (!policy.hasAccess) {
-    fail(403, "REVISION_SUBSCRIPTION_REQUIRED", "Your plan's AI allowance isn't active. Renew or upgrade to use the AI study engine on your modules.");
-  }
-  await assertAiMentorEntitlement(adminDb(), uid);
   const requestedSource = body.source === "own" ? "own" : "default";
+  // Subscription gate — SCHOOL/SHARED AI ONLY. A learner who brings their own
+  // provider key pays the model bill on their own account, so the plan is not
+  // charged and must not be required either: they choose "My own API key" in AI
+  // Configuration and the assistant answers. The school key stays a paid
+  // feature, because that is the one the institute is billed for.
+  if (requestedSource !== "own") {
+    if (!policy.hasAccess) {
+      // Name the actual state (no plan / ended plan / not in this plan) instead of
+      // the old "allowance isn't active", which every learner read as "limit used up".
+      fail(403, "REVISION_SUBSCRIPTION_REQUIRED", await describeAiSubscriptionBlock(adminDb(), uid, policy.planName));
+    }
+    await assertAiMentorEntitlement(adminDb(), uid);
+  }
   let config: RevisionAiConfig;
   if (requestedSource === "own") {
     let own: RevisionAiConfig | null;
@@ -956,6 +1016,14 @@ async function handleContext(db: Db, uid: string, body: Body) {
   const artifacts = await listArtifacts(db, uid, scope.storageModuleId);
   const source = body.source === "own" ? "own" : "default";
   const configured = source === "own" ? Boolean(parseOwnConfig(body.config, false)) : Boolean(text(asRecord(aiSettings).sharedApiKey)) && Boolean(text(asRecord(aiSettings).model));
+  // "My own API key" is exempt (see `groundedCompletion`): the learner pays the
+  // provider directly, so the plan requirement — and the shared ledger's
+  // blocked state — must not be reported as a wall in the module-AI paywall.
+  const ownKeyExempt = source === "own";
+  const planAllowsAi = policy.hasAccess || ownKeyExempt;
+  // The gate copy is resolved once, and only for a learner it actually blocks:
+  // "no plan yet" and "plan ended on <date>" must not read the same.
+  const accessBlockedReason = planAllowsAi ? "" : await describeAiSubscriptionBlock(db, uid, policy.planName);
   return {
     scope: {
       moduleId: scope.moduleId,
@@ -980,18 +1048,20 @@ async function handleContext(db: Db, uid: string, body: Body) {
     ai: {
       source,
       configured,
-      hasAccess: policy.hasAccess,
+      hasAccess: planAllowsAi,
       planId: policy.planId,
       planName: policy.planName,
       cycle: policy.cycle,
       dailyLimit: policy.dailyLimit,
       windowLimit: policy.windowLimit,
-      allowed: configured && policy.hasAccess && (asRecord(usage).allowed !== false),
-      blockedReason: !policy.hasAccess
-        ? "Your plan's AI allowance isn't active. Renew or upgrade to use the AI study engine."
+      allowed: configured && planAllowsAi && (ownKeyExempt || asRecord(usage).allowed !== false),
+      blockedReason: !planAllowsAi
+        ? accessBlockedReason
         : !configured
           ? "No AI provider is connected yet."
-          : text(asRecord(usage).blockedReason) || null,
+          : ownKeyExempt
+            ? null
+            : text(asRecord(usage).blockedReason) || null,
       usage,
     },
     unreadable: content.availability

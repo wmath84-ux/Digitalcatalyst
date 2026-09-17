@@ -232,7 +232,10 @@ test("buildSubscriptionLineItems honours the yearly override", () => {
 test("SubscriptionPage prices features through the shared resolver", () => {
   const source = readSource("src/subscription/components/SubscriptionPage.tsx");
   assert.match(source, /resolveFeaturesForPlan/);
-  assert.match(source, /sumSelectedFeaturePaise\(rawFeatures, chargeableFeatureIds, selectedPlanId, cycle\)/);
+  // The total is summed over the features this plan + cycle actually offers
+  // (`offeredFeatures` = catalog narrowed by the admin's per-cycle visibility),
+  // so the Monthly/Yearly toggle moves the totals too.
+  assert.match(source, /sumSelectedFeaturePaise\(offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle\)/);
   assert.match(source, /groupFeaturesByPriceTier/);
 });
 

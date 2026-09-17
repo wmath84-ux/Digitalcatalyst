@@ -389,7 +389,7 @@ export default function RevisionApp() {
                 setPaywallOpen(false);
                 window.location.hash = "#/subscription";
               }}
-              subtitle="Naya AI ya imported revision test cloud Test Bank mein save karne ke liye active Revision Studio access chahiye. Aapke existing tests, results aur retakes hamesha available rahenge."
+              subtitle="Naya AI ya imported revision test cloud Test Bank mein save karne ke liye active Roman AI Pro access chahiye. Aapke existing tests, results aur retakes hamesha available rahenge."
             />
           </RevisionHeaderProvider>
         </ExitGuardProvider>

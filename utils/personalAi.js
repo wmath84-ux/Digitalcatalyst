@@ -1233,13 +1233,17 @@ export const personalAiFailure = (input) => {
       // bigger than the whole remaining day can be trimmed by asking for less.
       case "AI_TOKEN_BUDGET_REACHED":
         return { message: message || "Today's AI token budget is used up. It resets at midnight your local time — or upgrade for a larger daily budget.", retryable: false, upgrade: true, kind: "limit" };
-      // AI Mentor is gated by its own subscription feature (ai-mentor).
+      // Roman AI Pro is gated by its own subscription feature (ai-mentor).
       case "AI_MENTOR_PLAN_REQUIRED":
-        return { message: message || "AI Mentor isn't included in your current plan. Upgrade to unlock it.", retryable: false, upgrade: true, kind: "entitlement" };
+        return { message: message || "Roman AI Pro isn't included in your current plan. Upgrade to unlock the AI study partner for this course.", retryable: false, upgrade: true, kind: "entitlement" };
+      // The learner has no usable membership at all (never bought, lapsed, or
+      // the plan does not carry AI). The server sends the specific reason —
+      // "no active plan yet", "ended on 12 Sep 2026", "isn't included in Pro" —
+      // so this fallback must never claim a limit was reached.
       case "REVISION_SUBSCRIPTION_REQUIRED":
       case "PLAN_REQUIRED":
       case "ENTITLEMENT_REQUIRED":
-        return { message: message || "An active subscription is required for the AI study engine.", retryable: false, upgrade: true, kind: "entitlement" };
+        return { message: message || "AI needs an active subscription. Start or renew a plan to use the AI assistant — your course access is not affected.", retryable: false, upgrade: true, kind: "entitlement" };
       case "AI_NOT_CONFIGURED":
       case "AI_SCHOOL_NOT_PUBLISHED":
         return { message: message || "No AI provider is connected yet. Connect one in Revision → AI Configuration, or ask your institute to publish the shared AI.", retryable: false, upgrade: false, kind: "config" };

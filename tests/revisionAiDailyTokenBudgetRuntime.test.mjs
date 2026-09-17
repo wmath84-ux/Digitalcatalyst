@@ -408,7 +408,7 @@ test("crossing midnight mid-generation cannot re-charge yesterday's tokens", { s
   assert.equal(final.tokensUsedDay, 1_000, "yesterday's 1.99M never joined today's total");
 });
 
-test("the AI Mentor gate is enforced server-side in the one place every model call passes", () => {
+test("the subscription gate is enforced server-side for school AI, and own keys are exempt", () => {
   // The entitlement cannot live in the browser: `groundedCompletion` is the
   // single choke point both `personalAi.ask` and `personalAi.generate` funnel
   // through, so the check cannot be skipped by calling another action.
@@ -420,10 +420,23 @@ test("the AI Mentor gate is enforced server-side in the one place every model ca
     "an unconfigured or deactivated feature keeps today's open behaviour");
   assert.match(gate, /AI_MENTOR_FEATURE_ID\)/, "the plan's own feature list decides");
   assert.match(gate, /403,\s*\n\s*"AI_MENTOR_PLAN_REQUIRED"/);
+
   const grounded = personalAi.slice(personalAi.indexOf("async function groundedCompletion"));
-  const callSite = grounded.slice(0, grounded.indexOf("const requestedSource"));
-  assert.match(callSite, /await assertAiMentorEntitlement\(adminDb\(\), uid\);/, "checked before any provider call");
-  assert.match(callSite, /if \(!policy\.hasAccess\)/, "after the allowance access check");
+  const callSite = grounded.slice(0, grounded.indexOf("let config: RevisionAiConfig;"));
+  // Both subscription checks sit INSIDE the school-AI branch: a learner who
+  // brings their own provider key pays the model bill themselves, so the plan
+  // is neither charged nor required.
+  assert.match(callSite, /const requestedSource = body\.source === "own" \? "own" : "default";/);
+  assert.match(callSite, /if \(requestedSource !== "own"\) \{/);
+  const planGate = callSite.slice(callSite.indexOf('if (requestedSource !== "own")'));
+  assert.match(planGate, /if \(!policy\.hasAccess\)/, "the plan check guards the school key");
+  assert.match(planGate, /await assertAiMentorEntitlement\(adminDb\(\), uid\);/, "checked before any provider call");
+
+  // The paywall the module-AI screens render follows the same rule.
+  assert.match(personalAi, /const ownKeyExempt = source === "own";/);
+  assert.match(personalAi, /const planAllowsAi = policy\.hasAccess \|\| ownKeyExempt;/);
+  assert.match(personalAi, /hasAccess: planAllowsAi,/);
+  assert.match(personalAi, /allowed: configured && planAllowsAi && \(ownKeyExempt \|\| asRecord\(usage\)\.allowed !== false\)/);
 
   // The client only ever receives a mapped failure, never a trust-me flag.
   const client = fs.readFileSync(path.join(ROOT, "utils/personalAi.js"), "utf8");
@@ -432,7 +445,7 @@ test("the AI Mentor gate is enforced server-side in the one place every model ca
 });
 
 /* ------------------------------------------------------------------ */
-/*  The AI Mentor subscription gate, driven through the real handler   */
+/*  The Roman AI Pro subscription gate, driven through the real handler */
 /* ------------------------------------------------------------------ */
 
 function fakeRes() {
@@ -447,7 +460,7 @@ function fakeRes() {
   return { res, out };
 }
 
-/** One AI Mentor question, asked the way the course player asks it. */
+/** One Roman AI Pro question, asked the way the course player asks it. */
 async function askMentor(uid = "learner-1", overrides = {}) {
   const { res, out } = fakeRes();
   await personalAi.handlePersonalAi({
@@ -476,13 +489,13 @@ test("the mentor stays open while the school has not configured the feature", { 
 });
 
 test("activating the feature gates the mentor on the server, not the browser", { skip: skipIfUnloaded }, async () => {
-  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "AI Mentor", active: true });
+  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "Roman AI Pro", active: true });
   store.delete("users/learner-1/subscription/current");
 
   const out = await askMentor();
   assert.equal(out.status, 403);
   assert.equal(out.body.code, "AI_MENTOR_PLAN_REQUIRED");
-  assert.match(out.body.message, /AI Mentor isn't included/);
+  assert.match(out.body.message, /Roman AI Pro isn't included/);
   // The client mapper ran on the server too, so the player gets an actionable
   // failure shape instead of a raw 403.
   assert.equal(out.body.upgrade, true, "the UI is told to offer an upgrade");
@@ -493,9 +506,9 @@ test("activating the feature gates the mentor on the server, not the browser", {
 });
 
 test("which plan unlocks the mentor is the plan's own feature list", { skip: skipIfUnloaded }, async () => {
-  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "AI Mentor", active: true });
+  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "Roman AI Pro", active: true });
 
-  // Revision Studio without the mentor feature: the entitlement is per plan, so
+  // Roman AI Pro without the mentor feature: the entitlement is per plan, so
   // a plan that does not ship `ai-mentor` does not get the model call.
   seed("users/learner-1/subscription/current", {
     ...ACTIVE_BASIC,
@@ -532,7 +545,7 @@ test("which plan unlocks the mentor is the plan's own feature list", { skip: ski
 });
 
 test("the gate runs before any provider call, and only for model calls", { skip: skipIfUnloaded }, async () => {
-  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "AI Mentor", active: true });
+  seed("subscriptionFeatures/ai-mentor", { id: "ai-mentor", name: "Roman AI Pro", active: true });
   store.delete("users/learner-1/subscription/current");
   // `personalAi.usage.status` must keep answering: the allowance card and the
   // paywall copy need to render for a learner who is not entitled.

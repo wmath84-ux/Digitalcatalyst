@@ -15,6 +15,7 @@
 // shape normalisation stay in one place.
 
 import { adminDb } from "./firebaseAdmin.js";
+import { resolveSubscriberOnlyPrice as sharedResolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing.js";
 
 export type SubscriptionGateDurationFlags = {
   monthly: boolean;
@@ -184,6 +185,10 @@ export async function getSubscriptionGateSettings(): Promise<SubscriptionGateSet
 // active, otherwise returns `basePrice`. The override is intentionally
 // only consulted server-side so a non-subscriber who pokes the admin
 // endpoint still cannot discover the discounted price.
+//
+// The rule itself lives in `utils/subscriptionPricing.js` (shared with the
+// client page and the quote). This wrapper only adapts the settings document
+// shape, so the server never carries a second copy of the arithmetic.
 export function resolveSubscriberOnlyPrice(
   planId: string,
   cycle: "monthly" | "yearly" | "lifetime",
@@ -191,14 +196,13 @@ export function resolveSubscriberOnlyPrice(
   isSubscriber: boolean,
   settings: SubscriptionGateSettings,
 ): number {
-  if (!isSubscriber) return basePrice;
-  const override = settings.subscriberPricing?.[planId];
-  if (!override) return basePrice;
-  const candidate = override[cycle];
-  if (candidate == null || Number.isNaN(Number(candidate))) return basePrice;
-  // Defensive: a negative or zero override is treated as "no override".
-  if (Number(candidate) <= 0) return basePrice;
-  return Number(candidate);
+  return sharedResolveSubscriberOnlyPrice(
+    planId,
+    cycle,
+    basePrice,
+    isSubscriber,
+    settings?.subscriberPricing || null,
+  );
 }
 
 // Resolve the daily AI-questions cap for a given plan (or the

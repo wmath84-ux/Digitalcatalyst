@@ -33,6 +33,13 @@ export interface SubscriptionPlanDoc {
   revisionTestBankLimits: { monthly: number; yearly: number };
   /** School-AI daily generation and per-term model-cost allowances. */
   aiAllowances: import("./aiAllowances.js").PlanAiAllowances;
+  /** Cycles a NON-subscriber may pick this plan on (admin visibility control). */
+  visibleCycles: import("./subscriptionVisibility.js").SubscriptionVisibilityCycle[];
+  /** Plan-doc copy of the subscriber-only price; null when unset. */
+  subscriberPricingOverride: { monthly: number | null; yearly: number | null; lifetime: number | null } | null;
+  featured: boolean;
+  cta: string | null;
+  accessTier: string | null;
 }
 
 /** Canonical subscription feature shape. */
@@ -55,6 +62,16 @@ export interface SubscriptionFeatureDoc {
   sortOrder: number;
   /** Non-subscriber daily item creations for My Day; null for other features. */
   freeItemsPerDay?: number | null;
+  /** Cycles a NON-subscriber may pick this feature on (admin visibility control). */
+  visibleCycles?: import("./subscriptionVisibility.js").SubscriptionVisibilityCycle[] | null;
+  /** Plans this feature is removed from outright. */
+  hiddenPlanIds?: string[] | null;
+  /** "gate" keeps the feature visible behind the paywall; "hide" removes it. */
+  visibilityMode?: "gate" | "hide";
+  /** Subscriber-only price from the feature doc, when the admin set one. */
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null } | null;
+  /** Per-feature usage cap (`aiQuestionsPerDay`), when the admin set one. */
+  userLimit?: { aiQuestionsPerDay: number | null } | null;
 }
 
 /** Plan-to-product unlock (Firestore `subscriptionPlanProductUnlocks`). */

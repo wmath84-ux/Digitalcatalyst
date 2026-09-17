@@ -21,6 +21,20 @@ export function resolveSubscriberOnlyPrice(
   subscriberPricing: Record<string, SubscriberPricingOverride | undefined> | null | undefined,
 ): number;
 
+export function mergeSubscriberPricing(
+  planOverride: Partial<SubscriberPricingOverride> | null | undefined,
+  gateOverride: Partial<SubscriberPricingOverride> | null | undefined,
+): SubscriberPricingOverride;
+
+export function resolveEffectiveSubscriberPrice(
+  planId: string,
+  cycle: Cycle,
+  basePrice: number,
+  isSubscriber: boolean,
+  planOverride: Partial<SubscriberPricingOverride> | null | undefined,
+  gatePricing: Record<string, Partial<SubscriberPricingOverride> | undefined> | null | undefined,
+): number;
+
 export function isPlanVisibleForAudience(
   planId: string,
   isSubscriber: boolean,

@@ -165,7 +165,7 @@ test("flowpath access helper requires an active subscription for revision kinds"
   // `revision` feature. The error code is the same one the
   // existing revision page returns.
   assert.match(flowpathAccess, /PLAN_REQUIRED/);
-  assert.match(flowpathAccess, /Revision Studio/);
+  assert.match(flowpathAccess, /Roman AI Pro/);
   // Entitlement is resolved through the shared single-source rule so
   // FlowPath, My Day, Revision Cloud APIs and Profile never disagree.
   assert.match(flowpathAccess, /subscriptionUnlocksFeature\(sub, "revision"\)/);

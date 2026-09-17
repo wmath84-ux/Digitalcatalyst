@@ -178,7 +178,7 @@ function accessSnapshot(
 ): Access {
   const featureConfigured = Boolean(feature) && feature?.active !== false;
   // Entitlement: the explicit stored feature list wins, but the two core
-  // subscription features (My Day cloud saving, Revision Studio) are what an
+  // subscription features (My Day cloud saving, Roman AI Pro) are what an
   // active membership itself grants — every admin plan pricing tier is
   // expressed as a price override, not an availability toggle. This keeps the
   // profile allowance, My Day and Revision in sync for older memberships whose
@@ -199,7 +199,14 @@ function accessSnapshot(
   const perDocMode = (feature as any)?.visibilityMode === "hide" ? "hide" : "gate";
   const globalHideOn = gateSettings ? gateSettings.hideUntilPurchasedEnabled || Boolean(gateSettings.features?.["myday"]?.gated) : false;
   const visibilityMode = perDocMode === "hide" || globalHideOn ? "hide" : "gate";
-  const hidden = visibilityMode === "hide" && !paid;
+  // The admin can narrow (or re-enable) the model per plan with
+  // `features.myday.tiers[planId]`; the client reads the same rule through
+  // `isFeatureHiddenForAudience`, so the rail and this snapshot agree.
+  const currentPlanId = text((subscription as any)?.planId, 120);
+  const tierFlag = currentPlanId && gateSettings?.features?.["myday"]?.tiers
+    ? (gateSettings.features["myday"].tiers as Record<string, unknown>)[currentPlanId]
+    : undefined;
+  const hidden = !paid && (tierFlag === true || (tierFlag !== false && visibilityMode === "hide"));
   return {
     paid,
     paidExpiresAt: paid ? millis(subscription.expiresAt) : 0,

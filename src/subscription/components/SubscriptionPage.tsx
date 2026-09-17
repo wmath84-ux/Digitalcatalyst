@@ -37,7 +37,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { useSubscriptionGateLogic } from "../../hooks/useSubscriptionGateLogic";
 import { apiFetch } from "../../utils/apiBase";
-import { isPlanVisibleForAudience, resolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing";
+import { isPlanVisibleForAudience, resolveEffectiveSubscriberPrice } from "../../utils/subscriptionPricing";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
@@ -46,6 +46,10 @@ import {
   resolveFeaturesForPlan,
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
+import {
+  featuresForPlanCycle,
+  planVisibleCycles,
+} from "../../../utils/subscriptionVisibility";
 import FeaturePricingTiers from "./FeaturePricingTiers";
 import PlanComparisonTable from "./PlanComparisonTable";
 import LiveSelectionCard from "./LiveSelectionCard";
@@ -271,7 +275,7 @@ export default function SubscriptionPage({
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
   const rawFeatures: SubscriptionFeatureDoc[] = catalog?.features || [];
   const rawSubscriptionProducts: any[] = catalog?.subscriptionProducts || [];
-  // Default-select the core paid features (My Day + Revision Studio) whenever
+  // Default-select the core paid features (My Day + Roman AI Pro) whenever
   // they exist in the catalog and the buyer has not made an explicit choice.
   // Removing a feature from the catalog drops it from the default set too.
   useEffect(() => {
@@ -288,10 +292,23 @@ export default function SubscriptionPage({
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId],
   );
+  // Membership state — declared here (not further down) because the per-cycle
+  // visibility rules below need to know whether this buyer is already a member:
+  // a member keeps every cycle and every feature they pay for.
+  const subscriptionExpiresAtMs = renewalToMillis(activeSubscription?.expiresAt);
+  const isActiveMember =
+    activeSubscription?.status === "active" && subscriptionExpiresAtMs > Date.now();
+
+  // Which cycles this buyer may pick for the selected plan: the plan's own
+  // `allowedCycles` (hard rule, also enforced by the quote) narrowed by the
+  // admin's per-cycle visibility for NON-subscribers. Members keep both.
   const supportedCycles: BillingCycle[] = useMemo(() => {
     if (!plan) return [];
-    return plan.allowedCycles.filter((c): c is BillingCycle => c === "monthly" || c === "yearly");
-  }, [plan]);
+    return planVisibleCycles(plan, {
+      isSubscriber: isActiveMember,
+      gateRows: gateSettings.planVisibility,
+    });
+  }, [plan, isActiveMember, gateSettings.planVisibility]);
   // If the active plan doesn't support the current cycle, fall back.
   useEffect(() => {
     if (plan && supportedCycles.length > 0 && !supportedCycles.includes(cycle)) {
@@ -306,6 +323,38 @@ export default function SubscriptionPage({
     ? (cycle === "yearly" ? plan.yearlyPricePaise : plan.monthlyPricePaise)
     : 0;
 
+  // ── Per-cycle visibility (admin → catalog → page) ─────────────────────────
+  // The admin decides, per feature, which cycles a NON-subscriber may be
+  // offered it on (`visibleCycles`), which plans it is removed from outright
+  // (`hiddenPlanIds`), and can stage the same thing in the
+  // `settings/subscriptionGate` matrix (`durations`). The shared pure helper
+  // resolves all three, so the table/list below genuinely changes when the
+  // Monthly ↔ Yearly toggle moves — and the server refuses anything hidden
+  // here, using the same function.
+  const cycleVisibilityOptions = useMemo(
+    () => ({ isSubscriber: isActiveMember, gateRows: gateSettings.features }),
+    [gateSettings.features, isActiveMember],
+  );
+  /** Features offered on the selected plan + cycle (this is what the page lists). */
+  const offeredFeatures = useMemo(
+    () => featuresForPlanCycle(rawFeatures, selectedPlanId, cycle, cycleVisibilityOptions),
+    [cycleVisibilityOptions, rawFeatures, selectedPlanId, cycle],
+  );
+  const offeredFeatureIdSet = useMemo(
+    () => new Set(offeredFeatures.map((feature) => String(feature.id))),
+    [offeredFeatures],
+  );
+
+  // A selection can only ever contain what is being offered: switching to a
+  // cycle where the admin hid a feature drops it from the order (the server
+  // applies the identical rule, so the page can never promise a hidden item).
+  useEffect(() => {
+    setSelectedFeatureIds((current) => {
+      const next = current.filter((id) => offeredFeatureIdSet.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [offeredFeatureIdSet]);
+
   // Feature prices are plan-aware AND cycle-aware: the same feature can
   // cost ₹99 on Basic, ₹49 on Premium and be free on Pro, with separate
   // yearly rates. `resolveFeaturesForPlan` projects the catalog onto the
@@ -313,8 +362,8 @@ export default function SubscriptionPage({
   // reflects those overrides. The server re-resolves with the identical
   // helper, so display and charge can never drift apart.
   const features = useMemo(
-    () => resolveFeaturesForPlan<SubscriptionFeatureDoc>(rawFeatures, selectedPlanId, cycle),
-    [rawFeatures, selectedPlanId, cycle],
+    () => resolveFeaturesForPlan<SubscriptionFeatureDoc>(offeredFeatures, selectedPlanId, cycle),
+    [offeredFeatures, selectedPlanId, cycle],
   );
 
   const selectedFeatureRecords = useMemo(
@@ -324,8 +373,8 @@ export default function SubscriptionPage({
 
   // Ascending price tiers for the "what you get at each price" strip.
   const featureTiers = useMemo(
-    () => groupFeaturesByPriceTier(rawFeatures, selectedPlanId, cycle),
-    [rawFeatures, selectedPlanId, cycle],
+    () => groupFeaturesByPriceTier(offeredFeatures, selectedPlanId, cycle),
+    [offeredFeatures, selectedPlanId, cycle],
   );
 
   // Plan-included features (free with the plan) — we surface them
@@ -500,8 +549,8 @@ export default function SubscriptionPage({
   const hasOwnedCarryOver =
     carriedOverFeatureRecords.length > 0 || carriedOverProductRecords.length > 0;
   const featuresTotalPaise = useMemo(
-    () => sumSelectedFeaturePaise(rawFeatures, chargeableFeatureIds, selectedPlanId, cycle),
-    [rawFeatures, chargeableFeatureIds, selectedPlanId, cycle],
+    () => sumSelectedFeaturePaise(offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle),
+    [offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle],
   );
   const chargeableProductRecords = useMemo(() => {
     const chargeable = new Set(chargeableCourseIds);
@@ -629,9 +678,6 @@ export default function SubscriptionPage({
   // ---------- Membership state ----------
   // An active subscriber sees the member dashboard, never the buy flow,
   // unless they explicitly chose to renew or change their plan.
-  const subscriptionExpiresAtMs = renewalToMillis(activeSubscription?.expiresAt);
-  const isActiveMember =
-    activeSubscription?.status === "active" && subscriptionExpiresAtMs > Date.now();
   const showMemberView = isActiveMember && !manageMode;
 
   // ---------------------------------------------------------------------------
@@ -770,11 +816,14 @@ export default function SubscriptionPage({
       ? (activePlan.yearlyPricePaise / 100)
       : (activePlan.monthlyPricePaise / 100);
     if (!Number.isFinite(baseRupees) || baseRupees <= 0) return null;
-    const resolved = resolveSubscriberOnlyPrice(
+    // Both admin surfaces resolve through one rule: the plan sheet's own
+    // override wins, the gate matrix is the fallback (see the shared helper).
+    const resolved = resolveEffectiveSubscriberPrice(
       activePlan.id,
       cycle,
       baseRupees,
       true,
+      activePlan.subscriberPricingOverride ?? null,
       gateSettings.subscriberPricing,
     );
     return Math.round(resolved);
@@ -1161,6 +1210,15 @@ export default function SubscriptionPage({
                 Everything downstream (feature prices, course prices, the live
                 card, the total) is resolved from these two values, so they are
                 the first and most prominent decision on the page. */}
+            {usingFallback ? (
+              <p
+                data-subscription-fallback-note
+                className="mx-5 mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-2.5 text-[11px] font-semibold text-amber-100"
+              >
+                Showing the built-in plan list — the live catalog could not be reached. Prices are re-checked by the server before any payment.
+              </p>
+            ) : null}
+
             <Step
               index={1}
               title="Choose your plan and duration"
@@ -1186,6 +1244,7 @@ export default function SubscriptionPage({
               ownedCycle={isActiveMember ? ownedCycle : null}
               isSubscriber={isActiveMember}
               subscriberPriceRupees={subscriberPriceRupees}
+              gatePlanRows={gateSettings.planVisibility}
             />
 
             {/* The comparison table — the single answer to "what is actually
@@ -1194,7 +1253,7 @@ export default function SubscriptionPage({
                 exact add-on price / not offered) for the active cycle. */}
             <PlanComparisonTable
               plans={pickerPlans}
-              features={rawFeatures}
+              features={offeredFeatures}
               cycle={cycle}
               selectedPlanId={selectedPlanId}
               ownedPlanId={isActiveMember ? ownedPlanId || null : null}

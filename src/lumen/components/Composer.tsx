@@ -173,7 +173,7 @@ export default function Composer({
             }
           }}
           placeholder={placeholder}
-          aria-label="Message Lumen"
+          aria-label="Message Roman AI Pro"
           enterKeyHint="send"
           className={cn(micro ? "px-3 pb-1.5 pt-2.5 text-[14px]" : small ? "px-3.5 pb-2 pt-3 text-[16px]" : "px-3.5 pb-2 pt-3 text-[15px]")}
         />
@@ -248,7 +248,7 @@ export default function Composer({
 
       {!small && (
         <div className="composer-disclaimer select-none px-2 pb-0.5 pt-2 text-center text-[11px] text-[--ink-4]">
-          Lumen can make mistakes — double-check important course information.
+          Roman AI Pro can make mistakes — double-check important course information.
         </div>
       )}
     </div>

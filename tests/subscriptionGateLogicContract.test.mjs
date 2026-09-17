@@ -76,13 +76,17 @@ test("server model honours the subscriber-only price rule", () => {
     /function\s+resolveSubscriberOnlyPrice\(/,
     "resolveSubscriberOnlyPrice is exported from the server",
   );
+  // ...but that wrapper is only an adapter: the rule itself lives in the
+  // shared runtime helper, which the quote and the client page also use, so
+  // there is exactly one implementation of the subscriber price.
+  assert.match(gateServer, /sharedResolveSubscriberOnlyPrice\(/, "the server wrapper delegates to the shared resolver");
   assert.match(
-    gateServer,
+    pricing,
     /if\s*\(!isSubscriber\)\s*return\s+basePrice/,
     "non-subscribers always get the public price",
   );
   assert.match(
-    gateServer,
+    pricing,
     /if\s*\(Number\(candidate\)\s*<=\s*0\)\s*return\s+basePrice/,
     "a zero / negative override falls back to the public price",
   );
@@ -244,9 +248,16 @@ test("HiddenFeatureHint renders the 'Unlock' card with a clear CTA to the subscr
 
 test("SubscriptionPage wires all three new components + the bottom upgrade button", () => {
   assert.match(subscriptionPage, /SubscriberActiveBadge/);
-  assert.match(subscriptionPage, /SubscriberOnlyPriceBadge/);
+  // The subscriber-only price badge lives in the plan card the page renders
+  // (PlanOverview); the page itself owns the price resolution and the props.
+  assert.match(planOverview, /import SubscriberOnlyPriceBadge from "\.\.\/\.\.\/components\/subscription\/SubscriberOnlyPriceBadge"/);
+  assert.match(planOverview, /<SubscriberOnlyPriceBadge[\s\S]*?price=\{subscriberPriceRupees\}/);
+  assert.match(subscriptionPage, /subscriberPriceRupees=\{subscriberPriceRupees\}/);
   assert.match(subscriptionPage, /useSubscriptionGateLogic/);
-  assert.match(subscriptionPage, /resolveSubscriberOnlyPrice/);
+  // Both admin surfaces (the plan sheet's own override and the gate matrix)
+  // resolve through the one merged helper, so the badge and the charge agree.
+  assert.match(subscriptionPage, /resolveEffectiveSubscriberPrice/);
+  assert.match(subscriptionPage, /activePlan\.subscriberPricingOverride \?\? null/);
   assert.match(subscriptionPage, /data-subscription-upgrade-button/);
   assert.match(
     subscriptionPage,

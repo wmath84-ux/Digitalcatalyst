@@ -14,7 +14,7 @@ const admin = fs.readFileSync("src/components/admin/products/ProductEditor.tsx",
 
 test("My Day feature is selected by default and changes subscription total", () => {
   // Default selection now covers every core feature present in the catalog
-  // (My Day + Revision Studio) while the buyer has made no explicit choice.
+  // (My Day + Roman AI Pro) while the buyer has made no explicit choice.
   assert.match(subscription, /const defaultFeatureIds = \["my-day", "revision"\]/);
   assert.match(subscription, /defaultFeatureIds\.filter\(\(id\) => rawFeatures\.some/);
   // Add-on upgrades zero out the plan price (already paid), so the subtotal
