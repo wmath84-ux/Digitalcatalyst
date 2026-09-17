@@ -33,6 +33,15 @@ import {
 
 const GLOBAL_USAGE_ID = "__library__";
 /**
+ * Firestore reserves document IDs that start with "__": the value above is a
+ * fine FIELD value (the global productId), but as a DOCUMENT ID every write
+ * fails with `INVALID_ARGUMENT: Resource id "__library__" is invalid because
+ * it is reserved` (reads never validate, which is why only saves broke).
+ * Both write-path files must keep this id in sync — they share one counter.
+ * No migration needed: no usage doc ever existed under the reserved id.
+ */
+const GLOBAL_USAGE_DOC_ID = "global_library";
+/**
  * Actions that only read. Kept in sync with READ_ACTIONS in
  * src/lib/personalCourseClient.ts: a load failure is retryable and must never
  * be worded like a lost write, so both layers need to agree on what is a read.
@@ -109,7 +118,7 @@ const identityKey = (raw: Record<string, unknown>) => `v1_${hash(personalResourc
 const savedBucketId = (contextProductId: string) => `saved_${hash(contextProductId || GLOBAL_USAGE_ID).slice(0, 32)}`;
 const isSystemModule = (data: Body) => Boolean(data.system) || text(data.kind) === "saved";
 const moduleCollection = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseModules");
-const usageRef = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseUsage").doc(GLOBAL_USAGE_ID);
+const usageRef = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseUsage").doc(GLOBAL_USAGE_DOC_ID);
 const ownedResourcesQuery = (db: Db, uid: string) => db.collectionGroup("resources").where("ownerUid", "==", uid).limit(RESOURCE_QUERY_LIMIT);
 const moduleQuery = (db: Db, uid: string) => moduleCollection(db, uid).limit(MODULE_QUERY_LIMIT);
 const isOwnedResourcePath = (uid: string, snapshot: DocSnapshot) => {

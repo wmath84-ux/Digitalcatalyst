@@ -48,6 +48,11 @@ const number = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 const GLOBAL_USAGE_ID = "__library__";
+// Must stay in sync with GLOBAL_USAGE_DOC_ID in personalCourse.ts — same
+// shared counter doc. Firestore reserves "__"-prefixed doc IDs (writes fail
+// with INVALID_ARGUMENT), so the doc lives under a non-reserved id while
+// "__library__" remains the field value only.
+const GLOBAL_USAGE_DOC_ID = "global_library";
 const SORT_STEP = 1024;
 const USAGE_SCHEMA_VERSION = 2;
 const GENERIC_CREATOR = "Shared by a Digitalcatalyst learner";
@@ -77,7 +82,7 @@ async function requireUid(req: VercelRequest): Promise<string> {
 
 const packCollection = (db: Db) => db.collection("studyPacks");
 const moduleCollection = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseModules");
-const usageRef = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseUsage").doc(GLOBAL_USAGE_ID);
+const usageRef = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseUsage").doc(GLOBAL_USAGE_DOC_ID);
 const stackCollection = (db: Db, uid: string) => db.collection("users").doc(uid).collection("studyStacks");
 const packUsageRef = (db: Db, uid: string) => db.collection("users").doc(uid).collection("studyPackUsage").doc("current");
 
