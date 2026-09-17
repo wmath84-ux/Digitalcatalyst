@@ -20,6 +20,7 @@ import { adminFetch } from "@/lib/admin/client";
 import type { PaidUpdate, ProductImage, ProductModule } from "@/lib/admin/types";
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import ModulesResourcesEditor from "@/components/admin/products/ModulesResourcesEditor";
+import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import {
   DEFAULT_STORE_FILTER_GROUP,
@@ -188,8 +189,21 @@ export function ProductEditor({ productId }: { productId?: string }) {
         if (!r.name.trim()) add(`A resource in “${m.title}” needs a name.`, "modules");
         if (r.accessLevel === "purchasable" && (r.cashPrice == null || r.cashPrice < 0)) add(`Resource “${r.name}” needs a valid cash price.`, "modules");
         if (r.salePrice != null && (r.cashPrice == null || r.salePrice < 0 || r.salePrice > r.cashPrice)) add(`Resource “${r.name}” sale price must be between ₹0 and its cash price.`, "modules");
-        if (!normalizeResourceUrl(r.url, r.type)) {
-          const learnerVisible = r.visibility !== "hidden" && r.accessLevel !== "hidden" && m.visibility !== "hidden" && m.accessLevel !== "hidden";
+        const learnerVisible = r.visibility !== "hidden" && r.accessLevel !== "hidden" && m.visibility !== "hidden" && m.accessLevel !== "hidden";
+        if (r.type === "brain") {
+          // The Brain practice set is the ONE resource type that is valid
+          // WITHOUT a URL — its content is the imported question list. A set
+          // the learner can see must be complete: every question needs text,
+          // two options and a marked answer, otherwise it would silently never
+          // reach the player's Brain tab.
+          const questions = Array.isArray(r.practiceQuestions) ? r.practiceQuestions : [];
+          if (questions.length === 0) {
+            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has no questions yet — import or add at least one.`, "modules", learnerVisible);
+          } else if (!practiceQuestionsReady(questions)) {
+            const incomplete = questions.filter((q) => !String(q?.prompt || "").trim() || (q?.options || []).map((o) => String(o || "").trim()).filter(Boolean).length < 2 || !(Number(q?.correctIndex) >= 0 && Number(q?.correctIndex) < (q?.options || []).length)).length;
+            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each needs text, two options and a marked answer.`, "modules", learnerVisible);
+          }
+        } else if (!normalizeResourceUrl(r.url, r.type)) {
           add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "modules", learnerVisible);
         }
       }
@@ -244,12 +258,34 @@ export function ProductEditor({ productId }: { productId?: string }) {
     const paidUpdateIds = new Set(form.paidUpdates.map((update) => update.id));
     const modules = form.modules.map((module) => ({
       ...module,
-      resources: (module.resources || []).map((resource, index) => ({
-        ...resource,
-        url: normalizeResourceUrl(resource.url, resource.type) || resource.url.trim(),
-        sortOrder: index,
-        paidUpdateId: resource.paidUpdateId && paidUpdateIds.has(resource.paidUpdateId) ? resource.paidUpdateId : null,
-      })),
+      resources: (module.resources || []).map((resource, index) => {
+        const paidUpdateId = resource.paidUpdateId && paidUpdateIds.has(resource.paidUpdateId) ? resource.paidUpdateId : null;
+        if (resource.type === "brain") {
+          // A Brain practice set is the ONE resource whose content lives in the
+          // resource itself instead of at a URL: it carries `practiceQuestions`
+          // and nothing else. Normalise them on the way out so what Firestore
+          // stores is already the canonical shape the Course Player reads back
+          // (ids filled in, option cap applied, junk dropped) — and clear the
+          // link fields a card may have kept from an earlier resource type.
+          return {
+            ...resource,
+            url: "",
+            embedUrl: "",
+            youtubeUrl: "",
+            youtubeVideoId: "",
+            sortOrder: index,
+            paidUpdateId,
+            practiceQuestions: normalizePracticeQuestions(resource.practiceQuestions),
+            practiceTitle: (resource.practiceTitle || "").trim(),
+          };
+        }
+        return {
+          ...resource,
+          url: normalizeResourceUrl(resource.url, resource.type) || resource.url.trim(),
+          sortOrder: index,
+          paidUpdateId,
+        };
+      }),
     }));
     const paidUpdates = form.paidUpdates.map((update) => ({
       ...update,

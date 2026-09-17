@@ -1,7 +1,9 @@
 // src/data/demoCourseContent.ts
 //
 // Comprehensive demo course content with ALL 12 supported file types
-// as individual modules, each with its own price.
+// as individual modules, each with its own price — plus a 13th module for the
+// Brain practice sets (a `brain` resource carries questions, not a URL), so
+// the Course Player's Brain tab always has something real to practise.
 //
 // File types supported (from CourseFileType):
 //   youtube | video | audio | pdf | doc | sheet | slides |
@@ -365,6 +367,69 @@ export const demoCourseContent: CourseModule[] = [
     paidUpdatePrice: "₹89",
     paidUpdateCoinPrice: 89,
   },
+
+  // ─── 13. Brain Module (practice sets — no URL) ─────────────────────
+  // The Brain tab's content: a `brain` resource carries NO url, only the
+  // questions. This is the exact payload the admin's "Brain · practice set"
+  // bulk importer writes on the Product / Course-content page, so a demo or
+  // unconfigured product already has something real to practise.
+  {
+    id: "mod-brain",
+    title: "Brain — Practice Sets",
+    files: [
+      {
+        id: "file-brain-1",
+        name: "Algebra Warm-up — Practice Set",
+        type: "brain",
+        provider: "Brain",
+        accessLevel: "included",
+        practiceTitle: "Algebra Warm-up",
+        practiceQuestions: [
+          {
+            id: "q1",
+            prompt: "If 2x + 6 = 18, what is x?",
+            options: ["4", "6", "8", "12"],
+            correctIndex: 1,
+            explanation: "2x = 18 − 6 = 12, so x = 12 ÷ 2 = 6.",
+            difficulty: "easy",
+            topic: "Linear equations",
+          },
+          {
+            id: "q2",
+            prompt: "Which expression is equivalent to (x + 3)(x − 3)?",
+            options: ["x² − 9", "x² + 9", "x² − 6x + 9", "x² + 6x + 9"],
+            correctIndex: 0,
+            explanation: "It is a difference of squares: (a + b)(a − b) = a² − b², so (x + 3)(x − 3) = x² − 9.",
+            difficulty: "medium",
+            topic: "Algebraic identities",
+          },
+          {
+            id: "q3",
+            prompt: "What is the slope of the line passing through (2, 3) and (6, 11)?",
+            options: ["1", "2", "3", "4"],
+            correctIndex: 1,
+            explanation: "Slope = (11 − 3) / (6 − 2) = 8 / 4 = 2.",
+            difficulty: "medium",
+            topic: "Coordinate geometry",
+          },
+          {
+            id: "q4",
+            prompt: "Factorise x² − 5x + 6.",
+            options: ["(x − 2)(x − 3)", "(x − 1)(x − 6)", "(x + 2)(x + 3)", "(x − 2)(x + 3)"],
+            correctIndex: 0,
+            explanation: "The pair that multiplies to 6 and adds to −5 is −2 and −3, so x² − 5x + 6 = (x − 2)(x − 3).",
+            difficulty: "hard",
+            topic: "Factorisation",
+          },
+        ],
+      },
+    ],
+    modules: [],
+    accessLevel: "included",
+    paidUpdateTitle: "Brain Module",
+    paidUpdatePrice: "₹129",
+    paidUpdateCoinPrice: 129,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -470,4 +535,5 @@ export const modulePriceSummary = [
   { type: "google_form", module: "Google Forms — Quizzes & Feedback", price: "₹9", coins: 9 },
   { type: "embed", module: "Embedded Pages & Interactives", price: "₹79", coins: 79 },
   { type: "mindmap", module: "Mind Maps (Whimsical)", price: "₹89", coins: 89 },
+  { type: "brain", module: "Brain — Practice Sets", price: "₹129", coins: 129 },
 ] as const;

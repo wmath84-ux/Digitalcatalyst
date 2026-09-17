@@ -96,7 +96,9 @@ const MediaScrubber = memo(function MediaScrubber({
 });
 
 function ResourceStage({ type, name }: { type: ResourceType; name: string }) {
-  const Icon = ICONS[type];
+  // A resource type the AI reader has no map for (a future stage type) must
+  // still draw a stage instead of crashing on an undefined component.
+  const Icon = ICONS[type] ?? SquareCode;
   const dark = type === "youtube" || type === "video" || type === "image";
   return (
     <div

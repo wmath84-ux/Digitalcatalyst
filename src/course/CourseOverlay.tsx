@@ -26,7 +26,9 @@
 // under it as usual. No sliding content animations.
 //
 //   - Modules   → every unlocked module (expandable to its files).
-//   - Brain     → dummy button for now (functionality lands later).
+//   - Brain     → the practice sets the admin imported for this course's
+//                 modules (resource type "Brain · practice set"), rendered as
+//                 the revision test-taking page (src/course/CourseBrainPanel).
 //   - Notes     → the notes panel.
 //   - Mind map  → the per-module mind map panel.
 //   - AI        → dummy button for now (functionality lands later).
@@ -73,10 +75,19 @@ type FlatModule = { module: CourseModule; depth: number };
 const flattenModules = (modules: CourseModule[], depth = 0): FlatModule[] =>
   modules.flatMap((module) => [{ module, depth }, ...flattenModules(module.modules || [], depth + 1)]);
 
+/**
+ * A `brain` resource is the ONE file type with no URL — its content is the
+ * practice set the admin imported (`practiceQuestions`). It is visible exactly
+ * when it holds at least one question.
+ */
+const isBrainFile = (file: CourseFile) => file.type === "brain" && (file.practiceQuestions?.length ?? 0) > 0;
+
 const isVisibleFile = (file: CourseFile) =>
-  file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId);
+  file.accessLevel !== "hidden" &&
+  (isBrainFile(file) || Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId));
 
 const fileIcon = (file: CourseFile) => {
+  if (file.type === "brain") return Brain;
   if (file.type === "youtube" || file.type === "video" || file.type === "audio") return PlayCircle;
   if (file.type === "pdf" || file.type === "ebook") return FileText;
   if (file.type === "sheet") return FileSpreadsheet;
@@ -397,6 +408,14 @@ interface CourseOverlayProps {
    * another tab is active. Absent → the Coming Soon placeholder.
    */
   aiPanel?: ReactNode;
+  /**
+   * The Brain tab's practice panel. Owned by the Course Player (it reads the
+   * course tree's `brain` resources — the practice sets the admin imported on
+   * the Product / Course-content page) and handed down ready-rendered, same
+   * ownership pattern as the mind map / AI panels. Absent → the old
+   * "coming soon" placeholder, so older call sites keep working.
+   */
+  brainPanel?: ReactNode;
 }
 
 /**
@@ -407,9 +426,10 @@ interface CourseOverlayProps {
  */
 export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; color: string; icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }> }> = [
   { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", color: "#FFBE0B", icon: BookOpen },
-  // The old Resources panel is gone — a Brain button sits in its slot, dummy
-  // for now (its functionality lands later).
-  { key: "brain", label: "Brain", heading: "Brain", hint: "Revision brain — jald aa raha hai", color: "#34D399", icon: Brain },
+  // The old Resources panel is gone — the Brain button sits in its slot: the
+  // practice sets the admin imported for this course's modules (resource type
+  // "Brain · practice set"), played back with the revision test-taking design.
+  { key: "brain", label: "Brain", heading: "Brain", hint: "Practice sets — apna Brain test", color: "#34D399", icon: Brain },
   { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", color: "#3A86FF", icon: NotebookPen },
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It hosts the per-module map library + canvas.
@@ -583,7 +603,9 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
             icon: <Icon size={20} />,
             color: tabColor,
             title: file.name,
-            subtitle: file.type,
+            // A Brain resource IS its question set, so the row says how much
+            // practice it holds instead of printing the raw type.
+            subtitle: isBrainFile(file) ? `${file.practiceQuestions?.length ?? 0} practice questions` : file.type,
             selected: selectedFileId === file.id,
             extra: fileLocked ? <LockKeyhole size={12} className="text-amber-400" /> : null,
             press: fileLocked ? undefined : () => onSelectFile(file),
@@ -733,6 +755,7 @@ export function StudyContent({
   personalModulesOpen = false,
   personalModulesPanel,
   aiPanel,
+  brainPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -745,6 +768,7 @@ export function StudyContent({
   personalModulesOpen?: boolean;
   personalModulesPanel?: ReactNode;
   aiPanel?: ReactNode;
+  brainPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -767,14 +791,19 @@ export function StudyContent({
         // the active file's own buttons and every player preference, one list.
         playerPanel
       ) : tab === "brain" ? (
-        // Dummy for now — the Brain's functionality lands later.
-        <ComingSoonPanel
-          icon={Brain}
-          color="#34D399"
-          title="Brain"
-          subtitle="Revision brain — jald aa raha hai"
-          panelAttr="data-course-brain-panel"
-        />
+        // The Brain tab hosts the practice sets the admin imported for this
+        // course's modules (resource type "Brain · practice set"). The parent
+        // owns the panel — it reads them off the course tree — so a missing
+        // slot keeps the old placeholder instead of a blank surface.
+        brainPanel ?? (
+          <ComingSoonPanel
+            icon={Brain}
+            color="#34D399"
+            title="Brain"
+            subtitle="Practice sets load with the Course Player"
+            panelAttr="data-course-brain-panel"
+          />
+        )
       ) : tab === "ai" ? (
         // Production chat is hosted as a sibling of the keyed tab body so
         // Lumen state survives tab switches. The Coming Soon panel stays
@@ -848,6 +877,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       personalModulesOpen={props.personalModulesOpen}
       personalModulesPanel={props.personalModulesPanel}
       aiPanel={props.aiPanel}
+      brainPanel={props.brainPanel}
     />
   );
 
@@ -928,7 +958,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
  * double-lists purchasable content. A locked module also hides its nested
  * children (the whole branch stays locked until the parent is unlocked).
  */
-const unlockedModuleIds = (
+export const unlockedModuleIds = (
   modules: CourseModule[],
   accessibleModuleIds: Set<string>,
   ownedUpdateIds: Set<string>,

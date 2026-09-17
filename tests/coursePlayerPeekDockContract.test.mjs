@@ -121,10 +121,13 @@ test("CourseOverlay conditionally drops the in-pane dock for peek mode", () => {
 // 3. The default is OFF (peek dock), and the toggle reverts to the old dock
 // ---------------------------------------------------------------------------
 
-test("the player defaults to the peek dock and persists the preference", () => {
-  // OFF by default: the loader returns false unless the key is "1".
+test("the player defaults to the always-visible dock and persists the preference", () => {
+  // ON by default (the owner's direction): only an explicit "0" — the player's
+  // own setting — switches the footer to the peek dock, and a storage failure
+  // still keeps the always-visible dock.
   assert.match(coursePlayer, /const legacyFooterDockStorageKey = "dc\.coursePlayerLegacyFooterDock"/);
-  assert.match(coursePlayer, /localStorage\.getItem\(legacyFooterDockStorageKey\) === "1"/);
+  assert.match(coursePlayer, /localStorage\.getItem\(legacyFooterDockStorageKey\) !== "0"/);
+  assert.match(coursePlayer, /return localStorage\.getItem\(legacyFooterDockStorageKey\) !== "0";\s*\n\s*\} catch \{\s*\n\s*return true;/);
   assert.match(coursePlayer, /const \[legacyFooterDock, setLegacyFooterDock\] = useState<boolean>\(loadLegacyFooterDock\)/);
   // Persisted on change, like every other player preference.
   assert.match(coursePlayer, /localStorage\.setItem\(legacyFooterDockStorageKey, legacyFooterDock \? "1" : "0"\)/);

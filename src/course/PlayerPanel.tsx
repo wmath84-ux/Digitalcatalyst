@@ -170,10 +170,10 @@ export interface PlayerPanelProps {
   courseFullscreen: boolean;
   onHideStatusBarChange: (next: boolean) => void;
   /**
-   * Footer navigation mode. `legacyFooterDock` = ON shows the original
-   * always-visible dock inside the study pane; OFF (the default) keeps the
-   * newer bottom-centre peek dock (line → tap/hover opens → swipe to select),
-   * which the owner prefers.
+   * Footer navigation mode. `legacyFooterDock` = ON (the DEFAULT) keeps the
+   * always-visible dock inside the study pane; OFF switches to the newer
+   * bottom-centre peek dock (line → tap/hover opens → swipe to select).
+   * The choice is remembered per device.
    */
   legacyFooterDock: boolean;
   onLegacyFooterDockChange: (next: boolean) => void;
@@ -406,8 +406,9 @@ export default function PlayerPanel({
         {settingsRow("Snowfall", snowMode, (next) => onSnowModeChange(next), "snow")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}
-        {/* OFF = the newer bottom-centre peek dock (line → tap opens → swipe to
-            select). ON reverts to the old always-visible in-pane dock. */}
+        {/* ON (default) = the always-visible dock inside the study pane.
+            OFF = the newer bottom-centre peek dock (line → tap opens → swipe
+            to select). Remembered per device. */}
         {settingsRow("Always-visible footer dock", legacyFooterDock, (next) => onLegacyFooterDockChange(next), "footerDock")}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.

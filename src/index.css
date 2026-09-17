@@ -2013,6 +2013,49 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   display: none !important;
 }
 
+/* ── Course Player BRAIN tab: the revision test-taking design, scaled ─────
+   The Brain tab renders the revision test-taking page exactly
+   (src/revision/pages/TestPlayerPage.tsx) inside the player's study pane
+   (src/course/CourseBrainPanel.tsx). Every metric that page fixes in px is
+   written here as `calc(<that px> * var(--brain-scale))`, and this is the one
+   place the scale is decided:
+
+     · on a phone (the design's own home, 360–560 px) the scale is 1, so the
+       Brain page IS the revision page, pixel for pixel;
+     · as the pane gets wider the type, the answer tiles, the letter circles,
+       the review grid and the card padding all grow with it (up to 1.24),
+       so the design reads at tablet / desktop / landscape-rail sizes instead
+       of staying phone-sized in a wide pane.
+
+   Scaling the whole design (not just the prompt) is what keeps the
+   proportions identical: the 19 px question and the 56 px answer tile keep
+   their ratio at every width. */
+[data-course-brain-panel] {
+  --brain-scale: 1;
+}
+@media (min-width: 560px) {
+  [data-course-brain-panel] {
+    --brain-scale: 1.08;
+  }
+}
+@media (min-width: 820px) {
+  [data-course-brain-panel] {
+    --brain-scale: 1.16;
+  }
+}
+@media (min-width: 1200px) {
+  [data-course-brain-panel] {
+    --brain-scale: 1.24;
+  }
+}
+/* A SHORT pane (landscape phone rail) keeps the design at its phone size even
+   though the viewport is wide — height, not width, is what runs out there. */
+@media (max-height: 460px) {
+  [data-course-brain-panel] {
+    --brain-scale: 1;
+  }
+}
+
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
    landscape stages. The player measures its stage and switches layout; these
    rules keep every control inside the visible box on phone / tablet / desktop. */

@@ -17,6 +17,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   BadgePercent,
+  BrainCircuit,
   Check,
   CircleAlert,
   CircleCheck,
@@ -118,6 +119,7 @@ const RESOURCE_TYPE_LABEL = {
   ebook: "E-book",
   embed: "Embed",
   mindmap: "Mind map",
+  brain: "Practice set",
 };
 
 const RESOURCE_TYPE_ICON = {
@@ -133,6 +135,7 @@ const RESOURCE_TYPE_ICON = {
   ebook: Package,
   embed: Package,
   mindmap: Sparkles,
+  brain: BrainCircuit,
 };
 
 // ---------------------------------------------------------------------------

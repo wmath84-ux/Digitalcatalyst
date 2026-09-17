@@ -3,7 +3,9 @@ import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } fro
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
-import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, type DockTab } from "./course/CourseOverlay";
+import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
+import CourseBrainPanel from "./course/CourseBrainPanel";
+import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
 // The mind map canvas is the single heaviest thing in the player: the panel
@@ -162,6 +164,36 @@ const firstAccessibleFileInModule = (
 };
 
 /**
+ * First Brain practice set inside ONE module subtree — the deep-link fallback
+ * for a module whose ONLY content is a `brain` resource. A brain resource has
+ * no URL, so `firstAccessibleFileInModule` (which is about things you can
+ * watch) never returns one; without this, hero-slide links pointed at a
+ * "practice" module would silently fall back to the course's first lesson.
+ * Same access rules as its siblings: hidden/locked modules contribute nothing.
+ */
+const firstBrainFileInModule = (
+  module: CourseModule,
+  accessible: Set<string>,
+  inheritedLocked = false,
+): CourseFile | null => {
+  if (module.accessLevel === "hidden") return null;
+  const moduleLocked = inheritedLocked || !accessible.has(String(module.id));
+  const file = filesInModule(module).find((item) =>
+    item.accessLevel !== "hidden" &&
+    item.type === "brain" &&
+    (item.practiceQuestions?.length ?? 0) > 0 &&
+    !moduleLocked &&
+    (item.accessLevel !== "paidUpdate" || accessible.has(String(accessId(item)))),
+  );
+  if (file) return file;
+  for (const child of module.modules || []) {
+    const nested = firstBrainFileInModule(child, accessible, moduleLocked);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+/**
  * Find the module that DIRECTLY owns a file (by file id), recursing through
  * the nested tree. Hidden modules are skipped so a file that lives under a
  * now-hidden branch never reports a stale owner. Returns null when the file
@@ -254,18 +286,25 @@ const loadCourseSnow = (): boolean => {
 // on a phone that IS in desktop-site mode starts in the readable mobile
 // rendering, because that is the whole point of the control.
 // ── Footer dock mode ─────────────────────────────────────────────────────
-// OFF (default) = the newer bottom-centre PEEK dock: a thin frosted line at
-// the bottom centre of the player; tap/hover opens the footer navigation and
-// swiping left/right selects the tab under the finger on release — the exact
-// pattern the desktop shell already uses. ON = the original always-visible
-// dock inside the study pane. Remembered per device; the owner asked for the
-// toggle to default to OFF because the peek dock is the better interaction.
+// ON = the always-visible dock inside the study pane (Player settings →
+// "Always-visible footer dock"). OFF = the bottom-centre PEEK dock: a thin
+// frosted line at the bottom centre of the player; tap/hover opens the footer
+// navigation and swiping left/right selects the tab under the finger on
+// release — the exact pattern the desktop shell already uses.
+//
+// DEFAULT IS ON: the owner asked for "Always-visible footer dock" to be the
+// out-of-the-box state, so a device that has never touched the toggle gets
+// the always-visible dock. The choice is still remembered per device, so a
+// learner who explicitly switches it off keeps the peek dock — only the
+// "never chose" value changed (missing key → ON, "0" → OFF, "1" → ON).
 const legacyFooterDockStorageKey = "dc.coursePlayerLegacyFooterDock";
 const loadLegacyFooterDock = (): boolean => {
   try {
-    return localStorage.getItem(legacyFooterDockStorageKey) === "1";
+    // Absent key = never chosen = ON (the new default). Only an explicit "0"
+    // from the player's own setting turns the always-visible dock off.
+    return localStorage.getItem(legacyFooterDockStorageKey) !== "0";
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -329,7 +368,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (!initialModuleId) return null;
     const target = findModuleById(modules, initialModuleId);
     if (!target) return null;
-    return firstAccessibleFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
+    const watchable = firstAccessibleFileInModule(target, resolution.accessibleModuleIds);
+    if (watchable) return watchable.id;
+    // A module that holds nothing watchable but DOES hold a Brain set (the
+    // "practice" module) is still a real deep-link target: open the set.
+    return firstBrainFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
   }, [initialModuleId, modules, resolution.accessibleModuleIds]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
@@ -342,6 +385,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const [playbackReady, setPlaybackReady] = useState(false);
   // Bottom dock state — which of the seven footer tabs the study pane shows.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
+  /**
+   * The Brain practice set the learner just tapped in the Modules list (or
+   * resumed). The Brain tab opens it once and hands the pin back — the panel
+   * owns the rest of the practice session (src/course/CourseBrainPanel).
+   */
+  const [brainOpenSetId, setBrainOpenSetId] = useState<string | null>(null);
   // ZIP Lumen chat is lazy-loaded on first AI tab open, then stays mounted
   // (hidden) so conversation state survives tab switches.
   const [aiOpened, setAiOpened] = useState(false);
@@ -354,6 +403,33 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // and the study pane (tabs + footer dock) on the other. Tapping the active
   // dock tab peek-collapses the study pane; the divider drags it back.
   const splitDeckRef = useRef<SplitDeckHandle | null>(null);
+  /**
+   * Every Brain practice set this learner may open — the course tree's `brain`
+   * resources (the sets the admin imported on the Product / Course-content
+   * page), filtered by the SAME access rule the modules list uses, so a paid
+   * module's practice never leaks to a learner who has not unlocked it.
+   */
+  const brainSets = useMemo(
+    () => collectBrainPracticeSets(modules, unlockedModuleIds(modules, resolution.accessibleModuleIds, resolution.ownedUpdateIds)),
+    [modules, resolution.accessibleModuleIds, resolution.ownedUpdateIds],
+  );
+
+  /**
+   * Open a Brain practice set: pin it for the panel, switch the study pane to
+   * the Brain tab and make sure the split is showing it. Used by the Modules
+   * list (a brain resource row), by resume, and by anything else that wants to
+   * take the learner straight to their practice.
+   */
+  const openBrainSet = useCallback((setId: string) => {
+    setBrainOpenSetId(setId);
+    setDockTab("brain");
+    splitDeckRef.current?.activateStudy();
+  }, []);
+  // Resume-into-practice happens at most once per set per player visit, so a
+  // late-arriving course tree can never pull the learner back to the Brain tab
+  // after they have navigated away.
+  const resumedBrainSetRef = useRef<string | null>(null);
+
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const [isLandscape, setIsLandscape] = useState(false);
   // ── TOP PROGRESS + CENTER COMPLETION ────────────────────────────────────
@@ -377,8 +453,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
-  // Footer navigation mode: OFF = the bottom-centre peek dock (default), ON =
-  // the legacy always-visible in-pane dock (Player settings).
+  // Footer navigation mode: ON = the always-visible in-pane dock (default,
+  // Player settings → "Always-visible footer dock"), OFF = the bottom-centre
+  // peek dock.
   const [legacyFooterDock, setLegacyFooterDock] = useState<boolean>(loadLegacyFooterDock);
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
@@ -508,6 +585,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // module id as "nothing to load yet".
   const moduleIdByFileId = useMemo(() => collectModuleIdByFileId(modules), [modules]);
   const activeMindMapModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] : undefined;
+  // ── Per-module Brain practice ───────────────────────────────────────────
+  // The Brain tab follows the module of the lesson being watched, exactly
+  // like the mind map above: same module ⇒ same practice sets, and the tab
+  // can be re-scoped by hand from its own module chip row.
+  const activeBrainModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] ?? null : null;
   const activeMindMapModuleTitle = activeMindMapModuleId ? moduleTitleById[activeMindMapModuleId] || "" : "";
   const mindMap = useCourseMindMap({
     uid: user?.id,
@@ -715,9 +797,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (selectedFile || files.length === 0) return;
     // A deep-linked module (hero slide tap) wins over "first lesson".
     const deep = deepLinkFileId ? files.find((file) => file.id === deepLinkFileId) : null;
+    // A deep link that lands on a Brain resource (a module whose content IS the
+    // practice set) opens it on the Brain tab — the viewer stack never receives
+    // a file type it cannot render. `files` above is URL-only, so the set is
+    // matched against the access-filtered `brainSets` the Brain tab itself uses.
+    const deepBrain = deepLinkFileId ? brainSets.find((set) => set.id === deepLinkFileId) : null;
+    if (deepBrain) {
+      openBrainSet(deepBrain.id);
+      return;
+    }
     const first = deep || firstAccessibleFile(modules, resolution.accessibleModuleIds);
+    if (first?.type === "brain") {
+      if (brainSets.some((set) => set.id === first.id)) openBrainSet(first.id);
+      return;
+    }
     if (first) setSelectedFile(first);
-  }, [files, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules]);
+  }, [files, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules, brainSets, openBrainSet]);
 
   // Resume the last opened file when the Firestore listener delivers the id.
   // A deep-link open is the learner's explicit "take me to THIS module" intent,
@@ -734,13 +829,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (!lastOpenedFileId || deepLinkFileId || userSelectedRef.current) return;
     const match = files.find((file) => file.id === lastOpenedFileId);
     if (!match) return;
+    // Resume straight into a practice set the same way tapping it does.
+    if (match.type === "brain") {
+      if (brainSets.some((set) => set.id === match.id) && resumedBrainSetRef.current !== match.id) {
+        resumedBrainSetRef.current = match.id;
+        openBrainSet(match.id);
+      }
+      return;
+    }
     const owner = owningModuleForFile(modules, match.id);
     const moduleAccessible = owner ? resolution.accessibleModuleIds.has(String(owner.id)) : true;
     const filePaidLocked = match.accessLevel === "paidUpdate"
       && Boolean(match.paidUpdateId)
       && !resolution.ownedUpdateIds.has(String(accessId(match)));
     if (moduleAccessible && !filePaidLocked) setSelectedFile(match);
-  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules]);
+  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules, brainSets, openBrainSet]);
 
   /**
    * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
@@ -879,7 +982,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     persistLocalNotes(user.id, product.id, next);
   };
 
+  /**
+   * Mark a Brain resource complete. Unlike the lesson toggle this is
+   * one-directional: passing a practice set completes its module resource and
+   * never un-completes it (nothing about the learner's progress should regress
+   * because they practised again). `arrayUnion` is idempotent, so a repeat
+   * pass cannot duplicate the id.
+   */
+  const markFileComplete = useCallback(async (fileId: string) => {
+    if (!user || !progressRef) return;
+    setCompletedIds((current) => (current.has(fileId) ? current : new Set([...current, fileId])));
+    await setDoc(progressRef, {
+      productId: product.id,
+      completedFileIds: arrayUnion(fileId),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }, [product.id, progressRef, user]);
+
   const selectFile = (file: CourseFile) => {
+    // A Brain resource is not a document to open — it is the practice set on
+    // the Brain tab, so selecting it takes the learner there instead of
+    // handing an un-viewable type to the viewer stack.
+    if (file.type === "brain") {
+      userSelectedRef.current = true;
+      openBrainSet(file.id);
+      return;
+    }
     // Switching modules must PAUSE the outgoing lesson rather than let it keep
     // playing in the background. `ResourceViewer` does that itself the moment
     // it stops being the active file (see its `active` prop).
@@ -960,7 +1088,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   const totalEligibleFiles = useMemo(() => {
     const inaccessibleModuleIds = resolution.lockedModuleIds;
-    return files.filter((file) => {
+    // Brain practice sets are completable content: passing one marks its
+    // resource complete (markFileComplete), so it must sit in the DENOMINATOR
+    // as well — otherwise a passed set would push the progress percentage past
+    // 100%. `brainSets` is already the access-filtered list (locked modules and
+    // paid modules the learner does not own are not in it), so the denominator
+    // and the Brain tab can never disagree about what exists.
+    const brainFiles = brainSets.map((set) => ({ id: set.id }) as CourseFile);
+    const eligible = files.filter((file) => {
       const visit = (node: CourseModule): boolean => {
         const fileIds = filesInModule(node).map((f) => f.id);
         if (fileIds.includes(file.id)) return !inaccessibleModuleIds.has(String(node.id));
@@ -974,9 +1109,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }
       return false;
     });
-  }, [files, modules, resolution.lockedModuleIds]);
+    return [...eligible, ...brainFiles];
+  }, [files, modules, resolution.lockedModuleIds, brainSets]);
 
-  const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
+  // Clamped: a completed id that is no longer eligible (content removed, module
+  // locked after a refund) can never render more than a full bar.
+  const progress = totalEligibleFiles.length ? Math.min(100, Math.round((completedIds.size / totalEligibleFiles.length) * 100)) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
   // The top progress bar's completion interaction is available for exactly the
   // files that can join official completion (never personal My Modules
@@ -1175,6 +1313,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // whole player (<CoursePeekDock /> below), so the study pane renders no
       // footer of its own. The legacy preference keeps the in-pane dock.
       peekDock={!legacyFooterDock}
+      // ── Brain tab: the course's practice sets, rendered with the revision
+      // test-taking design. Owned here because it reads the course tree and
+      // reports completions into the learner's progress.
+      brainPanel={
+        <CourseBrainPanel
+          productId={product.id}
+          sets={brainSets}
+          activeModuleId={activeBrainModuleId}
+          completedFileIds={completedIds}
+          openSetId={brainOpenSetId}
+          onOpenedSet={() => setBrainOpenSetId(null)}
+          onPass={(fileId) => {
+            void markFileComplete(fileId);
+          }}
+        />
+      }
       aiPanel={
         user?.id && aiOpened ? (
           <Suspense

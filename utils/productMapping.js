@@ -32,6 +32,8 @@
 //     the URL); but **never** remove a module — modules are commerce records
 //     even without valid resources.
 
+import { normalizePracticeQuestions, practiceQuestionsReady } from "./practiceSet.js";
+
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isString = (v) => typeof v === "string";
 
@@ -103,9 +105,35 @@ const normResourceType = (v) => {
     s === "gform" || s === "google_form" ||
     s === "ebook" ||
     s === "github_pages" || s === "whimsical" || s === "iframe" ||
+    s === "brain" ||
     s === "doc" || s === "sheet" || s === "embed" || s === "mindmap"
   ) return s;
   return "embed";
+};
+
+// ---------------------------------------------------------------------------
+// Brain practice sets (resource type `brain`)
+// ---------------------------------------------------------------------------
+//
+// A Brain resource carries no URL at all — its content IS the question set the
+// admin imported on the Product / Course-content page (see
+// utils/practiceSet.js and PracticeSetImportPanel.tsx). Every mapper below
+// therefore treats it as usable when it has questions, NOT when it has a link;
+// without this the URL-only rule would silently drop the whole practice set
+// before it ever reached the Course Player's Brain tab.
+
+const isBrainResourceType = (type) => type === "brain";
+
+/** The questions a resource carries, normalised (capped, ids unique). */
+const practiceQuestionsOf = (raw) => normalizePracticeQuestions(raw && raw.practiceQuestions);
+
+/** Title shown on the Brain tab for this set (falls back to the resource name). */
+const practiceTitleOf = (raw) => str(raw && (raw.practiceTitle || raw.practiceTitleText)).trim();
+
+/** A Brain resource is publishable when it holds a complete, answerable set. */
+const isUsableResource = (type, url, youtubeVideoId, raw) => {
+  if (isBrainResourceType(type)) return practiceQuestionsReady(raw && raw.practiceQuestions);
+  return Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
 };
 
 // ---------------------------------------------------------------------------
@@ -134,7 +162,7 @@ const toPlayerResourceType = (raw) => toCanonicalResourceType(raw);
 // URL validation — the canonical rule (the legacy `src/utils/courseContent.ts` shim was deleted).
 const VALID_URL_TYPES = new Set([
   "youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "image",
-  "google_form", "ebook", "embed", "mindmap", "iframe",
+  "google_form", "ebook", "embed", "mindmap", "iframe", "brain",
   "video_url", "audio_url", "image_url", "gdrive", "gdoc", "gsheet",
   "gslides", "gform", "github_pages", "whimsical",
 ]);
@@ -279,9 +307,10 @@ export const editorResourceToCanonical = (raw) => {
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
-  // Sanity rule: a YouTube resource may be valid via its videoId alone.
-  const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
-  if (!hasUsableLink) return null; // not a URL-acceptable record
+  // Sanity rule: a YouTube resource may be valid via its videoId alone, and a
+  // Brain resource is valid via its questions alone (it has no link at all).
+  const hasUsableLink = isUsableResource(type, url, youtubeVideoId, raw);
+  if (!hasUsableLink) return null; // not an acceptable record
 
   return {
     id: str(raw.id),
@@ -303,6 +332,10 @@ export const editorResourceToCanonical = (raw) => {
       : str(raw.paidUpdateId),
     // Carry the bare id so URL-less YouTube records survive the round trip.
     youtubeVideoId: type === "youtube" ? youtubeVideoId || undefined : undefined,
+    // The Brain practice set travels WITH the resource: it is the resource's
+    // content, not a link to it.
+    practiceQuestions: isBrainResourceType(type) ? practiceQuestionsOf(raw) : undefined,
+    practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
   };
 };
 
@@ -380,7 +413,7 @@ export const editorResourceToFirestore = (raw) => {
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
-  const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
+  const hasUsableLink = isUsableResource(type, url, youtubeVideoId, raw);
   if (!hasUsableLink) return null;
 
   const out = {
@@ -409,6 +442,11 @@ export const editorResourceToFirestore = (raw) => {
     // Legacy Player bridge fields.
     paidUpdatePrice: numOrNull(raw.cashPrice) === null ? undefined : `₹${numOrNull(raw.cashPrice)}`,
     paidUpdateCoinPrice: numOrNull(raw.coinPrice) || 0,
+    // The Brain set travels into `courseContent.files[]` too, because that is
+    // the tree the Course Player reads (documentId → canonicalModules →
+    // courseContent).
+    practiceQuestions: isBrainResourceType(type) ? practiceQuestionsOf(raw) : undefined,
+    practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
   };
   // Firestore rejects `undefined` field values outright, so the optional
   // slots above (embedUrl / youtubeUrl / youtubeVideoId / paidUpdatePrice)
@@ -574,6 +612,10 @@ export const firestoreResourceToEditor = (raw) => {
     // resource id. The editor keeps resources keyed by their `id`, which is
     // the resource entitlement id.
     entitlementId: str(raw.entitlementId, str(raw.id)),
+    // Brain practice sets come back into the editor so the admin can reopen,
+    // edit, extend or re-import the same set.
+    practiceQuestions: practiceQuestionsOf(raw).length ? practiceQuestionsOf(raw) : undefined,
+    practiceTitle: practiceTitleOf(raw) || undefined,
     parentModuleId: raw.parentModuleId === null || raw.parentModuleId === undefined || raw.parentModuleId === ""
       ? null
       : str(raw.parentModuleId),
@@ -708,7 +750,7 @@ export const firestoreResourceToCanonical = (raw) => {
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
-  const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
+  const hasUsableLink = isUsableResource(type, url, youtubeVideoId, raw);
   if (!hasUsableLink) return null;
   return {
     id: str(raw.id),
@@ -729,6 +771,8 @@ export const firestoreResourceToCanonical = (raw) => {
       ? null
       : str(raw.paidUpdateId),
     youtubeVideoId: type === "youtube" ? youtubeVideoId || undefined : undefined,
+    practiceQuestions: isBrainResourceType(type) ? practiceQuestionsOf(raw) : undefined,
+    practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
   };
 };
 
@@ -830,6 +874,10 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     paidUpdateId: str(resolvedUpdateId || r.paidUpdateId || "") || undefined,
     paidUpdatePrice: r.cashPrice === null || r.cashPrice === undefined ? undefined : `₹${r.cashPrice}`,
     paidUpdateCoinPrice: numOrNull(r.coinPrice) || 0,
+    // The Brain tab's content: the questions the admin imported for this
+    // module, carried through to the Course Player untouched.
+    practiceQuestions: isBrainResourceType(toPlayerResourceType(r.type)) ? practiceQuestionsOf(r) : undefined,
+    practiceTitle: isBrainResourceType(toPlayerResourceType(r.type)) ? practiceTitleOf(r) || undefined : undefined,
   };
 };
 
