@@ -33,12 +33,9 @@ import { db } from "../../firebase";
 import {
   normalizeDocsEditorAccess,
   normalizeDocsEditorAccessMap,
-  normalizeDrivePersonalCopySettings,
   type DocsEditorAccess,
   type DocsEditorAccessMap,
-  type DrivePersonalCopySettings,
 } from "../utils/courseEmbed";
-import { getGoogleClientId } from "../../utils/googleIdentity";
 
 /** What ships when the admin has never touched the switches.
  *  "full" — the complete docs.google.com page (header, menu bar AND
@@ -53,20 +50,13 @@ const DEFAULT_MAP: DocsEditorAccessMap = {
   slides: DEFAULT_DOCS_EDITOR_ACCESS,
 };
 
-const DEFAULT_PERSONAL_COPY: DrivePersonalCopySettings = {
-  clientId: "",
-  byType: { doc: false, sheet: false, slides: false, drive: false },
-};
-
 export interface CourseGoogleSettings {
   editorAccess: DocsEditorAccessMap;
-  personalCopy: DrivePersonalCopySettings;
 }
 
 export function useDocsEditorAccess(): CourseGoogleSettings {
   const [settings, setSettings] = useState<CourseGoogleSettings>({
     editorAccess: DEFAULT_MAP,
-    personalCopy: DEFAULT_PERSONAL_COPY,
   });
 
   useEffect(() => {
@@ -79,15 +69,11 @@ export function useDocsEditorAccess(): CourseGoogleSettings {
         const legacy = normalizeDocsEditorAccess(data?.docsEditorAccess, DEFAULT_DOCS_EDITOR_ACCESS);
         setSettings({
           editorAccess: normalizeDocsEditorAccessMap(data?.docsEditorAccessByType, legacy),
-          // The stored Client ID wins; the VITE_GOOGLE_CLIENT_ID env value
-          // (already used for Google sign-in) is the fallback so most
-          // installs need zero extra configuration.
-          personalCopy: normalizeDrivePersonalCopySettings(data?.drivePersonalCopy, getGoogleClientId()),
         });
       },
       // Settings being unreadable must never break the player — fall back
-      // to the compact defaults rather than surfacing an error.
-      () => setSettings({ editorAccess: DEFAULT_MAP, personalCopy: DEFAULT_PERSONAL_COPY }),
+      // to the editor defaults rather than surfacing an error.
+      () => setSettings({ editorAccess: DEFAULT_MAP }),
     );
   }, []);
 

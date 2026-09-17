@@ -26,6 +26,14 @@ We confirmed there is no in-repo consent configuration:
 Do **not** attempt a code workaround (e.g. custom sign-in chrome) — Google
 policy requires its own consent UI for OAuth.
 
+## Current scope boundary
+
+The production web client uses Firebase `GoogleAuthProvider` for basic identity
+sign-in only (`openid`, `email` and `profile`). It does **not** request a Google
+Drive scope. Course-file access is a separate email gate fulfilled by the
+owner-controlled server/Apps Script workflow; do not add a restricted Drive
+scope merely to change branding or satisfy verification.
+
 ## Manual steps required (Google Cloud Console)
 
 In the Google Cloud project backing this Firebase project

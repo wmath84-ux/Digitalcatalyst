@@ -43,10 +43,8 @@ import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { buildPersonalCopyUrl, editableGoogleKind, getCourseDownload, getCourseEmbed, getDriveSourceFileId, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, personalCopyKind, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
-import { usePersonalDriveCopy } from "../hooks/usePersonalDriveCopy";
-import { useAuth } from "../context/AuthContext";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 /**
@@ -70,10 +68,6 @@ export interface CourseFileActions {
   canEditInline: boolean;
   editMode: boolean;
   onToggleEditMode: () => void;
-  personalCopyEnabled: boolean;
-  personalCopyActive: boolean;
-  personalCopyBusy: boolean;
-  onTogglePersonalCopy: () => void;
 }
 
 const SUPPORTED_KINDS = new Set([
@@ -145,7 +139,7 @@ interface ResourceViewerProps {
   onPlaybackChange?: (fileId: string, patch: CoursePlaybackPatch) => void;
   /**
    * The viewer owns no visible chrome — its action buttons (open / download /
-   * fullscreen / editor / personal copy) are reported through this callback
+   * fullscreen / editor) are reported through this callback
    * so the Course Player's Player panel can list them for the ACTIVE file.
    * `null` unregisters when this viewer stops being the active one.
    */
@@ -203,87 +197,32 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
   // binaries have no editor endpoint, so no switch exists for them.
   // Editing still requires the learner to have edit permission on the
   // file (Google enforces that; no client code can bypass it).
-  const { editorAccess: accessByType, personalCopy: personalCopySettings } = useDocsEditorAccess();
+  const { editorAccess: accessByType } = useDocsEditorAccess();
   const editableKind = editableGoogleKind(file);
   const editorAccess = editableKind ? accessByType[editableKind] : "off";
   const editorChrome: DocsEditorChrome = editorAccess === "full" ? "full" : "toolbar";
   const canEditInline = editorAccess !== "off" && isEditableGoogleFile(file);
-  // Google Docs / Sheets / Slides open DIRECTLY in the editor (full toolbar
-  // +, with "full" chrome, Google's header) whenever the admin hasn't
-  // disabled the editor for that file type — learners who were granted
-  // editor permission no longer have to hunt for a toggle to see it. The
-  // header toggle still switches back to the read-only preview at any time.
+  // Google Docs / Sheets / Slides open DIRECTLY in the editor whenever the
+  // admin has enabled it for that file type. No learner Drive OAuth is used;
+  // Google itself enforces the document's sharing/edit permission inside the
+  // editor frame.
   const [editMode, setEditMode] = useState(canEditInline);
-
-  // ── Personal copy (admin-controlled, PER FILE TYPE) ─────────────────
-  // When the admin enables "Personal copy" for this file's family AND an
-  // OAuth Client ID is configured, the learner gets a "My copy" toggle:
-  // the first tap runs Google's consent popup + Drive `files.copy`, so a
-  // private copy lands in the STUDENT's own Drive (they own it → editing
-  // always works, master stays untouched). The mapping is remembered in
-  // `users/{uid}/driveCopies/{sourceFileId}`, so later taps are instant.
-  const { user } = useAuth();
-  const copyKind = personalCopyKind(file);
-  const driveSourceId = getDriveSourceFileId(file);
-  const personalCopyEnabled = Boolean(
-    copyKind && driveSourceId && personalCopySettings.clientId && personalCopySettings.byType[copyKind],
-  );
-  const copyState = usePersonalDriveCopy({
-    uid: personalCopyEnabled ? user?.id : null,
-    sourceFileId: driveSourceId,
-    copyName: `${file.name || "Course file"} — ${user?.name || "my"} copy`,
-    clientId: personalCopySettings.clientId,
-  });
-  const [copyMode, setCopyMode] = useState(false);
-  const personalCopyUrl = personalCopyEnabled && copyKind && copyState.copyFileId
-    ? buildPersonalCopyUrl(copyKind, copyState.copyFileId, editorChrome)
-    : "";
-  const showPersonalCopy = personalCopyEnabled && copyMode && Boolean(personalCopyUrl);
-  const copyBusy = copyState.status === "authorizing" || copyState.status === "copying";
 
   // ── Desktop/mobile switch while an editor is open ─────────────────────
   // The viewport choice only changes the PREVIEW rendering: the editor URL
   // is identical in both modes (Google has no mobile editor), so flipping
-  // the header's desktop/mobile button while the editor — or a personal
-  // copy — is on stage would appear to do nothing at all. Flipping it
-  // therefore exits the editor straight into the preview of the newly
-  // chosen viewport, which is exactly what the learner asked to see.
+  // the header's desktop/mobile button while the editor is on stage exits
+  // edit mode and shows the requested preview.
   const previousDesktopViewRef = useRef(desktopView);
-  /** Bumped on every viewport flip so an in-flight copy can't re-enter edit. */
-  const viewportFlipRef = useRef(0);
   useEffect(() => {
     if (previousDesktopViewRef.current === desktopView) return;
     previousDesktopViewRef.current = desktopView;
-    viewportFlipRef.current += 1;
     setEditMode(false);
-    setCopyMode(false);
   }, [desktopView]);
-
-  const handleToggleCopyMode = useCallback(() => {
-    if (copyMode) { setCopyMode(false); return; }
-    setEditMode(false);
-    if (copyState.copyFileId) { setCopyMode(true); return; }
-    const flip = viewportFlipRef.current;
-    void copyState.createCopy().then(() => {
-      // The learner may have flipped the viewport while Drive was still
-      // copying; that flip exits editor modes, so don't drag them back in.
-      if (viewportFlipRef.current === flip) setCopyMode(true);
-    }).catch(() => undefined);
-  }, [copyMode, copyState.copyFileId, copyState.createCopy]);
-
-  // A non-blocking note must never overstay: it fades out on its own and
-  // can be dismissed immediately.
-  useEffect(() => {
-    if (!copyState.warningMessage) return undefined;
-    const timer = setTimeout(() => copyState.dismissWarning(), 8000);
-    return () => clearTimeout(timer);
-  }, [copyState.warningMessage, copyState.dismissWarning]);
 
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
-  const baseEmbed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode && !showPersonalCopy ? "edit" : "preview", editorChrome });
-  // The personal copy takes over the stage when active — same kind, own URL.
-  const embed = showPersonalCopy ? { url: personalCopyUrl, kind: baseEmbed.kind } : baseEmbed;
+  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview", editorChrome });
   const download = useMemo(() => getCourseDownload(file), [file]);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
@@ -302,15 +241,14 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
   // Forms already loaded their own reflowing mobile page above, so scaling
   // them a second time would shrink the text we just made readable.
   // The full Google editor manages its own layout — never scale it.
-  const isEditingInline = (canEditInline && editMode && !showPersonalCopy) || showPersonalCopy;
+  const isEditingInline = canEditInline && editMode;
   const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind) && !isEditingInline;
 
   // ── The action rows live in the Player panel, not on an on-screen bar ──
   // The Course Player shows NO header anywhere: whatever this viewer could
-  // do from its old top bar (open the original, download, go fullscreen,
-  // flip preview ⇄ Google editor, open a personal Drive copy) is reported
-  // to the player while this file is ACTIVE, so the footer dock's Player
-  // tab always lists the active module's own buttons.
+  // do from its old top bar (open the original, download, go fullscreen
+  // and flip preview ⇄ Google editor) is reported to the player while this
+  // file is ACTIVE, so the footer dock's Player tab follows the active file.
   const toggleFullscreen = useCallback(() => {
     const root = document.querySelector("[data-course-viewer][data-active=\"true\"]") || document.querySelector("[data-course-viewer]");
     if (!root) return;
@@ -318,7 +256,6 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
     else void (root as HTMLElement).requestFullscreen?.();
   }, []);
   const toggleEditMode = useCallback(() => {
-    setCopyMode(false);
     setEditMode((value) => !value);
   }, []);
   const fileKindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
@@ -330,52 +267,26 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
     onFileActions(file.id, {
       fileId: file.id,
       fileName: file.name,
-      kindLabel: `${fileKindLabel} ${showPersonalCopy ? "my copy" : isEditingInline ? "editor" : "preview"}`,
+      kindLabel: `${fileKindLabel} ${isEditingInline ? "editor" : "preview"}`,
       externalUrl,
       isYouTube,
       isMedia,
       download,
       onToggleFullscreen: toggleFullscreen,
-      canEditInline: canEditInline && !showPersonalCopy,
-      editMode: canEditInline && editMode && !showPersonalCopy,
+      canEditInline,
+      editMode: canEditInline && editMode,
       onToggleEditMode: toggleEditMode,
-      personalCopyEnabled,
-      personalCopyActive: showPersonalCopy,
-      personalCopyBusy: copyBusy,
-      onTogglePersonalCopy: handleToggleCopyMode,
     });
     return () => onFileActions(file.id, null);
   }, [
     active, onFileActions, file.id, file.name, fileKindLabel, externalUrl,
     isYouTube, isMedia, download, toggleFullscreen, canEditInline, editMode,
-    showPersonalCopy, isEditingInline, personalCopyEnabled, copyBusy,
-    toggleEditMode, handleToggleCopyMode,
+    isEditingInline, toggleEditMode,
   ]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-doc-mode={canEditInline ? (isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
 
-      {personalCopyEnabled && copyState.status === "error" && copyState.errorMessage ? (
-        <div className="border-b border-amber-300/40 bg-amber-500/15 px-4 py-2 text-xs font-semibold text-amber-200" role="alert" data-course-personal-copy-error>
-          {copyState.errorMessage}
-        </div>
-      ) : null}
-      {/*
-        The copy EXISTS — only remembering it for next time failed. Shown as
-        a quiet, dismissible note, never as the red "it didn't work" banner.
-      */}
-      {personalCopyEnabled && copyState.status !== "error" && copyState.warningMessage ? (
-        <div className="flex items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" role="status" data-course-personal-copy-warning>
-          {/* No dismiss button — the warning clears itself after 8s, and the
-              player carries no close buttons anywhere. */}
-          <span className="min-w-0 flex-1">{copyState.warningMessage}</span>
-        </div>
-      ) : null}
-      {copyBusy ? (
-        <div className="border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" data-course-personal-copy-busy>
-          {copyState.status === "authorizing" ? "Waiting for Google authorization…" : "Creating your personal copy in Google Drive…"}
-        </div>
-      ) : null}
       <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : ""}`}>
         {isImage ? (
           <ImageViewer
@@ -420,7 +331,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
             )}
           </div>
         ) : (
-          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={showPersonalCopy ? personalCopyUrl : isEditingInline ? getGoogleEditorUrl(file) : ""} />
+          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={isEditingInline ? getGoogleEditorUrl(file) : ""} />
         )}
       </div>
     </div>
@@ -737,8 +648,8 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
 
   // Google's full editor never reflows, so it is laid out at a desktop-class
   // width and scaled down to the stage (see EDITOR_VIEWPORT_WIDTHS). Only the
-  // three real editors qualify: a personal copy of a Drive binary is still an
-  // ordinary preview page and reflows on its own.
+  // three real editors qualify: ordinary Drive binaries stay in their
+  // read-only preview and reflow on their own.
   const editorViewportWidth = EDITOR_VIEWPORT_WIDTHS[kind] ?? 0;
   const scalesEditor = editMode && !mobileDocument && kind in EDITOR_VIEWPORT_WIDTHS;
   // Both paths need the live stage width.

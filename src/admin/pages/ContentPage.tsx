@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Field, LoadingState, PrimaryButton, SectionCard, inputClass } from "@/components/admin/ui";
+import { LoadingState, PrimaryButton, SectionCard } from "@/components/admin/ui";
 import { useToast, useUnsavedGuard } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 
@@ -27,15 +27,7 @@ type ContentSettings = {
    * editor endpoint, so no switch exists for them.
    */
   docsEditorAccessByType?: Partial<Record<"doc" | "sheet" | "slides", "off" | "toolbar" | "full">>;
-  /**
-   * Personal-copy feature (Drive `files.copy`): every student gets their
-   * OWN copy of the master file in their OWN Google Drive. Needs the
-   * public OAuth Client ID; each Google family has its own enable switch.
-   */
-  drivePersonalCopy?: {
-    clientId?: string;
-    byType?: Partial<Record<"doc" | "sheet" | "slides" | "drive", boolean>>;
-  };
+  /** Personal access is handled by the email-only server gate, not learner OAuth. */
 };
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +70,6 @@ export default function AppContentPage() {
         body: JSON.stringify({
           docsEditorAccess: settings?.docsEditorAccess ?? "full",
           docsEditorAccessByType: settings?.docsEditorAccessByType ?? {},
-          drivePersonalCopy: settings?.drivePersonalCopy ?? { clientId: "", byType: {} },
         }),
       });
       notify("success", "Course player settings saved.");
@@ -115,25 +106,6 @@ export default function AppContentPage() {
     patch({
       docsEditorAccess: value,
       docsEditorAccessByType: { doc: value, sheet: value, slides: value },
-    });
-
-  /** Personal-copy feature — every copyable Google family gets a switch. */
-  const personalCopyTypes: Array<{ key: "doc" | "sheet" | "slides" | "drive"; label: string; hint: string }> = [
-    { key: "doc", label: "Google Docs", hint: "Student edits their own document copy" },
-    { key: "sheet", label: "Google Sheets", hint: "Student edits their own spreadsheet copy" },
-    { key: "slides", label: "Google Slides", hint: "Student edits their own presentation copy" },
-    { key: "drive", label: "Drive files (PDF & others)", hint: "Student gets the file copied into their Drive" },
-  ];
-
-  const personalCopyOn = (key: "doc" | "sheet" | "slides" | "drive"): boolean =>
-    settings?.drivePersonalCopy?.byType?.[key] === true;
-
-  const setPersonalCopy = (key: "doc" | "sheet" | "slides" | "drive", value: boolean) =>
-    patch({
-      drivePersonalCopy: {
-        ...(settings?.drivePersonalCopy ?? {}),
-        byType: { ...(settings?.drivePersonalCopy?.byType ?? {}), [key]: value },
-      },
     });
 
   if (error) return <SectionCard title="Course Player"><p className="text-sm text-red-500">{error}</p></SectionCard>;
@@ -209,60 +181,13 @@ export default function AppContentPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Personal copies (Google Drive) — DEPRECATED">
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900">
-          <span className="font-black">P1: OAuth personal-copy flow killed.</span> Google OAuth consent screen + <code>drive.file</code> scope is no longer used (avoids Google verification). The player now shows a simple <strong>Gate personal access</strong> email field — no permission is requested. Copies are made by a service-account (inside Vercel via <code>GATE_DRIVE_SERVICE_ACCOUNT</code>) or by the outside Apps Script Web App (<code>gatePersonalAccess.gs</code> → <code>GATE_APPS_SCRIPT_URL</code>). The toggles below are kept for rollback but are ignored while the gate is active.
+      <SectionCard title="Personal access — email gate">
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-[11px] leading-relaxed text-emerald-900">
+          <span className="font-black">Learner OAuth is disabled.</span> The Course Player uses <strong>Gate personal access</strong>: the learner enters an email, confirms the request, and the authenticated server/owner-controlled Apps Script prepares and shares the course file. No Google Drive permission, OAuth client ID or learner access token is requested.
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          Old flow (kept for reference): one-tap personal Drive copy via OAuth. New flow: learner fills email in Course Player → confirmation → server/Apps Script copies and shares.
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          Configure the automation outside this page with <code>GATE_APPS_SCRIPT_URL</code> (recommended) or the server-side gate settings. Keep the Apps Script/Drive authorization separate from the main learner OAuth client. See the public <a className="font-bold text-violet-700 underline" href="/privacy-policy.html#google-data" target="_blank" rel="noreferrer">Google user data policy</a> for the data flow.
         </p>
-        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500 opacity-60">
-          <span className="font-bold text-slate-600">Legacy OAuth setup (deprecated):</span> paste your Google OAuth <strong>Client ID</strong> below — from Google Cloud Console → APIs &amp; Services → Credentials. Masters only need
-          &ldquo;Anyone with the link → Viewer&rdquo; sharing.
-        </div>
-        <Field label="Google OAuth Client ID" hint="Leave blank to use the VITE_GOOGLE_CLIENT_ID the app already uses for Google sign-in">
-          <input
-            className={inputClass}
-            placeholder="1234567890-abc123.apps.googleusercontent.com"
-            value={settings.drivePersonalCopy?.clientId ?? ""}
-            data-admin-drive-client-id
-            onChange={(e) =>
-              patch({
-                drivePersonalCopy: { ...(settings.drivePersonalCopy ?? {}), clientId: e.target.value },
-              })
-            }
-          />
-        </Field>
-        <div className="mt-3 space-y-2" data-admin-personal-copy>
-          {personalCopyTypes.map((type) => {
-            const enabled = personalCopyOn(type.key);
-            return (
-              <button
-                key={type.key}
-                type="button"
-                disabled
-                title="OAuth personal copy disabled — gate (email) is now the only path. Clear this toggle to keep it off."
-                onClick={() => setPersonalCopy(type.key, !enabled)}
-                data-personal-copy-type={type.key}
-                aria-pressed={enabled}
-                className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition ${
-                  enabled ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200" : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-              >
-                <span>
-                  <span className={`block text-sm font-bold ${enabled ? "text-emerald-900" : "text-slate-800"}`}>{type.label}</span>
-                  <span className="mt-0.5 block text-[11px] text-slate-500">{type.hint}</span>
-                </span>
-                <span
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300"}`}
-                  aria-hidden="true"
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${enabled ? "left-[calc(100%-1.375rem)]" : "left-0.5"}`} />
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </SectionCard>
 
       <PrimaryButton className="w-full" loading={saving} onClick={save}>

@@ -18,6 +18,9 @@ export default function Footer() {
             {tagline ? <span className="text-white/55"> | {tagline}</span> : null}
           </span>
         </div>
+        <p className="max-w-xl text-center text-xs leading-relaxed text-white/45 sm:text-left">
+          Google Sign-In uses basic account identity details to create your Eduvora account. Course-player personal access uses an email you provide and does not request Google Drive permission.
+        </p>
         <p className="text-xs">© {new Date().getFullYear()} {appName}. All rights reserved.</p>
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <button

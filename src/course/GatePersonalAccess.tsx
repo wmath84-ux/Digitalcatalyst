@@ -16,8 +16,9 @@ interface GatePersonalAccessProps {
 }
 
 /**
- * P1: Gate personal access — replaces Google OAuth personal-copy flow.
- * The learner never sees an OAuth consent screen. They fill ONE email field
+ * Gate personal access uses the owner-side sharing workflow instead of
+ * learner-facing Google Drive OAuth. The learner never sees an OAuth consent screen.
+ * They fill ONE email field
  * (heading "Gate personal access") in the Course Player settings and confirm
  * on submit. The request is recorded and — when a service-account / Apps Script
  * is configured — the master Drive file is copied and shared with that email
@@ -56,7 +57,7 @@ export default function GatePersonalAccess({ fileId, fileUrl, fileName, productI
       setError("No file to gate — open a lesson file first.");
       return;
     }
-    const confirmed = typeof window !== "undefined" ? window.confirm(`Send a personal copy to ${trimmed}?\n\nYou will receive a Drive share email and the copy will appear in your Drive.`) : true;
+    const confirmed = typeof window !== "undefined" ? window.confirm(`Send a personal copy to ${trimmed}?\n\nYou will receive a Drive share email. No Google Drive permission will be requested from this app.`) : true;
     if (!confirmed) return;
     setSubmitting(true);
     try {
@@ -96,7 +97,8 @@ export default function GatePersonalAccess({ fileId, fileUrl, fileName, productI
         <Mail size={14} className="text-cyan-200" /> Gate personal access
       </h3>
       <p className="mt-1 text-[11px] font-medium leading-relaxed text-white/60">
-        Enter your email to receive a private, editable copy of this file in your own Google Drive. No Google permission is requested — the copy is prepared for you.
+        Enter your email to receive a private, editable copy of this file shared to your Google account. No Google Drive permission is requested — the course operator prepares the copy for you.
+        <a href="/privacy-policy.html#google-data" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-cyan-200 underline underline-offset-2">Privacy details</a>
       </p>
       <div className="mt-3 flex flex-col gap-2">
         <input

@@ -29,8 +29,8 @@
 //      outage) must NEVER strand a map the learner just drew, and the next
 //      mount pushes the device copy back up.
 //
-// This mirrors `src/hooks/usePersonalDriveCopy.ts`, which solves the same
-// "don't lose the learner's work" problem for Drive copies.
+// Like Notes, this also mirrors the latest local state so a temporary
+// Firestore failure never strands the learner's work.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";

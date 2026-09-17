@@ -146,10 +146,10 @@ test("only hosts lacking a mobile endpoint fall back to the narrow-frame trick",
 test("the viewer resolves the embed url from the chosen viewport (and the edit/preview mode)", () => {
   // The viewport decision still happens BEFORE the URL is built; the viewer
   // additionally forwards the Google Docs full-editor mode when the learner
-  // toggles Edit in the header, and the personal-copy URL replaces the
-  // stage when the learner opens their own Drive copy.
-  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile", mode: canEditInline && editMode && !showPersonalCopy \? "edit" : "preview", editorChrome \}\)/);
-  assert.match(resourceViewer, /showPersonalCopy \? \{ url: personalCopyUrl, kind: baseEmbed\.kind \} : baseEmbed/);
+  // toggles Edit; the viewport and mode are resolved before rendering.
+  assert.match(resourceViewer, /viewport: desktopView \? "desktop" : "mobile"/);
+  assert.match(resourceViewer, /mode: canEditInline && editMode \? "edit" : "preview"/);
+  assert.doesNotMatch(resourceViewer, /showPersonalCopy|personalCopyUrl/);
 });
 
 test("the switch drives the document's layout viewport like the browser setting", () => {

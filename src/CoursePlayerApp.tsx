@@ -49,7 +49,7 @@ import {
   syncCourseLandscapeChromeColor,
 } from "./utils/courseStatusBar";
 import { enterCoursePlayerRotation, exitCoursePlayerRotation } from "./utils/appOrientation";
-import { getCourseEmbed, VIEWPORT_AWARE_KINDS, getDriveSourceFileId, personalCopyKind } from "./utils/courseEmbed";
+import { getCourseEmbed, VIEWPORT_AWARE_KINDS, getGateSourceFileId, gateResourceKind } from "./utils/courseEmbed";
 import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
 import {
   loadPlaybackStore,
@@ -340,9 +340,6 @@ const fileActionsSignature = (actions: CourseFileActions): string =>
     actions.download.fileName,
     actions.canEditInline ? "1" : "0",
     actions.editMode ? "1" : "0",
-    actions.personalCopyEnabled ? "1" : "0",
-    actions.personalCopyActive ? "1" : "0",
-    actions.personalCopyBusy ? "1" : "0",
   ].join("");
 
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId }: CoursePlayerProps) {
@@ -463,8 +460,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // ── Active-file action registry ─────────────────────────────────────────
   // The viewer stack keeps every opened file mounted. Whichever viewer is
   // ACTIVE reports its action model (open / download / fullscreen / editor /
-  // personal copy — the rows the file's own header used to carry) through
-  // this callback, and the footer dock's Player tab renders them. Deduped by
+  // personal-access gate — the rows the file's own header used to carry)
+  // through this callback, and the footer dock's Player tab renders them. Deduped by
   // signature so reporting an identical model never re-renders the player.
   const [fileActions, setFileActions] = useState<{ signature: string; model: CourseFileActions } | null>(null);
   const handleFileActions = useCallback((fileId: string, model: CourseFileActions | null) => {
@@ -1222,7 +1219,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
-      gateFile={selectedFile && personalCopyKind(selectedFile) ? { id: getDriveSourceFileId(selectedFile) || null, url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
+      gateFile={selectedFile && gateResourceKind(selectedFile) ? { id: getGateSourceFileId(selectedFile) || null, url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
       productId={product.id}
       moduleId={selectedFile ? String(owningModuleForFile(modules, String(selectedFile.id))?.id || "") : null}
     />
