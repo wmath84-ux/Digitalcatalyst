@@ -43,6 +43,7 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { EASE_OUT_MOTION } from "./splitMotion";
+import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
 export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player";
@@ -808,6 +809,10 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   /** Pane tab switches crossfade; the opt-out keeps them a plain swap. */
   const paneCrossfade = useReducedMotion() !== true;
 
+  // The player's one keyboard state — the footer navigation hides while the
+  // soft keyboard is open, whichever of its two homes is in use.
+  const { keyboardVisible } = useCourseKeyboard();
+
   // ── The seven tabs' rows ───────────────────────────────────────────────
   const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
@@ -856,9 +861,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // In PEEK mode the dock has moved out to the bottom centre of the whole
   // player (<CoursePeekDock />, rendered by the parent) and the study pane
   // renders no footer of its own — the parent passes `peekDock` accordingly.
+  //
+  // ── The ONE keyboard rule ──────────────────────────────────────────────
+  // While the soft keyboard is open this footer navigation is hidden as well,
+  // from the player's single keyboard state (useCourseKeyboard) — the same
+  // state the notes editor, the mind map and the AI chat take the deck over
+  // with. Otherwise the dock would sit in the strip of study pane the deck
+  // keeps above the keyboard, i.e. exactly between the keyboard and the
+  // writing surface. Hiding (not unmounting) preserves the pane's restore.
   const dock = props.peekDock ? null : (
     <div
-      className="relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2"
+      className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 ${keyboardVisible ? "hidden" : ""}`}
       data-course-dock
       data-orientation={orientation}
       data-in-split="true"

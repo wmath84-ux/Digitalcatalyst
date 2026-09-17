@@ -17,6 +17,10 @@ const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOffic
 const LumenChat = lazy(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
+// ONE keyboard-visible state for the whole player: the footer navigation (peek
+// dock + legacy in-pane dock), the Notes editor, the mind map and the AI chat
+// all read this same state — no feature carries its own keyboard detection.
+import { CourseKeyboardProvider } from "./course/useCourseKeyboard";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
 import { toast } from "./components/ui/glass-toast";
@@ -1216,7 +1220,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // what flips between row/column). Portrait keeps the lesson above the study
   // pane, landscape keeps it on the left, and the footer dock rides inside
   // the study pane / the bottom-centre peek dock in both.
+  //
+  // The whole shell sits inside <CourseKeyboardProvider>: one keyboard state
+  // for the player, consumed by the footer navigation and by the writing tabs.
   return (
+    <CourseKeyboardProvider scopeRef={playerShellRef}>
     <>
     <div
       ref={playerShellRef}
@@ -1301,7 +1309,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           studyIcon={activeStudyTab.icon}
           lesson={viewerStack}
           study={studyOverlay}
-          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap"}
+          // Every writing surface whose keyboard deserves the whole deck: the
+          // notes editor, the mind map and the AI Mentor chat input. The deck
+          // reacts to the player's ONE keyboard state (see useCourseKeyboard),
+          // so "keyboard open → module/course content hidden" is one rule, not
+          // three per-tab hacks.
+          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai"}
           solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player"}
           handleRef={splitDeckRef}
         />
@@ -1339,7 +1352,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           line at the bottom centre — tap/hover opens the footer, swipe
           left/right selects the tab under the finger. The "Always-visible
           footer dock" Player setting turns it off and restores the dock
-          inside the study pane. */}
+          inside the study pane.
+          The dock itself carries the ONE keyboard rule (it hides completely
+          while the keyboard is open — src/course/CoursePeekDock.tsx), so the
+          footer can never ride above the keyboard, between the keyboard and
+          the writing surface. */}
       {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} /> : null}
       {snowMode ? <SnowOverlay /> : null}
     </div>
@@ -1356,5 +1373,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       </Suspense>
     ) : null}
     </>
+    </CourseKeyboardProvider>
   );
 }

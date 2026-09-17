@@ -366,11 +366,18 @@ test("The soft keyboard lifts the study pane's content box only", () => {
 });
 
 test("The soft keyboard hands the whole deck to a writing tab, then hands it back", () => {
-  // While the keyboard is open over notes / mind map, the study pane takes
-  // the FULL deck (lesson + divider hidden); closing the keyboard restores
-  // the exact split, because the takeover is derived, never persisted.
-  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap"\}/);
-  assert.match(studyPanels, /const keyboardTakeover = keyboardInset > 0 && keyboardExpandEnabled && collapsed !== "study";/);
+  // While the keyboard is open over a writing tab the study pane takes the
+  // FULL deck (lesson + divider hidden); closing the keyboard restores the
+  // exact split, because the takeover is derived, never persisted.
+  //
+  // Extended since (see coursePlayerKeyboardFooterContract.test.mjs): the AI
+  // Mentor chat input is a writing surface too, and the takeover now reads the
+  // player's ONE keyboard state (`keyboardVisible`) alongside the deck's own
+  // inset — the inset alone is 0 when the layout viewport RESIZES under the
+  // keyboard instead of being overlaid. Notes / mind map behaviour is
+  // otherwise untouched.
+  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "ai"\}/);
+  assert.match(studyPanels, /const keyboardTakeover = \(keyboardInset > 0 \|\| keyboardVisible\) && keyboardExpandEnabled && collapsed !== "study";/);
   assert.match(studyPanels, /data-keyboard-takeover=\{keyboardTakeover \? "true" : undefined\}/);
   assert.match(studyPanels, /style=\{keyboardTakeover \? \{ display: "none" \} : lessonStyle\}/);
   assert.match(studyPanels, /\{keyboardTakeover \? null : \(/);

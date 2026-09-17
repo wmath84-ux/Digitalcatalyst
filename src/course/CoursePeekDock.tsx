@@ -22,6 +22,21 @@
 // The old always-visible in-pane dock is still one Player-settings row away:
 // the "Always-visible footer dock" preference (Player tab → Player settings)
 // turns this peek dock off and restores the study pane's dock.
+//
+// ── The ONE keyboard rule ────────────────────────────────────────────────
+// While the soft keyboard is open the footer navigation is HIDDEN — in both
+// of its homes (this peek dock and the legacy in-pane dock inside the study
+// pane). It must never appear above the keyboard, between the keyboard and
+// the writing surface: the screen belongs to the active feature (notes /
+// mind map / AI chat) plus the keyboard, nothing else.
+//
+// The answer comes from the player's single keyboard state
+// (`useCourseKeyboard()` — src/course/useCourseKeyboard.tsx), which is the
+// same state the study pane takes the deck over with, so the footer, the
+// lesson pane and the writing surface can never disagree. The dock is hidden
+// as a class rather than unmounted on purpose: dismissing the keyboard brings
+// back exactly the dock the learner had, with no remount flicker and no
+// chance of a second footer existing while the first animates away.
 
 'use client'
 
@@ -30,6 +45,7 @@ import { useMotionValue, type MotionValue } from 'framer-motion'
 import GlassDock, { type GlassDockItem } from '../components/glass-dock/GlassDock'
 import GlassMaterial from '../components/glass-dock/GlassMaterial'
 import { buildDockItems, type DockTab } from './CourseOverlay'
+import { useCourseKeyboard } from './useCourseKeyboard'
 
 /** Horizontal travel (px) below which a press counts as a tap, not a drag. */
 const DRAG_SELECT_THRESHOLD = 12
@@ -41,6 +57,9 @@ export default function CoursePeekDock({
   tab: DockTab
   onTabChange: (tab: DockTab) => void
 }) {
+  // The player's one keyboard state: while it says the keyboard is open, this
+  // footer navigation is hidden entirely (rule + reasoning in the header).
+  const { keyboardVisible } = useCourseKeyboard()
   // `hover` covers pointer (mouse) hover; `pinned` covers the touch tap
   // toggle. The dock is open while EITHER is true.
   const [hover, setHover] = useState(false)
@@ -136,13 +155,17 @@ export default function CoursePeekDock({
     pointerX.set(-200)
   }, [pointerX])
 
+  // `hidden` (display:none) takes the line AND the open dock out of the layout
+  // entirely — no strip of glass above the keyboard, and no hit strip either,
+  // so a stray tap near the keyboard can never open the footer mid-typing.
   return (
     <div
       ref={rootRef}
       data-course-peek-dock=""
       data-open={open ? 'true' : 'false'}
       data-pinned={pinned ? 'true' : 'false'}
-      className="fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center"
+      data-keyboard-hidden={keyboardVisible ? 'true' : 'false'}
+      className={`fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center ${keyboardVisible ? 'hidden' : ''}`}
     >
       <div
         data-course-peek-panel=""
