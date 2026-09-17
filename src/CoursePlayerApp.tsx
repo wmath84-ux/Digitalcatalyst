@@ -24,6 +24,7 @@ import CoursePeekDock from "./course/CoursePeekDock";
 // all read this same state — no feature carries its own keyboard detection.
 import { CourseKeyboardProvider } from "./course/useCourseKeyboard";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
+import ModuleFolderBurst from "./course/ModuleFolderBurst";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
 import { toast } from "./components/ui/glass-toast";
 import { trackFeatureEvent } from "./utils/featureAnalytics";
@@ -1510,6 +1511,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           the writing surface. */}
       {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} /> : null}
       {snowMode ? <SnowOverlay /> : null}
+      {/* ── Uiverse "Card" folder burst on the Module dock button ──────────
+          The existing Module tab is untouched; on click the uiverse
+          folder-card (great-wombat-13) appears above it, plays the exact
+          open animation in full, then closes back into icon form. */}
+      <ModuleFolderBurst />
     </div>
     {addOfficialOpen ? (
       <Suspense fallback={null}>
