@@ -180,7 +180,26 @@ availability agree by construction.
 
 ---
 
-## 5. Adding a file type — the whole checklist
+## 5. What the learner is told
+
+The registry decides what is read; the UI must say the same thing, or the
+learner draws their own (wrong) conclusion. Both are wired to the same strings:
+
+| Where | What is shown |
+|---|---|
+| "What the AI can read" panel (`src/ai/AiSourcesView.tsx`) | one row per file with its own state and reason, straight from `personalAiReadPlan` + the extraction outcome |
+| Coverage line, every AI tab (`AiCoverageLine`) | "3 of 4 files in this scope could be read." **plus the scope note** — which sub-modules were locked, which files had no readable link |
+| Under an answer (`src/ai/AiChatView.tsx`) | the answer's own `scopeNote`, because that is the scope the answer was actually built from |
+| Lumen chat | the same reason text, appended by `withGroundingNote()` — a refusal always names the file-level cause |
+
+`scopeNote` originates on the server (`api/_lib/personalAi.ts`) from the
+resolved scope, so it can never be a client-side guess about the learner's
+access; and it is deliberately phrased as "its files were not read", never as
+"you don't own this".
+
+---
+
+## 6. Adding a file type — the whole checklist
 
 1. `utils/aiFileReaders.js` — add the label and the registry row (`via`,
    `captions`, `payload`, `hasReadPath`, `visual`, `fallback`, `reason`).

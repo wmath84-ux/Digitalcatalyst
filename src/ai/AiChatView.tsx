@@ -189,7 +189,7 @@ export default function AiChatView({
                     ? `Questions here are scoped to “${resourceTitle}” first. I only use content I could actually read from it.`
                     : "Ask anything about the material in this module. I answer only from what I could actually read, and I show you exactly which resource each part came from."}
                 </p>
-                {ai.coverageSentence ? <AiCoverageLine coverage={ai.snapshot!.coverage} className="mt-2.5" /> : null}
+                {ai.coverageSentence ? <AiCoverageLine coverage={ai.snapshot!.coverage} note={ai.scopeNote} className="mt-2.5" /> : null}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {prompts.map((prompt) => (
@@ -409,6 +409,7 @@ export default function AiChatView({
             </div>
             <p className="py-2 text-[10px] font-medium leading-4 text-white/30">
               Answers come only from what the AI could read in this module{ai.snapshot ? ` · ${ai.snapshot.coverage.readable}/${ai.snapshot.coverage.total} resources readable` : ""}. Ask again if a file was still being read.
+              {ai.scopeNote ? <span className="text-white/40"> {ai.scopeNote}</span> : null}
             </p>
           </div>
         </div>

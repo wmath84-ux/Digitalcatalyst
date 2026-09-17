@@ -108,6 +108,13 @@ export interface ModuleAiController {
   deleteArtifact: (artifactId: string) => Promise<void>;
   hasReadableContent: boolean;
   coverageSentence: string;
+  /**
+   * The server's own explanation of THIS scope — which files were skipped and
+   * why ("2 sub-modules are not unlocked for your account", "0 of 4 files could
+   * be read"). Never a permission claim: it is the answer to "why didn't it read
+   * my module", and it is re-resolved by each answer.
+   */
+  scopeNote: string;
 }
 
 export function useModuleAi(input: UseModuleAiInput): ModuleAiController {
@@ -368,6 +375,7 @@ export function useModuleAi(input: UseModuleAiInput): ModuleAiController {
     deleteArtifact,
     hasReadableContent,
     coverageSentence: coverage?.sentence || "",
+    scopeNote: (answer?.scopeNote || snapshot?.scopeNote || "").replace(/\s+/g, " ").trim(),
   };
 }
 

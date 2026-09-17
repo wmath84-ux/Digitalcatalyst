@@ -186,3 +186,45 @@ test("an unreadable file explains itself per type, in the chat's own voice", () 
   assert.match(playerUi, /label: "Not shared yet"/);
   assert.doesNotMatch(playerUi, /label: "No API access"/, "the learner cannot act on our API access");
 });
+
+/* ── 5. what was NOT read is said out loud, in the panel ───────────── */
+
+/*
+ * The other half of the bug's story: even with real grounding, a module whose
+ * files are half-unreadable used to show a bare "0 of 4 readable", which reads
+ * exactly like "the AI has no access to my course". The server's `scopeNote` is
+ * therefore carried all the way to the coverage line — and it is the ANSWER's
+ * note that wins after an ask, because that is the scope the answer was built
+ * from.
+ */
+test("the scope note reaches the learner, not just the payload", () => {
+  const hook = read("src/ai/useModuleAi.ts");
+  const component = read("src/ai/components.tsx");
+  const types = read("src/types/personalAi.ts");
+  const chat = read("src/ai/AiChatView.tsx");
+
+  // The context snapshot keeps the server's note instead of dropping it, and the
+  // freshest note (the one from the answer just given) is preferred.
+  assert.match(types, /scopeNote\?: string;/);
+  assert.match(hook, /scopeNote: \(answer\?\.scopeNote \|\| snapshot\?\.scopeNote \|\| ""\)/);
+  // Rendered beside the coverage numbers, and deduplicated so the same sentence
+  // is never printed twice when the coverage line already says it.
+  assert.match(component, /export function AiCoverageLine\(\{ coverage, note, className \}/);
+  assert.match(component, /!coverage\.sentence\.includes\(trimmed\)/);
+  assert.match(component, /data-module-ai-scope-note=""/);
+  // Every workspace tab that shows coverage shows the note — no tab gets to look
+  // broken on its own.
+  for (const file of [
+    "src/ai/AiChatView.tsx", "src/ai/AiSourcesView.tsx", "src/ai/AiSummaryView.tsx",
+    "src/ai/AiQuestionsView.tsx", "src/ai/AiFlashcardsView.tsx", "src/ai/AiStudyModeView.tsx",
+  ]) {
+    const lines = read(file).split("\n").filter((line) => line.includes("<AiCoverageLine"));
+    assert.ok(lines.length > 0, `${file} lost its coverage line`);
+    for (const line of lines) {
+      assert.match(line, /note=\{ai\.scopeNote\}/, `${file}: coverage line must carry the scope note`);
+    }
+  }
+  // And the post-answer footer, which is where "it didn't read my module" is
+  // actually noticed.
+  assert.match(chat, /ai\.scopeNote \? <span className="text-white\/40">/);
+});

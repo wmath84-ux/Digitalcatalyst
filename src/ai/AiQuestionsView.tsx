@@ -134,7 +134,7 @@ export default function AiQuestionsView({ ai, onOpenUpgrade, onConfigureAi, onOp
               busy={ai.busy?.kind === "questions"} onClick={() => generate(Boolean(questions.length))} dataAttrs={{ "data-module-ai-generate-questions": "" }} />
           }
         >
-          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} className="mb-3" /> : null}
+          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} note={ai.scopeNote} className="mb-3" /> : null}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex flex-wrap gap-1">
               {COUNTS.map((option) => (

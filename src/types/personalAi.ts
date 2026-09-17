@@ -80,6 +80,14 @@ export interface PersonalAiStateSnapshot {
   };
   resources: PersonalAiResourceAvailability[];
   coverage: PersonalAiCoverage;
+  /**
+   * Why the grounding is the size it is, in the learner's terms — e.g. "2
+   * sub-modules of this module are not unlocked for your account, so their files
+   * were not read." Set by the server from the resolved scope. Surfaced under the
+   * coverage line so "the AI didn't read it" is never mistaken for "the AI
+   * doesn't have access to my course".
+   */
+  scopeNote?: string;
   contentHash: string;
   unitCount: number;
   unitKinds: Record<string, number>;

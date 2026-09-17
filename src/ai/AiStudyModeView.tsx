@@ -101,7 +101,7 @@ export default function AiStudyModeView({ ai, onOpenUpgrade, onConfigureAi, onAs
               hint="Only readable material can ground a session. Files the AI can't read are shown honestly and left out."
               action={<AiPill tone="violet">{chosen.length} of {resources.length} selected</AiPill>}
             >
-              {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} className="mb-3" /> : null}
+              {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} note={ai.scopeNote} className="mb-3" /> : null}
               {resources.length ? (
                 <div className="space-y-2">
                   {resources.map((resource) => {
