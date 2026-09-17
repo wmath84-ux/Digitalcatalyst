@@ -1987,6 +1987,32 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   display: flex !important;
 }
 
+/* ── Course Player footer navigation: THE ONE KEYBOARD RULE ───────────────
+   While the soft keyboard is open over the player, the footer navigation is
+   HIDDEN — in both of its homes at once: the bottom-centre peek dock
+   (`[data-course-peek-dock]`) and the legacy in-pane dock
+   (`[data-course-dock]`). It must never ride above the keyboard, or sit
+   between the keyboard and the writing surface: the usable screen is the
+   active feature (notes / mind map / AI Mentor chat) plus the keyboard.
+
+   `data-course-keyboard` is published by the player's ONE keyboard state
+   (src/course/useCourseKeyboard.tsx → src/course/courseKeyboard.ts): "open"
+   only while a text field inside the player really has focus AND the viewport
+   has made room for a keyboard. Both footer surfaces also carry the same rule
+   in React, so this rule is the shared backstop — it wins the cascade with
+   higher specificity + `!important` regardless of what any other footer rule
+   says about `display`. `display: none` (not visibility / transform) is what
+   keeps the footer from creating an empty strip of its own above the
+   keyboard.
+
+   Dismissing the keyboard flips the attribute back to "closed" and the exact
+   footer the learner had returns — nothing about the footer is persisted, so
+   there is no second footer, no stuck-hidden footer and no layout jump. */
+.course-player-shell[data-course-keyboard="open"] [data-course-peek-dock],
+.course-player-shell[data-course-keyboard="open"] [data-course-dock] {
+  display: none !important;
+}
+
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
    landscape stages. The player measures its stage and switches layout; these
    rules keep every control inside the visible box on phone / tablet / desktop. */

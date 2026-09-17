@@ -78,6 +78,7 @@ import {
   type SplitAxis,
   type SplitSide,
 } from "./splitMotion";
+import { useCourseKeyboard } from "./useCourseKeyboard";
 
 /** The glass tokens every split surface is built from (Phase-2 discipline). */
 const CHROME_GLASS: CSSProperties = {
@@ -327,9 +328,10 @@ export interface SplitDeckProps {
   accent: string;
   /**
    * True while a writing surface that deserves the whole screen is on screen
-   * (the notes editor / mind map tab). When the soft keyboard then opens, the
-   * study pane takes over the FULL deck — lesson and divider are hidden — and
-   * the previous split comes back untouched when the keyboard closes.
+   * (the notes editor, the mind map, the AI Mentor chat input). When the soft
+   * keyboard then opens, the study pane takes over the FULL deck — lesson and
+   * divider are hidden — and the previous split comes back untouched when the
+   * keyboard closes.
    */
   keyboardExpandEnabled?: boolean;
   /** The active study tab's icon (the study peek rail). */
@@ -677,20 +679,27 @@ export function SplitDeck({
     [animateRatio, axis, collapseTo, commit, courseId, fiftyFifty, floor, ratio],
   );
 
-  // ── Soft keyboard: keep the notes editor above it ──────────────────────
+  // ── Soft keyboard: keep the writing surface above it ───────────────────
+  // The deck's own inset (unchanged): the px its bottom edge gives back to an
+  // OVERLAY keyboard, applied as `paddingBottom` below.
   const keyboardInset = useKeyboardInset(sectionRef);
+  // The player's ONE keyboard state. It is a superset of the inset above: it
+  // also sees the layout viewport that RESIZES under the keyboard (the engine
+  // where the inset is 0 by definition), so the takeover engages either way —
+  // and the footer navigation hides off the very same state.
+  const { keyboardVisible } = useCourseKeyboard();
 
   /**
    * Keyboard takeover (phones): while the keyboard is open over a writing
-   * tab (notes / mind map), the study pane takes the FULL deck — the lesson
-   * above it and the divider disappear entirely, so no lesson pixel steals
-   * writing room. This is DERIVED, never persisted: the moment the keyboard
-   * closes, the exact split the learner had (ratio + collapse) is back,
-   * because nothing about it was ever touched. Desktop keyboards never
-   * shrink the visual viewport, so `keyboardInset` stays 0 there and the
+   * tab (notes / mind map / the AI Mentor chat input), the study pane takes
+   * the FULL deck — the lesson above it and the divider disappear entirely,
+   * so no lesson pixel steals writing room. This is DERIVED, never persisted:
+   * the moment the keyboard closes, the exact split the learner had (ratio +
+   * collapse) is back, because nothing about it was ever touched. A desktop
+   * keyboard never moves the viewport, so neither signal fires there and the
    * takeover simply never engages.
    */
-  const keyboardTakeover = keyboardInset > 0 && keyboardExpandEnabled && collapsed !== "study";
+  const keyboardTakeover = (keyboardInset > 0 || keyboardVisible) && keyboardExpandEnabled && collapsed !== "study";
 
   const paneSizeProp = axis === "row" ? "minWidth" : "minHeight";
   const initialRatio = ratio.get();
