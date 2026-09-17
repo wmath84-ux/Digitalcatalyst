@@ -42,7 +42,7 @@ import {
 } from "../../utils/pushScheduler.js";
 import { runReferralRepairOnce } from "../_lib/referrals.js";
 import { getNotificationBrandChrome } from "../_lib/branding.js";
-import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } from "../_lib/fcm.js";
+import { fcmPushToAllDevices, fcmPushToUser, type FcmPayload } from "../_lib/fcm.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;

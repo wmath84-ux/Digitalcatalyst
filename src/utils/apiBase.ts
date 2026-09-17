@@ -36,12 +36,23 @@
 //   request against the other known Vercel origins, in order:
 //     1. the origin the page itself loaded from (same-origin first — the
 //        fast path when everything is healthy);
-//     2. https://eduvora.shop        (the production custom domain);
-//     3. https://digitalcatalyst.vercel.app (Vercel's default project URL —
-//        the same deployment, but it never depends on custom-domain DNS).
+//     2. VITE_API_ORIGIN, default https://eduvora.shop (production custom domain);
+//     3. VITE_VERCEL_API_ORIGIN, default https://digitalcatalyst.vercel.app
+//        (Vercel's default project URL — the same deployment, but it never
+//        depends on custom-domain DNS).
+//   Origins 2 and 3 are DEFAULTS, not guarantees. Set the two VITE_* variables
+//   at build time when your hosting differs — in particular a Vercel project
+//   inside a *team* is never at plain `digitalcatalyst.vercel.app`.
 //   A JSON answer — including 4xx/5xx error envelopes — is always returned
 //   as-is: that is the real API speaking, and other sites cannot impersonate
 //   it. Non-API paths are never rewritten or retried.
+//
+//   Caveat the fallback cannot paper over: if Deployment Protection is on for
+//   the deployment (Settings → Access Control → Vercel Authentication), Vercel
+//   answers EVERY path — /api/* included — with an HTML login page at the edge,
+//   before your function ever runs. That reads as "static host" here, so every
+//   origin is skipped and the library still fails. Protection must be off for
+//   a public API; a build-time URL cannot authenticate an end user's browser.
 
 // Production origin of the website / API. Same domain the TWA wraps
 // (see android/app/src/main/AndroidManifest.xml — trustedurl → eduvora.shop).
@@ -55,7 +66,16 @@ const PRODUCTION_ORIGIN =
 // bound to the project, not to the custom domain, so when eduvora.shop stops
 // serving /api/* (DNS moved to static hosting, production deployment missing)
 // the functions are still reachable here. See the file header.
-const VERCEL_DEFAULT_API_ORIGIN = "https://digitalcatalyst.vercel.app";
+//
+// MUST stay overridable. A project created inside a Vercel *team* does NOT get
+// the plain `<project>.vercel.app` name — its generated domains carry the team
+// slug, e.g. `digitalcatalyst-git-main-<team>-projects.vercel.app`. The literal
+// below is therefore only a best-effort default for a personal-scope project;
+// on a team, set VITE_VERCEL_API_ORIGIN at build time to the project's real
+// Production alias. Check it under Vercel → Project → Settings → Domains.
+const VERCEL_DEFAULT_API_ORIGIN =
+  (typeof import.meta !== "undefined" && (import.meta as { env?: Record<string, string> }).env?.VITE_VERCEL_API_ORIGIN) ||
+  "https://digitalcatalyst.vercel.app";
 
 /**
  * True when the bundle runs inside the installed native shell (Capacitor on

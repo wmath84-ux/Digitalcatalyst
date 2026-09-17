@@ -25,10 +25,23 @@ const TIMEOUT_MS = 40_000;
 
 // The two production origins that can run the serverless functions, in the
 // same order the client tries them (src/utils/apiBase.ts).
-const ORIGINS = [
-  "https://eduvora.shop",
-  "https://digitalcatalyst.vercel.app",
-];
+//
+// Both are overridable because neither is stable across hosting setups:
+//   • eduvora.shop only answers /api/* while its DNS points at the Vercel
+//     project. If it points at Firebase Hosting instead, it answers every path
+//     with the SPA and this probe reports it as unhealthy (correctly).
+//   • The Vercel default domain depends on the account scope. A project inside
+//     a *team* is NOT at plain `digitalcatalyst.vercel.app` — its generated
+//     domains carry the team slug. Set API_HEALTH_ORIGINS (comma-separated) to
+//     the real Production alias from Vercel → Project → Settings → Domains.
+const CONFIGURED_ORIGINS = (process.env.API_HEALTH_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+const ORIGINS = CONFIGURED_ORIGINS.length
+  ? CONFIGURED_ORIGINS
+  : ["https://eduvora.shop", "https://digitalcatalyst.vercel.app"];
 
 function classify(status, contentType, body) {
   if (contentType.includes("html")) {

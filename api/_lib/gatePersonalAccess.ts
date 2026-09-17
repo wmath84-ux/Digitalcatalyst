@@ -66,7 +66,12 @@ async function tryServiceAccountCopy(params: { fileId: string; email: string; fi
 }
 
 export async function handleGatePersonalAccess(req: VercelRequest, res: VercelResponse) {
-  const uid = await requireFirebaseUser(req);
+  // `requireFirebaseUser` resolves to the whole DecodedIdToken, so take `.uid`:
+  // every other handler in api/ does (`personalCourse`, `myDay`, `studyPacks`,
+  // `revisionData`, …). Passing the token object itself made `.doc(uid)` coerce
+  // it to "[object Object]", so every learner's gate request and admin-queue
+  // entry was written under one shared bogus id instead of their own account.
+  const { uid } = await requireFirebaseUser(req);
   const body = (req.body || {}) as Body;
   const action = text(body.action || body.route);
   if (action !== "gatePersonalAccess.request") {
