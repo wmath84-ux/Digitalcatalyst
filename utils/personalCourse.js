@@ -25,6 +25,8 @@
 // uses, and opens through ResourceViewer's existing `getCourseEmbed` path —
 // no second resource viewer, no duplicated type rendering.
 
+import { aiReaderFor } from "./aiFileReaders.js";
+
 export const PERSONAL_COURSE_FEATURE_ID = "personal-modules";
 
 // ---------------------------------------------------------------------------
@@ -955,84 +957,44 @@ export const isValidPersonalId = (value) => {
 //
 // The Course Player's AI bridge must know when the active resource is
 // personal AND must never pretend it can read content it cannot. This helper
-// is the single honest answer for personal resources. Screenshot-based
-// assistance can be layered on later where the architecture permits it.
+// is the single honest answer for a resource's FILE TYPE. Screenshot-based
+// assistance is layered on where the registry allows it.
 // ---------------------------------------------------------------------------
 
 /**
- * Which personal-resource content an AI/context layer can actually read
- * today through legitimate paths:
+ * Does this KIND of file have a legitimate read path, and what do we tell the
+ * learner when one specific file of that kind could not be read?
  *
- *   youtube      — no transcript pipeline exists yet → unavailable.
- *   pdf / ebook  — readable only when the URL is a direct file the app could
- *                  fetch server-side; today no such pipeline exists → honest
- *                  "unavailable", a screenshot path can help later.
- *   video/audio/image — media understanding not implemented → unavailable.
- *   google_form/embed/mindmap — cross-origin DOM is never scraped; private
- *                  forms are never claimed readable → unavailable.
+ * This used to be a hand-written table, and it had drifted away from the
+ * extractor in both directions: it announced that "Reading text out of personal
+ * PDF/e-book files isn't supported yet" long after the server's PDF extractor
+ * shipped, and it had no row at all for `doc` / `sheet` / `slides` / `brain`,
+ * so those fell through to a generic "Content isn't readable by the AI
+ * assistant yet." A learner with full access to a perfectly readable module was
+ * told, truthfully according to this table, that nothing could be read.
  *
- * `screenshotSupported` is exposed for a future screenshot-based assist path
- * (the architecture's existing permission model decides then, not here).
+ * It is now DERIVED from `utils/aiFileReaders.js` — the same table the
+ * extractor consults — so the copy and the pipeline can never disagree again.
+ *
+ * `readable` describes the TYPE. Whether THIS file was read comes from the
+ * extraction outcome (`personalAiState` in utils/personalAi.js), never from
+ * here, so a readable type can still honestly report "this one is private".
  */
 export const personalAiAvailability = (fileOrType) => {
   const type = typeof fileOrType === "string" ? fileOrType : String(fileOrType?.type || "");
-  switch (type) {
-    case "youtube":
-      return {
-        readable: false,
-        reason: "Transcripts for personal YouTube videos aren't available in the app yet.",
-        screenshotSupported: false,
-      };
-    case "pdf":
-    case "ebook":
-      return {
-        readable: false,
-        reason: "Reading text out of personal PDF/e-book files isn't supported yet.",
-        screenshotSupported: false,
-      };
-    case "video":
-      return {
-        readable: false,
-        reason: "Understanding video content isn't supported yet.",
-        screenshotSupported: false,
-      };
-    case "audio":
-      return {
-        readable: false,
-        reason: "Transcribing personal audio isn't supported yet.",
-        screenshotSupported: false,
-      };
-    case "image":
-      return {
-        readable: false,
-        reason: "Analysing personal images isn't supported yet.",
-        screenshotSupported: false,
-      };
-    case "google_form":
-      return {
-        readable: false,
-        reason: "Form responses are private to the form owner and can't be read here.",
-        screenshotSupported: false,
-      };
-    case "embed":
-      return {
-        readable: false,
-        reason: "Embedded websites are never scraped — their content can't be read.",
-        screenshotSupported: false,
-      };
-    case "mindmap":
-      return {
-        readable: false,
-        reason: "Mind-map contents can't be read from the embedded view.",
-        screenshotSupported: false,
-      };
-    default:
-      return {
-        readable: false,
-        reason: "Content isn't readable by the AI assistant yet.",
-        screenshotSupported: false,
-      };
-  }
+  const reader = aiReaderFor(type);
+  return {
+    type,
+    label: reader.label,
+    readable: reader.hasReadPath,
+    reason: reader.reason,
+    via: reader.via,
+    /** What the assistant falls back to when the text could not be read. */
+    fallback: reader.fallback,
+    screenshotSupported: reader.fallback === "screenshot" && reader.visual,
+    /** Text that already lives in the resource document (transcript, questions). */
+    payloadSupported: reader.payload,
+  };
 };
 
 /** Human provenance label: "My Modules → {module} → {resource}". */

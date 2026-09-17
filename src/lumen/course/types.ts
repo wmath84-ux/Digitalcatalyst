@@ -6,6 +6,13 @@
    read-only projection of it.
    ───────────────────────────────────────────────────────────── */
 
+/**
+ * Every file type the Course Player can hold. Mirrors `CourseFileType`
+ * (src/types/course.ts) and `AI_FILE_TYPES` (utils/aiFileReaders.js) — the
+ * registry test in tests/personalCourseContract.test.mjs fails if the three ever
+ * drift apart, because a type missing here is a type the chat silently treats as
+ * an unreadable embed.
+ */
 export type ResourceType =
   | "youtube"
   | "video"
@@ -18,7 +25,9 @@ export type ResourceType =
   | "image"
   | "google_form"
   | "embed"
-  | "mindmap";
+  | "mindmap"
+  /** The Brain practice set: no URL, its content is the imported questions. */
+  | "brain";
 
 /** Explicit, non-negotiable availability of a content source. */
 export type Availability =

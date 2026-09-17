@@ -9,20 +9,30 @@
 // states the UI shows (ready / partial / processing / unavailable /
 // permission_required / unsupported).
 //
-// Read paths that genuinely work today:
-//   · Google Docs / Sheets / Slides → the public `export?format=txt|csv`
-//     endpoint. Files the learner has not shared publicly answer with a
-//     sign-in/permission page, which is reported as `permission_required`
-//     (never as content, never silently skipped).
-//   · PDF / e-book → the bytes are fetched (direct https link or Drive
-//     `uc?export=download`) and text is pulled out of the content streams
-//     with a small built-in extractor (zlib inflate + Tj/TJ operators).
-//     Scanned/image-only or encrypted PDFs are reported honestly.
-//   · Plain text / markdown / csv / html links → fetched and stripped.
+// Which file type gets which treatment is decided in ONE place —
+// `utils/aiFileReaders.js` — and this service only executes that decision. The
+// read paths, in the order the registry tries them:
 //
-// Everything else (YouTube, video, audio, image, generic embeds, Forms,
-// mind maps) has no read path; the reason text comes from the EXISTING
-// `personalAiAvailability` table so there is no second honesty list.
+//   · in-document → the readable text is already inside the resource document:
+//     a Brain practice set's imported questions, a transcript the course owner
+//     pasted, a learner mind map's own branches. No network, no permission, no
+//     timeout, and it is the reason a file with no URL at all is still
+//     groundable.
+//   · caption-file → a linked WebVTT/SRT transcript is fetched and its cues are
+//     read with their timestamps. This is how a video or YouTube lesson becomes
+//     answerable — the app never watches anything and never scrapes a player.
+//   · google-export → Docs / Sheets / Slides via the public `export?format=txt|csv`
+//     endpoint. Files not shared publicly answer with a sign-in/permission page,
+//     reported as `permission_required` (never as content, never silently skipped).
+//   · pdf-bytes → PDF / e-book bytes fetched (direct https link or Drive
+//     `uc?export=download`) with text pulled out of the content streams by a
+//     small built-in extractor (zlib inflate + Tj/TJ operators). Scanned,
+//     image-only or encrypted PDFs are reported honestly.
+//   · text-file → plain text / markdown / csv / html links fetched and stripped.
+//
+// Everything else (images, generic embeds, Forms) has no read path, and the
+// reason shown comes from the same registry row, so there is no second honesty
+// list to drift out of date.
 //
 // Extraction results are cached per owner + resource under
 // `users/{uid}/personalAi/content/{resourceId}` keyed by a hash of the URL,
@@ -41,6 +51,7 @@ import {
   type PersonalAiOutcomeStatus,
   type PersonalAiReadPlan,
 } from "../../utils/personalAi.js";
+import { aiPayloadText, parseCaptionText } from "../../utils/aiFileReaders.js";
 
 export interface ContentExtraction {
   status: PersonalAiOutcomeStatus;
@@ -59,8 +70,21 @@ export interface PersonalResourceLike {
   type?: string;
   url?: string;
   sourceUrl?: string;
+  embedUrl?: string;
   description?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * Fields that make a file readable WITHOUT a network call. The reader
+   * registry (`utils/aiFileReaders.js`) looks for these, so a caller that has
+   * the resource document in hand — an official course file with its imported
+   * practice questions, a personal note with a pasted transcript — hands the
+   * text straight over. Everything is optional and untrusted-length-capped.
+   */
+  practiceQuestions?: unknown;
+  transcriptText?: string;
+  transcriptUrl?: string;
+  captionsUrl?: string;
+  mind?: unknown;
 }
 
 const FETCH_TIMEOUT_MS = 9000;
@@ -340,6 +364,20 @@ export const extractResourceContent = async (resource: PersonalResourceLike): Pr
 
   if (plan.kind === "none") return fail("unsupported", plan.reason);
 
+  /*
+   * in-document: the readable text is already inside the resource document, so
+   * there is nothing to fetch, nothing to authorise and nothing to time out.
+   * This is what makes a course's own practice sets (and any transcript the
+   * owner pasted) instantly grounded instead of "unreadable".
+   */
+  if (plan.kind === "in-document") {
+    const text = cleanAiText(aiPayloadText(resource), PERSONAL_AI_MAX_RESOURCE_CHARS);
+    if (text.length < PERSONAL_AI_MIN_READABLE_CHARS) {
+      return fail("empty", "This resource has no written content in it yet, so there is nothing for me to read from it.");
+    }
+    return { ...base, status: "ok", text, chars: text.length, reason: "", contentType: "application/x-payload" };
+  }
+
   try {
     assertSafeContentUrl(plan.url);
   } catch {
@@ -365,7 +403,7 @@ export const extractResourceContent = async (resource: PersonalResourceLike): Pr
       return { ...base, status: "ok", text, chars: text.length, reason: "", contentType: fetched.contentType };
     }
 
-    if (plan.kind === "pdf") {
+    if (plan.kind === "pdf-bytes") {
       if (!fetched.ok) {
         if ([401, 403, 404].includes(fetched.status)) {
           return fail("permission", "I can see that this PDF exists, but it isn't publicly downloadable, so I couldn't read it.");
@@ -392,7 +430,27 @@ export const extractResourceContent = async (resource: PersonalResourceLike): Pr
       return { ...base, status: "ok", text, chars: text.length, reason: "", contentType: fetched.contentType || "application/pdf" };
     }
 
-    // plan.kind === "text"
+    if (plan.kind === "caption-file") {
+      // A WebVTT/SRT transcript the course owner linked. Reading a caption file
+      // is not watching the video: it is reading the text the owner published,
+      // which is exactly why media lessons become answerable and why nothing
+      // here ever touches a player or scrapes a page.
+      if (!fetched.ok) {
+        if ([401, 403, 404].includes(fetched.status)) {
+          return fail("permission", "The transcript file for this lesson isn't publicly readable, so I couldn't open it.");
+        }
+        return fail("error", `The transcript link returned ${fetched.status || "an error"}.`);
+      }
+      const parsed = parseCaptionText(fetched.buffer.toString("utf8"));
+      if (!parsed.text) return fail("empty", "I opened the transcript file for this lesson but it had no cues in it.");
+      const text = cleanAiText(parsed.text, PERSONAL_AI_MAX_RESOURCE_CHARS);
+      if (text.length < PERSONAL_AI_MIN_READABLE_CHARS) {
+        return fail("empty", "The transcript for this lesson was too short to read anything from.");
+      }
+      return { ...base, status: "ok", text, chars: text.length, reason: "", contentType: "text/vtt" };
+    }
+
+    // plan.kind === "text-file"
     if (!fetched.ok) return fail("error", `That link returned ${fetched.status || "an error"}.`);
     const rawText = fetched.buffer.toString("utf8");
     if (isGoogleSignInPage(fetched.contentType, rawText) && isGoogleHost(fetched.finalUrl)) {
@@ -502,9 +560,18 @@ export const readResourceContent = async (
       extractedAt: Date.now(),
     };
   }
-  const urlHash = `${urlFingerprint(plan.url)}_${personalAiHash(plan.kind)}`;
+  /*
+   * A payload read costs nothing to redo and its "source" is the document
+   * itself, which can change under us (an admin importing more questions). So
+   * it is keyed by the payload's own fingerprint and never served from the
+   * cache after a stale write; every network read keeps the 24h cache.
+   */
+  const isPayload = plan.kind === "in-document";
+  const urlHash = isPayload
+    ? `payload_${urlFingerprint(aiPayloadText(resource).slice(0, 4000))}`
+    : `${urlFingerprint(plan.url)}_${personalAiHash(plan.kind)}`;
   const now = Date.now();
-  if (!options.refresh) {
+  if (!options.refresh && !isPayload) {
     const cached = await readCache(db, uid, resourceId, urlHash, now);
     if (cached) return cached;
   }

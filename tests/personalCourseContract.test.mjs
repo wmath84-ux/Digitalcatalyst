@@ -45,6 +45,19 @@ import {
   usageAtModuleLimit,
   usageAtResourceLimit,
 } from "../utils/personalCourse.js";
+import {
+  AI_FILE_TYPES,
+  AI_FALLBACKS,
+  AI_READ_KINDS,
+  aiCapabilitiesFor,
+  aiCaptionUrl,
+  aiPayloadText,
+  aiReadPlan,
+  aiReaderFor,
+  mindMapToText,
+  parseCaptionText,
+  practiceSetToText,
+} from "../utils/aiFileReaders.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -445,11 +458,56 @@ test("module ids must look like safe doc ids", async () => {
 // 6. AI-context honesty + provenance
 // ---------------------------------------------------------------------------
 
-test("personal resources are never claimed AI-readable when no real pipeline exists", () => {
+// The honesty contract, updated the day the reader registry became the single
+// source of truth (utils/aiFileReaders.js).
+//
+// This test used to assert that NO type is ever readable, which was a snapshot
+// of an unfinished pipeline that had gone stale: the server had long since been
+// able to read PDFs and Google files, and the table still told learners "isn't
+// supported yet" — while `doc`, `sheet`, `slides` and `brain` had no row at all.
+// The bug the old assertion protected (claiming to read what was never read) is
+// now prevented where it actually matters: per FILE, from the extraction
+// outcome (`personalAiState`), never from a type-level table.
+//
+// So the contract is now: a type is only ever called readable when the registry
+// gives it a real, legitimate read path — and every type, readable or not, must
+// carry its own honest reason.
+test("AI availability is derived from the reader registry, never from a copy", () => {
   for (const type of ALL_PERSONAL_COURSE_TYPES) {
     const availability = personalAiAvailability(type);
-    assert.equal(availability.readable, false, type);
-    assert.ok(availability.reason.length > 0, type);
+    const reader = aiReaderFor(type);
+    assert.equal(availability.readable, reader.hasReadPath, `${type}: readable flag must match the registry`);
+    assert.equal(availability.via, reader.via, `${type}: read kind must match the registry`);
+    assert.ok(availability.reason.length > 0, `${type}: needs an honest reason`);
+    // An honest reason must never blame the learner's permissions by default.
+    assert.doesNotMatch(availability.reason, /isn't supported yet|not supported yet/i, `${type}: stale capability copy`);
+  }
+  // A type with a read path must actually name it, and one without must not.
+  assert.equal(personalAiAvailability("pdf").readable, true);
+  assert.equal(personalAiAvailability("doc").readable, true);
+  assert.equal(personalAiAvailability("sheet").readable, true);
+  assert.equal(personalAiAvailability("slides").readable, true);
+  assert.equal(personalAiAvailability("brain").readable, true);
+  assert.equal(personalAiAvailability("embed").readable, false);
+  assert.equal(personalAiAvailability("google_form").readable, false);
+  assert.equal(personalAiAvailability("image").readable, false);
+});
+
+test("the reader registry covers every course file type the player can hold", () => {
+  const playerTypes = new Set([
+    "youtube", "video", "audio", "pdf", "doc", "sheet", "slides",
+    "ebook", "image", "google_form", "embed", "mindmap", "brain",
+  ]);
+  assert.deepEqual([...AI_FILE_TYPES].sort(), [...playerTypes].sort());
+  for (const type of AI_FILE_TYPES) {
+    const reader = aiReaderFor(type);
+    assert.ok(reader.label, type);
+    assert.ok(AI_READ_KINDS.includes(reader.via), `${type}: unknown read kind ${reader.via}`);
+    assert.ok(AI_FALLBACKS.includes(reader.fallback), `${type}: unknown fallback`);
+  }
+  // Nothing in the personal library may be missing from the registry either.
+  for (const type of ALL_PERSONAL_COURSE_TYPES) {
+    assert.ok(AI_FILE_TYPES.includes(type), `${type} missing from the reader registry`);
   }
 });
 

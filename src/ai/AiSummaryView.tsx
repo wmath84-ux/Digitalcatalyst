@@ -161,7 +161,7 @@ export default function AiSummaryView({
             </div>
           }
         >
-          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} className="mb-3" /> : null}
+          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} note={ai.scopeNote} className="mb-3" /> : null}
           {ai.busy?.kind === "summary" || ai.busy?.kind === "resource-summary" ? <AiBusyRow label={ai.busy.label} /> : null}
           {!summary && !(ai.busy?.kind === "summary" || ai.busy?.kind === "resource-summary") ? (
             <AiEmptyState

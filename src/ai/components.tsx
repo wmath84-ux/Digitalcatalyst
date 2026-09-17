@@ -100,16 +100,32 @@ export function AiOverlayHeader({ title, provenance, coverage, onClose, right }:
   );
 }
 
-/** "Based on 3 of 5 readable resources…" — never implies full coverage. */
-export function AiCoverageLine({ coverage, className }: { coverage: PersonalAiCoverage; className?: string }) {
+/**
+ * "Based on 3 of 5 readable resources…" — never implies full coverage.
+ *
+ * `note` is the server's own explanation of the scope (a locked sub-module, a
+ * file the learner has no link for). It is rendered next to the numbers because
+ * a bare "0 of 4 could be read" is exactly what reads like a permissions bug
+ * when it is not one.
+ */
+export function AiCoverageLine({ coverage, note, className }: { coverage: PersonalAiCoverage; note?: string; className?: string }) {
   const tone = coverage.none ? "text-amber-200" : coverage.full ? "text-emerald-200" : "text-white/60";
+  const trimmed = typeof note === "string" ? note.replace(/\s+/g, " ").trim() : "";
+  const showNote = Boolean(trimmed) && !coverage.sentence.includes(trimmed);
   return (
-    <p className={cn("flex flex-wrap items-center gap-x-1.5 text-[10px] font-bold leading-4", tone, className)} data-module-ai-coverage="">
-      <Info size={11} className="shrink-0" />
-      <span>{coverage.sentence}</span>
-      {coverage.processing > 0 ? <span className="text-white/40">· {coverage.processing} still being read</span> : null}
-      {coverage.permissionRequired > 0 ? <span className="text-white/40">· {coverage.permissionRequired} need permission</span> : null}
-    </p>
+    <div className={cn("min-w-0", className)} data-module-ai-coverage="">
+      <p className={cn("flex flex-wrap items-center gap-x-1.5 text-[10px] font-bold leading-4", tone)}>
+        <Info size={11} className="shrink-0" />
+        <span>{coverage.sentence}</span>
+        {coverage.processing > 0 ? <span className="text-white/40">· {coverage.processing} still being read</span> : null}
+        {coverage.permissionRequired > 0 ? <span className="text-white/40">· {coverage.permissionRequired} need permission</span> : null}
+      </p>
+      {showNote ? (
+        <p className="mt-1 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-white/45" data-module-ai-scope-note="">
+          {trimmed}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

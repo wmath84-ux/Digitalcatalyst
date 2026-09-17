@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { aiReadPlan, aiReaderFor, AI_FILE_TYPES } from "../../../utils/aiFileReaders";
 import { getAdapter } from "./adapters";
 import { PHYSICS_COURSE, RESOURCE_NOTES } from "./library";
 import type { CourseFile } from "../../types/course";
@@ -35,11 +36,10 @@ const FALLBACK_RESOURCE: CourseResource = {
 
 const asResourceType = (type?: string | null): ResourceType => {
   const value = String(type || "");
-  const allowed: ResourceType[] = [
-    "youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "ebook",
-    "image", "google_form", "embed", "mindmap",
-  ];
-  return (allowed as string[]).includes(value) ? (value as ResourceType) : "embed";
+  // The registry, not a hand-typed list, decides what is a known type — so a
+  // file type added on the server can never arrive here and be quietly demoted
+  // to "embed" (which reads as "I can't see this" to the learner).
+  return (AI_FILE_TYPES as readonly string[]).includes(value) ? (value as ResourceType) : "embed";
 };
 
 const fileToResource = (
@@ -47,15 +47,31 @@ const fileToResource = (
   accessState: CourseResource["accessState"],
 ): CourseResource => {
   if (!file) return { ...FALLBACK_RESOURCE, accessState };
+  const resourceType = asResourceType(file.type);
   const url = file.url || file.embedUrl || file.youtubeUrl || "";
+  const playable = resourceType === "youtube" && !url && Boolean(file.youtubeVideoId);
+  /*
+   * One question, answered by the shared registry: can this file's CONTENT be
+   * read at all? "No URL" used to be the only test, which mislabelled two whole
+   * groups — a Brain set (readable with no URL, its content is the imported
+   * questions) came out "unavailable", and an unreadable embed with a URL came
+   * out "available", promising a read that then never happened.
+   */
+  const plan = aiReadPlan({
+    type: resourceType,
+    url,
+    youtubeVideoId: file.youtubeVideoId,
+    practiceQuestions: (file as { practiceQuestions?: unknown }).practiceQuestions,
+  });
+  const readable = plan.kind !== "none" || playable;
   return {
     resourceId: file.id,
     resourceName: file.name,
-    resourceType: asResourceType(file.type),
-    resourceUrl: url,
+    resourceType,
+    resourceUrl: playable ? `https://www.youtube.com/watch?v=${file.youtubeVideoId}` : url,
     provider: file.provider || "",
-    availability: url ? "available" : "unavailable",
-    availabilityNote: url ? undefined : "This resource has no readable URL yet.",
+    availability: readable ? "available" : "unsupported",
+    availabilityNote: readable ? undefined : plan.reason || aiReaderFor(resourceType).reason,
     accessState,
   };
 };

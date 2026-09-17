@@ -42,6 +42,8 @@ import { adminDb, requireFirebaseUser, type VercelRequest, type VercelResponse }
 import { revisionAiRuntime, type RevisionAiConfig, type RevisionAiPolicy, type RevisionAiProviderUsage, type RevisionAiReservation } from "./revisionGenerate.js";
 import { readResourceContent, type ContentExtraction } from "./personalAiContent.js";
 import { isValidPersonalId } from "../../utils/personalCourse.js";
+import { collectEntitlementOwnership, isSubscriptionRecordActive, resolveCourseAccess } from "../../utils/courseAccess.js";
+import { firestoreToCatalogProduct } from "../../utils/productMapping.js";
 import { subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 import {
   PERSONAL_AI_ARTIFACT_TTL_MS,
@@ -190,6 +192,24 @@ interface ScopeResource {
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Other ids that name the SAME resource. An official course file is cached and
+   * cited under a derived id (its own id is not owner-namespaced), but the
+   * learner's notes still carry the raw course-tree id — without the alias a
+   * note the student wrote against an open lesson would silently stop
+   * grounding the answer.
+   */
+  aliases?: string[];
+  /**
+   * Readable payload stored inside the resource document itself. A `brain`
+   * practice set's imported questions and an owner-pasted transcript need no
+   * network and no permission, so they travel with the scope and the reader
+   * registry turns them straight into grounding text.
+   */
+  practiceQuestions?: unknown;
+  transcriptText?: string;
+  transcriptUrl?: string;
+  captionsUrl?: string;
 }
 
 interface Scope {
@@ -202,6 +222,15 @@ interface Scope {
   resources: ScopeResource[];
   /** Set when the caller scoped the request to one resource. */
   resourceId: string | null;
+  /** "official" when the whole scope was resolved from a course product doc. */
+  origin?: "official" | "personal";
+  /**
+   * One-line, learner-facing note about how much of an OFFICIAL lesson could
+   * actually be resolved (set by the Course Player path only). Surfaced so
+   * "I read 3 of 9 files in this module" is visible instead of being guessed at
+   * from the absence of an answer.
+   */
+  resolutionNote?: string;
 }
 
 const moduleCollection = (db: Db, uid: string) => db.collection("users").doc(uid).collection("personalCourseModules");
@@ -237,49 +266,380 @@ function coursePlayerStorageId(productId: string): string {
 }
 
 /**
- * Course Player asks (official lessons) have no personal module. Build a
- * virtual owner-scoped shell so the existing ask path can run: empty
- * resources (honest — we never pretend to have extracted official files)
- * plus the published course/module/resource titles as the module brief.
+ * Deterministic, owner-neutral id for one OFFICIAL course file.
+ *
+ * Official files live in a shared `siteProducts/{id}` document, so their raw ids
+ * cannot be used as the key of an owner-scoped extraction cache — two learners
+ * reading the same lesson would collide on one doc, and a cache write from one
+ * account could be read by another. Hashing product+file into a private id
+ * keeps the cache per-learner by construction while staying stable, so the
+ * second question in a lesson never re-downloads the PDF.
  */
-function virtualCoursePlayerScope(_uid: string, body: Body): Scope | null {
+function officialResourceId(productId: string, fileId: string): string {
+  return `oc_${personalAiHash(`${productId}/${fileId}`)}`.slice(0, 40);
+}
+
+const officialTypeLabel = (type: string) => String(type || "embed");
+
+/**
+ * One file of the course tree → one readable resource of the AI scope.
+ *
+ * The Course Player accepts a file by `url`, `embedUrl`, `youtubeUrl` or a bare
+ * `youtubeVideoId`; the reader registry accepts the same shapes, so the first
+ * non-empty one is what we hand over. `practiceQuestions` rides along because a
+ * Brain set's content IS its document — that read needs neither network nor
+ * permission and works even when the file has no link at all.
+ */
+function officialFileToResource(
+  file: Body,
+  productId: string,
+  storageModuleId: string,
+  index: number,
+): ScopeResource | null {
+  const rawId = text(file.id);
+  if (!rawId) return null;
+  const url = text(file.url || file.embedUrl || file.youtubeUrl || file.sourceUrl);
+  const videoId = text(file.youtubeVideoId);
+  const type = text(file.type) || (videoId && !url ? "youtube" : "embed");
+  return {
+    id: officialResourceId(productId, rawId),
+    storageModuleId,
+    name: text(file.name) || "Untitled lesson file",
+    description: text(file.description),
+    type: officialTypeLabel(type),
+    url: url || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : ""),
+    sourceUrl: url || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : ""),
+    originKind: "official",
+    provider: text(file.provider),
+    /*
+     * Deliberately empty. `metadata` is model-visible text AND it marks a
+     * resource as "authored by the learner", which is what lets an unreadable
+     * file still count as `partial`. A course tree's `accessLevel` / `size`
+     * fields are neither, so putting them here would let the assistant claim it
+     * could work from a file it never read.
+     */
+    metadata: {},
+    sortOrder: number(file.sortOrder, index),
+    createdAt: timestampMs(file.createdAt),
+    updatedAt: timestampMs(file.updatedAt) || timestampMs(file.createdAt),
+    aliases: [rawId],
+    practiceQuestions: Array.isArray(file.practiceQuestions) ? file.practiceQuestions : undefined,
+    transcriptText: text(file.transcriptText) || undefined,
+    transcriptUrl: text(file.transcriptUrl) || undefined,
+    captionsUrl: text(file.captionsUrl || file.captionUrl) || undefined,
+  };
+}
+
+/** Walk the course tree to one module (nested sub-modules included). */
+function findCourseModule(nodes: unknown[], moduleId: string): Body | null {
+  for (const raw of nodes) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const node = raw as Body;
+    if (text(node.id) === moduleId) return node;
+    const nested = findCourseModule(Array.isArray(node.modules) ? node.modules : [], moduleId);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** Ids of every module in a subtree — a locked parent hides its children. */
+const collectModuleIds = (nodes: unknown[], out: string[] = []): string[] => {
+  for (const raw of nodes) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const node = raw as Body;
+    const id = text(node.id);
+    if (id) out.push(id);
+    collectModuleIds(Array.isArray(node.modules) ? node.modules : [], out);
+  }
+  return out;
+};
+
+/**
+ * The learner's own entitlements, resolved with the SAME pure resolver the
+ * Course Player and the Study Library use (`utils/courseAccess.js`). Re-using it
+ * is the point: if the player will open a module, the AI may read it, and if the
+ * player locks it, no AI request can talk its way into that content.
+ */
+async function resolveLearnerCourseAccess(db: Db, uid: string, product: Record<string, unknown>) {
+  // Every read here is an ENLARGEMENT of what the learner may see (an extra
+  // purchase, an entitlement grant, an active subscription). So every read is
+  // individually defensive: a lookup that fails — a missing composite index, a
+  // cold emulator, a rule that denies the collection — must narrow what the AI
+  // may read, never turn a study question into a 500.
+  type Rows = { docs: Array<{ data: () => Body; id: string }> };
+  const safeRows = async (run: () => Promise<Rows>): Promise<Rows> => {
+    try { return await run(); } catch { return { docs: [] }; }
+  };
+  const safeDoc = async (run: () => Promise<{ data: () => Body | undefined } | null>): Promise<Body | null> => {
+    try {
+      const snapshot = await run();
+      return snapshot ? snapshot.data() || null : null;
+    } catch {
+      return null;
+    }
+  };
+  const [userData, purchaseSnapshot, entitlementSnapshot, subscriptionData] = await Promise.all([
+    safeDoc(() => db.collection("users").doc(uid).get()),
+    safeRows(() => db.collection("users").doc(uid).collection("purchases").get()),
+    safeRows(() => db.collection("entitlements").where("uid", "==", uid).get()),
+    safeDoc(() => db.collection("users").doc(uid).collection("subscription").doc("current").get()),
+  ]);
+  const user = userData || {};
+  const entitlements = collectEntitlementOwnership((entitlementSnapshot?.docs || []).map((item) => item.data()));
+  const ownedProducts = new Set<string>([
+    ...entitlements.ownedProductIds,
+    ...(Array.isArray(user.purchasedProductIds) ? user.purchasedProductIds.map(String) : []),
+    ...(purchaseSnapshot?.docs || []).map((item) => text(item.data().productDocumentId || item.id)),
+  ]);
+  const documentId = text((product as Body)._documentId);
+  const publicId = text((product as Body).id);
+  if (documentId && ownedProducts.has(documentId)) ownedProducts.add(publicId);
+  if (publicId && ownedProducts.has(publicId)) ownedProducts.add(documentId);
+  const updateMap = user.purchasedProductUpdateIds && typeof user.purchasedProductUpdateIds === "object"
+    ? Object.values(user.purchasedProductUpdateIds as Body).flatMap((item) => (Array.isArray(item) ? item.map(String) : []))
+    : [];
+  const subscription = subscriptionData || {};
+  const activeSubscription = Boolean(subscriptionData) && isSubscriptionRecordActive(subscription as never);
+  return resolveCourseAccess({
+    product: {
+      id: publicId,
+      canonicalModules: (product as Body).canonicalModules ?? null,
+      courseContent: (product as Body).courseContent ?? null,
+    },
+    ownedProductIds: [...ownedProducts],
+    ownedUpdateIds: [...entitlements.ownedUpdateIds, ...updateMap],
+    ownedModuleIds: [...entitlements.ownedModuleIds],
+    ownedResourceIds: [...entitlements.ownedResourceIds],
+    subscriptionProductIds: activeSubscription && Array.isArray(subscription.includedProductIds)
+      ? subscription.includedProductIds.map(String)
+      : [],
+    subscriptionModuleIds: activeSubscription && Array.isArray(subscription.includedModuleKeys)
+      ? subscription.includedModuleKeys.map((key: unknown) => text(key).split(":").pop() || "").filter(Boolean)
+      : [],
+    subscriptionResourceIds: [],
+    requireBaseCourseForUpdate: true,
+  } as never);
+}
+
+/**
+ * Read the course document, in whatever shape it is stored.
+ *
+ * A product can be addressed by its Firestore id or by its public `id` field
+ * (the storefront writes both), so both are tried. The stored tree is mapped
+ * through the SAME `firestoreToCatalogProduct` the player uses — an admin edit
+ * that renames a field must not silently change what the AI can see.
+ */
+async function loadCourseProductForAi(db: Db, productId: string, productDocumentId: string): Promise<Record<string, unknown> | null> {
+  const candidates = Array.from(new Set([productDocumentId, productId].filter(Boolean)));
+  for (const candidate of candidates) {
+    if (!isValidPersonalId(candidate)) continue;
+    const snapshot = await db.collection("siteProducts").doc(candidate).get();
+    if (snapshot.exists) return normalizeCourseProduct(snapshot);
+  }
+  const byPublicId = await db.collection("siteProducts").where("id", "==", productId).limit(1).get();
+  const found = byPublicId.docs[0];
+  return found ? normalizeCourseProduct(found) : null;
+}
+
+const normalizeCourseProduct = (snapshot: { id: string; data: () => Body | undefined }): Record<string, unknown> => {
+  const raw = snapshot.data() || {};
+  const catalog = firestoreToCatalogProduct(raw, snapshot.id);
+  return {
+    ...(catalog || raw),
+    id: text(raw.id || snapshot.id),
+    _documentId: snapshot.id,
+    courseContent: catalog?.courseContent ?? raw.courseContent ?? null,
+    canonicalModules: catalog?.canonicalModules ?? raw.canonicalModules ?? null,
+  };
+};
+
+/**
+ * Ask from the Course Player about an OFFICIAL lesson.
+ *
+ * This is the whole difference between "the AI reads my course" and "the AI
+ * keeps saying it has no access". The learner's entitlement is real, the module
+ * is open on screen — but the scope used to come back with `resources: []`, so
+ * the model was handed an empty CONTENT block and an instruction to never
+ * answer from memory. It obeyed. Every message, every question, on every module
+ * type: "I can't read this module."
+ *
+ * The rule now: read exactly what the Course Player itself would let this
+ * learner open, through exactly the pipeline the personal library uses. Nothing
+ * more — a locked paid update, a hidden module or another account's product
+ * yields no resources — and nothing less, so a public PDF, a shared Google Doc,
+ * a Sheet, a Slides deck, an e-book, a linked transcript, a learner mind map or
+ * an imported Brain set all become real grounding text.
+ */
+async function officialCoursePlayerScope(db: Db, uid: string, body: Body): Promise<Scope | null> {
   const ctx = asRecord(body.courseContext);
   const productId = text(ctx.productId);
   if (!productId) return null;
-  const storageModuleId = coursePlayerStorageId(productId);
   const courseTitle = text(ctx.courseTitle) || "Course";
-  const moduleTitle = text(ctx.moduleTitle);
-  const resourceName = text(ctx.resourceName);
-  const resourceType = text(ctx.resourceType);
-  const description = [moduleTitle, resourceName, resourceType].filter(Boolean).join(" · ");
-  return {
+  const requestedModuleId = text(ctx.moduleId) || text(body.moduleId);
+  const requestedResourceId = text(ctx.resourceId) || text(body.resourceId);
+  const storageModuleId = coursePlayerStorageId(`${productId}${requestedModuleId ? `/${requestedModuleId}` : ""}`);
+
+  /*
+   * The player's own label is preferred, with the course document's title as
+   * the fallback — the two are normally identical, but a stale client bundle
+   * should never be the reason a module is described as "Course" to the model.
+   */
+  const shell = (
+    resources: ScopeResource[],
+    note: string,
+    resourceId: string | null,
+    moduleTitle?: string,
+  ): Scope => ({
     moduleId: null,
     storageModuleId,
     saved: false,
+    origin: "official",
     module: {
       id: storageModuleId,
       title: courseTitle,
-      description,
+      description: [moduleTitle || text(ctx.moduleTitle), text(ctx.resourceName), text(ctx.resourceType)]
+        .filter(Boolean)
+        .join(" · "),
       productId,
     },
-    resources: [],
-    resourceId: null,
+    resources,
+    resourceId,
+    resolutionNote: note,
+  });
+
+  if (!isValidPersonalId(productId)) return shell([], "The course this lesson belongs to could not be identified, so no files were read.", null);
+
+  let product: Record<string, unknown> | null = null;
+  try {
+    product = await loadCourseProductForAi(db, productId, text(ctx.productDocumentId));
+  } catch {
+    return shell([], "That course could not be opened just now, so no files were read.", null);
+  }
+  if (!product) return shell([], "That course could not be found, so no files were read.", null);
+
+  const tree = Array.isArray(product.courseContent) ? (product.courseContent as unknown[]) : [];
+  const nodes = tree.length
+    ? tree
+    : Array.isArray(product.canonicalModules)
+      ? (product.canonicalModules as unknown[])
+      : [];
+  if (!nodes.length) return shell([], "This course has no lesson files published yet.", null);
+
+  let access: Awaited<ReturnType<typeof resolveLearnerCourseAccess>>;
+  try {
+    access = await resolveLearnerCourseAccess(db, uid, product);
+  } catch {
+    // The access check itself failed. Read nothing and say so: an AI answer
+    // must never become a way into content the resolver could not confirm.
+    return shell([], "Your access to this course could not be confirmed right now, so no files were read.", null);
+  }
+
+  // Which module is meant? An explicit id wins; otherwise the module holding the
+  // open file; otherwise the first module this learner may actually open.
+  let moduleNode = requestedModuleId ? findCourseModule(nodes, requestedModuleId) : null;
+  if (!moduleNode && requestedResourceId) {
+    const locate = (list: unknown[]): Body | null => {
+      for (const raw of list) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        const node = raw as Body;
+        const files = Array.isArray(node.files) ? (node.files as Body[]) : [];
+        if (files.some((file) => text(asRecord(file).id) === requestedResourceId)) return node;
+        const nested = locate(Array.isArray(node.modules) ? node.modules : []);
+        if (nested) return nested;
+      }
+      return null;
+    };
+    moduleNode = locate(nodes);
+  }
+  if (!moduleNode) {
+    const firstAccessible = nodes.find((raw) => {
+      const node = asRecord(raw) as Body;
+      return text(node.id) && access.accessibleModuleIds.has(text(node.id));
+    });
+    moduleNode = firstAccessible ? (firstAccessible as Body) : null;
+  }
+  if (!moduleNode) {
+    // Not accessible (or not published). Say so plainly and read nothing: an AI
+    // answer must never become the way into a module the learner cannot open.
+    return shell([], "This module is not part of your purchased or granted content, so its files were not read.", null);
+  }
+
+  const moduleIdsInSubtree = collectModuleIds([moduleNode]);
+  // Locked sub-modules are reported, never silently skipped: a learner who
+  // bought the base course deserves to know that part of what they see in the
+  // list was not read, rather than wondering whether the AI "can't access" it.
+  const subtreeLocked = moduleIdsInSubtree.filter((id) => !access.accessibleModuleIds.has(id));
+
+  /*
+   * Each file is judged against the module that actually holds it, with the
+   * resolver's own two sets and nothing else:
+   *
+   *   accessibleModuleIds   — full product, module purchase, subscription,
+   *                           paid update, preview
+   *   accessibleResourceIds — a resource bought on its own
+   *
+   * That is deliberately the SAME question the player asks before rendering the
+   * row, so "the AI could not read it" can never mean "the AI read past the
+   * paywall" — and never mean "the AI refused something already on screen".
+   */
+  const pairs: Array<{ file: Body; moduleId: string }> = [];
+  const walk = (list: unknown[], insideAccessibleModule: boolean, ownerModuleId: string) => {
+    for (const raw of list) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const node = raw as Body;
+      const nodeId = text(node.id);
+      const accessible = !nodeId ? insideAccessibleModule : access.accessibleModuleIds.has(nodeId);
+      for (const rawFile of Array.isArray(node.files) ? (node.files as Body[]) : []) {
+        pairs.push({ file: asRecord(rawFile) as Body, moduleId: accessible ? nodeId || ownerModuleId : "" });
+      }
+      walk(Array.isArray(node.modules) ? node.modules : [], accessible, nodeId || ownerModuleId);
+    }
   };
+  walk([moduleNode], access.accessibleModuleIds.has(text(moduleNode.id)), text(moduleNode.id));
+
+  const resources = pairs
+    .filter(({ file, moduleId }) => {
+      const id = text(file.id);
+      if (!id) return false;
+      // `hidden` is not in the course for anybody, and the AI is not an exception.
+      if (text(file.accessLevel) === "hidden") return false;
+      return access.accessibleResourceIds.has(id) || (Boolean(moduleId) && access.accessibleModuleIds.has(moduleId));
+    })
+    .map(({ file }, index) => officialFileToResource(file, productId, storageModuleId, index))
+    .filter((row): row is ScopeResource => Boolean(row));
+
+  const resourceId = requestedResourceId
+    ? resources.find((row) => row.aliases?.includes(requestedResourceId))?.id || null
+    : null;
+
+  const note = subtreeLocked.length
+    ? `${subtreeLocked.length} sub-module${subtreeLocked.length === 1 ? "" : "s"} of this module ${subtreeLocked.length === 1 ? "is" : "are"} not unlocked for your account, so their files were not read.`
+    : "";
+
+  return shell(resources, note, resourceId, text(moduleNode.title));
 }
 
 /**
  * Ask from the Course Player: a valid personal module id uses the existing
  * personal-module path. Official lessons (no personal id, but a product
- * context) get a virtual owner-scoped shell so threads still persist under
- * `cp_*` without inventing official-file extraction.
+ * context) are resolved against the real course tree under the learner's own
+ * entitlements, so the model is given the files it can genuinely read.
  */
 async function resolveAskScope(db: Db, uid: string, body: Body): Promise<Scope> {
+  const ctx = asRecord(body.courseContext);
   const requested = text(body.moduleId) || text(body.storageModuleId);
-  if (requested && isValidPersonalId(requested)) {
-    return resolveScope(db, uid, body);
+  const wantsOfficial = ctx.official === true;
+  if (!wantsOfficial && requested && isValidPersonalId(requested)) {
+    // The id may name a personal module — or an official lesson whose id happens
+    // to be shaped like one, because the admin mints `mod_<base36>` for course
+    // modules and `isValidPersonalId` accepts that form. Guessing from the
+    // shape is what produced an "access" error for content the learner owns, so
+    // the caller's own namespace is asked instead.
+    const personal = await moduleCollection(db, uid).doc(requested).get();
+    if (personal.exists) return resolveScope(db, uid, body);
   }
-  const virtual = virtualCoursePlayerScope(uid, body);
-  if (virtual) return virtual;
+  const official = await officialCoursePlayerScope(db, uid, body);
+  if (official) return official;
   return resolveScope(db, uid, body);
 }
 
@@ -420,6 +780,7 @@ async function readScopeContent(
         resourceName: resource.name,
         originKind: resource.originKind,
         saved: scope.saved,
+        source: scope.origin === "official" ? "course" : undefined,
       }).label,
       fromCache: extraction.fromCache,
     });
@@ -437,7 +798,13 @@ const cleanClientNotes = (raw: unknown, scope: Scope): Record<string, { id: stri
     const body = stripAiMarkup(note.text || note.html, 2000);
     if (!body) continue;
     const requestedResource = text(note.resourceId);
-    const key = requestedResource && scope.resources.some((row) => row.id === requestedResource) ? requestedResource : "__module__";
+    const owner = requestedResource
+      ? scope.resources.find((row) => row.id === requestedResource || row.aliases?.includes(requestedResource))
+      : null;
+    // An official file is cached and cited under a derived id, while the note
+    // still names the course-tree id. Resolve to the scope's own id so a note
+    // the learner typed on the open lesson keeps grounding the answer.
+    const key = owner ? owner.id : "__module__";
     const list = grouped[key] || [];
     list.push({ id: cleanAiText(note.id, 64) || personalAiHash(body), text: body });
     grouped[key] = list.slice(0, 20);
@@ -464,6 +831,10 @@ function buildGrounding(scope: Scope, availability: ResourceAvailability[], extr
   const units = buildPersonalAiUnits({
     module: scope.module,
     saved: scope.saved,
+    // Provenance is decided from the RESOLVED scope, never from a client field,
+    // so an answer can only ever be attributed to the course when the server
+    // actually read it from the course.
+    source: scope.origin === "official" ? "course" : undefined,
     resources: scope.resources,
     availability: Object.fromEntries(availability.map((row) => [row.id, row])),
     extracted,
@@ -995,7 +1366,11 @@ async function groundedCompletion(input: {
  * coverage sentence, stored artifacts, weak topics and the AI allowance state.
  */
 async function handleContext(db: Db, uid: string, body: Body) {
-  const scope = await resolveScope(db, uid, body);
+  // The same routing `ask` uses, so "what can the AI read here?" answers for an
+  // official lesson too. A Course Player that can ask questions but reports no
+  // readable files would be a mystery; one shared resolver keeps the panel and
+  // the answer describing the same set of files.
+  const scope = await resolveAskScope(db, uid, body);
   const refresh = body.refresh === true;
   const [content, thread, evidence, aiSettings] = await Promise.all([
     readScopeContent(db, uid, scope, { refresh }),
@@ -1014,6 +1389,11 @@ async function handleContext(db: Db, uid: string, body: Body) {
     usage = null;
   }
   const artifacts = await listArtifacts(db, uid, scope.storageModuleId);
+  const coverageNote = grounding.coverage.total
+    ? `${grounding.coverage.readable} of ${grounding.coverage.total} file${grounding.coverage.total === 1 ? "" : "s"} in this scope could be read.`
+    : scope.origin === "official"
+      ? "No file in this lesson has a readable text source yet."
+      : "";
   const source = body.source === "own" ? "own" : "default";
   const configured = source === "own" ? Boolean(parseOwnConfig(body.config, false)) : Boolean(text(asRecord(aiSettings).sharedApiKey)) && Boolean(text(asRecord(aiSettings).model));
   // "My own API key" is exempt (see `groundedCompletion`): the learner pays the
@@ -1064,6 +1444,7 @@ async function handleContext(db: Db, uid: string, body: Body) {
             : text(asRecord(usage).blockedReason) || null,
       usage,
     },
+    scopeNote: [scope.resolutionNote, coverageNote].filter(Boolean).join(" "),
     unreadable: content.availability
       .filter((row) => !row.readable)
       .map((row) => ({ id: row.id, name: row.name, type: row.type, state: row.state, reason: row.reason })),
@@ -1112,6 +1493,12 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
   const unitIds = call.chunks.map((chunk) => chunk.unitId);
   const answer = normalizePersonalAiAnswer(call.payload, unitIds);
   const sources = call.sources.filter((source) => answer.sources.includes(source.unitId));
+  const readableCount = grounding.coverage.readable;
+  const coverageNote = grounding.coverage.total
+    ? `${readableCount} of ${grounding.coverage.total} file${grounding.coverage.total === 1 ? "" : "s"} in this lesson could be read.`
+    : scope.origin === "official"
+      ? "No file in this lesson has a readable text source yet, so this answer uses titles, notes and the course material the app can legitimately open."
+      : "";
   const at = Date.now();
   await appendThread(db, uid, scope, [
     { id: `m_${randomUUID().slice(0, 12)}`, role: "user", text: question, sources: [], grounded: true, resourceId: scope.resourceId, at },
@@ -1129,6 +1516,10 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     kind: "answer",
     question,
     ...answer,
+    // Why the grounding is what it is — "12 files, 3 readable", "locked
+    // sub-modules skipped" — so a thin answer can be explained instead of
+    // sounding like a permission problem the learner must go fight.
+    scopeNote: [scope.resolutionNote, coverageNote].filter(Boolean).join(" "),
     // Provenance is always resolved server-side from the units actually sent,
     // so a model can never invent a source label.
     sourceDetails: sources,

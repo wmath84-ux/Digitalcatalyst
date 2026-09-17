@@ -105,7 +105,7 @@ export default function AiFlashcardsView({ ai, onOpenUpgrade, onConfigureAi }: P
               busy={ai.busy?.kind === "flashcards"} onClick={() => generate(Boolean(cards.length))} dataAttrs={{ "data-module-ai-generate-flashcards": "" }} />
           }
         >
-          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} className="mb-3" /> : null}
+          {ai.snapshot?.coverage ? <AiCoverageLine coverage={ai.snapshot.coverage} note={ai.scopeNote} className="mb-3" /> : null}
           <div className="flex flex-wrap gap-1">
             {COUNTS.map((option) => (
               <button key={option} type="button" onClick={() => setCount(option)} disabled={Boolean(ai.busy)}

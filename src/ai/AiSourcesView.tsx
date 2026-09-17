@@ -52,7 +52,7 @@ export default function AiSourcesView({ ai, onOpenUpgrade, onConfigureAi, onOpen
               onClick={() => void ai.reload({ refresh: true })} dataAttrs={{ "data-module-ai-refresh-content": "" }} />
           }
         >
-          {coverage ? <AiCoverageLine coverage={coverage} className="mb-3" /> : null}
+          {coverage ? <AiCoverageLine coverage={coverage} note={ai.scopeNote} className="mb-3" /> : null}
           {ai.phase === "loading" ? <AiBusyRow label="Reading your module" /> : null}
           {ai.phase === "ready" ? <AiAvailabilityListPlaceholder resources={resources} onOpenResource={onOpenResource} /> : null}
           {ai.phase === "error" ? (

@@ -17,7 +17,13 @@ export const PERSONAL_AI_READABLE_STATES: readonly PersonalAiState[];
 export const isPersonalAiReadableState: (state: unknown) => boolean;
 
 /** What the server extractor should attempt for one resource. */
-export type PersonalAiReadKind = "google-export" | "pdf" | "text" | "none";
+export type PersonalAiReadKind =
+  | "google-export"
+  | "pdf-bytes"
+  | "caption-file"
+  | "text-file"
+  | "in-document"
+  | "none";
 export const PERSONAL_AI_READ_KINDS: readonly PersonalAiReadKind[];
 
 export type PersonalAiOutcomeStatus =
@@ -57,6 +63,7 @@ export const PERSONAL_AI_QUESTION_CHARS_MAX: number;
 export const PERSONAL_AI_ARTIFACT_TTL_MS: number;
 export const PERSONAL_AI_SAVED_LABEL: string;
 export const PERSONAL_AI_MODULE_ROOT_LABEL: string;
+export const PERSONAL_AI_COURSE_ROOT_LABEL: string;
 
 export const cleanAiText: (value: unknown, max?: number) => string;
 export const stripAiMarkup: (value: unknown, max?: number) => string;
@@ -87,6 +94,9 @@ export const personalAiState: (input: {
   authored?: boolean;
 }) => PersonalAiAvailability;
 
+/** Where grounding text came from: the course itself, or the learner's own space. */
+export type PersonalAiProvenanceSource = "course" | undefined;
+
 export interface PersonalAiProvenance {
   scope: "module" | "resource";
   saved: boolean;
@@ -94,7 +104,7 @@ export interface PersonalAiProvenance {
   root: string;
   moduleTitle: string;
   resourceName: string;
-  kind: "official-copy" | "personal";
+  kind: "course-official" | "official-copy" | "personal";
   kindLabel: string;
 }
 export const personalAiProvenance: (input: {
@@ -103,6 +113,8 @@ export const personalAiProvenance: (input: {
   moduleTitle?: unknown;
   resourceName?: unknown;
   originKind?: unknown;
+  /** "course" when the text was read out of a course the learner owns. */
+  source?: PersonalAiProvenanceSource;
 }) => PersonalAiProvenance;
 
 export type PersonalAiUnitKind = "module-brief" | "resource-meta" | "resource-text" | "note" | "artifact";
@@ -124,6 +136,8 @@ export interface PersonalAiUnit {
 export const buildPersonalAiUnits: (input: {
   module?: unknown;
   saved?: boolean;
+  /** "course" for a corpus resolved from a course product document. */
+  source?: PersonalAiProvenanceSource;
   resources?: unknown[];
   availability?: Record<string, unknown>;
   extracted?: Record<string, unknown>;

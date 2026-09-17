@@ -13,7 +13,21 @@ import { routeQuery, type RouteDecision } from "./queryRouter";
    declared, never imagined.
    ───────────────────────────────────────────────────────────── */
 
-const CLAIMS = { userId: "student-aria", courseIds: ["crs-phys-201"] };
+/*
+ * The demo extraction endpoint authorises a read from these claims. Hard-coding
+ * them to one learner and one course id (it used to be `crs-phys-201`) meant the
+ * simulated server answered "You don't have access to this course." for EVERY
+ * other course — and that sentence ended up in a shipped course player, on top
+ * of the real reason an answer can be thin. Claims are therefore derived from the
+ * live context: the demo always authorises the course that is actually open.
+ *
+ * This whole file is the playground's simulated pipeline. Real grounding for a
+ * course happens on the server (api/_lib/personalAi.ts + personalAiContent.ts),
+ * which enforces the learner's real entitlement.
+ */
+function claimsFor(ctx: CurrentResourceContext): { userId: string; courseIds: string[] } {
+  return { userId: "student", courseIds: [ctx.course.courseId].filter(Boolean) };
+}
 
 export interface Grounding {
   route: RouteDecision;
@@ -33,7 +47,7 @@ export interface Grounding {
 export function prefetchActive(ctx: CurrentResourceContext): void {
   if (!ctx.capabilities.searchableChunks) return;
   if (ctx.availability !== "ready" && ctx.availability !== "partial") return;
-  void ensureContent(ctx, CLAIMS);
+  void ensureContent(ctx, claimsFor(ctx));
 }
 
 function apply(route: RouteDecision, ctx: CurrentResourceContext): CurrentResourceContext {
@@ -69,7 +83,7 @@ export function ground(text: string, attachments: Attachment[], ctx: CurrentReso
   const content = peekContent(ctx.resource.resourceId);
   if (!content) {
     // Not cached yet — kick off extraction for the next turn and be honest now.
-    void ensureContent(ctx, CLAIMS);
+    void ensureContent(ctx, claimsFor(ctx));
     if (ctx.availability === "ready" || ctx.availability === "partial") {
       steps.push({ label: "Fetching lesson content", detail: "first read — caching for next time" });
       return {
