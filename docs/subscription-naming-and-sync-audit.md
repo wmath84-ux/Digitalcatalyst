@@ -108,7 +108,7 @@ and whether the frontend sees it.
 | 4.4 | Feature price, monthly/yearly base, per-plan `planPricing` (incl. `included`) | feature doc | `resolveFeaturePrice` on **both** sides | page + table + modal | ✓ OK |
 | 4.5 | Feature active / badge / sort / `freeItemsPerDay` | feature doc | `loadActiveFeatures`, My Day quota | page | ✓ OK |
 | 4.6 | **Subscriber-only override price** | `settings/subscriptionGate.subscriberPricing` (and a duplicate `plan.subscriberPricingOverride`) | **FIXED** — `api/_lib/subscriptions.ts` resolves `resolveSubscriberOnlyPrice` for an already-subscribed buyer right after `buildSubscriptionLineItems` and overwrites the plan line's `regularPrice` / `effectivePrice` (rupees→paise once), so the charge equals the badge the page shows | page shows the discount, server charges it | ✓ OK (turn 4) |
-| 4.7 | **AI questions/day cap** (`usageLimits.aiQuestionsPerDay[plan]`, feature `userLimit.aiQuestionsPerDay`) | settings doc + feature doc | **still nobody** — `resolveAiQuestionsPerDay()` has zero callers; the AI engine enforces `aiAllowances.dailyTokenBudget` + `dailyGenerationLimit` (default plans ship 20/day) instead | admin now labels the field **"legacy; not enforced"** and points at the enforced allowances (`data-admin-ai-cap-legacy`, `data-admin-feature-ai-cap-legacy`) | ⚠ honest label only — owner decision needed: enforce it as a second cap, or delete the field |
+| 4.7 | **AI questions/day cap** (`usageLimits.aiQuestionsPerDay[plan]`, feature `userLimit.aiQuestionsPerDay`) | settings doc + feature doc | still not read by any enforcement path — the AI engine enforces `aiAllowances.dailyTokenBudget` + `dailyGenerationLimit` (default plans ship 20/day) | field + value stay exactly as they were; a one-line note under it says where the enforced caps live (`data-admin-ai-cap-note`, `data-admin-feature-ai-cap-note`) | ✓ owner decision (turn 7): **keep it as it is — do not remove, do not enforce** |
 | 4.8 | **Per-cycle feature visibility** (`feature.visibleCycles`) | feature doc | **FIXED** — normaliser emits it, `isFeatureVisibleForCycle` gates the page rows/prices/total, `subscriptionVisibility.js` shared with the server, and the quote rejects a hidden feature (`SUBSCRIPTION_FEATURE_NOT_OFFERED`) | monthly/yearly rows differ | ✓ OK (turn 4) |
 | 4.9 | **Per-plan feature hiding** (`feature.hiddenPlanIds`) | feature doc | **FIXED** — `isFeatureHiddenForPlan` runs first in `featuresForPlanCycle` and on the server before pricing | feature disappears for that plan in every cycle | ✓ OK (turn 4) |
 | 4.10 | **Feature visibility mode gate/hide** (`visibilityMode`) | feature doc | read directly from Firestore by `useRevisionAccess.ts` (rail) + `api/_lib/myDay.ts` (snapshot) **and** carried by the catalog normaliser | rail + nav + My Day | ✓ OK (turn 6) |
@@ -148,7 +148,8 @@ and whether the frontend sees it.
   (`isFeatureHiddenForAudience`, turn 6 helper in the shared module) and My Day
   (plan-scoped `tiers`); one subscriber-price resolver merges both admin
   surfaces (4.13); the plan-sheet copy no longer promises a ₹0 renewal that no
-  resolver honours; the legacy AI-questions knob is labelled honestly (4.7);
+  resolver honours; the legacy AI-questions knob stays as it was, with a short
+  note saying where the enforced caps live (4.7 — owner decision: keep it);
   the dead `utils/subscriptionAccess.ts` is deleted (4.18); a stray
   "fallback catalog in use" flag on the subscription page is now surfaced and
   the two stale subscription-area test assertions (badge + content column) are

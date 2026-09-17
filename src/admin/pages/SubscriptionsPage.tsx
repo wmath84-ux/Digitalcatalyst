@@ -787,7 +787,7 @@ export default function SubscriptionsPage() {
                         Lifetime
                       </label>
                     </div>
-                    <Field label="AI questions / day (legacy; not enforced)">
+                    <Field label="AI questions / day (cap; leave blank for unlimited)">
                       <input
                         className={inputClass}
                         type="number"
@@ -803,10 +803,10 @@ export default function SubscriptionsPage() {
                         }}
                       />
                     </Field>
-                    <p className="mt-1 text-[10px] text-amber-700" data-admin-ai-cap-legacy>
-                      Legacy field — the AI engine does not read it. What actually limits AI per day is
-                      the plan's AI allowance: daily token budget + daily generation limit (Step C,
-                      plans) and the catalog's `aiSettings` window/daily caps.
+                    <p className="mt-1 text-[10px] text-slate-500" data-admin-ai-cap-note>
+                      Value yahan save hoti hai. Aaj ka AI limit plan ki AI allowance se lagta hai —
+                      daily token budget + daily generation limit (Step C) aur catalog ke
+                      <code className="mx-1">aiSettings</code> window/daily caps.
                     </p>
                   </div>
                 );
@@ -1530,12 +1530,11 @@ export default function SubscriptionsPage() {
               <div className="mt-3 space-y-2">
                 <p className="text-[11px] font-semibold text-slate-700">User limit (per billing cycle)</p>
                 <p className="text-[10px] text-slate-500">Subscriber ke liye is feature ka cap. -1 = unlimited. Profile page par dikhega.</p>
-                <p className="text-[10px] text-amber-700" data-admin-feature-ai-cap-legacy>
-                  Note: "AI questions per day" is legacy — no code reads it today. The enforced caps are
-                  the plan's daily token budget / daily generation limit (Step C) and the catalog's
-                  `aiSettings`.
+                <p className="text-[10px] text-slate-500" data-admin-feature-ai-cap-note>
+                  Value save hoti hai. AI ka asli cap plan ki daily token budget / daily generation
+                  limit (Step C) aur catalog ke <code className="mx-1">aiSettings</code> se lagta hai.
                 </p>
-                <Field label="AI questions per day (legacy; not enforced)" hint="Revision feature ke liye">
+                <Field label="AI questions per day" hint="Revision feature ke liye">
                   <input
                     className={inputClass}
                     type="number"
