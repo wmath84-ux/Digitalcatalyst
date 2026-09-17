@@ -186,7 +186,7 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
        card shrink to less than its own content, which `overflow-hidden` would
        then clip. `auto` keeps the content height as the floor and still grows
        into whatever the row gives the column. */
-    <GlassSurface className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-scene-plate text-white lg:min-h-[220px]" contentClassName="flex min-h-0 flex-1 flex-col p-5 lg:p-4">
+    <GlassSurface tint={0.62} tintColor="173,216,255" className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-rev-glass dc-scene-plate text-white lg:min-h-[220px]" contentClassName="flex min-h-0 flex-1 flex-col p-5 lg:p-4">
       <div className="relative flex min-h-0 flex-1 flex-col">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-100 lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
@@ -276,7 +276,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
   return (
     /* Same fill chain as `FirstRevisionCard` — `flex-auto`, not `flex-1`, so the
        card can never be squeezed below its content. */
-    <GlassSurface className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-scene-plate text-white" contentClassName="flex min-h-0 flex-1 flex-col p-5">
+    <GlassSurface tint={0.62} tintColor="173,216,255" className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-rev-glass dc-scene-plate text-white" contentClassName="flex min-h-0 flex-1 flex-col p-5">
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="flex shrink-0 items-start justify-between gap-3">
           <div>
@@ -328,7 +328,7 @@ function PlanRow({ label, value }: { label: string; value: string }) {
 
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <GlassSurface tint={0.4} radius={20} className="dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 py-3 lg:py-2">
+    <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className="dc-rev-glass dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 py-3 lg:py-2">
       {icon}<span className="text-base font-bold text-white lg:text-sm">{value}</span><span className="text-[10px] font-medium text-white/55 lg:text-[9px]">{label}</span>
     </GlassSurface>
   );

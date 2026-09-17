@@ -141,7 +141,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     : snap.allowed ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/30";
 
   return (
-    <GlassCard data-ai-quota-card aria-live="polite" className="relative text-white" contentClassName="p-5 lg:p-3.5">
+    <GlassCard data-ai-quota-card aria-live="polite" className="relative dc-rev-glass text-white" contentClassName="p-5 lg:p-3.5">
       {/* Wave 14: the pack Glass Card — the white plate + drop shadow are gone. */}
       <div className="relative">
         <div className="flex items-start justify-between gap-3">

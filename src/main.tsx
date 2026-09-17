@@ -25,6 +25,10 @@ import "./store-glass.css";
 // AFTER glass.css + store-glass.css for the same cascade reason as the store
 // lens — it has to out-rank the navy plate glass.css paints on `.dc-glass-card`.
 import "./empty-state-glass.css";
+// Revision cards get the store's light-blue glass material — the same
+// transparent lens the store hero wears. AFTER glass.css + store-glass.css
+// so it out-ranks the navy contrast plate on `.dc-glass-card`.
+import "./revision-glass.css";
 // The Course Player's panel language, ported from the removed 3D Classroom:
 // deep navy plates, one hairline, crisp white ink and the room's five surface
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come

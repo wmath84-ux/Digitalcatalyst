@@ -42,6 +42,7 @@ import { useMyDayAccess } from "./hooks/useMyDayAccess";
 import { usePublishFeatureVisibility } from "./context/FeatureVisibilityContext";
 import PremiumGate from "./components/subscription/PremiumGate";
 import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
+import { richTextToPlain } from "./utils/richText";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
 type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
@@ -110,7 +111,7 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
-  const [activeSection, setActiveSection] = useState<DaySection>("overview");
+  const [activeSection, setActiveSection] = useState<DaySection>("tasks");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   // The My Day working column (right of the sticky side navigation). Every
   // create/edit overlay (Modal / ConfirmDialog) clamps itself to this column's
@@ -325,13 +326,6 @@ export default function App() {
       window.location.hash = "#/home";
       return;
     }
-    // Focus Mode has no in-page section — it hands off to the existing
-    // Revision experience (tests & smart sessions), so the entry is real
-    // navigation, never a dead button.
-    if (id === "focus") {
-      window.location.hash = "#/revision";
-      return;
-    }
     setActiveSection(id as DaySection);
     setHighlightId(null);
   }, []);
@@ -502,15 +496,17 @@ export default function App() {
     );
   }, [addToast, canSaveMyDay, persistMyDay, schedule, showConfirm]);
 
-  const handleAddNote = useCallback((noteText: string) => {
+  const handleAddNote = useCallback((noteHtml: string) => {
     // Check access for NEW note creation. Editing/deleting existing notes is always allowed.
     if (!requireMyDayAccess()) return;
     if (!canSaveMyDay()) return;
+    const plain = richTextToPlain(noteHtml) || "";
     const note: QuickNote = {
       id: crypto.randomUUID(),
-      text: noteText,
+      text: plain,
       createdAt: Date.now(),
       color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)],
+      html: noteHtml,
     };
     void persistMyDay({ notes: [note, ...notes] }).then((saved) => {
       if (!saved) return;
@@ -519,9 +515,10 @@ export default function App() {
     });
   }, [addToast, canSaveMyDay, notes, persistMyDay, requireMyDayAccess]);
 
-  const handleEditNote = useCallback((id: string, noteText: string) => {
+  const handleEditNote = useCallback((id: string, noteHtml: string) => {
     if (!canSaveMyDay()) return;
-    const next = notes.map((note) => note.id === id ? { ...note, text: noteText } : note);
+    const plain = richTextToPlain(noteHtml) || "";
+    const next = notes.map((note) => note.id === id ? { ...note, text: plain, html: noteHtml } : note);
     void persistMyDay({ notes: next }).then((saved) => saved && addToast("Note updated"));
   }, [addToast, canSaveMyDay, notes, persistMyDay]);
 

@@ -161,7 +161,7 @@ function TotalCard({ icon, label, value }: { icon: React.ReactNode; label: strin
   return (
     /* Wave 13: `.rev-card` paints nothing on its own — the total tile is the
        pack GlassCard. */
-    <GlassCard className="rev-card" contentClassName="flex items-center gap-3 p-3 lg:p-2.5">
+    <GlassCard className="rev-card dc-rev-glass" contentClassName="flex items-center gap-3 p-3 lg:p-2.5">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10">{icon}</span>
       <div className="min-w-0 flex-1">
         <span className="block truncate text-lg font-bold leading-tight text-white">{value}</span>

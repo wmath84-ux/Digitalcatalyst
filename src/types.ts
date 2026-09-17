@@ -26,6 +26,8 @@ export interface QuickNote {
   text: string;
   createdAt: number;
   color: NoteColor;
+  /** Rich-text HTML body (optional; falls back to `text` for legacy notes). */
+  html?: string;
 }
 
 export type NoteColor = "amber" | "sky" | "rose" | "emerald" | "violet";

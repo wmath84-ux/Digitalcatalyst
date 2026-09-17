@@ -2,8 +2,6 @@ import {
   Bell,
   CalendarClock,
   ClipboardList,
-  Crosshair,
-  LayoutGrid,
   NotebookPen,
   Quote,
 } from "lucide-react";
@@ -18,12 +16,10 @@ interface SideNavProps {
 }
 
 const items = [
-  { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "tasks", label: "Tasks", icon: ClipboardList },
   { id: "schedule", label: "Schedule", icon: CalendarClock },
   { id: "notes", label: "Notes", icon: NotebookPen },
   { id: "reminders", label: "Reminders", icon: Bell },
-  { id: "focus", label: "Focus Mode", icon: Crosshair },
 ];
 
 /**

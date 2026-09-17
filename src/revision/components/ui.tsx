@@ -131,17 +131,13 @@ export function Card({
   ...rest
 }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    /* Phase A4: the card IS the pack's Glass Card material — GlassSurface at
-       Glass Card's published values (tint 0.4, radius 20). Padding stays on the
-       outer box (the `.rev-card` hook the responsive bands size) so the Test
-       Bank's `p-0` cards and every band rule keep working exactly as before.
-       Revision legibility: `dc-scene-plate` is the same shared contrast plate
-       Home, the store, the product page and My Day wear (glass.css) — one edit
-       here plates every revision card at once. The two score heroes keep their
-       solid brand paint through the `[data-rev-score-card]` guard in glass.css;
-       the nested attempt overlay and the generator's picker panel keep the
-       pack's lighter wash so they still read as layers above the card. */
-    <GlassSurface tint={0.4} radius={20} className={`rev-card p-4 text-white dc-scene-plate ${className}`} {...rest}>
+    /* The card now wears the store's light-blue glass material
+       (`.dc-rev-glass`) — the same transparent lens the store hero card
+       uses.  `tint` and `tintColor` match the store hero's values so
+       revision-glass.css can paint the frost + tint layers identically.
+       `dc-scene-plate` stays as the fallback contrast plate for the
+       `?glass=off` kill switch and old WebViews without backdrop-filter. */
+    <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className={`rev-card dc-rev-glass p-4 text-white dc-scene-plate ${className}`} {...rest}>
       {children}
     </GlassSurface>
   );

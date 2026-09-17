@@ -133,9 +133,7 @@ export default function GatePersonalAccess({ fileId, fileUrl, fileName, productI
           <CheckCircle2 size={13} /> {result.message}
         </p>
       ) : null}
-      <p className="mt-2 text-[10px] font-medium leading-relaxed text-white/40">
-        Outside setup: deploy <code className="rounded bg-white/10 px-1 py-0.5">gatePersonalAccess.gs</code> as a Web App (executed as you) and set <code className="rounded bg-white/10 px-1 py-0.5">GATE_APPS_SCRIPT_URL</code> in Vercel — then copies + shares are fully automatic and the main app never shows an OAuth consent screen. Without it, requests are queued for you to fulfill manually from <code className="rounded bg-white/10 px-1 py-0.5">gatePersonalAccessQueue</code>.
-      </p>
+
     </div>
   );
 }
