@@ -19,7 +19,7 @@ import {
   getSubscriptionGateSettings,
   isPlanVisibleForAudience,
 } from "./_lib/subscriptionGate.js";
-import { isOwnedSubscriptionActive } from "../../utils/subscriptionOwnership.js";
+import { isOwnedSubscriptionActive } from "../utils/subscriptionOwnership.js";
 import {
   loadActiveFeatures,
   loadActivePlans,

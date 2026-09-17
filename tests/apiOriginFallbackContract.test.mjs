@@ -28,7 +28,14 @@ const corsSource = fs.readFileSync(path.join(root, "api/_lib/cors.ts"), "utf8");
 test("apiBase knows BOTH Vercel production origins (custom domain + default URL)", () => {
   assert.match(source, /eduvora\.shop/);
   assert.match(source, /digitalcatalyst\.vercel\.app/);
-  assert.match(source, /VERCEL_DEFAULT_API_ORIGIN\s*=\s*"https:\/\/digitalcatalyst\.vercel\.app"/);
+  // The Vercel default origin is a FALLBACK, not a hardcoded truth: a project
+  // created inside a team never gets plain `digitalcatalyst.vercel.app`, so
+  // VITE_VERCEL_API_ORIGIN must be able to override it at build time.
+  assert.match(source, /VITE_VERCEL_API_ORIGIN/);
+  assert.match(
+    source,
+    /VERCEL_DEFAULT_API_ORIGIN\s*=\s*\n?\s*\(typeof import\.meta[\s\S]{0,220}?VITE_VERCEL_API_ORIGIN\)\s*\|\|\s*\n?\s*"https:\/\/digitalcatalyst\.vercel\.app"/,
+  );
 });
 
 test("an HTML answer on an /api/* path means the API is not on that host — fall through to the next origin", () => {

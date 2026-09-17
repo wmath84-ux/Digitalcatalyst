@@ -1449,9 +1449,13 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
       await adminDb().runTransaction(async (tx) => {
         const snap = await tx.get(usageRef);
         const prev = snap.exists ? (snap.data() as any) : null;
-        const generated = Array.isArray(generated.questions) ? generated.questions.length : 0;
-        const total = (Number(prev?.aiQuestionsGenerated) || 0) + generated;
-        const byFeature = { ...((prev?.aiQuestionsByFeature) || {}), revision: (Number((prev?.aiQuestionsByFeature || {}).revision) || 0) + generated };
+        // Named `questionsGenerated`, NOT `generated`: a `const generated` here
+        // would shadow the outer `ProviderGeneration` (declared above) and its
+        // own initialiser would resolve to itself — TS7022 + TS2448, and the
+        // per-feature tally would count a length instead of the generation.
+        const questionsGenerated = Array.isArray(generated.questions) ? generated.questions.length : 0;
+        const total = (Number(prev?.aiQuestionsGenerated) || 0) + questionsGenerated;
+        const byFeature = { ...((prev?.aiQuestionsByFeature) || {}), revision: (Number((prev?.aiQuestionsByFeature || {}).revision) || 0) + questionsGenerated };
         tx.set(usageRef, { uid: user.uid, month, aiQuestionsGenerated: total, aiQuestionsByFeature: byFeature, updatedAt: Date.now() }, { merge: true });
       });
     } catch {

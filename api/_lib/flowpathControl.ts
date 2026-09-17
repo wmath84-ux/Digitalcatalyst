@@ -44,7 +44,7 @@
 //   straightforward grep + code-shape checks.
 
 import { randomUUID } from "node:crypto";
-import { FieldValue, Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import {
   adminDb,
   errorResponse,
@@ -52,16 +52,15 @@ import {
   type VercelRequest,
   type VercelResponse,
 } from "./firebaseAdmin.js";
-import { handleMyDay } from "./myDay.js";
 import { handleRevisionData } from "./revisionData.js";
 import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } from "./fcm.js";
 import { pushToAllDevices, pushToUser, pushConfigured, type PushPayload } from "./pushNotify.js";
 import { getNotificationBrandChrome } from "./branding.js";
-import { resolveFlowPathAccess, type FlowPathAccess } from "./flowpathAccess.js";
+import { resolveFlowPathAccess } from "./flowpathAccess.js";
 // `getLectureCourses` must be imported: `flowpath.lecture.courses` calls it, and
 // an unimported symbol only fails at request time (the api tsconfig is not part
 // of `vite build`), which surfaced as a 500 in the FlowPath course picker.
-import { resolveLectureAccess, getLectureCourses, getLectureModules, getPurchasedProductIds } from "./lecturePlanner.js";
+import { getLectureCourses, getLectureModules, getPurchasedProductIds } from "./lecturePlanner.js";
 
 /* -------------------------------------------------------------------------- */
 /*  Type definitions (kept in sync with src/flowpath/types/flowpath.ts)       */
@@ -147,6 +146,11 @@ export type FlowPathActivity = {
     localAlarm?: boolean;
     immediate?: boolean;
   };
+  /** id of the queued `settings/adminScheduledJobs` job, so an update or
+   *  delete can cancel the previously scheduled dispatch. Written by
+   *  dispatchActivity/scheduleJob. Must stay in sync with the client copy in
+   *  src/flowpath/types/flowpath.ts, which already declares this field. */
+  scheduledJobId?: string | null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -565,7 +569,10 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
         return void res.status(403).json({ ok: false, error: "Cannot create for another user." });
       }
       const access = await resolveFlowPathAccess(db, activity.uid, activity.kind);
-      if (access.error) return void res.status(access.status).json({ ok: false, code: access.code, error: access.error });
+      // `status` is optional on FlowPathAccess; every error branch in
+      // resolveFlowPathAccess sets 403, so default to it rather than calling
+      // res.status(undefined) (TS2345) if a future branch forgets.
+      if (access.error) return void res.status(access.status ?? 403).json({ ok: false, code: access.code, error: access.error });
 
       // 1. Persist to flowpathActivities (master copy).
       await persistActivity(db, activity);
@@ -600,14 +607,26 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
           },
           headers: req.headers,
         } as unknown as VercelRequest;
-        const fakeRes = {
-          status(code: number) { (fakeRes as { statusCode: number }).statusCode = code; return fakeRes; },
-          json(data: unknown) { (fakeRes as { body: unknown }).body = data; return fakeRes; },
-          setHeader() { return fakeRes; },
-        } as unknown as VercelResponse;
+        // A response double that records what handleRevisionData answers.
+        // `statusCode`/`body` are NOT properties of VercelResponse, so the
+        // casts the old code used ((fakeRes as { statusCode: number })) were
+        // rejected as unsound (TS2352). Keep the recorder in its own typed
+        // object and perform the single deliberate fiction once, here.
+        const revisionProbe: {
+          statusCode?: number;
+          body?: { ok?: boolean; saved?: { used?: number } };
+          status(code: number): unknown;
+          json(data: unknown): unknown;
+          setHeader(): unknown;
+        } = {
+          status(code: number) { revisionProbe.statusCode = code; return revisionProbe; },
+          json(data: unknown) { revisionProbe.body = data as typeof revisionProbe.body; return revisionProbe; },
+          setHeader() { return revisionProbe; },
+        };
+        const fakeRes = revisionProbe as unknown as VercelResponse;
         try {
           await handleRevisionData(fakeReq, fakeRes);
-          const result = (fakeRes as { body?: { ok?: boolean; saved?: { used?: number } } }).body;
+          const result = revisionProbe.body;
           if (!result || !result.ok) {
             // Roll back the flowpathActivities write so the user does
             // not see an orphan entry.

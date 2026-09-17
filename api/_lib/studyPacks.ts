@@ -68,7 +68,10 @@ async function optionalUid(req: VercelRequest): Promise<string | null> {
 
 async function requireUid(req: VercelRequest): Promise<string> {
   const uid = await optionalUid(req);
-  if (!uid) fail(401, "AUTH_REQUIRED", "Sign in to continue.");
+  // `return fail(…)` (not a bare call): `fail` is typed `never`, but TS only
+  // narrows after an explicit control-flow terminator, so a bare call left
+  // this returning `string | null` (TS2322).
+  if (!uid) return fail(401, "AUTH_REQUIRED", "Sign in to continue.");
   return uid;
 }
 
@@ -160,7 +163,7 @@ async function loadOwnedModule(db: Db, uid: string, moduleId: string) {
 
 async function createPack(db: Db, uid: string, body: Body) {
   const meta = sanitizeStudyPackMeta(body);
-  if (!meta.ok) fail(400, "VALIDATION", meta.errors[0]?.message || "Check the pack details.", meta.errors);
+  if (!meta.ok) return fail(400, "VALIDATION", meta.errors[0]?.message || "Check the pack details.", meta.errors);
   const plan = await readPlan(db, uid);
   if (!plan.packs.creationEnabled) fail(403, "PACK_CREATION_DISABLED", "Study Pack creation isn't included on your current plan. Existing packs remain available.");
   const published = await packCollection(db).where("ownerUid", "==", uid).limit(Math.max(plan.packs.maxPublishedPacks, 0) + 20).get();
@@ -228,7 +231,7 @@ async function updatePack(db: Db, uid: string, body: Body) {
     description: body.description ?? existing.description,
     visibility: body.visibility ?? existing.visibility,
   });
-  if (!meta.ok) fail(400, "VALIDATION", meta.errors[0]?.message || "Check the pack details.", meta.errors);
+  if (!meta.ok) return fail(400, "VALIDATION", meta.errors[0]?.message || "Check the pack details.", meta.errors);
   let resources = Array.isArray(existing.resources) ? existing.resources : [];
   if (body.refresh === true && text(existing.sourceModuleId)) {
     const loaded = await loadOwnedModule(db, uid, text(existing.sourceModuleId));
@@ -318,7 +321,6 @@ async function importPack(db: Db, uid: string, body: Body) {
 
   const result = await db.runTransaction(async (tx) => {
     const modulesSnap = await tx.get(moduleCollection(db, uid).limit(200));
-    const usageDoc = await tx.get(usageRef(db, uid));
     const userModules = modulesSnap.docs.filter((item) => !item.data()?.system && !item.data()?.deleting);
     const allResources: Array<{ id: string; data: () => Body; ref: { path: string }; parentId: string }> = [];
     for (const mod of modulesSnap.docs) {
@@ -341,7 +343,7 @@ async function importPack(db: Db, uid: string, body: Body) {
     if (destination === "existing") {
       if (!isValidPersonalId(moduleId)) fail(400, "INVALID_ID", "Choose a destination module.");
       const found = modulesSnap.docs.find((item) => item.id === moduleId);
-      if (!found || found.data()?.system || found.data()?.deleting) fail(404, "MODULE_NOT_FOUND", "That destination module no longer exists.");
+      if (!found || found.data()?.system || found.data()?.deleting) return fail(404, "MODULE_NOT_FOUND", "That destination module no longer exists.");
       parentRef = found.ref;
       parentData = found.data() || {};
       const currentCount = allResources.filter((item) => item.parentId === moduleId).length;
@@ -353,7 +355,7 @@ async function importPack(db: Db, uid: string, body: Body) {
         fail(409, "MODULE_LIMIT", personalLimitMessage("module", limits, plan.planName));
       }
       const cleaned = sanitizePersonalModuleInput({ title: moduleTitle, description: moduleDescription });
-      if (!cleaned.ok) fail(400, "VALIDATION", cleaned.errors[0]?.message || "Check the module details.");
+      if (!cleaned.ok) return fail(400, "VALIDATION", cleaned.errors[0]?.message || "Check the module details.");
       moduleId = makeId("pm");
       parentRef = moduleCollection(db, uid).doc(moduleId);
       const maxOrder = userModules.reduce((max, item) => Math.max(max, number(item.data()?.sortOrder)), -SORT_STEP);
