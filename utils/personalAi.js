@@ -24,6 +24,7 @@
 // Nothing here touches the network, Firestore or React.
 
 import { personalAiAvailability, personalCourseTypeLabel } from "./personalCourse.js";
+import { AI_READ_KINDS, aiReadPlan } from "./aiFileReaders.js";
 
 /* ------------------------------------------------------------------ */
 /* Constants + limits                                                  */
@@ -42,8 +43,13 @@ export const PERSONAL_AI_STATES = [
 /** True when a state means the AI may ground an answer in that resource. */
 export const PERSONAL_AI_READABLE_STATES = ["ready", "partial"];
 
-/** What the server extractor should attempt for a resource. */
-export const PERSONAL_AI_READ_KINDS = ["google-export", "pdf", "text", "none"];
+/**
+ * What the server extractor should attempt for a resource. These are the
+ * reader registry's kinds verbatim — the list lives in `utils/aiFileReaders.js`
+ * so the extractor, the availability table and the chat can never disagree
+ * about what "readable" meant for a given file type.
+ */
+export const PERSONAL_AI_READ_KINDS = AI_READ_KINDS;
 
 /** Extraction outcomes reported by the server content service. */
 export const PERSONAL_AI_OUTCOMES = ["ok", "empty", "invalid", "permission", "error", "skipped", "pending", "unsupported"];
@@ -94,6 +100,8 @@ export const PERSONAL_AI_ARTIFACT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Saved-for Later has no module document; it gets its own provenance root. */
 export const PERSONAL_AI_SAVED_LABEL = "Saved for Later";
 export const PERSONAL_AI_MODULE_ROOT_LABEL = "My Module";
+/** Root for content read straight out of a course the learner owns. */
+export const PERSONAL_AI_COURSE_ROOT_LABEL = "Course library";
 
 /* ------------------------------------------------------------------ */
 /* Small text helpers                                                  */
@@ -146,78 +154,25 @@ export const personalAiHash = (value) => {
 /* Read plan — what the extractor should try                           */
 /* ------------------------------------------------------------------ */
 
-const GOOGLE_ID_BY_HOST = [
-  [/^docs\.google\.com$/i, "doc"],
-  [/^drive\.google\.com$/i, "drive"],
-  [/^sheets\.google\.com$/i, "sheet"],
-  [/^slides\.google\.com$/i, "slides"],
-];
-
-/** Pull the Google file id out of any of the canonical personal URL shapes. */
-export const googleFileIdFromUrl = (rawUrl) => {
-  const url = String(rawUrl || "").trim();
-  if (!url) return "";
-  let parsed = null;
-  try { parsed = new URL(url); } catch { return ""; }
-  const host = parsed.hostname.replace(/^www\./i, "");
-  const known = GOOGLE_ID_BY_HOST.find(([pattern]) => pattern.test(host));
-  if (!known) return "";
-  // /document/d/{id}/edit · /file/d/{id}/view · /spreadsheets/d/{id} · /open?id={id}
-  const pathMatch = parsed.pathname.match(/\/(?:document|file|spreadsheets|slides|presentation|forms)?\/?d\/([a-zA-Z0-9_-]{10,})/);
-  if (pathMatch) return pathMatch[1];
-  const explicit = parsed.searchParams.get("id") || parsed.searchParams.get("fileId");
-  return explicit && /^[a-zA-Z0-9_-]{10,}$/.test(explicit) ? explicit : "";
-};
-
-const TEXT_EXTENSION = /\.(txt|md|markdown|csv|tsv|html?|xml|json|log|rtf)$/i;
+/**
+ * Re-exported from the reader registry so existing importers keep working
+ * while `utils/aiFileReaders.js` becomes the single owner of URL grammar.
+ */
+export { googleFileIdFromUrl } from "./aiFileReaders.js";
 
 /**
- * Decide what the server extractor should attempt for one personal resource.
- * Returns `{ kind: "none", reason }` for every type with no read path — the
- * reason comes from the EXISTING honesty table so the copy never drifts.
+ * Decide what the server extractor should attempt for one resource.
+ *
+ * The whole decision — payload text that is already in the document, a caption
+ * file, Google's export endpoint, PDF bytes, a plain-text link, or "no read
+ * path, and here is the honest reason" — lives in the shared reader registry
+ * (`utils/aiFileReaders.js`). Both the personal library and the Course Player's
+ * official lessons run through it, so a file type can never be readable in one
+ * surface and "not supported yet" in another.
  */
 export const personalAiReadPlan = (resource) => {
-  const row = asRecord(resource);
-  const type = String(row.type || "").trim();
-  const url = String(row.url || row.sourceUrl || "").trim();
-  const legacy = personalAiAvailability(type);
-  const noPlan = (reason) => ({ kind: "none", url: "", format: "", reason: reason || legacy.reason });
-
-  if (!url) return noPlan("This resource has no link to read.");
-  if (type === "doc") {
-    const fileId = googleFileIdFromUrl(url);
-    return fileId
-      ? { kind: "google-export", url: `https://docs.google.com/document/d/${fileId}/export?format=txt`, format: "txt", reason: "" }
-      : noPlan();
-  }
-  if (type === "sheet") {
-    const fileId = googleFileIdFromUrl(url);
-    return fileId
-      ? { kind: "google-export", url: `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`, format: "csv", reason: "" }
-      : noPlan();
-  }
-  if (type === "slides") {
-    const fileId = googleFileIdFromUrl(url);
-    return fileId
-      ? { kind: "google-export", url: `https://docs.google.com/presentation/d/${fileId}/export?format=txt`, format: "txt", reason: "" }
-      : noPlan();
-  }
-  if (type === "pdf" || type === "ebook") {
-    const fileId = googleFileIdFromUrl(url);
-    if (fileId) {
-      return { kind: "pdf", url: `https://drive.google.com/uc?export=download&id=${fileId}`, format: "pdf", reason: "" };
-    }
-    if (/^https:\/\//i.test(url) && !/\.(php|aspx?|jsp|do|cfm)(\?|$)/i.test(url)) {
-      return { kind: "pdf", url, format: "pdf", reason: "" };
-    }
-    return noPlan();
-  }
-  // Any other type that happens to point at a plain-text document is still
-  // readable — the extension, not the label, decides.
-  if (TEXT_EXTENSION.test(url.split("?")[0])) {
-    return { kind: "text", url, format: "text", reason: "" };
-  }
-  return noPlan();
+  const { via, ...plan } = aiReadPlan(resource);
+  return plan;
 };
 
 /* ------------------------------------------------------------------ */
@@ -304,11 +259,26 @@ export const personalAiProvenance = (input) => {
   const options = asRecord(input);
   const scope = options.scope === "resource" ? "resource" : "module";
   const saved = options.saved === true;
-  const root = saved ? PERSONAL_AI_SAVED_LABEL : PERSONAL_AI_MODULE_ROOT_LABEL;
-  const moduleTitle = saved ? "" : cleanAiText(options.moduleTitle, 120) || "Untitled module";
+  // Read straight from the course the learner owns ("course"), copied into My
+  // Modules ("official-copy"), or written by the learner ("personal"). Each has
+  // its own honest label — a learner who bought a course should not be told the
+  // material is "their personal copy", and a tutor must not claim otherwise.
+  const fromCourse = options.source === "course";
+  const official = String(options.originKind || "manual") === "official";
+  const root = fromCourse
+    ? PERSONAL_AI_COURSE_ROOT_LABEL
+    : saved
+      ? PERSONAL_AI_SAVED_LABEL
+      : PERSONAL_AI_MODULE_ROOT_LABEL;
+  const moduleTitle = saved && !fromCourse ? "" : cleanAiText(options.moduleTitle, 120) || (fromCourse ? "Course" : "Untitled module");
   const resourceName = scope === "resource" ? cleanAiText(options.resourceName, 140) : "";
   const parts = [root, moduleTitle, resourceName].filter(Boolean);
-  const official = String(options.originKind || "manual") === "official";
+  const kind = fromCourse ? "course-official" : official ? "official-copy" : "personal";
+  const kindLabel = fromCourse
+    ? "Official course material the learner has access to"
+    : official
+      ? "Personal copy of an official course resource"
+      : "Personal resource";
   return {
     scope,
     saved,
@@ -316,8 +286,8 @@ export const personalAiProvenance = (input) => {
     root,
     moduleTitle,
     resourceName,
-    kind: official ? "official-copy" : "personal",
-    kindLabel: official ? "Personal copy of an official course resource" : "Personal resource",
+    kind,
+    kindLabel,
   };
 };
 
@@ -341,16 +311,18 @@ export const buildPersonalAiUnits = (input) => {
   const options = asRecord(input);
   const module = asRecord(options.module);
   const saved = options.saved === true;
+  /** "course" when the corpus comes from an official lesson the learner owns. */
+  const fromCourse = options.source === "course";
   const resources = asArray(options.resources).slice(0, PERSONAL_AI_MAX_UNITS);
   const availability = asRecord(options.availability);
   const extracted = asRecord(options.extracted);
   const notes = asRecord(options.notes);
   const units = [];
 
-  const moduleTitle = cleanAiText(module.title, 120) || (saved ? PERSONAL_AI_SAVED_LABEL : "Untitled module");
+  const moduleTitle = cleanAiText(module.title, 120) || (saved ? PERSONAL_AI_SAVED_LABEL : fromCourse ? "Course" : "Untitled module");
   const moduleDescription = stripAiMarkup(module.description, PERSONAL_AI_MAX_AUTHORED_CHARS);
   if (moduleTitle || moduleDescription) {
-    const provenance = personalAiProvenance({ scope: "module", moduleTitle, saved });
+    const provenance = personalAiProvenance({ scope: "module", moduleTitle, saved, source: fromCourse ? "course" : undefined });
     units.push({
       id: `module:${module.id || "__scope__"}:brief`,
       kind: "module-brief",
@@ -358,12 +330,16 @@ export const buildPersonalAiUnits = (input) => {
       resourceId: null,
       title: moduleTitle,
       provenance: provenance.label,
-      originKind: "personal",
+      originKind: fromCourse ? "official" : "personal",
       readable: true,
       weight: 1.15,
       text: cleanAiText([
-        `Module: ${moduleTitle}`,
-        moduleDescription ? `What the learner says this module is about: ${moduleDescription}` : "",
+        fromCourse ? `Course: ${moduleTitle}` : `Module: ${moduleTitle}`,
+        moduleDescription
+          ? fromCourse
+            ? `What is open right now: ${moduleDescription}`
+            : `What the learner says this module is about: ${moduleDescription}`
+          : "",
       ].filter(Boolean).join("\n"), PERSONAL_AI_MAX_AUTHORED_CHARS),
     });
   }
@@ -377,8 +353,9 @@ export const buildPersonalAiUnits = (input) => {
       scope: "resource",
       moduleTitle,
       resourceName: resource.name,
-      originKind: resource.originKind,
+      originKind: fromCourse ? "official" : resource.originKind,
       saved,
+      source: fromCourse ? "course" : undefined,
     });
     const description = stripAiMarkup(resource.description, PERSONAL_AI_MAX_AUTHORED_CHARS);
     const metadata = asRecord(resource.metadata);
@@ -404,7 +381,9 @@ export const buildPersonalAiUnits = (input) => {
         `Type: ${provenance.kindLabel} · ${personalCourseTypeLabel(resource.type)}`,
         description ? `Learner's description: ${description}` : "",
         metadataText ? `Learner's labels: ${metadataText}` : "",
-        readable ? "" : `Not readable by the AI: ${state.reason || "no read path"}`,
+        readable ? "" : `Not readable by the AI: ${state.reason || "this file type has no read path"}`,
+        // A lesson file the learner can see but the server could not open is a
+        // different fact from "not shared"; the reason line above carries it.
       ].filter(Boolean).join("\n"), PERSONAL_AI_MAX_AUTHORED_CHARS),
     });
 

@@ -113,6 +113,13 @@ export interface PersonalAiAnswerResult {
   coverage: PersonalAiCoverage;
   unreadable: { id: string; name: string; type: string; state: PersonalAiState; reason: string }[];
   scopeLabel: string;
+  /**
+   * Why the grounding is the size it is — e.g. "3 of 9 files in this lesson
+   * could be read." or "2 sub-modules of this module are locked for your
+   * account". Set by the server from the resolved scope, so a thin answer can
+   * be explained to the learner instead of reading like a permissions problem.
+   */
+  scopeNote?: string;
   provider: string;
   model: string;
   aiSource: "own" | "default";

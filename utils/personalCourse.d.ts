@@ -159,10 +159,19 @@ export const sanitizePersonalResourceInput: (
 
 export const isValidPersonalId: (value: unknown) => boolean;
 
-export const personalAiAvailability: (fileOrType: unknown) => {
+/** One file type's honest AI-read capability, derived from utils/aiFileReaders. */
+export interface PersonalAiAvailability {
+  type: string;
+  label: string;
+  /** True when a read path exists for this KIND of file (not for a given file). */
   readable: boolean;
   reason: string;
+  via: "google-export" | "pdf-bytes" | "caption-file" | "text-file" | "in-document" | "none";
+  fallback: "screenshot" | "metadata" | "none";
   screenshotSupported: boolean;
-};
+  payloadSupported: boolean;
+}
+
+export const personalAiAvailability: (fileOrType: unknown) => PersonalAiAvailability;
 
 export const personalProvenanceLabel: (moduleTitle: string, resourceName: string) => string;

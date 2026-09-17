@@ -54,18 +54,25 @@ export function ensureContent(ctx: CurrentResourceContext, claims: AccessClaims)
   const running = inflight.get(id);
   if (running) return running.promise; // ← request de-duplication
 
-  /* Access control is enforced before any request leaves. */
+  /*
+   * Access control is enforced before any request leaves. A denial is NOT
+   * cached: entitlements change (a purchase completes, a plan renews, the
+   * player grants the next module) and a cached "no access" turned a temporary
+   * state into a permanent one — the learner kept asking about a module they had
+   * just unlocked and kept being told they could not see it.
+   */
   if (ctx.resource.accessState !== "granted") {
-    const denied: ExtractedContent = {
+    return Promise.resolve({
       resourceId: id,
       availability: "unavailable",
-      note: "You don't have access to this resource.",
+      note:
+        ctx.resource.accessState === "unauthenticated"
+          ? "Sign in and I can read this lesson."
+          : "This lesson isn't unlocked for your account yet.",
       chunks: [],
       contentHash: "none",
       fetchedAt: Date.now(),
-    };
-    cache.set(id, denied);
-    return Promise.resolve(denied);
+    });
   }
 
   /* Types with no legitimate extraction path never hit the network. */

@@ -6,6 +6,11 @@ Every course in the app now includes a comprehensive demo module system with **a
 
 ---
 
+> **How the AI in the player reads each of these types** — which file gets which
+> treatment, what makes a type readable, and what is deliberately never read —
+> is specified in [course-player-ai-file-readers.md](./course-player-ai-file-readers.md).
+> That document, not the tables scattered through the code, is the answer.
+
 ## Supported File Types & Prices
 
 | # | File Type     | Module Name                          | Price  | Source                          |

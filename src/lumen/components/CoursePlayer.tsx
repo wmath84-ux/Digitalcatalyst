@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import {
-  AudioLines, ChevronRight, FileSpreadsheet, FileText, FileType2, Film, Image as ImageIcon,
+  AudioLines, Brain, ChevronRight, FileSpreadsheet, FileText, FileType2, Film, Image as ImageIcon,
   ListChecks, Network, Pause, Play, Presentation, Sparkles, SquareCode, MonitorPlay, type LucideIcon,
 } from "lucide-react";
 import { courseBridge, useActiveLearningContext } from "../course/bridge";
@@ -19,6 +19,8 @@ const ICONS: Record<ResourceType, LucideIcon> = {
   youtube: MonitorPlay, video: Film, audio: AudioLines, pdf: FileText, doc: FileType2,
   sheet: FileSpreadsheet, slides: Presentation, ebook: FileText, image: ImageIcon,
   google_form: ListChecks, embed: SquareCode, mindmap: Network,
+  // A course file type without an icon here is a type the player cannot show.
+  brain: Brain,
 };
 
 const AVAIL_STYLE: Record<string, { label: string; cls: string }> = {
@@ -26,7 +28,9 @@ const AVAIL_STYLE: Record<string, { label: string; cls: string }> = {
   partial: { label: "Partial", cls: "border-[--border-2] bg-[--warn-bg] text-[--warn]" },
   available: { label: "On demand", cls: "border-[--border] bg-[--hover] text-[--ink-3]" },
   processing: { label: "Processing", cls: "border-[--border] bg-[--hover] text-[--ink-3]" },
-  permission_required: { label: "No API access", cls: "border-[--border-2] bg-[--warn-bg] text-[--warn]" },
+  // "No API access" described our plumbing and told the learner to give up. The
+  // actionable fact is that the FILE is not shared with us yet.
+  permission_required: { label: "Not shared yet", cls: "border-[--border-2] bg-[--warn-bg] text-[--warn]" },
   unsupported: { label: "Screenshot only", cls: "border-[--border-2] bg-[--hover] text-[--ink-3]" },
   unavailable: { label: "Unavailable", cls: "border-[--err-border] bg-[--err-bg] text-[--err]" },
 };

@@ -17,7 +17,6 @@ import type { StudentModel } from "./ai/types";
 import { useViewportKeyboard } from "./lib/useViewportKeyboard";
 import { courseBridge, getActiveContext, useCourseContextVersion } from "./course/bridge";
 import { abortExcept } from "./course/contentService";
-import { prefetchActive } from "./ai/courseGrounding";
 import type { Attachment, Chat, Message, ThinkingStep } from "./lib/types";
 import { makeScreenshotAttachment, uid } from "./lib/utils";
 import { PERF, perf } from "./lib/perf";
@@ -124,10 +123,16 @@ function LumenChatInner({
   /* Course ↔ AI synchronization. The version counter changes only on
      STRUCTURAL events (resource/page/slide), never on playback ticks. */
   const courseVersion = useCourseContextVersion();
+  /*
+   * Resource-change housekeeping only. The simulated extractor used to be
+   * warmed here (`prefetchActive`), which meant the real course player was
+   * calling a playground endpoint with playground credentials and caching its
+   * "no access" answer against the open lesson. Real grounding is fetched by
+   * the server, per ask, under the learner's own token; nothing here may
+   * pre-judge it.
+   */
   useEffect(() => {
-    const ctx = getActiveContext();
-    abortExcept(ctx.resource.resourceId); // cancel extraction for stale resources
-    prefetchActive(ctx);                  // warm the cache for the open one
+    abortExcept(getActiveContext().resource.resourceId); // cancel stale demo jobs
   }, [courseVersion]);
 
   useEffect(() => {
@@ -227,6 +232,12 @@ function LumenChatInner({
       moduleId: personal ? asPersonalId(selectedFile?.personalModuleId) : undefined,
       storageModuleId: personal ? asPersonalId(selectedFile?.personalStorageModuleId) : undefined,
       resourceId: personal ? asPersonalId(selectedFile?.personalResourceId) : undefined,
+      // An official lesson is addressed by its place in the course tree. The
+      // player already knows both ids; before they were sent, the server had no
+      // way to find the open module and grounded every answer in nothing.
+      official: personal ? false : true,
+      officialModuleId: personal ? undefined : moduleId || undefined,
+      officialResourceId: personal ? undefined : selectedFile?.id || undefined,
       notes: notes
         .filter((n) => n.text.trim())
         .slice(0, 12)

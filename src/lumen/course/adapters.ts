@@ -1,3 +1,4 @@
+import { aiCapabilitiesFor, aiReaderFor } from "../../../utils/aiFileReaders";
 import type { Capabilities, ChunkLocation, CourseResource, LocationState, PlaybackState, ResourceType } from "./types";
 
 /* ─────────────────────────────────────────────────────────────
@@ -34,11 +35,23 @@ const CAPS = (over: Partial<Capabilities>): Capabilities => ({
   serverAnalyzable: false, fallback: "metadata", ...over,
 });
 
+/**
+ * What the reader registry says about this file type, before the player's live
+ * availability narrows it. `Capabilities` and the registry's row are the same
+ * vocabulary on purpose: the chat must not promise a page map the server can
+ * never produce, nor refuse a PDF the server can read.
+ */
+const registryCaps = (type: ResourceType): Capabilities => {
+  const { label: _label, ...caps } = aiCapabilitiesFor(type);
+  return caps as Capabilities;
+};
+
 const timeBased = (type: ResourceType, label: string, medium: string): ResourceContextAdapter => ({
   type,
   label,
   capabilities: (r) =>
     CAPS({
+      ...registryCaps(type),
       text: r.availability === "ready",
       position: true,
       transcript: r.availability === "ready",
@@ -63,7 +76,7 @@ const PdfAdapter: ResourceContextAdapter = {
   type: "pdf",
   label: "PDF",
   capabilities: (r) =>
-    CAPS({ text: r.availability === "ready", pages: true, position: true, searchableChunks: r.availability === "ready", visual: true, original: true, serverAnalyzable: true, fallback: "screenshot" }),
+    CAPS({ ...registryCaps("pdf"), text: r.availability === "ready", pages: true, position: true, searchableChunks: r.availability === "ready", visual: true, original: true, serverAnalyzable: true, fallback: "screenshot" }),
   locate: (_p, l) => ({ page: l.currentPage }),
   // Never guessed: the page comes from the viewer's own reported state.
   describePosition: (_p, l, r) => (l.currentPage ? `on page ${l.currentPage}${r.pageCount ? ` of ${r.pageCount}` : ""}` : "in the document"),
@@ -73,7 +86,7 @@ const PdfAdapter: ResourceContextAdapter = {
 const DocAdapter: ResourceContextAdapter = {
   type: "doc",
   label: "Google Doc",
-  capabilities: (r) => CAPS({ text: r.availability === "ready", searchableChunks: r.availability === "ready", position: false, serverAnalyzable: true, fallback: "screenshot" }),
+  capabilities: (r) => CAPS({ ...registryCaps("doc"), text: r.availability === "ready", searchableChunks: r.availability === "ready", position: false, serverAnalyzable: true, fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "in the document",
   fallbackMessage: (r) => r.availabilityNote ?? "The document content isn't available to me right now. You can screenshot the relevant section.",
@@ -82,7 +95,7 @@ const DocAdapter: ResourceContextAdapter = {
 const SheetAdapter: ResourceContextAdapter = {
   type: "sheet",
   label: "Google Sheet",
-  capabilities: (r) => CAPS({ text: r.availability === "ready", searchableChunks: r.availability === "ready", position: true, serverAnalyzable: true, fallback: "screenshot" }),
+  capabilities: (r) => CAPS({ ...registryCaps("sheet"), text: r.availability === "ready", searchableChunks: r.availability === "ready", position: true, serverAnalyzable: true, fallback: "screenshot" }),
   locate: (_p, l) => ({ sheet: l.currentSheet }),
   describePosition: (_p, l) => (l.currentSheet ? `on sheet “${l.currentSheet}”` : "in the spreadsheet"),
   fallbackMessage: (r) => r.availabilityNote ?? "I can't read this spreadsheet. A screenshot of the range you mean works.",
@@ -91,7 +104,7 @@ const SheetAdapter: ResourceContextAdapter = {
 const SlidesAdapter: ResourceContextAdapter = {
   type: "slides",
   label: "Google Slides",
-  capabilities: (r) => CAPS({ text: r.availability === "ready", slides: true, position: true, searchableChunks: r.availability === "ready", visual: true, serverAnalyzable: true, fallback: "screenshot" }),
+  capabilities: (r) => CAPS({ ...registryCaps("slides"), text: r.availability === "ready", slides: true, position: true, searchableChunks: r.availability === "ready", visual: true, serverAnalyzable: true, fallback: "screenshot" }),
   locate: (_p, l) => ({ slide: l.currentSlide }),
   describePosition: (_p, l, r) => (l.currentSlide ? `on slide ${l.currentSlide}${r.slideCount ? ` of ${r.slideCount}` : ""}` : "in the deck"),
   fallbackMessage: (r) => r.availabilityNote ?? "I can't read this deck. Screenshot the slide and I'll take it from there.",
@@ -100,7 +113,7 @@ const SlidesAdapter: ResourceContextAdapter = {
 const EbookAdapter: ResourceContextAdapter = {
   type: "ebook",
   label: "E-book",
-  capabilities: (r) => CAPS({ text: r.availability === "ready", pages: true, position: true, searchableChunks: r.availability === "ready", original: true, serverAnalyzable: true, fallback: "screenshot" }),
+  capabilities: (r) => CAPS({ ...registryCaps("ebook"), text: r.availability === "ready", pages: true, position: true, searchableChunks: r.availability === "ready", original: true, serverAnalyzable: true, fallback: "screenshot" }),
   locate: (_p, l) => ({ chapter: l.currentChapter, page: l.currentPage }),
   describePosition: (_p, l) => (l.currentChapter ? `in ${l.currentChapter}` : "in the book"),
   fallbackMessage: (r) => r.availabilityNote ?? "I can't read this book's text. Screenshot the passage you mean.",
@@ -109,7 +122,10 @@ const EbookAdapter: ResourceContextAdapter = {
 const ImageAdapter: ResourceContextAdapter = {
   type: "image",
   label: "Image",
-  capabilities: () => CAPS({ visual: true, text: true, searchableChunks: true, original: true, serverAnalyzable: true, fallback: "screenshot" }),
+  // An image is only "readable" through what the learner captures: the app has
+  // no text-recognition path for a course image, and says so instead of
+  // inventing a description of the figure.
+  capabilities: () => CAPS({ ...registryCaps("image"), visual: true, text: false, searchableChunks: false, original: true, serverAnalyzable: false, fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "viewing the figure",
   fallbackMessage: () => "I couldn't analyse this image. Try capturing the specific area you're asking about.",
@@ -119,7 +135,7 @@ const GoogleFormAdapter: ResourceContextAdapter = {
   type: "google_form",
   label: "Google Form",
   // Deliberately no text capability: questions are never invented.
-  capabilities: (r) => CAPS({ text: false, searchableChunks: false, visual: false, serverAnalyzable: r.availability === "ready", fallback: "screenshot" }),
+  capabilities: (r) => CAPS({ ...registryCaps("google_form"), text: false, searchableChunks: false, visual: false, serverAnalyzable: r.availability === "ready", fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "on the form",
   fallbackMessage: (r) =>
@@ -130,7 +146,7 @@ const EmbedAdapter: ResourceContextAdapter = {
   type: "embed",
   label: "Embedded app",
   // Sandboxed third-party iframe: metadata + screenshot only, ever.
-  capabilities: () => CAPS({ text: false, searchableChunks: false, visual: false, fallback: "screenshot" }),
+  capabilities: () => CAPS({ ...registryCaps("embed"), text: false, searchableChunks: false, visual: false, fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "in the embedded app",
   fallbackMessage: (r) =>
@@ -141,10 +157,31 @@ const MindmapAdapter: ResourceContextAdapter = {
   type: "mindmap",
   label: "Mind map",
   capabilities: (r) =>
-    CAPS({ text: r.availability === "ready" || r.availability === "partial", searchableChunks: r.availability !== "unsupported", visual: true, serverAnalyzable: true, fallback: "screenshot" }),
+    CAPS({ ...registryCaps("mindmap"), text: r.availability === "ready" || r.availability === "partial", searchableChunks: r.availability !== "unsupported", visual: true, serverAnalyzable: true, fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "viewing the concept map",
   fallbackMessage: (r) => r.availabilityNote ?? "I can't read this map's structure. A screenshot of the branch you mean works.",
+};
+
+const BrainAdapter: ResourceContextAdapter = {
+  type: "brain",
+  label: "Brain practice set",
+  // Its content IS the document: the questions the admin imported. There is no
+  // file to open and nothing to authorise, so this is the one type that is
+  // readable even with no URL at all.
+  capabilities: (r) =>
+    CAPS({
+      ...registryCaps("brain"),
+      text: r.availability === "ready" || r.availability === "partial",
+      searchableChunks: r.availability !== "unsupported",
+      visual: false,
+      serverAnalyzable: true,
+      fallback: "metadata",
+    }),
+  locate: () => ({}),
+  describePosition: (_p, _l, r) => (r.pageCount ? `question set of ${r.pageCount}` : "in the practice set"),
+  fallbackMessage: (r) =>
+    r.availabilityNote ?? "This practice set has no questions imported yet, so there is nothing in it for me to work from.",
 };
 
 const REGISTRY: Record<ResourceType, ResourceContextAdapter> = {
@@ -160,10 +197,16 @@ const REGISTRY: Record<ResourceType, ResourceContextAdapter> = {
   google_form: GoogleFormAdapter,
   embed: EmbedAdapter,
   mindmap: MindmapAdapter,
+  brain: BrainAdapter,
 };
 
 export function getAdapter(type: ResourceType): ResourceContextAdapter {
   return REGISTRY[type] ?? EmbedAdapter; // safest default: metadata + screenshot
+}
+
+/** The registry's own explanation for a type, for copy that names no file. */
+export function readerReason(type: ResourceType): string {
+  return aiReaderFor(type).reason;
 }
 
 export function registerAdapter(adapter: ResourceContextAdapter): void {

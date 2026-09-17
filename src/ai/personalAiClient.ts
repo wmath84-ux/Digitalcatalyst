@@ -272,6 +272,23 @@ export interface CoursePlayerAiContext {
   moduleTitle?: string | null;
   resourceName?: string | null;
   resourceType?: string | null;
+  /**
+   * Which module / file of the course tree is open, by the id the course
+   * document itself uses. Without them the server cannot tell THIS lesson from
+   * the ten others in the course, and the assistant has nothing to read — which
+   * is exactly how "I don't have access to this module" was produced for a
+   * learner who had full access. Ignored for personal-module asks.
+   */
+  moduleId?: string | null;
+  resourceId?: string | null;
+  /**
+   * `true` for a file the learner owns through the course (not a personal
+   * module). The server resolves the entitlement itself — this flag only says
+   * which tree to look in, it grants nothing.
+   */
+  official?: boolean;
+  /** Firestore document id of the product, when it differs from its public id. */
+  productDocumentId?: string | null;
 }
 
 export interface AskModuleAiInput extends PersonalAiScopeInput {
