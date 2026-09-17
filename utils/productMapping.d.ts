@@ -28,7 +28,9 @@ export type EditorResourceType =
   | "ebook"
   | "github_pages"
   | "whimsical"
-  | "iframe";
+  | "iframe"
+  /** Brain practice set — the one editor type with no URL. */
+  | "brain";
 
 export interface EditorResource {
   id: string;
@@ -49,6 +51,9 @@ export interface EditorResource {
   paidUpdateId?: string | null;
   entitlementId?: string;
   parentModuleId?: string | null;
+  /** Brain practice set (`type: "brain"` only) — the resource's whole content. */
+  practiceQuestions?: unknown[];
+  practiceTitle?: string;
 }
 
 export interface EditorModule {
@@ -143,6 +148,8 @@ export interface FirestoreResource extends Record<string, unknown> {
   paidUpdateId?: string | null;
   paidUpdatePrice?: string;
   paidUpdateCoinPrice?: number;
+  practiceQuestions?: unknown[];
+  practiceTitle?: string;
 }
 
 export interface FirestoreModule extends Record<string, unknown> {

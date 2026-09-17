@@ -83,16 +83,28 @@ test("exactly the 12 required types exist with friendly labels", () => {
 
 test("registry values are a subset of the CourseFileType union in src/types/course.ts", () => {
   const courseTypesSource = readSource("src/types/course.ts");
-  const union = courseTypesSource.match(/export type CourseFileType = "([^"]+)"(?:\s*\|\s*"([^"]+)")+/);
-  assert.ok(union, "CourseFileType union must exist in src/types/course.ts");
-  const match = courseTypesSource.match(/export type CourseFileType = ([\s\S]*?);/);
+  // The union is written one member per line (it carries a doc comment for the
+  // admin-only `brain` type), so parse the whole declaration block rather than
+  // assuming a single-line `= "youtube" | …`.
+  const match = courseTypesSource.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(match, "CourseFileType union must exist in src/types/course.ts");
   const unionText = match[1];
   const declaredTypes = [...unionText.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  assert.ok(declaredTypes.length >= 12, "CourseFileType must declare every supported type");
   for (const type of ALL_PERSONAL_COURSE_TYPES) {
     assert.ok(declaredTypes.includes(type), `${type} must stay inside CourseFileType`);
   }
-  assert.equal(ALL_PERSONAL_COURSE_TYPES.length, declaredTypes.length, "registry must not drift from the union");
+  // The registry is a deliberate SUBSET: `brain` (the admin-imported practice
+  // sets behind the Course Player's Brain tab) is course-content only — a
+  // learner never picks it when adding their own material — so it must stay in
+  // the union and out of the personal registry. Any OTHER new type must be
+  // added to the registry, which is what this keeps honest.
+  assert.ok(declaredTypes.includes("brain"), "the union must carry the admin-only brain type");
+  assert.deepEqual(
+    declaredTypes.filter((type) => !ALL_PERSONAL_COURSE_TYPES.includes(type)),
+    ["brain"],
+    "only brain may sit outside the personal-course registry",
+  );
 });
 
 // ---------------------------------------------------------------------------

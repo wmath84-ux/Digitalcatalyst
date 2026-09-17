@@ -47,6 +47,11 @@ export type Visibility = "visible" | "hidden";
  *   - `paid_update`  — unlocked by buying a published paid course update.
  *   - `hidden`       — never exposed in the player.
  */
+// The Brain practice payload is defined next to the player's own course types,
+// so the admin editor, the canonical schema and the Course Player share ONE
+// definition of a practice question.
+import type { CoursePracticeQuestion } from "./course";
+
 export type AccessLevel = "included" | "purchasable" | "paid_update" | "hidden";
 
 export type ResourceType =
@@ -61,7 +66,13 @@ export type ResourceType =
   | "google_form"
   | "ebook"
   | "embed"
-  | "mindmap";
+  | "mindmap"
+  /**
+   * Brain practice set — the one canonical type with NO url: its content is
+   * `practiceQuestions`, imported by the admin on the Product / Course-content
+   * page and played back on the Course Player's Brain tab.
+   */
+  | "brain";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -87,6 +98,9 @@ export interface CanonicalCourseResource {
   paidUpdateId: string | null;
   /** Bare 11-char id for YouTube resources that were saved without a URL. */
   youtubeVideoId?: string;
+  /** Brain practice set (`type: "brain"` only). */
+  practiceQuestions?: CoursePracticeQuestion[];
+  practiceTitle?: string;
 }
 
 export interface CanonicalCourseModule {

@@ -1,5 +1,41 @@
 export type CourseAccessLevel = "included" | "paidUpdate" | "hidden";
-export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sheet" | "slides" | "ebook" | "image" | "google_form" | "embed" | "mindmap";
+export type CourseFileType =
+  | "youtube"
+  | "video"
+  | "audio"
+  | "pdf"
+  | "doc"
+  | "sheet"
+  | "slides"
+  | "ebook"
+  | "image"
+  | "google_form"
+  | "embed"
+  | "mindmap"
+  /**
+   * The Brain practice set. Unlike every other type a `brain` resource has NO
+   * url — its content IS `practiceQuestions` below, imported by the admin on
+   * the Product / Course-content page (resource type "Brain · practice set").
+   * It renders in the Course Player's Brain tab, not in the file viewer.
+   */
+  | "brain";
+
+/**
+ * One practice question imported by the admin into a `brain` resource.
+ * The single source of truth for the shape is `utils/practiceSet.js`; this is
+ * its TypeScript projection (the player reads resources straight off the
+ * course tree, so both sides must agree byte-for-byte).
+ */
+export interface CoursePracticeQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  /** -1 = no answer marked yet (only possible on a draft set). */
+  correctIndex: number;
+  explanation: string;
+  difficulty: "easy" | "medium" | "hard";
+  topic: string;
+}
 
 /**
  * Part 11 — single note shape. Stored on
@@ -91,6 +127,12 @@ export interface CourseFile extends CourseAccessMeta {
   officialSourceModuleId?: string;
   officialSourceResourceId?: string;
   description?: string;
+  /**
+   * Brain practice-set payload (type: "brain" only). The admin's bulk-import
+   * questions, exactly as stored — non-`brain` resources never carry these.
+   */
+  practiceQuestions?: CoursePracticeQuestion[];
+  practiceTitle?: string;
 }
 
 export interface CourseModule extends CourseAccessMeta {

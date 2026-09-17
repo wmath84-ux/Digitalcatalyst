@@ -36,7 +36,9 @@ import {
   textareaClass,
 } from "@/components/admin/ui";
 import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/admin/products/CloudinaryImageUploadField";
+import PracticeSetImportPanel from "@/components/admin/products/PracticeSetImportPanel";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
+import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
 import type { PaidUpdate, ProductModule, ProductResource } from "@/lib/admin/types";
 
 const RESOURCE_TYPES = [
@@ -54,6 +56,7 @@ const RESOURCE_TYPES = [
   "github_pages",
   "whimsical",
   "iframe",
+  "brain",
 ] as const;
 
 const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
@@ -71,9 +74,13 @@ const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
   github_pages: "GitHub Pages",
   whimsical: "Whimsical",
   iframe: "Other embed / iframe",
+  brain: "Brain · practice set",
 };
 
 function providerForType(type: ProductResource["type"]) {
+  // The Brain practice set is the ONE resource type with no external provider:
+  // its content is the question list the admin imports below.
+  if (type === "brain") return "Brain";
   if (type === "youtube") return "YouTube";
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
@@ -722,17 +729,35 @@ function ResourceCard({
   const isFirst = index === 0;
   const isLast = index === module.resources.length - 1;
 
+  // A Brain resource is the ONE type that is ready WITHOUT a URL: its content
+  // is the practice set below. Everything else keeps the URL-ready rule.
+  const isBrain = resource.type === "brain";
+  const brainQuestions = normalizePracticeQuestions(resource.practiceQuestions);
+  const brainReady = isBrain && practiceQuestionsReady(resource.practiceQuestions);
+  const readyForPlayer = isBrain ? brainReady : Boolean(cleanUrl);
+
   return (
     <article
       data-admin-resource-card
       data-resource-id={resource.id}
-      className={`space-y-3 rounded-xl border p-3 ${cleanUrl ? "border-slate-200 bg-slate-50/60" : "border-red-300 bg-red-50/30"}`}
+      data-resource-type={resource.type}
+      className={`space-y-3 rounded-xl border p-3 ${readyForPlayer ? "border-slate-200 bg-slate-50/60" : isBrain ? "border-amber-300 bg-amber-50/40" : "border-red-300 bg-red-50/30"}`}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
           Resource {index + 1} · {module.title || "Untitled module"}
         </p>
-        <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
+        {isBrain ? (
+          <Pill tone={brainReady ? "success" : "warn"}>
+            {brainQuestions.length === 0
+              ? "Questions required"
+              : brainReady
+                ? `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} ready`
+                : `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} · answer missing`}
+          </Pill>
+        ) : (
+          <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -762,7 +787,26 @@ function ResourceCard({
         </Field>
       </div>
 
-      {resource.type === "image_url" ? (
+      {isBrain ? (
+        <PracticeSetImportPanel
+          questions={brainQuestions}
+          title={resource.practiceTitle || ""}
+          resourceName={resource.name}
+          onChange={({ questions, title }) =>
+            onUpdate({
+              // Normalise for storage (caps, ids, difficulty) but keep drafts:
+              // `normalizePracticeQuestions` only drops entries with no text at
+              // all, which the panel never produces (a blank question is kept
+              // until the admin removes it).
+              practiceQuestions: questions.map((question, questionIndex) => ({
+                ...question,
+                id: String(question.id || `q${questionIndex + 1}`),
+              })),
+              practiceTitle: title || undefined,
+            })
+          }
+        />
+      ) : resource.type === "image_url" ? (
         <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-indigo-700">Image source</p>
@@ -834,9 +878,15 @@ function ResourceCard({
         </Field>
       )}
 
-      {!cleanUrl ? (
+      {!cleanUrl && !isBrain ? (
         <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">
           Add a valid public URL before publishing. This resource cannot appear in the player yet.
+        </p>
+      ) : null}
+      {isBrain && !brainReady ? (
+        <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
+          Every practice question needs text, two options and a marked answer. The set only reaches the learner&apos;s Brain tab once it is
+          complete — drafts stay saved here meanwhile.
         </p>
       ) : null}
       {resource.type === "whimsical" ? (
@@ -946,13 +996,15 @@ function ResourceCard({
       </details>
 
       <div className="flex flex-wrap gap-2">
-        <SecondaryButton
-          className="h-9 px-3 text-xs"
-          disabled={!cleanUrl}
-          onClick={() => cleanUrl && window.open(cleanUrl, "_blank", "noopener,noreferrer")}
-        >
-          Open URL
-        </SecondaryButton>
+        {!isBrain ? (
+          <SecondaryButton
+            className="h-9 px-3 text-xs"
+            disabled={!cleanUrl}
+            onClick={() => cleanUrl && window.open(cleanUrl, "_blank", "noopener,noreferrer")}
+          >
+            Open URL
+          </SecondaryButton>
+        ) : null}
         <SecondaryButton className="h-9 px-3 text-xs" disabled={isFirst} onClick={onMoveUp}>
           ↑ Up
         </SecondaryButton>

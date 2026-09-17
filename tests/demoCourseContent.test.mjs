@@ -15,7 +15,11 @@ const root = resolve(__dirname, "..");
 
 const source = readFileSync(resolve(root, "src/data/demoCourseContent.ts"), "utf-8");
 
-// ─── 2. Validate all 12 CourseFileType values are present ────────────
+// ─── 2. Validate every CourseFileType value is present ───────────────
+//
+// The 12 URL-backed types plus the Brain practice set (`brain`), which is the
+// one resource type with no URL — its content is its question list, imported
+// by the admin on the Product / Course-content page.
 
 const EXPECTED_TYPES = [
   "youtube",
@@ -30,6 +34,7 @@ const EXPECTED_TYPES = [
   "google_form",
   "embed",
   "mindmap",
+  "brain",
 ];
 
 for (const type of EXPECTED_TYPES) {
@@ -37,7 +42,7 @@ for (const type of EXPECTED_TYPES) {
     throw new Error(`Missing file type "${type}" in demoCourseContent.ts`);
   }
 }
-console.log(`✓ All 12 CourseFileType values present in demo course content`);
+console.log(`✓ All ${EXPECTED_TYPES.length} CourseFileType values present in demo course content`);
 
 // ─── 3. Validate each module has a unique id ─────────────────────────
 
@@ -62,10 +67,10 @@ console.log(`✓ ${prices.length} module prices defined (₹${prices.join(", ₹
 
 // Count files by looking for `type:` entries inside the `files:` arrays
 // Each file has a type and either a url, youtubeUrl, or embedUrl
-const fileTypeMatches = [...source.matchAll(/type:\s*["'](youtube|video|audio|pdf|doc|sheet|slides|ebook|image|google_form|embed|mindmap)["']/g)];
+const fileTypeMatches = [...source.matchAll(/type:\s*["'](youtube|video|audio|pdf|doc|sheet|slides|ebook|image|google_form|embed|mindmap|brain)["']/g)];
 const fileTypeCount = fileTypeMatches.length;
-if (fileTypeCount < 12) {
-  throw new Error(`Expected at least 12 files with types, found ${fileTypeCount}`);
+if (fileTypeCount < 13) {
+  throw new Error(`Expected at least 13 files with types, found ${fileTypeCount}`);
 }
 console.log(`✓ ${fileTypeCount} files with explicit types found across all modules`);
 
@@ -152,7 +157,7 @@ for (const type of EXPECTED_TYPES) {
     throw new Error(`CourseFileType is missing "${type}"`);
   }
 }
-console.log(`✓ CourseFileType in src/types/course.ts includes all 12 types`);
+console.log(`✓ CourseFileType in src/types/course.ts includes all ${EXPECTED_TYPES.length} types`);
 
 // ─── 12. Validate ResourceViewer supports all embed kinds ────────────
 
@@ -244,18 +249,18 @@ const summaryMatches = [
     /\{\s*type:\s*["']([^"']+)["'],\s*module:\s*["']([^"']+)["'],\s*price:\s*["']₹(\d+)["'],\s*coins:\s*(\d+)\s*\}/g
   ),
 ];
-if (summaryMatches.length !== 12) {
+if (summaryMatches.length !== EXPECTED_TYPES.length) {
   throw new Error(
-    `Expected 12 entries in modulePriceSummary, found ${summaryMatches.length}`
+    `Expected ${EXPECTED_TYPES.length} entries in modulePriceSummary, found ${summaryMatches.length}`
   );
 }
-console.log(`✓ modulePriceSummary has exactly 12 entries`);
+console.log(`✓ modulePriceSummary has exactly ${EXPECTED_TYPES.length} entries (one per file type)`);
 
 // ─── Summary ──────────────────────────────────────────────────────────
 
 console.log(`\n══════════════════════════════════════════════════════`);
 console.log(`  DEMO COURSE CONTENT VALIDATION: ALL 16 CHECKS PASS`);
-console.log(`  12 file types × individual prices ✓`);
+console.log(`  ${EXPECTED_TYPES.length} file types × individual prices ✓`);
 console.log(`  Public URLs for all types ✓`);
 console.log(`  Paid-update modules for purchase flow ✓`);
 console.log(`  Integration into CatalogContext ✓`);
