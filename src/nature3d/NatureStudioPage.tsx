@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
   Gauge, Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
-  Rows3, Sparkles, Waves, Wind, X,
+  LogOut, Rows3, Sparkles, Waves, Wind, X,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
@@ -55,6 +55,13 @@ export default function NatureStudioPage() {
   const [showPlacer, setShowPlacer] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep the fullscreen flag honest when the user leaves via Esc / F11.
+  useEffect(() => {
+    const sync = () => setImmersive(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
 
   // ── Boot the engine once ────────────────────────────────────────────
   useEffect(() => {
@@ -138,6 +145,21 @@ export default function NatureStudioPage() {
     });
   }, []);
 
+  // The shell (rail + top bar) is gone on this route, so the HUD owns the
+  // only way back out.
+  const exitSanctuary = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    window.location.hash = "#/home";
+  }, []);
+
+  // The page already fills the viewport, so this button escalates to real
+  // browser fullscreen (hides the OS/browser chrome too).
+  const toggleFullscreen = useCallback(() => {
+    const root = document.documentElement;
+    if (document.fullscreenElement) void document.exitFullscreen?.();
+    else void root.requestFullscreen?.().catch(() => {});
+  }, []);
+
   const onMoveStick = useCallback((x: number, y: number, active: boolean) => {
     engineRef.current?.setMoveStick(x, y, active);
   }, []);
@@ -161,10 +183,10 @@ export default function NatureStudioPage() {
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+    <main className="fixed inset-0 z-[90] bg-[#0b1620]">
       <div
-        className="relative min-h-0 flex-1 overflow-hidden rounded-[26px] border border-white/12 bg-[#0b1620] shadow-[0_28px_70px_rgba(0,0,0,0.45)]"
-        style={immersive ? { position: "fixed", inset: 12, zIndex: 80, borderRadius: 26 } : { height: "clamp(520px, calc(100dvh - 190px), 1100px)" }}
+        className="absolute overflow-hidden bg-[#0b1620]"
+        style={{ inset: 0 }}
       >
         {/* ── WebGL host. `touch-action:none` so a drag never scrolls the page ── */}
         <div ref={hostRef} className="absolute inset-0" style={{ touchAction: "none", cursor: carrying ? "grabbing" : "grab" }}>
@@ -218,8 +240,12 @@ export default function NatureStudioPage() {
               <Move3d className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Board</span>
             </HudButton>
-            <HudButton onClick={() => setImmersive((v) => !v)} title={immersive ? "Exit immersive" : "Immersive"}>
+            <HudButton onClick={toggleFullscreen} active={immersive} title={immersive ? "Exit fullscreen" : "Fullscreen"}>
               {immersive ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </HudButton>
+            <HudButton onClick={exitSanctuary} title="Back to Digital Catalyst">
+              <LogOut className="h-3.5 w-3.5 text-rose-200" />
+              <span className="hidden sm:inline">Exit</span>
             </HudButton>
           </div>
         </header>

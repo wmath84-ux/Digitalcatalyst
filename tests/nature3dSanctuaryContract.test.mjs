@@ -80,16 +80,25 @@ test("the route is registered and lazy-loaded like every other page", () => {
   assert.match(MAIN, /hash\.startsWith\(NATURE_STUDIO_HASH\)\) return <NatureStudioPage \/>/);
 });
 
-test("the page renders inside the shell, so the side panel stays visible", () => {
+test("the sanctuary takes over the whole viewport — no rail, no top bar", () => {
   // DesktopAppHost bails out of the shell for full-bleed routes. The sanctuary
-  // must NOT be in that list — the whole point is that it opens beside the rail.
+  // MUST be in that list: clicking the rail button hides every other chrome
+  // element and hands the entire viewport to the WebGL canvas.
   const bailout = MAIN.slice(MAIN.indexOf("Skip the shell on routes"), MAIN.indexOf("return (\n    <AppShell"));
   assert.ok(
-    !bailout.includes("nature-studio"),
-    "the sanctuary must not opt out of the desktop shell",
+    bailout.includes("NATURE_STUDIO_HASH"),
+    "the sanctuary must opt out of the desktop shell",
   );
-  // And it publishes a title/subtitle for the shell's top bar.
-  assert.match(MAIN, /3D Study Sanctuary/);
+  // The page itself pins to the viewport instead of living in a flex column,
+  // which is what previously collapsed the canvas to zero height.
+  assert.match(PAGE, /<main className="fixed inset-0 z-\[90\]/);
+  assert.ok(
+    !/clamp\(520px/.test(PAGE),
+    "the canvas host must not depend on a clamped flex height any more",
+  );
+  // And there is still a way back out, since the rail is gone.
+  assert.match(PAGE, /exitSanctuary/);
+  assert.match(PAGE, /window\.location\.hash = "#\/home"/);
 });
 
 // ── 2. The board: landscape, draggable, never under the ground ────────

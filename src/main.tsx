@@ -684,6 +684,10 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
     || hash.startsWith(OPENING_PREVIEW_HASH)
+    // The 3D Study Sanctuary is a full-screen WebGL experience: the rail,
+    // the top bar and the page scroller all have to get out of the way so
+    // the canvas owns the entire viewport.
+    || hash.startsWith(NATURE_STUDIO_HASH)
   ) {
     return <>{children}</>;
   }
