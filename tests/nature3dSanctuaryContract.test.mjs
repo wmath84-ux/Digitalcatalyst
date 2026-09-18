@@ -414,7 +414,11 @@ test("three and its types are locked for CI", () => {
 // ── 10. The kilometre world, and what does NOT move in it ─────────────
 
 test("the world is a full kilometre across, built as LOD shells", () => {
-  assert.match(TERRAIN, /export const WORLD_SIZE = 1000/);
+  // The ground now has to cover the whole three-district chain, so its size
+  // is derived from the chain's reach rather than hard-coded at 1000.
+  assert.match(TERRAIN, /export const WORLD_SIZE = WORLD_REACH \* 2 \+ 400/);
+  const reach = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  assert.ok(reach * 2 + 400 >= 1000, "the world must still be at least a kilometre across");
   assert.match(TERRAIN, /export const WORLD_HALF = WORLD_SIZE \/ 2/);
   // Three concentric shells, not one giant plane: detail where the camera is.
   const shells = TERRAIN.slice(TERRAIN.indexOf("const shells"), TERRAIN.indexOf("const mat ="));
@@ -426,8 +430,10 @@ test("the world is a full kilometre across, built as LOD shells", () => {
     assert.ok(Number(far) >= 1500, `farPlane ${far} cannot show a 1 km world`);
   }
   // Walking and board placement must both use the bigger world.
-  assert.match(CONTROLS, /const WALK_LIMIT = 430/);
-  assert.match(BOARD, /const MAX_RADIUS = 400/);
+  // The walk limit now spans the whole connected chain, not just the meadow.
+  assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
+  // The board travels with the learner across the whole connected world.
+  assert.match(BOARD, /const MAX_RADIUS = WORLD_REACH;/);
 });
 
 test("the distant hills are real eroded terrain, not cardboard pyramids", () => {
@@ -532,10 +538,11 @@ test("the leftover black slab is gone and the clamp scales with the board", () =
 });
 
 test("the opening camera is a wide establishing shot", () => {
-  // You land far enough back to read the whole valley and explore from there.
-  assert.match(SCENE, /this\.orbit\.panTo\(new THREE\.Vector3\(0, 6, -6\), 86, -0\.5, 0\.36\)/);
-  // And you can pull back far enough to see the kilometre.
-  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, 420\)/);
+  // You now land far enough back to read the ENTIRE connected world — all
+  // three districts at once — and explore in from there.
+  assert.match(SCENE, /this\.orbit\.panTo\(new THREE\.Vector3\(0, 30, 0\), 1500, -0\.30, 0\.34\)/);
+  // And you can pull back at least that far by hand.
+  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, 2400\)/);
   // The board and student presets still exist so you can click straight in.
   assert.match(SCENE, /case "board":/);
   assert.match(SCENE, /case "student":/);
@@ -682,88 +689,133 @@ test("the board remembers where and how big the learner left it", () => {
   assert.match(SCENE, /this\.boardCtl\.restore\(loadBoardPlacement\(\)\)/);
 });
 
-test("Clay Safari is installed as a second world, not a replacement", () => {
-  // The Sanctuary page and engine are untouched and still routed.
-  assert.ok(exists("src/nature3d/NatureStudioPage.tsx"), "the Sanctuary page must survive");
-  assert.ok(exists("src/nature3d/engine/scene.ts"), "the Sanctuary engine must survive");
+test("there is ONE 3D route — the districts are not separate pages", () => {
+  // The whole point of this round: no second button, no second page.
   assert.match(MAIN, /NATURE_STUDIO_HASH = "#\/nature-studio"/);
-  assert.match(MAIN, /hash\.startsWith\(NATURE_STUDIO_HASH\)\) return <NatureStudioPage \/>/);
-
-  // ...and the safari is added beside it with its own hash, page and chunk.
-  assert.ok(exists("src/nature3d/SafariStudioPage.tsx"), "the safari page must exist");
-  assert.ok(exists("src/nature3d/safari/SafariWorld.ts"), "the safari engine wrapper must exist");
-  assert.match(MAIN, /CLAY_SAFARI_HASH = "#\/clay-safari"/);
-  assert.match(MAIN, /lazyRoute\(\(\) => import\("\.\/nature3d\/SafariStudioPage"\)\)/);
-  assert.match(MAIN, /hash\.startsWith\(CLAY_SAFARI_HASH\)\) return <SafariStudioPage \/>/);
-  // Both worlds bypass the desktop shell and open full screen.
-  assert.match(MAIN, /\|\| hash\.startsWith\(CLAY_SAFARI_HASH\)/);
-});
-
-test("the safari button sits in the rail under the Study Library", () => {
+  assert.ok(!/CLAY_SAFARI_HASH/.test(MAIN), "the safari must not have its own route");
+  assert.ok(!exists("src/nature3d/SafariStudioPage.tsx"), "the safari must not have its own page");
   const shell = read("src/components/DesktopShell.tsx");
+  assert.ok(!/safari3d/.test(shell), "the safari must not have its own rail button");
+  // The one rail button still sits under Study Library.
   const study = shell.indexOf('key: "study"');
-  const safari = shell.indexOf('key: "safari3d"');
-  assert.ok(study > 0 && safari > study, "the safari entry must come after Study Library");
-  assert.match(shell, /key: "safari3d", label: "Clay Safari"/);
-  assert.match(shell, /hash: "#\/clay-safari"/);
-  assert.match(shell, /safari3d: "#[0-9A-Fa-f]{6}"/, "the rail entry needs its own colour");
-  assert.match(shell, /hash\.startsWith\("#\/clay-safari"\)\) return "safari3d"/);
-  // A new rail key must also be taught to the peek dock.
-  const dock = read("src/components/glass-dock/DesktopPeekDock.tsx");
-  assert.match(dock, /active === 'safari3d'/);
+  const nature = shell.indexOf('key: "nature3d"');
+  assert.ok(study > 0 && nature > study, "the 3D button stays directly under Study Library");
 });
 
-test("the safari keeps our character and joystick, not the source project's", () => {
-  const safari = read("src/nature3d/safari/SafariWorld.ts");
-  // Our rig, our stick, our keyboard.
-  assert.match(safari, /import \{ FirstPersonRig, KeyboardInput, type VirtualStick \}/);
-  assert.match(safari, /this\.fpp\.update\(dt, stick, this\.camera\)/);
-  // EXACTLY the Sanctuary's look sensitivity.
-  assert.match(safari, /\* 0\.005;/, "pointer look must use the same 0.005 per-pixel scaling");
-  assert.match(safari, /this\.fpp\.look\(dx \* 0\.9, dy \* 0\.9\)/, "and the same 0.9 rig gain");
-  const sanctuaryGain = /this\.fpp\.look\(dx \* ([\d.]+), dy \* ([\d.]+)\)/.exec(SCENE);
-  const safariGain = /this\.fpp\.look\(dx \* ([\d.]+), dy \* ([\d.]+)\)/.exec(safari);
-  assert.deepEqual(safariGain.slice(1), sanctuaryGain.slice(1), "both worlds must steer identically");
-  // The source project's own Player class must NOT be used.
-  assert.ok(!/from "\.\/player\.js"/.test(safari), "Clay Safari's own player controller must stay out");
-  assert.ok(!exists("src/nature3d/safari/player.js"), "the vendored player controller should not be shipped");
-});
-
-test("the safari ships the world assets but none of the unwanted extras", () => {
-  // The world itself is installed as-is.
-  for (const mod of ["world.js", "animals.js", "clay.js", "data.js", "effects.js", "nav.js", "noise.js", "tween.js"]) {
-    assert.ok(exists(`src/nature3d/safari/${mod}`), `${mod} must be vendored`);
+test("the world is one connected chain of three districts", () => {
+  const regions = read("src/nature3d/engine/regions.ts");
+  for (const id of ["sanctuary", "safari", "trek"]) {
+    assert.ok(regions.includes(`id: "${id}"`), `${id} must be a district of the world`);
   }
-  // Animals, birds and props are real GLB assets, served from /public.
+  // They are laid out along X, and the world reaches past the outermost.
+  const safariX = Number(/SAFARI: Region = \{ id: "safari", centerX: (-?\d+)/.exec(regions)[1]);
+  const trekX = Number(/TREK: Region = \{ id: "trek", centerX: (-?\d+)/.exec(regions)[1]);
+  const reach = Number(/WORLD_REACH = (\d+)/.exec(regions)[1]);
+  assert.ok(safariX > 0 && trekX < 0, "the districts must flank the sanctuary");
+  assert.ok(reach > Math.max(Math.abs(safariX), Math.abs(trekX)), "the world must contain every district");
+
+  // ONE height field answers for all of them — that is what makes it walkable.
+  assert.match(TERRAIN, /import \{[\s\S]*?regionWeight,\s*safariRelief,\s*trekRelief,[\s\S]*?\} from "\.\/regions"/);
+  assert.match(TERRAIN, /const wSanct = regionWeight\(SANCTUARY, x, z\)/);
+  assert.match(TERRAIN, /const wSafari = regionWeight\(SAFARI, x, z\)/);
+  assert.match(TERRAIN, /const wTrek = regionWeight\(TREK, x, z\)/);
+  // The ring of hills is opened up so the districts are not walled off.
+  assert.match(TERRAIN, /corridor/, "the sanctuary's hill ring needs passes to the neighbours");
+
+  // You can actually walk the whole way.
+  assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
+});
+
+test("all three districts are framed by the default opening view", () => {
+  // The establishing shot pulls back far enough to hold the whole chain.
+  const m = /panTo\(new THREE\.Vector3\(0, 30, 0\), (\d+), /.exec(SCENE);
+  assert.ok(m, "expected the opening establishing shot");
+  const dist = Number(m[1]);
+  const regions = read("src/nature3d/engine/regions.ts");
+  const spread = Number(/SAFARI: Region = \{ id: "safari", centerX: (\d+)/.exec(regions)[1]);
+  // Half-width `spread` must fit in half the 52-degree fov at `dist`.
+  const needed = spread / Math.tan((52 * Math.PI) / 180 / 2);
+  assert.ok(dist >= needed * 0.98, `camera at ${dist}m cannot frame districts ${spread}m out (needs ~${Math.round(needed)}m)`);
+  // ...and the far plane and zoom limit must both reach that far.
+  const far = Math.min(...[...QUALITY.matchAll(/farPlane: (\d+)/g)].map((x) => Number(x[1])));
+  assert.ok(far > dist + spread, `far plane ${far} clips the far district`);
+  const zoomMax = Number(/clamp\(this\.targetDistance \* factor, [\d.]+, (\d+)\)/.exec(CONTROLS)[1]);
+  assert.ok(zoomMax >= dist, `orbit zoom caps at ${zoomMax}, short of the ${dist}m world view`);
+  // Fog must not erase the far districts.
+  const fog = Math.max(...[...QUALITY.matchAll(/fogDensity: ([\d.]+)/g)].map((x) => Number(x[1])));
+  const visibility = Math.exp(-((fog * (dist + spread)) ** 2));
+  assert.ok(visibility > 0.15, `fog leaves only ${(visibility * 100).toFixed(0)}% of the far district visible`);
+  // And there are HUD presets to fly to each district.
+  for (const key of ["world", "trek", "safari"]) {
+    assert.ok(PAGE.includes(`key: "${key}"`), `the HUD needs a ${key} view preset`);
+    assert.ok(SCENE.includes(`case "${key}":`), `the engine needs a ${key} preset`);
+  }
+});
+
+test("the safari is built into the one scene, without a second sky or sun", () => {
+  const district = read("src/nature3d/engine/safariDistrict.ts");
+  assert.match(district, /group\.position\.set\(SAFARI\.centerX, 0, SAFARI\.centerZ\)/);
+  assert.match(district, /buildWorld\(group, \{ isMobile: false, district: true \}\)/);
+  // A district must not bring its own global lighting: that would mean two
+  // directional lights and two shadow passes.
+  const world = read("src/nature3d/safari/world.js");
+  assert.match(world, /export function buildWorld\(scene, \{ isMobile, district = false \}\)/);
+  assert.match(world, /\/\/ ---- lights & sky \(own-world only\)\s*\n\s*if \(!district\) \{/);
+  assert.match(world, /\/\/ ---- clouds \(own-world only[\s\S]{0,80}\n\s*if \(!district\) \{/);
+  // The animals still ship and still load.
+  assert.match(district, /new Creature\(def, model, world, i\)/);
   const models = listDir("public/safari/models").filter((f) => f.endsWith(".glb"));
-  assert.ok(models.length >= 15, `expected the animal/prop models, found ${models.length}`);
-  for (const must of ["lion.glb", "elephant.glb", "giraffe.glb", "zebra.glb", "bird.glb", "fish.glb"]) {
-    assert.ok(models.includes(must), `${must} must ship`);
-  }
+  assert.ok(models.length >= 15, `expected the safari models, found ${models.length}`);
+  // The scene wires it in and disposes it.
+  assert.match(SCENE, /this\.safari = createSafariDistrict\(\)/);
+  assert.match(SCENE, /this\.scene\.add\(this\.safari\.group\)/);
+  assert.match(SCENE, /this\.safari\.update\(dt, time\)/);
+  assert.match(SCENE, /this\.safari\.dispose\(\)/);
+});
 
-  // ── The explicitly unwanted things ──
-  // 1. no AI guide character
-  assert.ok(!models.includes("robot.glb"), "the robot AI guide must not ship");
-  for (const f of ["world.js", "animals.js", "data.js", "clay.js", "effects.js"]) {
-    assert.ok(
-      !/robot/i.test(read(`src/nature3d/safari/${f}`)),
-      `${f} must not reference the robot guide`,
-    );
-  }
-  assert.ok(!exists("src/nature3d/safari/tour.js"), "the auto-tour guide must not ship");
-  assert.ok(!exists("src/nature3d/safari/ui.js"), "the source project's instruction UI must not ship");
-  // 2. no written messages / vocabulary cards over the animals
-  const animals = read("src/nature3d/safari/animals.js");
-  assert.ok(!/makeLabel|fillText/.test(animals), "the floating word cards must be gone");
-  assert.ok(!/labelsVisible/.test(animals), "the label toggle must be gone");
-  // 3. no narration
-  assert.ok(!exists("src/nature3d/safari/audio.js"), "the TTS/narration module must not ship");
-  // 4. no leftover source-language instruction text anywhere in the vendored world
-  for (const f of listDir("src/nature3d/safari")) {
-    const body = read(`src/nature3d/safari/${f}`);
-    assert.ok(
-      !/[\u4e00-\u9fff]/.test(body),
-      `${f} still contains on-screen text from the source project`,
-    );
-  }
+test("the walking character is TerrainTrek's, implemented to its constants", () => {
+  const trek = read("src/nature3d/engine/trekAvatar.ts");
+  // Movement and camera constants, verbatim from the source project.
+  assert.match(trek, /WALK_SPEED = 10/);
+  assert.match(trek, /BOOST_SPEED = 30/);
+  assert.match(trek, /CAM_DISTANCE = 15/);
+  assert.match(trek, /CAM_PHI = Math\.PI \* 0\.45/);
+  assert.match(trek, /CAM_THETA = -Math\.PI \* 0\.25/);
+  assert.match(trek, /CAM_ABOVE_OFFSET = 2/);
+  assert.match(trek, /PHI_MIN = 0\.1/);
+  assert.match(trek, /PHI_MAX = Math\.PI - 0\.1/);
+
+  // The distinctive movement model: heading comes FROM the camera's theta,
+  // then the eight-way offsets are applied.
+  assert.match(trek, /this\.rotation = this\.theta/);
+  assert.match(trek, /this\.rotation \+= Math\.PI \* 0\.25/);
+  assert.match(trek, /this\.rotation -= Math\.PI \* 0\.75/);
+  assert.match(trek, /this\.rotation \+= Math\.PI \* 0\.5/);
+  // The joystick threshold is the source's.
+  assert.match(trek, /const DEAD = 0\.25/);
+
+  // The body is the source's stick human, part for part.
+  assert.match(trek, /SphereGeometry\(0\.24, 24, 18\)/);      // head
+  assert.match(trek, /CapsuleGeometry\(0\.09, 0\.15, 6, 12\)/); // neck
+  assert.match(trek, /CapsuleGeometry\(0\.22, 0\.75, 6, 18\)/); // torso
+  assert.match(trek, /CapsuleGeometry\(0\.09, 0\.6, 6, 12\)/);  // arms
+  assert.match(trek, /CapsuleGeometry\(0\.12, 0\.85, 6, 14\)/); // legs
+  assert.match(trek, /shoulderY = 1\.45/);
+  assert.match(trek, /shoulderX = 0\.34/);
+});
+
+test("the character sits on the chair and stands up to walk", () => {
+  const trek = read("src/nature3d/engine/trekAvatar.ts");
+  assert.match(trek, /setSeated\(seated: boolean, chair\?: THREE\.Vector3\): void/);
+  // Sitting folds the legs and drops the hips — not just a translation.
+  assert.match(trek, /legL\.rotation\.x = -Math\.PI \/ 2/);
+  assert.match(trek, /body\.position\.y = -0\.42/);
+  // Seated, they face the board (which is on -Z).
+  assert.match(trek, /group\.rotation\.y = Math\.PI/);
+  // The scene seats them at boot, and stands them up when walking starts.
+  assert.match(SCENE, /this\.avatar\.setSeated\(true, new THREE\.Vector3\(0, terrainHeight\(0, 2\.6\), 2\.6\)\)/);
+  assert.match(SCENE, /if \(this\.avatar\.seated && active\) this\.avatar\.setSeated\(false\)/);
+  // Walk mode drives the avatar, and the swipe steers its orbit camera.
+  assert.match(SCENE, /this\.trek\.update\(dt, \{ x: mx, y: my, active \}, this\.camera, WORLD_REACH\)/);
+  assert.match(SCENE, /this\.trek\.look\(dx \* 0\.9, dy \* 0\.9\)/);
 });

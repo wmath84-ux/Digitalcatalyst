@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
   Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
-  LogOut, Rows3, Sparkles, Waves, Wind, X,
+  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
@@ -32,7 +32,12 @@ const WIND_STEPS = [
 ];
 
 const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
+  // The whole connected world first, then the three districts, then the
+  // points of interest inside the home district.
+  { key: "world", label: "World", Icon: Globe2 },
+  { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
+  { key: "safari", label: "Safari", Icon: Rabbit },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "student", label: "Student", Icon: Eye },
   { key: "waterfall", label: "Waterfall", Icon: Waves },

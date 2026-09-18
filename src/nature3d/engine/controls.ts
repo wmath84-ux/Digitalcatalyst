@@ -18,6 +18,7 @@
 
 import * as THREE from "three";
 import { terrainHeight, insideRiver } from "./terrain";
+import { WORLD_REACH } from "./regions";
 
 /** Frame-rate independent smoothing factor. */
 export function damp(k: number, dt: number): number {
@@ -60,7 +61,9 @@ export class OrbitRig {
   zoom(factor: number) {
     // Upper bound raised with the world: you can now pull back far enough to
     // take in the whole kilometre and the hill ranges behind it.
-    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, 420);
+    // The far limit has to clear the whole three-district chain, or the
+    // establishing shot that shows all three areas at once cannot be reached.
+    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, 2400);
   }
 
   panTo(target: THREE.Vector3, distance: number, yaw?: number, pitch?: number) {
@@ -96,7 +99,9 @@ export class OrbitRig {
  * across, so this sits just inside the far grass ring: you can walk for
  * minutes, reach the foot of the hills, and still never see bare terrain.
  */
-const WALK_LIMIT = 430;
+// The walkable radius now has to reach every district, not just the meadow,
+// because the three areas are one connected world you travel between on foot.
+const WALK_LIMIT = WORLD_REACH;
 
 export class FirstPersonRig {
   position = new THREE.Vector3(0, 0, 3.4);

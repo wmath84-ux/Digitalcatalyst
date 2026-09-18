@@ -26,6 +26,7 @@
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import { terrainHeight } from "./terrain";
+import { WORLD_REACH } from "./regions";
 
 /** Board size in world units — 16:9 landscape. */
 export const BOARD_WIDTH = 4.8;
@@ -271,7 +272,9 @@ export function createBoard(budget: QualityBudget): BoardHandle {
 
 const MIN_DEPTH = 2.2;   // closest the board may come to the camera
 const MAX_DEPTH = 26;    // furthest it may be pushed
-const MAX_RADIUS = 400;  // never leaves the meadow
+// The board travels with the learner, so it may be placed anywhere in the
+// connected world — the meadow, the safari valley or the highlands.
+const MAX_RADIUS = WORLD_REACH;
 /**
  * Ceiling for the board, measured ABOVE THE GROUND UNDER IT — not as an
  * absolute world Y. The hills now reach ~93 m, so a fixed 16 m ceiling would

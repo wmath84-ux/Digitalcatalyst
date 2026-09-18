@@ -9,6 +9,10 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
+import {
+  REGIONS, SAFARI, SANCTUARY, TREK, WORLD_REACH,
+  regionWeight, safariRelief, trekRelief,
+} from "./regions";
 
 /** Where the river gorge runs (world X) and how wide it is. */
 export const RIVER_CENTER_X = 18;
@@ -23,7 +27,9 @@ export const CLEARING_RADIUS = 3.2;
  * WORLD_SIZE × WORLD_SIZE, so the meadow now measures a full kilometre across
  * and the learner can walk for minutes without reaching a boundary.
  */
-export const WORLD_SIZE = 1000;
+// The ground mesh has to cover all three districts and the land between
+// them, so it is sized from the chain's reach rather than from the meadow.
+export const WORLD_SIZE = WORLD_REACH * 2 + 400;
 export const WORLD_HALF = WORLD_SIZE / 2;
 
 /**
@@ -38,6 +44,26 @@ function distantRelief(x: number, z: number): number {
   // Nothing until well past the meadow, then a long smooth ramp.
   const rise = smoothstep(150, WORLD_HALF * 0.92, d);
   if (rise <= 0) return 0;
+
+  // The ring of hills that used to close off the meadow would now cut the
+  // meadow off from its neighbours, so it is opened up along the corridors
+  // that lead to the other two districts. The result is a natural mountain
+  // pass at each end rather than a wall.
+  let corridor = 1;
+  for (const r of REGIONS) {
+    if (r.id === "sanctuary") continue;
+    // Distance from the straight line joining the sanctuary to this district.
+    const t = Math.max(0, Math.min(1, x / r.centerX));
+    const lineZ = r.centerZ * t;
+    const off = Math.hypot(z - lineZ, 0);
+    const onCorridor = (x > 0) === (r.centerX > 0);
+    if (onCorridor) corridor = Math.min(corridor, smoothstep(90, 260, off));
+  }
+  if (corridor <= 0) return 0;
+  return distantReliefRaw(x, z, rise) * corridor;
+}
+
+function distantReliefRaw(x: number, z: number, rise: number): number {
 
   // Three octaves of ridged noise gives crests and saddles rather than cones.
   const a = Math.sin(x * 0.0115) * Math.cos(z * 0.0102);
@@ -79,7 +105,29 @@ export function terrainHeight(x: number, z: number): number {
     Math.sin(x * 0.037 - z * 0.029) * 1.35;
   const rollIn = smoothstep(40, 190, dist);
 
-  const base = hills * flatten + rolling * rollIn + distantRelief(x, z) - valley * 2.8;
+  // ── The three districts ─────────────────────────────────────────────
+  //
+  // The sanctuary's own relief fades out as you leave it, and the safari and
+  // trek reliefs fade in as you arrive, so the world is one continuous
+  // surface with no seam, no cliff and no invisible boundary between areas.
+  const wSanct = regionWeight(SANCTUARY, x, z);
+  const wSafari = regionWeight(SAFARI, x, z);
+  const wTrek = regionWeight(TREK, x, z);
+
+  const sanctuaryBase =
+    hills * flatten + rolling * rollIn + distantRelief(x, z) - valley * 2.8;
+
+  // Connecting plains: gentle open ground so the walk between districts is
+  // interesting but never a climb.
+  const linkRoll =
+    Math.sin(x * 0.0061 + 2.1) * Math.cos(z * 0.0083 - 1.2) * 5.2 +
+    Math.sin(x * 0.0135 - z * 0.0111) * 1.9;
+
+  const base =
+    sanctuaryBase * wSanct +
+    (safariRelief(x, z) + linkRoll * 0.35) * wSafari +
+    trekRelief(x, z) * wTrek +
+    linkRoll * Math.max(0, 1 - wSanct - wSafari - wTrek);
 
   // ── THE RIVER CARVES ────────────────────────────────────────────────
   //

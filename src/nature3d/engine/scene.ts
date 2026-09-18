@@ -32,9 +32,12 @@ import { createSky, type SkySystem } from "./sky";
 import { createBoard, BoardController, loadBoardPlacement, type BoardHandle, BOARD_HEIGHT } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
+import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
+import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
+import { SAFARI, TREK, WORLD_REACH } from "./regions";
 
 export type CameraMode = "orbit" | "fpp";
-export type ViewPreset = "sanctuary" | "board" | "student" | "waterfall" | "wildlife";
+export type ViewPreset = "sanctuary" | "board" | "student" | "waterfall" | "wildlife" | "safari" | "trek" | "world";
 
 export interface SceneStats {
   fps: number;
@@ -73,6 +76,9 @@ export class Sanctuary {
   private student: StudentRig;
   private boardCtl: BoardController;
   private keyboard: KeyboardInput;
+  private safari: SafariDistrict;
+  private avatar: TrekAvatar;
+  private trek = new TrekPlayer();
 
   private orbit = new OrbitRig();
   private fpp = new FirstPersonRig();
@@ -178,13 +184,33 @@ export class Sanctuary {
     // simply keeps the default position set above.
     this.boardCtl.restore(loadBoardPlacement());
 
+    // ── The other two districts of the same world ────────────────────
+    //
+    // The safari is built into the SAME scene, 900 m east, so walking there
+    // is just walking. Its models stream in asynchronously.
+    setSafariCamera(this.camera);
+    this.safari = createSafariDistrict();
+    this.scene.add(this.safari.group);
+
+    // The walking character. It starts seated on the study chair, and stands
+    // up the moment the learner takes control in walk mode.
+    this.avatar = createTrekAvatar(this.budget.shadowMapSize > 0);
+    this.scene.add(this.avatar.group);
+    this.trek.reset(0, 3.4);
+    this.avatar.setSeated(true, new THREE.Vector3(0, terrainHeight(0, 2.6), 2.6));
+
     this.keyboard = new KeyboardInput();
 
     // OPENING SHOT: a wide establishing view. You arrive high and far enough
     // back to read the whole valley — the herds, the river, the hills on the
     // skyline — and can then orbit in towards the board or the student. The
     // old default sat almost on top of the board, which hid the world.
-    this.orbit.panTo(new THREE.Vector3(0, 6, -6), 86, -0.5, 0.36);
+    // OPENING SHOT: the whole connected world in one frame. The camera pulls
+    // back far enough along the district chain that the TerrainTrek highlands
+    // (west), the Sanctuary meadow (centre) and the Clay Safari valley (east)
+    // are all on screen together, which is how the learner discovers there
+    // is somewhere to walk to.
+    this.orbit.panTo(new THREE.Vector3(0, 30, 0), 1500, -0.30, 0.34);
     this.fpp.reset(0, 3.4, Math.PI);
 
     this.attachPointer(opts.dom);
@@ -247,7 +273,9 @@ export class Sanctuary {
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
     if (this.mode === "orbit") this.orbit.rotate(dx, dy);
-    else this.fpp.look(dx * 0.9, dy * 0.9);
+    // In walk mode the swipe orbits TerrainTrek's third-person camera around
+    // the character, which is also what steers them: its theta is the heading.
+    else this.trek.look(dx * 0.9, dy * 0.9);
   };
 
   private onPointerUp = (e: PointerEvent) => {
@@ -291,13 +319,18 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     if (mode === "fpp") {
-      // Enter the world standing where the student sits — and hide the body
-      // so the FPP view is a pure camera (no limbs swinging in frame).
+      // Take control of the walking character. They get up from the chair and
+      // the camera drops in behind them — this is a third-person walk, so the
+      // seated student model steps aside and the avatar becomes the body.
       this.student.setVisible(false);
-      this.fpp.reset(this.student.eyePosition.x, this.student.eyePosition.z + 0.6, Math.PI);
-      this.camera.fov = 68;
+      this.avatar.setSeated(false);
+      this.trek.reset(this.student.eyePosition.x, this.student.eyePosition.z + 1.4);
+      this.avatar.group.position.copy(this.trek.position);
+      this.camera.fov = 60;
     } else {
+      // Hand the world back: the character returns to the chair and sits.
       this.student.setVisible(true);
+      this.avatar.setSeated(true, this.tmpV.set(0, terrainHeight(0, 2.6), 2.6).clone());
       this.camera.rotation.set(0, 0, 0);
       this.camera.fov = 52;
       this.orbit.panTo(this.tmpV.copy(this.board.group.position).setY(2.2), 13.5);
@@ -368,6 +401,15 @@ export class Sanctuary {
         break;
       case "waterfall":
         this.orbit.panTo(this.tmpV.set(18, 5, -34), 20, 0.5, 0.25);
+        break;
+      case "safari":
+        this.orbit.panTo(this.tmpV.set(SAFARI.centerX, 6, SAFARI.centerZ), 210, -0.5, 0.34);
+        break;
+      case "trek":
+        this.orbit.panTo(this.tmpV.set(TREK.centerX, 30, TREK.centerZ), 320, 0.6, 0.30);
+        break;
+      case "world":
+        this.orbit.panTo(this.tmpV.set(0, 30, 0), 1500, -0.30, 0.34);
         break;
       case "wildlife": {
         this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
@@ -443,9 +485,20 @@ export class Sanctuary {
       // Sprint is the OR of the keyboard modifier and the HUD toggle, recomputed
       // every frame — never latched, or the learner could not stop running.
       this.fpp.sprint = this.keyboard.sprint || this.hudSprint;
-      this.fpp.update(dt, { x: mx, y: my, active }, this.camera);
+      // Walking is TerrainTrek's character: a visible body running across the
+      // ground with the camera orbiting behind it, not a floating viewpoint.
+      // Taking control stands them up off the chair.
+      if (this.avatar.seated && active) this.avatar.setSeated(false);
+      this.trek.boost = this.keyboard.sprint || this.hudSprint;
+      this.trek.update(dt, { x: mx, y: my, active }, this.camera, WORLD_REACH);
+      if (!this.avatar.seated) {
+        this.avatar.group.position.copy(this.trek.position);
+        this.avatar.group.rotation.y = this.trek.rotation;
+      }
+      this.avatar.setVisible(true);
     } else {
       this.orbit.update(dt, this.camera);
+      this.avatar.setVisible(true);
     }
 
     // ── World (staggered) ─────────────────────────────────────────────
@@ -460,6 +513,9 @@ export class Sanctuary {
       this.student.update(time);
       this.aiClock = 0;
     }
+
+    // The safari district animates on the same 30 Hz budget as the herds.
+    this.safari.update(dt, time);
 
     this.skyClock += dt;
     if (this.skyClock >= 1 / 20) {
@@ -523,6 +579,8 @@ export class Sanctuary {
     this.stop();
     this.detachPointer(this.opts.dom);
     this.boardCtl.dispose();
+    this.safari.dispose();
+    this.avatar.dispose();
     this.keyboard.dispose();
     this.grass.dispose();
     this.flora.dispose();

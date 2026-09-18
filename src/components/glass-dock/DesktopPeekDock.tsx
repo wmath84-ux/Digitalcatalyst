@@ -37,7 +37,7 @@ function railToTab(active: DesktopRailKey): TabKey | null {
   // Rail entries that have no peek-dock slot of their own.
   if (
     active === 'favorites' || active === 'settings' || active === 'profile'
-    || active === 'study' || active === 'nature3d' || active === 'safari3d'
+    || active === 'study' || active === 'nature3d'
   ) return null
   return active
 }

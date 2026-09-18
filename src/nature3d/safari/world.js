@@ -49,12 +49,19 @@ function distToPath(samples, x, z) {
 }
 
 // ------------------------------------------------------------------ world
-export function buildWorld(scene, { isMobile }) {
+// `district: true` builds ONLY the ground-level contents of the safari — its
+// terrain skin, river, vegetation, rocks and bridge. The sky, sun, lights and
+// clouds are skipped, because when the safari is a district inside the single
+// connected Sanctuary world those are already provided once, globally, and a
+// second sky sphere or a second directional light would double-light the
+// scene and cost a full extra shadow pass.
+export function buildWorld(scene, { isMobile, district = false }) {
   const r = rng(2026);
   const world = { obstacles: [], updaters: [], samples: pathSamples() };
   const bump = clayBump();
 
-  // ---- lights & sky
+  // ---- lights & sky (own-world only)
+  if (!district) {
   const hemi = new THREE.HemisphereLight(0xcfe9ff, 0xe8c99a, 0.9);
   scene.add(hemi);
   scene.add(new THREE.AmbientLight(0xfff4e0, 0.25));
@@ -105,6 +112,7 @@ export function buildWorld(scene, { isMobile }) {
   sunG.lookAt(0, 10, 0);
   scene.add(sunG);
   world.updaters.push((dt, t) => { rays.rotation.z = t * 0.12; sunG.children[0].scale.setScalar(1 + Math.sin(t * 1.4) * 0.03); });
+  }
 
   // ---- terrain
   const nx = MAP.w * 2, nz = MAP.h * 2;
@@ -394,7 +402,8 @@ export function buildWorld(scene, { isMobile }) {
   bridge.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(bridge);
 
-  // ---- clouds
+  // ---- clouds (own-world only: the sanctuary sky carries its own)
+  if (!district) {
   const cloudList = [];
   for (let i = 0; i < 10; i++) {
     const cx = r.range(-70, 70), cz = r.range(-80, 20), cy = r.range(16, 26), s = r.range(1.4, 2.6);
@@ -412,6 +421,7 @@ export function buildWorld(scene, { isMobile }) {
     cloudList.push({ g, speed: r.range(0.25, 0.6), cy });
   }
   world.updaters.push((dt, t) => { for (const c of cloudList) { c.g.position.x += c.speed * dt; if (c.g.position.x > 90) c.g.position.x = -90; c.g.position.y = c.cy + Math.sin(t * 0.3 + c.cy) * 0.3; } });
+  }
 
   // ---- navigation grid
   const nav = new NavGrid({ minX: -MAP.w / 2, minZ: -MAP.h / 2, w: MAP.w, h: MAP.h, cell: 0.5 });

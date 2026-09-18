@@ -85,8 +85,8 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1,
     minPixelRatio: 0.6,
     sunShafts: false,
-    farPlane: 1500,
-    fogDensity: 0.0026,
+    farPlane: 3200,
+    fogDensity: 0.0006,
   },
   medium: {
     tier: "medium",
@@ -110,8 +110,8 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1.35,
     minPixelRatio: 0.7,
     sunShafts: true,
-    farPlane: 1700,
-    fogDensity: 0.0022,
+    farPlane: 3600,
+    fogDensity: 0.0006,
   },
   high: {
     tier: "high",
@@ -135,8 +135,8 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1.75,
     minPixelRatio: 0.8,
     sunShafts: true,
-    farPlane: 1900,
-    fogDensity: 0.0019,
+    farPlane: 4000,
+    fogDensity: 0.0006,
   },
   ultra: {
     tier: "ultra",
@@ -160,8 +160,8 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 2,
     minPixelRatio: 0.85,
     sunShafts: true,
-    farPlane: 2100,
-    fogDensity: 0.0017,
+    farPlane: 4400,
+    fogDensity: 0.0006,
   },
 };
 
