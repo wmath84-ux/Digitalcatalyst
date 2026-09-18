@@ -58,7 +58,13 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 
 /** Analytic ground height at a world position. */
 export function terrainHeight(x: number, z: number): number {
+  // Narrow Gaussian, used only for the muddy bank blend and the old clearing
+  // maths. The actual channel is carved by an explicit clamp further down,
+  // because a Gaussian wide enough to defeat a 90 m hill also drowns the
+  // study clearing 18 m away — the two requirements cannot be met by tuning
+  // one falloff, so they are separated.
   const valley = Math.exp(-(((x - RIVER_CENTER_X) / 7.5) ** 2));
+
   const hills =
     Math.sin(x * 0.06) * Math.cos(z * 0.06) * 2.2 +
     Math.sin(x * 0.14 + z * 0.1) * 0.85 +
@@ -73,7 +79,36 @@ export function terrainHeight(x: number, z: number): number {
     Math.sin(x * 0.037 - z * 0.029) * 1.35;
   const rollIn = smoothstep(40, 190, dist);
 
-  return hills * flatten + rolling * rollIn + distantRelief(x, z) - valley * 2.8;
+  const base = hills * flatten + rolling * rollIn + distantRelief(x, z) - valley * 2.8;
+
+  // ── THE RIVER CARVES ────────────────────────────────────────────────
+  //
+  // The water plane is a straight ribbon at a FIXED level running the full
+  // length of the world, so the bed must be below that level everywhere —
+  // including where a hill range crosses it. Rather than fight the relief
+  // with a falloff, the channel is cut explicitly:
+  //
+  //   inside the channel  -> hard clamp below the waterline, deepest mid-stream
+  //   the banks           -> blend back to the natural terrain over ~3 channel
+  //                          widths, which reads as a gorge the river eroded
+  //
+  // `bankBlend` is 1 in the channel and 0 out on the flats.
+  const fromCentre = Math.abs(x - RIVER_CENTER_X);
+  let bankBlend = 1 - smoothstep(RIVER_HALF_WIDTH, RIVER_HALF_WIDTH * 3.2, fromCentre);
+  if (bankBlend <= 0) return base;
+  // The study clearing sits only 18 m from the channel, well inside the bank
+  // blend. Without this the near bank tips the clearing into the water and the
+  // chair, board and student all end up on a slope. The clearing wins.
+  bankBlend *= smoothstep(CLEARING_RADIUS, CLEARING_RADIUS + 7, dist);
+  if (bankBlend <= 0) return base;
+
+  // Concave bed: deepest at the centre line, rising to the waterline at the
+  // channel edge. Always at least 0.8 m of water, so the plane never clips.
+  const across = Math.min(fromCentre / RIVER_HALF_WIDTH, 1);
+  const bedDepth = 3.4 - across * across * 2.2;
+  const bed = WATER_LEVEL - 0.8 - bedDepth;
+
+  return base * (1 - bankBlend) + Math.min(bed, base) * bankBlend;
 }
 
 /** True when the position sits inside the river bed (no grass / no animals). */

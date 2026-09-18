@@ -41,6 +41,7 @@ const TERRAIN = read("src/nature3d/engine/terrain.ts");
 const QUALITY = read("src/nature3d/engine/quality.ts");
 const CONTROLS = read("src/nature3d/engine/controls.ts");
 const SKY = read("src/nature3d/engine/sky.ts");
+const WATER = read("src/nature3d/engine/water.ts");
 const STUDENT = read("src/nature3d/engine/student.ts");
 const JOYSTICK = read("src/nature3d/components/Joystick.tsx");
 
@@ -535,4 +536,83 @@ test("the opening camera is a wide establishing shot", () => {
   // The board and student presets still exist so you can click straight in.
   assert.match(SCENE, /case "board":/);
   assert.match(SCENE, /case "student":/);
+});
+
+// ── 12. Water, sun and birds: open-source techniques, no new deps ─────
+
+test("the river uses dual-phase flow so the texture never visibly slides", () => {
+  // Valve's Portal 2 / three.js Water2 trick: sample the normal map twice at
+  // half-cycle-offset phases and cross-fade, so the pattern regenerates
+  // instead of scrolling. A single scrolling sample always reads as a sliding
+  // texture, which is the classic "blue plastic" look.
+  assert.match(WATER, /dcPhase0 = fract\(uTime \* dcCycle\)/);
+  assert.match(WATER, /dcPhase1 = fract\(uTime \* dcCycle \+ dcHalf\)/);
+  assert.match(WATER, /dcMix = abs\(\(dcPhase0 - dcHalf\) \/ dcHalf\)/);
+  assert.match(WATER, /mix\(dcN0, dcN1, dcMix\)/);
+
+  // Schlick Fresnel with water's real normal reflectance.
+  assert.match(WATER, /dcFres = 0\.02 \+ 0\.98 \* pow\(1\.0 - dcCos, 5\.0\)/);
+  // Depth tint and a sun glint.
+  assert.match(WATER, /dcShallow/);
+  assert.match(WATER, /dcDeep/);
+  assert.match(WATER, /dcSpec = pow\(max\(dot\(dcNormal, dcH\), 0\.0\), 220\.0\)/);
+
+  // No new runtime dependency was pulled in for any of this.
+  const pkg = JSON.parse(read("package.json"));
+  for (const name of Object.keys(pkg.dependencies ?? {})) {
+    assert.ok(
+      !/water|ocean|godray|postprocessing/i.test(name),
+      `${name} must not be added — the effects are re-implemented in-shader`,
+    );
+  }
+});
+
+test("the river runs the full kilometre and stays in its bed", () => {
+  assert.match(WATER, /const RIVER_LENGTH = 1000/);
+  // The channel is carved explicitly rather than by tuning a falloff.
+  assert.match(TERRAIN, /THE RIVER CARVES/);
+  assert.match(TERRAIN, /const bedDepth = 3\.4 - across \* across \* 2\.2/);
+  assert.match(TERRAIN, /Math\.min\(bed, base\)/, "the carve must never RAISE the ground");
+  // And the clearing must win against the near bank.
+  assert.match(TERRAIN, /bankBlend \*= smoothstep\(CLEARING_RADIUS, CLEARING_RADIUS \+ 7, dist\)/);
+});
+
+test("the waterfall aerates and breaks into ropes", () => {
+  // Two scroll speeds, vertical strands, and foam that builds toward the base.
+  assert.match(WATER, /dcA = texture2D\(map, vMapUv \* vec2\(1\.0, 2\.0\)/);
+  assert.match(WATER, /dcB = texture2D\(map, vMapUv \* vec2\(2\.3, 3\.7\)/);
+  assert.match(WATER, /dcRope/);
+  assert.match(WATER, /dcFoam = smoothstep\(0\.25, 1\.0, dcDrop\)/);
+});
+
+test("the spray is ballistic, not rising smoke", () => {
+  // Particles burst up and outward from the plunge point, fall under gravity
+  // and respawn — the old version drifted straight up and teleported back.
+  assert.match(WATER, /const seedParticle = \(i: number\) =>/);
+  assert.match(WATER, /velocities\[p \+ 1\] -= g/, "gravity must act on the spray");
+  assert.match(WATER, /life\[i\] -= dt/);
+  assert.ok(!/if \(arr\[yi\] > 2\.6\) arr\[yi\] = -1\.3/.test(WATER), "the teleport-loop must be gone");
+});
+
+test("the sky is physically motivated Rayleigh + Mie scattering", () => {
+  assert.match(SKY, /RAYLEIGH_BETA = vec3\(5\.8e-3, 1\.35e-2, 3\.31e-2\)/);
+  assert.match(SKY, /float henyeyGreenstein\(float cosTheta, float g\)/);
+  assert.match(SKY, /henyeyGreenstein\(cosTheta, 0\.76\)/);
+  // Rayleigh phase is (3/16pi)(1 + cos^2).
+  assert.match(SKY, /rayleighPhase = 0\.0596831 \* \(1\.0 \+ cosTheta \* cosTheta\)/);
+  // Blue must scatter more than red, or it is not Rayleigh at all.
+  const [, rs, gs, bs] = /RAYLEIGH_BETA = vec3\(([\d.e-]+), ([\d.e-]+), ([\d.e-]+)\)/.exec(SKY);
+  assert.ok(Number(bs) > Number(gs) && Number(gs) > Number(rs), "beta must rise from red to blue");
+  // The sun disc survives.
+  assert.match(SKY, /pow\(d, 900\.0\) \* 3\.2/);
+});
+
+test("soaring birds flap in bursts and bank into their turns", () => {
+  // Continuous flapping on a perfect circle is the give-away of a fake bird.
+  assert.match(FLORA, /function smootherstep/);
+  assert.match(FLORA, /const beating = smootherstep\(0\.42, 0\.62, cycle\)/);
+  assert.match(FLORA, /const glide = \(1 - beating\) \* 0\.16/);
+  assert.match(FLORA, /f\.g\.rotation\.z = THREE\.MathUtils\.clamp\(turnRate \* 2\.6/);
+  // Birds still actually sit in the trees.
+  assert.match(FLORA, /perched\.push/);
 });

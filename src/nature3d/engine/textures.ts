@@ -20,6 +20,7 @@ export interface TextureSet {
   rock: THREE.Texture;
   rockNormal: THREE.Texture;
   water: THREE.Texture;
+  waterNormal: THREE.Texture;
   fur: THREE.Texture;
   cloud: THREE.Texture;
   feather: THREE.Texture;
@@ -304,6 +305,8 @@ export function createTextures(anisotropy: number): TextureSet {
     rock: rockTex,
     rockNormal: heightToNormal(rock.c, 1.8),
     water: waterTex,
+    // Normal map for the river's dual-phase flow shader.
+    waterNormal: heightToNormal(water.c, 1.5),
     fur: toTexture(fur.c, anisotropy, [3, 3]),
     cloud: toTexture(cloud.c, anisotropy),
     feather: toTexture(feather.c, anisotropy),
@@ -315,5 +318,8 @@ export function createTextures(anisotropy: number): TextureSet {
   };
   set.barkNormal.repeat.set(1, 3);
   set.rockNormal.repeat.set(2, 2);
+  set.waterNormal.wrapS = THREE.RepeatWrapping;
+  set.waterNormal.wrapT = THREE.RepeatWrapping;
+  set.waterNormal.repeat.set(6, 30);
   return set;
 }

@@ -35,14 +35,56 @@ uniform vec3 uGround;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 
+// Physically-motivated sky, after Preetham/Bruneton but reduced to the two
+// terms that actually matter for a morning scene (the full precomputed model
+// needs lookup tables we cannot afford here):
+//
+//   RAYLEIGH  — 1/lambda^4 scattering by air molecules. Blue is scattered
+//               ~5.5x more than red, which is why the zenith is blue and why
+//               the horizon, seen through far more atmosphere, goes pale.
+//   MIE       — forward scattering by aerosols, using the Henyey-Greenstein
+//               phase function with g = 0.76. This is the warm halo that
+//               hugs the sun and the haze that sits on the horizon.
+//
+// Everything is analytic: no textures, no lookup tables, ~30 ALU.
+const vec3 RAYLEIGH_BETA = vec3(5.8e-3, 1.35e-2, 3.31e-2);
+
+float henyeyGreenstein(float cosTheta, float g) {
+  float g2 = g * g;
+  return (1.0 - g2) / (4.0 * 3.14159265 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+}
+
 void main() {
-  float h = vWorld.y;
-  // Two-stage gradient: warm haze near the horizon, deep blue overhead.
-  vec3 sky = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55));
+  vec3 dir = normalize(vWorld);
+  float h = dir.y;
+  float cosTheta = dot(dir, normalize(uSunDir));
+
+  // Optical depth: looking at the horizon travels through far more air than
+  // looking up. The +0.15 keeps it finite below the horizon.
+  float zenithAngle = max(h, 0.0);
+  float optical = 1.0 / (zenithAngle + 0.15);
+
+  // Rayleigh: the phase function is (1 + cos^2) * 3/16pi.
+  float rayleighPhase = 0.0596831 * (1.0 + cosTheta * cosTheta);
+  vec3 rayleigh = RAYLEIGH_BETA * optical * rayleighPhase * 62.0;
+
+  // Mie: strong forward lobe, the sun's warm halo.
+  float miePhase = henyeyGreenstein(cosTheta, 0.76);
+  vec3 mie = vec3(0.0035) * optical * miePhase * 34.0;
+
+  vec3 sky = rayleigh + mie;
+
+  // Keep the art-directed palette in charge of the overall mood — the
+  // scattering above supplies the STRUCTURE (gradient, halo, horizon haze),
+  // these uniforms supply the colour grade the rest of the scene is lit to.
+  vec3 graded = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55));
+  sky = mix(graded, sky * uSunColor, 0.42);
+
+  // Ground haze below the horizon line.
   sky = mix(uGround, sky, smoothstep(-0.12, 0.05, h));
 
-  // Sun disc + broad glow, the thing that makes a gradient read as morning.
-  float d = max(dot(normalize(vWorld), normalize(uSunDir)), 0.0);
+  // Sun disc with a soft limb, plus the broad glow.
+  float d = max(cosTheta, 0.0);
   sky += uSunColor * pow(d, 900.0) * 3.2;
   sky += uSunColor * pow(d, 14.0) * 0.30;
   sky += uSunColor * pow(d, 3.0) * 0.07;

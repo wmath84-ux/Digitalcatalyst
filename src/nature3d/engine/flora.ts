@@ -406,6 +406,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
  *
  * Each perched bird is ~90 triangles and only animates inside 45 m.
  */
+/** Smooth 0..1 ramp with zero first AND second derivative at both ends. */
+function smootherstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
 export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: QualityBudget): BirdColony {
   const group = new THREE.Group();
   group.name = "birds";
@@ -578,19 +584,39 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
         }
       }
 
+      // Soaring birds. Real birds do not flap continuously on a fixed circle:
+      // they beat a few times, then hold a glide, and they BANK into the turn
+      // (roll proportional to how hard they are turning). Both are almost
+      // free — a couple of sines — and they are most of what separates a
+      // convincing bird from a flapping cardboard cut-out.
       for (let i = 0; i < flyers.length; i += 1) {
         const f = flyers[i];
         f.angle += f.speed * dt;
+
+        // Wandering radius and height so the path is never a clean circle.
+        const wobbleR = Math.sin(time * 0.23 + f.angle * 0.7) * f.radius * 0.14;
+        const r = f.radius + wobbleR;
         f.g.position.set(
-          Math.cos(f.angle) * f.radius,
-          f.height + Math.sin(time * 0.7 + f.angle * 2) * 1.6,
-          Math.sin(f.angle) * f.radius,
+          Math.cos(f.angle) * r,
+          f.height + Math.sin(time * 0.7 + f.angle * 2) * 1.6 + Math.sin(time * 0.31 + i) * 2.4,
+          Math.sin(f.angle) * r,
         );
         f.g.rotation.y = -f.angle - Math.PI / 2;
-        f.g.rotation.z = Math.sin(time * 0.8 + f.angle) * 0.25;
-        const flap = Math.sin(time * 9 + f.angle * 4) * 0.55;
-        f.wings[0].rotation.z = flap;
-        f.wings[1].rotation.z = -flap;
+
+        // Bank into the turn, the way a real bird does.
+        const turnRate = f.speed + Math.cos(time * 0.23 + f.angle * 0.7) * 0.12;
+        f.g.rotation.z = THREE.MathUtils.clamp(turnRate * 2.6, -0.85, 0.85)
+          + Math.sin(time * 0.8 + f.angle) * 0.12;
+
+        // Flap-then-glide: a slow cycle gates the fast wingbeat, so each bird
+        // beats for a moment and then holds its wings out and coasts.
+        const cycle = (Math.sin(time * 0.42 + i * 1.7) + 1) * 0.5;
+        const beating = smootherstep(0.42, 0.62, cycle);
+        const flap = Math.sin(time * 11 + f.angle * 4) * 0.62 * beating;
+        // Wings stay slightly raised in a dihedral while gliding.
+        const glide = (1 - beating) * 0.16;
+        f.wings[0].rotation.z = flap + glide;
+        f.wings[1].rotation.z = -flap - glide;
       }
     },
     dispose() {
