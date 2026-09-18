@@ -131,15 +131,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // holds roughly three trees in ten. On top of that the wind amplitude fades
   // to zero with distance inside the shader, so a swaying tree 200 m away
   // costs the vertex maths but produces no visible motion and no shimmer.
-  // Reference geometry: PlaneGeometry(0.9, 0.9) per leaf.
-  const leafGeo = new THREE.PlaneGeometry(0.9, 0.9);
+  const leafGeo = new THREE.PlaneGeometry(1, 1);
 
   const makeLeafMaterial = (animated: boolean) => {
     const mat = new THREE.MeshLambertMaterial({
       map: tex.leaf,
-      // Reference foliage material: alphaTest 0.22, DoubleSide. The old 0.45
-      // ate the soft bezier edge of the blade and left a hard rectangle.
-      alphaTest: 0.22,
+      alphaTest: 0.45,
       side: THREE.DoubleSide,
       vertexColors: true,
     });
@@ -186,12 +183,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
 
   const layout = treeLayout(budget.treeCount);
   const swayTrees = layout.filter((t) => t.sways).length;
-  // Four reference clusters at max(4, round(leavesPerTree / 4) * 2) planes
-  // each, so the real per-tree leaf count is up to 4 * that. Size the
-  // instance buffers for the worst case or the last clusters get clipped.
-  const leavesPerTree = Math.max(4, Math.round(budget.leavesPerTree / 4) * 2) * 4;
-  const maxSway = swayTrees * leavesPerTree + 8;
-  const maxStill = (layout.length - swayTrees) * leavesPerTree + 8;
+  const maxSway = swayTrees * budget.leavesPerTree + 8;
+  const maxStill = (layout.length - swayTrees) * budget.leavesPerTree + 8;
 
   const leavesSway = new THREE.InstancedMesh(leafGeo, leafMatSway, Math.max(1, maxSway));
   const leavesStill = new THREE.InstancedMesh(leafGeo, leafMatStill, Math.max(1, maxStill));
@@ -220,10 +213,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       continue;
     }
 
-    // Reference trunk: CylinderGeometry(0.2, 0.42, 3.6, 12) — narrower at the
-    // top, 12 radial segments so the silhouette is round rather than faceted.
-    const trunkH = (t.kind === "acacia" ? 4.6 : 3.6) * s;
-    bake(woodParts, new THREE.CylinderGeometry(0.2 * s, 0.42 * s, trunkH, 12), t.x, baseY + trunkH / 2, t.z);
+    const trunkH = (t.kind === "acacia" ? 4.6 : 4.0) * s;
+    bake(woodParts, new THREE.CylinderGeometry(0.2 * s, 0.46 * s, trunkH, 9), t.x, baseY + trunkH / 2, t.z);
 
     // Boughs — also the bird perches.
     const boughCount = t.kind === "acacia" ? 5 : 4;
@@ -248,67 +239,27 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       ));
     }
 
-    // ── Canopy, built exactly the way the reference builds it ───────────
-    //
-    // The reference does NOT scatter leaves through one big sphere. It places
-    // four overlapping CLUSTERS at fixed offsets and fills each with 14 leaf
-    // planes inside a small radius. That is what gives its trees readable
-    // botanical mass — lobes of foliage with gaps of sky between them —
-    // instead of the uniform green ball we had.
+    // Canopy leaf cards.
+    const canopyY = baseY + trunkH * (t.kind === "acacia" ? 1.02 : 0.94);
+    const spread = (t.kind === "acacia" ? 3.4 : 2.4) * s;
     const target = t.sways ? leavesSway : leavesStill;
     const cap = t.sways ? maxSway : maxStill;
-    // [x, y, z, spread], all relative to the trunk base, from the reference.
-    const clusters: readonly (readonly [number, number, number, number])[] =
-      t.kind === "acacia"
-        ? [
-            // An acacia's crown is a flat wide platter, so the same four
-            // clusters are spread out and flattened.
-            [0, 4.6 * s, 0, 2.6 * s],
-            [-1.9 * s, 4.4 * s, 0.7 * s, 2.1 * s],
-            [2.0 * s, 4.45 * s, -0.9 * s, 2.0 * s],
-            [0.3 * s, 4.9 * s, 0.4 * s, 1.8 * s],
-          ]
-        : [
-            [0, 4.2 * s, 0, 1.6 * s],
-            [-1.0 * s, 3.7 * s, 0.4 * s, 1.25 * s],
-            [1.1 * s, 3.8 * s, -0.5 * s, 1.2 * s],
-            [0.2 * s, 4.8 * s, 0.2 * s, 1.1 * s],
-          ];
-    // The reference plants 14 planes per cluster. Our leaf budget is per
-    // tree and tier-dependent, so spread it over the four clusters instead
-    // of hard-coding 56 and blowing the low-end budget.
-    const perCluster = Math.max(4, Math.round(budget.leavesPerTree / clusters.length) * 2);
-    for (const [cx, cy, cz, spread] of clusters) {
-      for (let k = 0; k < perCluster; k += 1) {
-        const slot = t.sways ? swayIndex : stillIndex;
-        if (slot >= cap) break;
-        // Reference placement: a random angle, a radius inside half the
-        // spread, and a vertical jitter of 0.6 * spread.
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * (spread * 0.5);
-        dummy.position.set(
-          t.x + cx + Math.cos(angle) * dist,
-          baseY + cy + (Math.random() - 0.5) * spread * 0.6,
-          t.z + cz + Math.sin(angle) * dist,
-        );
-        dummy.rotation.set((Math.random() - 0.5) * 1.5, Math.random() * Math.PI, (Math.random() - 0.5) * 1.5);
-        // The reference planes are 0.9 world units and the geometry is
-        // already 0.9, so the instance scale only carries the tree scale
-        // plus a little natural variation in leaf size.
-        const size = s * (0.9 + Math.random() * 0.5);
-        dummy.scale.set(size, size, size);
-        dummy.updateMatrix();
-        target.setMatrixAt(slot, dummy.matrix);
-        // The leaf texture already carries the reference greens
-        // (#5ea833 -> #38781e -> #244e13). The old code threw an HSL tint on
-        // top and destroyed them. Stay near white and vary only brightness,
-        // so sunlit leaves differ from shaded ones without changing the hue.
-        const shade = 0.82 + Math.random() * 0.28;
-        color.setRGB(shade, shade, shade);
-        target.setColorAt(slot, color);
-        if (t.sways) swayIndex += 1;
-        else stillIndex += 1;
-      }
+    for (let l = 0; l < budget.leavesPerTree; l += 1) {
+      const slot = t.sways ? swayIndex : stillIndex;
+      if (slot >= cap) break;
+      const a = Math.random() * Math.PI * 2;
+      const rad = Math.pow(Math.random(), 0.6) * spread;
+      const yOff = (Math.random() - 0.4) * (t.kind === "acacia" ? 0.9 : 2.0) * s;
+      dummy.position.set(t.x + Math.cos(a) * rad, canopyY + yOff, t.z + Math.sin(a) * rad);
+      dummy.rotation.set((Math.random() - 0.5) * 1.6, Math.random() * Math.PI, (Math.random() - 0.5) * 1.6);
+      const size = (1.5 + Math.random() * 1.3) * s;
+      dummy.scale.set(size, size, size);
+      dummy.updateMatrix();
+      target.setMatrixAt(slot, dummy.matrix);
+      color.setHSL(0.24 + Math.random() * 0.05, 0.45 + Math.random() * 0.22, 0.28 + Math.random() * 0.2);
+      target.setColorAt(slot, color);
+      if (t.sways) swayIndex += 1;
+      else stillIndex += 1;
     }
   }
   // Flush the merged static forest: 2 draw calls for every trunk, bough and

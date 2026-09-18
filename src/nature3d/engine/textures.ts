@@ -114,47 +114,65 @@ function heightToNormal(src: HTMLCanvasElement, strength = 2.2): THREE.Texture {
 
 export function createTextures(anisotropy: number): TextureSet {
   // ── Bark ──────────────────────────────────────────────────────────────
-  //
-  // Copied verbatim from the reference scene's createProceduralTextures():
-  // a 512x1024 canvas filled #3c2b1e, then 700 tall thin streaks alternating
-  // rgba(25,17,11,.45) and rgba(80,62,45,.38), repeat (1,4).
-  const bark = canvas2d(512, 1024);
-  bark.ctx.fillStyle = "#3c2b1e";
-  bark.ctx.fillRect(0, 0, 512, 1024);
-  for (let i = 0; i < 700; i += 1) {
+  const bark = canvas2d(512, 512);
+  bark.ctx.fillStyle = "#3a2a1d";
+  bark.ctx.fillRect(0, 0, 512, 512);
+  for (let y = 0; y < 512; y += 1) {
+    for (let x = 0; x < 512; x += 2) {
+      const f = fbm(x / 26, y / 150, 4, 3);
+      const ridge = Math.abs(Math.sin(x * 0.09 + f * 5.5));
+      const lum = 26 + ridge * 62 + f * 40;
+      bark.ctx.fillStyle = `rgb(${lum + 16},${lum * 0.78},${lum * 0.55})`;
+      bark.ctx.fillRect(x, y, 2, 1);
+    }
+  }
+  // deep vertical fissures
+  for (let i = 0; i < 90; i += 1) {
     const x = Math.random() * 512;
-    const y = Math.random() * 1024;
-    bark.ctx.fillStyle = Math.random() > 0.5 ? "rgba(25, 17, 11, 0.45)" : "rgba(80, 62, 45, 0.38)";
-    bark.ctx.fillRect(x, y, 2 + Math.random() * 6, 40 + Math.random() * 160);
+    bark.ctx.strokeStyle = `rgba(14,9,5,${0.25 + Math.random() * 0.4})`;
+    bark.ctx.lineWidth = 1 + Math.random() * 3.5;
+    bark.ctx.beginPath();
+    bark.ctx.moveTo(x, 0);
+    for (let y = 0; y < 512; y += 24) bark.ctx.lineTo(x + Math.sin(y * 0.05 + i) * 6, y);
+    bark.ctx.stroke();
   }
 
-  // ── Leaf ─────────────────────────────────────────────────────────────
-  //
-  // Also verbatim from the reference: ONE 256x256 bezier blade, radial
-  // gradient #5ea833 -> #38781e (0.7) -> #244e13 (1.0), with a 3.5 px
-  // rgba(180,240,130,0.6) midrib. The previous three-leaf cluster card is
-  // deliberately gone: the reference gets its canopy volume from 14 separate
-  // leaf planes per cluster, not from stacking leaves inside one texture,
-  // and the cluster card is why our foliage looked like flat printed sheets.
+  // ── Leaf (alpha card with vein detail) ───────────────────────────────
   const leaf = canvas2d(256, 256);
   leaf.ctx.clearRect(0, 0, 256, 256);
-  leaf.ctx.beginPath();
-  leaf.ctx.moveTo(128, 16);
-  leaf.ctx.bezierCurveTo(215, 65, 215, 180, 128, 242);
-  leaf.ctx.bezierCurveTo(41, 180, 41, 65, 128, 16);
-  leaf.ctx.closePath();
-  const leafGrad = leaf.ctx.createRadialGradient(128, 120, 10, 128, 120, 120);
-  leafGrad.addColorStop(0, "#5ea833");
-  leafGrad.addColorStop(0.7, "#38781e");
-  leafGrad.addColorStop(1, "#244e13");
-  leaf.ctx.fillStyle = leafGrad;
-  leaf.ctx.fill();
-  leaf.ctx.strokeStyle = "rgba(180, 240, 130, 0.6)";
-  leaf.ctx.lineWidth = 3.5;
-  leaf.ctx.beginPath();
-  leaf.ctx.moveTo(128, 26);
-  leaf.ctx.lineTo(128, 240);
-  leaf.ctx.stroke();
+  const drawLeaf = (cx: number, cy: number, w: number, h: number, hue: number) => {
+    const g = leaf.ctx.createLinearGradient(cx, cy - h, cx, cy + h);
+    g.addColorStop(0, `hsl(${hue},58%,46%)`);
+    g.addColorStop(0.55, `hsl(${hue + 6},54%,34%)`);
+    g.addColorStop(1, `hsl(${hue + 10},52%,22%)`);
+    leaf.ctx.fillStyle = g;
+    leaf.ctx.beginPath();
+    leaf.ctx.moveTo(cx, cy - h);
+    leaf.ctx.bezierCurveTo(cx + w, cy - h * 0.45, cx + w * 0.86, cy + h * 0.52, cx, cy + h);
+    leaf.ctx.bezierCurveTo(cx - w * 0.86, cy + h * 0.52, cx - w, cy - h * 0.45, cx, cy - h);
+    leaf.ctx.fill();
+    leaf.ctx.strokeStyle = "rgba(196,236,150,0.42)";
+    leaf.ctx.lineWidth = 1.6;
+    leaf.ctx.beginPath();
+    leaf.ctx.moveTo(cx, cy - h * 0.92);
+    leaf.ctx.lineTo(cx, cy + h * 0.92);
+    leaf.ctx.stroke();
+    for (let v = -5; v <= 5; v += 1) {
+      const vy = cy + (v / 6) * h * 0.8;
+      leaf.ctx.lineWidth = 0.9;
+      leaf.ctx.beginPath();
+      leaf.ctx.moveTo(cx, vy);
+      leaf.ctx.lineTo(cx + w * 0.62, vy + h * 0.16);
+      leaf.ctx.moveTo(cx, vy);
+      leaf.ctx.lineTo(cx - w * 0.62, vy + h * 0.16);
+      leaf.ctx.stroke();
+    }
+  };
+  // A cluster card: three overlapping leaves reads as real foliage volume
+  // for the cost of one quad.
+  drawLeaf(84, 96, 52, 78, 96);
+  drawLeaf(170, 120, 56, 86, 104);
+  drawLeaf(124, 186, 48, 66, 88);
 
   // ── Grass blade (single alpha-tested blade, gradient root→tip) ───────
   const blade = canvas2d(64, 256);
@@ -236,63 +254,20 @@ export function createTextures(anisotropy: number): TextureSet {
     }
   }
 
-  // ── Animal hide ──────────────────────────────────────────────────────
-  //
-  // The old coat was 4 200 faint white hairs on white, which multiplied
-  // against a flat vertex colour to give an almost uniform surface — that is
-  // why the animals read as smooth plastic toys with legs rather than as
-  // living things. A real coat has THREE scales of variation and you need all
-  // three or the eye rejects it:
-  //
-  //   1. broad blotches   — the mottling of a hide, metres across
-  //   2. a hair grain     — fine directional strokes, centimetres
-  //   3. dirt and shading — darker along the belly and flanks
-  //
-  // Kept white-ish on average so the per-species vertex colour still drives
-  // the actual hue; this texture supplies the TEXTURE, not the colour.
-  const fur = canvas2d(512, 512);
+  // ── Fur (animal coats) ───────────────────────────────────────────────
+  const fur = canvas2d(256, 256);
   fur.ctx.fillStyle = "#ffffff";
-  fur.ctx.fillRect(0, 0, 512, 512);
-
-  // 1. Broad blotches of lighter and darker coat.
-  for (let i = 0; i < 26; i += 1) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const r = 30 + Math.random() * 90;
-    const g = fur.ctx.createRadialGradient(x, y, 2, x, y, r);
-    const dark = Math.random() > 0.5;
-    const a = 0.1 + Math.random() * 0.16;
-    g.addColorStop(0, dark ? `rgba(120,104,88,${a})` : `rgba(255,252,246,${a})`);
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    fur.ctx.fillStyle = g;
-    fur.ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-
-  // 2. Hair grain — dense, short, mostly-aligned strokes with a slow swirl so
-  //    the lie of the coat changes across the body.
-  for (let i = 0; i < 26000; i += 1) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const swirl = Math.sin(x / 90) * 0.5 + Math.cos(y / 110) * 0.4;
-    const len = 2.5 + Math.random() * 5;
-    const shade = 150 + Math.random() * 105;
-    const alpha = 0.16 + Math.random() * 0.3;
-    fur.ctx.strokeStyle = `rgba(${shade | 0},${(shade * 0.96) | 0},${(shade * 0.9) | 0},${alpha})`;
-    fur.ctx.lineWidth = 0.5 + Math.random() * 0.9;
+  fur.ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4200; i += 1) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const shade = 200 + Math.random() * 55;
+    fur.ctx.strokeStyle = `rgba(${shade | 0},${shade | 0},${shade | 0},0.5)`;
+    fur.ctx.lineWidth = 0.7 + Math.random();
     fur.ctx.beginPath();
     fur.ctx.moveTo(x, y);
-    fur.ctx.lineTo(x + Math.sin(swirl) * len, y + Math.cos(swirl) * len);
+    fur.ctx.lineTo(x + (Math.random() - 0.5) * 7, y + 3 + Math.random() * 6);
     fur.ctx.stroke();
-  }
-
-  // 3. Scuffs and dirt so no two patches of hide look identical.
-  for (let i = 0; i < 420; i += 1) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    fur.ctx.fillStyle = `rgba(96,82,66,${0.03 + Math.random() * 0.09})`;
-    fur.ctx.beginPath();
-    fur.ctx.ellipse(x, y, 3 + Math.random() * 14, 2 + Math.random() * 8, Math.random() * Math.PI, 0, Math.PI * 2);
-    fur.ctx.fill();
   }
 
   // ── Soft cloud puff (billboards) ─────────────────────────────────────
@@ -316,7 +291,7 @@ export function createTextures(anisotropy: number): TextureSet {
   feather.ctx.ellipse(52, 32, 52, 24, 0, 0, Math.PI * 2);
   feather.ctx.fill();
 
-  const barkTex = toTexture(bark.c, anisotropy, [1, 4]); // reference repeat
+  const barkTex = toTexture(bark.c, anisotropy, [1, 3]);
   const groundTex = toTexture(ground.c, anisotropy, [42, 42]);
   const rockTex = toTexture(rock.c, anisotropy, [2, 2]);
   const waterTex = toTexture(water.c, anisotropy, [6, 30]);

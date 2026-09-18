@@ -131,16 +131,9 @@ class SpeciesBank {
     const key = woolly ? "wool" : "plain";
     let m = this.materials.get(key);
     if (!m) {
-      // EVERY animal gets the hide texture, not just the woolly ones. With a
-      // bare vertex colour the body is a single flat tone and the eye reads
-      // it as a smooth plastic prop; the coat grain is what makes it skin.
-      // Woolly species tile it tighter so the fleece grain is finer.
-      const map = this.furTex.clone();
-      map.needsUpdate = true;
-      map.repeat.set(woolly ? 5 : 2.4, woolly ? 5 : 2.4);
       m = new THREE.MeshLambertMaterial({
         vertexColors: true,
-        map,
+        map: woolly ? this.furTex : null,
       });
       this.materials.set(key, m);
     }
@@ -231,61 +224,15 @@ function buildPieces(spec: SpeciesSpec, baby: boolean, lod: Lod): AnimalPieces {
   const near = lod === "near";
   const far = lod === "far";
   // Ring counts collapse hard with distance — a 60 m animal is ~8 px tall.
-  const ring = far ? 5 : near ? 16 : 10;
+  const ring = far ? 4 : near ? 12 : 7;
   const hipY = spec.legLength;
   const bodyY = hipY + spec.bodyRadius * 0.86;
 
   // ── Body ────────────────────────────────────────────────────────────
-  //
-  // A single capsule is what made these read as "legs and a head attached to
-  // a pill". A quadruped's torso is not a tube: it is a deep rib cage at the
-  // front, a narrow waist, and a broad muscular rump, with the shoulder and
-  // haunch masses standing proud of the barrel. Building those four masses
-  // costs four more merged geometries — still ONE draw call per animal —
-  // and it is the difference between a prop and a body.
   const bodyParts: THREE.BufferGeometry[] = [];
-  const R = spec.bodyRadius;
-  const L = spec.bodyLength;
-
-  // Barrel: the underlying rib-cage-to-waist tube, tapered in Y and Z so the
-  // cross-section is an oval (deeper than it is wide), like a real animal.
-  const barrel = new THREE.CapsuleGeometry(R, L - R * 2, 3, ring);
+  const barrel = new THREE.CapsuleGeometry(spec.bodyRadius, spec.bodyLength - spec.bodyRadius * 2, 2, ring);
   barrel.rotateZ(Math.PI / 2);
-  part(bodyParts, barrel, spec.coat, 0, bodyY, 0, 0, 0, 0, 1, 0.94, 0.82);
-
-  if (!far) {
-    // Chest / rib cage — the deepest part of the torso, just behind the
-    // forelegs, and where the body is widest.
-    part(
-      bodyParts, new THREE.SphereGeometry(R * 1.02, ring, ring - 2), spec.coat,
-      L * 0.26, bodyY - R * 0.06, 0, 0, 0, 0, 0.92, 1.04, 0.94,
-    );
-    // Rump / hindquarters — broad and high, carrying the drive of the animal.
-    part(
-      bodyParts, new THREE.SphereGeometry(R * 0.98, ring, ring - 2), spec.coat,
-      -L * 0.3, bodyY + R * 0.06, 0, 0, 0, 0, 1.0, 1.0, 0.96,
-    );
-    // Belly — sags slightly below the barrel between the limbs.
-    part(
-      bodyParts, new THREE.SphereGeometry(R * 0.8, ring - 2, ring - 3), spec.coatAlt,
-      -L * 0.02, bodyY - R * 0.5, 0, 0, 0, 0, 1.7, 0.6, 0.86,
-    );
-    // Shoulder and haunch muscles, proud of the barrel on both flanks.
-    for (const side of [1, -1]) {
-      part(
-        bodyParts, new THREE.SphereGeometry(R * 0.52, ring - 3, ring - 4), spec.coat,
-        L * 0.24, bodyY - R * 0.12, side * R * 0.72, 0, 0, 0, 1.1, 1.15, 0.7,
-      );
-      part(
-        bodyParts, new THREE.SphereGeometry(R * 0.56, ring - 3, ring - 4), spec.coat,
-        -L * 0.27, bodyY - R * 0.04, side * R * 0.74, 0, 0, 0, 1.15, 1.2, 0.7,
-      );
-    }
-    // Tail, dropping off the back of the rump.
-    const tail = new THREE.CylinderGeometry(R * 0.07, R * 0.15, R * 1.5, 4);
-    tail.translate(0, -R * 0.75, 0);
-    part(bodyParts, tail, spec.coatAlt, -L * 0.48, bodyY + R * 0.4, 0, 0, 0, -0.45);
-  }
+  part(bodyParts, barrel, spec.coat, 0, bodyY, 0, 0, 0, 0, 1, 0.92, 0.86);
 
   if (spec.humped && !far) {
     part(

@@ -154,58 +154,6 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   clouds.renderOrder = -850;
   group.add(clouds);
 
-  // ── High-altitude airliner ───────────────────────────────────────────
-  //
-  // A plane crossing the sky is a strong "this world is alive and large"
-  // cue and costs almost nothing: one merged fuselage+wing mesh plus two
-  // additive contrail quads, flying a straight line at 300 m and respawning
-  // off the far edge. It is deliberately small and slow — at that altitude
-  // it should read as a distant glint with a trail, not a flypast.
-  const planeGroup = new THREE.Group();
-  planeGroup.renderOrder = -800;
-  const planeMat = new THREE.MeshBasicMaterial({ color: 0xe8eef5, fog: false });
-  // Fuselage: a thin capsule laid along +X, the direction of travel.
-  const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 16, 3, 8), planeMat);
-  fuselage.rotation.z = Math.PI / 2;
-  planeGroup.add(fuselage);
-  // Main wings and tailplane as flat swept boxes.
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.5, 26), planeMat);
-  wing.position.x = -1;
-  planeGroup.add(wing);
-  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 10), planeMat);
-  tailplane.position.x = -8.5;
-  planeGroup.add(tailplane);
-  const fin = new THREE.Mesh(new THREE.BoxGeometry(3.4, 6, 0.4), planeMat);
-  fin.position.set(-8.6, 3, 0);
-  planeGroup.add(fin);
-  // Twin contrails streaming back from the wings.
-  const trailMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.3,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    fog: false,
-  });
-  const trailGeo = new THREE.PlaneGeometry(260, 3.4);
-  for (const side of [1, -1]) {
-    const trail = new THREE.Mesh(trailGeo, trailMat);
-    // The quad extends behind the aircraft (−X) and lies flat so it reads
-    // from the ground looking up.
-    trail.position.set(-130, 0, side * 9);
-    trail.rotation.x = Math.PI / 2;
-    planeGroup.add(trail);
-  }
-  // Flight path: crosses the sky every ~95 s at 300 m, slightly off-axis so
-  // it never passes exactly overhead and can be seen against the mountains.
-  const PLANE_PERIOD = 95;
-  const PLANE_ALT = 300;
-  const PLANE_SPAN = 2400;
-  // Start partway through so a plane is in the air shortly after boot.
-  let planeT = PLANE_PERIOD * 0.22;
-  group.add(planeGroup);
-
   // ── Volumetric sun shafts ────────────────────────────────────────────
   let shafts: THREE.Group | null = null;
   if (budget.sunShafts) {
@@ -306,21 +254,6 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
         }
       }
       moteAttr.needsUpdate = true;
-
-      // Airliner: constant-speed straight run, then wrap.
-      planeT += dt;
-      if (planeT > PLANE_PERIOD) planeT -= PLANE_PERIOD;
-      const planeProgress = planeT / PLANE_PERIOD;
-      planeGroup.position.set(
-        -PLANE_SPAN * 0.5 + PLANE_SPAN * planeProgress,
-        PLANE_ALT + Math.sin(planeProgress * 3.0) * 8,
-        -420 + planeProgress * 240,
-      );
-      // Yaw to match the slight diagonal of the flight path.
-      planeGroup.rotation.y = -0.1;
-      // Hide it for the first slice of the cycle so the sky is not
-      // permanently occupied by an aircraft.
-      planeGroup.visible = planeProgress > 0.06 && planeProgress < 0.94;
 
       if (shafts) shafts.rotation.y = Math.sin(time * 0.04) * 0.03;
     },
