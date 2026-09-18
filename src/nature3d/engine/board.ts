@@ -281,7 +281,8 @@ const MAX_RADIUS = 400;  // never leaves the meadow
 const MAX_HEIGHT_ABOVE_GROUND = 14;
 /** Resize limits, as a multiple of the default 4.8 × 2.7 m board. */
 const MIN_SCALE = 0.35;
-const MAX_SCALE = 4.5;
+// 60 m of board width. BOARD_WIDTH is 4.8 m, so 60 / 4.8 = 12.5.
+const MAX_SCALE = 60 / BOARD_WIDTH;
 
 export interface BoardControllerOptions {
   board: THREE.Group;

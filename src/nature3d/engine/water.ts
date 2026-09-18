@@ -138,6 +138,24 @@ export function createWater(tex: TextureSet, budget: QualityBudget): WaterSystem
         vec3 dcH = normalize(dcView + uSunDir);
         float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 2.4;
 
+        // ── Drifting sun glitter path ───────────────────────────────────
+        //
+        // A tight specular lobe alone gives a static hotspot. On real water
+        // the sun's reflection is a long shimmering PATH of sparkles that
+        // crawls downstream with the current. Two very slow counter-drifting
+        // noise fields gate the highlight so individual glints are born,
+        // travel and die over several seconds, which is what the eye reads
+        // as "the reflection is slowly flowing". Speeds are deliberately
+        // small (0.045 / 0.031) — this must creep, never race.
+        float dcGlitA = texture2D(map, vDcWorld.xz * 0.055 + vec2(0.0, uTime * 0.045)).r;
+        float dcGlitB = texture2D(map, vDcWorld.zx * 0.037 - vec2(uTime * 0.031, 0.0)).r;
+        float dcGlitter = smoothstep(0.62, 0.98, dcGlitA * 0.6 + dcGlitB * 0.6);
+        // Sparkles only appear where the surface already faces the sun, so
+        // the path stays anchored to the real reflection direction and
+        // widens toward the horizon the way a sun glitter path does.
+        float dcSunLane = pow(max(dot(dcNormal, dcH), 0.0), 14.0);
+        dcSpec += dcGlitter * dcSunLane * 2.8;
+
         vec3 dcCol = mix(dcBody, dcSky, dcFres) + dcSpec;
         // Whitewater where the surface is steep (riffles over the bed).
         dcCol += smoothstep(0.55, 1.0, abs(dcNrm.x) + abs(dcNrm.y)) * 0.12;
@@ -225,22 +243,51 @@ export function createWater(tex: TextureSet, budget: QualityBudget): WaterSystem
         "#include <dithering_fragment>",
         /* glsl */ `
         #include <dithering_fragment>
-        // vMapUv.y runs 0 at the base to 1 at the lip.
-        float dcDrop = 1.0 - vMapUv.y;
+        // vMapUv.y runs 0 at the BASE to 1 at the LIP.
+        float dcDrop = 1.0 - vMapUv.y;   // 0 at the lip, 1 at the plunge pool
 
-        // Two speeds: a fast surface streak over a slower body.
-        float dcA = texture2D(map, vMapUv * vec2(1.0, 2.0) + vec2(0.0, -uTime * 1.9)).r;
-        float dcB = texture2D(map, vMapUv * vec2(2.3, 3.7) + vec2(0.13, -uTime * 3.1)).r;
+        // ── Falling water, three cascades ──────────────────────────────
+        // +uTime on v scrolls the sampled pattern downward on screen.
+        // Water accelerates as it falls, so the lower samples scroll faster —
+        // that velocity gradient is a large part of why a fall reads as
+        // falling rather than as a moving curtain.
+        float dcSpeed = 1.0 + dcDrop * 1.8;
+        float dcA = texture2D(map, vMapUv * vec2(1.0, 2.0) + vec2(0.0, uTime * 1.9 * dcSpeed)).r;
+        float dcB = texture2D(map, vMapUv * vec2(2.3, 3.7) + vec2(0.13, uTime * 3.1 * dcSpeed)).r;
+        float dcC = texture2D(map, vMapUv * vec2(5.1, 9.0) + vec2(0.61, uTime * 5.2 * dcSpeed)).r;
 
-        // Vertical ropes — a fall separates into strands, it is not a sheet.
-        float dcRope = 0.55 + 0.45 * sin(vMapUv.x * 46.0 + dcA * 5.0);
+        // ── Ropes: a fall separates into strands, it is not a sheet ─────
+        // The strands wander slightly as they descend instead of being
+        // perfectly straight columns.
+        float dcLane = vMapUv.x * 34.0 + sin(vMapUv.y * 7.0 + uTime * 0.6) * 1.4;
+        float dcRope = 0.5 + 0.5 * sin(dcLane + dcA * 4.0);
+        dcRope = pow(dcRope, 1.6);
 
-        // Aeration: clear at the lip, churned white at the base.
+        // ── Vertical motion-blur streaks ───────────────────────────────
+        // Fast water smears along its direction of travel. Mixing the fine
+        // cascade toward its vertical average is a cheap directional blur.
+        float dcStreak = mix(dcC, (dcA + dcB) * 0.5, 0.55);
+
+        // ── The lip: a clean glassy crest before the water breaks up ────
+        float dcLip = 1.0 - smoothstep(0.0, 0.14, dcDrop);
+
+        // ── Aeration: clear at the lip, churned white at the base ───────
         float dcFoam = smoothstep(0.25, 1.0, dcDrop);
-        vec3 dcCol = mix(vec3(0.62, 0.82, 0.93), vec3(1.0), dcFoam * 0.9 + dcB * 0.25);
+        // Plunge-pool boil: the bottom 12% is almost pure white turbulence.
+        float dcBoil = smoothstep(0.88, 1.0, dcDrop) * (0.6 + 0.4 * dcC);
 
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol * (0.72 + dcRope * 0.4), 0.85);
-        gl_FragColor.a *= clamp(0.45 + dcDrop * 0.75 + dcB * 0.2, 0.0, 1.0);
+        vec3 dcClear = vec3(0.55, 0.78, 0.92);   // thin, sky-lit water
+        vec3 dcWhite = vec3(0.97, 0.99, 1.0);    // aerated foam
+        vec3 dcCol = mix(dcClear, dcWhite, clamp(dcFoam * 0.85 + dcStreak * 0.3 + dcBoil, 0.0, 1.0));
+        // The glassy lip stays darker and more transparent than the body.
+        dcCol = mix(dcCol, vec3(0.42, 0.66, 0.84), dcLip * 0.7);
+
+        // Rope shading: lit crests, shadowed gaps between strands.
+        dcCol *= 0.74 + dcRope * 0.46;
+
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol, 0.9);
+        // Thin and see-through at the lip, dense and opaque at the bottom.
+        gl_FragColor.a *= clamp(0.30 + dcDrop * 0.72 + dcBoil * 0.3 + dcRope * 0.14, 0.0, 1.0);
         `,
       );
     fallMat.userData.shader = shader;
@@ -313,7 +360,10 @@ export function createWater(tex: TextureSet, budget: QualityBudget): WaterSystem
       // Scrolling UVs = flowing water, one float per frame.
       flowTex.offset.y = (time * 0.28) % 1;
       flowTex.offset.x = Math.sin(time * 0.15) * 0.04;
-      fallTex.offset.y = (-time * 1.35) % 1;
+      // Water falls DOWN. PlaneGeometry's v runs 0 at the bottom edge to 1 at
+      // the top, and the sampler reads uv - offset, so a NEGATIVE offset walks
+      // the pattern up the sheet. It must be positive.
+      fallTex.offset.y = (time * 1.35) % 1;
       const fallShader = fallMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (fallShader) fallShader.uniforms.uTime.value = time;
 

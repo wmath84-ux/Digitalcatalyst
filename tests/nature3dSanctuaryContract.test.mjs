@@ -490,7 +490,8 @@ test("the board can be resized by dragging any edge or corner", () => {
   assert.match(BOARD, /this\.resizeEdge = u === 0 && v === 0 \? null : \{ u, v \}/);
   assert.match(BOARD, /setScale\(w: number, h: number\)/);
   assert.match(BOARD, /const MIN_SCALE = 0\.35/);
-  assert.match(BOARD, /const MAX_SCALE = 4\.5/);
+  // MAX_SCALE is asserted by the 60 m test below; it is no longer 4.5.
+  assert.match(BOARD, /const MAX_SCALE = /);
   // Free aspect: width and height are clamped independently.
   assert.match(BOARD, /THREE\.MathUtils\.clamp\(w, MIN_SCALE, MAX_SCALE\)/);
   assert.match(BOARD, /THREE\.MathUtils\.clamp\(h, MIN_SCALE, MAX_SCALE\)/);
@@ -615,4 +616,143 @@ test("soaring birds flap in bursts and bank into their turns", () => {
   assert.match(FLORA, /f\.g\.rotation\.z = THREE\.MathUtils\.clamp\(turnRate \* 2\.6/);
   // Birds still actually sit in the trees.
   assert.match(FLORA, /perched\.push/);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Group 11 — the second review pass: fall direction, animal anatomy, the
+// reference tree recipe, the 60 m board, the drifting glint and the airliner.
+// ───────────────────────────────────────────────────────────────────────────
+
+const TEXTURES = read("src/nature3d/engine/textures.ts");
+
+test("the waterfall scrolls downward, not upward", () => {
+  // The whole bug was a negative sign on the v offset, which walks the
+  // sampled pattern UP the sheet and makes the fall appear to flow backwards.
+  assert.match(
+    WATER,
+    /fallTex\.offset\.y = \(time \* [\d.]+\) % 1/,
+    "the waterfall texture offset must advance with +time so the water falls down",
+  );
+  assert.ok(
+    !/fallTex\.offset\.y = \(-\s*time/.test(WATER),
+    "a negative time offset scrolls the waterfall upward",
+  );
+  // The in-shader cascades must scroll the same way as the texture offset.
+  assert.ok(
+    !/vMapUv \* vec2\([\d., ]+\) \+ vec2\([\d.]+, -uTime/.test(WATER),
+    "the waterfall's shader cascades must not scroll with -uTime",
+  );
+});
+
+test("the waterfall accelerates as it falls and boils at the plunge pool", () => {
+  assert.match(WATER, /dcSpeed = 1\.0 \+ dcDrop \* [\d.]+/, "falling water must speed up on the way down");
+  assert.match(WATER, /dcBoil = smoothstep\(0\.88, 1\.0, dcDrop\)/, "the base needs a plunge-pool boil");
+  assert.match(WATER, /dcLip = 1\.0 - smoothstep\(0\.0, 0\.14, dcDrop\)/, "the lip must stay glassy before it breaks up");
+  assert.match(WATER, /dcStreak/, "fast water needs a directional motion-blur smear");
+});
+
+test("the sun reflection drifts slowly across the river", () => {
+  assert.match(WATER, /dcGlitter/, "the river needs a drifting sun-glitter path, not a static hotspot");
+  const speeds = [...WATER.matchAll(/uTime \* (0\.0\d+)[,)]/g)].map((m) => Number(m[1]));
+  assert.ok(speeds.length >= 2, "expected two counter-drifting glitter fields");
+  for (const v of speeds) {
+    assert.ok(v <= 0.06, `glitter drift ${v} is too fast — the user asked for a slow creep`);
+  }
+  assert.match(WATER, /dcSunLane/, "glitter must be gated to the sun's reflection direction");
+});
+
+test("animals have an actual body, not a bare capsule", () => {
+  for (const mass of ["Chest", "Rump", "Belly"]) {
+    assert.ok(WILDLIFE.includes(mass), `the torso must model the ${mass.toLowerCase()} mass`);
+  }
+  assert.match(WILDLIFE, /Tail/, "a quadruped needs a tail");
+  // Ring counts were far 4 / mid 7 / near 12, which faceted the body into a
+  // polygon at any readable distance.
+  const rings = /const ring = far \? (\d+) : near \? (\d+) : (\d+);/.exec(WILDLIFE);
+  assert.ok(rings, "expected the LOD ring-count expression");
+  assert.ok(Number(rings[2]) >= 14, "the near LOD needs enough rings to look round");
+  assert.ok(Number(rings[3]) >= 9, "the mid LOD needs enough rings to look round");
+});
+
+test("every animal is skinned with the hide texture, not just the woolly ones", () => {
+  assert.ok(
+    !/map: woolly \? this\.furTex : null/.test(WILDLIFE),
+    "plain-coated animals must not fall back to a bare untextured material",
+  );
+  assert.match(WILDLIFE, /const map = this\.furTex\.clone\(\)/, "each coat variant needs its own tiling of the hide");
+  // The hide itself needs variation at more than one scale.
+  assert.match(TEXTURES, /Broad blotches/, "the hide needs large-scale mottling");
+  assert.match(TEXTURES, /Hair grain/, "the hide needs a fine directional hair grain");
+  const hairs = /for \(let i = 0; i < (\d+); i \+= 1\) \{\n\s+const x = Math\.random\(\) \* 512;\n\s+const y = Math\.random\(\) \* 512;\n\s+const swirl/.exec(TEXTURES);
+  assert.ok(hairs && Number(hairs[1]) >= 20000, "the coat needs a dense hair grain to read as skin");
+});
+
+test("trees use the reference scene's bark and leaf textures verbatim", () => {
+  // Bark: 512x1024, #3c2b1e, 700 streaks in two exact rgba values, repeat 1x4.
+  assert.match(TEXTURES, /canvas2d\(512, 1024\)/, "reference bark canvas is 512x1024");
+  assert.match(TEXTURES, /bark\.ctx\.fillStyle = "#3c2b1e"/, "reference bark base colour");
+  assert.match(TEXTURES, /i < 700/, "reference bark uses 700 streaks");
+  assert.match(TEXTURES, /rgba\(25, 17, 11, 0\.45\)/, "reference bark dark streak");
+  assert.match(TEXTURES, /rgba\(80, 62, 45, 0\.38\)/, "reference bark light streak");
+  assert.match(TEXTURES, /toTexture\(bark\.c, anisotropy, \[1, 4\]\)/, "reference bark repeat is (1, 4)");
+
+  // Leaf: one bezier blade with the reference's three gradient stops + midrib.
+  assert.match(TEXTURES, /bezierCurveTo\(215, 65, 215, 180, 128, 242\)/, "reference leaf bezier");
+  for (const stop of ["#5ea833", "#38781e", "#244e13"]) {
+    assert.ok(TEXTURES.includes(stop), `reference leaf gradient must include ${stop}`);
+  }
+  assert.match(TEXTURES, /rgba\(180, 240, 130, 0\.6\)/, "reference leaf midrib colour");
+  assert.match(TEXTURES, /lineWidth = 3\.5/, "reference leaf midrib width");
+});
+
+test("tree geometry and canopy follow the reference recipe", () => {
+  assert.match(FLORA, /PlaneGeometry\(0\.9, 0\.9\)/, "reference leaf planes are 0.9 x 0.9");
+  assert.match(FLORA, /alphaTest: 0\.22/, "reference foliage alphaTest is 0.22");
+  assert.match(
+    FLORA,
+    /CylinderGeometry\(0\.2 \* s, 0\.42 \* s, trunkH, 12\)/,
+    "reference trunk is 0.2 -> 0.42 over 12 radial segments",
+  );
+  // Four discrete canopy clusters, exactly as the reference lays them out.
+  assert.match(FLORA, /\[0, 4\.2 \* s, 0, 1\.6 \* s\]/, "reference cluster 1");
+  assert.match(FLORA, /\[-1\.0 \* s, 3\.7 \* s, 0\.4 \* s, 1\.25 \* s\]/, "reference cluster 2");
+  assert.match(FLORA, /\[1\.1 \* s, 3\.8 \* s, -0\.5 \* s, 1\.2 \* s\]/, "reference cluster 3");
+  assert.match(FLORA, /\[0\.2 \* s, 4\.8 \* s, 0\.2 \* s, 1\.1 \* s\]/, "reference cluster 4");
+  assert.match(FLORA, /dist = Math\.random\(\) \* \(spread \* 0\.5\)/, "reference leaf scatter radius");
+  // The old HSL tint overwrote the reference greens; only brightness may vary.
+  assert.ok(
+    !/color\.setHSL\(0\.24/.test(FLORA),
+    "leaves must not be re-tinted away from the reference gradient",
+  );
+  assert.match(FLORA, /color\.setRGB\(shade, shade, shade\)/, "leaf instance colour may only vary brightness");
+});
+
+test("the student faces the board instead of sitting backwards", () => {
+  assert.ok(
+    !/boy\.rotation\.y = Math\.PI/.test(STUDENT),
+    "the boy is authored facing -Z already; a half-turn seats him backwards",
+  );
+  // Sanity-check that he really is authored on the board side.
+  assert.match(STUDENT, /eyes sit at/, "the pose comment should record the forward-facing authoring");
+});
+
+test("the board stretches to a full 60 m", () => {
+  assert.match(BOARD, /const MAX_SCALE = 60 \/ BOARD_WIDTH;/, "max scale must be expressed as 60 m of board");
+  const width = Number(/export const BOARD_WIDTH = ([\d.]+)/.exec(BOARD)[1]);
+  const maxScale = 60 / width;
+  assert.ok(Math.abs(width * maxScale - 60) < 1e-9, "BOARD_WIDTH * MAX_SCALE must be exactly 60 m");
+  assert.ok(maxScale > 4.5, "the old 4.5x cap fell far short of 60 m");
+});
+
+test("an airliner crosses the sky overhead", () => {
+  assert.match(SKY, /planeGroup/, "the sky needs an aircraft");
+  for (const partName of ["fuselage", "wing", "tailplane", "fin"]) {
+    assert.ok(SKY.includes(partName), `the airliner needs a ${partName}`);
+  }
+  assert.match(SKY, /contrail/i, "a high-altitude airliner should leave contrails");
+  const alt = Number(/const PLANE_ALT = (\d+)/.exec(SKY)[1]);
+  assert.ok(alt >= 200, "the aircraft must be genuinely high, not buzzing the trees");
+  const period = Number(/const PLANE_PERIOD = (\d+)/.exec(SKY)[1]);
+  assert.ok(period >= 45, "the crossing must be leisurely, not a flypast every few seconds");
+  assert.match(SKY, /planeT \+= dt/, "the aircraft must actually be advanced each tick");
 });
