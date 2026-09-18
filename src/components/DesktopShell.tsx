@@ -46,6 +46,7 @@ import {
   ShoppingBag,
   Sparkles,
   Store,
+  Trees,
   Trophy,
   UserRound,
   X,
@@ -89,6 +90,7 @@ export type DesktopRailKey =
   | "myday"
   | "revision"
   | "study"
+  | "nature3d"
   | "profile"
   | "settings";
 
@@ -158,6 +160,11 @@ const PRIMARY_RAIL: RailEntry[] = [
 
 const WORKSPACE_RAIL: RailEntry[] = [
   { key: "study", label: "Study Library", description: "Modules & saved resources", Icon: Library, hash: "#/study-library", group: "workspace" },
+  // The 3D study sanctuary — opens beside this rail like every other page
+  // (see `src/nature3d/NatureStudioPage.tsx`). Desktop/tablet-landscape only:
+  // the rail itself is never rendered on mobile, so nothing extra is needed
+  // to keep it off the phone bottom nav.
+  { key: "nature3d", label: "3D Sanctuary", description: "Immersive nature study world", Icon: Trees, hash: "#/nature-studio", group: "workspace" },
   { key: "favorites", label: "Favorites", description: "Saved for later", Icon: Heart, hash: "#/favorites", group: "workspace" },
   { key: "profile", label: "Profile", description: "Account & plan", Icon: UserRound, hash: "#/profile", group: "workspace" },
   // Settings is its own page (`#/settings`) — it used to deep-link into the
@@ -176,6 +183,7 @@ const RAIL_COLORS: Record<DesktopRailKey, string> = {
   myday: "#06D6A0",
   revision: "#B388FF",
   study: "#22D3EE",
+  nature3d: "#4ADE80",
   favorites: "#FF5C8A",
   profile: "#FF7B54",
   settings: "#9AA5B1",
@@ -223,6 +231,7 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   if (hash.startsWith("#/flowpath")) return "myday";
   if (hash.startsWith("#/revision")) return "revision";
   if (hash.startsWith("#/study-library")) return "study";
+  if (hash.startsWith("#/nature-studio")) return "nature3d";
   // The Settings page is its own route; without this the rail falls back to
   // "home" and no entry lights up while the learner is on it.
   if (hash.startsWith("#/settings")) return "settings";

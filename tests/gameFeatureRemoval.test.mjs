@@ -35,13 +35,16 @@ test('both old and downloaded game implementations and their build hook are dele
 });
 
 // This test used to pin the 3D vendor stack + src/classroom3d as "shared, do
-// not delete" while the game was being removed. The 3D Classroom has since been
-// removed as a feature of its own (owner, 2026-09-08), so nothing in the app
-// pulls `three` any more — see tests/classroom3dRemovalContract.test.mjs for
-// the full removal contract.
-test('no 3D vendor stack is left behind by either removal', () => {
+// not delete" while the game was being removed. The 3D Classroom was then
+// removed as a feature of its own (owner, 2026-09-08).
+//
+// `three` returned on 2026-09-18 for the 3D Study Sanctuary (src/nature3d/**),
+// which is unrelated to both the game and the classroom. What this test still
+// pins is that NEITHER removed feature came back: no React-3D wrappers, and no
+// src/classroom3d or game directory.
+test('neither removed 3D feature is left behind', () => {
   const pkg = JSON.parse(read('package.json'));
-  for (const dependency of ['three', '@react-three/fiber', '@react-three/drei', '@types/three']) {
+  for (const dependency of ['@react-three/fiber', '@react-three/drei']) {
     assert.equal(pkg.dependencies[dependency], undefined, dependency);
     assert.equal(pkg.devDependencies[dependency], undefined, dependency);
   }
