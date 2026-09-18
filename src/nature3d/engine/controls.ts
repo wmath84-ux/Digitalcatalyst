@@ -118,8 +118,14 @@ export class FirstPersonRig {
   }
 
   look(dx: number, dy: number) {
+    // Yaw is deliberately unbounded, so you can keep turning and look all the
+    // way behind you without the view ever hitting a wall.
     this.yaw -= dx;
-    this.pitch = THREE.MathUtils.clamp(this.pitch - dy, -1.25, 1.25);
+    // Pitch reaches almost straight up and almost straight down. 1.52 rad is
+    // 87 degrees: the last 3 degrees are held back on purpose, because AT
+    // exactly 90 the forward vector becomes parallel to the world up axis and
+    // the yaw frame degenerates (gimbal flip), which makes the view snap.
+    this.pitch = THREE.MathUtils.clamp(this.pitch - dy, -1.52, 1.52);
   }
 
   update(dt: number, move: VirtualStick, camera: THREE.PerspectiveCamera) {

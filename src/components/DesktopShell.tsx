@@ -47,6 +47,7 @@ import {
   Sparkles,
   Store,
   Trees,
+  Rabbit,
   Trophy,
   UserRound,
   X,
@@ -91,6 +92,7 @@ export type DesktopRailKey =
   | "revision"
   | "study"
   | "nature3d"
+  | "safari3d"
   | "profile"
   | "settings";
 
@@ -165,6 +167,10 @@ const WORKSPACE_RAIL: RailEntry[] = [
   // the rail itself is never rendered on mobile, so nothing extra is needed
   // to keep it off the phone bottom nav.
   { key: "nature3d", label: "3D Sanctuary", description: "Immersive nature study world", Icon: Trees, hash: "#/nature-studio", group: "workspace" },
+  // The second 3D area, built on the open-source Clay Safari world. It is an
+  // ADDITIONAL environment, not a replacement: it has its own route, its own
+  // page and its own scene, and the Sanctuary above is untouched.
+  { key: "safari3d", label: "Clay Safari", description: "Explore the animal valley", Icon: Rabbit, hash: "#/clay-safari", group: "workspace" },
   { key: "favorites", label: "Favorites", description: "Saved for later", Icon: Heart, hash: "#/favorites", group: "workspace" },
   { key: "profile", label: "Profile", description: "Account & plan", Icon: UserRound, hash: "#/profile", group: "workspace" },
   // Settings is its own page (`#/settings`) — it used to deep-link into the
@@ -184,6 +190,7 @@ const RAIL_COLORS: Record<DesktopRailKey, string> = {
   revision: "#B388FF",
   study: "#22D3EE",
   nature3d: "#4ADE80",
+  safari3d: "#FBBF24",
   favorites: "#FF5C8A",
   profile: "#FF7B54",
   settings: "#9AA5B1",
@@ -232,6 +239,7 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   if (hash.startsWith("#/revision")) return "revision";
   if (hash.startsWith("#/study-library")) return "study";
   if (hash.startsWith("#/nature-studio")) return "nature3d";
+  if (hash.startsWith("#/clay-safari")) return "safari3d";
   // The Settings page is its own route; without this the rail falls back to
   // "home" and no entry lights up while the learner is on it.
   if (hash.startsWith("#/settings")) return "settings";

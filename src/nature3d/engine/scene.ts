@@ -29,7 +29,7 @@ import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
-import { createBoard, BoardController, type BoardHandle, BOARD_HEIGHT } from "./board";
+import { createBoard, BoardController, loadBoardPlacement, type BoardHandle, BOARD_HEIGHT } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 
@@ -171,6 +171,12 @@ export class Sanctuary {
         opts.onBoardGrab?.(g);
       },
     });
+
+    // Restore the learner's own board placement, if they made one. This runs
+    // AFTER the controller exists because restore() goes through setScale(),
+    // which needs the controller's clamp. If there is nothing saved the board
+    // simply keeps the default position set above.
+    this.boardCtl.restore(loadBoardPlacement());
 
     this.keyboard = new KeyboardInput();
 

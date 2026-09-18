@@ -294,6 +294,77 @@ export interface BoardControllerOptions {
   enabled: () => boolean;
 }
 
+// ── Board persistence ──────────────────────────────────────────────────
+//
+// Wherever the learner puts the board, and whatever size they made it, is
+// theirs. It survives reloads. Saved to localStorage as one small JSON blob.
+//
+// Everything below is written defensively on purpose: localStorage throws in
+// private-browsing modes and when the quota is full, the stored JSON can be
+// corrupt or from an older build, and a single NaN that slips through would
+// put the board somewhere unreachable with no way for the user to get it
+// back. So every field is validated and the whole thing silently falls back
+// to the default placement if anything at all looks wrong.
+
+const BOARD_STORAGE_KEY = "nature3d.board.placement.v1";
+
+export interface BoardPlacement {
+  px: number; py: number; pz: number;
+  rx: number; ry: number; rz: number;
+  sw: number; sh: number;
+}
+
+/** A finite number inside [lo, hi], or null if it is anything else. */
+function finiteIn(v: unknown, lo: number, hi: number): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
+}
+
+export function loadBoardPlacement(): BoardPlacement | null {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(BOARD_STORAGE_KEY);
+  } catch {
+    return null; // storage blocked (private mode, disabled cookies)
+  }
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    // Position is bounded by the same limits clamp() enforces, so a stale or
+    // hand-edited entry can never park the board outside the world.
+    const px = finiteIn(o.px, -MAX_RADIUS, MAX_RADIUS);
+    const py = finiteIn(o.py, -50, 500);
+    const pz = finiteIn(o.pz, -MAX_RADIUS, MAX_RADIUS);
+    const rx = finiteIn(o.rx, -Math.PI * 2, Math.PI * 2);
+    const ry = finiteIn(o.ry, -Math.PI * 2, Math.PI * 2);
+    const rz = finiteIn(o.rz, -Math.PI * 2, Math.PI * 2);
+    const sw = finiteIn(o.sw, MIN_SCALE, MAX_SCALE);
+    const sh = finiteIn(o.sh, MIN_SCALE, MAX_SCALE);
+    if (px === null || py === null || pz === null) return null;
+    if (rx === null || ry === null || rz === null) return null;
+    if (sw === null || sh === null) return null;
+    return { px, py, pz, rx, ry, rz, sw, sh };
+  } catch {
+    return null; // corrupt JSON
+  }
+}
+
+export function saveBoardPlacement(p: BoardPlacement) {
+  try {
+    localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(p));
+  } catch {
+    // Quota or private mode. Losing the placement is not worth breaking the
+    // frame over, so this is deliberately swallowed.
+  }
+}
+
+export function clearBoardPlacement() {
+  try {
+    localStorage.removeItem(BOARD_STORAGE_KEY);
+  } catch {
+    /* see above */
+  }
+}
+
 export class BoardController {
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -341,6 +412,13 @@ export class BoardController {
   }
 
   dispose() {
+    // Flush any pending debounced write before tearing down, otherwise
+    // leaving the page within 400 ms of the last change loses it.
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+      this.save();
+    }
     const dom = this.opts.dom;
     dom.removeEventListener("pointerdown", this.onDown);
     dom.removeEventListener("pointermove", this.onMove);
@@ -514,6 +592,11 @@ export class BoardController {
     this.resizeEdge = null;
     this.opts.onGrabChange?.(false);
     this.opts.dom.releasePointerCapture?.(e.pointerId);
+    // The gesture is over: whatever the learner just set is now their board.
+    // Once released the board also stops billboarding, so the angle they let
+    // go of is the angle that gets saved and restored.
+    this.faceCamera = false;
+    this.scheduleSave();
   };
 
   private onWheel = (e: WheelEvent) => {
@@ -550,6 +633,7 @@ export class BoardController {
       .normalize();
     this.opts.board.position.copy(this.opts.camera.position).addScaledVector(dir, clamped);
     this.clamp();
+    this.scheduleSave();
   }
 
   /**
@@ -564,15 +648,17 @@ export class BoardController {
     );
     this.opts.board.scale.set(this.scale.x, this.scale.y, 1);
     this.clamp();
+    this.scheduleSave();
   }
 
   getScale(): { w: number; h: number } {
     return { w: this.scale.x, h: this.scale.y };
   }
 
-  /** Reset the board to its original 16:9 size. */
+  /** Reset the board to its original 16:9 size, and forget the saved size. */
   resetScale() {
     this.setScale(1, 1);
+    clearBoardPlacement();
   }
 
   /** Nudge the board by a world delta (used by the HUD arrows). */
@@ -581,6 +667,7 @@ export class BoardController {
     this.opts.board.position.y += dy;
     this.opts.board.position.z += dz;
     this.clamp();
+    this.scheduleSave();
   }
 
   /**
@@ -611,6 +698,57 @@ export class BoardController {
     const maxY = minY + MAX_HEIGHT_ABOVE_GROUND;
     if (p.y < minY) p.y = minY;
     else if (p.y > maxY) p.y = maxY;
+  }
+
+  /**
+   * Capture the board's current placement so it can be restored next visit.
+   */
+  placement(): BoardPlacement {
+    const b = this.opts.board;
+    return {
+      px: b.position.x, py: b.position.y, pz: b.position.z,
+      rx: b.rotation.x, ry: b.rotation.y, rz: b.rotation.z,
+      sw: this.scale.x, sh: this.scale.y,
+    };
+  }
+
+  /**
+   * Restore a saved placement. Returns false if there was nothing valid to
+   * restore, so the caller can fall back to the default framing.
+   *
+   * Restoring also turns OFF faceCamera: the saved rotation IS the user's
+   * chosen orientation, and the billboarding in update() would otherwise
+   * spin the board back to face the camera within a frame or two and quietly
+   * throw away the angle they had picked.
+   */
+  restore(p: BoardPlacement | null): boolean {
+    if (!p) return false;
+    const b = this.opts.board;
+    b.position.set(p.px, p.py, p.pz);
+    b.rotation.set(p.rx, p.ry, p.rz);
+    this.faceCamera = false;
+    this.setScale(p.sw, p.sh);  // setScale applies the mesh scale and clamps
+    return true;
+  }
+
+  /** Persist the placement now. */
+  save() {
+    saveBoardPlacement(this.placement());
+  }
+
+  /**
+   * Persist shortly after the last change. Writing to localStorage is
+   * synchronous and touches the disk, so doing it on every pointermove of a
+   * drag would stutter the frame. Coalescing to one write 400 ms after the
+   * user stops means a continuous drag costs exactly one write.
+   */
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  scheduleSave() {
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.save();
+    }, 400);
   }
 
   /** Per-frame: keep the board readable (facing the viewer) and legal. */

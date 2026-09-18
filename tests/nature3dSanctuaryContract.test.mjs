@@ -24,10 +24,13 @@
 // same `node --test` pass as the rest of the suite.
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const ROOT = new URL("../", import.meta.url);
+const exists = (p) => existsSync(new URL(p, ROOT));
+const listDir = (p) => readdirSync(new URL(p, ROOT));
 
 const DESKTOP_SHELL = read("src/components/DesktopShell.tsx");
 const MAIN = read("src/main.tsx");
@@ -615,4 +618,152 @@ test("soaring birds flap in bursts and bank into their turns", () => {
   assert.match(FLORA, /f\.g\.rotation\.z = THREE\.MathUtils\.clamp\(turnRate \* 2\.6/);
   // Birds still actually sit in the trees.
   assert.match(FLORA, /perched\.push/);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Group 11 — look freedom, the seated student, board persistence, and the
+// second world (Clay Safari) installed alongside the Sanctuary.
+// ───────────────────────────────────────────────────────────────────────────
+
+test("the learner can look straight up and all the way behind", () => {
+  const m = /clamp\(this\.pitch - dy, (-?[\d.]+), ([\d.]+)\)/.exec(CONTROLS);
+  assert.ok(m, "expected the first-person pitch clamp");
+  const hi = Number(m[2]);
+  assert.ok(hi >= 1.5, `pitch cap ${hi} rad is too low — the sky must be reachable`);
+  // Never a full 90 degrees: at exactly PI/2 the yaw frame degenerates.
+  assert.ok(hi < Math.PI / 2, "pitch must stop just short of vertical to avoid gimbal flip");
+  assert.equal(Number(m[1]), -hi, "looking down must be as free as looking up");
+  // Yaw has to stay unbounded so you can turn to face behind you.
+  assert.match(CONTROLS, /this\.yaw -= dx;/);
+  assert.ok(
+    !/clamp\([^)]*this\.yaw/.test(CONTROLS),
+    "yaw must not be clamped — the learner has to be able to look behind",
+  );
+});
+
+test("the student faces the board, not the backrest", () => {
+  assert.ok(
+    !/boy\.rotation\.y = Math\.PI/.test(STUDENT),
+    "the boy is authored facing -Z already; a half-turn seats him backwards",
+  );
+  // The pose really is authored on the board side: everything that should
+  // point at the board sits at negative z, and the chair back is at +z.
+  for (const part of [
+    /eye\.position\.set\(x, 0\.02, -0\.19\)/,
+    /thigh\.position\.set\(x, 0\.86, -0\.2\)/,
+    /hand\.position\.set\(0, -0\.4, -0\.24\)/,
+  ]) {
+    assert.match(STUDENT, part, "the boy's front must stay on the -Z (board) side");
+  }
+  assert.match(STUDENT, /post\.position\.set\(x, 1\.25, 0\.4\)/, "the chair back belongs behind him at +z");
+});
+
+test("the board remembers where and how big the learner left it", () => {
+  assert.match(BOARD, /const BOARD_STORAGE_KEY = "nature3d\.board\.placement\.v1"/);
+  for (const fn of ["loadBoardPlacement", "saveBoardPlacement", "clearBoardPlacement"]) {
+    assert.ok(BOARD.includes(`export function ${fn}`), `${fn} must be exported`);
+  }
+  // Position, rotation AND size are all persisted.
+  assert.match(BOARD, /px: b\.position\.x, py: b\.position\.y, pz: b\.position\.z/);
+  assert.match(BOARD, /rx: b\.rotation\.x, ry: b\.rotation\.y, rz: b\.rotation\.z/);
+  assert.match(BOARD, /sw: this\.scale\.x, sh: this\.scale\.y/);
+  // Restoring must switch billboarding off or the saved angle is thrown away.
+  assert.match(BOARD, /restore\(p: BoardPlacement \| null\): boolean/);
+  assert.match(BOARD, /this\.faceCamera = false;\s*\n\s*this\.setScale\(p\.sw, p\.sh\)/);
+  // Writes are debounced, and flushed on teardown so nothing is lost.
+  assert.match(BOARD, /scheduleSave\(\)/);
+  assert.match(BOARD, /}, 400\);/, "saves should coalesce rather than run per pointermove");
+  assert.match(BOARD, /if \(this\.saveTimer !== null\) \{\s*\n\s*clearTimeout/);
+  // Every storage touch is guarded — localStorage throws in private mode.
+  const storageCalls = (BOARD.match(/localStorage\./g) || []).length;
+  const tryBlocks = (BOARD.match(/try \{/g) || []).length;
+  assert.ok(tryBlocks >= 3, `expected every localStorage access wrapped in try (${storageCalls} calls, ${tryBlocks} try blocks)`);
+  // The scene restores on boot.
+  assert.match(SCENE, /this\.boardCtl\.restore\(loadBoardPlacement\(\)\)/);
+});
+
+test("Clay Safari is installed as a second world, not a replacement", () => {
+  // The Sanctuary page and engine are untouched and still routed.
+  assert.ok(exists("src/nature3d/NatureStudioPage.tsx"), "the Sanctuary page must survive");
+  assert.ok(exists("src/nature3d/engine/scene.ts"), "the Sanctuary engine must survive");
+  assert.match(MAIN, /NATURE_STUDIO_HASH = "#\/nature-studio"/);
+  assert.match(MAIN, /hash\.startsWith\(NATURE_STUDIO_HASH\)\) return <NatureStudioPage \/>/);
+
+  // ...and the safari is added beside it with its own hash, page and chunk.
+  assert.ok(exists("src/nature3d/SafariStudioPage.tsx"), "the safari page must exist");
+  assert.ok(exists("src/nature3d/safari/SafariWorld.ts"), "the safari engine wrapper must exist");
+  assert.match(MAIN, /CLAY_SAFARI_HASH = "#\/clay-safari"/);
+  assert.match(MAIN, /lazyRoute\(\(\) => import\("\.\/nature3d\/SafariStudioPage"\)\)/);
+  assert.match(MAIN, /hash\.startsWith\(CLAY_SAFARI_HASH\)\) return <SafariStudioPage \/>/);
+  // Both worlds bypass the desktop shell and open full screen.
+  assert.match(MAIN, /\|\| hash\.startsWith\(CLAY_SAFARI_HASH\)/);
+});
+
+test("the safari button sits in the rail under the Study Library", () => {
+  const shell = read("src/components/DesktopShell.tsx");
+  const study = shell.indexOf('key: "study"');
+  const safari = shell.indexOf('key: "safari3d"');
+  assert.ok(study > 0 && safari > study, "the safari entry must come after Study Library");
+  assert.match(shell, /key: "safari3d", label: "Clay Safari"/);
+  assert.match(shell, /hash: "#\/clay-safari"/);
+  assert.match(shell, /safari3d: "#[0-9A-Fa-f]{6}"/, "the rail entry needs its own colour");
+  assert.match(shell, /hash\.startsWith\("#\/clay-safari"\)\) return "safari3d"/);
+  // A new rail key must also be taught to the peek dock.
+  const dock = read("src/components/glass-dock/DesktopPeekDock.tsx");
+  assert.match(dock, /active === 'safari3d'/);
+});
+
+test("the safari keeps our character and joystick, not the source project's", () => {
+  const safari = read("src/nature3d/safari/SafariWorld.ts");
+  // Our rig, our stick, our keyboard.
+  assert.match(safari, /import \{ FirstPersonRig, KeyboardInput, type VirtualStick \}/);
+  assert.match(safari, /this\.fpp\.update\(dt, stick, this\.camera\)/);
+  // EXACTLY the Sanctuary's look sensitivity.
+  assert.match(safari, /\* 0\.005;/, "pointer look must use the same 0.005 per-pixel scaling");
+  assert.match(safari, /this\.fpp\.look\(dx \* 0\.9, dy \* 0\.9\)/, "and the same 0.9 rig gain");
+  const sanctuaryGain = /this\.fpp\.look\(dx \* ([\d.]+), dy \* ([\d.]+)\)/.exec(SCENE);
+  const safariGain = /this\.fpp\.look\(dx \* ([\d.]+), dy \* ([\d.]+)\)/.exec(safari);
+  assert.deepEqual(safariGain.slice(1), sanctuaryGain.slice(1), "both worlds must steer identically");
+  // The source project's own Player class must NOT be used.
+  assert.ok(!/from "\.\/player\.js"/.test(safari), "Clay Safari's own player controller must stay out");
+  assert.ok(!exists("src/nature3d/safari/player.js"), "the vendored player controller should not be shipped");
+});
+
+test("the safari ships the world assets but none of the unwanted extras", () => {
+  // The world itself is installed as-is.
+  for (const mod of ["world.js", "animals.js", "clay.js", "data.js", "effects.js", "nav.js", "noise.js", "tween.js"]) {
+    assert.ok(exists(`src/nature3d/safari/${mod}`), `${mod} must be vendored`);
+  }
+  // Animals, birds and props are real GLB assets, served from /public.
+  const models = listDir("public/safari/models").filter((f) => f.endsWith(".glb"));
+  assert.ok(models.length >= 15, `expected the animal/prop models, found ${models.length}`);
+  for (const must of ["lion.glb", "elephant.glb", "giraffe.glb", "zebra.glb", "bird.glb", "fish.glb"]) {
+    assert.ok(models.includes(must), `${must} must ship`);
+  }
+
+  // ── The explicitly unwanted things ──
+  // 1. no AI guide character
+  assert.ok(!models.includes("robot.glb"), "the robot AI guide must not ship");
+  for (const f of ["world.js", "animals.js", "data.js", "clay.js", "effects.js"]) {
+    assert.ok(
+      !/robot/i.test(read(`src/nature3d/safari/${f}`)),
+      `${f} must not reference the robot guide`,
+    );
+  }
+  assert.ok(!exists("src/nature3d/safari/tour.js"), "the auto-tour guide must not ship");
+  assert.ok(!exists("src/nature3d/safari/ui.js"), "the source project's instruction UI must not ship");
+  // 2. no written messages / vocabulary cards over the animals
+  const animals = read("src/nature3d/safari/animals.js");
+  assert.ok(!/makeLabel|fillText/.test(animals), "the floating word cards must be gone");
+  assert.ok(!/labelsVisible/.test(animals), "the label toggle must be gone");
+  // 3. no narration
+  assert.ok(!exists("src/nature3d/safari/audio.js"), "the TTS/narration module must not ship");
+  // 4. no leftover source-language instruction text anywhere in the vendored world
+  for (const f of listDir("src/nature3d/safari")) {
+    const body = read(`src/nature3d/safari/${f}`);
+    assert.ok(
+      !/[\u4e00-\u9fff]/.test(body),
+      `${f} still contains on-screen text from the source project`,
+    );
+  }
 });

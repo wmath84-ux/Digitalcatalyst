@@ -71,7 +71,11 @@ export function createStudent(budget: QualityBudget): StudentRig {
 
   // ── Boy ──────────────────────────────────────────────────────────────
   const boy = new THREE.Group();
-  boy.rotation.y = Math.PI; // facing the board (−Z)
+  // NO rotation. The boy is authored already facing −Z, which is the board
+  // side: his eyes sit at z = −0.19, his thighs run out to z = −0.2 and his
+  // arms reach to z = −0.1. The chair's backrest is at z = +0.4, behind him.
+  // The old Math.PI spun that finished pose a half turn, so he ended up
+  // sitting with his face in the backrest and his back to the board.
 
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.34, 3, 12), shirt);
   torso.position.set(0, 1.16, 0);

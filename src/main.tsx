@@ -66,6 +66,7 @@ const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage")
 // is lazy like every other route — nothing is downloaded until the learner
 // opens it from the rail.
 const NatureStudioPage = lazyRoute(() => import("./nature3d/NatureStudioPage"));
+const SafariStudioPage = lazyRoute(() => import("./nature3d/SafariStudioPage"));
 const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
@@ -183,6 +184,7 @@ const SETTINGS_HASH = "#/settings";
 const STUDY_LIBRARY_HASH = "#/study-library";
 const STUDY_PACK_HASH = "#/pack/";
 const NATURE_STUDIO_HASH = "#/nature-studio";
+const CLAY_SAFARI_HASH = "#/clay-safari";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -563,6 +565,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
   if (hash.startsWith(NATURE_STUDIO_HASH)) return NatureStudioPage;
+  if (hash.startsWith(CLAY_SAFARI_HASH)) return SafariStudioPage;
   if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
@@ -688,6 +691,8 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     // the top bar and the page scroller all have to get out of the way so
     // the canvas owns the entire viewport.
     || hash.startsWith(NATURE_STUDIO_HASH)
+    // Clay Safari is the same deal: its own full-screen WebGL world.
+    || hash.startsWith(CLAY_SAFARI_HASH)
   ) {
     return <>{children}</>;
   }
@@ -706,7 +711,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                 ? "My Study Library"
                 : hash.startsWith(NATURE_STUDIO_HASH)
                   ? "3D Study Sanctuary"
-                  : undefined
+                  : hash.startsWith(CLAY_SAFARI_HASH)
+                    ? "Clay Safari"
+                    : undefined
       }
       pageSubtitle={
         hash.startsWith("#/flowpath")
@@ -719,7 +726,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                 ? "Modules, saved resources and recent learning"
                 : hash.startsWith(NATURE_STUDIO_HASH)
                   ? "Walk the meadow, place the board, study with the herd"
-                  : undefined
+                  : hash.startsWith(CLAY_SAFARI_HASH)
+                    ? "Explore the clay valley and its animals"
+                    : undefined
       }
     >
       {children}
@@ -1729,6 +1738,7 @@ function RootPage(): ReactNode {
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(NATURE_STUDIO_HASH)) return <NatureStudioPage />;
+  if (hash.startsWith(CLAY_SAFARI_HASH)) return <SafariStudioPage />;
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) {
     // The boundary keeps a Study Library render crash contained to this route:
