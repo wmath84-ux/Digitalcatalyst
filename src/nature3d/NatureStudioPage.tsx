@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
-  Gauge, Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
+  Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
@@ -164,10 +164,6 @@ export default function NatureStudioPage() {
     engineRef.current?.setMoveStick(x, y, active);
   }, []);
 
-  const onLookStick = useCallback((x: number, y: number, active: boolean) => {
-    engineRef.current?.setLookStick(x, y, active);
-  }, []);
-
   if (!supported || error) {
     return (
       <main className="grid min-h-[60vh] place-items-center px-6 py-10">
@@ -217,7 +213,7 @@ export default function NatureStudioPage() {
                 </span>
               </h1>
               <p className="text-[11px] text-white/55">
-                Waterfall · River · Grazing herds · Drag the board anywhere
+                1 km valley · Waterfall · Grazing herds · Drag or resize the board
               </p>
             </div>
           </div>
@@ -306,7 +302,6 @@ export default function NatureStudioPage() {
               >
                 <Footprints className="h-5 w-5" />
               </button>
-              <Joystick onChange={onLookStick} label="Look" accent="#60a5fa" size={128} />
             </div>
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <div className="h-5 w-5 rounded-full border border-white/45 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
@@ -314,7 +309,7 @@ export default function NatureStudioPage() {
               </div>
             </div>
             <p className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 translate-y-12 text-[10px] font-semibold text-white/45 lg:block">
-              WASD to walk · Shift to run · drag to look
+              WASD or the stick to walk · Shift to run · swipe anywhere to look around
             </p>
           </>
         ) : null}
@@ -329,7 +324,9 @@ export default function NatureStudioPage() {
               </button>
             </div>
             <p className="mb-2.5 text-[10px] leading-relaxed text-white/50">
-              Or just grab the board with one finger and drag it anywhere — it can never sink below the ground.
+              Grab the middle with one finger to move it anywhere, or pull any
+              edge or corner to resize. Pinch to push it near or far — it stays
+              where you leave it and never sinks below the ground.
             </p>
             <div className="mx-auto grid w-[120px] grid-cols-3 gap-1">
               <span />
@@ -356,6 +353,22 @@ export default function NatureStudioPage() {
                 className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
               >
                 Farther
+              </button>
+            </div>
+            <div className="mt-1.5 flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => engineRef.current?.scaleBoard(1 / 1.15)}
+                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
+              >
+                Smaller
+              </button>
+              <button
+                type="button"
+                onClick={() => engineRef.current?.scaleBoard(1.15)}
+                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
+              >
+                Bigger
               </button>
             </div>
           </div>
@@ -410,12 +423,9 @@ export default function NatureStudioPage() {
         ) : null}
       </div>
 
-      {/* ── Caption strip under the viewport ── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-white/45">
-        <span className="flex items-center gap-1.5"><Gauge className="h-3 w-3" /> Quality adapts automatically to your device</span>
-        <span className="flex items-center gap-1.5"><Move3d className="h-3 w-3" /> One finger drags the board · pinch to push it away</span>
-        <span className="flex items-center gap-1.5"><Footprints className="h-3 w-3" /> FPP walks the meadow with the twin sticks</span>
-      </div>
+      {/* The old caption strip lived below the viewport. The page is now a
+          fixed full-screen surface, so there is no "below" — the same hints
+          are surfaced in the HUD and the board panel instead. */}
     </main>
   );
 }

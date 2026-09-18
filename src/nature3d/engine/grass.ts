@@ -53,6 +53,12 @@ interface RingOptions {
   height: number;
   width: number;
   colorJitter: number;
+  /**
+   * How much bigger a blade gets at the rim of the ring. Sparse far grass
+   * only reads as a continuous meadow if each clump covers more ground, so
+   * the far ring grows its blades with distance instead of adding instances.
+   */
+  distanceGain?: number;
 }
 
 function buildRing(
@@ -111,7 +117,14 @@ function buildRing(
         float dcGust   = sin(uTime * 0.31 + dcTravel * 0.4) * 0.5 + 0.5;
         float dcFlutter= sin(uTime * 6.1 + dcPhase * 2.3) * 0.14;
 
-        float dcAmp = (0.16 + dcSwell * 0.3 + dcGust * 0.26 + dcFlutter) * uWind * dcBend;
+        // DISTANCE CUTOFF. Past ~70 m a blade is a couple of pixels wide and
+        // the sway is pure aliasing — it shimmers instead of waving. Fading
+        // the amplitude out there costs one dot product and removes both the
+        // shimmer and the wasted vertex work on the far ring.
+        vec4 dcView = modelViewMatrix * vec4(dcRoot, 1.0);
+        float dcNear = 1.0 - smoothstep(45.0, 95.0, -dcView.z);
+
+        float dcAmp = (0.16 + dcSwell * 0.3 + dcGust * 0.26 + dcFlutter) * uWind * dcBend * dcNear;
 
         transformed.x += uWindDir.x * dcAmp;
         transformed.z += uWindDir.y * dcAmp;
@@ -155,7 +168,8 @@ function buildRing(
     // Fade the blade height to zero across the last 12 % of the ring so the
     // LOD boundary is invisible.
     const edge = 1 - Math.max(0, (r - (opts.outerRadius - span * 0.12)) / (span * 0.12));
-    const scale = (0.62 + Math.random() * 0.68) * Math.min(1, Math.max(0.05, edge));
+    const gain = 1 + ((opts.distanceGain ?? 0) * (r - opts.innerRadius)) / Math.max(span, 1);
+    const scale = (0.62 + Math.random() * 0.68) * Math.min(1, Math.max(0.05, edge)) * gain;
 
     dummy.position.set(x, y, z);
     dummy.rotation.set(
@@ -163,7 +177,7 @@ function buildRing(
       Math.random() * Math.PI,
       (Math.random() - 0.5) * 0.22,
     );
-    dummy.scale.set(0.8 + Math.random() * 0.5, scale, 1);
+    dummy.scale.set((0.8 + Math.random() * 0.5) * gain, scale, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(placed, dummy.matrix);
 
@@ -220,6 +234,10 @@ export function createGrassField(bladeTex: THREE.Texture, budget: QualityBudget)
       height: 0.8,
       width: 0.2,
       colorJitter: 0.045,
+      // Blades at the 400 m rim are ~4.5× the size of the ones at the inner
+      // edge. That is what keeps the meadow solid all the way to the hills
+      // without paying for millions of instances.
+      distanceGain: 3.5,
     },
     budget,
   );

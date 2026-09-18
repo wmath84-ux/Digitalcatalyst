@@ -468,12 +468,22 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
   const animals: Animal[] = [];
   const shadows = budget.shadowMapSize > 0;
 
+  // Herds now spread across the whole kilometre, in bands. Near herds are
+  // readable in detail; the distant ones are what make the valley feel
+  // populated all the way to the hills.
   const plan: Array<{ species: Species; herds: number; perHerd: number; radius: [number, number] }> = [
-    { species: "buffalo", herds: 3, perHerd: 4, radius: [16, 42] },
-    { species: "cow", herds: 3, perHerd: 4, radius: [10, 34] },
-    { species: "deer", herds: 3, perHerd: 3, radius: [12, 46] },
-    { species: "sheep", herds: 2, perHerd: 6, radius: [8, 26] },
-    { species: "goat", herds: 2, perHerd: 3, radius: [9, 30] },
+    { species: "cow", herds: 3, perHerd: 4, radius: [10, 40] },
+    { species: "sheep", herds: 2, perHerd: 6, radius: [8, 34] },
+    { species: "goat", herds: 2, perHerd: 3, radius: [9, 36] },
+    { species: "buffalo", herds: 3, perHerd: 5, radius: [22, 70] },
+    { species: "deer", herds: 3, perHerd: 4, radius: [18, 80] },
+    { species: "buffalo", herds: 3, perHerd: 6, radius: [80, 190] },
+    { species: "cow", herds: 3, perHerd: 5, radius: [70, 170] },
+    { species: "deer", herds: 3, perHerd: 5, radius: [90, 210] },
+    { species: "sheep", herds: 2, perHerd: 8, radius: [110, 230] },
+    { species: "buffalo", herds: 2, perHerd: 6, radius: [200, 330] },
+    { species: "cow", herds: 2, perHerd: 6, radius: [190, 310] },
+    { species: "deer", herds: 2, perHerd: 6, radius: [220, 360] },
   ];
 
   let spawned = 0;
@@ -487,10 +497,16 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
         const a = Math.random() * Math.PI * 2;
         ax = Math.cos(a) * r;
         az = Math.sin(a) * r;
-        if (!insideRiver(ax, az) && Math.hypot(ax, az) > 6.5 && terrainHeight(ax, az) > -0.9) break;
+        const gh = terrainHeight(ax, az);
+        // Keep herds on grazeable ground: out of the river, off the clearing,
+        // and below the rocky tree line.
+        if (!insideRiver(ax, az) && Math.hypot(ax, az) > 6.5 && gh > -0.9 && gh < 26) break;
       }
 
-      const spread = 3 + (1 - SPECS[entry.species].herdTightness) * 7;
+      // Distant herds spread wider so they read as a scatter across a hillside
+      // rather than a tight clump of dots.
+      const distGain = 1 + Math.min(Math.hypot(ax, az) / 160, 2.2);
+      const spread = (3 + (1 - SPECS[entry.species].herdTightness) * 7) * distGain;
       let motherIndex = -1;
 
       for (let i = 0; i < entry.perHerd; i += 1) {
@@ -512,6 +528,14 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
         const base = buildAnimal(entry.species, baby, lod, bank, shadows && dist < 26);
         base.group.position.set(x, terrainHeight(x, z), z);
         base.group.rotation.y = Math.random() * Math.PI * 2;
+        // Far animals are scaled up a little. A real buffalo at 300 m is about
+        // two pixels tall and simply vanishes; nudging the silhouette keeps the
+        // distant herds legible without adding a single triangle. The growth is
+        // gentle and only starts past 90 m, so nothing near you looks wrong.
+        if (dist > 90) {
+          const grow = 1 + Math.min((dist - 90) / 260, 1) * 1.5;
+          base.group.scale.setScalar(grow);
+        }
 
         const animal: Animal = {
           ...base,
@@ -577,7 +601,11 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
           const step = a.speed * dt;
           const nx = pos.x + Math.cos(a.heading) * step;
           const nz = pos.z + Math.sin(a.heading) * step;
-          if (insideRiver(nx, nz) || Math.hypot(nx, nz) > 78 || Math.hypot(nx, nz) < 5.2) {
+          // Fence each animal around its OWN herd anchor, not around the
+          // origin. The old global 78 m ring dragged every distant herd back
+          // towards the clearing until the far half of the valley emptied out.
+          const fromHome = Math.hypot(nx - a.homeX, nz - a.homeZ);
+          if (insideRiver(nx, nz) || fromHome > 26 || Math.hypot(nx, nz) < 5.2) {
             a.heading += Math.PI * (0.6 + Math.random() * 0.8);
           } else {
             pos.x = nx;
@@ -590,7 +618,11 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
         }
 
         // ── Animation LOD ─────────────────────────────────────────────
-        if (a.distance > 62) continue; // invisible detail — skip entirely
+        // Skip the per-bone animation once the animal is too far for a leg
+        // swing to cover even a pixel. They still walk (that is 6 float ops
+        // above) so the distant herds keep drifting across the hillside; they
+        // just stop paying for gait, head bob and tail flick.
+        if (a.distance > 62) continue;
 
         const t = time + a.phase;
         const moving = a.speed > 0.01;

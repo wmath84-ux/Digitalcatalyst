@@ -218,43 +218,38 @@ export function createBoard(budget: QualityBudget): BoardHandle {
   );
   panel.add(edges);
 
-  // ── Plinth: granite monolith + fully concealed rear chassis ──────────
+  // ── Resize grips ─────────────────────────────────────────────────────
+  // Eight small pucks on the edges and corners. They are pure affordance —
+  // the hit-test is done against the panel UV, not against these — but
+  // without them nobody discovers that the board can be stretched.
+  const gripMat = new THREE.MeshBasicMaterial({ color: 0xbfe4ff, transparent: true, opacity: 0.72 });
+  const gripGeo = new THREE.SphereGeometry(0.075, 10, 8);
+  const hw = BOARD_WIDTH * 0.5;
+  const hh = BOARD_HEIGHT * 0.5;
+  for (const [gx, gy] of [
+    [-1, -1], [0, -1], [1, -1],
+    [-1, 0], [1, 0],
+    [-1, 1], [0, 1], [1, 1],
+  ] as const) {
+    const grip = new THREE.Mesh(gripGeo, gripMat);
+    grip.position.set(gx * hw, gy * hh, BOARD_THICKNESS * 0.5 + 0.01);
+    grip.name = "board-grip";
+    panel.add(grip);
+  }
+
+  // ── No plinth ────────────────────────────────────────────────────────
+  //
+  // There used to be a granite monolith with a black steel mast and backplate
+  // bolted to it. Because the board itself is free-floating and placeable, the
+  // moment you dragged the board away the chassis stayed behind — a black slab
+  // standing in the meadow with nothing on it. The board is the only board now:
+  // it hovers where you put it and nothing is left behind.
+  //
+  // `plinth` is kept as an empty group so the rest of the engine (visibility
+  // toggles, disposal) needs no special-casing.
   const plinth = new THREE.Group();
   plinth.name = "board-plinth";
-
-  const rockGeo = new THREE.DodecahedronGeometry(1.7, 1);
-  const rp = rockGeo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < rp.count; i += 1) {
-    const x = rp.getX(i);
-    let y = rp.getY(i);
-    const z = rp.getZ(i);
-    if (y > 0.45) y = 0.45 + (y - 0.45) * 0.2; // flat summit for the mount
-    rp.setXYZ(i, x * (1.2 + Math.sin(y * 3) * 0.1), y * 0.95, z * 1.24);
-  }
-  rockGeo.computeVertexNormals();
-  const rock = new THREE.Mesh(
-    rockGeo,
-    new THREE.MeshStandardMaterial({ color: 0x7c8781, roughness: 0.94, metalness: 0.04, flatShading: true }),
-  );
-  rock.position.y = 0.9;
-  rock.castShadow = budget.shadowMapSize > 0;
-  rock.receiveShadow = budget.shadowMapSize > 0;
-  plinth.add(rock);
-
-  const moss = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.95, 1.1, 0.1, 12),
-    new THREE.MeshStandardMaterial({ color: 0x3d6e2a, roughness: 0.96 }),
-  );
-  moss.position.set(-0.2, 1.42, 0.05);
-  plinth.add(moss);
-
-  const chassisMat = new THREE.MeshStandardMaterial({ color: 0x20242a, roughness: 0.35, metalness: 0.85 });
-  const mast = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.14), chassisMat);
-  mast.position.set(0, 2.05, -0.22);
-  plinth.add(mast);
-  const backPlate = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 0.05), chassisMat);
-  backPlate.position.set(0, 2.5, -0.14);
-  plinth.add(backPlate);
+  plinth.visible = false;
 
   return {
     group,
@@ -266,11 +261,6 @@ export function createBoard(budget: QualityBudget): BoardHandle {
       texture.dispose();
       rim.dispose();
       face.dispose();
-      plinth.traverse((o) => {
-        const m = o as THREE.Mesh;
-        m.geometry?.dispose?.();
-        (m.material as THREE.Material | undefined)?.dispose?.();
-      });
     },
   };
 }
@@ -281,8 +271,17 @@ export function createBoard(budget: QualityBudget): BoardHandle {
 
 const MIN_DEPTH = 2.2;   // closest the board may come to the camera
 const MAX_DEPTH = 26;    // furthest it may be pushed
-const MAX_RADIUS = 58;   // never leaves the meadow
-const MAX_HEIGHT = 16;
+const MAX_RADIUS = 400;  // never leaves the meadow
+/**
+ * Ceiling for the board, measured ABOVE THE GROUND UNDER IT — not as an
+ * absolute world Y. The hills now reach ~93 m, so a fixed 16 m ceiling would
+ * clamp the board straight down inside a hillside the moment you carried it
+ * uphill. Relative keeps "as high as I can reach" meaningful everywhere.
+ */
+const MAX_HEIGHT_ABOVE_GROUND = 14;
+/** Resize limits, as a multiple of the default 4.8 × 2.7 m board. */
+const MIN_SCALE = 0.35;
+const MAX_SCALE = 4.5;
 
 export interface BoardControllerOptions {
   board: THREE.Group;
@@ -306,10 +305,17 @@ export class BoardController {
   private activePointers = new Map<number, { x: number; y: number }>();
   private pinchStart = 0;
   private depthAtPinch = 0;
+  private scaleAtPinch = 1;
   private dragging = false;
   private moved = false;
   /** Board keeps facing the viewer while carried, then locks on release. */
   private faceCamera = true;
+
+  // ── Edge resize ──────────────────────────────────────────────────────
+  /** Which edge/corner was grabbed, or null for a body drag. */
+  private resizeEdge: { u: -1 | 0 | 1; v: -1 | 0 | 1 } | null = null;
+  private resizeStart = { w: 1, h: 1, x: 0, y: 0 };
+  private scale = new THREE.Vector2(1, 1);
 
   constructor(private opts: BoardControllerOptions) {
     const dom = opts.dom;
@@ -352,10 +358,59 @@ export class BoardController {
     );
   }
 
+  /**
+   * Hit-test the panel and, if hit, work out WHERE on it — body or edge.
+   *
+   * The intersection carries a UV in 0..1 across the front face, so an
+   * 18 % margin on each side becomes the resize gutter. Grabbing the left or
+   * right gutter resizes width, top/bottom resizes height, and a corner does
+   * both at once — the standard "drag any edge to resize" affordance.
+   */
   private hitsBoard(e: PointerEvent): boolean {
     this.updatePointer(e);
     this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
-    return this.raycaster.intersectObject(this.opts.panel, false).length > 0;
+    const hits = this.raycaster.intersectObject(this.opts.panel, false);
+    if (hits.length === 0) {
+      this.resizeEdge = null;
+      return false;
+    }
+    const uv = hits[0].uv;
+    if (!uv) {
+      this.resizeEdge = null;
+      return true;
+    }
+    const M = 0.18;
+    const u: -1 | 0 | 1 = uv.x < M ? -1 : uv.x > 1 - M ? 1 : 0;
+    const v: -1 | 0 | 1 = uv.y < M ? -1 : uv.y > 1 - M ? 1 : 0;
+    this.resizeEdge = u === 0 && v === 0 ? null : { u, v };
+    return true;
+  }
+
+  /**
+   * Re-anchor the one-finger drag to wherever the board is RIGHT NOW.
+   *
+   * This is the fix for the "board snaps back when I lift a finger" bug. The
+   * drag plane and grab offset are captured once at pointerdown. A pinch then
+   * moves the board along the view ray — but the stale plane still sits at the
+   * OLD depth, so the instant the second finger came up, the surviving finger's
+   * next move re-projected the board onto that old plane and it jumped back.
+   * Re-anchoring on every pointer-count change means a pinch is committed:
+   * zoom in, the board stays near; zoom out, it stays far.
+   */
+  private reanchor(clientX: number, clientY: number) {
+    const rect = this.opts.dom.getBoundingClientRect();
+    this.pointer.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
+    this.opts.camera.getWorldDirection(this.planeNormal);
+    this.dragPlane.setFromNormalAndCoplanarPoint(this.planeNormal, this.opts.board.position);
+    if (this.raycaster.ray.intersectPlane(this.dragPlane, this.hitPoint)) {
+      this.grabOffset.copy(this.opts.board.position).sub(this.hitPoint);
+    } else {
+      this.grabOffset.set(0, 0, 0);
+    }
   }
 
   private onDown = (e: PointerEvent) => {
@@ -366,21 +421,21 @@ export class BoardController {
       const [a, b] = [...this.activePointers.values()];
       this.pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
       this.depthAtPinch = this.currentDepth();
+      this.scaleAtPinch = this.scale.x;
       return;
     }
     if (this.activePointers.size > 1) return;
     if (!this.hitsBoard(e)) return;
 
+    if (this.resizeEdge) {
+      // Start a resize: remember the size and the pointer origin.
+      this.resizeStart = { w: this.scale.x, h: this.scale.y, x: e.clientX, y: e.clientY };
+    }
+
     // Drag plane: parallel to the screen, through the board's centre. This is
     // what makes one finger move the board 1:1 in every direction — up, down,
     // left, right — with no mode switch.
-    this.opts.camera.getWorldDirection(this.planeNormal);
-    this.dragPlane.setFromNormalAndCoplanarPoint(this.planeNormal, this.opts.board.position);
-    if (this.raycaster.ray.intersectPlane(this.dragPlane, this.hitPoint)) {
-      this.grabOffset.copy(this.opts.board.position).sub(this.hitPoint);
-    } else {
-      this.grabOffset.set(0, 0, 0);
-    }
+    this.reanchor(e.clientX, e.clientY);
 
     this.dragging = true;
     this.moved = false;
@@ -398,10 +453,34 @@ export class BoardController {
       const [a, b] = [...this.activePointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (this.pinchStart > 0) {
-        // Pinch out → board comes closer (appears bigger).
-        this.setDepth(this.depthAtPinch * (this.pinchStart / Math.max(dist, 1)));
+        const ratio = this.pinchStart / Math.max(dist, 1);
+        if (this.resizeEdge) {
+          // Pinching while holding an edge scales the board itself.
+          this.setScale(this.scaleAtPinch / ratio, this.scaleAtPinch / ratio);
+        } else {
+          // Pinch out → board comes closer (appears bigger).
+          this.setDepth(this.depthAtPinch * ratio);
+        }
         this.moved = true;
       }
+      e.preventDefault();
+      return;
+    }
+
+    if (this.resizeEdge) {
+      // ── Edge resize ──────────────────────────────────────────────────
+      // Convert the pointer travel to a fraction of the viewport, then to a
+      // size multiplier. Pulling outwards (away from the board centre) grows
+      // it, pushing inwards shrinks it — for every edge and every corner.
+      const rect = this.opts.dom.getBoundingClientRect();
+      const dx = (e.clientX - this.resizeStart.x) / rect.width;
+      const dy = (e.clientY - this.resizeStart.y) / rect.height;
+      const { u, v } = this.resizeEdge;
+      // Screen +y is down, board +v is up, hence the negation on dy.
+      const w = u === 0 ? this.resizeStart.w : this.resizeStart.w + u * dx * 4.5;
+      const h = v === 0 ? this.resizeStart.h : this.resizeStart.h + v * -dy * 4.5;
+      this.setScale(w, h);
+      this.moved = true;
       e.preventDefault();
       return;
     }
@@ -419,9 +498,20 @@ export class BoardController {
   private onUp = (e: PointerEvent) => {
     this.activePointers.delete(e.pointerId);
     if (this.activePointers.size < 2) this.pinchStart = 0;
-    if (this.activePointers.size > 0) return;
+    if (this.activePointers.size > 0) {
+      // A finger came up but one is still down: COMMIT whatever the pinch did
+      // and re-anchor the drag to the board's new position. Without this the
+      // surviving finger would yank the board back to the pre-pinch depth.
+      const survivor = [...this.activePointers.values()][0];
+      this.reanchor(survivor.x, survivor.y);
+      if (this.resizeEdge) {
+        this.resizeStart = { w: this.scale.x, h: this.scale.y, x: survivor.x, y: survivor.y };
+      }
+      return;
+    }
     if (!this.dragging) return;
     this.dragging = false;
+    this.resizeEdge = null;
     this.opts.onGrabChange?.(false);
     this.opts.dom.releasePointerCapture?.(e.pointerId);
   };
@@ -462,6 +552,29 @@ export class BoardController {
     this.clamp();
   }
 
+  /**
+   * Resize the board. Aspect is free — drag a side to make it a wide strip,
+   * a corner to scale both axes — within sane limits so it can never become
+   * a sliver or swallow the sky.
+   */
+  setScale(w: number, h: number) {
+    this.scale.set(
+      THREE.MathUtils.clamp(w, MIN_SCALE, MAX_SCALE),
+      THREE.MathUtils.clamp(h, MIN_SCALE, MAX_SCALE),
+    );
+    this.opts.board.scale.set(this.scale.x, this.scale.y, 1);
+    this.clamp();
+  }
+
+  getScale(): { w: number; h: number } {
+    return { w: this.scale.x, h: this.scale.y };
+  }
+
+  /** Reset the board to its original 16:9 size. */
+  resetScale() {
+    this.setScale(1, 1);
+  }
+
   /** Nudge the board by a world delta (used by the HUD arrows). */
   nudge(dx: number, dy: number, dz: number) {
     this.opts.board.position.x += dx;
@@ -487,14 +600,17 @@ export class BoardController {
 
     // Sample the ground under the board's footprint, not just its centre, so a
     // slope on either side cannot clip a corner through the hill.
-    const half = BOARD_WIDTH * 0.5;
+    // Footprint and clearance both scale with the board, so a board grown to
+    // 4× still keeps its bottom edge above the grass.
+    const half = BOARD_WIDTH * 0.5 * this.scale.x;
     let ground = terrainHeight(p.x, p.z);
     for (const [ox, oz] of [[-half, 0], [half, 0], [0, -half * 0.3], [0, half * 0.3]] as const) {
       ground = Math.max(ground, terrainHeight(p.x + ox, p.z + oz));
     }
-    const minY = ground + BOARD_HEIGHT * 0.5 + 0.12;
+    const minY = ground + BOARD_HEIGHT * 0.5 * this.scale.y + 0.12;
+    const maxY = minY + MAX_HEIGHT_ABOVE_GROUND;
     if (p.y < minY) p.y = minY;
-    if (p.y > MAX_HEIGHT) p.y = MAX_HEIGHT;
+    else if (p.y > maxY) p.y = maxY;
   }
 
   /** Per-frame: keep the board readable (facing the viewer) and legal. */

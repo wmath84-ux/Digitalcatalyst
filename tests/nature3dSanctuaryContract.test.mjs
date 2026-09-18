@@ -40,6 +40,7 @@ const FLORA = read("src/nature3d/engine/flora.ts");
 const TERRAIN = read("src/nature3d/engine/terrain.ts");
 const QUALITY = read("src/nature3d/engine/quality.ts");
 const CONTROLS = read("src/nature3d/engine/controls.ts");
+const SKY = read("src/nature3d/engine/sky.ts");
 const STUDENT = read("src/nature3d/engine/student.ts");
 const JOYSTICK = read("src/nature3d/components/Joystick.tsx");
 
@@ -221,15 +222,47 @@ test("first person is a camera only — the student body is hidden", () => {
   assert.match(STUDENT, /if \(!group\.visible\) return;/);
 });
 
-test("the FPP button and twin joysticks are wired to the engine", () => {
+test("FPP has ONE move stick — looking is done by swiping", () => {
   assert.match(PAGE, /FPP/);
   assert.match(PAGE, /toggleMode/);
   assert.match(PAGE, /<Joystick[\s\S]*?onChange=\{onMoveStick\}/);
-  assert.match(PAGE, /<Joystick[\s\S]*?onChange=\{onLookStick\}/);
   assert.match(PAGE, /setMoveStick/);
-  assert.match(PAGE, /setLookStick/);
+  // The look stick is gone: you swipe the screen while the other thumb walks.
+  assert.ok(!/onLookStick/.test(PAGE), "the look joystick must be removed");
+  assert.ok(!/setLookStick/.test(SCENE), "the engine must not keep a look-stick channel");
+  assert.equal(
+    (PAGE.match(/<Joystick/g) ?? []).length,
+    1,
+    "exactly one joystick — move only",
+  );
   // Sticks are only mounted in walk mode.
   assert.match(PAGE, /mode === "fpp" \? \(/);
+});
+
+test("the move stick walks the camera FORWARD, not backwards", () => {
+  // The camera's forward vector for a yaw rotation about +Y is
+  // (-sin(yaw), 0, -cos(yaw)). The rig must use those signs; the original bug
+  // was (+sin, +cos), i.e. exactly the reverse, so pushing up walked back.
+  const body = CONTROLS.slice(CONTROLS.indexOf("const desiredX"), CONTROLS.indexOf("const a = damp(11"));
+  assert.match(body, /desiredX = \(forward \* -sin \+ strafe \* cos\)/);
+  assert.match(body, /desiredZ = \(forward \* -cos - strafe \* sin\)/);
+  assert.match(CONTROLS, /const forward = -move\.y/, "stick up (y = -1) must mean forward");
+
+  // Prove it numerically over a full turn rather than trusting the regex.
+  const facing = (yaw) => ({ x: -Math.sin(yaw), z: -Math.cos(yaw) });
+  const move = (yaw, sx, sy) => {
+    const forward = -sy, strafe = sx, sin = Math.sin(yaw), cos = Math.cos(yaw);
+    return { x: forward * -sin + strafe * cos, z: forward * -cos - strafe * sin };
+  };
+  for (let deg = 0; deg < 360; deg += 15) {
+    const yaw = (deg * Math.PI) / 180;
+    const f = facing(yaw);
+    const fwd = move(yaw, 0, -1);
+    assert.ok(fwd.x * f.x + fwd.z * f.z > 0.999, `stick up must walk forward at yaw ${deg}`);
+    const right = move(yaw, 1, 0);
+    assert.ok(Math.abs(right.x * f.x + right.z * f.z) < 1e-9, `strafe must be perpendicular at yaw ${deg}`);
+    assert.ok(Math.hypot(right.x - -f.z, right.z - f.x) < 1e-9, `strafe must go right at yaw ${deg}`);
+  }
 });
 
 test("the joystick never re-renders React while it is being dragged", () => {
@@ -372,4 +405,134 @@ test("three and its types are locked for CI", () => {
   assert.match(lock, /\n {6}three:\n/, "three is not an importer dependency in pnpm-lock.yaml");
   assert.match(lock, /\n {6}'@types\/three':\n/, "@types/three is not in pnpm-lock.yaml");
   assert.match(lock, /\n {2}three@[\d.]+:/, "three has no resolved package entry");
+});
+
+// ── 10. The kilometre world, and what does NOT move in it ─────────────
+
+test("the world is a full kilometre across, built as LOD shells", () => {
+  assert.match(TERRAIN, /export const WORLD_SIZE = 1000/);
+  assert.match(TERRAIN, /export const WORLD_HALF = WORLD_SIZE \/ 2/);
+  // Three concentric shells, not one giant plane: detail where the camera is.
+  const shells = TERRAIN.slice(TERRAIN.indexOf("const shells"), TERRAIN.indexOf("const mat ="));
+  assert.match(shells, /half: 90/);
+  assert.match(shells, /half: 260/);
+  assert.match(shells, /half: WORLD_HALF/);
+  // The camera has to be able to SEE a kilometre.
+  for (const [, far] of QUALITY.matchAll(/farPlane: (\d+)/g)) {
+    assert.ok(Number(far) >= 1500, `farPlane ${far} cannot show a 1 km world`);
+  }
+  // Walking and board placement must both use the bigger world.
+  assert.match(CONTROLS, /const WALK_LIMIT = 430/);
+  assert.match(BOARD, /const MAX_RADIUS = 400/);
+});
+
+test("the distant hills are real eroded terrain, not cardboard pyramids", () => {
+  assert.match(TERRAIN, /function distantRelief/);
+  // Ridged noise (1 - |n|) is what gives crests and flanks instead of cones.
+  assert.match(TERRAIN, /1 - Math\.abs\(a\)/);
+  assert.match(TERRAIN, /distantRelief\(x, z\)/, "the height field must include the hills");
+  // Altitude banding — bare rock then snow on the tops.
+  assert.match(TERRAIN, /if \(h > 18\) tmp\.lerp\(rock/);
+  assert.match(TERRAIN, /if \(h > 52\) tmp\.lerp\(snow/);
+  // The old triangle ring in the sky is gone.
+  assert.ok(!/peakCount/.test(SKY), "the fake mountain ring must be deleted");
+  assert.ok(!/const ridge = new THREE\.Mesh/.test(SKY), "no cardboard ridge mesh");
+});
+
+test("only a minority of trees animate, and distance switches motion off", () => {
+  // Trees carry an explicit sways flag ...
+  assert.match(FLORA, /sways: boolean/);
+  assert.match(FLORA, /sways: Math\.random\(\) < \(r < 70 \? 0\.55 : r < 150 \? 0\.3 : 0\.08\)/);
+  // ... and the still ones use a material with NO wind shader at all.
+  assert.match(FLORA, /const leafMatStill = makeLeafMaterial\(false\)/);
+  assert.match(FLORA, /const leafMatSway = makeLeafMaterial\(true\)/);
+  assert.match(FLORA, /group\.add\(leavesSway, leavesStill\)/);
+
+  // Weighted over the real radius distribution, well under half the forest
+  // should animate — "3 trees in 10" as asked.
+  let sway = 0;
+  const N = 200000;
+  for (let i = 0; i < N; i += 1) {
+    const r = 9 + Math.sqrt(i / N) * 430;
+    sway += r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08;
+  }
+  const fraction = sway / N;
+  assert.ok(fraction < 0.4, `too many trees animate: ${(fraction * 100).toFixed(1)}%`);
+  assert.ok(fraction > 0.05, `nothing animates: ${(fraction * 100).toFixed(1)}%`);
+
+  // Both grass and leaves fade their wind out with distance.
+  assert.match(GRASS, /smoothstep\(45\.0, 95\.0, -dcView\.z\)/);
+  assert.match(FLORA, /smoothstep\(60\.0, 130\.0, -dcView\.z\)/);
+});
+
+test("the world is populated to the horizon", () => {
+  // Trees scatter out to the foot of the hills, evenly per unit area.
+  assert.match(FLORA, /const maxRadius = 430/);
+  assert.match(FLORA, /Math\.sqrt\(Math\.random\(\)\) \* maxRadius/);
+  // Herds occupy far bands, not just a ring around the clearing.
+  assert.ok(/radius: \[200, 330\]/.test(WILDLIFE), "there must be herds out at 300 m");
+  assert.ok(/radius: \[220, 360\]/.test(WILDLIFE), "and beyond");
+  // Distant animals must not be dragged back to the origin by a global fence.
+  assert.match(WILDLIFE, /const fromHome = Math\.hypot\(nx - a\.homeX, nz - a\.homeZ\)/);
+  assert.ok(!/Math\.hypot\(nx, nz\) > 78/.test(WILDLIFE), "the old origin fence must be gone");
+  // Grass must reach far enough to meet them.
+  for (const [, far] of QUALITY.matchAll(/grassFarRadius: (\d+)/g)) {
+    assert.ok(Number(far) >= 165, `grassFarRadius ${far} leaves bare ground`);
+  }
+});
+
+// ── 11. Board: resize, pinch persistence, no leftover slab ────────────
+
+test("the board can be resized by dragging any edge or corner", () => {
+  // UV margins turn the panel border into a resize gutter.
+  assert.match(BOARD, /const M = 0\.18/);
+  assert.match(BOARD, /this\.resizeEdge = u === 0 && v === 0 \? null : \{ u, v \}/);
+  assert.match(BOARD, /setScale\(w: number, h: number\)/);
+  assert.match(BOARD, /const MIN_SCALE = 0\.35/);
+  assert.match(BOARD, /const MAX_SCALE = 4\.5/);
+  // Free aspect: width and height are clamped independently.
+  assert.match(BOARD, /THREE\.MathUtils\.clamp\(w, MIN_SCALE, MAX_SCALE\)/);
+  assert.match(BOARD, /THREE\.MathUtils\.clamp\(h, MIN_SCALE, MAX_SCALE\)/);
+  // Visible grips so the affordance is discoverable, and a HUD path too.
+  assert.match(BOARD, /board-grip/);
+  assert.match(SCENE, /scaleBoard\(factor: number\)/);
+  assert.match(PAGE, /scaleBoard\(1\.15\)/);
+});
+
+test("a pinch sticks — the board does not snap back when a finger lifts", () => {
+  // The drag plane is captured at pointerdown; a pinch moves the board off it.
+  // Re-anchoring on every pointer-count change is what commits the zoom.
+  assert.match(BOARD, /private reanchor\(clientX: number, clientY: number\)/);
+  const onUp = BOARD.slice(BOARD.indexOf("private onUp ="), BOARD.indexOf("private onWheel ="));
+  assert.match(onUp, /this\.reanchor\(survivor\.x, survivor\.y\)/,
+    "lifting one finger of a pinch must re-anchor the surviving finger");
+  // Pinch out = nearer, pinch in = farther, and it persists.
+  assert.match(BOARD, /this\.setDepth\(this\.depthAtPinch \* ratio\)/);
+});
+
+test("the leftover black slab is gone and the clamp scales with the board", () => {
+  // The granite plinth and its black steel mast/backplate are deleted.
+  assert.ok(!/const mast = new THREE\.Mesh/.test(BOARD), "the black mast must be gone");
+  assert.ok(!/const backPlate = new THREE\.Mesh/.test(BOARD), "the black backplate must be gone");
+  assert.ok(!/DodecahedronGeometry\(1\.7/.test(BOARD), "the granite plinth must be gone");
+  assert.match(BOARD, /plinth\.visible = false/);
+
+  // Ground clearance and footprint both follow the current scale ...
+  assert.match(BOARD, /const half = BOARD_WIDTH \* 0\.5 \* this\.scale\.x/);
+  assert.match(BOARD, /BOARD_HEIGHT \* 0\.5 \* this\.scale\.y \+ 0\.12/);
+  // ... and the ceiling is relative to the ground, because the hills are 90 m
+  // tall now and a fixed world-Y ceiling would bury the board in a hillside.
+  assert.match(BOARD, /const MAX_HEIGHT_ABOVE_GROUND = 14/);
+  assert.match(BOARD, /const maxY = minY \+ MAX_HEIGHT_ABOVE_GROUND/);
+  assert.ok(!/p\.y > MAX_HEIGHT\b/.test(BOARD), "the absolute height ceiling must be gone");
+});
+
+test("the opening camera is a wide establishing shot", () => {
+  // You land far enough back to read the whole valley and explore from there.
+  assert.match(SCENE, /this\.orbit\.panTo\(new THREE\.Vector3\(0, 6, -6\), 86, -0\.5, 0\.36\)/);
+  // And you can pull back far enough to see the kilometre.
+  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, 420\)/);
+  // The board and student presets still exist so you can click straight in.
+  assert.match(SCENE, /case "board":/);
+  assert.match(SCENE, /case "student":/);
 });

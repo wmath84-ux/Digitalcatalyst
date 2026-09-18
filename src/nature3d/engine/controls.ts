@@ -58,7 +58,9 @@ export class OrbitRig {
   }
 
   zoom(factor: number) {
-    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, 95);
+    // Upper bound raised with the world: you can now pull back far enough to
+    // take in the whole kilometre and the hill ranges behind it.
+    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, 420);
   }
 
   panTo(target: THREE.Vector3, distance: number, yaw?: number, pitch?: number) {
@@ -89,8 +91,12 @@ export class OrbitRig {
   }
 }
 
-/** How far from the clearing the learner may walk (inside the grass ring). */
-const WALK_LIMIT = 52;
+/**
+ * How far from the clearing the learner may walk. The world is a kilometre
+ * across, so this sits just inside the far grass ring: you can walk for
+ * minutes, reach the foot of the hills, and still never see bare terrain.
+ */
+const WALK_LIMIT = 430;
 
 export class FirstPersonRig {
   position = new THREE.Vector3(0, 0, 3.4);
@@ -116,18 +122,23 @@ export class FirstPersonRig {
     this.pitch = THREE.MathUtils.clamp(this.pitch - dy, -1.25, 1.25);
   }
 
-  update(dt: number, move: VirtualStick, look: VirtualStick, camera: THREE.PerspectiveCamera) {
-    // Look stick (right side / touch drag) — rate based, smoothed.
-    if (look.active) this.look(look.x * dt * 2.4, -look.y * dt * 1.9);
-
+  update(dt: number, move: VirtualStick, camera: THREE.PerspectiveCamera) {
     // Movement: stick vector rotated into the camera's yaw frame.
+    //
+    // THE SIGN THAT MATTERS. With rotation order YXZ and yaw applied about +Y,
+    // the direction the camera actually looks is
+    //     forward = (-sin(yaw), 0, -cos(yaw))
+    // and its right-hand vector is
+    //     right   = ( cos(yaw), 0, -sin(yaw)).
+    // The old code used (+sin, +cos) for forward, i.e. exactly the BACKWARD
+    // vector, which is why pushing the stick up walked the camera backwards.
     const speed = (this.sprint ? 6.2 : 3.1) * (move.active ? 1 : 0);
-    const forward = -move.y;
-    const strafe = move.x;
+    const forward = -move.y; // stick up (y = -1) → forward = +1
+    const strafe = move.x;   // stick right → strafe right
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
-    const desiredX = (forward * sin + strafe * cos) * speed;
-    const desiredZ = (forward * cos - strafe * sin) * speed;
+    const desiredX = (forward * -sin + strafe * cos) * speed;
+    const desiredZ = (forward * -cos - strafe * sin) * speed;
 
     // Acceleration smoothing — no instant start/stop, so the walk reads heavy.
     const a = damp(11, dt);
@@ -141,6 +152,7 @@ export class FirstPersonRig {
     // that makes a boundary feel like a wall rather than a bug.
     // WALK_LIMIT stays inside the far grass ring, so the learner can never
     // reach the edge of the meadow and see bare terrain.
+    // Sprinting the full radius takes over a minute — the world is big now.
     if (!insideRiver(nx, this.position.z) && Math.hypot(nx, this.position.z) < WALK_LIMIT) this.position.x = nx;
     if (!insideRiver(this.position.x, nz) && Math.hypot(this.position.x, nz) < WALK_LIMIT) this.position.z = nz;
 

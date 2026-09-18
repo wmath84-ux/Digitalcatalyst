@@ -40,30 +40,50 @@ interface TreeLayout {
   z: number;
   scale: number;
   kind: "broadleaf" | "pine" | "acacia";
+  /** Only these trees get wind-animated leaf cards. */
+  sways: boolean;
 }
 
-/** Deterministic-ish scatter that avoids the river, clearing and the board. */
+/**
+ * Scatter trees across the whole kilometre.
+ *
+ * `sways` is the important field. Animating every leaf card in a 500-tree
+ * forest is pure waste: at 200 m you cannot see a leaf move, and a forest
+ * where EVERY canopy pulses in unison looks synthetic — real woodland has
+ * still trees and moving trees side by side. So only a fraction of the trees
+ * are flagged as animated, and the flag is biased towards the ones near the
+ * clearing where the motion is actually legible.
+ */
 function treeLayout(count: number): TreeLayout[] {
   const out: TreeLayout[] = [];
   let guard = 0;
+  // Scatter out to the foot of the hills, not just around the clearing.
+  const maxRadius = 430;
   while (out.length < count && guard < count * 30) {
     guard += 1;
-    const ring = out.length / count;
-    const r = 9 + ring * 52 + Math.random() * 14;
+    // sqrt keeps the density even per unit AREA instead of bunching at the centre.
+    const r = 9 + Math.sqrt(Math.random()) * maxRadius;
     const a = Math.random() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     if (insideRiver(x, z)) continue;
     if (Math.hypot(x, z) < 8) continue;
     if (Math.abs(x) < 4 && z > -6 && z < 6) continue; // keep the board sightline clear
-    if (terrainHeight(x, z) < -0.8) continue;
-    if (out.some((t) => Math.hypot(t.x - x, t.z - z) < 4.2)) continue;
+    const h = terrainHeight(x, z);
+    if (h < -0.8) continue;
+    if (h > 34) continue; // above the tree line
+    // Spacing relaxes with distance — dense grove near you, open woodland far off.
+    const minGap = r < 60 ? 4.2 : r < 160 ? 6 : 9;
+    if (out.some((t) => Math.hypot(t.x - x, t.z - z) < minGap)) continue;
     const roll = Math.random();
     out.push({
       x,
       z,
       scale: 0.85 + Math.random() * 0.85,
       kind: roll < 0.58 ? "broadleaf" : roll < 0.84 ? "pine" : "acacia",
+      // ~55 % of close trees sway, dropping to ~8 % past 150 m. Over the whole
+      // forest that lands near "3 in 10", which is what was asked for.
+      sways: Math.random() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
     });
   }
   return out;
@@ -104,51 +124,77 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     parts.push(geo.applyMatrix4(bakeMatrix));
   };
 
-  // ── Leaf instances (whole forest, one draw call) ─────────────────────
+  // ── Leaf instances: TWO buckets, still and swaying ───────────────────
+  //
+  // The still bucket uses the stock Lambert shader — the GPU does no extra
+  // work per vertex at all. Only the swaying bucket pays for the wind, and it
+  // holds roughly three trees in ten. On top of that the wind amplitude fades
+  // to zero with distance inside the shader, so a swaying tree 200 m away
+  // costs the vertex maths but produces no visible motion and no shimmer.
   const leafGeo = new THREE.PlaneGeometry(1, 1);
-  const leafMat = new THREE.MeshLambertMaterial({
-    map: tex.leaf,
-    alphaTest: 0.45,
-    side: THREE.DoubleSide,
-    vertexColors: true,
-  });
-  leafMat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = { value: 0 };
-    shader.uniforms.uWind = { value: 1 };
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        /* glsl */ `
-        #include <common>
-        uniform float uTime;
-        uniform float uWind;
-        float dcHash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-        `,
-      )
-      .replace(
-        "#include <begin_vertex>",
-        /* glsl */ `
-        #include <begin_vertex>
-        vec3 dcOrigin = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-        float dcPhase = dcHash(dcOrigin.xz + dcOrigin.y) * 6.2831;
-        // Higher leaves sway more — the canopy edge always moves first.
-        float dcHeightGain = clamp(dcOrigin.y / 9.0, 0.15, 1.0);
-        float dcSway = sin(uTime * 1.6 + dcPhase) + sin(uTime * 3.7 + dcPhase * 1.7) * 0.4;
-        transformed.x += dcSway * 0.11 * uWind * dcHeightGain;
-        transformed.z += cos(uTime * 1.3 + dcPhase) * 0.08 * uWind * dcHeightGain;
-        transformed.y += sin(uTime * 2.4 + dcPhase) * 0.035 * uWind * dcHeightGain;
-        `,
-      );
-    leafMat.userData.shader = shader;
+
+  const makeLeafMaterial = (animated: boolean) => {
+    const mat = new THREE.MeshLambertMaterial({
+      map: tex.leaf,
+      alphaTest: 0.45,
+      side: THREE.DoubleSide,
+      vertexColors: true,
+    });
+    if (!animated) return mat;
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = { value: 0 };
+      shader.uniforms.uWind = { value: 1 };
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          /* glsl */ `
+          #include <common>
+          uniform float uTime;
+          uniform float uWind;
+          float dcHash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+          `,
+        )
+        .replace(
+          "#include <begin_vertex>",
+          /* glsl */ `
+          #include <begin_vertex>
+          vec3 dcOrigin = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+          float dcPhase = dcHash(dcOrigin.xz + dcOrigin.y) * 6.2831;
+          // Higher leaves sway more — the canopy edge always moves first.
+          float dcHeightGain = clamp(dcOrigin.y / 9.0, 0.15, 1.0);
+          // Distance fade: past ~120 m the motion is sub-pixel, so switch it
+          // off rather than paying for invisible shimmer.
+          vec4 dcView = modelViewMatrix * vec4(dcOrigin, 1.0);
+          float dcFade = 1.0 - smoothstep(60.0, 130.0, -dcView.z);
+          float dcAmp = uWind * dcHeightGain * dcFade;
+          float dcSway = sin(uTime * 1.6 + dcPhase) + sin(uTime * 3.7 + dcPhase * 1.7) * 0.4;
+          transformed.x += dcSway * 0.11 * dcAmp;
+          transformed.z += cos(uTime * 1.3 + dcPhase) * 0.08 * dcAmp;
+          transformed.y += sin(uTime * 2.4 + dcPhase) * 0.035 * dcAmp;
+          `,
+        );
+      mat.userData.shader = shader;
+    };
+    return mat;
   };
 
+  const leafMatStill = makeLeafMaterial(false);
+  const leafMatSway = makeLeafMaterial(true);
+
   const layout = treeLayout(budget.treeCount);
-  const maxLeaves = layout.length * budget.leavesPerTree + 8;
-  const leaves = new THREE.InstancedMesh(leafGeo, leafMat, maxLeaves);
-  leaves.castShadow = shadows;
-  leaves.receiveShadow = shadows;
-  leaves.frustumCulled = false; // canopy spans the whole scene
-  let leafIndex = 0;
+  const swayTrees = layout.filter((t) => t.sways).length;
+  const maxSway = swayTrees * budget.leavesPerTree + 8;
+  const maxStill = (layout.length - swayTrees) * budget.leavesPerTree + 8;
+
+  const leavesSway = new THREE.InstancedMesh(leafGeo, leafMatSway, Math.max(1, maxSway));
+  const leavesStill = new THREE.InstancedMesh(leafGeo, leafMatStill, Math.max(1, maxStill));
+  for (const m of [leavesSway, leavesStill]) {
+    m.castShadow = shadows;
+    m.receiveShadow = shadows;
+    m.frustumCulled = false; // canopy spans the whole scene
+  }
+  let swayIndex = 0;
+  let stillIndex = 0;
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
 
@@ -196,7 +242,11 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     // Canopy leaf cards.
     const canopyY = baseY + trunkH * (t.kind === "acacia" ? 1.02 : 0.94);
     const spread = (t.kind === "acacia" ? 3.4 : 2.4) * s;
-    for (let l = 0; l < budget.leavesPerTree && leafIndex < maxLeaves; l += 1) {
+    const target = t.sways ? leavesSway : leavesStill;
+    const cap = t.sways ? maxSway : maxStill;
+    for (let l = 0; l < budget.leavesPerTree; l += 1) {
+      const slot = t.sways ? swayIndex : stillIndex;
+      if (slot >= cap) break;
       const a = Math.random() * Math.PI * 2;
       const rad = Math.pow(Math.random(), 0.6) * spread;
       const yOff = (Math.random() - 0.4) * (t.kind === "acacia" ? 0.9 : 2.0) * s;
@@ -205,10 +255,11 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       const size = (1.5 + Math.random() * 1.3) * s;
       dummy.scale.set(size, size, size);
       dummy.updateMatrix();
-      leaves.setMatrixAt(leafIndex, dummy.matrix);
+      target.setMatrixAt(slot, dummy.matrix);
       color.setHSL(0.24 + Math.random() * 0.05, 0.45 + Math.random() * 0.22, 0.28 + Math.random() * 0.2);
-      leaves.setColorAt(leafIndex, color);
-      leafIndex += 1;
+      target.setColorAt(slot, color);
+      if (t.sways) swayIndex += 1;
+      else stillIndex += 1;
     }
   }
   // Flush the merged static forest: 2 draw calls for every trunk, bough and
@@ -235,10 +286,13 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     pineParts.forEach((g) => g.dispose());
   }
 
-  leaves.count = leafIndex;
-  leaves.instanceMatrix.needsUpdate = true;
-  if (leaves.instanceColor) leaves.instanceColor.needsUpdate = true;
-  group.add(leaves);
+  leavesSway.count = swayIndex;
+  leavesStill.count = stillIndex;
+  for (const m of [leavesSway, leavesStill]) {
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
+  group.add(leavesSway, leavesStill);
 
   // ── Shrubs (instanced spheres of leaf cards would be heavy — use
   //    low-poly icospheres with the bark/leaf palette instead) ──────────
@@ -248,7 +302,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   const shrubs = new THREE.InstancedMesh(shrubGeo, shrubMat, shrubCount);
   let si = 0;
   for (let i = 0; i < shrubCount * 3 && si < shrubCount; i += 1) {
-    const r = 6 + Math.sqrt(Math.random()) * 56;
+    const r = 6 + Math.sqrt(Math.random()) * 300;
     const a = Math.random() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
@@ -301,14 +355,17 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   const rocks = new THREE.InstancedMesh(rockGeo, rockMat, budget.rocks);
   let ri = 0;
   for (let i = 0; i < budget.rocks * 4 && ri < budget.rocks; i += 1) {
-    const r = 5 + Math.sqrt(Math.random()) * 60;
+    const r = 5 + Math.sqrt(Math.random()) * 420;
     const a = Math.random() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     const y = terrainHeight(x, z);
     dummy.position.set(x, y + 0.1, z);
     dummy.rotation.set(Math.random(), Math.random(), Math.random());
-    const sc = 0.4 + Math.random() * 1.6;
+    // Far boulders are scaled up: a 0.5 m pebble is invisible at 300 m, but
+    // scree and outcrops on the hill flanks are what give the distance scale.
+    const distGain = 1 + Math.min(r / 120, 4.5);
+    const sc = (0.4 + Math.random() * 1.6) * distGain;
     dummy.scale.set(sc, sc * 0.7, sc * 1.1);
     dummy.updateMatrix();
     rocks.setMatrixAt(ri, dummy.matrix);
@@ -324,7 +381,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     group,
     perches,
     update(time, wind) {
-      const shader = leafMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
+      const shader = leafMatSway.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (shader) {
         shader.uniforms.uTime.value = time;
         shader.uniforms.uWind.value = wind;

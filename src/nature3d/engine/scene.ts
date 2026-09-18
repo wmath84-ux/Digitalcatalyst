@@ -79,7 +79,6 @@ export class Sanctuary {
   private mode: CameraMode = "orbit";
 
   private moveStick: VirtualStick = { x: 0, y: 0, active: false };
-  private lookStick: VirtualStick = { x: 0, y: 0, active: false };
 
   private clock = new THREE.Clock();
   private adaptive: AdaptiveResolution;
@@ -169,16 +168,17 @@ export class Sanctuary {
       dom: opts.dom,
       enabled: () => true,
       onGrabChange: (g) => {
-        // While the board is carried the plinth would look absurd floating
-        // under nothing — fade it out instead.
-        this.board.plinth.visible = !g;
         opts.onBoardGrab?.(g);
       },
     });
 
     this.keyboard = new KeyboardInput();
 
-    this.orbit.panTo(new THREE.Vector3(0, 2.2, 0.4), 13.5, -0.35, 0.3);
+    // OPENING SHOT: a wide establishing view. You arrive high and far enough
+    // back to read the whole valley — the herds, the river, the hills on the
+    // skyline — and can then orbit in towards the board or the student. The
+    // old default sat almost on top of the board, which hid the world.
+    this.orbit.panTo(new THREE.Vector3(0, 6, -6), 86, -0.5, 0.36);
     this.fpp.reset(0, 3.4, Math.PI);
 
     this.attachPointer(opts.dom);
@@ -310,12 +310,6 @@ export class Sanctuary {
     this.moveStick.active = active;
   }
 
-  setLookStick(x: number, y: number, active: boolean) {
-    this.lookStick.x = x;
-    this.lookStick.y = y;
-    this.lookStick.active = active;
-  }
-
   private hudSprint = false;
 
   setSprint(on: boolean) {
@@ -345,9 +339,15 @@ export class Sanctuary {
     this.boardCtl.setDepth(depth * factor);
   }
 
+  /** Scale the board from the HUD (edge-drag does the same thing by gesture). */
+  scaleBoard(factor: number) {
+    const { w, h } = this.boardCtl.getScale();
+    this.boardCtl.setScale(w * factor, h * factor);
+  }
+
   resetBoard() {
     this.board.group.position.set(0, terrainHeight(0, -1.4) + BOARD_HEIGHT * 0.5 + 1.55, -1.4);
-    this.board.plinth.visible = true;
+    this.boardCtl.resetScale();
     this.boardCtl.clamp();
   }
 
@@ -368,7 +368,8 @@ export class Sanctuary {
         break;
       }
       default:
-        this.orbit.panTo(this.tmpV.set(0, 2.2, 0.4), 15, -0.35, 0.32);
+        // "Sanctuary" is the wide establishing view you land on.
+        this.orbit.panTo(this.tmpV.set(0, 6, -6), 86, -0.5, 0.36);
     }
     this.requestShadowRefresh();
   }
@@ -436,7 +437,7 @@ export class Sanctuary {
       // Sprint is the OR of the keyboard modifier and the HUD toggle, recomputed
       // every frame — never latched, or the learner could not stop running.
       this.fpp.sprint = this.keyboard.sprint || this.hudSprint;
-      this.fpp.update(dt, { x: mx, y: my, active }, this.lookStick, this.camera);
+      this.fpp.update(dt, { x: mx, y: my, active }, this.camera);
     } else {
       this.orbit.update(dt, this.camera);
     }

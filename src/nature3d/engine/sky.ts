@@ -77,60 +77,15 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   dome.renderOrder = -1000;
   group.add(dome);
 
-  // ── Mountain ring (merged, 1 draw call) ──────────────────────────────
+  // ── No mountain ring ─────────────────────────────────────────────────
+  //
+  // There used to be a ring of three-vertex triangles out at the fog line
+  // standing in for mountains. From inside the meadow they read exactly like
+  // what they were: flat cardboard pyramids. They are gone. The skyline is now
+  // REAL terrain — `distantRelief()` in terrain.ts raises eroded, snow-capped
+  // ridges out of the same height field as the ground, so the hills have
+  // proper silhouettes, catch the fog correctly, and can be walked to.
   const ringRadius = budget.farPlane * 0.3;
-  const peakCount = budget.tier === "low" ? 18 : 30;
-  const verts: number[] = [];
-  const cols: number[] = [];
-  const snow = new THREE.Color(0xf2f7ff);
-  const rockHi = new THREE.Color(0x8fa1ae);
-  const rockLo = new THREE.Color(0x3c5a44);
-  const tmp = new THREE.Color();
-
-  for (let i = 0; i < peakCount; i += 1) {
-    const a0 = (i / peakCount) * Math.PI * 2;
-    const a1 = ((i + 1) / peakCount) * Math.PI * 2;
-    const r0 = ringRadius * (0.9 + Math.random() * 0.25);
-    const r1 = ringRadius * (0.9 + Math.random() * 0.25);
-    const h = ringRadius * (0.16 + Math.random() * 0.2);
-    const mid = (a0 + a1) / 2;
-    const rm = (r0 + r1) / 2 * (0.94 + Math.random() * 0.12);
-
-    const p0 = [Math.cos(a0) * r0, -4, Math.sin(a0) * r0];
-    const p1 = [Math.cos(a1) * r1, -4, Math.sin(a1) * r1];
-    const peak = [Math.cos(mid) * rm, h, Math.sin(mid) * rm];
-    verts.push(...p0, ...p1, ...peak);
-
-    tmp.copy(rockLo);
-    cols.push(tmp.r, tmp.g, tmp.b, tmp.r, tmp.g, tmp.b);
-    tmp.copy(h > ringRadius * 0.27 ? snow : rockHi);
-    cols.push(tmp.r, tmp.g, tmp.b);
-
-    // A second, taller ridge behind for depth.
-    if (i % 2 === 0) {
-      const back = ringRadius * 1.28;
-      const hb = ringRadius * (0.22 + Math.random() * 0.24);
-      verts.push(
-        Math.cos(a0) * back, -4, Math.sin(a0) * back,
-        Math.cos(a1) * back, -4, Math.sin(a1) * back,
-        Math.cos(mid) * back, hb, Math.sin(mid) * back,
-      );
-      tmp.set(0x6d8698);
-      cols.push(tmp.r, tmp.g, tmp.b, tmp.r, tmp.g, tmp.b);
-      tmp.copy(snow);
-      cols.push(tmp.r, tmp.g, tmp.b);
-    }
-  }
-  const ridgeGeo = new THREE.BufferGeometry();
-  ridgeGeo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  ridgeGeo.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
-  ridgeGeo.computeVertexNormals();
-  const ridge = new THREE.Mesh(
-    ridgeGeo,
-    new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true }),
-  );
-  ridge.renderOrder = -900;
-  group.add(ridge);
 
   // ── Clouds ───────────────────────────────────────────────────────────
   const cloudMat = new THREE.MeshBasicMaterial({
