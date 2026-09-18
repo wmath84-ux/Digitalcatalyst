@@ -326,13 +326,13 @@ export class Sanctuary {
       this.avatar.setSeated(false);
       this.trek.reset(this.student.eyePosition.x, this.student.eyePosition.z + 1.4);
       this.avatar.group.position.copy(this.trek.position);
-      this.camera.fov = 60;
+      this.applyFov();
     } else {
       // Hand the world back: the character returns to the chair and sits.
       this.student.setVisible(true);
       this.avatar.setSeated(true, this.tmpV.set(0, terrainHeight(0, 2.6), 2.6).clone());
       this.camera.rotation.set(0, 0, 0);
-      this.camera.fov = 52;
+      this.applyFov();
       this.orbit.panTo(this.tmpV.copy(this.board.group.position).setY(2.2), 13.5);
     }
     this.camera.updateProjectionMatrix();
@@ -424,10 +424,48 @@ export class Sanctuary {
 
   resize(width: number, height: number) {
     if (width === 0 || height === 0) return;
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+    this.camera.aspect = aspect;
+
+    // KEEP THE WORLD IN FRAME ON NARROW SCREENS.
+    //
+    // A PerspectiveCamera's fov is VERTICAL, so the horizontal field shrinks
+    // as the window narrows. At 16:9 the establishing shot holds all three
+    // districts; at 0.86:1 the horizontal half-angle covers only 627 m and
+    // the districts 700 m out fall off both edges — which is why shrinking
+    // the window made everything disappear.
+    //
+    // The fix is the standard "horizontal-locked" projection: below a
+    // reference aspect, widen the vertical fov so the HORIZONTAL extent stays
+    // constant. The framing then depends on the scene, not on the window.
+    this.applyFov();
+
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.requestShadowRefresh();
+  }
+
+  /** The fov the current mode wants before the aspect correction. */
+  private get baseFovForMode() {
+    return this.mode === "fpp" ? 60 : 52;
+  }
+
+  /**
+   * Apply the mode's fov with the narrow-screen correction folded in, and
+   * push it to the projection. Called on resize AND on every mode change, so
+   * switching modes can never silently undo the correction.
+   */
+  private applyFov() {
+    const REFERENCE_ASPECT = 16 / 9;
+    const base = this.baseFovForMode;
+    let fov = base;
+    if (this.camera.aspect < REFERENCE_ASPECT) {
+      const halfH = (Math.tan((base * Math.PI) / 360) * REFERENCE_ASPECT) / this.camera.aspect;
+      fov = (Math.atan(halfH) * 360) / Math.PI;
+    }
+    // Never let the correction run away on an extremely tall viewport.
+    this.camera.fov = Math.min(fov, 100);
+    this.camera.updateProjectionMatrix();
   }
 
   /** Shadows are static: re-render the map only when the world changes. */

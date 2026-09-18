@@ -39,10 +39,22 @@ export const WORLD_HALF = WORLD_SIZE / 2;
  * rim. Because the mesh samples this function everywhere, the hills are real
  * geometry you can actually walk towards — not billboards at the edge.
  */
+/**
+ * How far out the sanctuary's own ring of hills sits.
+ *
+ * THIS MUST NOT BE KEYED TO WORLD_HALF. It used to be, and when the world
+ * grew from 1000 m to hold three districts, the ramp stretched with it: the
+ * hills that used to top out at the meadow rim were pushed to a tenth of
+ * their height there and the meadow read as flat ground. The ring belongs to
+ * the SANCTUARY, so it is pinned to the sanctuary's own radius.
+ */
+const SANCTUARY_HILL_RIM = 460;
+
 function distantRelief(x: number, z: number): number {
   const d = Math.hypot(x, z);
-  // Nothing until well past the meadow, then a long smooth ramp.
-  const rise = smoothstep(150, WORLD_HALF * 0.92, d);
+  // Nothing until well past the clearing, then a long smooth ramp that is
+  // fully up by the meadow rim — exactly as it was before the world grew.
+  const rise = smoothstep(150, SANCTUARY_HILL_RIM, d);
   if (rise <= 0) return 0;
 
   // The ring of hills that used to close off the meadow would now cut the
@@ -60,7 +72,9 @@ function distantRelief(x: number, z: number): number {
     if (onCorridor) corridor = Math.min(corridor, smoothstep(90, 260, off));
   }
   if (corridor <= 0) return 0;
-  return distantReliefRaw(x, z, rise) * corridor;
+  // Past the rim the ring stays at full height rather than fading, so the
+  // meadow really is ringed by mountains on every side that is not a pass.
+  return distantReliefRaw(x, z, Math.min(rise, 1)) * corridor;
 }
 
 function distantReliefRaw(x: number, z: number, rise: number): number {
@@ -205,10 +219,21 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
 
   const density = budget.tier === "low" ? 0.62 : budget.tier === "medium" ? 0.82 : 1;
 
+  // Four shells, not three.
+  //
+  // With three, the outer shell had to cover the whole 2760 m world on 132
+  // segments — one vertex every 21 m. Mountains sampled that coarsely lose
+  // their crests and the far districts flatten into smooth swells. A fourth
+  // shell splits that span, so the sanctuary's ring of hills and the
+  // neighbouring districts are both carried at roughly 7 m, which is what
+  // the old single-kilometre world used.
   const shells: Array<{ half: number; segs: number; shadow: boolean }> = [
     { half: 90, segs: Math.round(150 * density), shadow: true },
     { half: 260, segs: Math.round(120 * density), shadow: false },
-    { half: WORLD_HALF, segs: Math.round(132 * density), shadow: false },
+    // Covers the sanctuary's hill ring and both mountain passes.
+    { half: 620, segs: Math.round(190 * density), shadow: false },
+    // Covers the trek and safari districts out to the world edge.
+    { half: WORLD_HALF, segs: Math.round(300 * density), shadow: false },
   ];
 
   const mat = new THREE.MeshStandardMaterial({

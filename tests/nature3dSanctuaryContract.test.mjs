@@ -819,3 +819,97 @@ test("the character sits on the chair and stands up to walk", () => {
   assert.match(SCENE, /this\.trek\.update\(dt, \{ x: mx, y: my, active \}, this\.camera, WORLD_REACH\)/);
   assert.match(SCENE, /this\.trek\.look\(dx \* 0\.9, dy \* 0\.9\)/);
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Group 12 — regressions from growing the world to three districts. Each of
+// these was a real bug the learner hit, so each gets a guard.
+// ───────────────────────────────────────────────────────────────────────────
+
+test("the sanctuary's hill ring is not keyed to the world size", () => {
+  // THE FLAT-GROUND BUG. The ring's ramp used to end at WORLD_HALF * 0.92.
+  // When the world grew from 1000 m to hold three districts, that ramp
+  // stretched with it and the hills collapsed to a tenth of their height at
+  // the meadow rim — the meadow read as flat ground.
+  assert.match(TERRAIN, /const SANCTUARY_HILL_RIM = \d+/, "the ring needs its own fixed radius");
+  assert.ok(
+    !/smoothstep\(150, WORLD_HALF \* 0\.92, d\)/.test(TERRAIN),
+    "the hill ramp must not be derived from WORLD_HALF",
+  );
+  assert.match(TERRAIN, /smoothstep\(150, SANCTUARY_HILL_RIM, d\)/);
+  const rim = Number(/const SANCTUARY_HILL_RIM = (\d+)/.exec(TERRAIN)[1]);
+  assert.ok(rim >= 400 && rim <= 700, `hill rim ${rim} should sit around the old meadow edge`);
+});
+
+test("the terrain mesh is fine enough to show mountains at world scale", () => {
+  // A 2760 m world on the old three shells meant one vertex every 21 m, which
+  // smooths crests away. A fourth shell keeps the spacing usable.
+  const shells = TERRAIN.slice(TERRAIN.indexOf("const shells"), TERRAIN.indexOf("const mat ="));
+  const halves = [...shells.matchAll(/half: (\d+|WORLD_HALF)/g)].map((m) => m[1]);
+  assert.ok(halves.length >= 4, `expected at least 4 LOD shells, found ${halves.length}`);
+  const segs = [...shells.matchAll(/segs: Math\.round\((\d+) \* density\)/g)].map((m) => Number(m[1]));
+  const reach = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  const worldHalf = reach + 200;
+  // Worst-case spacing on the outermost shell, at the lowest density (0.62).
+  const outerSpacing = (worldHalf * 2) / Math.round(segs[segs.length - 1] * 0.62);
+  assert.ok(outerSpacing < 16, `outer shell samples every ${outerSpacing.toFixed(1)} m — mountains will flatten`);
+});
+
+test("the highlands use real simplex noise, not a sin/cos approximation", () => {
+  const regions = read("src/nature3d/engine/regions.ts");
+  const simplex = read("src/nature3d/engine/simplex.ts");
+  // A separable sin/cos field repeats on an axis-aligned lattice and cannot
+  // look eroded no matter how many octaves are stacked on it.
+  assert.match(regions, /import \{ noise \} from "\.\/simplex"/);
+  assert.match(regions, /noise\.noise2D\(lx \* frequency \+ ox, lz \* frequency \+ oz\)/);
+  assert.ok(
+    !/Math\.sin\(lx \* frequency/.test(regions),
+    "the trek octaves must not be built from sin/cos",
+  );
+  // The generator really is simplex: skew factors and the 12-gradient table.
+  assert.match(simplex, /F2 = 0\.5 \* \(Math\.sqrt\(3\) - 1\)/);
+  assert.match(simplex, /G2 = \(3 - Math\.sqrt\(3\)\) \/ 6/);
+  assert.match(simplex, /GRAD3/);
+  // Deterministic: the world must be identical on every machine and reload.
+  // Strip comments first: the file's own docstring mentions Math.random().
+  const simplexCode = simplex.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/Math\.random\(\)/.test(simplexCode), "the noise seed must not be random");
+
+  // TerrainTrek's published fractal settings.
+  assert.match(regions, /LACUNARITY = 2\.05/);
+  assert.match(regions, /PERSISTENCE = 0\.45/);
+  assert.match(regions, /POWER = 2/);
+  assert.match(regions, /BASE_FREQUENCY = 0\.003/);
+  assert.match(regions, /ELEVATION_OFFSET = 1/);
+});
+
+test("shrinking the window never pushes the world off screen", () => {
+  // THE DISAPPEARING-WORLD BUG. fov is VERTICAL, so a narrow window loses
+  // horizontal extent and the districts fell off both edges.
+  assert.match(SCENE, /private applyFov\(\)/);
+  assert.match(SCENE, /const REFERENCE_ASPECT = 16 \/ 9/);
+  assert.match(SCENE, /if \(this\.camera\.aspect < REFERENCE_ASPECT\)/);
+  // resize() and setMode() must BOTH go through it, or a mode switch would
+  // silently restore the uncorrected fov.
+  assert.match(SCENE, /this\.applyFov\(\);\s*\n\s*this\.camera\.updateProjectionMatrix\(\);/);
+  const modeFovs = SCENE.match(/this\.camera\.fov = \d+;/g) || [];
+  assert.equal(modeFovs.length, 0, `setMode must not hard-set fov (found ${modeFovs.join(", ")})`);
+  assert.match(SCENE, /Math\.min\(fov, 100\)/, "the correction needs an upper bound");
+
+  // Prove the framing actually holds: at every aspect the horizontal
+  // half-extent at the establishing distance must still cover the districts.
+  const dist = Number(/panTo\(new THREE\.Vector3\(0, 30, 0\), (\d+), /.exec(SCENE)[1]);
+  const spread = Number(/centerX: (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  for (const aspect of [16 / 9, 4 / 3, 1, 0.86, 0.6]) {
+    const base = 52;
+    let fov = base;
+    if (aspect < 16 / 9) {
+      fov = (Math.atan((Math.tan((base * Math.PI) / 360) * (16 / 9)) / aspect) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const halfWidth = Math.tan(Math.atan(Math.tan((fov * Math.PI) / 360) * aspect)) * dist;
+    assert.ok(
+      halfWidth > spread,
+      `at aspect ${aspect.toFixed(2)} only ${halfWidth.toFixed(0)} m is visible, districts are ${spread} m out`,
+    );
+  }
+});

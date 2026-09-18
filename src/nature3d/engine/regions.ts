@@ -20,6 +20,8 @@
 // entire world — which is what keeps grass, trees, animals, the student's
 // feet and the board clamp all agreeing about where the ground is.
 
+import { noise } from "./simplex";
+
 /** Centre of each district in world space, and how far its core reaches. */
 export interface Region {
   id: "sanctuary" | "safari" | "trek";
@@ -57,7 +59,11 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  */
 export function regionWeight(r: Region, x: number, z: number): number {
   const d = Math.hypot(x - r.centerX, z - r.centerZ);
-  return 1 - smoothstep(r.radius * 0.55, r.radius * 1.25, d);
+  // A LONG blend. The trek district carries 100 m of relief, so if it faded
+  // in over a short distance its rim would be a cliff where the mountains
+  // meet the plain. Fading from 35% to 190% of the radius turns that into a
+  // foothill approach you can walk up.
+  return 1 - smoothstep(r.radius * 0.35, r.radius * 1.9, d);
 }
 
 /**
@@ -109,23 +115,32 @@ export function trekRelief(x: number, z: number): number {
   const lx = x - TREK.centerX;
   const lz = z - TREK.centerZ;
 
-  const LACUNARITY = 2.05;
-  const PERSISTENCE = 0.45;
-  const POWER = 2;
-  const BASE_FREQUENCY = 0.0075;
-  const AMPLITUDE = 62;
-  const ITERATIONS = 5;
+  // TerrainTrek's published terrain settings, from
+  // sources/Game/State/Terrains.js, carried over unchanged:
+  const LACUNARITY = 2.05;   // frequency multiplier per octave
+  const PERSISTENCE = 0.45;  // amplitude multiplier per octave
+  const POWER = 2;           // sharpens peaks, broadens valleys
+  const BASE_FREQUENCY = 0.003;
+  const ELEVATION_OFFSET = 1;
+  const ITERATIONS = 6;
 
-  // Fixed per-octave offsets. The source picks these from a seeded RNG; here
-  // they are constants so the world is identical on every machine and every
-  // reload — the herds, trees and the saved board placement all depend on the
-  // ground being reproducible.
+  // The one value that is NOT the source's: it publishes baseAmplitude 180
+  // for an infinite world with nothing man-made in it. Beside a 2.7 m study
+  // board that is a 180 m wall, so the range is scaled to something a learner
+  // can actually walk up while still reading as real mountains from the
+  // meadow 700 m away.
+  const AMPLITUDE = 110;
+
+  // The source seeds its per-octave offsets from a seeded RNG. Fixed values
+  // here keep the world byte-identical across machines and reloads, which the
+  // herds, the trees and the saved board placement all depend on.
   const OFFSETS: readonly [number, number][] = [
     [0, 0],
     [131.7, -88.3],
     [-274.1, 412.9],
     [615.4, 302.6],
     [-98.2, -531.8],
+    [347.6, 159.4],
   ];
 
   let elevation = 0;
@@ -135,13 +150,11 @@ export function trekRelief(x: number, z: number): number {
 
   for (let i = 0; i < ITERATIONS; i += 1) {
     const [ox, oz] = OFFSETS[i];
-    // Smooth value noise standing in for simplex: the visual signature of
-    // this terrain comes from the octave stack and the power curve, not from
-    // the particular gradient basis, and this keeps the height field a pure
-    // analytic function that every other system can sample cheaply.
-    const n =
-      Math.sin(lx * frequency + ox) * Math.cos(lz * frequency + oz) * 0.6 +
-      Math.sin((lx + lz) * frequency * 1.37 + ox * 0.5) * 0.4;
+    // REAL simplex noise, the same basis the source uses. A sum of sin/cos
+    // terms was tried here first and is wrong: it is separable, so its ridges
+    // align to the axes and repeat on a visible lattice instead of looking
+    // eroded.
+    const n = noise.noise2D(lx * frequency + ox, lz * frequency + oz);
     elevation += n * amplitude;
     normalisation += amplitude;
     amplitude *= PERSISTENCE;
@@ -149,14 +162,19 @@ export function trekRelief(x: number, z: number): number {
   }
 
   elevation /= normalisation;
-  // The power curve is applied to the magnitude and the sign restored, so
-  // valleys broaden and ridges sharpen without flipping any terrain over.
+  // Power curve on the magnitude with the sign restored, exactly as the
+  // source does it, so valleys broaden and ridges sharpen.
   elevation = Math.pow(Math.abs(elevation), POWER) * Math.sign(elevation);
   elevation *= AMPLITUDE;
+  elevation += ELEVATION_OFFSET;
 
-  // Lift the whole district so its valley floors sit above the meadow rather
-  // than below it: you climb INTO the highlands.
-  return elevation + 6;
+  // The source's terrain is infinite and has no sea level, so its noise is
+  // free to go as far down as it goes up. Here the district has to MEET the
+  // connecting plain at its rim, so the basins are lifted: the highlands rise
+  // out of the meadow rather than sinking a 50 m pit beside it.
+  if (elevation < 0) elevation *= 0.28;
+
+  return elevation;
 }
 
 /** Local safari coordinates -> world coordinates. */
