@@ -321,3 +321,46 @@ test("the study clearing is flat and the river bed is carved", () => {
   assert.match(TERRAIN, /RIVER_CENTER_X/);
   assert.match(TERRAIN, /flatten/);
 });
+
+// ── 9. The lockfile CI actually installs from ─────────────────────────
+//
+// The repo declares `packageManager: pnpm@…`, and Vercel/CI run
+// `pnpm install` — which defaults to `--frozen-lockfile`. Adding a dependency
+// with npm updates package-lock.json but leaves pnpm-lock.yaml untouched, and
+// the build then dies with ERR_PNPM_OUTDATED_LOCKFILE before a single line of
+// app code runs. It is invisible locally and fatal in CI, so it gets a test.
+
+test("every runtime dependency is present in the pnpm lockfile", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const lock = read("pnpm-lock.yaml");
+
+  assert.match(
+    pkg.packageManager ?? "",
+    /^pnpm@/,
+    "this repo installs with pnpm — keep pnpm-lock.yaml authoritative",
+  );
+
+  for (const [name, range] of Object.entries({
+    ...pkg.dependencies,
+    ...pkg.devDependencies,
+  })) {
+    // Scoped names are YAML-quoted in the importers block ('@scope/pkg':),
+    // plain ones are not — accept either form.
+    assert.ok(
+      lock.includes(`\n      ${name}:\n`) || lock.includes(`\n      '${name}':\n`),
+      `${name} is missing from pnpm-lock.yaml — run \`pnpm install --lockfile-only\``,
+    );
+    assert.ok(
+      lock.includes(`specifier: ${range}`),
+      `pnpm-lock.yaml has no "specifier: ${range}" entry for ${name} — the lockfile is stale`,
+    );
+  }
+});
+
+test("three and its types are locked for CI", () => {
+  const lock = read("pnpm-lock.yaml");
+  // The exact failure that broke the first deploy of this feature.
+  assert.match(lock, /\n {6}three:\n/, "three is not an importer dependency in pnpm-lock.yaml");
+  assert.match(lock, /\n {6}'@types\/three':\n/, "@types/three is not in pnpm-lock.yaml");
+  assert.match(lock, /\n {2}three@[\d.]+:/, "three has no resolved package entry");
+});
