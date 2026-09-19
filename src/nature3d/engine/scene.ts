@@ -456,12 +456,17 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
+    // The 90-degree neck belongs to the seated student and nothing else. Every
+    // preset revokes it up front; the student case below grants it again. Doing
+    // it here rather than per-case means a preset added later cannot forget to.
+    this.orbit.setLookUpAllowed(preset === "student");
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
         break;
       case "student":
-        // Sitting at the desk: all three boards in frame, none cut off.
+        // Sitting at the desk: all three boards in frame, none cut off — and
+        // the only view from which you can tip your head back to the sky.
         this.focusStudentDesk();
         break;
       case "waterfall":

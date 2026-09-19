@@ -101,19 +101,40 @@ export class OrbitRig {
   lookUp = 0;
   private targetLookUp = 0;
 
+  /**
+   * Whether the neck is available at all. OFF by default.
+   *
+   * Looking straight up is a SEATED-STUDENT gesture: at the desk, tipping
+   * your head back to see the sky is natural and is what was asked for. On
+   * every other camera it is wrong — an establishing shot of the valley, or a
+   * board framed square-on, should not be able to swing round and stare at
+   * the sky, because there is no way to tell from the picture that it has
+   * happened and no obvious gesture to undo it. So the degree of freedom is
+   * opt-in per view: `focus()` clears it and only the student preset sets it.
+   *
+   * Turning it off also unwinds any tilt already applied, so switching away
+   * from the desk mid-stare returns to a level view instead of stranding it.
+   */
+  private lookUpAllowed = false;
+
+  setLookUpAllowed(allowed: boolean) {
+    this.lookUpAllowed = allowed;
+    if (!allowed) this.targetLookUp = 0;
+  }
+
   rotate(dx: number, dy: number) {
     this.targetYaw -= dx;
     const LOW = 0.03;
     const ceiling = LOOK_UP_MAX + this.targetPitch;
     const next = this.targetPitch + dy;
-    if (next < LOW && this.targetLookUp < ceiling) {
+    if (this.lookUpAllowed && next < LOW && this.targetLookUp < ceiling) {
       // The orbit is already as low as it goes: spend the rest of the drag on
       // tilting the view up instead of stalling against the clamp.
       this.targetLookUp = THREE.MathUtils.clamp(this.targetLookUp + (LOW - next), 0, LOOK_UP_MAX + LOW);
       this.targetPitch = LOW;
       return;
     }
-    if (this.targetLookUp > 0 && dy > 0) {
+    if (this.lookUpAllowed && this.targetLookUp > 0 && dy > 0) {
       // Dragging back the other way unwinds the neck first, so the gesture is
       // symmetric and you always end up back where you started.
       const spend = Math.min(this.targetLookUp, dy);

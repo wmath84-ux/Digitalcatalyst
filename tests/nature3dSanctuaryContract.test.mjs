@@ -1147,7 +1147,12 @@ test("the DOM boards are culled the way BGMI culls the world", () => {
   assert.match(SCENE, /study \? 1 \/ 12 : 1 \/ 30/);
   assert.match(SCENE, /study \? 1 \/ 8 : 1 \/ 20/);
   // Leaving a board view must restore the full world.
-  assert.match(SCENE, /this\.studyFocus = false;[\s\S]{0,120}switch \(preset\)/);
+  // Leaving a single-board view restores the full world. Asserted on the
+  // slice of focus() itself rather than a brittle character window, so
+  // unrelated lines added to the preamble cannot break it.
+  const focusBody = SCENE.slice(SCENE.indexOf("focus(preset: ViewPreset) {"));
+  const preamble = focusBody.slice(0, focusBody.indexOf("switch (preset)"));
+  assert.match(preamble, /this\.studyFocus = false;/);
 });
 
 test("the student can look a full 90 degrees straight up", () => {
@@ -1402,6 +1407,27 @@ test("animals standing on the ground are gone, birds are not", () => {
   }
 });
 
+test("the 90-degree neck belongs to the student view alone", () => {
+  // Looking straight up is a seated gesture. On an establishing shot or a
+  // board framed square-on it is wrong: nothing in the picture explains why
+  // the view is pointing at the sky, and there is no obvious way back. So the
+  // freedom is opt-in per view.
+  assert.match(CONTROLS, /private lookUpAllowed = false;/, "the neck must be off by default");
+  assert.match(CONTROLS, /setLookUpAllowed\(allowed: boolean\)/);
+  // Revoking must also unwind any tilt already applied, or switching away
+  // mid-stare would strand the camera looking at the sky.
+  assert.match(CONTROLS, /if \(!allowed\) this\.targetLookUp = 0;/);
+  // Both arms of the gesture are gated.
+  assert.match(CONTROLS, /if \(this\.lookUpAllowed && next < LOW/);
+  assert.match(CONTROLS, /if \(this\.lookUpAllowed && this\.targetLookUp > 0 && dy > 0\)/);
+
+  // focus() revokes for EVERY preset and grants for exactly one, so a preset
+  // added later cannot forget to opt out.
+  assert.match(SCENE, /this\.orbit\.setLookUpAllowed\(preset === "student"\);/);
+  const grants = [...SCENE.matchAll(/setLookUpAllowed\(/g)];
+  assert.equal(grants.length, 1, "there must be exactly one place that decides this");
+});
+
 test("any camera can be rotated, and the seated student can look straight up", () => {
   // An orbit camera looks AT its target, so its view can never point above
   // the horizon however far the pitch is pushed — that is why the sky was
@@ -1412,7 +1438,8 @@ test("any camera can be rotated, and the seated student can look straight up", (
   assert.match(CONTROLS, /const LOOK_UP_MAX = Math\.PI \/ 2;/);
 
   // The ceiling carries the orbit's own downward tilt, or a flat PI/2 tops
-  // out at 88.3 degrees instead of a full 90.
+  // out at 88.3 degrees instead of a full 90. (Gated to the student view —
+  // see the test above.)
   assert.match(CONTROLS, /const ceiling = LOOK_UP_MAX \+ this\.targetPitch;/);
 
   // The pole must not degenerate: an explicit perpendicular up vector is
