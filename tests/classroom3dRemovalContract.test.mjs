@@ -118,17 +118,39 @@ test("no source file references the classroom, its CSS or its hooks", () => {
   }
 });
 
-test("the 3D vendor stack is out of the manifest and out of the source", () => {
+// `three` itself came back on 2026-09-18 for the 3D Study Sanctuary
+// (src/nature3d/**, reachable from the desktop rail at #/nature-studio). That
+// is a NEW feature with its own contract in tests/nature3dSanctuaryContract.test.mjs
+// — it is not the course-player classroom, and nothing in the player imports it.
+//
+// So this test no longer bans the renderer outright. What it still guarantees is
+// the part that actually matters for the removal:
+//   • the React wrappers the classroom used (@react-three/fiber + drei) stay out;
+//   • `three` is imported ONLY from the sanctuary, never from the course player
+//     or anywhere else that could grow a second room.
+const THREE_ALLOWED_PREFIX = "src/nature3d/";
+
+test("the classroom's React-3D wrappers stay out of the manifest", () => {
   const pkg = JSON.parse(read("package.json"));
-  for (const dependency of ["three", "@react-three/fiber", "@react-three/drei", "@types/three"]) {
+  for (const dependency of ["@react-three/fiber", "@react-three/drei"]) {
     assert.equal(pkg.dependencies[dependency], undefined, dependency);
     assert.equal(pkg.devDependencies[dependency], undefined, dependency);
   }
+  assert.doesNotMatch(read("package-lock.json"), /@react-three\/fiber|@react-three\/drei/);
   for (const file of SOURCE_FILES()) {
-    assert.doesNotMatch(codeOnly(read(file)), /from ["']three["']|@react-three|@types\/three/, file);
+    assert.doesNotMatch(codeOnly(read(file)), /@react-three/, file);
   }
-  // Both lockfiles must agree with the manifest, or `npm ci` (CI) fails.
-  assert.doesNotMatch(read("package-lock.json"), /"node_modules\/three"|@react-three\/fiber/);
+});
+
+test("only the 3D Sanctuary may import three — never the course player", () => {
+  for (const file of SOURCE_FILES()) {
+    if (file.startsWith(THREE_ALLOWED_PREFIX)) continue;
+    assert.doesNotMatch(
+      codeOnly(read(file)),
+      /from ["']three["']|from ["']three\//,
+      `${file} must not import three — the renderer belongs to ${THREE_ALLOWED_PREFIX}`,
+    );
+  }
 });
 
 /* ── 3. The player: one shell, no room switch ───────────────────────────── */

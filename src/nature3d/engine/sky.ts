@@ -1,0 +1,301 @@
+// src/nature3d/engine/sky.ts
+//
+// Sky dome, the 360° mountain ring, clouds, sun shafts and the drifting
+// leaf/pollen motes — everything that lives above the horizon line.
+//
+// The dome is a single BackSide sphere with a shader gradient (no texture
+// upload, no banding), and the mountains are ONE merged geometry so the whole
+// panorama costs a single draw call.
+
+import * as THREE from "three";
+import type { QualityBudget } from "./quality";
+import type { DaylightState } from "./daylight";
+import type { TextureSet } from "./textures";
+
+export interface SkySystem {
+  group: THREE.Group;
+  sun: THREE.DirectionalLight;
+  hemi: THREE.HemisphereLight;
+  /** Current sun direction, shared (not copied) with everything that reads it. */
+  sunDir: THREE.Vector3;
+  /** Re-light the whole sky for a moment of the day. */
+  applyDaylight(state: DaylightState): void;
+  update(dt: number, time: number, wind: number): void;
+  dispose(): void;
+}
+
+const SKY_VERT = /* glsl */ `
+varying vec3 vWorld;
+void main() {
+  vWorld = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const SKY_FRAG = /* glsl */ `
+varying vec3 vWorld;
+uniform vec3 uZenith;
+uniform vec3 uHorizon;
+uniform vec3 uGround;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+
+// Physically-motivated sky, after Preetham/Bruneton but reduced to the two
+// terms that actually matter for a morning scene (the full precomputed model
+// needs lookup tables we cannot afford here):
+//
+//   RAYLEIGH  — 1/lambda^4 scattering by air molecules. Blue is scattered
+//               ~5.5x more than red, which is why the zenith is blue and why
+//               the horizon, seen through far more atmosphere, goes pale.
+//   MIE       — forward scattering by aerosols, using the Henyey-Greenstein
+//               phase function with g = 0.76. This is the warm halo that
+//               hugs the sun and the haze that sits on the horizon.
+//
+// Everything is analytic: no textures, no lookup tables, ~30 ALU.
+const vec3 RAYLEIGH_BETA = vec3(5.8e-3, 1.35e-2, 3.31e-2);
+
+float henyeyGreenstein(float cosTheta, float g) {
+  float g2 = g * g;
+  return (1.0 - g2) / (4.0 * 3.14159265 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+}
+
+void main() {
+  vec3 dir = normalize(vWorld);
+  float h = dir.y;
+  float cosTheta = dot(dir, normalize(uSunDir));
+
+  // Optical depth: looking at the horizon travels through far more air than
+  // looking up. The +0.15 keeps it finite below the horizon.
+  float zenithAngle = max(h, 0.0);
+  float optical = 1.0 / (zenithAngle + 0.15);
+
+  // Rayleigh: the phase function is (1 + cos^2) * 3/16pi.
+  float rayleighPhase = 0.0596831 * (1.0 + cosTheta * cosTheta);
+  vec3 rayleigh = RAYLEIGH_BETA * optical * rayleighPhase * 62.0;
+
+  // Mie: strong forward lobe, the sun's warm halo.
+  float miePhase = henyeyGreenstein(cosTheta, 0.76);
+  vec3 mie = vec3(0.0035) * optical * miePhase * 34.0;
+
+  vec3 sky = rayleigh + mie;
+
+  // Keep the art-directed palette in charge of the overall mood — the
+  // scattering above supplies the STRUCTURE (gradient, halo, horizon haze),
+  // these uniforms supply the colour grade the rest of the scene is lit to.
+  vec3 graded = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55));
+  sky = mix(graded, sky * uSunColor, 0.42);
+
+  // Ground haze below the horizon line.
+  sky = mix(uGround, sky, smoothstep(-0.12, 0.05, h));
+
+  // Sun disc with a soft limb, plus the broad glow.
+  float d = max(cosTheta, 0.0);
+  sky += uSunColor * pow(d, 900.0) * 3.2;
+  sky += uSunColor * pow(d, 14.0) * 0.30;
+  sky += uSunColor * pow(d, 3.0) * 0.07;
+
+  gl_FragColor = vec4(sky, 1.0);
+  #include <colorspace_fragment>
+}
+`;
+
+export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
+  const group = new THREE.Group();
+  group.name = "sky";
+
+  const sunDir = new THREE.Vector3(0.62, 0.34, -0.7).normalize();
+
+  // ── Dome ─────────────────────────────────────────────────────────────
+  const domeMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      uZenith: { value: new THREE.Color(0x2a6ec4) },
+      uHorizon: { value: new THREE.Color(0xbfe0f5) },
+      uGround: { value: new THREE.Color(0xd9c9a8) },
+      uSunDir: { value: sunDir.clone() },
+      uSunColor: { value: new THREE.Color(0xfff0cf) },
+    },
+    vertexShader: SKY_VERT,
+    fragmentShader: SKY_FRAG,
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(budget.farPlane * 0.46, 32, 20), domeMat);
+  dome.renderOrder = -1000;
+  group.add(dome);
+
+  // ── No mountain ring ─────────────────────────────────────────────────
+  //
+  // There used to be a ring of three-vertex triangles out at the fog line
+  // standing in for mountains. From inside the meadow they read exactly like
+  // what they were: flat cardboard pyramids. They are gone. The skyline is now
+  // REAL terrain — `distantRelief()` in terrain.ts raises eroded, snow-capped
+  // ridges out of the same height field as the ground, so the hills have
+  // proper silhouettes, catch the fog correctly, and can be walked to.
+  const ringRadius = budget.farPlane * 0.3;
+
+  // ── Clouds ───────────────────────────────────────────────────────────
+  const cloudMat = new THREE.MeshBasicMaterial({
+    map: tex.cloud,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    fog: false,
+  });
+  const cloudGeo = new THREE.PlaneGeometry(1, 1);
+  const cloudCount = budget.tier === "low" ? 14 : 30;
+  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, cloudCount);
+  const dummy = new THREE.Object3D();
+  const cloudSeeds: Array<{ a: number; r: number; y: number; s: number; drift: number }> = [];
+  for (let i = 0; i < cloudCount; i += 1) {
+    cloudSeeds.push({
+      a: Math.random() * Math.PI * 2,
+      r: ringRadius * (0.55 + Math.random() * 0.8),
+      y: ringRadius * (0.18 + Math.random() * 0.3),
+      s: ringRadius * (0.1 + Math.random() * 0.18),
+      drift: 0.004 + Math.random() * 0.008,
+    });
+  }
+  clouds.renderOrder = -850;
+  group.add(clouds);
+
+  // ── Volumetric sun shafts ────────────────────────────────────────────
+  let shafts: THREE.Group | null = null;
+  if (budget.sunShafts) {
+    shafts = new THREE.Group();
+    const shaftMat = new THREE.MeshBasicMaterial({
+      color: 0xfff6dd,
+      transparent: true,
+      opacity: 0.055,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    const shaftGeo = new THREE.CylinderGeometry(1.4, 7.5, 60, 10, 1, true);
+    for (let i = 0; i < 5; i += 1) {
+      const m = new THREE.Mesh(shaftGeo, shaftMat);
+      m.position.set(16 + i * 5, 22, -16 + i * 4);
+      m.rotation.set(0.6, 0, -0.46);
+      shafts.add(m);
+    }
+    group.add(shafts);
+  }
+
+  // ── Drifting leaves / pollen motes ───────────────────────────────────
+  const moteCount = budget.driftingLeaves;
+  const moteGeo = new THREE.BufferGeometry();
+  const motePos = new Float32Array(moteCount * 3);
+  for (let i = 0; i < moteCount; i += 1) {
+    motePos[i * 3] = (Math.random() - 0.5) * 60;
+    motePos[i * 3 + 1] = 0.6 + Math.random() * 6;
+    motePos[i * 3 + 2] = (Math.random() - 0.5) * 60;
+  }
+  moteGeo.setAttribute("position", new THREE.BufferAttribute(motePos, 3));
+  const motes = new THREE.Points(
+    moteGeo,
+    new THREE.PointsMaterial({
+      map: tex.leaf,
+      color: 0xd8e9a8,
+      size: 0.4,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      alphaTest: 0.25,
+    }),
+  );
+  group.add(motes);
+  const moteAttr = moteGeo.attributes.position as THREE.BufferAttribute;
+
+  // ── Lights ───────────────────────────────────────────────────────────
+  const hemi = new THREE.HemisphereLight(0xfff4e2, 0x4a6b33, 1.05);
+  const sun = new THREE.DirectionalLight(0xfff1d6, 2.35);
+  sun.position.copy(sunDir).multiplyScalar(70);
+  if (budget.shadowMapSize > 0) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.setScalar(budget.shadowMapSize);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 190;
+    sun.shadow.camera.left = -34;
+    sun.shadow.camera.right = 34;
+    sun.shadow.camera.top = 34;
+    sun.shadow.camera.bottom = -34;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.035;
+  }
+  const fill = new THREE.DirectionalLight(0xa8d6ff, 0.5);
+  fill.position.set(-40, 26, 34);
+
+  group.add(hemi, sun, sun.target, fill);
+
+  return {
+    group,
+    sun,
+    hemi,
+    sunDir,
+    /**
+     * Re-light for a moment of the day.
+     *
+     * `sunDir` is mutated in place rather than replaced: the water shader and
+     * the scene's shadow rig hold a reference to this very vector, so writing
+     * through it keeps every consumer in step with no wiring and no per-frame
+     * copying. The sun LIGHT is positioned by the scene (it follows the
+     * camera so a finite shadow map stays useful) — only its direction,
+     * colour and intensity are decided here.
+     */
+    applyDaylight(state) {
+      sunDir.copy(state.sunDir);
+      domeMat.uniforms.uSunDir.value.copy(state.sunDir);
+      (domeMat.uniforms.uSunColor.value as THREE.Color).copy(state.sunTint);
+      (domeMat.uniforms.uZenith.value as THREE.Color).copy(state.zenith);
+      (domeMat.uniforms.uHorizon.value as THREE.Color).copy(state.horizon);
+      (domeMat.uniforms.uGround.value as THREE.Color).copy(state.ground);
+
+      sun.color.copy(state.sunColor);
+      sun.intensity = state.sunIntensity;
+      hemi.color.copy(state.hemiSky);
+      hemi.groundColor.copy(state.hemiGround);
+      hemi.intensity = state.hemiIntensity;
+      fill.intensity = state.fillIntensity;
+    },
+    update(dt, time, wind) {
+      // Clouds drift
+      for (let i = 0; i < cloudCount; i += 1) {
+        const s = cloudSeeds[i];
+        s.a += s.drift * dt * (0.6 + wind * 0.5);
+        dummy.position.set(Math.cos(s.a) * s.r, s.y + Math.sin(time * 0.1 + i) * 1.4, Math.sin(s.a) * s.r);
+        dummy.lookAt(0, s.y * 0.4, 0);
+        dummy.scale.set(s.s * 2.4, s.s, 1);
+        dummy.updateMatrix();
+        clouds.setMatrixAt(i, dummy.matrix);
+      }
+      clouds.instanceMatrix.needsUpdate = true;
+
+      // Motes drift downwind and respawn upwind
+      const arr = moteAttr.array as Float32Array;
+      for (let i = 0; i < moteCount; i += 1) {
+        const xi = i * 3;
+        arr[xi] += (1.1 + (i % 5) * 0.2) * dt * wind;
+        arr[xi + 1] -= (0.12 + (i % 3) * 0.05) * dt;
+        arr[xi + 2] += Math.sin(time * 0.6 + i) * dt * 0.3;
+        if (arr[xi] > 32 || arr[xi + 1] < 0.2) {
+          arr[xi] = -32;
+          arr[xi + 1] = 1.5 + Math.random() * 5;
+          arr[xi + 2] = (Math.random() - 0.5) * 60;
+        }
+      }
+      moteAttr.needsUpdate = true;
+
+      if (shafts) shafts.rotation.y = Math.sin(time * 0.04) * 0.03;
+    },
+    dispose() {
+      group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose?.();
+        const mat = m.material as THREE.Material | undefined;
+        mat?.dispose?.();
+      });
+      group.clear();
+    },
+  };
+}

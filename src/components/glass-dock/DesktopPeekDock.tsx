@@ -34,7 +34,11 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon; color: string; 
 
 
 function railToTab(active: DesktopRailKey): TabKey | null {
-  if (active === 'favorites' || active === 'settings' || active === 'profile' || active === 'study') return null
+  // Rail entries that have no peek-dock slot of their own.
+  if (
+    active === 'favorites' || active === 'settings' || active === 'profile'
+    || active === 'study' || active === 'nature3d'
+  ) return null
   return active
 }
 
