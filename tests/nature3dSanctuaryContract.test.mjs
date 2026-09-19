@@ -543,8 +543,10 @@ test("the opening camera is a wide establishing shot", () => {
   // You now land far enough back to read the ENTIRE connected world — all
   // three districts at once — and explore in from there.
   assert.match(SCENE, /this\.orbit\.panTo\(new THREE\.Vector3\(0, 30, 0\), 1500, -0\.30, 0\.34\)/);
-  // And you can pull back at least that far by hand.
-  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, 2400\)/);
+  // And you can pull back by hand — as far as the world allows. The limit is
+  // no longer a fixed 2400 m (which flew the camera off the 1380 m plate);
+  // it is derived from the plate itself. See Group 14.
+  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, this\.maxDistance\)/);
   // The board and student presets still exist so you can click straight in.
   assert.match(SCENE, /case "board":/);
   assert.match(SCENE, /case "student":/);
@@ -741,12 +743,19 @@ test("all three districts are framed by the default opening view", () => {
   assert.ok(dist >= needed * 0.98, `camera at ${dist}m cannot frame districts ${spread}m out (needs ~${Math.round(needed)}m)`);
   // ...and the far plane and zoom limit must both reach that far.
   const far = Math.min(...[...QUALITY.matchAll(/farPlane: (\d+)/g)].map((x) => Number(x[1])));
-  assert.ok(far > dist + spread, `far plane ${far} clips the far district`);
-  const zoomMax = Number(/clamp\(this\.targetDistance \* factor, [\d.]+, (\d+)\)/.exec(CONTROLS)[1]);
-  assert.ok(zoomMax >= dist, `orbit zoom caps at ${zoomMax}, short of the ${dist}m world view`);
+  // The zoom cap is world-derived now, so compute it the way OrbitRig does
+  // and check the DISTRICTS still fit — the requested 1500 m is pulled in to
+  // whatever keeps the camera over its own terrain.
+  const reach = Number(/WORLD_REACH = (\d+)/.exec(regions)[1]);
+  const worldHalf = reach + 200;
+  const zoomMax = (worldHalf * 0.93) / Math.cos(0.34);
+  const settled = Math.min(dist, zoomMax);
+  const halfWidth = Math.tan((52 * Math.PI) / 180 / 2) * (16 / 9) * settled;
+  assert.ok(halfWidth > spread, `at the capped ${settled.toFixed(0)}m only ${halfWidth.toFixed(0)}m is visible`);
   // Fog must not erase the far districts.
+  assert.ok(far > settled + spread, `far plane ${far} clips the far district`);
   const fog = Math.max(...[...QUALITY.matchAll(/fogDensity: ([\d.]+)/g)].map((x) => Number(x[1])));
-  const visibility = Math.exp(-((fog * (dist + spread)) ** 2));
+  const visibility = Math.exp(-((fog * (settled + spread)) ** 2));
   assert.ok(visibility > 0.15, `fog leaves only ${(visibility * 100).toFixed(0)}% of the far district visible`);
   // And there are HUD presets to fly to each district.
   for (const key of ["world", "trek", "safari"]) {
@@ -1152,4 +1161,129 @@ test("the student has a desk in front of the chair", () => {
   assert.match(LECTERN, /const z = LECTERN_PIVOT_Z - 1\.05;/);
   // And it is cleaned up.
   assert.match(SCENE, /disposeGroup\(this\.desk\)/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Group 14 — zooming all the way out must still show the world
+//
+//  Pulling back far enough used to reach a point where nothing was visible:
+//  a black/grey screen, or a view from underneath the ground, or from outside
+//  the world looking at its edge. Those are THREE separate failures that all
+//  arrive together, so all three are pinned here.
+// ─────────────────────────────────────────────────────────────────────────
+
+test("the orbit zoom-out limit is derived from the world, not guessed", () => {
+  // The old cap was a hardcoded 2400 m — nearly twice the 1380 m plate, so
+  // the camera flew clean off its own terrain.
+  assert.ok(
+    !/clamp\(this\.targetDistance \* factor, 2\.4, 2400\)/.test(CONTROLS),
+    "the hardcoded 2400 m zoom cap is back",
+  );
+  assert.match(CONTROLS, /get maxDistance\(\): number/);
+  assert.match(CONTROLS, /const usable = WORLD_HALF \* 0\.93;/);
+  assert.match(CONTROLS, /clamp\(this\.targetDistance \* factor, 2\.4, this\.maxDistance\)/);
+
+  // The cap depends on PITCH, so it has to be re-applied in update() too —
+  // tilting down after zooming, or a panTo() preset, both bypass zoom().
+  assert.match(CONTROLS, /const cap = this\.maxDistance;/);
+  assert.match(CONTROLS, /if \(this\.targetDistance > cap\) this\.targetDistance = cap;/);
+  assert.match(CONTROLS, /if \(this\.distance > cap\) this\.distance = cap;/);
+});
+
+test("the camera can never orbit off its own terrain plate", () => {
+  const WORLD_REACH = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  const WORLD_HALF = WORLD_REACH + 200;
+  const usable = WORLD_HALF * 0.93;
+  const ceiling = WORLD_HALF * 2;
+  const maxDistance = (pitch) => {
+    const cp = Math.cos(pitch);
+    return cp < 0.05 ? ceiling : Math.min(usable / cp, ceiling);
+  };
+
+  // Ground reach is cos(pitch) * distance. At every pitch it must stay on the
+  // plate, which is what stops the "out of the world" view.
+  for (const pitch of [0.03, 0.12, 0.3, 0.34, 0.5, 0.8, 1.2, 1.5]) {
+    const reach = Math.cos(pitch) * maxDistance(pitch);
+    assert.ok(
+      reach <= WORLD_HALF,
+      `at pitch ${pitch} the camera sits ${reach.toFixed(0)} m out, past the ${WORLD_HALF} m plate`,
+    );
+  }
+
+  // Looking straight down, cos goes to zero and `usable / cp` runs away to
+  // 16 km — outside every tier's far plane. The altitude ceiling catches it.
+  assert.match(CONTROLS, /const ceiling = WORLD_HALF \* 2;/);
+  assert.ok(maxDistance(Math.PI / 2 - 0.001) <= ceiling, "a top-down view must be bounded by altitude");
+});
+
+test("the ground floor is sampled on the plate, so it cannot fake a hill", () => {
+  // `terrainHeight` is analytic and has no domain limit: outside the drawn
+  // plate it keeps returning hill values for ground that was never built, so
+  // the floor clamp was shoving the camera up to clear phantom terrain — or
+  // judging it underground while it floated over nothing.
+  assert.match(CONTROLS, /const sx = THREE\.MathUtils\.clamp\(camera\.position\.x, -WORLD_HALF, WORLD_HALF\)/);
+  assert.match(CONTROLS, /const sz = THREE\.MathUtils\.clamp\(camera\.position\.z, -WORLD_HALF, WORLD_HALF\)/);
+  assert.match(CONTROLS, /const floor = terrainHeight\(sx, sz\) \+ 0\.9;/);
+  assert.ok(
+    !/const floor = terrainHeight\(camera\.position\.x, camera\.position\.z\)/.test(CONTROLS),
+    "the floor must not be sampled at the unclamped position",
+  );
+});
+
+test("the fully zoomed-out world is not fogged into a grey screen", () => {
+  const WORLD_REACH = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  const WORLD_HALF = WORLD_REACH + 200;
+  const densities = [...QUALITY.matchAll(/fogDensity: ([\d.]+)/g)].map((m) => Number(m[1]));
+  assert.equal(densities.length, 4, "every tier needs a fog density");
+
+  // FogExp2 is exponential in the SQUARE of distance. At 0.0006 the far rim
+  // was 49 % obscured at the new cap and 87 % at the old one — the grey-out.
+  const cap = (WORLD_HALF * 0.93) / Math.cos(0.34);
+  for (const density of densities) {
+    const obscured = 1 - Math.exp(-((cap * density) ** 2));
+    assert.ok(
+      obscured < 0.25,
+      `fog hides ${(obscured * 100).toFixed(0)}% of the far rim at full zoom-out`,
+    );
+  }
+});
+
+test("every tier's far plane clears the far corner of the world", () => {
+  const WORLD_REACH = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  const WORLD_HALF = WORLD_REACH + 200;
+  const planes = [...QUALITY.matchAll(/farPlane: (\d+)/g)].map((m) => Number(m[1]));
+  assert.equal(planes.length, 4, "every tier needs a far plane");
+
+  // Worst case is the steep top-down view, where the camera is highest: the
+  // opposite corner of the plate is the furthest thing that can be on screen.
+  const ceiling = WORLD_HALF * 2;
+  const worstCorner = Math.hypot(WORLD_HALF, WORLD_HALF, ceiling * 0.95);
+  for (const plane of planes) {
+    assert.ok(
+      plane >= 3400,
+      `far plane ${plane} slices the far hills off at full zoom-out (corner is ~${worstCorner.toFixed(0)} m)`,
+    );
+  }
+});
+
+test("the establishing shot still frames all three districts after the cap", () => {
+  const WORLD_REACH = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  const WORLD_HALF = WORLD_REACH + 200;
+  const spread = Number(/centerX: (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
+  // The preset asks for 1500 m; the cap pulls it in to ~1361 m at pitch 0.34.
+  const settled = Math.min(1500, (WORLD_HALF * 0.93) / Math.cos(0.34));
+
+  for (const aspect of [2.4, 16 / 9, 4 / 3, 1, 0.86, 0.6]) {
+    const base = 52;
+    let fov = base;
+    if (aspect < 16 / 9) {
+      fov = (Math.atan((Math.tan((base * Math.PI) / 360) * (16 / 9)) / aspect) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const halfWidth = Math.tan(Math.atan(Math.tan((fov * Math.PI) / 360) * aspect)) * settled;
+    assert.ok(
+      halfWidth > spread,
+      `at aspect ${aspect.toFixed(2)} the capped distance shows only ${halfWidth.toFixed(0)} m`,
+    );
+  }
 });

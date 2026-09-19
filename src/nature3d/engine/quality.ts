@@ -57,7 +57,21 @@ export interface QualityBudget {
   minPixelRatio: number;
   /** Volumetric sun shafts. */
   sunShafts: boolean;
-  /** Far plane / fog density pair. */
+  /**
+   * Far plane / fog density pair.
+   *
+   * Both are sized against the ZOOMED-OUT view, not the walking view. With
+   * the orbit distance now capped so the camera stays over its own terrain
+   * (see `OrbitRig.maxDistance`), the furthest thing that can ever be on
+   * screen is the opposite corner of the plate — about 3310 m away — so every
+   * tier's far plane must clear that or the far hills get sliced off.
+   *
+   * Fog is exponential in the SQUARE of distance, which is why 0.0006 looked
+   * fine up close and turned the fully zoomed-out world into a grey-out: it
+   * obscured 49 % of the far rim. 0.00028 keeps the same haze near the meadow
+   * while leaving the rim ~9 % obscured, so pulling all the way back shows
+   * the world instead of fog.
+   */
   farPlane: number;
   fogDensity: number;
 }
@@ -85,8 +99,8 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1,
     minPixelRatio: 0.6,
     sunShafts: false,
-    farPlane: 3200,
-    fogDensity: 0.0006,
+    farPlane: 3500,
+    fogDensity: 0.00028,
   },
   medium: {
     tier: "medium",
@@ -111,7 +125,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     minPixelRatio: 0.7,
     sunShafts: true,
     farPlane: 3600,
-    fogDensity: 0.0006,
+    fogDensity: 0.00028,
   },
   high: {
     tier: "high",
@@ -136,7 +150,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     minPixelRatio: 0.8,
     sunShafts: true,
     farPlane: 4000,
-    fogDensity: 0.0006,
+    fogDensity: 0.00028,
   },
   ultra: {
     tier: "ultra",
@@ -161,7 +175,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     minPixelRatio: 0.85,
     sunShafts: true,
     farPlane: 4400,
-    fogDensity: 0.0006,
+    fogDensity: 0.00028,
   },
 };
 

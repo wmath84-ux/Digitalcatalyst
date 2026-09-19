@@ -17,7 +17,7 @@
 // never stutters when a frame is long.
 
 import * as THREE from "three";
-import { terrainHeight, insideRiver } from "./terrain";
+import { terrainHeight, insideRiver, WORLD_HALF } from "./terrain";
 import { WORLD_REACH } from "./regions";
 
 /** Frame-rate independent smoothing factor. */
@@ -58,12 +58,50 @@ export class OrbitRig {
     this.targetPitch = THREE.MathUtils.clamp(this.targetPitch + dy, 0.03, Math.PI / 2 - 0.05);
   }
 
+  /**
+   * The furthest the camera may orbit out.
+   *
+   * THIS IS NOT AN ARBITRARY NUMBER. Past a certain distance the view stops
+   * being "far away" and starts being broken, in three separate ways at once:
+   *
+   *   1. THE CAMERA LEAVES THE GROUND. The terrain is a finite plate
+   *      WORLD_HALF across. An orbit camera at a shallow pitch sits at
+   *      cos(pitch) * distance from the centre, so beyond ~1380 m of ground
+   *      reach it is hovering over NOTHING — you are outside the world
+   *      looking back at its edge, which is the "out of the world" view.
+   *   2. IT GOES UNDERGROUND. Outside the plate `terrainHeight` keeps
+   *      returning hill values, so the "never dive under the meadow" floor
+   *      below is being computed against ground that is not drawn. The camera
+   *      is then legitimately below a surface that does not exist.
+   *   3. EVERYTHING FOGS OUT. FogExp2 is exponential in the SQUARE of
+   *      distance: at 2400 m the far rim is 87 % obscured — the black screen.
+   *
+   * So the cap is derived from the world instead of guessed: stay close
+   * enough that the camera is always over its own terrain. `maxDistance` is
+   * recomputed from the live pitch, because a steeper look-down angle buys
+   * real height without leaving the plate.
+   */
+  get maxDistance(): number {
+    // Ground reach is cos(pitch) * distance, and it must stay inside the
+    // plate with a little margin so the edge itself is never the horizon.
+    const usable = WORLD_HALF * 0.93;
+    const cp = Math.cos(this.targetPitch);
+    // Looking straight down, ground reach stops constraining anything (cos
+    // goes to zero and `usable / cp` runs away to 16 km, far outside the far
+    // plane). What constrains a top-down view instead is ALTITUDE: climb high
+    // enough to see the whole plate and no higher. That is WORLD_HALF over
+    // tan(half-fov), and the widest sane half-fov here is ~50 degrees, so
+    // 2 * WORLD_HALF is a safe ceiling that still clears the far plane.
+    const ceiling = WORLD_HALF * 2;
+    if (cp < 0.05) return ceiling;
+    return Math.min(usable / cp, ceiling);
+  }
+
   zoom(factor: number) {
-    // Upper bound raised with the world: you can now pull back far enough to
-    // take in the whole kilometre and the hill ranges behind it.
-    // The far limit has to clear the whole three-district chain, or the
-    // establishing shot that shows all three areas at once cannot be reached.
-    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, 2400);
+    // The near limit keeps you outside the board; the far limit is the
+    // world-derived one above, so pulling back always lands on a view of the
+    // world rather than on empty sky beyond its edge.
+    this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, this.maxDistance);
   }
 
   panTo(target: THREE.Vector3, distance: number, yaw?: number, pitch?: number) {
@@ -76,10 +114,18 @@ export class OrbitRig {
   update(dt: number, camera: THREE.PerspectiveCamera) {
     if (this.autoRotate) this.targetYaw += dt * 0.12;
 
+    // Re-apply the cap every frame. It depends on the PITCH, so tilting the
+    // camera down after zooming out would otherwise leave the distance at a
+    // value that is no longer legal — and a panTo() preset could set one
+    // directly without ever going through zoom().
+    const cap = this.maxDistance;
+    if (this.targetDistance > cap) this.targetDistance = cap;
+
     const k = damp(9, dt);
     this.yaw += (this.targetYaw - this.yaw) * k;
     this.pitch += (this.targetPitch - this.pitch) * k;
     this.distance += (this.targetDistance - this.distance) * k;
+    if (this.distance > cap) this.distance = cap;
 
     const cp = Math.cos(this.pitch);
     camera.position.set(
@@ -88,7 +134,17 @@ export class OrbitRig {
       this.target.z + Math.cos(this.yaw) * cp * this.distance,
     );
     // Never let the orbit camera dive under the meadow.
-    const floor = terrainHeight(camera.position.x, camera.position.z) + 0.9;
+    //
+    // Sampled at the CLAMPED position, not the raw one. `terrainHeight` is an
+    // analytic function with no domain limit, so outside the drawn plate it
+    // happily returns hill heights for ground that was never built — and the
+    // camera would then be shoved up to clear a phantom hill, or judged to be
+    // underground while floating over empty space. Clamping the sample point
+    // to the plate means the floor outside it is the plate's own edge height,
+    // which is exactly the surface you can still see.
+    const sx = THREE.MathUtils.clamp(camera.position.x, -WORLD_HALF, WORLD_HALF);
+    const sz = THREE.MathUtils.clamp(camera.position.z, -WORLD_HALF, WORLD_HALF);
+    const floor = terrainHeight(sx, sz) + 0.9;
     if (camera.position.y < floor) camera.position.y = floor;
     camera.lookAt(this.target);
   }
