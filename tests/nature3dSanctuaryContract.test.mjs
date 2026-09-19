@@ -1407,25 +1407,26 @@ test("animals standing on the ground are gone, birds are not", () => {
   }
 });
 
-test("the 90-degree neck belongs to the student view alone", () => {
-  // Looking straight up is a seated gesture. On an establishing shot or a
-  // board framed square-on it is wrong: nothing in the picture explains why
-  // the view is pointing at the sky, and there is no obvious way back. So the
-  // freedom is opt-in per view.
-  assert.match(CONTROLS, /private lookUpAllowed = false;/, "the neck must be off by default");
-  assert.match(CONTROLS, /setLookUpAllowed\(allowed: boolean\)/);
-  // Revoking must also unwind any tilt already applied, or switching away
-  // mid-stare would strand the camera looking at the sky.
-  assert.match(CONTROLS, /if \(!allowed\) this\.targetLookUp = 0;/);
-  // Both arms of the gesture are gated.
-  assert.match(CONTROLS, /if \(this\.lookUpAllowed && next < LOW/);
-  assert.match(CONTROLS, /if \(this\.lookUpAllowed && this\.targetLookUp > 0 && dy > 0\)/);
+test("looking up must not flip the picture upside down", () => {
+  // REGRESSION. The up vector was built by rotating the tilted view a quarter
+  // turn about the right axis and then NEGATING it. That yields (0,-1,0) at
+  // rest — the camera upside down — so the picture flipped the instant the
+  // neck left zero, and only then travelled upward. Rotating the other way
+  // flips it just the same: the sign has to match the tilt, so there is no
+  // negate and no minus in this expression.
+  assert.match(
+    CONTROLS,
+    /ORBIT_UP\.copy\(ORBIT_TILTED\)\.applyAxisAngle\(ORBIT_RIGHT, Math\.PI \/ 2\);/,
+  );
+  const upLine = CONTROLS.split("\n").find((l) => l.includes("ORBIT_UP.copy("));
+  assert.ok(upLine && !/negate|-Math\.PI/.test(upLine), `up vector must not be inverted: ${upLine}`);
 
-  // focus() revokes for EVERY preset and grants for exactly one, so a preset
-  // added later cannot forget to opt out.
-  assert.match(SCENE, /this\.orbit\.setLookUpAllowed\(preset === "student"\);/);
-  const grants = [...SCENE.matchAll(/setLookUpAllowed\(/g)];
-  assert.equal(grants.length, 1, "there must be exactly one place that decides this");
+  // And it applies to every camera again, not just the desk — the per-view
+  // gate existed only to contain this bug and is gone with it.
+  assert.ok(
+    !/lookUpAllowed|setLookUpAllowed/.test(CONTROLS + SCENE),
+    "looking up is available from every camera",
+  );
 });
 
 test("any camera can be rotated, and the seated student can look straight up", () => {
@@ -1438,14 +1439,15 @@ test("any camera can be rotated, and the seated student can look straight up", (
   assert.match(CONTROLS, /const LOOK_UP_MAX = Math\.PI \/ 2;/);
 
   // The ceiling carries the orbit's own downward tilt, or a flat PI/2 tops
-  // out at 88.3 degrees instead of a full 90. (Gated to the student view —
-  // see the test above.)
+  // out at 88.3 degrees instead of a full 90.
   assert.match(CONTROLS, /const ceiling = LOOK_UP_MAX \+ this\.targetPitch;/);
 
   // The pole must not degenerate: an explicit perpendicular up vector is
   // supplied rather than relying on lookAt's default.
   assert.match(CONTROLS, /camera\.up\.copy\(ORBIT_UP\)/);
-  assert.match(CONTROLS, /applyAxisAngle\(ORBIT_RIGHT, Math\.PI \/ 2\)\.negate\(\)/);
+  // (The exact form of the up vector is pinned by the flip test above — this
+  // assertion used to pin the inverted version, which is how the bug shipped.)
+  assert.match(CONTROLS, /applyAxisAngle\(ORBIT_RIGHT, Math\.PI \/ 2\)/);
   // ...and restored the moment the neck is level, or every later view rolls.
   assert.match(CONTROLS, /camera\.up\.set\(0, 1, 0\);/);
 
