@@ -15,7 +15,7 @@
 // updates through a direct DOM write, and the joysticks talk to the engine
 // through a ref. That is what keeps the panel at a locked frame rate.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
   Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
@@ -27,7 +27,7 @@ import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
-import { useCatalog } from "../context/CatalogContext";
+import useOwnedCourses from "./boards/useOwnedCourses";
 
 const WIND_STEPS = [
   { label: "Calm", mult: 0.45 },
@@ -86,13 +86,11 @@ export default function NatureStudioPage() {
   const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
 
   const { user } = useAuth();
-  const { products, purchasedIds, loading: catalogLoading } = useCatalog();
-
-  // Only what the learner actually owns reaches the reading board.
-  const ownedCourses = useMemo(
-    () => products.filter((p) => purchasedIds.has(p.id)),
-    [products, purchasedIds],
-  );
+  // Ownership is resolved from ALL five sources the app recognises —
+  // canonical entitlements, the active subscription's product unlocks and
+  // both legacy purchase records — not just `purchasedIds`, which is only
+  // the legacy subcollection and left subscribers with an empty library.
+  const { courses: ownedCourses, loading: coursesLoading } = useOwnedCourses();
 
   // Keep the fullscreen flag honest when the user leaves via Esc / F11.
   useEffect(() => {
@@ -311,9 +309,8 @@ export default function NatureStudioPage() {
         <BoardPortals
           hosts={boardHosts}
           courses={ownedCourses}
-          loading={catalogLoading}
+          loading={coursesLoading}
           uid={user?.id ?? null}
-          activeCourse={ownedCourses[0] ?? null}
         />
 
         {/* ── Study-board tray ── */}

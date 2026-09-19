@@ -32,6 +32,25 @@ export interface VirtualStick {
   active: boolean;
 }
 
+/**
+ * A full 90 degrees of neck. Straight up is reachable, as asked.
+ *
+ * Unlike the first-person rig this cannot gimbal-flip even at exactly PI/2,
+ * because the look direction is built from the stored angle and handed to
+ * `lookAt` together with an explicit up vector chosen to stay perpendicular
+ * to it — nothing recovers a yaw from the direction, so there is no frame to
+ * degenerate.
+ */
+const LOOK_UP_MAX = Math.PI / 2;
+
+// Hoisted scratch for the look-up maths — the frame loop allocates nothing.
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const ORBIT_DIR = new THREE.Vector3();
+const ORBIT_RIGHT = new THREE.Vector3();
+const ORBIT_TILTED = new THREE.Vector3();
+const ORBIT_UP = new THREE.Vector3();
+const ORBIT_TARGET = new THREE.Vector3();
+
 export class OrbitRig {
   yaw = -0.35;
   pitch = 0.32;
@@ -44,6 +63,8 @@ export class OrbitRig {
   autoRotate = false;
 
   setFromCamera(camera: THREE.PerspectiveCamera) {
+    this.targetLookUp = 0;
+    this.lookUp = 0;
     const offset = camera.position.clone().sub(this.target);
     this.targetDistance = offset.length();
     this.targetYaw = Math.atan2(offset.x, offset.z);
@@ -53,9 +74,56 @@ export class OrbitRig {
     this.distance = this.targetDistance;
   }
 
+  /**
+   * Extra upward tilt of the VIEW, applied after the camera is positioned.
+   *
+   * An orbit camera looks at its target, so its view direction can never
+   * point above the horizon: raising the pitch lifts the camera and it looks
+   * further DOWN. That is why the seated student could not look up at the
+   * sky — there was no angle in the rig that pointed there.
+   *
+   * Moving the camera below the target instead would work geometrically and
+   * be wrong in practice: at the desk it would bury the camera metres
+   * underground, where the ground-floor clamp then shoves it back up.
+   *
+   * So looking up is a separate degree of freedom. Once the orbit has bottomed
+   * out at the horizon, further downward drag accumulates here and tilts the
+   * LOOK direction upward while the camera stays exactly where it is — which
+   * is what a seated person actually does with their neck. 0 = look at the
+   * target as usual.
+   *
+   * The CEILING is not a constant. The orbit itself is still pitched a little
+   * above the target, so its view already points `pitch` radians DOWN; the
+   * elevation the learner actually sees is `lookUp - pitch`. Budgeting a flat
+   * PI/2 therefore topped out at 88.3 degrees. The ceiling carries the orbit's
+   * own downward tilt so a full 90 is reachable.
+   */
+  lookUp = 0;
+  private targetLookUp = 0;
+
   rotate(dx: number, dy: number) {
     this.targetYaw -= dx;
-    this.targetPitch = THREE.MathUtils.clamp(this.targetPitch + dy, 0.03, Math.PI / 2 - 0.05);
+    const LOW = 0.03;
+    const ceiling = LOOK_UP_MAX + this.targetPitch;
+    const next = this.targetPitch + dy;
+    if (next < LOW && this.targetLookUp < ceiling) {
+      // The orbit is already as low as it goes: spend the rest of the drag on
+      // tilting the view up instead of stalling against the clamp.
+      this.targetLookUp = THREE.MathUtils.clamp(this.targetLookUp + (LOW - next), 0, LOOK_UP_MAX + LOW);
+      this.targetPitch = LOW;
+      return;
+    }
+    if (this.targetLookUp > 0 && dy > 0) {
+      // Dragging back the other way unwinds the neck first, so the gesture is
+      // symmetric and you always end up back where you started.
+      const spend = Math.min(this.targetLookUp, dy);
+      this.targetLookUp -= spend;
+      const left = dy - spend;
+      if (left <= 0) return;
+      this.targetPitch = THREE.MathUtils.clamp(this.targetPitch + left, LOW, Math.PI / 2 - 0.05);
+      return;
+    }
+    this.targetPitch = THREE.MathUtils.clamp(next, LOW, Math.PI / 2 - 0.05);
   }
 
   /**
@@ -105,6 +173,10 @@ export class OrbitRig {
   }
 
   panTo(target: THREE.Vector3, distance: number, yaw?: number, pitch?: number) {
+    // A preset frames something specific, so it always starts from a level
+    // neck — otherwise clicking "Reading" while looking at the sky would
+    // frame the board and then stare over the top of it.
+    this.targetLookUp = 0;
     this.target.copy(target);
     this.targetDistance = distance;
     if (yaw !== undefined) this.targetYaw = yaw;
@@ -146,7 +218,45 @@ export class OrbitRig {
     const sz = THREE.MathUtils.clamp(camera.position.z, -WORLD_HALF, WORLD_HALF);
     const floor = terrainHeight(sx, sz) + 0.9;
     if (camera.position.y < floor) camera.position.y = floor;
-    camera.lookAt(this.target);
+
+    this.lookUp += (this.targetLookUp - this.lookUp) * k;
+
+    if (this.lookUp < 1e-4) {
+      // Restore the default up vector: the look-up branch below overwrites it,
+      // and leaving it tilted would roll every ordinary view afterwards.
+      camera.up.set(0, 1, 0);
+      camera.lookAt(this.target);
+      return;
+    }
+
+    // ── Looking up ────────────────────────────────────────────────────
+    //
+    // Rotate the view direction up by `lookUp` about the camera's own RIGHT
+    // axis. Doing it about the right axis (rather than lerping toward world
+    // up) keeps the horizon level at every angle.
+    //
+    // At exactly PI/2 the direction becomes world up and `lookAt`'s default
+    // up vector is parallel to it, which is the one case that degenerates. So
+    // the up vector is supplied explicitly as the direction rotated a further
+    // quarter turn — always perpendicular to the view, so the frame is well
+    // defined right through the pole.
+    ORBIT_DIR.copy(this.target).sub(camera.position);
+    const len = ORBIT_DIR.length();
+    if (len < 1e-6) {
+      camera.lookAt(this.target);
+      return;
+    }
+    ORBIT_DIR.divideScalar(len);
+    ORBIT_RIGHT.crossVectors(ORBIT_DIR, WORLD_UP);
+    if (ORBIT_RIGHT.lengthSq() < 1e-8) ORBIT_RIGHT.set(1, 0, 0);
+    else ORBIT_RIGHT.normalize();
+
+    ORBIT_TILTED.copy(ORBIT_DIR).applyAxisAngle(ORBIT_RIGHT, this.lookUp);
+    ORBIT_UP.copy(ORBIT_TILTED).applyAxisAngle(ORBIT_RIGHT, Math.PI / 2).negate();
+
+    camera.up.copy(ORBIT_UP);
+    ORBIT_TARGET.copy(camera.position).addScaledVector(ORBIT_TILTED, len);
+    camera.lookAt(ORBIT_TARGET);
   }
 }
 

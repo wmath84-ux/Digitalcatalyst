@@ -1091,12 +1091,17 @@ test("the boards are live DOM surfaces, not textures, so every file type works",
 });
 
 test("the reading board lists only purchased courses", () => {
-  assert.match(PAGE, /purchasedIds\.has\(p\.id\)/);
+  // Ownership now comes from the full entitlement resolver (Group 15), not
+  // from the legacy purchases subcollection alone.
+  assert.match(PAGE, /useOwnedCourses\(\)/);
   assert.match(PAGE, /<BoardPortals/);
   // Drilling down: course -> module -> resource, chosen by the learner.
   assert.match(READING_BOARD, /courses\.map\(/);
   assert.match(READING_BOARD, /course\.courseContent/);
-  assert.match(READING_BOARD, /onOpen=\{setFile\}/);
+  // Opening a resource also records which module it came from, so the notes
+  // and mind-map boards scope to it (Group 15).
+  assert.match(READING_BOARD, /onSelectModule\(ownerId\);/);
+  assert.match(READING_BOARD, /setFile\(f\);/);
 });
 
 test("the tray switches boards and the camera turns to the one picked", () => {
@@ -1286,4 +1291,145 @@ test("the establishing shot still frames all three districts after the cap", () 
       `at aspect ${aspect.toFixed(2)} the capped distance shows only ${halfWidth.toFixed(0)} m`,
     );
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Group 15 — real entitlements, empty boards, no ground animals, 90° neck
+// ─────────────────────────────────────────────────────────────────────────
+
+const OWNED = read("src/nature3d/boards/useOwnedCourses.ts");
+const SAFARI_DISTRICT = read("src/nature3d/engine/safariDistrict.ts");
+
+test("course ownership is resolved from every source, not just the legacy one", () => {
+  // `purchasedIds` alone is only `users/{uid}/purchases/*` — the narrowest of
+  // the five places access can live, so subscribers saw an empty library.
+  assert.match(OWNED, /collectEntitlementOwnership/);
+  assert.match(OWNED, /isSubscriptionRecordActive/);
+  assert.match(OWNED, /entitlements:\$\{uid\}/);
+  assert.match(OWNED, /users\/\$\{uid\}\/subscription\/current/);
+  assert.match(OWNED, /purchasedProductIds/);
+
+  // The shared-snapshot helpers mean these join the listeners the player and
+  // the catalogue already hold, rather than opening duplicates.
+  assert.match(OWNED, /subscribeShared\b/);
+  assert.match(OWNED, /subscribeSharedDoc\b/);
+
+  // An expired plan must stop unlocking courses.
+  assert.match(OWNED, /setSubscriptionIds\(active \? new Set\(included\) : new Set\(\)\)/);
+
+  // The page uses it instead of the old narrow filter.
+  assert.match(PAGE, /useOwnedCourses\(\)/);
+  assert.ok(
+    !/purchasedIds\.has\(p\.id\)/.test(PAGE),
+    "the page must not fall back to the legacy purchases-only filter",
+  );
+});
+
+test("nothing is auto-selected, so the side boards open empty", () => {
+  // THE BUG: `activeCourse={ownedCourses[0]}` silently scoped the notes and
+  // mind-map boards to whichever course the catalogue happened to return
+  // first, so they opened showing somebody's existing notes.
+  assert.ok(
+    !/activeCourse=\{ownedCourses\[0\]/.test(PAGE),
+    "the first owned course must not be auto-selected",
+  );
+  assert.match(STUDY_BOARDS, /const \[selectedCourseId, setSelectedCourseId\] = useState<string \| null>\(null\)/);
+  assert.match(STUDY_BOARDS, /const \[selectedModuleId, setSelectedModuleId\] = useState<string \| null>\(null\)/);
+
+  // With no course picked the notes panel is handed an empty list — so the
+  // board shows only the circular "+", as asked.
+  assert.match(STUDY_BOARDS, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
+  // Stable identity: a fresh [] every render would rebuild the grid forever.
+  assert.match(STUDY_BOARDS, /const EMPTY_NOTES: CoursePlayerNote\[\] = \[\];/);
+
+  // Losing entitlement to the selected course must clear it.
+  assert.match(STUDY_BOARDS, /if \(selectedCourseId && !activeCourse\)/);
+});
+
+test("the learner picks the course and then the module themselves", () => {
+  // Selection is lifted out of the reading board so all three boards agree.
+  assert.match(READING_BOARD, /courseId: string \| null;/);
+  assert.match(READING_BOARD, /onSelectCourse: \(id: string \| null\) => void;/);
+  assert.match(READING_BOARD, /moduleId: string \| null;/);
+  assert.match(READING_BOARD, /onSelectModule: \(id: string \| null\) => void;/);
+  // Opening a resource reports the module it came from...
+  assert.match(READING_BOARD, /onOpen: \(f: CourseFile, moduleId: string\) => void/);
+  assert.match(READING_BOARD, /onOpen\(f, module\.id\)/);
+  // ...and the mind map scopes to it, exactly as the player does.
+  assert.match(STUDY_BOARDS, /moduleId: selectedModuleId \?\? undefined/);
+});
+
+test("the notes and mind map panels are the player's own, unmodified", () => {
+  // The brief is explicit that the design must not change: same toolbar, same
+  // editor, same library. So they are imported, never re-implemented.
+  assert.match(STUDY_BOARDS, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
+  assert.match(STUDY_BOARDS, /import\("\.\.\/\.\.\/course\/MindMapPanel"\)/);
+  assert.match(STUDY_BOARDS, /import useCourseMindMap from "\.\.\/\.\.\/course\/useCourseMindMap"/);
+  assert.match(STUDY_BOARDS, /loadLocalNotes|persistLocalNotes/);
+});
+
+test("animals standing on the ground are gone, birds are not", () => {
+  // The meadow herd: constructed with a zero budget rather than deleted, so
+  // the fur material, the species banks and the update/dispose paths all stay
+  // honest. (Verified separately: every tier yields 0 meshes.)
+  assert.match(SCENE, /createWildlife\(\{ \.\.\.this\.budget, animalCount: 0 \}/);
+
+  // The safari floor: filtered on the AUTHORED placement rather than a
+  // hand-typed id list, so a new entry in data.js classifies itself.
+  assert.match(SAFARI_DISTRICT, /const isGroundAnimal =/);
+  assert.match(SAFARI_DISTRICT, /item\.kind === "animal" && \(item\.y === "ground" \|\| item\.y === "rock"\)/);
+  assert.match(SAFARI_DISTRICT, /\.filter\(\s*\(item\) => !isGroundAnimal\(item\),?\s*\)/);
+
+  // Prove the filter keeps what it should. Birds stay, as asked; so do the
+  // perched monkey, the water creatures and every prop.
+  const data = read("src/nature3d/safari/data.js");
+  const items = [...data.matchAll(/\{ id: '([a-z]+)',\s*kind: '(\w+)'[^}]*?y: '?([\w.]+)'?/g)];
+  assert.ok(items.length >= 17, `expected the safari item table, parsed ${items.length}`);
+  const removed = items.filter(([, , kind, y]) => kind === "animal" && (y === "ground" || y === "rock"));
+  const kept = items.filter((m) => !removed.includes(m));
+  assert.deepEqual(
+    removed.map(([, id]) => id).sort(),
+    ["crocodile", "elephant", "giraffe", "lion", "snake", "zebra"],
+    "exactly the ground/rock animals must be dropped",
+  );
+  assert.ok(kept.some(([, id]) => id === "bird"), "the bird must stay");
+  assert.ok(kept.some(([, id]) => id === "monkey"), "the perched monkey is not on the ground");
+  for (const id of ["hippo", "fish"]) {
+    assert.ok(kept.some(([, k]) => k === id), `${id} is in the water, not on the ground`);
+  }
+  for (const id of ["flower", "bone", "stump", "banana", "truck", "camera", "binoculars"]) {
+    assert.ok(kept.some(([, k]) => k === id), `prop ${id} must be untouched`);
+  }
+});
+
+test("any camera can be rotated, and the seated student can look straight up", () => {
+  // An orbit camera looks AT its target, so its view can never point above
+  // the horizon however far the pitch is pushed — that is why the sky was
+  // unreachable. Looking up is a separate degree of freedom applied to the
+  // view direction, with the camera left where it is.
+  assert.match(CONTROLS, /lookUp = 0;/);
+  assert.match(CONTROLS, /private targetLookUp = 0;/);
+  assert.match(CONTROLS, /const LOOK_UP_MAX = Math\.PI \/ 2;/);
+
+  // The ceiling carries the orbit's own downward tilt, or a flat PI/2 tops
+  // out at 88.3 degrees instead of a full 90.
+  assert.match(CONTROLS, /const ceiling = LOOK_UP_MAX \+ this\.targetPitch;/);
+
+  // The pole must not degenerate: an explicit perpendicular up vector is
+  // supplied rather than relying on lookAt's default.
+  assert.match(CONTROLS, /camera\.up\.copy\(ORBIT_UP\)/);
+  assert.match(CONTROLS, /applyAxisAngle\(ORBIT_RIGHT, Math\.PI \/ 2\)\.negate\(\)/);
+  // ...and restored the moment the neck is level, or every later view rolls.
+  assert.match(CONTROLS, /camera\.up\.set\(0, 1, 0\);/);
+
+  // A preset frames something specific, so it resets the neck.
+  assert.match(CONTROLS, /this\.targetLookUp = 0;\s*\n\s*this\.target\.copy\(target\)/);
+
+  // The frame path allocates nothing.
+  assert.match(CONTROLS, /const ORBIT_DIR = new THREE\.Vector3\(\);/);
+  const update = CONTROLS.slice(CONTROLS.indexOf("update(dt: number, camera"));
+  assert.ok(
+    !/new THREE\.(Vector3|Quaternion)/.test(update.slice(0, update.indexOf("\n  }"))),
+    "OrbitRig.update must not allocate",
+  );
 });

@@ -173,7 +173,18 @@ export class Sanctuary {
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
     this.scene.add(this.birds.group);
 
-    this.wildlife = createWildlife(this.budget, this.textures.fur);
+    // ── The grazing herd is not built ────────────────────────────────
+    //
+    // Every animal that stood on the meadow floor — the buffalo, cows, deer,
+    // sheep and goats — is gone at the owner's request. Birds stay: they are
+    // in the trees and in the air, not on the ground.
+    //
+    // The system is still CONSTRUCTED, with a zero animal budget, rather than
+    // deleted. `createWildlife` owns the fur material and the shared species
+    // geometry banks, and `Sanctuary` calls `update`/`dispose` on it in three
+    // places; keeping the object means those paths stay honest and re-enabling
+    // the herd later is a one-line budget change instead of a re-import.
+    this.wildlife = createWildlife({ ...this.budget, animalCount: 0 }, this.textures.fur);
     this.scene.add(this.wildlife.group);
 
     this.water = createWater(this.textures, this.budget);

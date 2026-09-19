@@ -31,6 +31,16 @@ interface ReadingBoardProps {
   loading: boolean;
   /** Signed out — the board says so instead of pretending the library is empty. */
   signedIn: boolean;
+  /**
+   * The course the learner has picked, LIFTED so the notes and mind-map
+   * boards scope to it too. Nothing is auto-selected: until the learner
+   * chooses, this is null and the side boards stay empty.
+   */
+  courseId: string | null;
+  onSelectCourse: (id: string | null) => void;
+  /** The module they drilled into, for the same reason. */
+  moduleId: string | null;
+  onSelectModule: (id: string | null) => void;
 }
 
 const TYPE_ICON: Partial<Record<CourseFileType, typeof FileText>> = {
@@ -54,9 +64,11 @@ function moduleFiles(module: CourseModule): CourseFile[] {
   return module.files ?? [];
 }
 
-export default function ReadingBoard({ courses, loading, signedIn }: ReadingBoardProps) {
-  const [courseId, setCourseId] = useState<string | null>(null);
+export default function ReadingBoard({
+  courses, loading, signedIn, courseId, onSelectCourse, moduleId, onSelectModule,
+}: ReadingBoardProps) {
   const [file, setFile] = useState<CourseFile | null>(null);
+  const setCourseId = onSelectCourse;
 
   const course = useMemo(
     () => courses.find((c) => c.id === courseId) ?? null,
@@ -68,7 +80,7 @@ export default function ReadingBoard({ courses, loading, signedIn }: ReadingBoar
     return (
       <BoardFrame
         title={file.name}
-        subtitle={course.title}
+        subtitle={moduleId ? `${course.title} · notes scoped to this module` : course.title}
         onBack={() => setFile(null)}
         backLabel="Modules"
       >
@@ -86,7 +98,10 @@ export default function ReadingBoard({ courses, loading, signedIn }: ReadingBoar
       <BoardFrame
         title={course.title}
         subtitle={`${modules.length} module${modules.length === 1 ? "" : "s"}`}
-        onBack={() => setCourseId(null)}
+        onBack={() => {
+          onSelectModule(null);
+          setCourseId(null);
+        }}
         backLabel="My courses"
       >
         {modules.length === 0 ? (
@@ -94,7 +109,16 @@ export default function ReadingBoard({ courses, loading, signedIn }: ReadingBoar
         ) : (
           <div className="grid gap-5 p-8 lg:grid-cols-2 2xl:grid-cols-3">
             {modules.map((module) => (
-              <ModuleCard key={module.id} module={module} onOpen={setFile} />
+              <ModuleCard
+                key={module.id}
+                module={module}
+                onOpen={(f, ownerId) => {
+                  // Scope the notes and mind-map boards to the module this
+                  // resource came from, exactly as the player does.
+                  onSelectModule(ownerId);
+                  setFile(f);
+                }}
+              />
             ))}
           </div>
         )}
@@ -145,7 +169,7 @@ export default function ReadingBoard({ courses, loading, signedIn }: ReadingBoar
   );
 }
 
-function ModuleCard({ module, onOpen }: { module: CourseModule; onOpen: (f: CourseFile) => void }) {
+function ModuleCard({ module, onOpen }: { module: CourseModule; onOpen: (f: CourseFile, moduleId: string) => void }) {
   const files = moduleFiles(module);
   const children = module.modules ?? [];
   return (
@@ -161,7 +185,7 @@ function ModuleCard({ module, onOpen }: { module: CourseModule; onOpen: (f: Cour
             <button
               key={f.id}
               type="button"
-              onClick={() => onOpen(f)}
+              onClick={() => onOpen(f, module.id)}
               className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-left text-[15px] font-semibold text-white/85 transition hover:border-emerald-300/50 hover:bg-emerald-400/10 hover:text-white"
             >
               <Icon className="h-4.5 w-4.5 shrink-0 text-sky-300" />
@@ -171,6 +195,9 @@ function ModuleCard({ module, onOpen }: { module: CourseModule; onOpen: (f: Cour
         })}
         {children.map((child) => (
           <div key={child.id} className="ml-3 border-l border-white/10 pl-3">
+            {/* `onOpen` is passed straight through, so a nested module reports
+                its OWN id — notes scope to the module the file really lives
+                in, not to its top-level ancestor. */}
             <ModuleCard module={child} onOpen={onOpen} />
           </div>
         ))}

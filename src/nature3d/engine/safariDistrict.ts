@@ -64,8 +64,24 @@ export function createSafariDistrict(): SafariDistrict {
   const creatures: { update(dt: number, t: number): void }[] = [];
   let disposed = false;
 
+  // ── Ground animals are not built ─────────────────────────────────────
+  //
+  // The meadow herd is gone and so is everything standing on the safari
+  // floor: the lion on its rock, the snake, giraffe, zebra, crocodile and
+  // elephant. Birds stay, as asked, and so does anything that was never
+  // standing on the ground in the first place — the perched monkey and the
+  // water creatures (hippo, fish), which are not "ground animals".
+  //
+  // The filter keys off the AUTHORED placement (`y`) rather than a hand-typed
+  // list of ids, so a future item added to `data.js` is classified correctly
+  // without anyone remembering to update this file. Props are untouched.
+  const isGroundAnimal = (item: { kind?: string; y?: unknown; id?: string }) =>
+    item.kind === "animal" && (item.y === "ground" || item.y === "rock");
+
   // Kick off the model loads. Each animal is added the moment it arrives.
-  const defs = ITEMS as { id: string }[];
+  const defs = (ITEMS as { id: string; kind?: string; y?: unknown }[]).filter(
+    (item) => !isGroundAnimal(item),
+  );
   for (let i = 0; i < defs.length; i += 1) {
     const def = defs[i];
     void loadModel(def.id)

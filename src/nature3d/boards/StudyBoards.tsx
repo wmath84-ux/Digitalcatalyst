@@ -35,6 +35,14 @@ const MindMapPanel = lazy(() => import("../../course/MindMapPanel"));
 
 export type BoardSlot = "mindmap" | "reading" | "notes";
 
+/**
+ * Frozen so the "no course picked" case passes the SAME array identity every
+ * render. A fresh `[]` would change props every frame and make NotesPanel
+ * rebuild its grid continuously — on a board that is composited in 3D, that
+ * is a visible cost.
+ */
+const EMPTY_NOTES: CoursePlayerNote[] = [];
+
 export interface BoardHosts {
   mindmap: HTMLElement | null;
   reading: HTMLElement | null;
@@ -46,8 +54,6 @@ interface BoardPortalsProps {
   courses: Product[];
   loading: boolean;
   uid: string | null;
-  /** The course whose notes / maps the side boards are scoped to. */
-  activeCourse: Product | null;
 }
 
 /**
@@ -116,24 +122,62 @@ function useBoardNotes(uid: string | null, productId: string | null) {
   return { notes, onAdd, onEdit, onDelete };
 }
 
-export default function BoardPortals({ hosts, courses, loading, uid, activeCourse }: BoardPortalsProps) {
+export default function BoardPortals({ hosts, courses, loading, uid }: BoardPortalsProps) {
+  // ── NOTHING IS AUTO-SELECTED ─────────────────────────────────────────
+  //
+  // This used to be `activeCourse={ownedCourses[0]}` — the first course the
+  // catalogue happened to return. That is why the note and mind-map boards
+  // opened showing somebody's existing notes: the boards were silently
+  // scoped to a course the learner never picked. The learner chooses the
+  // course (and then the module) on the reading board, and until they do,
+  // `selectedCourseId` is null and the side boards are genuinely empty —
+  // just the "+" to create the first one.
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+
+  const activeCourse = useMemo(
+    () => courses.find((c) => c.id === selectedCourseId) ?? null,
+    [courses, selectedCourseId],
+  );
+
+  // A course that disappears from the entitlement list (subscription lapsed,
+  // refund) must not leave its notes on the board.
+  useEffect(() => {
+    if (selectedCourseId && !activeCourse) {
+      setSelectedCourseId(null);
+      setSelectedModuleId(null);
+    }
+  }, [selectedCourseId, activeCourse]);
+
   const productId = activeCourse?.id ?? null;
   const notes = useBoardNotes(uid, productId);
 
   // The mind map hook is the player's own, pointed at the same document, so
-  // maps made here appear in the player and vice versa.
+  // maps made here appear in the player and vice versa. `moduleId` is the
+  // module the learner drilled into — the same scoping the player uses, so
+  // the two show the same maps.
   const mindMap = useCourseMindMap({
     uid: uid ?? undefined,
     productId: productId ?? "",
-    moduleId: undefined,
+    moduleId: selectedModuleId ?? undefined,
     rootTopic: activeCourse?.title || "Study map",
   });
 
   const signedIn = Boolean(uid);
 
   const readingTree = useMemo(
-    () => <ReadingBoard courses={courses} loading={loading} signedIn={signedIn} />,
-    [courses, loading, signedIn],
+    () => (
+      <ReadingBoard
+        courses={courses}
+        loading={loading}
+        signedIn={signedIn}
+        courseId={selectedCourseId}
+        onSelectCourse={setSelectedCourseId}
+        moduleId={selectedModuleId}
+        onSelectModule={setSelectedModuleId}
+      />
+    ),
+    [courses, loading, signedIn, selectedCourseId, selectedModuleId],
   );
 
   return (
@@ -142,15 +186,13 @@ export default function BoardPortals({ hosts, courses, loading, uid, activeCours
 
       {hosts.notes
         ? createPortal(
-            <BoardFrame
-              title="Note taking"
-              subtitle={activeCourse ? activeCourse.title : "Your saved notes"}
-            >
-              {/* The player's panel, untouched. It opens on the note library
-                  by itself — that is its own default view. */}
+            <BoardFrame title="Note taking" subtitle={activeCourse?.title}>
+              {/* The player's panel, untouched — same toolbar, same editor,
+                  same library grid. With no course picked it is handed an
+                  EMPTY list, so the board shows only the circular "+". */}
               <div className="h-full w-full">
                 <NotesPanel
-                  notes={notes.notes}
+                  notes={activeCourse ? notes.notes : EMPTY_NOTES}
                   onAdd={notes.onAdd}
                   onEdit={notes.onEdit}
                   onDelete={notes.onDelete}
@@ -163,10 +205,7 @@ export default function BoardPortals({ hosts, courses, loading, uid, activeCours
 
       {hosts.mindmap
         ? createPortal(
-            <BoardFrame
-              title="Mind map"
-              subtitle={activeCourse ? activeCourse.title : "Your maps"}
-            >
+            <BoardFrame title="Mind map" subtitle={activeCourse?.title}>
               <Suspense
                 fallback={
                   <div className="grid h-full place-items-center text-white/50">
