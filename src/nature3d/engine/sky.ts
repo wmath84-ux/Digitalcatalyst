@@ -9,12 +9,17 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
+import type { DaylightState } from "./daylight";
 import type { TextureSet } from "./textures";
 
 export interface SkySystem {
   group: THREE.Group;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
+  /** Current sun direction, shared (not copied) with everything that reads it. */
+  sunDir: THREE.Vector3;
+  /** Re-light the whole sky for a moment of the day. */
+  applyDaylight(state: DaylightState): void;
   update(dt: number, time: number, wind: number): void;
   dispose(): void;
 }
@@ -227,6 +232,32 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     group,
     sun,
     hemi,
+    sunDir,
+    /**
+     * Re-light for a moment of the day.
+     *
+     * `sunDir` is mutated in place rather than replaced: the water shader and
+     * the scene's shadow rig hold a reference to this very vector, so writing
+     * through it keeps every consumer in step with no wiring and no per-frame
+     * copying. The sun LIGHT is positioned by the scene (it follows the
+     * camera so a finite shadow map stays useful) — only its direction,
+     * colour and intensity are decided here.
+     */
+    applyDaylight(state) {
+      sunDir.copy(state.sunDir);
+      domeMat.uniforms.uSunDir.value.copy(state.sunDir);
+      (domeMat.uniforms.uSunColor.value as THREE.Color).copy(state.sunTint);
+      (domeMat.uniforms.uZenith.value as THREE.Color).copy(state.zenith);
+      (domeMat.uniforms.uHorizon.value as THREE.Color).copy(state.horizon);
+      (domeMat.uniforms.uGround.value as THREE.Color).copy(state.ground);
+
+      sun.color.copy(state.sunColor);
+      sun.intensity = state.sunIntensity;
+      hemi.color.copy(state.hemiSky);
+      hemi.groundColor.copy(state.hemiGround);
+      hemi.intensity = state.hemiIntensity;
+      fill.intensity = state.fillIntensity;
+    },
     update(dt, time, wind) {
       // Clouds drift
       for (let i = 0; i < cloudCount; i += 1) {

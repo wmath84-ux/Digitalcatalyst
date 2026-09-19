@@ -1476,3 +1476,94 @@ test("the lesson board sits where a seated learner can read it", () => {
   // The lesson text itself is untouched — the brief was to keep it.
   assert.match(BOARD, /ctx\.fillText\("Morning Nature Study"/);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Group 17 — time of day: a real moving sun, and morning/midday/evening
+// ─────────────────────────────────────────────────────────────────────────
+
+const DAYLIGHT = read("src/nature3d/engine/daylight.ts");
+// SKY and WATER are already declared at the top of this file — reuse them.
+
+test("the sun is computed from the clock, not keyframed", () => {
+  // Three presets plus a crossfade cannot answer "where is the sun at 10:40":
+  // blending two directions cuts the chord of the arc, so the sun would sag
+  // below its true path all mid-morning. The arc is evaluated from the hour
+  // instead, and the named modes are just three hours through the same
+  // function — so "auto" and "manual" can never drift apart.
+  assert.match(DAYLIGHT, /export function daylightAt\(hour: number\): DaylightState/);
+  assert.match(DAYLIGHT, /export const MODE_HOURS/);
+  assert.match(DAYLIGHT, /hourForMode = \(mode: DaylightMode, now: Date = new Date\(\)\)/);
+  assert.match(DAYLIGHT, /mode === "auto" \? clampToDaylight\(currentHour\(now\)\) : MODE_HOURS\[mode\]/);
+  // Elevation on a sine and azimuth sweeping east→west — an actual arc.
+  assert.match(DAYLIGHT, /Math\.sin\(Math\.PI \* t\) \* MAX_ELEVATION/);
+  assert.match(DAYLIGHT, /const azimuth = \(1 - 2 \* t\) \* HORIZON_SWING/);
+
+  // Verified numerically against the real module (hours 6.00 → 18.50):
+  //   azimuth  +70.0 → -70.0 deg, strictly decreasing  (east to west)
+  //   elevation  4.0 → 72.0 → 4.0 deg                  (rises, peaks, falls)
+  //   intensity 1.11 → 3.15 → 1.11, exposure 0.938 → 1.160 → 0.938
+  //   colour   #ff8b46 → #fff6e8 → #ff8242             (warm, white, warm)
+});
+
+test("brightness and warmth follow the sun's height", () => {
+  // One driver for everything: dayFactor = sin(elevation) normalised, so
+  // midday really is the brightest and the ends really are the warmest
+  // without any of them being tuned by hand.
+  assert.match(DAYLIGHT, /const dayFactor = THREE\.MathUtils\.clamp\(Math\.sin\(elevation\) \/ Math\.sin\(MAX_ELEVATION\), 0, 1\)/);
+  assert.match(DAYLIGHT, /sunIntensity: THREE\.MathUtils\.lerp\(0\.95, 3\.15, dayFactor\)/);
+  assert.match(DAYLIGHT, /exposure: THREE\.MathUtils\.lerp\(0\.92, 1\.16, dayFactor\)/);
+  assert.match(DAYLIGHT, /const warm = 1 - THREE\.MathUtils\.smoothstep\(dayFactor, 0\.06, 0\.62\)/);
+});
+
+test("night holds the evening look and the sun never touches the horizon", () => {
+  // A study space must stay readable: 23:00 renders as sunset, not darkness.
+  // Measured: 23h, 21h and 19.5h all resolve to hour 18.50; 02h and 04:30 to
+  // 06.00 — and the sun's y stays above 0.05 at every hour of the clock.
+  assert.match(DAYLIGHT, /clampToDaylight = \(hour: number\): number =>\s*\n?\s*THREE\.MathUtils\.clamp\(hour, DAY_START, DAY_END\)/);
+  // At exactly 0 elevation the shadow frustum degenerates and shadows stretch
+  // to infinity — which reads as a black screen, not a sunset.
+  assert.match(DAYLIGHT, /const MIN_ELEVATION = THREE\.MathUtils\.degToRad\(4\)/);
+  assert.match(DAYLIGHT, /Math\.max\(Math\.sin\(Math\.PI \* t\) \* MAX_ELEVATION, MIN_ELEVATION\)/);
+});
+
+test("everything that reads the sun shares one vector", () => {
+  // The water glint has to track the sun or the river sparkles from the dawn
+  // position all evening. Rather than wiring an update through, the shader
+  // holds the SAME Vector3 the sky writes — so the daylight code writes once
+  // and every consumer follows, with no per-frame copying. The reflection
+  // schedule itself is untouched, as the owner asked.
+  assert.match(SKY, /sunDir: THREE\.Vector3;/);
+  assert.match(SKY, /applyDaylight\(state: DaylightState\): void;/);
+  assert.match(SKY, /sunDir\.copy\(state\.sunDir\)/);
+  assert.match(WATER, /shader\.uniforms\.uSunDir = \{ value: sunDir \}/);
+  assert.ok(
+    !/uSunDir = \{ value: new THREE\.Vector3\(0\.62/.test(WATER),
+    "the water must not keep its own frozen sun direction",
+  );
+  assert.match(SCENE, /createWater\(this\.textures, this\.budget, this\.sky\.sunDir\)/);
+
+  // The shadow-casting light must sit on the real sun direction. The old
+  // hardcoded (+44, 48, -50) offset was a permanent morning sun, so shadows
+  // pointed the same way at dusk as at dawn — the tell that gives away a fake
+  // moving sun.
+  assert.match(SCENE, /this\.sky\.sun\.position\.copy\(this\.sky\.sunDir\)\.multiplyScalar\(70\)/);
+  assert.ok(!/position\.set\(\s*\n?\s*this\.camera\.position\.x \+ 44/.test(SCENE));
+});
+
+test("the learner can switch lighting from the top tray", () => {
+  assert.match(PAGE, /const DAYLIGHT_MODES/);
+  for (const mode of ["auto", "morning", "midday", "evening"]) {
+    assert.ok(PAGE.includes(`key: "${mode}"`), `${mode} must be offered`);
+  }
+  // Auto is the default, so the sanctuary matches the real world unprompted.
+  assert.match(PAGE, /useState<DaylightMode>\("auto"\)/);
+  assert.match(PAGE, /engineRef\.current\?\.setDaylightMode\(key\)/);
+  assert.match(SCENE, /setDaylightMode\(mode: DaylightMode\)/);
+  // Auto re-reads the clock while the page is open — otherwise a long session
+  // started in the morning would still be lit as morning at dusk.
+  assert.match(SCENE, /if \(this\.daylightMode === "auto"\)/);
+  assert.match(SCENE, /if \(this\.daylightClock >= 20\)/);
+  // Moving the sun invalidates every shadow in the static shadow map.
+  const applyBody = SCENE.slice(SCENE.indexOf("private applyDaylight()"));
+  assert.match(applyBody.slice(0, applyBody.indexOf("\n  }")), /this\.requestShadowRefresh\(\)/);
+});

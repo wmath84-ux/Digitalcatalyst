@@ -29,6 +29,7 @@ import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
+import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
@@ -113,6 +114,11 @@ export class Sanctuary {
   private lastStats = 0;
   private aiClock = 0;
   private skyClock = 0;
+  /** Which lighting the learner chose; "auto" follows the device clock. */
+  private daylightMode: DaylightMode = "auto";
+  private daylight: DaylightState = daylightAt(hourForMode("auto"));
+  /** Seconds since the auto clock was last re-read. */
+  private daylightClock = 0;
   private ambientClock = 0;
   /** True while the camera is parked on one study board (see the frame loop). */
   private studyFocus = false;
@@ -186,7 +192,12 @@ export class Sanctuary {
     this.wildlife = createWildlife({ ...this.budget, animalCount: 0 }, this.textures.fur);
     this.scene.add(this.wildlife.group);
 
-    this.water = createWater(this.textures, this.budget);
+    this.water = createWater(this.textures, this.budget, this.sky.sunDir);
+
+    // Light the world for the current moment before the first frame, so the
+    // sanctuary never flashes the authored midday look and then correct
+    // itself.
+    this.applyDaylight();
     this.scene.add(this.water.group);
 
     this.student = createStudent(this.budget);
@@ -427,7 +438,40 @@ export class Sanctuary {
     return this.orbit.autoRotate;
   }
 
-  focus(preset: ViewPreset) {
+/**
+   * Push the current daylight state into the sky, the fog and the exposure.
+   *
+   * The water needs nothing here: its shader holds the very Vector3 the sky
+   * writes, so the glint has already moved by the time this returns.
+   */
+  private applyDaylight() {
+    const state = daylightAt(hourForMode(this.daylightMode));
+    this.daylight = state;
+    this.sky.applyDaylight(state);
+    (this.scene.fog as THREE.FogExp2).color.copy(state.fog);
+    this.scene.background = null;
+    this.renderer.toneMappingExposure = state.exposure;
+    // The sun moved, so every shadow in the world is now wrong.
+    this.requestShadowRefresh();
+  }
+
+  /** Morning / midday / evening, or "auto" to follow the real clock. */
+  setDaylightMode(mode: DaylightMode) {
+    this.daylightMode = mode;
+    this.daylightClock = 0;
+    this.applyDaylight();
+  }
+
+  getDaylightMode(): DaylightMode {
+    return this.daylightMode;
+  }
+
+  /** Decimal hour currently being rendered (for the HUD readout). */
+  getDaylightHour(): number {
+    return this.daylight.hour;
+  }
+
+    focus(preset: ViewPreset) {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
@@ -694,6 +738,18 @@ export class Sanctuary {
       this.aiClock = 0;
     }
 
+    // In auto mode the clock is re-read every 20 s. The sun crosses the sky in
+    // 12.5 hours, so that is under a tenth of a degree per step — far below
+    // what the eye can catch, while still costing nothing: one date read and a
+    // handful of colour lerps, three times a minute.
+    if (this.daylightMode === "auto") {
+      this.daylightClock += dt;
+      if (this.daylightClock >= 20) {
+        this.daylightClock = 0;
+        this.applyDaylight();
+      }
+    }
+
     this.skyClock += dt;
     if (this.skyClock >= (study ? 1 / 8 : 1 / 20)) {
       this.sky.update(this.skyClock, time, this.wind);
@@ -710,12 +766,12 @@ export class Sanctuary {
         this.lastShadowCam.copy(this.camera.position);
         this.requestShadowRefresh();
       }
+      // Park the light on the REAL sun direction, 70 m from the viewer. The
+      // old fixed (+44, 48, -50) offset was a hardcoded morning sun: shadows
+      // would have pointed the same way at dusk as at dawn, which is the
+      // giveaway that makes a moving sun look fake.
       this.sky.sun.target.position.set(this.camera.position.x, 0, this.camera.position.z);
-      this.sky.sun.position.set(
-        this.camera.position.x + 44,
-        48,
-        this.camera.position.z - 50,
-      );
+      this.sky.sun.position.copy(this.sky.sunDir).multiplyScalar(70).add(this.sky.sun.target.position);
       this.sky.sun.target.updateMatrixWorld();
       if (this.shadowDirty > 0) {
         this.renderer.shadowMap.needsUpdate = true;

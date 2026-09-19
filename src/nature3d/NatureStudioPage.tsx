@@ -20,7 +20,7 @@ import {
   Compass, Eye, Footprints,
   Maximize2, Minimize2, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
-  BookOpen, PenLine, Network, Users,
+  BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
@@ -28,6 +28,7 @@ import { webglSupported } from "./engine/quality";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
+import { hourForMode, type DaylightMode } from "./engine/daylight";
 
 const WIND_STEPS = [
   { label: "Calm", mult: 0.45 },
@@ -57,6 +58,22 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
  * you read ONE board at a time. "Desk" pulls back to the seat so all three are
  * in frame together.
  */
+/**
+ * Lighting modes for the top tray.
+ *
+ * "Auto" leads because it is the default: the sanctuary follows the device
+ * clock, so a learner opening it at 5 pm gets evening light without touching
+ * anything. The other three pin the sun to a representative hour. Night is
+ * deliberately absent — after sunset the scene holds the evening look, since
+ * a dark study space would make the boards unreadable.
+ */
+const DAYLIGHT_MODES: { key: DaylightMode; label: string; Icon: typeof Sun }[] = [
+  { key: "auto", label: "Auto", Icon: Clock },
+  { key: "morning", label: "Morning", Icon: Sunrise },
+  { key: "midday", label: "Midday", Icon: Sun },
+  { key: "evening", label: "Evening", Icon: Sunset },
+];
+
 const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
   { key: "mindmap", label: "Mind map", Icon: Network },
   { key: "reading", label: "Reading", Icon: BookOpen },
@@ -74,6 +91,10 @@ export default function NatureStudioPage() {
   const [booting, setBooting] = useState(true);
   const [mode, setMode] = useState<CameraMode>("orbit");
   const [windIdx, setWindIdx] = useState(1);
+  const [daylight, setDaylight] = useState<DaylightMode>("auto");
+  // Shown next to the buttons so "Auto" is legible — otherwise the learner
+  // cannot tell which hour the scene decided on. Ticks once a minute.
+  const [clockHour, setClockHour] = useState(() => hourForMode("auto"));
   const [autoOrbit, setAutoOrbit] = useState(false);
   const [showLesson, setShowLesson] = useState(false);
   const [immersive, setImmersive] = useState(false);
@@ -163,6 +184,13 @@ export default function NatureStudioPage() {
     setMode(next);
     if (next === "fpp") setAutoOrbit(false);
   }, []);
+
+  useEffect(() => {
+    if (daylight !== "auto") return undefined;
+    const id = window.setInterval(() => setClockHour(hourForMode("auto")), 60_000);
+    setClockHour(hourForMode("auto"));
+    return () => window.clearInterval(id);
+  }, [daylight]);
 
   const cycleWind = useCallback(() => {
     setWindIdx((i) => {
@@ -259,6 +287,38 @@ export default function NatureStudioPage() {
             >
               — fps
             </span>
+            <div className="flex items-center gap-1 rounded-xl border border-white/18 bg-slate-950/45 p-1 backdrop-blur-xl">
+              {DAYLIGHT_MODES.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    engineRef.current?.setDaylightMode(key);
+                    setDaylight(key);
+                  }}
+                  className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold transition ${
+                    daylight === key
+                      ? "bg-amber-400/25 text-white shadow-[0_0_16px_rgba(251,191,36,0.35)]"
+                      : "text-white/70 hover:bg-white/12"
+                  }`}
+                  title={
+                    key === "auto"
+                      ? "Follow the real time of day"
+                      : `Light the sanctuary as ${label.toLowerCase()}`
+                  }
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">{label}</span>
+                </button>
+              ))}
+              {daylight === "auto" ? (
+                <span className="px-1 font-mono text-[10px] font-bold text-amber-200/80">
+                  {String(Math.floor(clockHour)).padStart(2, "0")}:
+                  {String(Math.floor((clockHour % 1) * 60)).padStart(2, "0")}
+                </span>
+              ) : null}
+            </div>
+
             <HudButton onClick={cycleWind} title="Wind strength">
               <Wind className="h-3.5 w-3.5 text-sky-200" />
               <span className="hidden sm:inline">{WIND_STEPS[windIdx].label}</span>

@@ -22,7 +22,18 @@ export interface WaterSystem {
   dispose(): void;
 }
 
-export function createWater(tex: TextureSet, budget: QualityBudget): WaterSystem {
+export function createWater(
+  tex: TextureSet,
+  budget: QualityBudget,
+  /**
+   * The live sun direction, SHARED with the sky (same Vector3 instance).
+   * The glint has to track the sun or the river would sparkle from the
+   * morning position all evening. Holding the reference means the daylight
+   * code writes once and this follows for free — no per-frame copy, and the
+   * reflection schedule itself is untouched.
+   */
+  sunDir: THREE.Vector3,
+): WaterSystem {
   const group = new THREE.Group();
   group.name = "water";
 
@@ -74,7 +85,7 @@ export function createWater(tex: TextureSet, budget: QualityBudget): WaterSystem
   riverMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uFlowMap = { value: normTex };
-    shader.uniforms.uSunDir = { value: new THREE.Vector3(0.62, 0.34, -0.7).normalize() };
+    shader.uniforms.uSunDir = { value: sunDir };
 
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nuniform float uTime;\nvarying vec3 vDcWorld;")
