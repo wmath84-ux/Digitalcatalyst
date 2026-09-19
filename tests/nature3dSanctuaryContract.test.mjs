@@ -313,9 +313,11 @@ test("adaptive resolution trims pixels instead of popping content", () => {
 });
 
 test("the frame loop is allocation-free, staggered and pausable", () => {
-  // Heavy systems run on their own cadence.
-  assert.match(SCENE, /this\.aiClock >= 1 \/ 30/);
-  assert.match(SCENE, /this\.skyClock >= 1 \/ 20/);
+  // Heavy systems run on their own cadence. Each one also has a slower
+  // study-mode rate used while a single board is framed (Group 13) — the
+  // normal rate is the second arm of that conditional.
+  assert.match(SCENE, /this\.aiClock >= \(study \? 1 \/ 12 : 1 \/ 30\)/);
+  assert.match(SCENE, /this\.skyClock >= \(study \? 1 \/ 8 : 1 \/ 20\)/);
   // Long stalls can never teleport the world.
   assert.match(SCENE, /Math\.min\(this\.clock\.getDelta\(\), 0\.05\)/);
   // Shadows are static and refreshed on demand only.
@@ -633,13 +635,14 @@ test("soaring birds flap in bursts and bank into their turns", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 test("the learner can look straight up and all the way behind", () => {
-  const m = /clamp\(this\.pitch - dy, (-?[\d.]+), ([\d.]+)\)/.exec(CONTROLS);
+  const m = /clamp\(this\.pitch - dy, (-?[\d.]+), [^)]+\)/.exec(CONTROLS);
   assert.ok(m, "expected the first-person pitch clamp");
-  const hi = Number(m[2]);
-  assert.ok(hi >= 1.5, `pitch cap ${hi} rad is too low — the sky must be reachable`);
-  // Never a full 90 degrees: at exactly PI/2 the yaw frame degenerates.
-  assert.ok(hi < Math.PI / 2, "pitch must stop just short of vertical to avoid gimbal flip");
-  assert.equal(Number(m[1]), -hi, "looking down must be as free as looking up");
+  // Looking UP now reaches a full 90 degrees, as the brief asks. The old cap
+  // stopped 3 degrees short on gimbal-flip grounds, which do not apply: this
+  // rig stores yaw and pitch as state and only ever writes them out (YXZ), so
+  // the pole is an ordinary rotation — nothing recovers yaw from a direction.
+  assert.match(CONTROLS, /clamp\(this\.pitch - dy, -1\.52, Math\.PI \/ 2\)/);
+  assert.ok(Number(m[1]) <= -1.5, "looking down must stay nearly as free");
   // Yaw has to stay unbounded so you can turn to face behind you.
   assert.match(CONTROLS, /this\.yaw -= dx;/);
   assert.ok(
@@ -769,7 +772,9 @@ test("the safari is built into the one scene, without a second sky or sun", () =
   // The scene wires it in and disposes it.
   assert.match(SCENE, /this\.safari = createSafariDistrict\(\)/);
   assert.match(SCENE, /this\.scene\.add\(this\.safari\.group\)/);
-  assert.match(SCENE, /this\.safari\.update\(dt, time\)/);
+  // The safari runs on the shared ambient budget (Group 13), so its dt is the
+  // accumulated ambient step rather than the raw frame dt.
+  assert.match(SCENE, /this\.safari\.update\(adt, time\)/);
   assert.match(SCENE, /this\.safari\.dispose\(\)/);
 });
 
@@ -912,4 +917,239 @@ test("shrinking the window never pushes the world off screen", () => {
       `at aspect ${aspect.toFixed(2)} only ${halfWidth.toFixed(0)} m is visible, districts are ${spread} m out`,
     );
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Group 13 — the three-board study lectern
+//
+//  Three 30 m boards stand around the chair, each showing a live page from
+//  the course player. The geometry is exact and is proved here rather than
+//  eyeballed, because "1 m apart and square on to the student" is the kind
+//  of constraint that silently drifts the moment a number is touched.
+// ─────────────────────────────────────────────────────────────────────────
+
+const LECTERN = read("src/nature3d/engine/lectern.ts");
+const SCREENS = read("src/nature3d/engine/boardScreens.ts");
+const READING_BOARD = read("src/nature3d/boards/ReadingBoard.tsx");
+const STUDY_BOARDS = read("src/nature3d/boards/StudyBoards.tsx");
+
+/**
+ * Re-derive the layout from the shipped constants, exactly as `lectern.ts`
+ * does. If the source's own maths changes, these assertions move with it —
+ * what they pin down is the RESULT: 30 m boards, 1 m gaps, dead square on.
+ */
+function solveLectern() {
+  const W = Number(/LECTERN_BOARD_WIDTH = (\d+)/.exec(LECTERN)[1]);
+  const GAP = Number(/LECTERN_GAP = (\d+)/.exec(LECTERN)[1]);
+  const R = Number(/LECTERN_RADIUS = (\d+)/.exec(LECTERN)[1]);
+  const HW = W / 2;
+  const k = GAP + HW;
+  const residual = (p) => Math.atan2(HW + k * Math.cos(p), R + k * Math.sin(p)) - p;
+  let lo = 0.01;
+  let hi = 1.5;
+  for (let i = 0; i < 90; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (residual(lo) * residual(mid) <= 0) hi = mid;
+    else lo = mid;
+  }
+  const p = (lo + hi) / 2;
+  const rx = HW + k * Math.cos(p);
+  const rz = -R - k * Math.sin(p);
+  return { W, GAP, R, HW, swing: p, boards: [
+    { slot: "mindmap", x: -rx, z: rz, yaw: -p },
+    { slot: "reading", x: 0, z: -R, yaw: 0 },
+    { slot: "notes", x: rx, z: rz, yaw: p },
+  ] };
+}
+
+test("the three study boards are 30 m wide, 1 m apart and square on to the student", () => {
+  const L = solveLectern();
+  assert.equal(L.W, 30, "the brief fixes the board width at 30 m");
+  assert.equal(L.GAP, 1, "there must be exactly 1 m between neighbouring boards");
+
+  const corners = (b) => {
+    const ax = Math.cos(b.yaw);
+    const az = -Math.sin(b.yaw);
+    return {
+      left: { x: b.x - L.HW * ax, z: b.z - L.HW * az },
+      right: { x: b.x + L.HW * ax, z: b.z + L.HW * az },
+    };
+  };
+
+  // Every board faces the seat dead-on, so no page is ever read at a slant.
+  for (const b of L.boards) {
+    const bearing = Math.atan2(b.x, -b.z);
+    assert.ok(
+      Math.abs(bearing - b.yaw) < 1e-6,
+      `${b.slot} is ${(((bearing - b.yaw) * 180) / Math.PI).toFixed(2)}deg off square`,
+    );
+  }
+
+  // And the gaps are the specified 1 m — on BOTH sides.
+  const [mm, rd, nt] = L.boards.map(corners);
+  const gapLeft = Math.hypot(mm.right.x - rd.left.x, mm.right.z - rd.left.z);
+  const gapRight = Math.hypot(rd.right.x - nt.left.x, rd.right.z - nt.left.z);
+  assert.ok(Math.abs(gapLeft - 1) < 1e-6, `left gap is ${gapLeft.toFixed(3)} m, not 1 m`);
+  assert.ok(Math.abs(gapRight - 1) < 1e-6, `right gap is ${gapRight.toFixed(3)} m, not 1 m`);
+});
+
+test("all three boards share one ground datum so the set is not staggered", () => {
+  // Sampling the rolling terrain under each board put them at three different
+  // heights (11.5 / 10.6 / 8.5 m). One datum under the chair, legs take the
+  // slack — a lectern is one piece of furniture.
+  assert.match(LECTERN, /const groundY = terrainHeight\(0, pivotZ\)/);
+  assert.match(LECTERN, /position: new THREE\.Vector3\(x, groundY \+ y, z \+ pivotZ\)/);
+  // The legs, by contrast, MUST be measured per board or they float/sink.
+  assert.match(SCREENS, /legH = p\.position\.y - H \/ 2 - terrainHeight\(p\.position\.x, p\.position\.z\)/);
+});
+
+test("each board frames edge-to-edge at every aspect with a half-metre of air", () => {
+  const L = solveLectern();
+  const H = (L.W * 9) / 16;
+  const margin = Number(/const BOARD_VIEW_MARGIN = ([\d.]+)/.exec(SCENE)[1]);
+  assert.equal(margin, 0.5, "the brief asks for ~0.5 m of world still showing");
+
+  // The distance must be COMPUTED from the live projection, never stored:
+  // the fov is aspect-dependent, so a fixed distance crops on a narrow window.
+  assert.match(SCENE, /private focusBoard\(slot: LecternSlot\)/);
+  assert.match(SCENE, /needH \/ 2 \/ Math\.tan\(vFov \/ 2\)/);
+  assert.match(SCENE, /needW \/ 2 \/ Math\.tan\(hFov \/ 2\)/);
+
+  for (const aspect of [2.4, 16 / 9, 1.5, 4 / 3, 1, 0.75, 0.55]) {
+    const base = 52;
+    let fov = base;
+    if (aspect < 16 / 9) {
+      fov = (Math.atan((Math.tan((base * Math.PI) / 360) * (16 / 9)) / aspect) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const v = (fov * Math.PI) / 180;
+    const h = 2 * Math.atan(Math.tan(v / 2) * aspect);
+    const d = Math.max((H + 2 * margin) / 2 / Math.tan(v / 2), (L.W + 2 * margin) / 2 / Math.tan(h / 2));
+    const visibleW = 2 * d * Math.tan(h / 2);
+    const visibleH = 2 * d * Math.tan(v / 2);
+    assert.ok(visibleW >= L.W, `at aspect ${aspect.toFixed(2)} the board is cut off sideways`);
+    assert.ok(visibleH >= H, `at aspect ${aspect.toFixed(2)} the board is cut off vertically`);
+  }
+});
+
+test("the desk view fits all three boards without cutting any off", () => {
+  const L = solveLectern();
+  const H = (L.W * 9) / 16;
+  assert.match(SCENE, /private focusStudentDesk\(\)/);
+  // "Student" must route to it — that is the button that shows the trio.
+  assert.match(SCENE, /case "student":[\s\S]{0,200}this\.focusStudentDesk\(\)/);
+
+  let halfSpan = 0;
+  for (const b of L.boards) {
+    const ax = Math.cos(b.yaw);
+    halfSpan = Math.max(halfSpan, Math.abs(b.x + L.HW * ax), Math.abs(b.x - L.HW * ax));
+  }
+  for (const aspect of [2.4, 16 / 9, 4 / 3, 1, 0.75]) {
+    const base = 52;
+    let fov = base;
+    if (aspect < 16 / 9) {
+      fov = (Math.atan((Math.tan((base * Math.PI) / 360) * (16 / 9)) / aspect) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const v = (fov * Math.PI) / 180;
+    const h = 2 * Math.atan(Math.tan(v / 2) * aspect);
+    const d = Math.max((H + 1) / 2 / Math.tan(v / 2), (halfSpan * 2 + 1) / 2 / Math.tan(h / 2));
+    assert.ok(2 * d * Math.tan(h / 2) >= halfSpan * 2, `aspect ${aspect.toFixed(2)} clips the outer boards`);
+  }
+});
+
+test("the boards are live DOM surfaces, not textures, so every file type works", () => {
+  // A canvas texture cannot host an iframe, which rules out YouTube and PDF
+  // outright, and no render-target resolution keeps body text legible on a
+  // 30 m board. CSS3D is the only approach that satisfies the brief.
+  assert.match(SCREENS, /CSS3DRenderer/);
+  assert.match(SCREENS, /CSS3DObject/);
+  assert.ok(!/WebGLRenderTarget/.test(SCREENS), "the boards must not be render targets");
+
+  // The real player viewer is reused, so every CourseFileType is covered by
+  // construction rather than re-implemented per type.
+  assert.match(READING_BOARD, /import ResourceViewer from "\.\.\/\.\.\/course\/ResourceViewer"/);
+  assert.match(READING_BOARD, /<ResourceViewer file=\{file\}/);
+
+  // Notes and mind map are the player's OWN panels — the brief says the
+  // design must not change.
+  assert.match(STUDY_BOARDS, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
+  assert.match(STUDY_BOARDS, /import\("\.\.\/\.\.\/course\/MindMapPanel"\)/);
+  assert.match(STUDY_BOARDS, /import useCourseMindMap from "\.\.\/\.\.\/course\/useCourseMindMap"/);
+  // ...and they share the player's stores, so a note taken here is the same
+  // note the player shows.
+  assert.match(STUDY_BOARDS, /loadLocalNotes|persistLocalNotes/);
+});
+
+test("the reading board lists only purchased courses", () => {
+  assert.match(PAGE, /purchasedIds\.has\(p\.id\)/);
+  assert.match(PAGE, /<BoardPortals/);
+  // Drilling down: course -> module -> resource, chosen by the learner.
+  assert.match(READING_BOARD, /courses\.map\(/);
+  assert.match(READING_BOARD, /course\.courseContent/);
+  assert.match(READING_BOARD, /onOpen=\{setFile\}/);
+});
+
+test("the tray switches boards and the camera turns to the one picked", () => {
+  // The three named buttons, plus the desk view that shows all of them.
+  assert.match(PAGE, /const BOARD_VIEWS/);
+  for (const [key, label] of [["mindmap", "Mind map"], ["reading", "Reading"], ["notes", "Note taking"]]) {
+    assert.ok(
+      new RegExp(`key: "${key}", label: "${label}"`).test(PAGE),
+      `the tray is missing the ${label} button`,
+    );
+  }
+  assert.match(PAGE, /key: "student", label: "Desk"/);
+  assert.match(PAGE, /engineRef\.current\?\.focus\(key\)/);
+  // And the engine knows those presets.
+  assert.match(SCENE, /\| "reading" \| "notes" \| "mindmap"/);
+});
+
+test("board input does not fight the camera", () => {
+  // The board is a child of the element carrying the orbit/look handlers, so
+  // without this every click in a panel would also spin the world.
+  assert.match(SCREENS, /stopPropagation/);
+  assert.match(SCREENS, /pointerdown", "pointermove", "pointerup", "wheel"/);
+  // The CSS layer itself must stay transparent to pointers.
+  assert.match(SCREENS, /domElement\.style\.pointerEvents = "none"/);
+  assert.match(SCREENS, /element\.style\.pointerEvents = "auto"/);
+});
+
+test("the DOM boards are culled the way BGMI culls the world", () => {
+  // 1. An idle camera writes no styles at all.
+  assert.match(SCREENS, /if \(!moved && !changed\) return;/);
+  // 2. Frustum + back-face culled per board.
+  assert.match(SCREENS, /frustum\.intersectsSphere\(sphere\)/);
+  assert.match(SCREENS, /boardNormal\.dot\(toCamera\) > 0/);
+  // 3. display:none, NOT visibility:hidden — only the former stops an
+  //    off-screen YouTube iframe from decoding video.
+  assert.match(SCREENS, /style\.display = visible \? "" : "none"/);
+  assert.ok(!/visibility = "hidden"/.test(SCREENS), "visibility:hidden keeps video decoding");
+
+  // 4. Reading one board drops the ambient world to a quarter rate, the same
+  //    trade BGMI makes when the scope opens.
+  assert.match(SCENE, /private studyFocus = false;/);
+  assert.match(SCENE, /const study = this\.studyFocus;/);
+  assert.match(SCENE, /study \? 1 \/ 12 : 1 \/ 30/);
+  assert.match(SCENE, /study \? 1 \/ 8 : 1 \/ 20/);
+  // Leaving a board view must restore the full world.
+  assert.match(SCENE, /this\.studyFocus = false;[\s\S]{0,120}switch \(preset\)/);
+});
+
+test("the student can look a full 90 degrees straight up", () => {
+  // Was clamped 3 degrees short against gimbal flip. That only applies when an
+  // orientation is RECOVERED from a direction vector; this rig stores yaw and
+  // pitch and only writes them, so the pole is an ordinary rotation.
+  assert.match(CONTROLS, /clamp\(this\.pitch - dy, -1\.52, Math\.PI \/ 2\)/);
+  assert.ok(!/clamp\(this\.pitch - dy, -1\.52, 1\.52\)/.test(CONTROLS), "the 87-degree cap is back");
+});
+
+test("the student has a desk in front of the chair", () => {
+  assert.match(LECTERN, /export function createDesk/);
+  assert.match(SCENE, /this\.desk = createDesk\(/);
+  assert.match(SCENE, /this\.scene\.add\(this\.desk\)/);
+  // Between the chair and the boards, not behind the learner.
+  assert.match(LECTERN, /const z = LECTERN_PIVOT_Z - 1\.05;/);
+  // And it is cleaned up.
+  assert.match(SCENE, /disposeGroup\(this\.desk\)/);
 });

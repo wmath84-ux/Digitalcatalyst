@@ -15,15 +15,19 @@
 // updates through a direct DOM write, and the joysticks talk to the engine
 // through a ref. That is what keeps the panel at a locked frame rate.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
   Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
+  BookOpen, PenLine, Network, Users,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
+import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
+import { useAuth } from "../context/AuthContext";
+import { useCatalog } from "../context/CatalogContext";
 
 const WIND_STEPS = [
   { label: "Calm", mult: 0.45 },
@@ -44,6 +48,22 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
 ];
 
+/**
+ * The study-board tray.
+ *
+ * These are the three boards standing around the chair. Clicking one flies the
+ * camera square onto that board so it fills the view (with the half-metre of
+ * world still showing at the edges), which is what makes a 30 m board usable:
+ * you read ONE board at a time. "Desk" pulls back to the seat so all three are
+ * in frame together.
+ */
+const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
+  { key: "mindmap", label: "Mind map", Icon: Network },
+  { key: "reading", label: "Reading", Icon: BookOpen },
+  { key: "notes", label: "Note taking", Icon: PenLine },
+  { key: "student", label: "Desk", Icon: Users },
+];
+
 export default function NatureStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -60,6 +80,19 @@ export default function NatureStudioPage() {
   const [showPlacer, setShowPlacer] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The board faces are DOM elements the engine creates. They only exist once
+  // the engine has booted, so React portals into them on a second pass.
+  const [boardHosts, setBoardHosts] = useState<BoardHosts>({ mindmap: null, reading: null, notes: null });
+  const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
+
+  const { user } = useAuth();
+  const { products, purchasedIds, loading: catalogLoading } = useCatalog();
+
+  // Only what the learner actually owns reaches the reading board.
+  const ownedCourses = useMemo(
+    () => products.filter((p) => purchasedIds.has(p.id)),
+    [products, purchasedIds],
+  );
 
   // Keep the fullscreen flag honest when the user leaves via Esc / F11.
   useEffect(() => {
@@ -93,6 +126,7 @@ export default function NatureStudioPage() {
       return undefined;
     }
     engineRef.current = engine;
+    setBoardHosts(engine.boardHosts());
 
     const resize = () => {
       const r = host.getBoundingClientRect();
@@ -269,6 +303,40 @@ export default function NatureStudioPage() {
           <div className="rounded-2xl border border-white/18 bg-slate-950/40 px-2 py-2 text-center text-[8px] font-bold uppercase tracking-wide text-white/45 backdrop-blur-xl">
             {mode === "fpp" ? "Walking" : "Orbit"}
           </div>
+        </div>
+
+        {/* ── The live board surfaces ───────────────────────────────────
+            React owns these trees; the browser's 3D compositor decides where
+            their pixels land on the boards. */}
+        <BoardPortals
+          hosts={boardHosts}
+          courses={ownedCourses}
+          loading={catalogLoading}
+          uid={user?.id ?? null}
+          activeCourse={ownedCourses[0] ?? null}
+        />
+
+        {/* ── Study-board tray ── */}
+        <div className="pointer-events-auto absolute bottom-16 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/20 bg-slate-950/60 p-1.5 backdrop-blur-xl">
+          {BOARD_VIEWS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                engineRef.current?.focus(key);
+                setActiveBoard(key);
+              }}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12px] font-bold transition ${
+                activeBoard === key
+                  ? "bg-emerald-400/25 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+                  : "text-white/80 hover:bg-white/15"
+              }`}
+              title={`Look at the ${label.toLowerCase()} board`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* ── Viewpoint presets ── */}

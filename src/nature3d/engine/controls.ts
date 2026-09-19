@@ -126,11 +126,21 @@ export class FirstPersonRig {
     // Yaw is deliberately unbounded, so you can keep turning and look all the
     // way behind you without the view ever hitting a wall.
     this.yaw -= dx;
-    // Pitch reaches almost straight up and almost straight down. 1.52 rad is
-    // 87 degrees: the last 3 degrees are held back on purpose, because AT
-    // exactly 90 the forward vector becomes parallel to the world up axis and
-    // the yaw frame degenerates (gimbal flip), which makes the view snap.
-    this.pitch = THREE.MathUtils.clamp(this.pitch - dy, -1.52, 1.52);
+    // Straight up is a FULL 90 degrees, as asked.
+    //
+    // This used to stop 3 degrees short, on the theory that pitch = 90 gimbal
+    // flips. It does not here, and the distinction matters. The snap happens
+    // when an orientation is recovered FROM a direction vector (lookAt, or
+    // decomposing a matrix): at the pole the yaw is undefined and any numeric
+    // wobble throws it around. This rig never does that — it stores yaw and
+    // pitch as the authoritative state and only ever writes them out, in YXZ
+    // order, where pitch = PI/2 is a perfectly ordinary rotation. Yaw keeps
+    // its value across the pole because nothing reads it back.
+    //
+    // Looking DOWN is still held just short: the camera is at eye height, so
+    // the last couple of degrees only ever show the inside of the character's
+    // own feet.
+    this.pitch = THREE.MathUtils.clamp(this.pitch - dy, -1.52, Math.PI / 2);
   }
 
   update(dt: number, move: VirtualStick, camera: THREE.PerspectiveCamera) {

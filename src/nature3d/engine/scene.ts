@@ -32,12 +32,26 @@ import { createSky, type SkySystem } from "./sky";
 import { createBoard, BoardController, loadBoardPlacement, type BoardHandle, BOARD_HEIGHT } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
+import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
+import { createBoardScreens, type BoardScreensHandle } from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
 
 export type CameraMode = "orbit" | "fpp";
-export type ViewPreset = "sanctuary" | "board" | "student" | "waterfall" | "wildlife" | "safari" | "trek" | "world";
+/**
+ * Air left around a board when it is framed on its own, in metres. The brief
+ * asks for "thoda sa area bhi halka sa 1/2 meter ka" — the board fills the
+ * view but a sliver of the meadow still shows, so it never reads as a flat
+ * fullscreen page that has lost its place in the world.
+ */
+const BOARD_VIEW_MARGIN = 0.5;
+
+export type ViewPreset =
+  | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
+  | "safari" | "trek" | "world"
+  // The three study boards. Each frames ONE board edge-to-edge.
+  | "reading" | "notes" | "mindmap";
 
 export interface SceneStats {
   fps: number;
@@ -79,6 +93,9 @@ export class Sanctuary {
   private safari: SafariDistrict;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
+  /** The three live course-player boards + their WebGL frames. */
+  private screens: BoardScreensHandle;
+  private desk: THREE.Group;
 
   private orbit = new OrbitRig();
   private fpp = new FirstPersonRig();
@@ -97,6 +114,9 @@ export class Sanctuary {
   private lastStats = 0;
   private aiClock = 0;
   private skyClock = 0;
+  private ambientClock = 0;
+  /** True while the camera is parked on one study board (see the frame loop). */
+  private studyFocus = false;
   private disposed = false;
 
   // Hoisted scratch — the loop never allocates.
@@ -161,6 +181,23 @@ export class Sanctuary {
 
     this.student = createStudent(this.budget);
     this.scene.add(this.student.group);
+
+    // ── The study lectern: a desk and three 30 m boards ───────────────
+    //
+    // The desk goes between the chair and the boards; the three boards stand
+    // in a solved arc around the chair (see `lectern.ts` for why the layout
+    // has to be root-found rather than placed on a circle). Each board's face
+    // is a LIVE DOM surface rendered by CSS3D, so the course-player panels
+    // run on them for real — video plays, PDFs scroll, the editor takes a
+    // caret — and stay sharp at any board size.
+    this.desk = createDesk(this.budget.shadowMapSize > 0);
+    this.scene.add(this.desk);
+
+    this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
+    this.scene.add(this.screens.shells);
+    // The CSS3D layer is a sibling of the canvas, sharing its camera. It is
+    // inserted BEFORE the HUD so the glass controls stay on top of it.
+    opts.dom.appendChild(this.screens.domElement);
 
     this.board = createBoard(this.budget);
     this.board.group.position.set(0, terrainHeight(0, -1.4) + BOARD_HEIGHT * 0.5 + 1.55, -1.4);
@@ -318,6 +355,7 @@ export class Sanctuary {
     if (mode === this.mode) return;
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
+    this.studyFocus = false;
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -341,6 +379,19 @@ export class Sanctuary {
 
   getMode(): CameraMode {
     return this.mode;
+  }
+
+  /**
+   * The DOM elements the three boards' faces are made of, so React can portal
+   * the course-player panels into them. Handing out the elements (rather than
+   * letting the engine know about React) keeps `engine/` framework-free.
+   */
+  boardHosts(): Record<LecternSlot, HTMLElement> {
+    return {
+      mindmap: this.screens.byId("mindmap")!.element,
+      reading: this.screens.byId("reading")!.element,
+      notes: this.screens.byId("notes")!.element,
+    };
   }
 
   setMoveStick(x: number, y: number, active: boolean) {
@@ -392,12 +443,15 @@ export class Sanctuary {
 
   focus(preset: ViewPreset) {
     if (this.mode === "fpp") this.setMode("orbit");
+    // Any view that is not a single board puts the full world back on budget.
+    this.studyFocus = false;
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
         break;
       case "student":
-        this.orbit.panTo(this.tmpV.set(0, 1.5, 2.6), 4.6, -0.5, 0.18);
+        // Sitting at the desk: all three boards in frame, none cut off.
+        this.focusStudentDesk();
         break;
       case "waterfall":
         this.orbit.panTo(this.tmpV.set(18, 5, -34), 20, 0.5, 0.25);
@@ -415,11 +469,84 @@ export class Sanctuary {
         this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
         break;
       }
+      case "reading":
+      case "notes":
+      case "mindmap":
+        this.focusBoard(preset);
+        break;
       default:
         // "Sanctuary" is the wide establishing view you land on.
         this.orbit.panTo(this.tmpV.set(0, 6, -6), 86, -0.5, 0.36);
     }
     this.requestShadowRefresh();
+  }
+
+  /**
+   * Frame ONE board, edge to edge, with a small margin of world showing.
+   *
+   * The distance is COMPUTED from the live projection rather than stored as a
+   * magic number, because the fov is aspect-dependent (see `applyFov`). A
+   * fixed distance that framed the board at 16:9 would crop it on a narrow
+   * window — the exact failure this brief calls out. Here the board is fitted
+   * against both the horizontal and the vertical half-angles and the larger
+   * requirement wins, so it fits at every aspect.
+   *
+   * `BOARD_VIEW_MARGIN` is the 0.5 m of air asked for on each side: the board
+   * fills the frame but never bleeds off it.
+   */
+  private focusBoard(slot: LecternSlot) {
+    const placement = lecternPlacements().find((p) => p.slot === slot);
+    if (!placement) return;
+    this.studyFocus = true;
+
+    const vFov = (this.camera.fov * Math.PI) / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const needW = LECTERN_BOARD_WIDTH + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const distance = Math.max(
+      needH / 2 / Math.tan(vFov / 2),
+      needW / 2 / Math.tan(hFov / 2),
+    );
+
+    // Square on to the board: the orbit yaw that puts the camera on the board's
+    // face normal is its yaw, and the pitch is level so the page is not
+    // read at a slant.
+    this.orbit.panTo(this.tmpV.copy(placement.position), distance, placement.yaw, 0);
+  }
+
+  /**
+   * Frame ALL THREE boards from the student's seat — the "Student" preset.
+   * Same fitting maths, but against the full width of the trio (the outer
+   * corner of a side board, mirrored) so nothing is cut off.
+   */
+  private focusStudentDesk() {
+    const placements = lecternPlacements();
+    let halfSpan = 0;
+    let sumZ = 0;
+    for (const p of placements) {
+      const ax = Math.cos(p.yaw);
+      const az = -Math.sin(p.yaw);
+      const half = LECTERN_BOARD_WIDTH / 2;
+      halfSpan = Math.max(
+        halfSpan,
+        Math.abs(p.position.x + half * ax),
+        Math.abs(p.position.x - half * ax),
+      );
+      sumZ += p.position.z + half * Math.abs(az) * 0;
+    }
+    const centreZ = sumZ / placements.length;
+
+    const vFov = (this.camera.fov * Math.PI) / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const distance = Math.max(
+      needH / 2 / Math.tan(vFov / 2),
+      needW / 2 / Math.tan(hFov / 2),
+    );
+
+    const target = this.tmpV.set(0, placements[1].position.y, centreZ);
+    this.orbit.panTo(target, distance, 0, 0.06);
   }
 
   resize(width: number, height: number) {
@@ -442,6 +569,10 @@ export class Sanctuary {
 
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    this.screens.setSize(width, height);
+    // The CSS layer caches the last camera pose, so a resize has to force one
+    // render — the pose is unchanged but the projection is not.
+    this.screens.render(this.camera, true);
     this.requestShadowRefresh();
   }
 
@@ -540,23 +671,44 @@ export class Sanctuary {
     }
 
     // ── World (staggered) ─────────────────────────────────────────────
-    this.grass.update(time, this.wind);
-    this.flora.update(time, this.wind);
-    this.water.update(dt, time);
+    //
+    // STUDY MODE — the biggest single saving in this scene.
+    //
+    // When the learner is reading one board, the camera is locked square onto
+    // it 18 m away and the meadow is a few pixels at the edges. Simulating the
+    // whole valley for that is pure waste, and it competes for the main thread
+    // with the very DOM work (video decode, text layout, the mind-map canvas)
+    // that has to stay smooth. This is the same trade BGMI makes when it drops
+    // world detail the instant you open the scope: spend the frame on what the
+    // player is actually looking at.
+    //
+    // So while a single board is framed, the ambient world animation runs at a
+    // quarter rate. Nothing is hidden and nothing pops — the grass still
+    // sways, just on fewer ticks — and the frame budget goes to the board.
+    const study = this.studyFocus;
+    this.ambientClock += dt;
+    const ambientStep = study ? 1 / 15 : 0;
+    const runAmbient = this.ambientClock >= ambientStep;
+    if (runAmbient) {
+      const adt = this.ambientClock;
+      this.ambientClock = 0;
+      this.grass.update(time, this.wind);
+      this.flora.update(time, this.wind);
+      this.water.update(adt, time);
+      // The safari district animates on the same budget as the herds.
+      this.safari.update(adt, time);
+    }
 
     this.aiClock += dt;
-    if (this.aiClock >= 1 / 30) {
+    if (this.aiClock >= (study ? 1 / 12 : 1 / 30)) {
       this.wildlife.update(this.aiClock, time, this.camera.position);
       this.birds.update(this.aiClock, time, this.wind);
       this.student.update(time);
       this.aiClock = 0;
     }
 
-    // The safari district animates on the same 30 Hz budget as the herds.
-    this.safari.update(dt, time);
-
     this.skyClock += dt;
-    if (this.skyClock >= 1 / 20) {
+    if (this.skyClock >= (study ? 1 / 8 : 1 / 20)) {
       this.sky.update(this.skyClock, time, this.wind);
       this.skyClock = 0;
     }
@@ -587,6 +739,10 @@ export class Sanctuary {
     this.boardCtl.update(dt);
 
     this.renderer.render(this.scene, this.camera);
+    // The DOM boards share this camera. The call is a no-op unless the camera
+    // actually moved or a board crossed a cull boundary, so a still frame
+    // costs nothing here.
+    this.screens.render(this.camera);
 
     // ── Adaptive resolution + stats ───────────────────────────────────
     const frameMs = performance.now() - frameStart;
@@ -617,6 +773,8 @@ export class Sanctuary {
     this.stop();
     this.detachPointer(this.opts.dom);
     this.boardCtl.dispose();
+    this.screens.dispose();
+    disposeGroup(this.desk);
     this.safari.dispose();
     this.avatar.dispose();
     this.keyboard.dispose();
