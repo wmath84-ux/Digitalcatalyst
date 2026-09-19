@@ -26,7 +26,6 @@
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import { terrainHeight } from "./terrain";
-import { WORLD_REACH } from "./regions";
 
 /** Board size in world units — 16:9 landscape. */
 export const BOARD_WIDTH = 4.8;
@@ -267,503 +266,97 @@ export function createBoard(budget: QualityBudget): BoardHandle {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-//  Placement controller
+//  Where the board stands
 // ─────────────────────────────────────────────────────────────────────────
 
-const MIN_DEPTH = 2.2;   // closest the board may come to the camera
-const MAX_DEPTH = 26;    // furthest it may be pushed
-// The board travels with the learner, so it may be placed anywhere in the
-// connected world — the meadow, the safari valley or the highlands.
-const MAX_RADIUS = WORLD_REACH;
 /**
- * Ceiling for the board, measured ABOVE THE GROUND UNDER IT — not as an
- * absolute world Y. The hills now reach ~93 m, so a fixed 16 m ceiling would
- * clamp the board straight down inside a hillside the moment you carried it
- * uphill. Relative keeps "as high as I can reach" meaningful everywhere.
+ * The board's fixed home: on the hill crest ahead-left of the chair.
+ *
+ * Every number here was measured against the real terrain and the real
+ * lectern rather than eyeballed, because three constraints have to hold at
+ * once and they nearly conflict:
+ *
+ *   1. It must not hide behind a study board. From the chair the three 30 m
+ *      boards occupy -41.3 deg .. +41.3 deg of azimuth, in one continuous fan
+ *      (mindmap -41.3..-30.7, reading -30.0..+30.0, notes +30.7..+41.3).
+ *      Anything inside that is invisible from the seat. -45 deg is the first
+ *      clear bearing, and it happens to be the highest ground available
+ *      outside the fan.
+ *   2. It must be ABOVE the boards in the picture, not beside them. The crest
+ *      at that bearing is 380 m out and 38.3 m high — about 5.5 deg above eye
+ *      level, where the study boards top out at roughly 3.8 deg. So it reads
+ *      as "on the mountain behind", which is what was asked for.
+ *   3. It must still be readable. At 380 m the default 4.8 m board subtends
+ *      0.72 deg — far too small. Scaled 8x it spans 38 m and subtends 5.7 deg,
+ *      comparable to a study board seen from the desk, and the texture is
+ *      2048 px wide so it stays sharp.
  */
-const MAX_HEIGHT_ABOVE_GROUND = 14;
-/** Resize limits, as a multiple of the default 4.8 × 2.7 m board. */
-const MIN_SCALE = 0.35;
-const MAX_SCALE = 4.5;
+export const BOARD_HILL = {
+  position: new THREE.Vector3(-268.7, 38.3 + 15.5, -266.1),
+  /** Yaw so the face turns back towards the chair at the origin. */
+  yaw: Math.atan2(-268.7 - 0, -266.1 - 2.6) + Math.PI,
+  scale: 8,
+} as const;
 
-export interface BoardControllerOptions {
-  board: THREE.Group;
-  panel: THREE.Mesh;
-  camera: THREE.Camera;
-  dom: HTMLElement;
-  /** Called when the board is picked up / put down (for HUD state). */
-  onGrabChange?: (grabbed: boolean) => void;
-  /** Returns false to ignore pointer input (e.g. while the joystick is used). */
-  enabled: () => boolean;
+/**
+ * Two posts and a cross-brace holding the board up on the hillside, so it
+ * reads as a planted signboard rather than something floating in the air.
+ * Built from the board's own scaled footprint and sunk into the slope.
+ */
+export function createBoardStand(
+  hill: { position: THREE.Vector3; yaw: number; scale: number },
+  shadows: boolean,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "board-stand";
+  group.position.copy(hill.position);
+  group.rotation.y = hill.yaw;
+
+  const halfW = BOARD_WIDTH * hill.scale * 0.5;
+  const halfH = BOARD_HEIGHT * hill.scale * 0.5;
+  // Reach from the board's bottom edge down to the ground beneath it, plus a
+  // little extra so the feet are buried rather than resting on the surface.
+  const groundY = terrainHeight(hill.position.x, hill.position.z);
+  const legLength = hill.position.y - halfH - groundY + 3;
+
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2b3242, roughness: 0.72, metalness: 0.3 });
+  const legGeo = new THREE.CylinderGeometry(0.62, 0.92, legLength, 10);
+  for (const sx of [-1, 1]) {
+    const leg = new THREE.Mesh(legGeo, mat);
+    leg.position.set(sx * halfW * 0.62, -halfH - legLength * 0.5 + 0.4, 0);
+    leg.castShadow = shadows;
+    group.add(leg);
+  }
+
+  const braceGeo = new THREE.BoxGeometry(halfW * 1.3, 0.7, 0.7);
+  const brace = new THREE.Mesh(braceGeo, mat);
+  brace.position.set(0, -halfH - legLength * 0.42, 0);
+  brace.castShadow = shadows;
+  group.add(brace);
+
+  group.userData.dispose = () => {
+    legGeo.dispose();
+    braceGeo.dispose();
+    mat.dispose();
+  };
+  return group;
 }
 
-// ── Board persistence ──────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+//  No placement controller
+// ─────────────────────────────────────────────────────────────────────────
 //
-// Wherever the learner puts the board, and whatever size they made it, is
-// theirs. It survives reloads. Saved to localStorage as one small JSON blob.
+// There used to be ~470 lines here: BoardController (pointer drag, edge/corner
+// resize, pinch depth, ground clamp, billboarding) plus localStorage
+// persistence of the board's position, rotation and size.
 //
-// Everything below is written defensively on purpose: localStorage throws in
-// private-browsing modes and when the quota is full, the stored JSON can be
-// corrupt or from an older build, and a single NaN that slips through would
-// put the board somewhere unreachable with no way for the user to get it
-// back. So every field is validated and the whole thing silently falls back
-// to the default placement if anything at all looks wrong.
-
-const BOARD_STORAGE_KEY = "nature3d.board.placement.v1";
-
-export interface BoardPlacement {
-  px: number; py: number; pz: number;
-  rx: number; ry: number; rz: number;
-  sw: number; sh: number;
-}
-
-/** A finite number inside [lo, hi], or null if it is anything else. */
-function finiteIn(v: unknown, lo: number, hi: number): number | null {
-  return typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
-}
-
-export function loadBoardPlacement(): BoardPlacement | null {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(BOARD_STORAGE_KEY);
-  } catch {
-    return null; // storage blocked (private mode, disabled cookies)
-  }
-  if (!raw) return null;
-  try {
-    const o = JSON.parse(raw) as Record<string, unknown>;
-    // Position is bounded by the same limits clamp() enforces, so a stale or
-    // hand-edited entry can never park the board outside the world.
-    const px = finiteIn(o.px, -MAX_RADIUS, MAX_RADIUS);
-    const py = finiteIn(o.py, -50, 500);
-    const pz = finiteIn(o.pz, -MAX_RADIUS, MAX_RADIUS);
-    const rx = finiteIn(o.rx, -Math.PI * 2, Math.PI * 2);
-    const ry = finiteIn(o.ry, -Math.PI * 2, Math.PI * 2);
-    const rz = finiteIn(o.rz, -Math.PI * 2, Math.PI * 2);
-    const sw = finiteIn(o.sw, MIN_SCALE, MAX_SCALE);
-    const sh = finiteIn(o.sh, MIN_SCALE, MAX_SCALE);
-    if (px === null || py === null || pz === null) return null;
-    if (rx === null || ry === null || rz === null) return null;
-    if (sw === null || sh === null) return null;
-    return { px, py, pz, rx, ry, rz, sw, sh };
-  } catch {
-    return null; // corrupt JSON
-  }
-}
-
-export function saveBoardPlacement(p: BoardPlacement) {
-  try {
-    localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(p));
-  } catch {
-    // Quota or private mode. Losing the placement is not worth breaking the
-    // frame over, so this is deliberately swallowed.
-  }
-}
-
-export function clearBoardPlacement() {
-  try {
-    localStorage.removeItem(BOARD_STORAGE_KEY);
-  } catch {
-    /* see above */
-  }
-}
-
-export class BoardController {
-  private raycaster = new THREE.Raycaster();
-  private pointer = new THREE.Vector2();
-  private dragPlane = new THREE.Plane();
-  private planeNormal = new THREE.Vector3();
-  private hitPoint = new THREE.Vector3();
-  private grabOffset = new THREE.Vector3();
-  private camForward = new THREE.Vector3();
-  private activePointers = new Map<number, { x: number; y: number }>();
-  private pinchStart = 0;
-  private depthAtPinch = 0;
-  private scaleAtPinch = 1;
-  private dragging = false;
-  private moved = false;
-  /** Board keeps facing the viewer while carried, then locks on release. */
-  private faceCamera = true;
-
-  // ── Edge resize ──────────────────────────────────────────────────────
-  /** Which edge/corner was grabbed, or null for a body drag. */
-  private resizeEdge: { u: -1 | 0 | 1; v: -1 | 0 | 1 } | null = null;
-  private resizeStart = { w: 1, h: 1, x: 0, y: 0 };
-  private scale = new THREE.Vector2(1, 1);
-
-  constructor(private opts: BoardControllerOptions) {
-    const dom = opts.dom;
-    dom.addEventListener("pointerdown", this.onDown);
-    dom.addEventListener("pointermove", this.onMove);
-    dom.addEventListener("pointerup", this.onUp);
-    dom.addEventListener("pointercancel", this.onUp);
-    dom.addEventListener("pointerleave", this.onUp);
-    dom.addEventListener("wheel", this.onWheel, { passive: false });
-  }
-
-  get isDragging(): boolean {
-    return this.dragging;
-  }
-
-  /** Did the last gesture move the board (vs. a tap that should open the modal)? */
-  get gestureMoved(): boolean {
-    return this.moved;
-  }
-
-  setFaceCamera(v: boolean) {
-    this.faceCamera = v;
-  }
-
-  dispose() {
-    // Flush any pending debounced write before tearing down, otherwise
-    // leaving the page within 400 ms of the last change loses it.
-    if (this.saveTimer !== null) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = null;
-      this.save();
-    }
-    const dom = this.opts.dom;
-    dom.removeEventListener("pointerdown", this.onDown);
-    dom.removeEventListener("pointermove", this.onMove);
-    dom.removeEventListener("pointerup", this.onUp);
-    dom.removeEventListener("pointercancel", this.onUp);
-    dom.removeEventListener("pointerleave", this.onUp);
-    dom.removeEventListener("wheel", this.onWheel);
-  }
-
-  private updatePointer(e: PointerEvent) {
-    const rect = this.opts.dom.getBoundingClientRect();
-    this.pointer.set(
-      ((e.clientX - rect.left) / rect.width) * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
-    );
-  }
-
-  /**
-   * Hit-test the panel and, if hit, work out WHERE on it — body or edge.
-   *
-   * The intersection carries a UV in 0..1 across the front face, so an
-   * 18 % margin on each side becomes the resize gutter. Grabbing the left or
-   * right gutter resizes width, top/bottom resizes height, and a corner does
-   * both at once — the standard "drag any edge to resize" affordance.
-   */
-  private hitsBoard(e: PointerEvent): boolean {
-    this.updatePointer(e);
-    this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
-    const hits = this.raycaster.intersectObject(this.opts.panel, false);
-    if (hits.length === 0) {
-      this.resizeEdge = null;
-      return false;
-    }
-    const uv = hits[0].uv;
-    if (!uv) {
-      this.resizeEdge = null;
-      return true;
-    }
-    const M = 0.18;
-    const u: -1 | 0 | 1 = uv.x < M ? -1 : uv.x > 1 - M ? 1 : 0;
-    const v: -1 | 0 | 1 = uv.y < M ? -1 : uv.y > 1 - M ? 1 : 0;
-    this.resizeEdge = u === 0 && v === 0 ? null : { u, v };
-    return true;
-  }
-
-  /**
-   * Re-anchor the one-finger drag to wherever the board is RIGHT NOW.
-   *
-   * This is the fix for the "board snaps back when I lift a finger" bug. The
-   * drag plane and grab offset are captured once at pointerdown. A pinch then
-   * moves the board along the view ray — but the stale plane still sits at the
-   * OLD depth, so the instant the second finger came up, the surviving finger's
-   * next move re-projected the board onto that old plane and it jumped back.
-   * Re-anchoring on every pointer-count change means a pinch is committed:
-   * zoom in, the board stays near; zoom out, it stays far.
-   */
-  private reanchor(clientX: number, clientY: number) {
-    const rect = this.opts.dom.getBoundingClientRect();
-    this.pointer.set(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
-    this.opts.camera.getWorldDirection(this.planeNormal);
-    this.dragPlane.setFromNormalAndCoplanarPoint(this.planeNormal, this.opts.board.position);
-    if (this.raycaster.ray.intersectPlane(this.dragPlane, this.hitPoint)) {
-      this.grabOffset.copy(this.opts.board.position).sub(this.hitPoint);
-    } else {
-      this.grabOffset.set(0, 0, 0);
-    }
-  }
-
-  private onDown = (e: PointerEvent) => {
-    if (!this.opts.enabled()) return;
-    this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (this.activePointers.size === 2 && this.dragging) {
-      const [a, b] = [...this.activePointers.values()];
-      this.pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
-      this.depthAtPinch = this.currentDepth();
-      this.scaleAtPinch = this.scale.x;
-      return;
-    }
-    if (this.activePointers.size > 1) return;
-    if (!this.hitsBoard(e)) return;
-
-    if (this.resizeEdge) {
-      // Start a resize: remember the size and the pointer origin.
-      this.resizeStart = { w: this.scale.x, h: this.scale.y, x: e.clientX, y: e.clientY };
-    }
-
-    // Drag plane: parallel to the screen, through the board's centre. This is
-    // what makes one finger move the board 1:1 in every direction — up, down,
-    // left, right — with no mode switch.
-    this.reanchor(e.clientX, e.clientY);
-
-    this.dragging = true;
-    this.moved = false;
-    this.opts.dom.setPointerCapture?.(e.pointerId);
-    this.opts.onGrabChange?.(true);
-    e.preventDefault();
-  };
-
-  private onMove = (e: PointerEvent) => {
-    if (!this.activePointers.has(e.pointerId)) return;
-    this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (!this.dragging) return;
-
-    if (this.activePointers.size >= 2) {
-      const [a, b] = [...this.activePointers.values()];
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (this.pinchStart > 0) {
-        const ratio = this.pinchStart / Math.max(dist, 1);
-        if (this.resizeEdge) {
-          // Pinching while holding an edge scales the board itself.
-          this.setScale(this.scaleAtPinch / ratio, this.scaleAtPinch / ratio);
-        } else {
-          // Pinch out → board comes closer (appears bigger).
-          this.setDepth(this.depthAtPinch * ratio);
-        }
-        this.moved = true;
-      }
-      e.preventDefault();
-      return;
-    }
-
-    if (this.resizeEdge) {
-      // ── Edge resize ──────────────────────────────────────────────────
-      // Convert the pointer travel to a fraction of the viewport, then to a
-      // size multiplier. Pulling outwards (away from the board centre) grows
-      // it, pushing inwards shrinks it — for every edge and every corner.
-      const rect = this.opts.dom.getBoundingClientRect();
-      const dx = (e.clientX - this.resizeStart.x) / rect.width;
-      const dy = (e.clientY - this.resizeStart.y) / rect.height;
-      const { u, v } = this.resizeEdge;
-      // Screen +y is down, board +v is up, hence the negation on dy.
-      const w = u === 0 ? this.resizeStart.w : this.resizeStart.w + u * dx * 4.5;
-      const h = v === 0 ? this.resizeStart.h : this.resizeStart.h + v * -dy * 4.5;
-      this.setScale(w, h);
-      this.moved = true;
-      e.preventDefault();
-      return;
-    }
-
-    this.updatePointer(e);
-    this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
-    if (this.raycaster.ray.intersectPlane(this.dragPlane, this.hitPoint)) {
-      this.opts.board.position.copy(this.hitPoint).add(this.grabOffset);
-      this.clamp();
-      this.moved = true;
-    }
-    e.preventDefault();
-  };
-
-  private onUp = (e: PointerEvent) => {
-    this.activePointers.delete(e.pointerId);
-    if (this.activePointers.size < 2) this.pinchStart = 0;
-    if (this.activePointers.size > 0) {
-      // A finger came up but one is still down: COMMIT whatever the pinch did
-      // and re-anchor the drag to the board's new position. Without this the
-      // surviving finger would yank the board back to the pre-pinch depth.
-      const survivor = [...this.activePointers.values()][0];
-      this.reanchor(survivor.x, survivor.y);
-      if (this.resizeEdge) {
-        this.resizeStart = { w: this.scale.x, h: this.scale.y, x: survivor.x, y: survivor.y };
-      }
-      return;
-    }
-    if (!this.dragging) return;
-    this.dragging = false;
-    this.resizeEdge = null;
-    this.opts.onGrabChange?.(false);
-    this.opts.dom.releasePointerCapture?.(e.pointerId);
-    // The gesture is over: whatever the learner just set is now their board.
-    // Once released the board also stops billboarding, so the angle they let
-    // go of is the angle that gets saved and restored.
-    this.faceCamera = false;
-    this.scheduleSave();
-  };
-
-  private onWheel = (e: WheelEvent) => {
-    if (!this.opts.enabled()) return;
-    // Wheel only affects the board while the pointer is over it, so the
-    // orbit camera keeps its own zoom everywhere else.
-    const rect = this.opts.dom.getBoundingClientRect();
-    this.pointer.set(
-      ((e.clientX - rect.left) / rect.width) * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(this.pointer, this.opts.camera as THREE.PerspectiveCamera);
-    if (this.raycaster.intersectObject(this.opts.panel, false).length === 0) return;
-    e.preventDefault();
-    // stopImmediatePropagation, not stopPropagation: the camera's own wheel
-    // handler is bound to the SAME element, and only the "immediate" form
-    // stops a sibling listener on that element. Without it, scrolling over the
-    // board would push the board AND zoom the camera at once.
-    e.stopImmediatePropagation();
-    this.setDepth(this.currentDepth() * (1 + Math.sign(e.deltaY) * 0.1));
-    this.moved = true;
-  };
-
-  private currentDepth(): number {
-    return this.opts.board.position.distanceTo(this.opts.camera.position);
-  }
-
-  /** Push/pull the board along the camera ray it currently sits on. */
-  setDepth(depth: number) {
-    const clamped = THREE.MathUtils.clamp(depth, MIN_DEPTH, MAX_DEPTH);
-    const dir = this.camForward
-      .copy(this.opts.board.position)
-      .sub(this.opts.camera.position)
-      .normalize();
-    this.opts.board.position.copy(this.opts.camera.position).addScaledVector(dir, clamped);
-    this.clamp();
-    this.scheduleSave();
-  }
-
-  /**
-   * Resize the board. Aspect is free — drag a side to make it a wide strip,
-   * a corner to scale both axes — within sane limits so it can never become
-   * a sliver or swallow the sky.
-   */
-  setScale(w: number, h: number) {
-    this.scale.set(
-      THREE.MathUtils.clamp(w, MIN_SCALE, MAX_SCALE),
-      THREE.MathUtils.clamp(h, MIN_SCALE, MAX_SCALE),
-    );
-    this.opts.board.scale.set(this.scale.x, this.scale.y, 1);
-    this.clamp();
-    this.scheduleSave();
-  }
-
-  getScale(): { w: number; h: number } {
-    return { w: this.scale.x, h: this.scale.y };
-  }
-
-  /** Reset the board to its original 16:9 size, and forget the saved size. */
-  resetScale() {
-    this.setScale(1, 1);
-    clearBoardPlacement();
-  }
-
-  /** Nudge the board by a world delta (used by the HUD arrows). */
-  nudge(dx: number, dy: number, dz: number) {
-    this.opts.board.position.x += dx;
-    this.opts.board.position.y += dy;
-    this.opts.board.position.z += dz;
-    this.clamp();
-    this.scheduleSave();
-  }
-
-  /**
-   * The safety net. Runs after every move AND once per frame:
-   *   • the board's lowest corner stays above the terrain under it;
-   *   • it stays inside the meadow and under the sky ceiling;
-   *   • it never ends up behind the camera.
-   */
-  clamp() {
-    const p = this.opts.board.position;
-
-    const radius = Math.hypot(p.x, p.z);
-    if (radius > MAX_RADIUS) {
-      p.x = (p.x / radius) * MAX_RADIUS;
-      p.z = (p.z / radius) * MAX_RADIUS;
-    }
-
-    // Sample the ground under the board's footprint, not just its centre, so a
-    // slope on either side cannot clip a corner through the hill.
-    // Footprint and clearance both scale with the board, so a board grown to
-    // 4× still keeps its bottom edge above the grass.
-    const half = BOARD_WIDTH * 0.5 * this.scale.x;
-    let ground = terrainHeight(p.x, p.z);
-    for (const [ox, oz] of [[-half, 0], [half, 0], [0, -half * 0.3], [0, half * 0.3]] as const) {
-      ground = Math.max(ground, terrainHeight(p.x + ox, p.z + oz));
-    }
-    const minY = ground + BOARD_HEIGHT * 0.5 * this.scale.y + 0.12;
-    const maxY = minY + MAX_HEIGHT_ABOVE_GROUND;
-    if (p.y < minY) p.y = minY;
-    else if (p.y > maxY) p.y = maxY;
-  }
-
-  /**
-   * Capture the board's current placement so it can be restored next visit.
-   */
-  placement(): BoardPlacement {
-    const b = this.opts.board;
-    return {
-      px: b.position.x, py: b.position.y, pz: b.position.z,
-      rx: b.rotation.x, ry: b.rotation.y, rz: b.rotation.z,
-      sw: this.scale.x, sh: this.scale.y,
-    };
-  }
-
-  /**
-   * Restore a saved placement. Returns false if there was nothing valid to
-   * restore, so the caller can fall back to the default framing.
-   *
-   * Restoring also turns OFF faceCamera: the saved rotation IS the user's
-   * chosen orientation, and the billboarding in update() would otherwise
-   * spin the board back to face the camera within a frame or two and quietly
-   * throw away the angle they had picked.
-   */
-  restore(p: BoardPlacement | null): boolean {
-    if (!p) return false;
-    const b = this.opts.board;
-    b.position.set(p.px, p.py, p.pz);
-    b.rotation.set(p.rx, p.ry, p.rz);
-    this.faceCamera = false;
-    this.setScale(p.sw, p.sh);  // setScale applies the mesh scale and clamps
-    return true;
-  }
-
-  /** Persist the placement now. */
-  save() {
-    saveBoardPlacement(this.placement());
-  }
-
-  /**
-   * Persist shortly after the last change. Writing to localStorage is
-   * synchronous and touches the disk, so doing it on every pointermove of a
-   * drag would stutter the frame. Coalescing to one write 400 ms after the
-   * user stops means a continuous drag costs exactly one write.
-   */
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
-  scheduleSave() {
-    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      this.saveTimer = null;
-      this.save();
-    }, 400);
-  }
-
-  /** Per-frame: keep the board readable (facing the viewer) and legal. */
-  update(dt: number) {
-    if (this.faceCamera) {
-      const board = this.opts.board;
-      const cam = this.opts.camera.position;
-      const targetYaw = Math.atan2(cam.x - board.position.x, cam.z - board.position.z);
-      let diff = targetYaw - board.rotation.y;
-      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-      board.rotation.y += diff * Math.min(1, dt * (this.dragging ? 8 : 2.4));
-    }
-    this.clamp();
-  }
-}
+// All of it is deleted rather than merely unwired. The board is scenery now —
+// bolted to the hillside at BOARD_HILL where the seated learner can read it
+// between the study boards — so there is no gesture to interpret and nothing
+// to remember. Keeping a dead controller around would be a standing invitation
+// to re-enable half of it by accident, and its pointer handlers competed with
+// the orbit camera for the same events.
+//
+// The saved placements of past sessions are deliberately NOT migrated: there
+// is nowhere to put them, and a stale key cannot move a board that no longer
+// listens.

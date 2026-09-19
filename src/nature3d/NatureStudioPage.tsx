@@ -17,8 +17,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Compass, Eye, Footprints,
-  Maximize2, Minimize2, MousePointer2, Move3d, PawPrint, RotateCw,
+  Compass, Eye, Footprints,
+  Maximize2, Minimize2, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
   BookOpen, PenLine, Network, Users,
 } from "lucide-react";
@@ -75,9 +75,7 @@ export default function NatureStudioPage() {
   const [mode, setMode] = useState<CameraMode>("orbit");
   const [windIdx, setWindIdx] = useState(1);
   const [autoOrbit, setAutoOrbit] = useState(false);
-  const [carrying, setCarrying] = useState(false);
   const [showLesson, setShowLesson] = useState(false);
-  const [showPlacer, setShowPlacer] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The board faces are DOM elements the engine creates. They only exist once
@@ -112,7 +110,6 @@ export default function NatureStudioPage() {
         canvas,
         dom: host,
         onBoardTap: () => setShowLesson(true),
-        onBoardGrab: setCarrying,
         onStats: (s) => {
           // Direct DOM write — no setState, so the loop never triggers React.
           const el = statsRef.current;
@@ -222,7 +219,7 @@ export default function NatureStudioPage() {
         style={{ inset: 0 }}
       >
         {/* ── WebGL host. `touch-action:none` so a drag never scrolls the page ── */}
-        <div ref={hostRef} className="absolute inset-0" style={{ touchAction: "none", cursor: carrying ? "grabbing" : "grab" }}>
+        <div ref={hostRef} className="absolute inset-0" style={{ touchAction: "none", cursor: "grab" }}>
           <canvas ref={canvasRef} className="block h-full w-full outline-none" />
         </div>
 
@@ -250,7 +247,7 @@ export default function NatureStudioPage() {
                 </span>
               </h1>
               <p className="text-[11px] text-white/55">
-                1 km valley · Waterfall · Grazing herds · Drag or resize the board
+                1 km valley · Waterfall · Grazing herds
               </p>
             </div>
           </div>
@@ -268,10 +265,6 @@ export default function NatureStudioPage() {
             </HudButton>
             <HudButton onClick={toggleOrbit} active={autoOrbit} title="Auto 360° orbit">
               <RotateCw className="h-3.5 w-3.5" />
-            </HudButton>
-            <HudButton onClick={() => setShowPlacer((v) => !v)} active={showPlacer} title="Board placement tools">
-              <Move3d className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Board</span>
             </HudButton>
             <HudButton onClick={toggleFullscreen} active={immersive} title={immersive ? "Exit fullscreen" : "Fullscreen"}>
               {immersive ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -385,70 +378,6 @@ export default function NatureStudioPage() {
         ) : null}
 
         {/* ── Board placement pad ── */}
-        {showPlacer ? (
-          <div className="pointer-events-auto absolute right-3 top-24 w-[196px] rounded-2xl border border-white/20 bg-slate-950/55 p-3 backdrop-blur-xl">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-black text-white">Place the board</p>
-              <button type="button" onClick={() => setShowPlacer(false)} className="text-white/50 hover:text-white">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <p className="mb-2.5 text-[10px] leading-relaxed text-white/50">
-              Grab the middle with one finger to move it anywhere, or pull any
-              edge or corner to resize. Pinch to push it near or far — it stays
-              where you leave it and never sinks below the ground.
-            </p>
-            <div className="mx-auto grid w-[120px] grid-cols-3 gap-1">
-              <span />
-              <PadBtn onPress={() => engineRef.current?.nudgeBoard(0, 0.25, 0)}><ArrowUp className="h-3.5 w-3.5" /></PadBtn>
-              <span />
-              <PadBtn onPress={() => engineRef.current?.nudgeBoard(-0.3, 0, 0)}><ArrowLeft className="h-3.5 w-3.5" /></PadBtn>
-              <PadBtn onPress={() => engineRef.current?.resetBoard()}><MousePointer2 className="h-3.5 w-3.5" /></PadBtn>
-              <PadBtn onPress={() => engineRef.current?.nudgeBoard(0.3, 0, 0)}><ArrowRight className="h-3.5 w-3.5" /></PadBtn>
-              <span />
-              <PadBtn onPress={() => engineRef.current?.nudgeBoard(0, -0.25, 0)}><ArrowDown className="h-3.5 w-3.5" /></PadBtn>
-              <span />
-            </div>
-            <div className="mt-2.5 flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => engineRef.current?.zoomBoard(0.85)}
-                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
-              >
-                Closer
-              </button>
-              <button
-                type="button"
-                onClick={() => engineRef.current?.zoomBoard(1.18)}
-                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
-              >
-                Farther
-              </button>
-            </div>
-            <div className="mt-1.5 flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => engineRef.current?.scaleBoard(1 / 1.15)}
-                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
-              >
-                Smaller
-              </button>
-              <button
-                type="button"
-                onClick={() => engineRef.current?.scaleBoard(1.15)}
-                className="flex-1 rounded-lg border border-white/18 bg-white/10 py-1.5 text-[10px] font-bold text-white hover:bg-white/20"
-              >
-                Bigger
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {carrying ? (
-          <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 rounded-full border border-emerald-300/50 bg-emerald-500/25 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100 backdrop-blur-xl">
-            Carrying board — release to place
-          </div>
-        ) : null}
 
         {/* ── Lesson modal ── */}
         {showLesson ? (
@@ -528,28 +457,3 @@ function HudButton({
 }
 
 /** A D-pad button that repeats while held (pointer capture, rAF driven). */
-function PadBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
-  const timer = useRef(0);
-  const start = () => {
-    onPress();
-    const loop = () => {
-      onPress();
-      timer.current = window.setTimeout(loop, 60);
-    };
-    timer.current = window.setTimeout(loop, 320);
-  };
-  const stop = () => window.clearTimeout(timer.current);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return (
-    <button
-      type="button"
-      onPointerDown={start}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-      className="grid h-9 place-items-center rounded-lg border border-white/18 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
-    >
-      {children}
-    </button>
-  );
-}

@@ -4,7 +4,7 @@
 //
 // One class owns the renderer, the scene graph, the camera rigs and the frame
 // loop. React never touches Three.js objects directly — it calls the small
-// imperative API at the bottom (`setMode`, `setWind`, `focus`, `nudgeBoard`,
+// imperative API at the bottom (`setMode`, `setWind`, `focus`,
 // …) and reads stats through a callback. That separation is what keeps the
 // React tree from re-rendering during the animation loop, which is the single
 // most common cause of jank in React + WebGL apps.
@@ -29,7 +29,7 @@ import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
-import { createBoard, BoardController, loadBoardPlacement, type BoardHandle, BOARD_HEIGHT } from "./board";
+import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
@@ -88,7 +88,6 @@ export class Sanctuary {
   private sky: SkySystem;
   private board: BoardHandle;
   private student: StudentRig;
-  private boardCtl: BoardController;
   private keyboard: KeyboardInput;
   private safari: SafariDistrict;
   private avatar: TrekAvatar;
@@ -210,27 +209,28 @@ export class Sanctuary {
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
 
+    // ── The lesson board, planted on the hillside ────────────────────────
+    //
+    // This is the small "Morning Nature Study" board. It used to float in
+    // front of the learner and be draggable, resizable and pushable — which
+    // fought the three study boards for the same space and the same gestures.
+    // It is now scenery: fixed on the hill crest the seated learner can see
+    // BETWEEN the boards, standing on its own posts, and it accepts no input
+    // at all.
+    //
+    // The crest is chosen by measurement, not by eye (see BOARD_HILL below):
+    // the three 30 m boards cover -41.3 deg .. +41.3 deg of the learner's view,
+    // so the board has to sit outside that fan or it would be hidden behind
+    // one of them.
     this.board = createBoard(this.budget);
-    this.board.group.position.set(0, terrainHeight(0, -1.4) + BOARD_HEIGHT * 0.5 + 1.55, -1.4);
-    this.scene.add(this.board.group, this.board.plinth);
-    this.board.plinth.position.set(0, terrainHeight(0, -1.4), -1.4);
+    this.board.group.position.copy(BOARD_HILL.position);
+    this.board.group.rotation.y = BOARD_HILL.yaw;
+    this.board.group.scale.setScalar(BOARD_HILL.scale);
+    this.scene.add(this.board.group);
+    this.scene.add(createBoardStand(BOARD_HILL, this.budget.shadowMapSize > 0));
 
-    this.boardCtl = new BoardController({
-      board: this.board.group,
-      panel: this.board.panel,
-      camera: this.camera,
-      dom: opts.dom,
-      enabled: () => true,
-      onGrabChange: (g) => {
-        opts.onBoardGrab?.(g);
-      },
-    });
-
-    // Restore the learner's own board placement, if they made one. This runs
-    // AFTER the controller exists because restore() goes through setScale(),
-    // which needs the controller's clamp. If there is nothing saved the board
-    // simply keeps the default position set above.
-    this.boardCtl.restore(loadBoardPlacement());
+// The board is scenery now: no controller, no drag, no resize, no
+    // persistence. Nothing to restore either — its place is fixed in code.
 
     // ── The other two districts of the same world ────────────────────
     //
@@ -293,7 +293,6 @@ export class Sanctuary {
   private onPointerDown = (e: PointerEvent) => {
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // The board controller claims the gesture first (it hit-tests the panel).
-    if (this.boardCtl.isDragging) return;
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       this.pinchPrev = Math.hypot(a.x - b.x, a.y - b.y);
@@ -305,7 +304,6 @@ export class Sanctuary {
   private onPointerMove = (e: PointerEvent) => {
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (this.boardCtl.isDragging) return;
 
     if (this.pointers.size >= 2 && this.mode === "orbit") {
       const [a, b] = [...this.pointers.values()];
@@ -333,7 +331,7 @@ export class Sanctuary {
     if (e.pointerId === this.pointerPrev.id) this.pointerPrev.down = false;
 
     // A tap (no drag, no board move) on the board opens the lesson modal.
-    if (start && !this.boardCtl.gestureMoved) {
+    if (start) {
       const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
       if (moved < 6) this.maybeTapBoard(e);
     }
@@ -427,29 +425,6 @@ export class Sanctuary {
 
   getAutoOrbit(): boolean {
     return this.orbit.autoRotate;
-  }
-
-  /** Move the board with the HUD arrows (keeps the ground clamp). */
-  nudgeBoard(dx: number, dy: number, dz: number) {
-    this.boardCtl.nudge(dx, dy, dz);
-  }
-
-  /** Push/pull the board along the view ray (HUD zoom buttons / slider). */
-  zoomBoard(factor: number) {
-    const depth = this.board.group.position.distanceTo(this.camera.position);
-    this.boardCtl.setDepth(depth * factor);
-  }
-
-  /** Scale the board from the HUD (edge-drag does the same thing by gesture). */
-  scaleBoard(factor: number) {
-    const { w, h } = this.boardCtl.getScale();
-    this.boardCtl.setScale(w * factor, h * factor);
-  }
-
-  resetBoard() {
-    this.board.group.position.set(0, terrainHeight(0, -1.4) + BOARD_HEIGHT * 0.5 + 1.55, -1.4);
-    this.boardCtl.resetScale();
-    this.boardCtl.clamp();
   }
 
   focus(preset: ViewPreset) {
@@ -748,7 +723,6 @@ export class Sanctuary {
       }
     }
 
-    this.boardCtl.update(dt);
 
     this.renderer.render(this.scene, this.camera);
     // The DOM boards share this camera. The call is a no-op unless the camera
@@ -784,7 +758,6 @@ export class Sanctuary {
     this.disposed = true;
     this.stop();
     this.detachPointer(this.opts.dom);
-    this.boardCtl.dispose();
     this.screens.dispose();
     disposeGroup(this.desk);
     this.safari.dispose();

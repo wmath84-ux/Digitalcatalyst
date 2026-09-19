@@ -37,6 +37,10 @@ const MAIN = read("src/main.tsx");
 const PAGE = read("src/nature3d/NatureStudioPage.tsx");
 const SCENE = read("src/nature3d/engine/scene.ts");
 const BOARD = read("src/nature3d/engine/board.ts");
+// Comment-stripped view: several assertions below check that a mechanism is
+// GONE, and the file documents what was removed and why. Matching prose would
+// fail those checks for the wrong reason.
+const BOARD_CODE = BOARD.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const GRASS = read("src/nature3d/engine/grass.ts");
 const WILDLIFE = read("src/nature3d/engine/wildlife.ts");
 const FLORA = read("src/nature3d/engine/flora.ts");
@@ -120,39 +124,6 @@ test("the board is a 16:9 landscape panel", () => {
   const ch = Number(/canvas\.height = (\d+)/.exec(BOARD)[1]);
   assert.ok(Math.abs(cw / ch - 16 / 9) < 0.02, "the board canvas must be 16:9 too");
 });
-
-test("one finger drags the board on a screen-parallel plane", () => {
-  assert.match(BOARD, /class BoardController/);
-  assert.match(BOARD, /setFromNormalAndCoplanarPoint/, "the drag plane must face the camera");
-  assert.match(BOARD, /pointerdown/);
-  assert.match(BOARD, /pointermove/);
-  assert.match(BOARD, /setPointerCapture/, "the finger must keep control outside the element");
-  // Pinch + wheel push the board away / pull it closer.
-  assert.match(BOARD, /pinchStart/);
-  assert.match(BOARD, /setDepth\(/);
-});
-
-test("the board can never sink below the ground or leave the meadow", () => {
-  const clamp = BOARD.slice(BOARD.indexOf("clamp() {"), BOARD.indexOf("/** Per-frame"));
-  assert.match(clamp, /terrainHeight/, "the clamp must sample the real terrain");
-  assert.match(clamp, /BOARD_HEIGHT \* 0\.5/, "it must account for the board's half height");
-  assert.match(clamp, /MAX_RADIUS/);
-  assert.match(clamp, /MAX_HEIGHT/);
-  // The footprint (not just the centre) is sampled, so a slope cannot clip a corner.
-  assert.ok(
-    /for \(const \[ox, oz\] of/.test(clamp),
-    "the clamp must sample several points under the board, not only its centre",
-  );
-  // And it runs every frame, not only on pointer events.
-  assert.match(BOARD, /update\(dt: number\) \{[\s\S]*this\.clamp\(\);/);
-});
-
-test("the board stays readable by facing the viewer", () => {
-  assert.match(BOARD, /faceCamera/);
-  assert.match(BOARD, /Math\.atan2\(cam\.x - board\.position\.x/);
-});
-
-// ── 3. Grass to the horizon ───────────────────────────────────────────
 
 test("grass is instanced, GPU-animated and reaches the far field", () => {
   assert.match(GRASS, /InstancedMesh/);
@@ -435,7 +406,8 @@ test("the world is a full kilometre across, built as LOD shells", () => {
   // The walk limit now spans the whole connected chain, not just the meadow.
   assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
   // The board travels with the learner across the whole connected world.
-  assert.match(BOARD, /const MAX_RADIUS = WORLD_REACH;/);
+  // (The board's own MAX_RADIUS clamp went with the deleted placement
+  // controller — the board no longer moves, so it cannot leave the world.)
 });
 
 test("the distant hills are real eroded terrain, not cardboard pyramids", () => {
@@ -495,48 +467,21 @@ test("the world is populated to the horizon", () => {
 
 // ── 11. Board: resize, pinch persistence, no leftover slab ────────────
 
-test("the board can be resized by dragging any edge or corner", () => {
-  // UV margins turn the panel border into a resize gutter.
-  assert.match(BOARD, /const M = 0\.18/);
-  assert.match(BOARD, /this\.resizeEdge = u === 0 && v === 0 \? null : \{ u, v \}/);
-  assert.match(BOARD, /setScale\(w: number, h: number\)/);
-  assert.match(BOARD, /const MIN_SCALE = 0\.35/);
-  assert.match(BOARD, /const MAX_SCALE = 4\.5/);
-  // Free aspect: width and height are clamped independently.
-  assert.match(BOARD, /THREE\.MathUtils\.clamp\(w, MIN_SCALE, MAX_SCALE\)/);
-  assert.match(BOARD, /THREE\.MathUtils\.clamp\(h, MIN_SCALE, MAX_SCALE\)/);
-  // Visible grips so the affordance is discoverable, and a HUD path too.
-  assert.match(BOARD, /board-grip/);
-  assert.match(SCENE, /scaleBoard\(factor: number\)/);
-  assert.match(PAGE, /scaleBoard\(1\.15\)/);
-});
-
-test("a pinch sticks — the board does not snap back when a finger lifts", () => {
-  // The drag plane is captured at pointerdown; a pinch moves the board off it.
-  // Re-anchoring on every pointer-count change is what commits the zoom.
-  assert.match(BOARD, /private reanchor\(clientX: number, clientY: number\)/);
-  const onUp = BOARD.slice(BOARD.indexOf("private onUp ="), BOARD.indexOf("private onWheel ="));
-  assert.match(onUp, /this\.reanchor\(survivor\.x, survivor\.y\)/,
-    "lifting one finger of a pinch must re-anchor the surviving finger");
-  // Pinch out = nearer, pinch in = farther, and it persists.
-  assert.match(BOARD, /this\.setDepth\(this\.depthAtPinch \* ratio\)/);
-});
-
-test("the leftover black slab is gone and the clamp scales with the board", () => {
-  // The granite plinth and its black steel mast/backplate are deleted.
-  assert.ok(!/const mast = new THREE\.Mesh/.test(BOARD), "the black mast must be gone");
-  assert.ok(!/const backPlate = new THREE\.Mesh/.test(BOARD), "the black backplate must be gone");
-  assert.ok(!/DodecahedronGeometry\(1\.7/.test(BOARD), "the granite plinth must be gone");
-  assert.match(BOARD, /plinth\.visible = false/);
-
-  // Ground clearance and footprint both follow the current scale ...
-  assert.match(BOARD, /const half = BOARD_WIDTH \* 0\.5 \* this\.scale\.x/);
-  assert.match(BOARD, /BOARD_HEIGHT \* 0\.5 \* this\.scale\.y \+ 0\.12/);
-  // ... and the ceiling is relative to the ground, because the hills are 90 m
-  // tall now and a fixed world-Y ceiling would bury the board in a hillside.
-  assert.match(BOARD, /const MAX_HEIGHT_ABOVE_GROUND = 14/);
-  assert.match(BOARD, /const maxY = minY \+ MAX_HEIGHT_ABOVE_GROUND/);
-  assert.ok(!/p\.y > MAX_HEIGHT\b/.test(BOARD), "the absolute height ceiling must be gone");
+test("the lesson board is scenery: no drag, no resize, no zoom", () => {
+  // SUPERSEDED. This board used to be draggable, edge-resizable and
+  // pinch-zoomable. It now stands on the hillside and takes no input at all,
+  // so the whole controller is deleted rather than left dormant — a dormant
+  // one would keep competing with the orbit camera for pointer events.
+  for (const gone of ["class BoardController", "resizeEdge", "setScale(", "MIN_SCALE", "MAX_SCALE", "onWheel"]) {
+    assert.ok(!BOARD_CODE.includes(gone), `${gone} must be gone from board.ts`);
+  }
+  assert.ok(!/pointerdown|pointermove/.test(BOARD_CODE), "the board must not listen for pointer input");
+  // And the HUD controls that drove it are gone from the page + scene.
+  for (const gone of ["nudgeBoard", "zoomBoard", "scaleBoard", "resetBoard"]) {
+    assert.ok(!SCENE.includes(gone), `Sanctuary.${gone} must be gone`);
+    assert.ok(!PAGE.includes(gone), `the HUD must not call ${gone}`);
+  }
+  assert.ok(!/showPlacer|PadBtn/.test(PAGE), "the board placement pad must be gone");
 });
 
 test("the opening camera is a wide establishing shot", () => {
@@ -670,28 +615,29 @@ test("the student faces the board, not the backrest", () => {
   assert.match(STUDENT, /post\.position\.set\(x, 1\.25, 0\.4\)/, "the chair back belongs behind him at +z");
 });
 
-test("the board remembers where and how big the learner left it", () => {
-  assert.match(BOARD, /const BOARD_STORAGE_KEY = "nature3d\.board\.placement\.v1"/);
-  for (const fn of ["loadBoardPlacement", "saveBoardPlacement", "clearBoardPlacement"]) {
-    assert.ok(BOARD.includes(`export function ${fn}`), `${fn} must be exported`);
-  }
-  // Position, rotation AND size are all persisted.
-  assert.match(BOARD, /px: b\.position\.x, py: b\.position\.y, pz: b\.position\.z/);
-  assert.match(BOARD, /rx: b\.rotation\.x, ry: b\.rotation\.y, rz: b\.rotation\.z/);
-  assert.match(BOARD, /sw: this\.scale\.x, sh: this\.scale\.y/);
-  // Restoring must switch billboarding off or the saved angle is thrown away.
-  assert.match(BOARD, /restore\(p: BoardPlacement \| null\): boolean/);
-  assert.match(BOARD, /this\.faceCamera = false;\s*\n\s*this\.setScale\(p\.sw, p\.sh\)/);
-  // Writes are debounced, and flushed on teardown so nothing is lost.
-  assert.match(BOARD, /scheduleSave\(\)/);
-  assert.match(BOARD, /}, 400\);/, "saves should coalesce rather than run per pointermove");
-  assert.match(BOARD, /if \(this\.saveTimer !== null\) \{\s*\n\s*clearTimeout/);
-  // Every storage touch is guarded — localStorage throws in private mode.
-  const storageCalls = (BOARD.match(/localStorage\./g) || []).length;
-  const tryBlocks = (BOARD.match(/try \{/g) || []).length;
-  assert.ok(tryBlocks >= 3, `expected every localStorage access wrapped in try (${storageCalls} calls, ${tryBlocks} try blocks)`);
-  // The scene restores on boot.
-  assert.match(SCENE, /this\.boardCtl\.restore\(loadBoardPlacement\(\)\)/);
+test("the lesson board is bolted to the hill the student can actually see", () => {
+  // SUPERSEDED: nothing is persisted any more, because nothing can be moved.
+  assert.ok(!BOARD_CODE.includes("nature3d.board.placement"), "the placement key must be gone");
+  assert.ok(!/localStorage/.test(BOARD_CODE), "the board stores nothing");
+
+  // Its position is measured, not eyeballed. The three 30 m study boards cover
+  // a continuous -41.3..+41.3 deg fan from the chair, so a board inside that
+  // range would simply be hidden behind one of them. BOARD_HILL sits at -45
+  // deg — the first clear bearing — on the highest ground there.
+  assert.match(BOARD, /export const BOARD_HILL = \{/);
+  assert.match(BOARD, /new THREE\.Vector3\(-268\.7, 38\.3 \+ 15\.5, -266\.1\)/);
+  // Turned back towards the chair, or the learner reads the back of it.
+  assert.match(BOARD, /yaw: Math\.atan2\(-268\.7 - 0, -266\.1 - 2\.6\) \+ Math\.PI/);
+  // 380 m away a 4.8 m board subtends 0.72 deg — unreadable. 8x makes it 38 m
+  // wide and ~5.7 deg, comparable to a study board seen from the desk.
+  assert.match(BOARD, /scale: 8/);
+
+  // It stands on posts rather than floating, and the scene mounts both.
+  assert.match(BOARD, /export function createBoardStand/);
+  assert.match(SCENE, /this\.board\.group\.position\.copy\(BOARD_HILL\.position\)/);
+  assert.match(SCENE, /createBoardStand\(BOARD_HILL/);
+  // The plinth is gone for good, not just hidden.
+  assert.ok(!/plinth/.test(SCENE), "the scene must not mount a plinth any more");
 });
 
 test("there is ONE 3D route — the districts are not separate pages", () => {
@@ -1461,4 +1407,72 @@ test("any camera can be rotated, and the seated student can look straight up", (
     !/new THREE\.(Vector3|Quaternion)/.test(update.slice(0, update.indexOf("\n  }"))),
     "OrbitRig.update must not allocate",
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Group 16 — the boards are the real course player, and the lesson board
+//             is scenery on the hill
+// ─────────────────────────────────────────────────────────────────────────
+
+test("the boards render inside the course-player style scope", () => {
+  // THE BUG behind "the toolbar doesn't look or work like the real editor".
+  // Every course-player surface — the rich-text toolbar, note cards, mind-map
+  // chrome — is styled through CSS custom properties (--course-border,
+  // --course-text, --course-surface, --dc-chrome-glass ...) that are declared
+  // ON `.course-player-shell` and inherited by its descendants. The 3D boards
+  // rendered outside it, so those variables resolved to nothing: borders,
+  // plates and ink all vanished and the editor stopped looking like itself.
+  assert.match(READING_BOARD, /className="course-player-shell flex h-full w-full flex-col/);
+
+  // Proof the scope really is where the tokens live, so this is not cargo cult.
+  const css = read("src/index.css");
+  const scope = css.slice(css.indexOf(".course-player-shell {"));
+  const block = scope.slice(0, scope.indexOf("}"));
+  for (const token of ["--course-text", "--course-border", "--course-surface"]) {
+    assert.ok(block.includes(token), `${token} is scoped to .course-player-shell`);
+  }
+  // StudyLibraryPage hosts the same panels the same way.
+  assert.match(read("src/personal-library/StudyLibraryPage.tsx"), /course-player-shell/);
+});
+
+test("the side boards stay empty until the learner picks a course", () => {
+  // Verified separately by rendering the real NotesPanel in jsdom:
+  //   notes=[]           -> 0 cards, only the circular "+"
+  //   notes=[2 notes]    -> 2 cards          (the panel is not simply broken)
+  //   click "+"          -> mode "compose", 13 toolbar buttons
+  // so an empty board is the DATA's doing, which is what these pin.
+  assert.match(STUDY_BOARDS, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
+  assert.match(STUDY_BOARDS, /const EMPTY_NOTES: CoursePlayerNote\[\] = \[\];/);
+  // Notes are keyed per user AND per product, so one course's notes can never
+  // appear under another.
+  assert.match(STUDY_BOARDS, /useBoardNotes\(uid, productId\)/);
+  assert.match(STUDY_BOARDS, /const productId = activeCourse\?\.id \?\? null;/);
+  assert.match(
+    read("src/course/notesStore.ts"),
+    /`dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/,
+  );
+  // The mind map is scoped the same way and gets no product until one is picked.
+  assert.match(STUDY_BOARDS, /productId: productId \?\? ""/);
+});
+
+test("the lesson board sits where a seated learner can read it", () => {
+  // Numbers come from measuring the real terrain along the sight lines the
+  // chair actually has, not from taste:
+  //   - study boards cover -41.3..+41.3 deg, so -45 deg is the first clear
+  //     bearing; it is also the highest ground outside the fan
+  //   - crest there: 380 m out, 38.3 m high => ~5.5 deg above eye level, so it
+  //     reads as "up on the mountain" rather than beside the boards
+  //   - 8x scale => 38 m wide => ~5.7 deg, about as big as a study board looks
+  //     from the desk, and the texture is 2048 px so it stays sharp
+  assert.match(BOARD, /export const BOARD_HILL/);
+  assert.match(SCENE, /this\.board\.group\.rotation\.y = BOARD_HILL\.yaw/);
+  assert.match(SCENE, /this\.board\.group\.scale\.setScalar\(BOARD_HILL\.scale\)/);
+
+  // The stand is derived from the board's scaled size and the ground under it,
+  // so it cannot float or leave a gap when the terrain changes.
+  assert.match(BOARD, /const groundY = terrainHeight\(hill\.position\.x, hill\.position\.z\)/);
+  assert.match(BOARD, /const legLength = hill\.position\.y - halfH - groundY \+ 3/);
+
+  // The lesson text itself is untouched — the brief was to keep it.
+  assert.match(BOARD, /ctx\.fillText\("Morning Nature Study"/);
 });

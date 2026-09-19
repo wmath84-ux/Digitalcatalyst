@@ -224,7 +224,15 @@ export function BoardFrame({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-full w-full flex-col bg-[#070b12] text-white">
+    // `course-player-shell` is NOT decoration. Every course-player surface —
+    // the rich-text toolbar, the note cards, the mind-map chrome — is styled
+    // through CSS custom properties (--course-border, --course-text,
+    // --course-surface, --dc-chrome-glass ...) that are declared ON THAT CLASS
+    // and inherited by descendants. Rendered outside it those variables
+    // resolve to nothing, so the toolbar lost its borders, plates and ink and
+    // stopped looking (or behaving) like the real editor. StudyLibraryPage
+    // wraps the viewer in the same class for exactly this reason.
+    <div className="course-player-shell flex h-full w-full flex-col bg-[#070b12] text-white">
       <header className="flex shrink-0 items-center gap-4 border-b border-white/10 bg-white/[0.03] px-8 py-5">
         {onBack ? (
           <button
