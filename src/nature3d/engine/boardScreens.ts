@@ -76,7 +76,7 @@ export const SCREEN_PX_WIDTH = 1920;
 export const SCREEN_PX_HEIGHT = 1080;
 
 /** CSS pixels → world metres. 1920 px across a 30 m board. */
-const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
+export const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
 
 export interface BoardScreen {
   slot: LecternSlot;
@@ -185,6 +185,16 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     element.style.overflow = "hidden";
     element.style.background = "#070b12";
     element.style.pointerEvents = "auto";
+    // A tap must land IMMEDIATELY and a list must SCROLL on touch.
+    // `pan-y` keeps native vertical scrolling of the panels (notes list,
+    // library, …) but gives the browser no business doing double-tap zoom
+    // or pinch INSIDE the board — those delays and page-level gestures are
+    // exactly what made the board's buttons feel dead ("click kabhi hota
+    // hai kabhi nahin"). Horizontal gestures and the mind-map's pan/zoom
+    // are pointer-event driven in JS, so they are unaffected. When the
+    // device's 3D hit-test drops a touch entirely, the engine's input
+    // bridge (scene.ts) replays the same gesture into this element.
+    element.style.touchAction = "pan-y";
     // The DOM board is a screen, not a window: nothing inside it should be
     // able to spill past the bezel painted in the WebGL scene.
     element.style.borderRadius = "6px";
@@ -198,6 +208,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     for (const type of ["pointerdown", "pointermove", "pointerup", "wheel"]) {
       element.addEventListener(type, (event) => event.stopPropagation());
     }
+    // A cancelled touch (system gesture, call arriving) must not leak to the
+    // camera rig either, or the world would lurch at the moment a touch dies.
+    element.addEventListener("pointercancel", (event) => event.stopPropagation());
 
     const object = new CSS3DObject(element);
     object.position.copy(placement.position);

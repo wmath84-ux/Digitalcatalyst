@@ -1075,6 +1075,140 @@ test("board input does not fight the camera", () => {
   assert.match(SCREENS, /element\.style\.pointerEvents = "auto"/);
 });
 
+test("a missed board tap can never drag the camera", () => {
+  // Some device browsers deliver board touches to the host anyway (their
+  // hit-test of the large 3D-transformed element is unreliable). stopPropagation
+  // is the first line of defence; the rig itself must refuse board targets,
+  // or the "first tap nudges the world" symptom comes back.
+  assert.match(SCENE, /private boardTarget\(target: EventTarget \| null\): boolean/);
+  assert.match(SCENE, /closest\("\.nature3d-board-screen"\)/);
+  const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
+  assert.match(down, /if \(this\.boardTarget\(e\.target\)\) return;/);
+  const wheel = SCENE.slice(SCENE.indexOf("private onWheel"), SCENE.indexOf("setMode(mode: CameraMode)"));
+  assert.match(wheel, /if \(this\.boardTarget\(e\.target\)\) return;/);
+});
+
+test("board taps are guaranteed by the engine's raycast bridge, not by device hit-testing", () => {
+  // The learner looks at the board ITSELF — the 2D reading page (a flat
+  // overlay standing in for the 3D board) is removed, per the owner. The
+  // device's 3D hit-test is still the only thing between the finger and a
+  // full-size board's buttons, so the engine stops trusting it: when a
+  // touch the device mis-delivers to the canvas lands on a board face by
+  // raycast, the engine replays it into the board's own DOM.
+  //
+  // The two input paths are mutually exclusive BY CONSTRUCTION: native
+  // delivery is swallowed by the board's stopPropagation before the host
+  // handlers run, so the bridge can never double-fire a click the device
+  // already landed, and on desktop (where native always works) the bridge
+  // stays completely dormant.
+
+  // The 2D reading page is removed from every layer.
+  for (const [name, src] of [["scene", SCENE], ["page", PAGE], ["screens", SCREENS], ["boards", STUDY_BOARDS]]) {
+    for (const gone of ["setBoardPresented", "presentedSlot", "stageHost", "panelRef", "dc-reading-page"]) {
+      assert.ok(!src.includes(gone), `${name} still carries the removed reading-page mechanism: ${gone}`);
+    }
+  }
+  assert.ok(!SCREENS.includes("setPresented"), "the presented-culling fold must be gone");
+  assert.ok(!/createPortal\(/.test(PAGE), "the page must not portal a reading page any more");
+
+  // The bridge re-aims the touch with pure geometry: a world plane per
+  // board face, a ray from the camera through the exact touch point ...
+  assert.match(SCENE, /private localOnBoard\(/);
+  assert.match(SCENE, /setFromNormalAndCoplanarPoint/);
+  assert.match(SCENE, /intersectPlane\(/);
+  // ... into the board's 1920×1080 layout box, with the exact inverse of
+  // CSS3DRenderer's transform (object +Y is the element's TOP — CSS y is
+  // downward — so the y term is negated).
+  assert.match(SCENE, /const x = lx \/ PX_TO_M \+ SCREEN_PX_WIDTH \/ 2;/);
+  assert.match(SCENE, /const y = -dy \/ PX_TO_M \+ SCREEN_PX_HEIGHT \/ 2;/);
+  // ... and a faithful synthetic replay (pointerdown/up, click, pointercancel).
+  assert.match(SCENE, /new PointerEvent\(/);
+  assert.match(SCENE, /\.dispatchEvent\(/);
+  // The bridge owns the mis-delivered touch the moment it re-aims it.
+  const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
+  assert.match(down, /if \(this\.boardTarget\(e\.target\)\) return;/);
+  assert.match(down, /e\.preventDefault\(\);/);
+  assert.match(down, /this\.localOnBoard\(e\)/);
+  // ... and scrolls the panel's overflow boxes itself, because native touch
+  // scroll is a compositor gesture a synthetic pointermove cannot drive.
+  assert.match(SCENE, /el\.scrollTop = THREE\.MathUtils\.clamp\(el\.scrollTop - dly/);
+  assert.match(SCENE, /el\.scrollLeft = THREE\.MathUtils\.clamp\(el\.scrollLeft - dlx/);
+
+  // Prove the px mapping's constants: with PX_TO_M = 30/1920 the four
+  // corners of the board's object frame must land on the four corners of
+  // the 1920×1080 element (the mirror of the pinned formula above).
+  const L = solveLectern();
+  const pxPerM = L.W / 1920;
+  const H = (L.W * 9) / 16;
+  for (const [lxM, lyM, expectX, expectY] of [
+    [-L.HW, H / 2, 0, 0],
+    [L.HW, H / 2, 1920, 0],
+    [-L.HW, -H / 2, 0, 1080],
+    [L.HW, -H / 2, 1920, 1080],
+  ]) {
+    const x = lxM / pxPerM + 960;
+    const y = -lyM / pxPerM + 540;
+    assert.ok(Math.abs(x - expectX) < 1e-9 && Math.abs(y - expectY) < 1e-9,
+      `board corner (${lxM}, ${lyM}) maps to (${x}, ${y}), not (${expectX}, ${expectY})`);
+  }
+});
+
+test("board framing is square-on the face normal at every aspect", () => {
+  // The camera parks ON the board's face normal (orbit target = the board's
+  // own centre, pitch 0), so the full-screen board projects as an exact
+  // rectangle: the flat overlay stays pixel-exact, and off-axis large
+  // boards — where device hit-testing starts dropping taps — are never
+  // framed. The board still clears the HUD: screen-centred, it needs to
+  // clear each chrome edge by a HALF board.
+  const focusBoard = SCENE.slice(SCENE.indexOf("private focusBoard(slot: LecternSlot)"), SCENE.indexOf("private focusStudentDesk"));
+  assert.match(focusBoard, /this\.orbit\.panTo\(this\.tmpV\.copy\(placement\.position\), distance, placement\.yaw, 0\)/);
+  assert.ok(!/nx|ny|rightX|rightZ/.test(focusBoard), "the target offset that sheared the board is gone");
+  assert.match(focusBoard, /Math\.min\(this\.viewH [\/] 2 - ins\.top, this\.viewH [\/] 2 - ins\.bottom\)/);
+  assert.match(focusBoard, /Math\.min\(this\.viewW [\/] 2 - ins\.left, this\.viewW [\/] 2 - ins\.right\)/);
+
+  // The symmetric fit still keeps every pixel of the board clear of the
+  // chrome at every aspect (the chrome insets here mirror the page's).
+  const L = solveLectern();
+  const H = (L.W * 9) / 16;
+  const margin = 0.5;
+  const chrome = { top: 84, bottom: 152, left: 84, right: 20 };
+  for (const [viewW, viewH] of [[390, 844], [844, 390], [1180, 820], [1920, 1080], [320, 568]]) {
+    const aspect = viewW / viewH;
+    let fov = 52;
+    if (aspect < 16 / 9) {
+      const halfH = (Math.tan((52 * Math.PI) / 360) * (16 / 9)) / aspect;
+      fov = (Math.atan(halfH) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const v = (fov * Math.PI) / 180;
+    const h = 2 * Math.atan(Math.tan(v / 2) * aspect);
+    const needW = L.W + 2 * margin;
+    const needH = H + 2 * margin;
+    const limitH = Math.max(8, Math.min(viewH / 2 - chrome.top, viewH / 2 - chrome.bottom));
+    const limitW = Math.max(8, Math.min(viewW / 2 - chrome.left, viewW / 2 - chrome.right));
+    const d = Math.max(
+      (needH / 2 / Math.tan(v / 2)) / (2 * limitH / viewH),
+      (needW / 2 / Math.tan(h / 2)) / (2 * limitW / viewW),
+    );
+    const fy = viewH / 2 / Math.tan(v / 2);
+    const pxW = L.W * (fy / d);
+    const pxH = H * (fy / d);
+    // The board is screen-centred: it must clear each chrome edge.
+    assert.ok(viewW / 2 - pxW / 2 >= Math.max(chrome.left, chrome.right) - 0.5, `${viewW}x${viewH}: the board eats the side chrome`);
+    assert.ok(viewH / 2 - pxH / 2 >= Math.max(chrome.top, chrome.bottom) - 0.5, `${viewW}x${viewH}: the board's bottom rows sit under the tray`);
+  }
+});
+
+test("board panels keep native vertical scroll on touch", () => {
+  // `pan-y`: the notes list and library scroll natively on a phone (they
+  // could not while `manipulation`'s wider gesture set — and the old
+  // `manipulation` also let a double-tap inside the board page-zoom the
+  // whole app). JS-driven gestures (mind-map pan/zoom) use pointer events
+  // and are unaffected.
+  assert.match(SCREENS, /element\.style\.touchAction = "pan-y"/);
+  assert.ok(!/touchAction = "manipulation"/.test(SCREENS), "manipulation re-enables the double-tap delay the brief killed");
+});
+
 test("the DOM boards are culled the way BGMI culls the world", () => {
   // 1. An idle camera writes no styles at all.
   assert.match(SCREENS, /if \(!moved && !changed\) return;/);

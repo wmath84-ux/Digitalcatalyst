@@ -122,7 +122,15 @@ function useBoardNotes(uid: string | null, productId: string | null) {
   return { notes, onAdd, onEdit, onDelete };
 }
 
-export default function BoardPortals({ hosts, courses, loading, uid }: BoardPortalsProps) {
+export default function BoardPortals({
+  hosts, courses, loading, uid,
+}: BoardPortalsProps) {
+  // Every board tree always renders into the engine's 3D screen — the
+  // learner looks at the board itself, and the engine's input bridge
+  // (scene.ts) guarantees its taps land at any framing.
+  const readingHost = hosts.reading;
+  const notesHost = hosts.notes;
+  const mindmapHost = hosts.mindmap;
   // ── NOTHING IS AUTO-SELECTED ─────────────────────────────────────────
   //
   // This used to be `activeCourse={ownedCourses[0]}` — the first course the
@@ -182,9 +190,9 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
 
   return (
     <>
-      {hosts.reading ? createPortal(readingTree, hosts.reading) : null}
+      {readingHost ? createPortal(readingTree, readingHost) : null}
 
-      {hosts.notes
+      {notesHost
         ? createPortal(
             <BoardFrame title="Note taking" subtitle={activeCourse?.title}>
               {/* The player's panel, untouched — same toolbar, same editor,
@@ -199,11 +207,11 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
                 />
               </div>
             </BoardFrame>,
-            hosts.notes,
+            notesHost,
           )
         : null}
 
-      {hosts.mindmap
+      {mindmapHost
         ? createPortal(
             <BoardFrame title="Mind map" subtitle={activeCourse?.title}>
               <Suspense
@@ -235,7 +243,7 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
                 </div>
               </Suspense>
             </BoardFrame>,
-            hosts.mindmap,
+            mindmapHost,
           )
         : null}
     </>
