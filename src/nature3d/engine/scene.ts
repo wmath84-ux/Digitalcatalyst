@@ -236,7 +236,7 @@ export class Sanctuary {
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
 
-    this.scene.fog = new THREE.FogExp2(0xbcd9ef, this.budget.fogDensity);
+    this.scene.fog = new THREE.FogExp2(0xaedcfa, this.budget.fogDensity);
 
     const aniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.budget.tier === "low" ? 2 : 8);
     this.textures = createTextures(aniso);
@@ -1105,7 +1105,8 @@ export class Sanctuary {
     this.orbit.panTo(this.tmpV.copy(placement.position), distance, placement.yaw, 0);
   }
 
-  * Frame ALL THREE boards from the student's seat — the "Student" preset.
+  /**
+   * Frame ALL THREE boards from the student's seat — the "Student" preset.
    * Same fitting maths, but against the full width of the trio (the outer
    * corner of a side board, mirrored) so nothing is cut off.
    */
@@ -1422,8 +1423,5 @@ export class Sanctuary {
     });
     this.scene.clear();
     this.renderer.dispose();
-  }
-}
-
   }
 }
