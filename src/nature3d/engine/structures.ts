@@ -74,6 +74,20 @@ function withAO(geo: THREE.BufferGeometry): THREE.BufferGeometry {
 }
 
 /**
+ * Flat white vertex colour. Every part in a merged bucket must carry the SAME
+ * attribute set or `mergeGeometries` drops the WHOLE bucket — a bug that ate
+ * one silently (a mixed wood bucket at the jetty). Unbaked parts get flat 1s:
+ * visually identical to no vertex colour, but mergeable.
+ */
+function withFlatColor(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(pos.count * 3);
+  colors.fill(1);
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+/**
  * Where the sea actually starts, on one azimuth. Walks the REAL height field
  * outward — the shoreline is a measurement, not a constant.
  */
@@ -129,7 +143,10 @@ export function createStructures(budget: QualityBudget): Structures {
     ry = 0,
     bake = true,
   ) => {
+    // ALWAYS a colour attribute — AO where baked, flat white otherwise — so
+    // every bucket merges (see withFlatColor).
     if (bake) withAO(geo);
+    else withFlatColor(geo);
     if (ry !== 0) geo.rotateY(ry);
     geo.translate(x, y, z);
     parts.find((p) => p.mat === mat)!.list.push(geo);

@@ -324,6 +324,17 @@ structures.group.traverse((o) => {
 });
 check("bay: the district merges into a handful of draw calls",
   structureMeshes.length > 0 && structureMeshes.length <= 14, `${structureMeshes.length} meshes`);
+// A bucket whose parts disagree on attributes (AO'd vs not) is dropped by
+// mergeGeometries SILENTLY — that once ate the whole wood bucket (jetty).
+// The district must therefore keep its full triangle mass.
+{
+  let bayTris = 0;
+  for (const m of structureMeshes) {
+    const idx = m.geometry.getIndex();
+    bayTris += idx ? idx.count / 3 : (m.geometry.attributes.position?.count ?? 0) / 3;
+  }
+  check("bay: no material bucket was silently dropped on merge", bayTris > 4500, `${Math.round(bayTris)} tris`);
+}
 check("bay: the landmark islands exist as one merged mesh",
   !!structures.group.getObjectByName("distant-islands"));
 let bayNaN = 0;
