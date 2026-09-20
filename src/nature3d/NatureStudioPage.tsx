@@ -45,7 +45,6 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
   { key: "safari", label: "Safari", Icon: Rabbit },
   { key: "board", label: "Board", Icon: Rows3 },
-  { key: "student", label: "Student", Icon: Eye },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
 ];
@@ -82,14 +81,6 @@ const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass 
   { key: "student", label: "Desk", Icon: Users },
 ];
 
-/** Extra board sizes vs the pinned 30 m face: current, 1.5×, 2×, 3×. */
-const BOARD_SCALES: Array<{ scale: number; label: string }> = [
-  { scale: 1, label: "1×" },
-  { scale: 1.5, label: "1½×" },
-  { scale: 2, label: "2×" },
-  { scale: 3, label: "3×" },
-];
-
 export default function NatureStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -100,7 +91,6 @@ export default function NatureStudioPage() {
   const hudTrayRef = useRef<HTMLDivElement | null>(null);
   const hudPresetRef = useRef<HTMLDivElement | null>(null);
   const hudFppRef = useRef<HTMLDivElement | null>(null);
-  const hudSizeRef = useRef<HTMLDivElement | null>(null);
 
   const [supported] = useState(() => webglSupported());
   const [booting, setBooting] = useState(true);
@@ -118,7 +108,6 @@ export default function NatureStudioPage() {
   // the engine has booted, so React portals into them on a second pass.
   const [boardHosts, setBoardHosts] = useState<BoardHosts>({ mindmap: null, reading: null, notes: null });
   const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
-  const [boardScale, setBoardScale] = useState(1);
   // True when the learner has hidden every HUD button (bottom-right toggle).
   // Only the toggle itself stays on screen.
   const [hudHidden, setHudHidden] = useState(false);
@@ -269,10 +258,7 @@ export default function NatureStudioPage() {
     const left = hudFppRef.current
       ? hudFppRef.current.getBoundingClientRect().right + 16
       : 80;
-    const right = hudSizeRef.current
-      ? window.innerWidth - hudSizeRef.current.getBoundingClientRect().left + 16
-      : 18;
-    eng.setHudInsets({ top, bottom, left, right });
+    eng.setHudInsets({ top, bottom, left, right: 18 });
   }, [hudHidden]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
@@ -456,37 +442,6 @@ export default function NatureStudioPage() {
           loading={coursesLoading}
           uid={user?.id ?? null}
         />
-
-        {/* ── Board size (1× / 1½× / 2× / 3× vs the pinned 30 m face) ── */}
-        {!hudHidden ? (
-        <div
-          ref={hudSizeRef}
-          className="pointer-events-auto absolute right-3 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-2xl border border-white/20 bg-slate-950/55 p-1.5 backdrop-blur-xl"
-        >
-          <p className="px-1 pt-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white/50">
-            Size
-          </p>
-          {BOARD_SCALES.map(({ scale, label }) => (
-            <button
-              key={scale}
-              type="button"
-              onClick={() => {
-                engineRef.current?.setBoardScale(scale);
-                setBoardScale(scale);
-                engineRef.current?.focus(activeBoard);
-              }}
-              className={`min-w-[3rem] rounded-xl px-2 py-1.5 text-[12px] font-black transition ${
-                boardScale === scale
-                  ? "bg-emerald-400/25 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)]"
-                  : "text-white/80 hover:bg-white/15"
-              }`}
-              title={`Board size ${label} (current is 30 m)`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        ) : null}
 
         {/* ── Study-board tray ── */}
         {!hudHidden ? (
