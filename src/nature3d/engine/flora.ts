@@ -275,9 +275,15 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   const leafMatSway = makeLeafMaterial(true);
 
   const layout = treeLayout(budget.treeCount);
-  const swayTrees = layout.filter((t) => t.sways).length;
-  const maxSway = swayTrees * budget.leavesPerTree + 8;
-  const maxStill = (layout.length - swayTrees) * budget.leavesPerTree + 8;
+  // LOD/culling (audit §5): the LEAF pools size to broadleaf/acacia trees
+  // only — palms write fronds into their own pools below, and pine tiers are
+  // merged geometry — so instance buffers carry no dead slots. The IMPOSTOR
+  // radius (300 m) sits inside the scatter radius (430 m) so every far tree
+  // is a 2-card silhouette, never full geometry.
+  const leafSwayTrees = layout.filter((t) => t.sways && t.kind !== "palm").length;
+  const leafStillTrees = layout.filter((t) => !t.sways && t.kind !== "palm").length;
+  const maxSway = leafSwayTrees * budget.leavesPerTree + 8;
+  const maxStill = leafStillTrees * budget.leavesPerTree + 8;
 
   const leavesSway = new THREE.InstancedMesh(leafGeo, leafMatSway, Math.max(1, maxSway));
   const leavesStill = new THREE.InstancedMesh(leafGeo, leafMatStill, Math.max(1, maxStill));

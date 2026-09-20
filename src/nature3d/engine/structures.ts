@@ -580,6 +580,11 @@ export function createStructures(budget: QualityBudget): Structures {
     }
     list.forEach((g) => g.dispose());
   }
+  // The district never moves: freeze the group's matrix too. Only the boat
+  // and the umbrella canopies animate, and those are their own meshes with
+  // auto matrices — everything else skips the per-frame matrix pass.
+  group.matrixAutoUpdate = false;
+  group.updateMatrixWorld(true);
 
   return {
     group,
