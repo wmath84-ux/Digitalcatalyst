@@ -36,7 +36,7 @@ import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
-import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
+import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
   createBoardScreens,
   PX_TO_M,
@@ -187,6 +187,8 @@ export class Sanctuary {
   private ambientClock = 0;
   /** True while the camera is parked on one study board (see the frame loop). */
   private studyFocus = false;
+  /** Face-size multiplier vs the pinned 30 m board. 1 / 1.5 / 2 / 3. */
+  private boardScale = 1;
   private disposed = false;
 
   // Hoisted scratch — the loop never allocates.
@@ -688,6 +690,8 @@ export class Sanctuary {
     // getBoundingClientRect of a CSS3D child is the flattened AABB, which
     // is exactly what misses buttons in the centre of a full-size board.
     if (localX !== undefined && localY !== undefined) {
+      const flat = this.elementAtBoardFlat(screen, x, y);
+      if (flat && flat !== root) return this.preferInteractive(flat, root, localX, localY);
       const laid = this.elementAtBoardLayout(root, localX, localY);
       if (laid !== root) return laid;
     }
@@ -703,18 +707,81 @@ export class Sanctuary {
     return best;
   }
 
+  private isBoardInteractive(el: Element): boolean {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    if (tag === "BUTTON" || tag === "A" || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "LABEL") {
+      return true;
+    }
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute("role");
+    return role === "button" || role === "textbox" || role === "menuitem";
+  }
+
+  /**
+   * CSS3D hit-testing of a full-size board drops the CENTRE (notes +, rename,
+   * heading/body). Flatten the 1920×1080 element onto its visual rectangle
+   * for one layout query so elementFromPoint sees ordinary 2D boxes, then
+   * restore the 3D matrix before the next frame paints.
+   */
+  private elementAtBoardFlat(screen: BoardScreen, clientX: number, clientY: number): Element | null {
+    const root = screen.element;
+    const visual = root.getBoundingClientRect();
+    if (visual.width < 2 || visual.height < 2) return null;
+    const prevTransform = root.style.transform;
+    const prevOrigin = root.style.transformOrigin;
+    const prevPosition = root.style.position;
+    const prevLeft = root.style.left;
+    const prevTop = root.style.top;
+    const prevWidth = root.style.width;
+    const prevHeight = root.style.height;
+    const prevZ = root.style.zIndex;
+    root.style.position = "fixed";
+    root.style.left = `${visual.left}px`;
+    root.style.top = `${visual.top}px`;
+    root.style.width = `${SCREEN_PX_WIDTH}px`;
+    root.style.height = `${SCREEN_PX_HEIGHT}px`;
+    root.style.transformOrigin = "0 0";
+    root.style.transform = `scale(${visual.width / SCREEN_PX_WIDTH}, ${visual.height / SCREEN_PX_HEIGHT})`;
+    root.style.zIndex = "2147483646";
+    let hit: Element | null = null;
+    try {
+      hit = document.elementFromPoint(clientX, clientY);
+    } finally {
+      root.style.transform = prevTransform;
+      root.style.transformOrigin = prevOrigin;
+      root.style.position = prevPosition;
+      root.style.left = prevLeft;
+      root.style.top = prevTop;
+      root.style.width = prevWidth;
+      root.style.height = prevHeight;
+      root.style.zIndex = prevZ;
+    }
+    return hit && root.contains(hit) ? hit : null;
+  }
+
+  private preferInteractive(hit: Element, root: HTMLElement, lx: number, ly: number): Element {
+    if (this.isBoardInteractive(hit)) return hit;
+    const laid = this.elementAtBoardLayout(root, lx, ly);
+    if (laid !== root) return laid;
+    return hit;
+  }
+
   /**
    * Deepest descendant of `root` whose LAYOUT box (offset chain, not the
    * CSS3D screen rect) contains (lx, ly) in the board's 1920×1080 space.
+   * Interactive controls win over the large wrappers that fill the centre.
    */
   private elementAtBoardLayout(root: HTMLElement, lx: number, ly: number): Element {
     let best: Element = root;
     let bestArea = Infinity;
+    let bestInteractive: Element | null = null;
+    let bestInteractiveArea = Infinity;
     for (const node of root.querySelectorAll("*")) {
       const el = node as HTMLElement;
       if (!(el instanceof HTMLElement)) continue;
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
+      const w = Math.max(el.offsetWidth, el.clientWidth);
+      const h = Math.max(el.offsetHeight, el.clientHeight);
       if (w <= 1 || h <= 1) continue;
       let x = 0;
       let y = 0;
@@ -731,9 +798,13 @@ export class Sanctuary {
           best = el;
           bestArea = area;
         }
+        if (this.isBoardInteractive(el) && area <= bestInteractiveArea) {
+          bestInteractive = el;
+          bestInteractiveArea = area;
+        }
       }
     }
-    return best;
+    return bestInteractive ?? best;
   }
 
   /**
@@ -838,6 +909,12 @@ export class Sanctuary {
    * the caret exactly at the finger's coordinates.
    */
   private focusTapTarget(target: Element, screen: BoardScreen, x: number, y: number) {
+    // A layout miss lands on a wrapper around the heading/body. Walk DOWN
+    // into the editable if the target itself isn't one.
+    if (target instanceof HTMLElement && !target.isContentEditable && target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+      const inner = target.querySelector("[contenteditable], input, textarea");
+      if (inner) target = inner;
+    }
     let el: Element | null = target;
     while (el && screen.element.contains(el)) {
       if (el instanceof HTMLElement && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
@@ -1165,14 +1242,14 @@ export class Sanctuary {
    * limits below — and every pixel of it stays reachable at any device size.
    */
   private focusBoard(slot: LecternSlot) {
-    const placement = lecternPlacements().find((p) => p.slot === slot);
+    const placement = this.screens.byId(slot)?.placement;
     if (!placement) return;
     this.studyFocus = true;
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const needW = LECTERN_BOARD_WIDTH + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const needW = LECTERN_BOARD_WIDTH * this.boardScale + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
 
     // The board projects to the screen centre, so each side has to clear the
     // chrome from the centre line: the nearer edge on that axis wins. The 8 px
@@ -1197,13 +1274,13 @@ export class Sanctuary {
    * corner of a side board, mirrored) so nothing is cut off.
    */
   private focusStudentDesk() {
-    const placements = lecternPlacements();
+    const placements = this.screens.screens.map((s) => s.placement);
     let halfSpan = 0;
     let sumZ = 0;
+    const half = (LECTERN_BOARD_WIDTH * this.boardScale) / 2;
     for (const p of placements) {
       const ax = Math.cos(p.yaw);
       const az = -Math.sin(p.yaw);
-      const half = LECTERN_BOARD_WIDTH / 2;
       halfSpan = Math.max(
         halfSpan,
         Math.abs(p.position.x + half * ax),
@@ -1216,7 +1293,7 @@ export class Sanctuary {
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
     const distance = Math.max(
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
@@ -1522,6 +1599,20 @@ export class Sanctuary {
     this.board.dispose();
     this.student.dispose();
     this.atmosphere.dispose();
+    this.weathering.dispose();
+    this.textures.dispose();
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      m.geometry?.dispose?.();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+      else mat?.dispose?.();
+    });
+    this.scene.clear();
+    this.renderer.dispose();
+  }
+}
+phere.dispose();
     this.weathering.dispose();
     this.textures.dispose();
     this.scene.traverse((o) => {

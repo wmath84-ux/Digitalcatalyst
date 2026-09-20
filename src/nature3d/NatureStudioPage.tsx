@@ -82,6 +82,14 @@ const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass 
   { key: "student", label: "Desk", Icon: Users },
 ];
 
+/** Extra board sizes vs the pinned 30 m face: current, 1.5×, 2×, 3×. */
+const BOARD_SCALES: Array<{ scale: number; label: string }> = [
+  { scale: 1, label: "1×" },
+  { scale: 1.5, label: "1½×" },
+  { scale: 2, label: "2×" },
+  { scale: 3, label: "3×" },
+];
+
 export default function NatureStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -109,6 +117,7 @@ export default function NatureStudioPage() {
   // the engine has booted, so React portals into them on a second pass.
   const [boardHosts, setBoardHosts] = useState<BoardHosts>({ mindmap: null, reading: null, notes: null });
   const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
+  const [boardScale, setBoardScale] = useState(1);
   // True when the learner has hidden every HUD button (bottom-right toggle).
   // Only the toggle itself stays on screen.
   const [hudHidden, setHudHidden] = useState(false);
@@ -276,7 +285,8 @@ export default function NatureStudioPage() {
     if (
       activeBoard === "reading" ||
       activeBoard === "notes" ||
-      activeBoard === "mindmap"
+      activeBoard === "mindmap" ||
+      activeBoard === "student"
     ) {
       engineRef.current?.focus(activeBoard);
     }

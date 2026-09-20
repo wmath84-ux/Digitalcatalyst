@@ -115,6 +115,64 @@ function solveSwing(radius: number): number {
 export const LECTERN_SWING = solveSwing(LECTERN_RADIUS);
 
 /**
+ * Extra board sizes offered from the HUD, as multipliers of the pinned
+ * 30 m face. The authored constants stay at 1× so the contract's geometry
+ * proof does not move; runtime layout is `lecternPlacementsAt(scale)`.
+ */
+export const BOARD_SCALE_OPTIONS = [1, 1.5, 2, 3] as const;
+export type BoardScale = (typeof BOARD_SCALE_OPTIONS)[number];
+
+function solveSwingAt(radius: number, halfW: number, gap: number): number {
+  const k = gap + halfW;
+  const residual = (p: number) => {
+    const cx = halfW + k * Math.cos(p);
+    const cz = -radius - k * Math.sin(p);
+    return Math.atan2(cx, -cz) - p;
+  };
+  let lo = 0.01;
+  let hi = 1.5;
+  if (residual(lo) * residual(hi) > 0) return 0.7;
+  for (let i = 0; i < 90; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (residual(lo) * residual(mid) <= 0) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * The lectern laid out at a given face-size multiplier. Width, gap and
+ * reading radius all scale together so neighbouring boards stay 1 m * scale
+ * apart and still face the chair square-on.
+ */
+export function lecternPlacementsAt(scale: number): LecternPlacement[] {
+  const s = scale > 0 ? scale : 1;
+  const width = LECTERN_BOARD_WIDTH * s;
+  const height = LECTERN_BOARD_HEIGHT * s;
+  const half = width / 2;
+  const gap = LECTERN_GAP * s;
+  const radius = LECTERN_RADIUS * s;
+  const pivotZ = LECTERN_PIVOT_Z;
+  const p = s === 1 ? LECTERN_SWING : solveSwingAt(radius, half, gap);
+  const k = gap + half;
+  const rx = half + k * Math.cos(p);
+  const rz = -radius - k * Math.sin(p);
+  const y = LECTERN_BASE_HEIGHT + height / 2;
+  const groundY = terrainHeight(0, pivotZ);
+  const make = (slot: LecternSlot, x: number, z: number, yaw: number): LecternPlacement => ({
+    slot,
+    position: new THREE.Vector3(x, groundY + y, z + pivotZ),
+    yaw,
+    distance: Math.hypot(x, z),
+  });
+  return [
+    make("mindmap", -rx, rz, -p),
+    make("reading", 0, -radius, 0),
+    make("notes", rx, rz, p),
+  ];
+}
+
+/**
  * Where each board stands. Computed once and frozen — the layout is fixed, so
  * every consumer (the meshes, the camera presets, the tests) reads the same
  * numbers instead of recomputing them and drifting apart.

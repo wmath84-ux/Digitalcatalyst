@@ -58,6 +58,7 @@ import {
   LECTERN_BOARD_HEIGHT,
   LECTERN_BOARD_WIDTH,
   lecternPlacements,
+  lecternPlacementsAt,
   type LecternPlacement,
   type LecternSlot,
 } from "./lectern";
@@ -96,6 +97,8 @@ export interface BoardScreensHandle {
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
   setSize(width: number, height: number): void;
+  /** Relayout the trio at `scale` × the pinned 30 m face. */
+  setScale(scale: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
   dispose(): void;
 }
@@ -252,6 +255,27 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
     setSize(width, height) {
       renderer.setSize(width, height);
+    },
+
+    setScale(scale) {
+      const s = scale > 0 ? scale : 1;
+      const placements = lecternPlacementsAt(s);
+      screens.forEach((screen, i) => {
+        const p = placements[i];
+        if (!p) return;
+        screen.placement = p;
+        screen.object.position.copy(p.position);
+        screen.object.rotation.y = p.yaw;
+        screen.object.scale.setScalar(PX_TO_M * s);
+      });
+      shells.children.forEach((board, i) => {
+        const p = placements[i];
+        if (!p) return;
+        board.position.copy(p.position);
+        board.rotation.y = p.yaw;
+        board.scale.setScalar(s);
+      });
+      sphere.radius = LECTERN_BOARD_WIDTH * s * 0.62;
     },
 
     render(camera, force = false) {
