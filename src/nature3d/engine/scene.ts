@@ -34,7 +34,7 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
-import { createBoardScreens, SCREEN_PX_WIDTH, type BoardScreensHandle } from "./boardScreens";
+import { createBoardScreens, SCREEN_PX_HEIGHT, SCREEN_PX_WIDTH, type BoardScreensHandle } from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
@@ -699,33 +699,50 @@ export class Sanctuary {
   //
   // A framed board is a DOM element 1920 px across, carried through
   // CSS3DRenderer's preserve-3d camera element as a matrix3d. At framing
-  // size — the board filling most of the screen — some device browsers stop
+  // size — the board filling most of the screen — device browsers stop
   // hit-testing that layer: the tap falls THROUGH to the canvas (the rig
   // guard above keeps the camera from twitching, but the button never
   // fires), while the very same board tapped at a smaller zoom works fine.
-  // The failure lives in the browser's hit-testing of 3D-transformed
-  // layers, which we cannot fix from here.
   //
-  // So instead of fighting it: while a board is framed SQUARE-ON (the camera
-  // on its face normal — `focusBoard` guarantees it), the board's DOM
-  // element is moved out of the CSS3D layer into a FLAT 2D layer and placed
-  // with a plain translate+scale at its projected screen rect. No
-  // perspective, no matrix3d — the browser hit-tests it like any ordinary
-  // DOM node, so buttons land exactly where they are at ANY distance (the
-  // learner can even pinch the board up or down while reading; the overlay
-  // tracks the projection every frame).
+  // The flat overlay removes the failure from the equation on BOTH counts:
   //
-  // The handover is pixel-exact on both sides: square-on, the 3D
-  // projection of the board is the same rect the overlay draws, so nothing
-  // pops. When the learner orbits off the face normal (beyond ~0.35 deg,
-  // where a flat rect would stop matching the 3D trapezoid), or leaves the
-  // study view, the element is handed back to the CSS3D layer.
+  //   1. the board's DOM element is moved OUT of the preserve-3d CSS3D
+  //      layer into a plain sibling div — hit-tested like any ordinary DOM
+  //      node, no 3D matrix involved;
+  //   2. it is RESIZED to its projected screen rect and placed with a bare
+  //      translate — NO scale of any kind. This matters: a 1920×1080
+  //      element scaled up to fill the screen makes the compositor build a
+  //      raster far past the mobile GPU's max texture size (1920×1080 at
+  //      3× DPR is 5760×3240) — the layer comes out BLACK and its hit
+  //      region comes out broken, which is exactly what the device showed.
+  //      Sized to the screen, the raster is the screen: always legal,
+  //      always painted, always hit-testable. The panels are fluid
+  //      (they are the 2D app's own phone layouts), so the reflow to a
+  //      phone-sized box is the layout they were designed for — text at
+  //      native size, buttons at thumb size.
+  //
+  // While a board is framed SQUARE-ON (the camera on its face normal —
+  // `focusBoard` guarantees it), the overlay tracks the projection every
+  // frame: the translate is written per frame (compositor-only, no layout)
+  // and the box is re-sized only when it moves by more than a size bucket
+  // (a resize reflows the panels, so we don't do it needlessly). The
+  // handover is content-identical in spirit on both sides: square-on, the
+  // 3D projection of the board IS the rect the overlay draws. When the
+  // learner orbits off the face normal (beyond ~0.35 deg, where a flat rect
+  // would stop matching the 3D trapezoid), or leaves the study view, the
+  // element is handed back to the CSS3D layer at its 1920×1080 layout size.
   //
   // FACING_GATE: arccos(0.99999) ≈ 0.35 deg. The framing converges to
   // exactly 0, so the overlay is active for the whole time the board is
-  // framed straight on.
+  // framed straight on — at ANY distance, so pinch-zooming the board while
+  // reading stays on the reliable 2D path.
 
   private static readonly OVERLAY_FACE_GATE = 0.99999;
+  /** Resize only when the rect moves this much (px) — a resize reflows panels. */
+  private static readonly OVERLAY_SIZE_BUCKET = 16;
+
+  private overlayW = 0;
+  private overlayH = 0;
 
   private updateBoardOverlay() {
     const host = this.overlayHost;
@@ -778,11 +795,14 @@ export class Sanctuary {
     this.ovB.copy(this.camera.position).sub(P).normalize();
     const facing = this.ovA.dot(this.ovB);
 
+    const w = Math.round(maxX - minX);
+    const h = Math.round(maxY - minY);
+
     if (this.overlaySlot === slot && (!inFront || facing < Sanctuary.OVERLAY_FACE_GATE)) {
       this.leaveBoardOverlay();
       return;
     }
-    if (this.overlaySlot !== slot && inFront && facing >= Sanctuary.OVERLAY_FACE_GATE) {
+    if (this.overlaySlot !== slot && inFront && facing >= Sanctuary.OVERLAY_FACE_GATE && w >= 32 && h >= 32) {
       this.overlaySlot = slot;
       const el = screen.element;
       if (el.parentNode !== host) {
@@ -790,16 +810,38 @@ export class Sanctuary {
         host.appendChild(el);
       }
       el.style.transformOrigin = "0 0";
+      // Snap to the screen rect: the element's layout box IS its on-screen
+      // box from this frame on — no scale, ever.
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+      this.overlayW = w;
+      this.overlayH = h;
+      // Mobile insurance: a subtree that just moved between layer trees can
+      // come out STALE (black until something invalidates it) on some
+      // devices. Force a dedicated layer and flush layout synchronously so
+      // the very first paint of the re-homed element is fresh.
+      el.style.willChange = "transform";
+      void el.offsetHeight;
     }
     if (this.overlaySlot === slot) {
-      // Plain 2D placement at the projected rect: 1920 px of element maps to
-      // (maxX - minX) px of screen, so the overlay covers the CSS3D board's
-      // pixels to the sub-pixel. Identical frames write nothing.
-      const s = (maxX - minX) / SCREEN_PX_WIDTH;
-      const style = `translate3d(${Math.round(minX * 100) / 100}px, ${Math.round(minY * 100) / 100}px, 0) scale(${s})`;
+      const el = screen.element;
+      // The translate is the only per-frame write: compositor-only, zero
+      // layout cost, so the fly-in and every orbit stays smooth.
+      const x = Math.round(minX);
+      const y = Math.round(minY);
+      const style = `translate3d(${x}px, ${y}px, 0)`;
       if (style !== this.overlayStyle) {
-        screen.element.style.transform = style;
+        el.style.transform = style;
         this.overlayStyle = style;
+      }
+      // A resize re-lays-out the whole panel tree, so it happens only when
+      // the rect actually moved by more than the bucket (pinch-zoom, a
+      // reframe). A still board writes nothing.
+      if (Math.abs(w - this.overlayW) > Sanctuary.OVERLAY_SIZE_BUCKET || Math.abs(h - this.overlayH) > Sanctuary.OVERLAY_SIZE_BUCKET) {
+        el.style.width = `${w}px`;
+        el.style.height = `${h}px`;
+        this.overlayW = w;
+        this.overlayH = h;
       }
     }
   }
@@ -810,12 +852,18 @@ export class Sanctuary {
     const slot = this.overlaySlot;
     this.overlaySlot = null;
     this.overlayStyle = "";
+    this.overlayW = 0;
+    this.overlayH = 0;
     if (!host || !slot) return;
     const screen = this.screens.byId(slot);
     if (!screen) return;
     const el = screen.element;
 
-    el.remove(); // out of the flat layer
+    el.remove(); // out of the flat layer (detached: no reflow until re-home)
+    // Back to the 1920×1080 layout box the 3D representation is built on
+    // (the CSS3D object's PX_TO_M scale turns it back into 30 m).
+    el.style.width = `${SCREEN_PX_WIDTH}px`;
+    el.style.height = `${SCREEN_PX_HEIGHT}px`;
     // A forced render hands the element BACK to the CSS3D layer — their
     // renderObject re-appends it to the camera element.
     this.screens.render(this.camera, true);
@@ -824,7 +872,9 @@ export class Sanctuary {
     // computation their renderObject performs — and the handover frame is
     // exact even on a still camera.
     el.style.transformOrigin = "";
+    el.style.willChange = "";
     el.style.transform = this.boardCss3dStyle(screen.object);
+    void el.offsetHeight; // same stale-subtree insurance, in reverse
   }
 
   /**

@@ -1091,7 +1091,7 @@ test("a missed board tap can never drag the camera", () => {
 test("the framed board hands to a flat 2D layer so device hit-testing cannot miss it", () => {
   // While a board is framed square-on, its DOM element is moved out of the
   // preserve-3d CSS3D layer into a flat sibling layer and placed with a
-  // plain translate+scale at its projected rect — an ordinary DOM node the
+  // plain translate at its projected rect — an ordinary DOM node the
   // browser hit-tests reliably at any size.
   assert.match(SCENE, /updateBoardOverlay\(\)/);
   assert.match(SCENE, /insertAdjacentElement\("afterend", this\.overlayHost\)/);
@@ -1100,16 +1100,27 @@ test("the framed board hands to a flat 2D layer so device hit-testing cannot mis
   // screen-plane corners, recomputed every frame (it must track zoom).
   assert.match(SCENE, /c\.applyMatrix4\(this\.camera\.matrixWorldInverse\)/);
   assert.match(SCENE, /c\.applyMatrix4\(this\.camera\.projectionMatrix\)/);
-  assert.match(SCENE, /translate3d\(/);
+  // THE RASTER RULE: the element is RESIZED to its screen rect and moved
+  // with a bare translate — never scaled. A 1920×1080 box scaled up to
+  // fill the screen forces the compositor into a raster past the mobile
+  // GPU's max texture size: the layer comes out black and its hit region
+  // comes out broken (the device showed exactly this).
+  const overlay = SCENE.slice(SCENE.indexOf("private updateBoardOverlay()"), SCENE.indexOf("/** Hand the board's element back"));
+  assert.match(overlay, /el\.style\.width = `\$\{w\}px`/);
+  assert.match(overlay, /el\.style\.height = `\$\{h\}px`/);
+  assert.ok(!/scale\(/.test(overlay), "no scale of any kind on the overlay — the box IS the rect");
+  assert.match(overlay, /OVERLAY_SIZE_BUCKET/);
   // The overlay is only entered square-on the face normal: a flat rect
   // cannot match a sheared trapezoid without dark wedges at the edges.
   assert.match(SCENE, /OVERLAY_FACE_GATE = 0\.99999/);
   assert.match(SCENE, /facing >= Sanctuary\.OVERLAY_FACE_GATE/);
-  // The hand-back must be pixel-exact: re-attach through a forced CSS render
-  // and assert the renderer's own 3D transform (their cache skips the write
-  // on a still camera).
-  assert.match(SCENE, /el\.remove\(\); \/\/ out of the flat layer/);
-  assert.match(SCENE, /this\.screens\.render\(this\.camera, true\);/);
+  // The hand-back must be pixel-exact: restore the 1920×1080 layout box,
+  // re-attach through a forced CSS render, and assert the renderer's own
+  // 3D transform (their cache skips the write on a still camera).
+  const leave = SCENE.slice(SCENE.indexOf("private leaveBoardOverlay()"), SCENE.indexOf("private boardCss3dStyle"));
+  assert.match(leave, /el\.style\.width = `\$\{SCREEN_PX_WIDTH\}px`/);
+  assert.match(leave, /el\.style\.height = `\$\{SCREEN_PX_HEIGHT\}px`/);
+  assert.match(leave, /this\.screens\.render\(this\.camera, true\);/);
   assert.match(SCENE, /translate\(-50%,-50%\)/);
   // And the layer is torn down with the scene.
   assert.match(SCENE, /this\.overlayHost\?\.remove\(\)/);
