@@ -374,6 +374,8 @@ export class KeyboardInput {
   private keys = new Set<string>();
   readonly stick: VirtualStick = { x: 0, y: 0, active: false };
   sprint = false;
+  /** Edge-triggered jump press, set by Space, consumed by the player. */
+  private jumpPressed = false;
   /**
    * Only true while the walk mode is active. WASD/arrows are `preventDefault`ed
    * (otherwise the page scrolls under the canvas), so the capture MUST be off
@@ -391,9 +393,16 @@ export class KeyboardInput {
   private onKey = (e: KeyboardEvent) => {
     if (!this.enabled) return;
     const code = e.code;
-    // Never steal keys from a focused input / textarea / contenteditable.
+    // Never steal keys from a focused input / textarea / button / contenteditable.
     const el = document.activeElement as HTMLElement | null;
-    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "BUTTON" || el.isContentEditable)) return;
+    // Space jumps. Edge-triggered: key repeat must not bunny-hop, and a held
+    // Space must not scroll the page under the canvas.
+    if (code === "Space") {
+      if (e.type === "keydown" && !e.repeat) this.jumpPressed = true;
+      e.preventDefault();
+      return;
+    }
     const relevant =
       code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD" ||
       code === "ArrowUp" || code === "ArrowDown" || code === "ArrowLeft" || code === "ArrowRight" ||
@@ -407,8 +416,19 @@ export class KeyboardInput {
 
   private clear = () => {
     this.keys.clear();
+    this.jumpPressed = false;
     this.recompute();
   };
+
+  /**
+   * Take a queued jump press, if any. The walk update calls this every frame
+   * and forwards it to the player — the flag can never latch across frames.
+   */
+  consumeJump(): boolean {
+    const j = this.jumpPressed;
+    this.jumpPressed = false;
+    return j;
+  }
 
   private recompute() {
     const k = this.keys;

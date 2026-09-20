@@ -733,9 +733,10 @@ test("the safari is built into the one scene, without a second sky or sun", () =
   assert.match(SCENE, /this\.safari\.dispose\(\)/);
 });
 
-test("the walking character is TerrainTrek's, implemented to its constants", () => {
+test("the walking character keeps TerrainTrek's gameplay constants", () => {
   const trek = read("src/nature3d/engine/trekAvatar.ts");
-  // Movement and camera constants, verbatim from the source project.
+  // Movement and camera constants, verbatim from the source project — the
+  // presentation and locomotion were upgraded, the GAMEPLAY was preserved.
   assert.match(trek, /WALK_SPEED = 10/);
   assert.match(trek, /BOOST_SPEED = 30/);
   assert.match(trek, /CAM_DISTANCE = 15/);
@@ -744,24 +745,74 @@ test("the walking character is TerrainTrek's, implemented to its constants", () 
   assert.match(trek, /CAM_ABOVE_OFFSET = 2/);
   assert.match(trek, /PHI_MIN = 0\.1/);
   assert.match(trek, /PHI_MAX = Math\.PI - 0\.1/);
-
-  // The distinctive movement model: heading comes FROM the camera's theta,
-  // then the eight-way offsets are applied.
-  assert.match(trek, /this\.rotation = this\.theta/);
-  assert.match(trek, /this\.rotation \+= Math\.PI \* 0\.25/);
-  assert.match(trek, /this\.rotation -= Math\.PI \* 0\.75/);
-  assert.match(trek, /this\.rotation \+= Math\.PI \* 0\.5/);
   // The joystick threshold is the source's.
   assert.match(trek, /const DEAD = 0\.25/);
+});
 
-  // The body is the source's stick human, part for part.
-  assert.match(trek, /SphereGeometry\(0\.24, 24, 18\)/);      // head
-  assert.match(trek, /CapsuleGeometry\(0\.09, 0\.15, 6, 12\)/); // neck
-  assert.match(trek, /CapsuleGeometry\(0\.22, 0\.75, 6, 18\)/); // torso
-  assert.match(trek, /CapsuleGeometry\(0\.09, 0\.6, 6, 12\)/);  // arms
-  assert.match(trek, /CapsuleGeometry\(0\.12, 0\.85, 6, 14\)/); // legs
-  assert.match(trek, /shoulderY = 1\.45/);
-  assert.match(trek, /shoulderX = 0\.34/);
+test("locomotion is analog with turn-rate limiting — the 8-way snap is gone", () => {
+  const trek = read("src/nature3d/engine/trekAvatar.ts");
+  // The heading reference is STILL the camera's theta (the source's
+  // distinctive contract), but the offset is the stick's ANALOG angle now.
+  assert.match(trek, /wishHeading = this\.theta - Math\.atan2\(stick\.x, -stick\.y\)/);
+  // ...and the heading turns toward it at a limited rate instead of popping.
+  assert.match(trek, /angDiff\(this\.rotation, wishHeading\)/);
+  assert.match(trek, /clamp\(dHead, -maxTurn \* dt, maxTurn \* dt\)/);
+  // The old compass-pop table must be GONE, not just unused.
+  assert.ok(!/this\.rotation \+= Math\.PI \* 0\.25/.test(trek), "8-way snap table is back");
+  assert.ok(!/this\.rotation -= Math\.PI \* 0\.75/.test(trek), "8-way snap table is back");
+  assert.ok(!/this\.rotation \+= Math\.PI \* 0\.5/.test(trek), "8-way snap table is back");
+  // Asymmetric accel/decel through frame-rate independent filters.
+  assert.match(trek, /ACCEL_K = 6\.5/);
+  assert.match(trek, /DECEL_K = 9/);
+  // Gait phase is locked to distance over stride — the no-skate law.
+  assert.match(trek, /gaitPhase \+= \(this\.speed \* dt\) \/ this\.strideLen \* Math\.PI/);
+  // Locomotion states exist for gait selection.
+  assert.match(trek, /export type LocoState/);
+  assert.match(trek, /"jump" \| "fall" \| "land"/);
+});
+
+test("the character is a jointed rig with foot IK, not the stick human", () => {
+  const trek = read("src/nature3d/engine/trekAvatar.ts");
+  // Full joint hierarchy: spine chain, arms with elbows + wrists, legs with
+  // knees + ankles.
+  assert.match(trek, /const pelvisG = joint\(body, 0, PELVIS_Y, 0\)/);
+  assert.match(trek, /const neckG = joint\(chestG, 0, 0\.2, 0\)/);
+  assert.match(trek, /const elbowL = armBuildL\.elbow/);
+  assert.match(trek, /const wristL = armBuildL\.wrist/);
+  assert.match(trek, /const kneeL = legBuildL\.knee/);
+  assert.match(trek, /const ankleL = legBuildL\.ankle/);
+  // Two materials, vertex-coloured, nothing transparent anywhere.
+  assert.match(trek, /vertexColors: true/);
+  assert.ok(!/transparent:\s*true/.test(trek), "the rig must stay fully opaque");
+  // Analytic two-bone foot IK with staggered updates.
+  assert.match(trek, /function solveLeg\(/);
+  assert.match(trek, /function updateFoot\(/);
+  assert.match(trek, /STAGGER/i);
+  // The old monochrome body must be GONE.
+  assert.ok(!/SphereGeometry\(0\.24, 24, 18\)/.test(trek), "stick-human head is back");
+  assert.ok(!/CapsuleGeometry\(0\.22, 0\.75, 6, 18\)/.test(trek), "stick-human torso is back");
+  // Deterministic: no Math.random in the character (seeded PRNG instead).
+  const code = trek.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/Math\.random\(\)/.test(code), "the character must stay deterministic");
+});
+
+test("jump, camera feel and the scene wiring exist", () => {
+  const trek = read("src/nature3d/engine/trekAvatar.ts");
+  // Buffered + coyote-time jump.
+  assert.match(trek, /JUMP_V = 7\.4/);
+  assert.match(trek, /COYOTE = 0\.1/);
+  assert.match(trek, /jumpQueued/);
+  // Camera: damped placement with a soft low-angle limit, shoulder offset,
+  // sprint FOV kick.
+  assert.match(trek, /placePhi = Math\.min\(this\.smoothPhi, Math\.PI \/ 2 \+ 0\.35\)/);
+  assert.match(trek, /SHOULDER_RIGHT = 0\.55/);
+  assert.match(trek, /fovKickDegrees\(\)/);
+  // The rig poses from the player every frame in both camera modes.
+  assert.match(SCENE, /this\.avatar\.update\(dt, time, this\.trek, this\.camera\)/);
+  // Jump input: Space on desktop, HUD button on touch.
+  assert.match(CONTROLS, /code === "Space"/);
+  assert.match(SCENE, /queueJump\(\)/);
+  assert.match(SCENE, /consumeJump\(\)/);
 });
 
 test("the character sits on the chair and stands up to walk", () => {
@@ -1674,7 +1725,19 @@ test("everything that reads the sun shares one vector", () => {
     !/uSunDir = \{ value: new THREE\.Vector3\(0\.62/.test(WATER),
     "the water must not keep its own frozen sun direction",
   );
-  assert.match(SCENE, /createWater\(this\.textures, this\.budget, this\.sky\.sunDir\)/);
+  // The call grew a fourth argument — the live sky colours the water reflects —
+  // but the contract is unchanged and now covers all THREE shared instances:
+  // the sun vector, the haze colour and the sun colour are handed over by
+  // reference, so `daylight.ts` still writes once and every consumer follows.
+  assert.match(SCENE, /createWater\(this\.textures, this\.budget, this\.sky\.sunDir, \{/);
+  assert.match(SCENE, /sky: this\.atmosphere\.uniforms\.uDcHazeColor\.value/);
+  assert.match(SCENE, /sun: this\.atmosphere\.uniforms\.uDcSunColor\.value/);
+  assert.ok(
+    !/new THREE\.Color\(.*\).*createWater/s.test(SCENE),
+    "the water must borrow the atmosphere's colours, not freeze its own",
+  );
+  // And the river fades into that air with everything else.
+  assert.match(SCENE, /this\.water\.materials\.forEach\(\(m\) => this\.atmosphere\.register\(m\)\)/);
 
   // The shadow-casting light must sit on the real sun direction. The old
   // hardcoded (+44, 48, -50) offset was a permanent morning sun, so shadows

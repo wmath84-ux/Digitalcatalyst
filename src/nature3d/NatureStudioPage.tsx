@@ -21,6 +21,7 @@ import {
   Maximize2, Minimize2, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
+  ChevronsUp,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
@@ -530,6 +531,15 @@ export default function NatureStudioPage() {
               >
                 <Footprints className="h-5 w-5" />
               </button>
+              {/* Tap to jump — edge-triggered, same as Space on desktop. */}
+              <button
+                type="button"
+                onPointerDown={() => engineRef.current?.queueJump()}
+                className="mb-7 grid h-14 w-14 place-items-center rounded-full border border-white/25 bg-slate-950/45 text-white/85 backdrop-blur-xl transition active:scale-95 active:bg-sky-500/35"
+                title="Jump"
+              >
+                <ChevronsUp className="h-5 w-5" />
+              </button>
             </div>
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <div className="h-5 w-5 rounded-full border border-white/45 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
@@ -537,7 +547,7 @@ export default function NatureStudioPage() {
               </div>
             </div>
             <p className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 translate-y-12 text-[10px] font-semibold text-white/45 lg:block">
-              WASD or the stick to walk · Shift to run · swipe anywhere to look around
+              WASD or the stick to walk · Shift to run · Space to jump · swipe anywhere to look around
             </p>
           </>
           )

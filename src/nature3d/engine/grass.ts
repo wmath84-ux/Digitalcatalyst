@@ -1,6 +1,6 @@
 // src/nature3d/engine/grass.ts
 //
-// HYPER-REAL GRASS FIELD — up to 150 000 blades in TWO draw calls.
+// HYPER-REAL GRASS FIELD — up to 100 000 clumps in TWO draw calls.
 //
 // How it stays free on a low-end GPU:
 //
@@ -8,23 +8,52 @@
 //     geometry, one material, one draw call. The CPU never touches a blade
 //     after boot.
 //   * The wind is a VERTEX SHADER effect injected with `onBeforeCompile`, so
-//     animating 150 k blades costs exactly one uniform update per frame
+//     animating 100 k blades costs exactly one uniform update per frame
 //     (`uTime`) — zero JS work, zero matrix rebuilds, no GC pressure.
 //   * The near ring uses a 3-segment curved blade, the far ring uses a flat
 //     2-triangle card. Blades also SHRINK to zero over the last few metres of
 //     each ring, so LOD transitions have no popping.
 //   * Alpha-test (not alpha-blend) so there is no sorting cost and no
-//     overdraw explosion — the single biggest cause of grass jank.
-//   * Per-instance colour variation + root darkening is baked into an
-//     instanced attribute, which is what actually sells "real grass" — a
-//     uniform green field always reads as CGI.
+//     overdraw explosion — the single biggest cause of grass jank on mobile
+//     (research §4, §22, principle 35).
+//
+// ── What the research pass changed (and why) ───────────────────────────
+//
+//   CLUMPS, NOT BLADES (§4, principle 17). Grass does not grow as evenly
+//   spaced individual blades; it grows in tufts that share a root system and
+//   a microclimate. The scatter now seeds a CLUMP and fills it with 2–6
+//   blades inside a 30 cm radius, which is what gives a meadow its volume —
+//   the silhouette of the tuft, not of the blade, is what the eye reads.
+//
+//   THE GRASS WEARS THE GROUND'S COLOUR (§12, §27). Every clump samples the
+//   same `groundColorAt` rule the terrain mesh uses and derives its own
+//   colour from it, so the grass over wet soil comes out darker and greener
+//   than the grass over dry ground — the field becomes a continuation of the
+//   terrain instead of a green carpet laid over it.
+//
+//   WORN GROUND HAS NO GRASS (§8, §48). Trails and the trodden disc under
+//   the chair are read from `pathWeight`; blades thin out across the shoulder
+//   and stop entirely on the core. That is the visible proof of the level's
+//   design — where the learner walks, the ground wears.
+//
+//   A SKIRT AROUND EVERY ROCK (principle 50). Each boulder in the rock kit
+//   reports its base radius; the grass field grows a ring of blades around it,
+//   so no rock ever sits on the ground as if it had been dropped there.
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X } from "./terrain";
+import { GROUND_PALETTE } from "./palette";
+import { groundColorAt, pathWeight } from "./environment";
 
 export interface GrassField {
   group: THREE.Group;
+  /**
+   * The two ring materials. Exposed so `scene.ts` can register them with the
+   * atmosphere pass as FOLIAGE — they get the sun transmission term that makes
+   * a backlit field glow (research §4, principle 18), which a rock must not.
+   */
+  materials: THREE.Material[];
   update(time: number, windStrength: number): void;
   dispose(): void;
 }
@@ -59,6 +88,13 @@ interface RingOptions {
    * the far ring grows its blades with distance instead of adding instances.
    */
   distanceGain?: number;
+  /** Blades per tuft at the near edge … far edge of the ring. */
+  clumpNear: number;
+  clumpFar: number;
+  /** Radius of one tuft, in metres. */
+  clumpRadius: number;
+  /** Rock bases to skirt, as (x, z, radius) triples. */
+  skirt?: Float32Array;
 }
 
 function buildRing(
@@ -70,7 +106,10 @@ function buildRing(
 
   const material = new THREE.MeshLambertMaterial({
     map: bladeTex,
-    alphaTest: 0.42,
+    // A tighter cut than 0.42 trims the soft fringe off every blade card:
+    // fewer surviving transparent texels, less overdraw, sharper silhouette
+    // (principle 35 — the alpha card's empty pixels are pure cost).
+    alphaTest: 0.5,
     side: THREE.DoubleSide,
     transparent: false,
     vertexColors: true,
@@ -145,9 +184,91 @@ function buildRing(
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
+  const ground = new THREE.Color();
   const span = opts.outerRadius - opts.innerRadius;
   let placed = 0;
   let guard = 0;
+
+  /**
+   * Does a blade belong here?
+   *
+   * The three refusals are the environmental logic of research §8: no grass
+   * in the moving water, on the bare shingle the river scours, under the
+   * chair, or on ground that feet have worn bare.
+   */
+  const acceptsBlade = (x: number, z: number, y: number, worn: number): boolean => {
+    if (insideRiver(x, z)) return false;
+    if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.72) return false;
+    if (Math.hypot(x, z + 1.35) < 1.9) return false;
+    if (y < -1.1) return false;
+    // Thin across the shoulder, stop dead on the core: a trail's edge is
+    // ragged in life, and a hard cutoff would draw a line along the path.
+    if (worn > 0.62) return false;
+    if (worn > 0.18 && Math.random() < worn * 1.45) return false;
+    return true;
+  };
+
+  /**
+   * One tuft: the ground colour it inherits, and the blades it carries.
+   *
+   * `cy` is the tuft's own ground height. It is reused for the blades that land
+   * closest to the middle (where the surface is the same to a millimetre) and
+   * only the outer blades pay for their own height sample — the build loop
+   * samples this height field often enough that saving a third of the calls is
+   * worth more than a centimetre of precision under a 50 cm blade.
+   */
+  const plantClump = (cx: number, cz: number, cy: number, blades: number, gain: number, fade: number) => {
+    // One wear measurement and one ground sample per TUFT, not per blade: the
+    // blades of a tuft share a root system and a patch of soil 30 cm across, so
+    // measuring each one individually would triple the build cost to produce
+    // the same answer.
+    const worn = pathWeight(cx, cz);
+    // The clump's colour is the GROUND's colour, greened. This is what makes
+    // the field read as the terrain growing something rather than as a
+    // separate object sitting on it (research §12, §27).
+    groundColorAt(cx, cz, cy, ground, GROUND_PALETTE, 1, worn);
+    const hsl = { h: 0, s: 0, l: 0 };
+    ground.getHSL(hsl);
+    const patch = (Math.sin(cx * 0.21) * Math.cos(cz * 0.19) + 1) * 0.5;
+
+    for (let b = 0; b < blades; b += 1) {
+      if (placed >= opts.count) return;
+      const a = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * opts.clumpRadius;
+      const x = cx + Math.cos(a) * rad;
+      const z = cz + Math.sin(a) * rad;
+      const y = rad < 0.06 ? cy : terrainHeight(x, z);
+      if (!acceptsBlade(x, z, y, worn)) continue;
+
+      const scale = (0.62 + Math.random() * 0.68) * fade * gain;
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(
+        (Math.random() - 0.5) * 0.16,
+        Math.random() * Math.PI,
+        (Math.random() - 0.5) * 0.22,
+      );
+      dummy.scale.set((0.8 + Math.random() * 0.5) * gain, scale, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(placed, dummy.matrix);
+
+      // Hue drifts with the ground's own hue and lightness, so a clump on
+      // pale dry soil comes out yellower and one over wet dark soil comes out
+      // deep green. Per-blade jitter on top stops any two blades matching.
+      const hue = 0.215 + hsl.l * 0.07 + patch * 0.02 + (Math.random() - 0.5) * opts.colorJitter;
+      const sat = 0.34 + hsl.s * 0.35 + patch * 0.12 + Math.random() * 0.1;
+      const lit = 0.26 + hsl.l * 0.36 + Math.random() * 0.16 - patch * 0.04;
+      color.setHSL(hue, sat, lit);
+      mesh.setColorAt(placed, color);
+      placed += 1;
+    }
+  };
+
+  // SKIRTS FIRST. The ring's instance buffer is written from slot 0, so the
+  // prop skirts take the first slots and the scenic scatter continues from
+  // wherever they left off. Planting them last would overwrite real blades.
+  if (opts.skirt && opts.skirt.length > 0) {
+    placed = plantSkirt(mesh, opts.skirt, placed, Math.round(opts.count * 0.08));
+  }
 
   while (placed < opts.count && guard < opts.count * 6) {
     guard += 1;
@@ -156,39 +277,21 @@ function buildRing(
     const a = Math.random() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
-
-    // No grass in the water, on the bare riverbank shingle, or under the rock.
-    if (insideRiver(x, z)) continue;
-    if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.72) continue;
-    if (Math.hypot(x, z + 1.35) < 1.9) continue;
-
+    // Cheap rejections FIRST, before the (expensive) height field is sampled:
+    // most of the ring is rejected for being in the water or off the edge.
+    const wornHere = pathWeight(x, z);
+    if (wornHere > 0.62) continue;
     const y = terrainHeight(x, z);
-    if (y < -1.1) continue;
+    if (!acceptsBlade(x, z, y, wornHere)) continue;
 
     // Fade the blade height to zero across the last 12 % of the ring so the
     // LOD boundary is invisible.
-    const edge = 1 - Math.max(0, (r - (opts.outerRadius - span * 0.12)) / (span * 0.12));
+    const fade = Math.min(1, Math.max(0.05, 1 - Math.max(0, (r - (opts.outerRadius - span * 0.12)) / (span * 0.12))));
     const gain = 1 + ((opts.distanceGain ?? 0) * (r - opts.innerRadius)) / Math.max(span, 1);
-    const scale = (0.62 + Math.random() * 0.68) * Math.min(1, Math.max(0.05, edge)) * gain;
-
-    dummy.position.set(x, y, z);
-    dummy.rotation.set(
-      (Math.random() - 0.5) * 0.16,
-      Math.random() * Math.PI,
-      (Math.random() - 0.5) * 0.22,
-    );
-    dummy.scale.set((0.8 + Math.random() * 0.5) * gain, scale, 1);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(placed, dummy.matrix);
-
-    // Colour breakup: patches of lush / dry, plus per-blade jitter.
-    const patch = (Math.sin(x * 0.21) * Math.cos(z * 0.19) + 1) * 0.5;
-    const hue = 0.24 + patch * 0.035 + (Math.random() - 0.5) * opts.colorJitter;
-    const sat = 0.42 + patch * 0.2 + Math.random() * 0.12;
-    const lit = 0.3 + Math.random() * 0.22 - patch * 0.05;
-    color.setHSL(hue, sat, lit);
-    mesh.setColorAt(placed, color);
-    placed += 1;
+    const mix = span > 0 ? (r - opts.innerRadius) / span : 0;
+    const perClump = opts.clumpNear + (opts.clumpFar - opts.clumpNear) * mix;
+    const blades = Math.max(1, Math.round(perClump * (0.6 + Math.random() * 0.8)));
+    plantClump(x, z, y, blades, gain, fade);
   }
 
   mesh.count = placed;
@@ -204,7 +307,63 @@ function buildRing(
   return { mesh, material };
 }
 
-export function createGrassField(bladeTex: THREE.Texture, budget: QualityBudget): GrassField {
+/**
+ * Grow a skirt of blades around a prop's base.
+ *
+ * Called for every boulder the rock kit placed. The blades sit in a ring just
+ * outside the rock's own footprint, are slightly taller than the surrounding
+ * turf (they are growing in the loose soil the rock traps) and lean away from
+ * it — which is what makes the join between a hard-edged mesh and a soft
+ * ground disappear (principle 50).
+ *
+ * It writes from `startIndex` and returns the next free slot, so the caller's
+ * own scatter simply continues from there — no slot is ever overwritten.
+ */
+function plantSkirt(
+  mesh: THREE.InstancedMesh,
+  skirt: Float32Array,
+  startIndex: number,
+  limit: number,
+): number {
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  let placed = startIndex;
+  for (let i = 0; i + 2 < skirt.length && placed < limit; i += 3) {
+    const cx = skirt[i];
+    const cz = skirt[i + 1];
+    const radius = skirt[i + 2];
+    const blades = 7;
+    for (let b = 0; b < blades && placed < limit; b += 1) {
+      const a = (b / blades) * Math.PI * 2 + Math.random() * 0.6;
+      const rad = radius * (0.75 + Math.random() * 0.7);
+      const x = cx + Math.cos(a) * rad;
+      const z = cz + Math.sin(a) * rad;
+      if (insideRiver(x, z)) continue;
+      const y = terrainHeight(x, z);
+      if (y < -1.1) continue;
+      dummy.position.set(x, y, z);
+      // Lean AWAY from the rock: grass growing against a boulder is pushed
+      // outward, and a ring of blades all leaning out is what reads as turf
+      // piling up against the stone.
+      dummy.rotation.set(-Math.sin(a) * 0.2, Math.random() * Math.PI, Math.cos(a) * 0.2);
+      const sc = 0.9 + Math.random() * 0.8;
+      dummy.scale.set(1.05, sc, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(placed, dummy.matrix);
+      color.setHSL(0.235 + Math.random() * 0.03, 0.4 + Math.random() * 0.14, 0.24 + Math.random() * 0.14);
+      mesh.setColorAt(placed, color);
+      placed += 1;
+    }
+  }
+  return placed;
+}
+
+export function createGrassField(
+  bladeTex: THREE.Texture,
+  budget: QualityBudget,
+  /** Rock bases, as (x, z, radius) triples — see `rocks.ts`. */
+  skirtPoints?: Float32Array,
+): GrassField {
   const group = new THREE.Group();
   group.name = "grass-field";
 
@@ -218,6 +377,11 @@ export function createGrassField(bladeTex: THREE.Texture, budget: QualityBudget)
       height: 0.52,
       width: 0.075,
       colorJitter: 0.03,
+      // Dense tufts near the camera: 4–7 blades sharing a root.
+      clumpNear: 5.5,
+      clumpFar: 3.2,
+      clumpRadius: 0.3,
+      skirt: skirtPoints,
     },
     budget,
   );
@@ -238,6 +402,11 @@ export function createGrassField(bladeTex: THREE.Texture, budget: QualityBudget)
       // edge. That is what keeps the meadow solid all the way to the hills
       // without paying for millions of instances.
       distanceGain: 3.5,
+      // Away from the camera a "tuft" is a wider, sparser grouping: the eye
+      // can no longer resolve individual blades, only clumps of volume.
+      clumpNear: 2.4,
+      clumpFar: 1.6,
+      clumpRadius: 0.55,
     },
     budget,
   );
@@ -248,6 +417,7 @@ export function createGrassField(bladeTex: THREE.Texture, budget: QualityBudget)
 
   return {
     group,
+    materials,
     update(time, windStrength) {
       for (const mat of materials) {
         const shader = mat.userData.shader as { uniforms: Record<string, { value: unknown }> } | undefined;
