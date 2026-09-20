@@ -155,14 +155,15 @@ check("decal: world position IS published", count(decal.fs, "varying vec3 vDcWor
 const terrainMat = new THREE.MeshStandardMaterial({ map: new THREE.Texture(), vertexColors: true });
 terrainMat.onBeforeCompile = (shader: unknown) => {
   // Same body as terrain.ts (kept in sync by hand; the file is asserted by the
-  // contract test as well).
+  // contract test as well) — including the per-pixel SHORELINE treatment.
   const s = shader as ShaderLike;
   s.uniforms.uDcSunSide = { value: new THREE.Vector2(0, -1) };
+  s.uniforms.uDcOceanLevel = { value: -2.6 };
   s.fragmentShader = s.fragmentShader
-    .replace("#include <common>", "#include <common>\nuniform vec2 uDcSunSide;\n")
+    .replace("#include <common>", "#include <common>\nuniform vec2 uDcSunSide;\nuniform float uDcOceanLevel;\n")
     .replace(
       "#include <map_fragment>",
-      "#include <map_fragment>\nvec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;\nfloat dcFacing = dot( normalize(vDcWorldNormal.xz + vec2(1e-4)), normalize(uDcSunSide) );\n",
+      "#include <map_fragment>\nvec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;\nfloat dcShore = vDcWorldPos.y - uDcOceanLevel;\nfloat dcFacing = dot( normalize(vDcWorldNormal.xz + vec2(1e-4)), normalize(uDcSunSide) );\n",
     );
 };
 atmosphere.register(terrainMat);
@@ -170,6 +171,7 @@ const terrain = compile(terrainMat);
 check("terrain: macro variation resolves", terrain.fs.includes("dcMacro") && terrain.fs.includes("* 0.0625"));
 check("terrain: vMapUv exists in the resolved map chunk", terrain.fs.includes("texture2D( map, vMapUv )"));
 check("terrain: aspect tint present", terrain.fs.includes("dcFacing"));
+check("terrain: shoreline distance compiles", terrain.fs.includes("dcShore") && terrain.fs.includes("uDcOceanLevel"));
 check("terrain: no duplicate varyings after both passes", count(terrain.fs, "varying vec3 vDcWorldPos;") === 1);
 check("terrain: sphere-style normal transform is NOT applied", !terrain.vs.includes("instanceMatrix * mat3( modelMatrix )"));
 
@@ -180,7 +182,8 @@ const textureSet = {
   ground: fakeTex(), rock: fakeTex(), rockNormal: fakeTex(), rockORM: fakeTex(),
   weather: fakeTex(), contact: fakeTex(), canopy: fakeTex(),
   water: fakeTex(), waterNormal: fakeTex(), fur: fakeTex(), cloud: fakeTex(),
-  feather: fakeTex(), dispose() {},
+  feather: fakeTex(), frond: fakeTex(), palmBark: fakeTex(), palmCanopy: fakeTex(),
+  dispose() {},
 } as unknown as Parameters<typeof createWater>[0];
 
 const water = createWater(textureSet, budget, new THREE.Vector3(0.62, 0.34, -0.7).normalize(), {
@@ -214,6 +217,24 @@ check(
 check("water: the fall is graded in linear light too", fall.fs.indexOf("vec3 dcCol = mix(dcClear") < fall.fs.indexOf("dcHazeFall"));
 check("water: the spray is hazed like the rest of the air", spray.fs.includes("dcHazeFall"));
 check("water: the spray never got the transmission term", !spray.fs.includes("dcThru"));
+
+// ── 5b. The ocean (tropical) ──────────────────────────────────────────
+const oceanMat = water.materials[5] as THREE.MeshStandardMaterial;
+check("ocean: the material is published (appended after the pinned indices)", !!oceanMat && oceanMat.type === "MeshStandardMaterial");
+const ocean = compile(oceanMat);
+check("ocean: flood mask attribute consumed in the vertex stage", ocean.vs.includes("attribute float aDcDepth") && ocean.vs.includes("aDcDepth < 0.0"));
+check("ocean: dry verts collapse below the terrain", ocean.vs.includes("transformed.y -= 90.0"));
+check("ocean: depth varying published", ocean.vs.includes("vDcDepth = aDcDepth") && ocean.fs.includes("varying float vDcDepth"));
+check("ocean: dual-phase flow regenerates (no sliding texture)", ocean.fs.includes("dcPhase0 = fract") && ocean.fs.includes("mix( dcN0, dcN1, dcMix )"));
+check("ocean: Fresnel is Schlick with water's F0", ocean.fs.includes("0.02 + 0.98 * pow( 1.0 - dcCos, 5.0 )"));
+check("ocean: depth ramp runs turquoise → deep", ocean.fs.includes("dcShallowC") && ocean.fs.includes("dcDeepC") && ocean.fs.includes("smoothstep( 6.0, 13.0, dcD )"));
+check("ocean: shoreline surf band present", ocean.fs.includes("dcFoam") && ocean.fs.includes("dcLine"));
+check("ocean: glint tracks the SHARED sun vector", ocean.fs.includes("uSunDir") && !/uSunDir = \{ value: new/.test(stripComments(ocean.fs)));
+check("ocean: no orphaned inputs", (() => {
+  const fi = new Set([...varyings(ocean.fs, "varying"), ...varyings(ocean.fs, "in")]);
+  const vo = new Set([...varyings(ocean.vs, "varying"), ...varyings(ocean.vs, "out")]);
+  return [...fi].filter((v) => v.startsWith("vDc") && !vo.has(v)).length === 0;
+})());
 
 // ── 6. Every fragment input has a vertex output ───────────────────────
 function varyings(glsl: string, kw: "varying" | "out" | "in"): Set<string> {

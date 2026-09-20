@@ -18,7 +18,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { QualityBudget } from "./quality";
-import { insideRiver, terrainHeight } from "./terrain";
+import { insideRiver, terrainHeight, OCEAN_LEVEL } from "./terrain";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
 import type { TextureSet } from "./textures";
 
@@ -48,7 +48,7 @@ interface TreeLayout {
   x: number;
   z: number;
   scale: number;
-  kind: "broadleaf" | "pine" | "acacia";
+  kind: "broadleaf" | "pine" | "acacia" | "palm";
   /** Only these trees get wind-animated leaf cards. */
   sways: boolean;
   /**
@@ -60,6 +60,21 @@ interface TreeLayout {
   crowding: number;
   /** Soil depth, 0…1. Shallow soil → visible root flare and a smaller crown. */
   soil: number;
+  /**
+   * The palm variation A–E (0…4): trunk height, curvature, crown size, frond
+   * count and droop all read off this one index, so no two neighbouring palms
+   * are clones and yet every palm is one of five authored archetypes rather
+   * than random noise (Phase 7).
+   */
+  variant: number;
+  /**
+   * Which way the palm leans, in radians — beach palms lean OUT TO SEA, the
+   * classic tropical-island silhouette, and the coast direction is simply the
+   * outward radial at the palm's position. 0 for inland trees.
+   */
+  leanAngle: number;
+  /** 0…1, from the environmental field: how close to the beach this tree is. */
+  coastal: number;
   /**
    * Beyond this radius the tree is rendered as its own LOD: a crossed pair of
    * painted canopy cards instead of trunk + boughs + twenty leaf cards. The
@@ -102,23 +117,52 @@ function treeLayout(count: number): TreeLayout[] {
     if (h < -0.8) continue;
     if (h > 34) continue; // above the tree line
     // Spacing relaxes with distance — dense grove near you, open woodland far off.
-    const minGap = r < 60 ? 4.2 : r < 160 ? 6 : 9;
+    // On the beach the gaps tighten: coconut palms grow almost colonially
+    // along the shore, and the clustered palms ARE the beach read.
+    const site = siteAt(x, z, treeSite);
+    const minGap = site.coastal > 0.3 ? 3.4 : r < 60 ? 4.2 : r < 160 ? 6 : 9;
     if (out.some((t) => Math.hypot(t.x - x, t.z - z) < minGap)) continue;
-    const roll = Math.random();
     // Ask the environmental field what this spot is like before the tree is
     // built: soil depth decides whether the roots show, crowding decides how
     // much bare trunk it grows, and both are geography, not chance (§1).
-    const site = siteAt(x, z, treeSite);
+    const roll = Math.random();
+    // THE TROPICAL DISTRIBUTION (Phase 7/8): the coast belongs to the coconut
+    // palm; the inland woods stay lush broadleaf with a savanna accent; only
+    // the high ground keeps a handful of iron-pines for altitude variety.
+    const kind: TreeLayout["kind"] = site.coastal > 0.3
+      ? (roll < 0.78 ? "palm" : "broadleaf")
+      : roll < 0.52
+        ? "broadleaf"
+        : roll < 0.82
+          ? "palm"
+          : roll < 0.94
+            ? "acacia"
+            : "pine";
+    // Beach palms reach — more sun, less competition, salt wind. Inland
+    // palms are the slender, taller variant.
+    const scale = site.coastal > 0.3
+      ? 1.0 + Math.random() * 0.5
+      : 0.85 + Math.random() * 0.85;
     out.push({
       x,
       z,
-      scale: 0.85 + Math.random() * 0.85,
-      kind: roll < 0.58 ? "broadleaf" : roll < 0.84 ? "pine" : "acacia",
+      scale,
+      kind,
       // ~55 % of close trees sway, dropping to ~8 % past 150 m. Over the whole
       // forest that lands near "3 in 10", which is what was asked for.
       sways: Math.random() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
       crowding: site.crowding,
       soil: site.soil,
+      variant: (Math.random() * 5) | 0,
+      // Beach palms lean OUT TO SEA — the outward radial — with a few
+      // rebellious leaners for naturalism. Inland palms keep a small
+      // random lean; broadleaf/pine/acacia ignore it.
+      leanAngle: kind === "palm"
+        ? (site.coastal > 0.3 && Math.random() < 0.72
+            ? Math.atan2(z, x)
+            : Math.random() * Math.PI * 2)
+        : 0,
+      coastal: site.coastal,
       impostor: r > IMPOSTOR_RADIUS,
     });
   }
@@ -134,8 +178,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // `vertexColors: true` on both: the tree factory bakes its AO, its moss and
   // its needle gradient into vertex colours (see `woodColor`/`tierColor`
   // below), which is a texture lookup's worth of shading for zero memory.
+  // The palm gets its OWN material + merged mesh: its ringed, sun-bleached
+  // trunk is one of the strongest tropical reads in the whole scene, and
+  // temperate bark would undo it.
   const trunkMat = new THREE.MeshLambertMaterial({ map: tex.bark, vertexColors: true });
-  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2f5c33, vertexColors: true });
+  const palmTrunkMat = new THREE.MeshLambertMaterial({ map: tex.palmBark, vertexColors: true });
+  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2e6438, vertexColors: true });
 
   // STATIC GEOMETRY IS MERGED, NOT ADDED.
   //
@@ -145,6 +193,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // single biggest win in the whole scene and it is why the forest is free
   // even on an integrated GPU.
   const woodParts: THREE.BufferGeometry[] = [];
+  const palmWoodParts: THREE.BufferGeometry[] = [];
   const pineParts: THREE.BufferGeometry[] = [];
   const bakeMatrix = new THREE.Matrix4();
   const bakeEuler = new THREE.Euler();
@@ -171,6 +220,11 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // to zero with distance inside the shader, so a swaying tree 200 m away
   // costs the vertex maths but produces no visible motion and no shimmer.
   const leafGeo = new THREE.PlaneGeometry(1, 1);
+  // Palm fronds pivot at the ROOT (the crown), not the centre, so the card is
+  // re-based to the left edge before instancing — a rotating frond then sweeps
+  // around the crown point like the real thing instead of spinning in place.
+  const frondGeo = new THREE.PlaneGeometry(1, 0.5);
+  frondGeo.translate(0.5, 0, 0);
 
   const makeLeafMaterial = (animated: boolean, map: THREE.Texture = tex.leaf) => {
     const mat = new THREE.MeshLambertMaterial({
@@ -314,7 +368,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // drawn as a crossed pair of painted canopy cards: no trunk geometry, no
   // boughs, no twenty leaf cards — one InstancedMesh holds the whole distant
   // forest, and the silhouette (which is all the eye has at that range) is
-  // carried by painted alpha instead of by polygons.
+  // carried by painted alpha instead of by polygons. Palms get their own
+  // card + mesh: their silhouette (slim curved trunk, radiating crown) is so
+  // distinctive that a round broadleaf blob would read as a mistake.
   const impostorTrees = layout.filter((t) => t.impostor).length;
   const impostorMat = makeLeafMaterial(true, tex.canopy);
   const impostors = new THREE.InstancedMesh(
@@ -327,6 +383,18 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   impostors.frustumCulled = false;
   let impostorIndex = 0;
 
+  const palmImpostorTrees = layout.filter((t) => t.impostor && t.kind === "palm").length;
+  const palmImpostorMat = makeLeafMaterial(true, tex.palmCanopy);
+  const palmImpostors = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    palmImpostorMat,
+    Math.max(1, palmImpostorTrees * 2 + 4),
+  );
+  palmImpostors.castShadow = false;
+  palmImpostors.receiveShadow = false;
+  palmImpostors.frustumCulled = false;
+  let palmImpostorIndex = 0;
+
   // The sun's mean azimuth: where the light comes from all day. Branches chase
   // it (phototropism), the far side of every trunk grows the moss.
   const sunAzimuth = Math.atan2(SUN_SIDE_Z, SUN_SIDE_X);
@@ -334,6 +402,161 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   for (const t of layout) {
     const baseY = terrainHeight(t.x, t.z);
     const s = t.scale;
+
+    if (t.kind === "palm") {
+      // ════════════════════════════════════════════════════════════════
+      // THE COCONUT PALM (Phase 7) — five ORIGINAL archetypes, A…E.
+      //
+      // Each archetype pins the five numbers that make a palm read as a palm:
+      // trunk height, total lean, crown radius, frond count and droop. The
+      // trunk is a curved stack of tapered cylinders (with the ring scars
+      // coming from the texture's banding), the crown is 8–11 instanced
+      // frond cards pivoting at the crown point, and 2–3 coconuts finish it.
+      // The whole tree is ~120 trunk triangles + ~10 cards — cheaper than
+      // one broadleaf's leaf cluster.
+      // ════════════════════════════════════════════════════════════════
+      const PALMS = [
+        { h: 5.6, bend: 0.17, crown: 2.6, fronds: 9, droop: 1.0 },   // A: the classic
+        { h: 7.3, bend: 0.26, crown: 3.0, fronds: 10, droop: 1.14 }, // B: the tall leaner
+        { h: 4.3, bend: 0.08, crown: 2.3, fronds: 8, droop: 0.9 },   // C: the young one
+        { h: 6.5, bend: 0.32, crown: 2.8, fronds: 11, droop: 1.22 }, // D: the wind-swept
+        { h: 5.0, bend: 0.11, crown: 2.4, fronds: 9, droop: 0.95 },  // E: the stout one
+      ] as const;
+      const P = PALMS[t.variant % PALMS.length];
+      const trunkH = P.h * s * (0.92 + Math.random() * 0.18);
+      const leanDirX = Math.cos(t.leanAngle);
+      const leanDirZ = Math.sin(t.leanAngle);
+      // Beach palms commit to the lean (salt wind, phototropism over open
+      // water); inland palms only suggest it.
+      const totalLean = P.bend * (t.coastal > 0.3 ? 1 : 0.45) * (0.75 + Math.random() * 0.5);
+      const SEGS = 5;
+      let px = t.x;
+      let pz = t.z;
+      let py = baseY - 0.15 * s; // sink the root slightly, like every rock
+      for (let seg = 0; seg < SEGS; seg += 1) {
+        const f0 = seg / SEGS;
+        const f1 = (seg + 1) / SEGS;
+        // Radius tapers with height; alternate segments bulge ±7 % — the
+        // texture's ring bands then land on real geometry ridges.
+        const ring = seg % 2 === 0 ? 1.07 : 0.93;
+        const r0 = (0.21 - 0.105 * f0) * s * (seg === 0 ? 1.18 : ring);
+        const r1 = (0.21 - 0.105 * f1) * s * (seg === SEGS - 1 ? 0.8 : ring);
+        const segLen = trunkH / SEGS;
+        const tilt = (totalLean / SEGS) * (seg + 0.5);
+        const midX = px + leanDirX * Math.sin(tilt) * segLen * 0.5;
+        const midZ = pz + leanDirZ * Math.sin(tilt) * segLen * 0.5;
+        bake(
+          palmWoodParts,
+          woodColor(new THREE.CylinderGeometry(r1, r0, segLen * 1.04, 7), "trunk"),
+          midX,
+          py + Math.cos(tilt) * segLen * 0.5,
+          midZ,
+          leanDirZ * tilt,
+          0,
+          -leanDirX * tilt,
+        );
+        px += leanDirX * Math.sin(tilt) * segLen;
+        pz += leanDirZ * Math.sin(tilt) * segLen;
+        py += Math.cos(tilt) * segLen;
+      }
+      // Crown point: where the trunk curve ends.
+      const crownX = px;
+      const crownY = py;
+      const crownZ = pz;
+      const crownR = P.crown * s;
+
+      // Coconuts: three small husk spheres tucked under the crown. Constant
+      // vertex colour (the palette's coconut husk) — no extra material.
+      const nuts = 2 + ((Math.random() * 2) | 0);
+      for (let n = 0; n < nuts; n += 1) {
+        const na = (n / nuts) * Math.PI * 2 + Math.random();
+        const nut = new THREE.SphereGeometry(0.15 * s, 6, 5);
+        const nPos = nut.attributes.position as THREE.BufferAttribute;
+        const nCol = new Float32Array(nPos.count * 3);
+        for (let vi = 0; vi < nPos.count; vi += 1) {
+          nCol[vi * 3] = 0.33;
+          nCol[vi * 3 + 1] = 0.26;
+          nCol[vi * 3 + 2] = 0.16;
+        }
+        nut.setAttribute("color", new THREE.BufferAttribute(nCol, 3));
+        nut.translate(Math.cos(na) * 0.3 * s, -0.24 * s, Math.sin(na) * 0.3 * s);
+        palmWoodParts.push(nut);
+      }
+
+      // ── The frond crown ──────────────────────────────────────────────
+      if (t.impostor) {
+        // Far LOD: two crossed palm-silhouette cards spanning trunk + crown.
+        const imW = crownR * 1.5;
+        const imH = (trunkH + crownR * 1.5) * s * 0.98;
+        for (let k = 0; k < 2; k += 1) {
+          if (palmImpostorIndex >= palmImpostors.instanceMatrix.count) break;
+          dummy.position.set(t.x, baseY + imH / 2, t.z);
+          dummy.rotation.set(0, (k * Math.PI) / 2 + Math.random() * 0.4, 0);
+          dummy.scale.set(imW, imH, 1);
+          dummy.updateMatrix();
+          palmImpostors.setMatrixAt(palmImpostorIndex, dummy.matrix);
+          // A salt-stressed palm is yellower; a sheltered one deeper green.
+          color.setHSL(
+            0.24 + Math.random() * 0.035,
+            0.5 + Math.random() * 0.12,
+            0.3 - t.crowding * 0.04 + Math.random() * 0.09,
+          );
+          palmImpostors.setColorAt(palmImpostorIndex, color);
+          palmImpostorIndex += 1;
+        }
+        perches.push(new THREE.Vector3(crownX, crownY + 0.2, crownZ));
+        continue;
+      }
+
+      const target = t.sways ? leavesSway : leavesStill;
+      const cap = t.sways ? maxSway : maxStill;
+      const fronds = Math.min(P.fronds, Math.max(6, budget.leavesPerTree));
+      const frondQ = new THREE.Quaternion();
+      const frondRoll = new THREE.Quaternion();
+      const frondDir = new THREE.Vector3();
+      const X_AXIS = new THREE.Vector3(1, 0, 0);
+      const unhealthy = t.variant === 2 && Math.random() < 0.4; // some C-palms yellow
+      for (let f = 0; f < fronds; f += 1) {
+        const slot = t.sways ? swayIndex : stillIndex;
+        if (slot >= cap) break;
+        const yaw = (f / fronds) * Math.PI * 2 + Math.random() * 0.5;
+        // Fronds near the top stay almost upright; outer ones droop. The
+        // archetype's `droop` scales the whole fan — archetype D sags hardest.
+        const rank = f % 3; // 0 upright, 1 mid, 2 outer
+        const pitch = rank === 0
+          ? 0.1 + Math.random() * 0.16
+          : rank === 1
+            ? 0.42 + Math.random() * 0.2
+            : (0.78 + Math.random() * 0.26) * P.droop;
+        const cp = Math.cos(pitch);
+        frondDir.set(Math.cos(yaw) * cp, -Math.sin(pitch), Math.sin(yaw) * cp).normalize();
+        frondQ.setFromUnitVectors(X_AXIS, frondDir);
+        // A little twist around the frond's own axis so cards never pair up
+        // into visible mirrored planes.
+        frondRoll.setFromAxisAngle(frondDir, (Math.random() - 0.5) * 0.55);
+        frondQ.premultiply(frondRoll);
+        dummy.position.set(crownX, crownY + 0.08 * s, crownZ);
+        dummy.quaternion.copy(frondQ);
+        const len = crownR * (1.25 + Math.random() * 0.4);
+        dummy.scale.set(len, len * 0.52, 1);
+        dummy.updateMatrix();
+        target.setMatrixAt(slot, dummy.matrix);
+        // Sunlit fronds are warm yellow-green; shaded and unhealthy ones go
+        // deeper, then yellow. Hue jitter keeps no two fronds identical.
+        const outer = rank / 2;
+        color.setHSL(
+          unhealthy ? 0.19 + Math.random() * 0.03 : 0.262 + outer * 0.018 + Math.random() * 0.014,
+          unhealthy ? 0.55 : 0.52 + outer * 0.1 + Math.random() * 0.08,
+          0.3 + outer * 0.12 + Math.random() * 0.08,
+        );
+        target.setColorAt(slot, color);
+        if (t.sways) swayIndex += 1;
+        else stillIndex += 1;
+      }
+      // Birds perch in palm crowns — the frond bases ARE the branches.
+      perches.push(new THREE.Vector3(crownX + 0.4 * s, crownY + 0.3, crownZ));
+      continue;
+    }
 
     if (t.kind === "pine") {
       // A conifer is the purest phototropism in nature: one vertical leader
@@ -490,9 +713,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // Hue follows the tree's own exposure: a crowded crown is darker (it
         // is in shade), an open one is yellow-green.
         color.setHSL(
-          0.235 + Math.random() * 0.04,
-          0.4 + t.crowding * 0.1,
-          0.3 - t.crowding * 0.06 + Math.random() * 0.1,
+          0.25 + Math.random() * 0.035,
+          0.46 + t.crowding * 0.1,
+          0.31 - t.crowding * 0.06 + Math.random() * 0.1,
         );
         impostors.setColorAt(impostorIndex, color);
         impostorIndex += 1;
@@ -524,12 +747,14 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       dummy.updateMatrix();
       target.setMatrixAt(slot, dummy.matrix);
       // Leaf colour carries the same story as the geometry: the outer, sunlit
-      // leaves are yellow-green and bright; the inner ones are dark and cooler.
+      // leaves are yellow-green and bright; the inner ones are dark and
+      // cooler. TROPICAL: the whole band is warmer and brighter than the old
+      // temperate olive — the island canopy is vivid but still varied.
       const outer = Math.min(1, radial / Math.max(0.001, spread));
       color.setHSL(
-        0.24 + outer * 0.045 + Math.random() * 0.03,
-        0.42 + outer * 0.16 + Math.random() * 0.1,
-        0.24 + outer * 0.14 - t.crowding * 0.04 + Math.random() * 0.12,
+        0.255 + outer * 0.04 + Math.random() * 0.028,
+        0.5 + outer * 0.14 + Math.random() * 0.1,
+        0.26 + outer * 0.15 - t.crowding * 0.04 + Math.random() * 0.12,
       );
       target.setColorAt(slot, color);
       if (t.sways) swayIndex += 1;
@@ -542,8 +767,13 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   if (impostors.instanceColor) impostors.instanceColor.needsUpdate = true;
   group.add(impostors);
 
+  palmImpostors.count = palmImpostorIndex;
+  palmImpostors.instanceMatrix.needsUpdate = true;
+  if (palmImpostors.instanceColor) palmImpostors.instanceColor.needsUpdate = true;
+  group.add(palmImpostors);
+
   // Flush the merged static forest: 2 draw calls for every trunk, bough and
-  // pine tier in the scene.
+  // pine tier in the scene (3 with the palms, which carry their own bark).
   if (woodParts.length) {
     const merged = mergeGeometries(woodParts, false);
     if (merged) {
@@ -554,6 +784,17 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       group.add(wood);
     }
     woodParts.forEach((g) => g.dispose());
+  }
+  if (palmWoodParts.length) {
+    const merged = mergeGeometries(palmWoodParts, false);
+    if (merged) {
+      const palmWood = new THREE.Mesh(merged, palmTrunkMat);
+      palmWood.castShadow = shadows;
+      palmWood.receiveShadow = shadows;
+      palmWood.name = "forest-palm-wood";
+      group.add(palmWood);
+    }
+    palmWoodParts.forEach((g) => g.dispose());
   }
   if (pineParts.length) {
     const merged = mergeGeometries(pineParts, false);
@@ -576,8 +817,10 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
 
   // ── Shrubs (instanced spheres of leaf cards would be heavy — use
   //    low-poly icospheres with the bark/leaf palette instead) ──────────
+  // TROPICAL: warmer island green; on the beach they thin out so the sand
+  // stays the sand (Phase 8: ROCKY/BEACH zones get sparse vegetation).
   const shrubGeo = new THREE.IcosahedronGeometry(0.55, 0);
-  const shrubMat = new THREE.MeshLambertMaterial({ color: 0x3b6b2c, flatShading: true });
+  const shrubMat = new THREE.MeshLambertMaterial({ color: 0x43802e, flatShading: true });
   const shrubCount = Math.round(budget.flowers * 0.35);
   const shrubs = new THREE.InstancedMesh(shrubGeo, shrubMat, shrubCount);
   let si = 0;
@@ -587,13 +830,15 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     if (insideRiver(x, z)) continue;
-    dummy.position.set(x, terrainHeight(x, z) + 0.2, z);
+    const sy = terrainHeight(x, z);
+    if (sy < OCEAN_LEVEL + 1.6 && Math.random() < 0.85) continue; // beach: very sparse
+    dummy.position.set(x, sy + 0.2, z);
     dummy.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
     const sc = 0.6 + Math.random() * 1.3;
     dummy.scale.set(sc, sc * 0.78, sc);
     dummy.updateMatrix();
     shrubs.setMatrixAt(si, dummy.matrix);
-    color.setHSL(0.26 + Math.random() * 0.04, 0.5, 0.2 + Math.random() * 0.12);
+    color.setHSL(0.27 + Math.random() * 0.04, 0.52, 0.22 + Math.random() * 0.12);
     shrubs.setColorAt(si, color);
     si += 1;
   }
@@ -604,10 +849,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   group.add(shrubs);
 
   // ── Wildflowers ──────────────────────────────────────────────────────
+  // TROPICAL: the island's blooms — hibiscus, plumeria, bougainvillea and
+  // white ginger — instead of the temperate meadow set.
   const flowerGeo = new THREE.SphereGeometry(0.06, 5, 4);
   const flowerMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const flowers = new THREE.InstancedMesh(flowerGeo, flowerMat, budget.flowers);
-  const palette = [0xffe066, 0xff6b81, 0x9ad0ff, 0xffffff, 0xd8a3ff];
+  const palette = [0xe8446e, 0xfff0d0, 0xc23fb0, 0xf2a03d, 0xff6b81];
   let fi = 0;
   for (let i = 0; i < budget.flowers * 3 && fi < budget.flowers; i += 1) {
     const r = 3 + Math.sqrt(Math.random()) * 34;
@@ -642,8 +889,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   return {
     group,
     perches,
-    foliageMaterials: [leafMatSway, leafMatStill, impostorMat],
-    solidMaterials: [trunkMat, pineMat, shrubMat, flowerMat],
+    foliageMaterials: [leafMatSway, leafMatStill, impostorMat, palmImpostorMat],
+    solidMaterials: [trunkMat, palmTrunkMat, pineMat, shrubMat, flowerMat],
     update(time, wind) {
       // Both wind-animated foliage materials — the near canopy and the distant
       // impostors — run off the same two uniforms.

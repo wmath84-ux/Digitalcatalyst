@@ -42,7 +42,7 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
-import { insideRiver, terrainHeight, RIVER_CENTER_X } from "./terrain";
+import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { GROUND_PALETTE } from "./palette";
 import { groundColorAt, pathWeight } from "./environment";
 
@@ -192,15 +192,24 @@ function buildRing(
   /**
    * Does a blade belong here?
    *
-   * The three refusals are the environmental logic of research §8: no grass
-   * in the moving water, on the bare shingle the river scours, under the
-   * chair, or on ground that feet have worn bare.
+   * The refusals are the environmental logic of research §8: no grass in the
+   * moving water, on the bare shingle the river scours, under the chair, on
+   * ground that feet have worn bare — and, for the tropical island, none on
+   * the beach itself (Phase 9). The wet sand band is absolute; the dry upper
+   * beach thins to scattered salt-tolerant tufts, which is exactly what a
+   * real back-shore looks like and what keeps the sand reading as SAND.
    */
   const acceptsBlade = (x: number, z: number, y: number, worn: number): boolean => {
     if (insideRiver(x, z)) return false;
     if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.72) return false;
     if (Math.hypot(x, z + 1.35) < 1.9) return false;
     if (y < -1.1) return false;
+    // THE BEACH: no grass below the tide line + 1 m; the dry sand above it
+    // keeps only ~1 blade in 4, and that inherits the sand colour from the
+    // ground rule, so the tufts read as dune grass rather than as a sparse bug.
+    const shoreUp = y - OCEAN_LEVEL;
+    if (shoreUp < 1.0) return false;
+    if (coastWeight(x, z) > 0.05 && shoreUp < 2.6 && Math.random() < 0.74) return false;
     // Thin across the shoulder, stop dead on the core: a trail's edge is
     // ragged in life, and a hard cutoff would draw a line along the path.
     if (worn > 0.62) return false;
@@ -253,10 +262,14 @@ function buildRing(
 
       // Hue drifts with the ground's own hue and lightness, so a clump on
       // pale dry soil comes out yellower and one over wet dark soil comes out
-      // deep green. Per-blade jitter on top stops any two blades matching.
-      const hue = 0.215 + hsl.l * 0.07 + patch * 0.02 + (Math.random() - 0.5) * opts.colorJitter;
-      const sat = 0.34 + hsl.s * 0.35 + patch * 0.12 + Math.random() * 0.1;
-      const lit = 0.26 + hsl.l * 0.36 + Math.random() * 0.16 - patch * 0.04;
+      // deep green. TROPICAL: the base hue sits warmer (0.232) and the
+      // saturation floor is higher — the island's grass is sunnier than the
+      // old temperate olive, and the beach tufts (over pale sand) drift
+      // naturally toward dune-grass yellow. Per-blade jitter on top stops
+      // any two blades matching.
+      const hue = 0.232 + hsl.l * 0.06 + patch * 0.02 + (Math.random() - 0.5) * opts.colorJitter;
+      const sat = 0.42 + hsl.s * 0.32 + patch * 0.1 + Math.random() * 0.1;
+      const lit = 0.27 + hsl.l * 0.36 + Math.random() * 0.16 - patch * 0.04;
       color.setHSL(hue, sat, lit);
       mesh.setColorAt(placed, color);
       placed += 1;
@@ -350,7 +363,7 @@ function plantSkirt(
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
-      color.setHSL(0.235 + Math.random() * 0.03, 0.4 + Math.random() * 0.14, 0.24 + Math.random() * 0.14);
+      color.setHSL(0.25 + Math.random() * 0.03, 0.48 + Math.random() * 0.12, 0.26 + Math.random() * 0.14);
       mesh.setColorAt(placed, color);
       placed += 1;
     }

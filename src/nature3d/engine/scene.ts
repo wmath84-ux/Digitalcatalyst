@@ -47,6 +47,7 @@ import {
 } from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
+import { createStructures, type Structures } from "./structures";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
 
 export type CameraMode = "orbit" | "fpp";
@@ -143,6 +144,8 @@ export class Sanctuary {
   private wildlife: Wildlife;
   private water: WaterSystem;
   private sky: SkySystem;
+  /** The bay district: tropical-modern buildings, landmark, jetty, props. */
+  private structures: Structures;
   private board: BoardHandle;
   private student: StudentRig;
   private keyboard: KeyboardInput;
@@ -189,6 +192,8 @@ export class Sanctuary {
   // Hoisted scratch — the loop never allocates.
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
+  /** The tropical brightness push applied on top of the per-hour curve. */
+  private gradeExposure = 1.06;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -213,7 +218,12 @@ export class Sanctuary {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    // TROPICAL GRADE (Phase 20): the per-hour curve in `daylight.ts` is
+    // contract-fixed, so the final brightness push lives here — a single
+    // +6 % on top of it. ACES rolls the highlights off, which is exactly what
+    // bright sand, white walls and white clouds need to hold detail.
+    this.gradeExposure = 1.06;
+    this.renderer.toneMappingExposure = 1.08 * this.gradeExposure;
     if (this.budget.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -296,6 +306,15 @@ export class Sanctuary {
       sun: this.atmosphere.uniforms.uDcSunColor.value,
     });
     this.water.materials.forEach((m) => this.atmosphere.register(m));
+
+    // THE BAY DISTRICT — buildings, beacon, jetty, props, distant islands.
+    // Built from the same height field everything else reads, so the village
+    // sits on the measured shoreline. Its materials join the air like every
+    // other solid: the far islands and the white tower fade into the haze
+    // exactly as the mountains do (Phase 19 — no full-contrast pastes).
+    this.structures = createStructures(this.budget);
+    this.scene.add(this.structures.group);
+    this.atmosphere.registerTree(this.structures.group);
 
     // Light the world for the current moment before the first frame, so the
     // sanctuary never flashes the authored midday look and then correct
@@ -846,7 +865,7 @@ export class Sanctuary {
     // towards the sun, so its Y component IS the sine of the elevation.
     this.atmosphere.update(state.sunDir.y, state.sunDir, state.sunColor, state.fog);
     this.scene.background = null;
-    this.renderer.toneMappingExposure = state.exposure;
+    this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();
   }
@@ -1175,6 +1194,8 @@ export class Sanctuary {
       this.grass.update(time, this.wind);
       this.flora.update(time, this.wind);
       this.water.update(adt, time);
+      // The bay's idle motion (boat, umbrellas) rides the same budget.
+      this.structures.update(time);
       // The safari district animates on the same budget as the herds.
       this.safari.update(adt, time);
     }
@@ -1274,6 +1295,7 @@ export class Sanctuary {
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();
+    this.structures.dispose();
     this.sky.dispose();
     this.board.dispose();
     this.student.dispose();

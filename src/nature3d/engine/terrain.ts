@@ -36,6 +36,18 @@ export const RIVER_CENTER_X = 18;
 export const RIVER_HALF_WIDTH = 6.4;
 export const WATER_LEVEL = -1.45;
 
+/**
+ * SEA LEVEL — the level the OCEAN mesh floods to.
+ *
+ * The island edge already fell away into haze; now it falls away into the
+ * sea. −2.6 sits comfortably below the river's own waterline (−1.45, so the
+ * river is always the higher body and runs downhill to the estuary) and deep
+ * enough under the rolling plain that no gameplay ground ever crosses it by
+ * accident: the only terrain below sea level is the drowned shelf past the
+ * island edge, which is beyond the walk limit.
+ */
+export const OCEAN_LEVEL = -2.6;
+
 /** Radius of the flat study clearing at the origin. */
 export const CLEARING_RADIUS = 3.2;
 
@@ -76,10 +88,51 @@ const RIM_INNER = 300; // foothills begin
 const RIM_FULL = 900;  // full 100 m band starts
 export const MOUNTAIN_MAX_HEIGHT = 100;
 
+/**
+ * THE BAY — the one sector of the mountain arc that opens to the sea.
+ *
+ * A tropical island is read by its coastline, so the rim must have a place
+ * where it drops to dunes and lets the map see the water. This is that
+ * place: an angular window (centre ≈ 0.92 rad, roughly south-east) where the
+ * arc's height is scaled down to a low dune ridge. The edges of the window
+ * are wide and noisy, so it reads as a natural bay between two headlands —
+ * never as a bite taken out of a ring by a formula. The bay is where the
+ * beach district, the village and the jetty all live, and from the high
+ * meadow the gap frames the ocean and the distant islands behind it.
+ */
+const BAY_AZIMUTH = 0.92;
+const BAY_HALF_WIDTH = 0.34;
+
+function bayGap(ang: number): number {
+  // Angular distance from the bay's centre, wrapped to 0…π.
+  let d = Math.abs(ang - BAY_AZIMUTH);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  // Noisy rim so the gap's edge is a coastline, not a protractor arc.
+  const wobble = noise.noise2D(Math.cos(ang) * 3.1 + 13.7, Math.sin(ang) * 3.1 - 4.9) * 0.09;
+  return 0.1 + 0.9 * smoothstep(BAY_HALF_WIDTH - 0.1 + wobble, BAY_HALF_WIDTH + 0.24 + wobble, d);
+}
+
 /** Where the world's CIRCLE edge begins and ends (the plate is a square, the world is not). */
-const ISLAND_EDGE_IN = 1150;
-const ISLAND_EDGE_OUT = 1330;
-const ISLAND_FLOOR = -16;
+const ISLAND_EDGE_IN = 1120;
+const ISLAND_EDGE_OUT = 1440;
+const ISLAND_FLOOR = -18;
+
+/**
+ * Where the COAST's influence becomes trustworthy, in metres from the centre.
+ *
+ * Height alone cannot pick out the beach — the safari basin sits at −4.5 m
+ * and the study clearing at 0 m, both far inland, and both must stay grass.
+ * The coast is a GEOGRAPHIC band past this radius, so every coastal consumer
+ * (sand colour, palms, grass thinning, rock bleaching) ANDs the height band
+ * with this ring mask. Past ISLAND_EDGE_IN the falloff is fully in charge and
+ * the weight saturates at 1.
+ */
+export const COAST_ZONE_IN = 920;
+
+/** 0 well inland → 1 at the coast ring and everywhere seaward of it. */
+export function coastWeight(x: number, z: number): number {
+  return smoothstep(COAST_ZONE_IN, ISLAND_EDGE_IN - 60, Math.hypot(x, z));
+}
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
@@ -195,9 +248,11 @@ function outerRim(x: number, z: number): number {
   // slope amplification a full square would cause, and the ×1.28 stretch
   // (clamped at 1) lifts the real peaks up to the full 100 m cap — without
   // it the noise only ever reaches ~80% of it and the "100 m mountain"
-  // never actually is 100 m. A small floor keeps the arc from ever flat.
+  // never actually is 100 m. A small floor keeps the arc from ever flat —
+  // except in the bay, where the floor is exactly what we want to keep, so
+  // the bay factor is applied AFTER it (see `bayGap`).
   const h = Math.min(1, Math.max(Math.pow(ridged * mass, 1.15), 0.05) * 1.28);
-  return h * MOUNTAIN_MAX_HEIGHT * rise * corridor;
+  return h * MOUNTAIN_MAX_HEIGHT * rise * corridor * bayGap(Math.atan2(z, x));
 }
 
 /**
@@ -307,13 +362,22 @@ export function terrainHeight(x: number, z: number): number {
   // what "kinare kinare se circle" means in geometry — the edge itself is
   // the circle, not a fence on it.
   const edge = 1 - smoothstep(ISLAND_EDGE_IN, ISLAND_EDGE_OUT, dist);
+  // THE COASTAL SHELF. The raw falloff would drop the island into the sea
+  // like a cliff: the fall crosses sea level at a slope the beach could never
+  // exist on, and the shallow-water zone the tropical look depends on would
+  // be metres wide. Easing the blend with a power > 1 keeps the inland side
+  // identical (edge ≈ 1 ⇒ shelf ≈ 1) while pulling the top of the fall out
+  // into a long, gentle ramp — the crossing of OCEAN_LEVEL moves seaward and
+  // shallow, which is what gives the ocean something to turn turquoise over
+  // and the beach somewhere flat to be.
+  const shelf = Math.pow(edge, 1.45);
   // The 100 m cap: the brief says the mountains are 100 m high, so nothing
   // in the whole world — arc, trek highlands, the lesson crest — is allowed
   // to exceed it. (The lesson crest targets 37.5 m, so the cap only ever
   // trims real mountain peaks.)
   const base = Math.min(
     MOUNTAIN_MAX_HEIGHT,
-    (districtBlend + lessonBump) * edge + ISLAND_FLOOR * (1 - edge),
+    (districtBlend + lessonBump) * shelf + ISLAND_FLOOR * (1 - shelf),
   );
 
   // ── THE RIVER CARVES ────────────────────────────────────────────────
@@ -385,15 +449,19 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   group.name = "terrain";
 
   // The altitude anchors stay explicit: they are also READ by the props (the
-  // rock kit refuses to place above the snowline, the grass uses the same
-  // heights), so they belong to the terrain. The base blend itself now comes
-  // from the environmental field, so the mesh, the grass and the trees all
-  // describe the same ground (research §8, §12).
-  const rock = new THREE.Color(0x6f7b74);
-  const snow = new THREE.Color(0xeef4fb);
-  // The island edge floor: dark, wet soil so the dropped-off corners read as
-  // shadowed ground in the haze, never as a bright square patch.
-  const deep = new THREE.Color(0x33291d);
+  // rock kit refuses to place above the bleached crest line, the grass uses
+  // the same heights), so they belong to the terrain. The base blend itself
+  // comes from the environmental field, so the mesh, the grass and the trees
+  // all describe the same ground (research §8, §12). TROPICAL KEY: the rock
+  // band is warm coral limestone, the old "snow" line is the sun-bleached
+  // crest (pale, warm — weathered rock, not snow), and the deep floor under
+  // the ocean is teal-shifted so the transparent water reads blue-green over
+  // it instead of grey.
+  const rock = new THREE.Color(0x8d8770);
+  const snow = new THREE.Color(0xf4efe0);
+  // The island edge floor under the sea: dark lagoon bed so the dropped-off
+  // corners read as deep water in the haze, never as a bright square patch.
+  const deep = new THREE.Color(0x2e4f4a);
   const tmp = new THREE.Color();
 
   /**
@@ -452,6 +520,8 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // lean, the rock weathering and the grass tint all read: one truth, many
     // readers.
     shader.uniforms.uDcSunSide = { value: new THREE.Vector2(SUN_SIDE_X, SUN_SIDE_Z) };
+    // Sea level, for the per-pixel shoreline treatment below.
+    shader.uniforms.uDcOceanLevel = { value: OCEAN_LEVEL };
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -459,6 +529,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         /* glsl */ `
         #include <common>
         uniform vec2 uDcSunSide;
+        uniform float uDcOceanLevel;
         `,
       )
       .replace(
@@ -473,6 +544,34 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         vec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
         diffuseColor.rgb *= mix( 0.87, 1.13, dcMacroL );
+
+        // SHORELINE (per-pixel, Phase 4/5). vDcWorldPos.y is the fragment's own
+        // ground height, so distance to the waterline costs one subtract — and
+        // unlike a vertex-colour band it stays razor-crisp on the outer shell,
+        // whose vertices are ~9 m apart. Three bands:
+        //   wet sand  — the tide's reach, darkened and saturated;
+        //   foam line — the surf left ON THE SAND right at the waterline,
+        //               broken up with the macro texture so it never reads
+        //               as a painted stripe;
+        //   bed       — below the waterline the sand sinks toward the deep
+        //               lagoon bed, which is what the transparent ocean
+        //               composites over.
+        float dcShore = vDcWorldPos.y - uDcOceanLevel;
+        float dcSwash = dcMacroL * 1.4;
+        if ( dcShore < 3.2 ) {
+          // Wet band: 0 at the waterline → gone by ~+2.4 m.
+          float dcWet = 1.0 - smoothstep( 0.1 + dcSwash, 2.2 + dcSwash, dcShore );
+          diffuseColor.rgb *= mix( 1.0, 0.66, dcWet * 0.85 );
+          // Surf foam hugging the waterline on the wet band only.
+          float dcFoam = ( 1.0 - smoothstep( 0.02 + dcSwash * 0.4, 0.5 + dcSwash * 0.6, dcShore ) )
+                       * step( 0.0, dcShore )
+                       * smoothstep( 0.35, 0.75, dcMacroL + 0.25 * sin( vDcWorldPos.x * 0.7 + vDcWorldPos.z * 0.5 ) );
+          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.92, 0.97, 0.97 ), clamp( dcFoam, 0.0, 1.0 ) * 0.8 );
+          // Under the water: teal shift with depth, so the shelf reads through
+          // the transparent ocean instead of as raw sand.
+          float dcBed = clamp( -dcShore / 10.0, 0.0, 1.0 );
+          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.075, 0.18, 0.17 ), dcBed * 0.85 );
+        }
 
         // ASPECT TINT — warm on the sunlit faces, cool where the sky bounces
         // into the shade, applied to ALBEDO rather than to light so it survives

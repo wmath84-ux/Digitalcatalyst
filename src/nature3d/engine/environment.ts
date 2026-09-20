@@ -42,7 +42,7 @@
 // import waiting to bite. Lazy init costs one `if` per call and nothing else.
 
 import * as THREE from "three";
-import { terrainHeight, RIVER_CENTER_X } from "./terrain";
+import { terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { noise } from "./simplex";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -230,6 +230,13 @@ const TRAILS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   [[1.5, 1.5], [34, 6], [120, 10], [240, 6], [360, -4]],
   // West, towards the highlands.
   [[-1.5, 1.5], [-30, 7], [-110, 14], [-215, 8], [-330, -6]],
+  // SOUTH-EAST: meadow → the bay. The one trail that reaches the open sea —
+  // it follows the coastal gap between the hill sectors, threads the village,
+  // and ends at the jetty on the beach. The worn ground is what guides the
+  // learner's eye (and feet) from the chair to the water. The last waypoints
+  // are pinned to the MEASURED bay shoreline (the terrain crosses sea level
+  // at r ≈ 1215 on the bay's azimuth, and the dry beach runs to ~1075).
+  [[2, 5], [60, 34], [150, 96], [300, 250], [470, 450], [620, 650], [688, 790], [706, 880], [700, 940], [686, 1000]],
 ];
 
 /**
@@ -358,6 +365,7 @@ function clamp01(x: number): number {
 export type Biome =
   | "meadow"
   | "riverbank"
+  | "beach"
   | "woodland"
   | "slope"
   | "highland"
@@ -387,6 +395,15 @@ export interface Site {
   path: number;
   /** Proximity to open water, 0 … 1. */
   nearWater: number;
+  /**
+   * Proximity to the OPEN SEA, 0 (inland) … 1 (water's edge).
+   *
+   * This is the beach mask the whole coastal system reads — palms, sand
+   * colour, grass thinning, rock bleaching — and it is measured from the
+   * height above OCEAN_LEVEL, so it always agrees with where the ocean mesh
+   * actually floods the ground.
+   */
+  coastal: number;
   /** Competition for light — drives bare lower trunks and high canopies. */
   crowding: number;
   biome: Biome;
@@ -408,6 +425,7 @@ export function createSite(): Site {
     path: 0,
     nearWater: 0,
     crowding: 0,
+    coastal: 0,
     biome: "meadow",
   };
 }
@@ -429,7 +447,6 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
   const dx = (hL - hR) / (2 * e);
   const dz = (hD - hU) / (2 * e);
   const gradient = Math.hypot(dx, dz);
-
   out.height = height;
   out.slopeDeg = (Math.atan(gradient) * 180) / Math.PI;
   out.normalY = 1 / Math.sqrt(1 + gradient * gradient);
@@ -447,6 +464,16 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
   // long before they are wet, and that band is what grows differently.
   const fromRiver = Math.abs(x - RIVER_CENTER_X);
   out.nearWater = 1 - smoothstep(9, 34, fromRiver);
+
+  // COASTAL — how close this spot is to the open sea. Two masks, both from
+  // the same source of truth: the height above OCEAN_LEVEL (the level the
+  // ocean mesh actually floods to) AND the geographic coast ring. The ring is
+  // what keeps inland low spots — the safari basin at −4.5 m, the study
+  // clearing at 0 m — grass-green: they are low, but they are nowhere near
+  // the sea. The height band is generous, 11 m above the sea, because the
+  // beach is a ZONE (dry crest, light sand, wet sand), not a line.
+  const shoreUp = height - OCEAN_LEVEL;
+  out.coastal = coastWeight(x, z) * (1 - smoothstep(1.1, 11, shoreUp));
 
   // Aspect, in the sun's frame. The sun sits on the -Z side, so a facet whose
   // downhill direction points +Z is a shade-side slope.
@@ -471,6 +498,7 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
 
   const bare = out.slopeDeg > 41 || out.soil < 0.16;
   if (height > 62) out.biome = "summit";
+  else if (out.coastal > 0.62 && out.slopeDeg < 12) out.biome = "beach";
   else if (height > 24) out.biome = bare ? "slope" : "highland";
   else if (out.nearWater > 0.55 && out.slopeDeg < 18) out.biome = "riverbank";
   else if (bare) out.biome = "slope";
@@ -531,6 +559,37 @@ export function groundColorAt(
   // ── Drainage: the wet, dark soil of the channels ──────────────────
   out.lerp(palette.mud, clamp01(wet * 1.15 - 0.12));
 
+  // ── THE BEACH GRADIENT (Phase 4) ──────────────────────────────────
+  //
+  // The sea owns every metre it can reach — but only near the sea (the
+  // `coast` ring mask protects the inland basins). The band is measured
+  // straight off the height above OCEAN_LEVEL, so the ground rule, the ocean
+  // mesh and the shoreline foam all agree on where "the beach" is, by
+  // construction:
+  //
+  //   +11 m  coastal influence fades in
+  //    +4 m  dry sand → full pale sand at +2 m
+  //   +0.9 m wet sand begins (the tide's reach)
+  //    0     OCEAN_LEVEL — the waterline
+  //   below  the sand goes teal-green as the water column takes over
+  //
+  // A touch of long-wave noise breaks the bands up so the shoreline never
+  // reads as a contour line painted on the ground.
+  const shoreUp = h - OCEAN_LEVEL;
+  const coast = coastWeight(x, z);
+  if (shoreUp < 12 && coast > 0.02) {
+    const swash = noise.noise2D(x * 0.045 + 9.3, z * 0.045 - 2.8) * 0.9;
+    const drySand = (1 - smoothstep(2.2 + swash, 5.4 + swash, shoreUp)) * coast;
+    out.lerp(palette.sand, clamp01(drySand));
+    const wetSand = (1 - smoothstep(-0.2 + swash * 0.4, 1.0 + swash * 0.4, shoreUp)) * coast;
+    out.lerp(palette.sandWet, clamp01(wetSand));
+    if (shoreUp < 0.2) {
+      const under = clamp01((0.2 - shoreUp) / 5.5) * coast;
+      out.lerp(palette.sandUnder, under * 0.8);
+      out.lerp(palette.deep, clamp01((0.2 - shoreUp) / 11) * coast);
+    }
+  }
+
   // ── Slope: soil cannot sit on a 45° face ───────────────────────────
   // The research is specific (§8, principle 21): past ~45° nothing clings,
   // so the ground switches to bare rock. `normalY` is cosine of the slope, so
@@ -560,6 +619,12 @@ export interface GroundPalette {
   mud: THREE.Color;
   rock: THREE.Color;
   gravel: THREE.Color;
+  /** Dry beach sand, pale and warm. */
+  sand: THREE.Color;
+  /** Tide-wet sand: darker and more saturated, right at the waterline. */
+  sandWet: THREE.Color;
+  /** Sand under the water column: the teal shift of the shallow shelf. */
+  sandUnder: THREE.Color;
   snow: THREE.Color;
   deep: THREE.Color;
 }

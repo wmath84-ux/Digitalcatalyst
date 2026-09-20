@@ -229,8 +229,10 @@ export function createRockField(
       clusterZ = Math.sin(a) * r;
       const s = siteAt(clusterX, clusterZ, site);
       // Steep ground and drainage lines are where rock shows through. Flat,
-      // deep-soiled meadow keeps its grass, so most flat draws are rejected.
-      if (s.slopeDeg < 5 && rand() < 0.62) continue;
+      // deep-soiled meadow keeps its grass, so most flat draws are rejected —
+      // EXCEPT on the beach, where scattered coral boulders are part of the
+      // shoreline's composition (Phase 10: rocks at the coast, deliberately).
+      if (s.slopeDeg < 5 && rand() < (s.coastal > 0.35 ? 0.22 : 0.62)) continue;
       if (pathWeight(clusterX, clusterZ) > 0.35) continue;
       if (Math.hypot(clusterX, clusterZ) < 14) continue;
       clusterLeft = 3 + ((rand() * 7) | 0);
@@ -301,14 +303,16 @@ export function createRockField(
     wbucket[masterIndex].push(moss, dust, wet);
 
     // Tint: rocks are never one colour. A boulder under trees picks up a
-    // green-grey cast from the canopy, a river rock reads cooler, and the
-    // high scree is paler and bleached (research §10).
+    // green-grey cast from the canopy, a river rock reads cooler, the high
+    // scree is paler and bleached (research §10) — and a BEACH boulder is
+    // the most bleached of all: sun + salt strip it pale and warm.
     const green = moss * 0.22;
     const cool = wet * 0.16 + Math.min(0.12, s.height / 600);
+    const bleach = s.coastal * 0.16;
     tint.setRGB(
-      1 - green * 0.35 + Math.min(0.1, s.height / 500) - cool * 0.15,
-      1 - green * 0.1 + Math.min(0.08, s.height / 700) + cool * 0.02,
-      1 - green * 0.5 + cool * 0.28,
+      1 - green * 0.35 + Math.min(0.1, s.height / 500) - cool * 0.15 + bleach,
+      1 - green * 0.1 + Math.min(0.08, s.height / 700) + cool * 0.02 + bleach * 0.94,
+      1 - green * 0.5 + cool * 0.28 + bleach * 0.78,
     );
     cbucket[masterIndex].push(tint.clone());
 

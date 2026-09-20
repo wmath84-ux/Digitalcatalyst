@@ -142,17 +142,24 @@ export function daylightAt(hour: number): DaylightState {
 
   return {
     sunDir,
-    sunColor: lerpColor(0xfff6e8, 0xff8b45, warm).lerp(new THREE.Color(0xff6f3a), evening * 0.35),
+    sunColor: lerpColor(0xfff7e6, 0xff9450, warm).lerp(new THREE.Color(0xff7a40), evening * 0.35),
     sunIntensity: THREE.MathUtils.lerp(0.95, 3.15, dayFactor),
-    hemiSky: lerpColor(0xdff0ff, 0xffc79a, warm),
-    hemiGround: lerpColor(0x4a6b33, 0x3a2c22, warm),
+    // TROPICAL AIR. The sky light is a clean, bright cyan-blue (a tropical
+    // sky scatters harder blue than a temperate one) and the ground bounce is
+    // sunlit foliage and pale sand — warm green-gold, never mud. The zenith
+    // holds a saturated but CONTROLLED blue (no neon), the horizon washes to
+    // pale turquoise-white, and the fog is that same bright haze the
+    // references carry: distance on this island is measured in layers of
+    // turquoise air.
+    hemiSky: lerpColor(0xd2f2ff, 0xffcf9e, warm),
+    hemiGround: lerpColor(0x6d8a42, 0x594636, warm),
     hemiIntensity: THREE.MathUtils.lerp(0.55, 1.15, dayFactor),
     fillIntensity: THREE.MathUtils.lerp(0.22, 0.55, dayFactor),
-    zenith: lerpColor(0x1f5fb8, 0x2b3f7a, warm),
-    horizon: lerpColor(0xcfe8f8, 0xffb277, warm),
-    ground: lerpColor(0xd9c9a8, 0x8a6a4e, warm),
-    sunTint: lerpColor(0xfff0cf, 0xff9c5c, warm),
-    fog: lerpColor(0xbcd9ef, 0xe8b98c, warm),
+    zenith: lerpColor(0x2f7fd9, 0x35508f, warm),
+    horizon: lerpColor(0xd2f0fa, 0xffbd8c, warm),
+    ground: lerpColor(0xeadfc2, 0x9a7a5c, warm),
+    sunTint: lerpColor(0xfff3d4, 0xffa468, warm),
+    fog: lerpColor(0xc6e9f2, 0xf2c49a, warm),
     exposure: THREE.MathUtils.lerp(0.92, 1.16, dayFactor),
     dayFactor,
     hour: h,
