@@ -233,6 +233,39 @@ const TRAILS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
 ];
 
 /**
+ * Every trail, flattened to segments with their vectors precomputed.
+ *
+ * `pathWeight` answers hundreds of thousands of queries while the terrain and
+ * the grass are built, and the per-segment vectors never change — recomputing
+ * them (plus two `sqrt` calls) per query per segment was the hottest waste in
+ * the build. `len` is `Math.sqrt(lenSq)`, evaluated once: IEEE sqrt is
+ * correctly rounded, so this is bit-identical to computing it per query.
+ */
+interface TrailSeg {
+  ax: number;
+  az: number;
+  vx: number;
+  vz: number;
+  lenSq: number;
+  len: number;
+}
+
+const TRAIL_SEGS: ReadonlyArray<TrailSeg> = (() => {
+  const segs: TrailSeg[] = [];
+  for (const trail of TRAILS) {
+    for (let i = 0; i < trail.length - 1; i += 1) {
+      const [ax, az] = trail[i];
+      const [bx, bz] = trail[i + 1];
+      const vx = bx - ax;
+      const vz = bz - az;
+      const lenSq = vx * vx + vz * vz;
+      segs.push({ ax, az, vx, vz, lenSq, len: Math.sqrt(lenSq) });
+    }
+  }
+  return segs;
+})();
+
+/**
  * The bounding box of every trail, grown by the shoulder width.
  *
  * `pathWeight` runs tens of thousands of times while the world is built, and
@@ -284,26 +317,19 @@ export function pathWeight(x: number, z: number): number {
   // noise call per query rather than one per trail: this function is called
   // ~60 000 times while the grass and the terrain are built.
   const wobble = 0.82 + 0.18 * noise.noise2D(x * 0.21 + 3.1, z * 0.21 - 7.7);
-  for (const trail of TRAILS) {
-    for (let i = 0; i < trail.length - 1; i += 1) {
-      const [ax, az] = trail[i];
-      const [bx, bz] = trail[i + 1];
-      const vx = bx - ax;
-      const vz = bz - az;
-      const lenSq = vx * vx + vz * vz;
-      let t = lenSq > 0 ? ((x - ax) * vx + (z - az) * vz) / lenSq : 0;
-      t = Math.min(1, Math.max(0, t));
-      const px = ax + vx * t;
-      const pz = az + vz * t;
-      const d = Math.hypot(x - px, z - pz);
-      // Taper the ends: a trail fades out over its last ~14 m instead of
-      // stopping dead, which is how a real path thins to scattered footprints.
-      const along = t * Math.sqrt(lenSq);
-      const total = Math.sqrt(lenSq);
-      const endFade = Math.min(1, along / 14, (total - along) / 14);
-      const core = 1 - smoothstep(PATH_CORE, PATH_SHOULDER, d);
-      w = Math.max(w, core * Math.max(0, endFade) * wobble);
-    }
+  for (const s of TRAIL_SEGS) {
+    let t = s.lenSq > 0 ? ((x - s.ax) * s.vx + (z - s.az) * s.vz) / s.lenSq : 0;
+    t = Math.min(1, Math.max(0, t));
+    const px = s.ax + s.vx * t;
+    const pz = s.az + s.vz * t;
+    const d = Math.hypot(x - px, z - pz);
+    // Taper the ends: a trail fades out over its last ~14 m instead of
+    // stopping dead, which is how a real path thins to scattered footprints.
+    const along = t * s.len;
+    const total = s.len;
+    const endFade = Math.min(1, along / 14, (total - along) / 14);
+    const core = 1 - smoothstep(PATH_CORE, PATH_SHOULDER, d);
+    w = Math.max(w, core * Math.max(0, endFade) * wobble);
   }
   // The clearing: the trodden disc under the chair, desk and lectern.
   const d = Math.hypot(x, z);

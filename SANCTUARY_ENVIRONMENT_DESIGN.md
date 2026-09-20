@@ -38,7 +38,7 @@ Ye teen gate **isi working tree par** chalaye gaye hain:
 |---|---|---|
 | TypeScript strict | `npx tsc --noEmit -p tsconfig.json` | **CLEAN** (no output) |
 | Contract suite (source-shape) | `node --test tests/nature3dSanctuaryContract.test.mjs` | **84 / 84 pass, 0 fail** |
-| Shader harness (real GLSL resolution) | `bash scripts/verify-nature3d.sh` → `scripts/verify-nature3d-shaders.mts` | **58 / 58 checks pass** |
+| Shader harness (real GLSL resolution) | `bash scripts/verify-nature3d.sh` → `scripts/verify-nature3d-shaders.mts` | **66 / 66 checks pass** (58 + 8 naye §8 regression checks) |
 | World harness (runtime objects) | `bash scripts/verify-nature3d.sh` → `scripts/verify-nature3d-world.mts` | **ALL WORLD CHECKS PASSED** |
 | Production build | `npm run build` | **built in 21.9 s**, `dist/index.html` me `oklch(` count = **0** |
 | Poora repo suite | `bash run_tests.sh` | **2 569 pass / 31 fail** — aur wo 31 **is kaam se related nahi hain** (sab My Day / revision / liquid-glass / store ke UI contract suites me hain, jin files ko is change ne chhua hi nahi; **nature3d ke 84 tests 84/84 pass**) |
@@ -666,3 +666,44 @@ bash scripts/verify-nature3d.sh      # shaders + world, dono, plain node me — 
 
 Ye jaan-boojh kar rakhe gaye hain: shader harness ne ek asli GLSL bug pakda tha (waterfall ka redeclared
 uniform) jo kisi bhi source-shape test se nahi dikhta. Bundle `/tmp` me jaata hai — repo me kuch nahi girta.
+
+---
+
+## 7. Zameen gayab thi — bug, fix aur optimization (is doc ke baad ka kaam)
+
+User ne report kiya: preview me **zameen dikh hi nahi rahi thi**. Jaach me nikla ye chhota visual glitch nahi,
+balki ek shader bug tha jo poori nature ko gayab kar raha tha:
+
+**Bug.** `atmosphere.ts` ka `register()` fragment shader me `#include <common>` ko **replace** kar deta tha
+sirf apne uniforms se — include line hi uda deta tha. `common` chunk me `PI`, `saturate`, `pow2`,
+`BRDF_Lambert` define hote hain, jinhin standard/lambert pipeline **use** karta hai. Natija: har
+atmosphere-registered material (terrain, rocks, grass, flora, water) ke fragment shader me 4+ guaranteed GLSL
+compile errors → three.js program link nahi kar paata → **mesh render hi nahi hota**. Zameen ke saath ghaas,
+ped, patthar aur nadi bhi gayab the; sirf sky/student/boards dikhte the (wo register nahi hote).
+
+**Fix (1 line).** Replacement me `#include <common>` wapas rakha — har doosra injection (terrain, grass,
+flora, water, weathering) pehle se yehi karta tha; sirf atmosphere bhool gaya tha.
+
+**Regression test (harness §8, 8 naye checks).** Purana harness ye bug pakad hi nahi sakta tha — wo anchors,
+duplicates aur varyings check karta tha, lekin ye kabhi assert nahi karta tha ki load-bearing chunks
+**survive** karte hain. Ab general check hai: stock lib ke har top-level `#define` aur function ko injection
+ke baad bhi resolve hona chahiye (jaan-boojh kar replace hone wale chunks — fog, project_vertex,
+opaque/map/roughness — me sirf main()-scoped code hai, isliye sahi injection kabhi trip nahi karta).
+Self-test ke saath: harness ko pata hai ye checker kabhi khaali fire nahi karta.
+
+**Zameen ki optimization (research ke hisaab se, §18/§20) — zero visual change:**
+Proof: poori terrain (positions + normals + UVs + colors, 4 shells) ka FNV hash change se pehle aur baad me
+**identical** (`b7ae7b3c`) — ek bhi pixel nahi badla.
+
+| Kaam | Research | Natija |
+|---|---|---|
+| Per-shell **tight bounding volumes** (sirf visible verts par; -240 m pit verts bahar) | §20 cull volumes | shell-1 ka culling sphere center **-105 m → +15 m**, radius 394 → 370 m — frustum culling ab actually kaam karta hai |
+| `matrixAutoUpdate = false` (4 static meshes, rotation ek baar set) | §20 static = zero per-frame CPU | har frame ka redundant matrix compose khatam |
+| `tiles` loop se hoist + hot loops me direct `Float32Array` access | §20 hot-loop hygiene | ~165k verts × 3 passes par laakhon getter calls khatam; wall-clock noise-dominated hai (~0.5 s, `terrainHeight` noise math) isliye build time lagbhag same |
+| Trail segments precompute (`TRAIL_SEGS` — vectors + `len` ek baar) | §20 loop invariants hoist | `pathWeight` **117 ms → 76 ms** (200k queries, **35% tez**), results bit-identical |
+| Texture setup verify | §18 texel density | ground map pehle se sahi tha: RepeatWrapping + sRGB + aniso — kuch badalne ki zaroorat nahi padi |
+
+**Imaandaar note:** terrain build wall-clock (~441–601 ms) is pass se materially nahi ghata — 90%+ waqt
+`terrainHeight` ke noise evaluation me hai, jo duniya ki shape hai (usko chhuna = duniya badalna, jo contract
+bhi rokta hai: shell `segs` ka shape + outer spacing < 16 m pin hai). Isliye optimization runtime (culling,
+static freeze) aur shared hot path (`pathWeight`, jo ghaas bhi use karti hai) par lagayi — wahi fayda tha.

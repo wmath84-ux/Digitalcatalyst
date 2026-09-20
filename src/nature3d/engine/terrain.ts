@@ -494,22 +494,32 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // vertices down out of sight, so they never z-fight the shell inside.
     const innerHalf = index === 0 ? 0 : shells[index - 1].half;
 
+    // ── Texel density: the same texels per metre on every shell ─────
+    // The tile count is derived from THIS shell's size, so the 180 m shell
+    // and the 2760 m shell are authored at one density and the meadow never
+    // looks sharper than the hills (research §18). Hoisted: it is
+    // loop-invariant, so computing it per vertex was pure waste.
+    const tiles = size / TILE_METRES;
     const uv = geo.attributes.uv as THREE.BufferAttribute;
+    // Direct typed-array access in the hot loop (research §20): the getters
+    // are a function call plus a bounds check per component, and this loop
+    // runs ~165 000 times. PlaneGeometry attributes are plain
+    // non-interleaved Float32Arrays, so reading/writing `.array` touches the
+    // exact same memory — identical heights, identical UVs, fewer calls.
+    const p = pos.array as Float32Array;
+    const u = uv.array as Float32Array;
     for (let i = 0; i < pos.count; i += 1) {
-      const x = pos.getX(i);
+      const x = p[i * 3];
       // PlaneGeometry lies in XY and is rotated -90° about X, so local +Y → world -Z.
-      const z = -pos.getY(i);
+      const z = -p[i * 3 + 1];
       const h = terrainHeight(x, z);
       const inside = innerHalf > 0 && Math.abs(x) < innerHalf - 1 && Math.abs(z) < innerHalf - 1;
-      pos.setZ(i, inside ? h - 240 : h);
-
-      // ── Texel density: the same texels per metre on every shell ─────
-      // The tile count is derived from THIS shell's size, so the 180 m shell
-      // and the 2760 m shell are authored at one density and the meadow never
-      // looks sharper than the hills (research §18).
-      const tiles = size / TILE_METRES;
-      uv.setXY(i, uv.getX(i) * tiles, uv.getY(i) * tiles);
+      p[i * 3 + 2] = inside ? h - 240 : h;
+      u[i * 2] *= tiles;
+      u[i * 2 + 1] *= tiles;
     }
+    pos.needsUpdate = true;
+    uv.needsUpdate = true;
     geo.computeVertexNormals();
 
     // The colour pass runs AFTER the normals exist, because the normals ARE
@@ -518,10 +528,13 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // from `terrainHeight` instead would mean four more height samples on all
     // ~150 000 vertices (research §8 — slope masks drive the layers).
     const normalAttr = geo.attributes.normal as THREE.BufferAttribute;
+    // Same direct-array reads as the height pass (`computeVertexNormals`
+    // reallocates nothing, so `p` is still the live position array).
+    const n = normalAttr.array as Float32Array;
     for (let i = 0; i < pos.count; i += 1) {
-      const x = pos.getX(i);
-      const z = -pos.getY(i);
-      const h = pos.getZ(i);
+      const x = p[i * 3];
+      const z = -p[i * 3 + 1];
+      const h = p[i * 3 + 2];
       // The hidden ring-interior vertices (pushed 240 m down) are never seen,
       // so they get no colour work at all.
       if (h < -180) {
@@ -535,7 +548,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       // and the ground it grows out of are one colour decision. The wear is
       // measured once here and reused by the gravel tint below.
       const worn = pathWeight(x, z);
-      const normalY = normalAttr.getY(i);
+      const normalY = n[i * 3 + 1];
       groundColorAt(x, z, h, tmp, GROUND_PALETTE, normalY, worn);
 
       // Altitude banding: grass gives way to bare rock, then snow on the
@@ -567,10 +580,54 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
+    // ── Tight bounds over the VISIBLE surface only ─────────────────────
+    // Research §20 (cull volumes): three.js frustum-culls per mesh against
+    // the bounding sphere, but the auto-computed one includes the
+    // ring-interior verts sitting 240 m below the ground — which dragged
+    // every outer shell's culling volume ~100 m underground and inflated it,
+    // so a shell the camera was not looking at could never be rejected.
+    // Re-testing the same `inside` predicate from the height pass keeps
+    // exactly the verts the eye can see. (Heights alone cannot do this: pit
+    // verts under high ground sit ABOVE -180 m.)
+    // Local +Y maps to world -Z under the -90° X rotation, so |planeY| is |z|.
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < pos.count; i += 1) {
+      const bx = p[i * 3];
+      const by = p[i * 3 + 1];
+      if (innerHalf > 0 && Math.abs(bx) < innerHalf - 1 && Math.abs(by) < innerHalf - 1) continue;
+      const bz = p[i * 3 + 2];
+      if (bx < minX) minX = bx;
+      if (by < minY) minY = by;
+      if (bz < minZ) minZ = bz;
+      if (bx > maxX) maxX = bx;
+      if (by > maxY) maxY = by;
+      if (bz > maxZ) maxZ = bz;
+    }
+    geo.boundingBox = new THREE.Box3(
+      new THREE.Vector3(minX, minY, minZ),
+      new THREE.Vector3(maxX, maxY, maxZ),
+    );
+    // 1 m of guard for rotation/float rounding on a 180–2760 m shell — the
+    // landscape shader displaces no vertices, so exact bounds are safe and
+    // this only covers numeric dust at the frustum edge.
+    geo.boundingBox.expandByScalar(1);
+    geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.receiveShadow = shell.shadow && budget.shadowMapSize > 0;
     mesh.name = `ground-shell-${index}`;
+    // The ground never moves: freeze the matrix so the renderer never
+    // recomposes it (research §20 — static things cost zero per-frame CPU).
+    // matrixWorld still propagates to children/culling/shadows; only the
+    // redundant compose from position/quaternion/scale is skipped.
+    mesh.updateMatrix();
+    mesh.matrixAutoUpdate = false;
     group.add(mesh);
   });
 

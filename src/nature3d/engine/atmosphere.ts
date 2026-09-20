@@ -285,10 +285,16 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
       injectWorldVaryings(shader);
 
       // ── Fragment: haze uniforms, fog, (foliage) transmission ─────────
+      // NOTE: the replacement KEEPS `#include <common>`. That chunk defines
+      // PI, saturate, pow2 and BRDF_Lambert, which the standard/lambert
+      // pipelines use — dropping the line compiles to four GLSL errors and
+      // three.js renders NOTHING for the material (this exact mistake once
+      // made the whole ground invisible; the harness section 8 guards it).
       shader.fragmentShader = shader.fragmentShader
         .replace(
           FRAG_COMMON,
           /* glsl */ `
+          #include <common>
           uniform vec3 uDcSunDir;
           uniform vec3 uDcSunColor;
           uniform vec3 uDcHazeColor;

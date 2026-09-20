@@ -276,5 +276,63 @@ for (const [name, pair] of Object.entries({ rock, leaf, decal, terrain, river, f
   );
 }
 
+// ── 8. Injections are ADDITIVE: stock definitions survive ──────────────
+//
+// Every injection in this engine appends AFTER `#include <common>` — it must
+// never REPLACE it. The common chunk defines PI, RECIPROCAL_PI, saturate,
+// pow2 and BRDF_Lambert, and the standard/lambert pipelines USE all of them.
+// Dropping that one include line is therefore not a subtle visual bug: it is
+// four guaranteed GLSL compile errors, the program fails to link, and three.js
+// renders NOTHING for the material. That is exactly how the whole ground
+// (plus grass, trees, rocks and water — everything atmosphere-registered)
+// once went invisible while all 58 checks above stayed green: nothing here
+// asserted that load-bearing chunks SURVIVE. This section is that assertion.
+//
+// The check is general, not pinned to one chunk: every top-level `#define`
+// and every top-level function the STOCK lib resolves must still resolve
+// after our injections. The chunks we intentionally replace (fog_fragment,
+// project_vertex, opaque/map/roughness/begin_vertex) carry only main()-scoped
+// code, so a correct injection can never trip this.
+function topLevelDefs(glsl: string): Set<string> {
+  const defs = new Set<string>();
+  let m: RegExpExecArray | null;
+  const reD = /^\s*#define\s+(\w+)/gm;
+  while ((m = reD.exec(glsl))) defs.add(m[1]);
+  const reF = /^\s*(?:float|vec[234]|mat[234]|int|uint|bool|void)\s+(\w+)\s*\(/gm;
+  while ((m = reF.exec(glsl))) defs.add(m[1]);
+  return defs;
+}
+
+function missingDefs(stock: string, injected: string): string[] {
+  const want = topLevelDefs(stock);
+  const have = topLevelDefs(injected);
+  return [...want].filter((d) => !have.has(d));
+}
+
+// Self-test first: a checker that never fires is not evidence. This simulates
+// the exact bug — the resolved common chunk deleted from a stock shader.
+{
+  const stockStd = THREE.ShaderLib.standard as unknown as { vertexShader: string; fragmentShader: string };
+  const stockFs = resolveIncludes(stockStd.fragmentShader);
+  const sabotaged = stockFs.replace(resolveIncludes("#include <common>"), "");
+  const caught = missingDefs(stockFs, sabotaged);
+  check(
+    "harness self-test: a dropped chunk IS detected",
+    caught.includes("BRDF_Lambert") && caught.includes("RECIPROCAL_PI") && caught.includes("saturate"),
+    caught.slice(0, 6).join(", "),
+  );
+}
+
+for (const [name, pair] of Object.entries({ rock, leaf, decal, terrain, river, fall, spray })) {
+  const stock = THREE.ShaderLib[pair.lib] as unknown as { vertexShader: string; fragmentShader: string };
+  const missFs = missingDefs(resolveIncludes(stock.fragmentShader), pair.fs);
+  const missVs = missingDefs(resolveIncludes(stock.vertexShader), pair.vs);
+  check(
+    `${name}: stock definitions survive our injections`,
+    missFs.length === 0 && missVs.length === 0,
+    [...missFs.map((d) => `frag:${d}`), ...missVs.map((d) => `vert:${d}`)].slice(0, 8).join(", "),
+  );
+}
+
 console.log(failures === 0 ? "\nALL SHADER CHECKS PASSED" : `\n${failures} SHADER CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
