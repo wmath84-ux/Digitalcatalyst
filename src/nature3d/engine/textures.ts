@@ -41,6 +41,12 @@ export interface TextureSet {
   contact: THREE.Texture;
   /** A painted canopy silhouette, stamped on the far-tree impostor cards. */
   canopy: THREE.Texture;
+  /** Painted palm frond (alpha card) — the crown of every palm tree. */
+  frond: THREE.Texture;
+  /** Ringed palm-trunk bark. */
+  palmBark: THREE.Texture;
+  /** A painted palm-crown silhouette, stamped on the far-palm impostor cards. */
+  palmCanopy: THREE.Texture;
   water: THREE.Texture;
   waterNormal: THREE.Texture;
   fur: THREE.Texture;
@@ -191,19 +197,25 @@ export function createTextures(anisotropy: number): TextureSet {
     }
   };
   // A cluster card: three overlapping leaves reads as real foliage volume
-  // for the cost of one quad.
-  drawLeaf(84, 96, 52, 78, 96);
-  drawLeaf(170, 120, 56, 86, 104);
-  drawLeaf(124, 186, 48, 66, 88);
+  // for the cost of one quad. TROPICAL: the hue sits in the warm green band
+  // (100–118) — brighter and sunnier than the old temperate set, still under
+  // the neon line.
+  drawLeaf(84, 96, 52, 78, 104);
+  drawLeaf(170, 120, 56, 86, 114);
+  drawLeaf(124, 186, 48, 66, 100);
 
   // ── Grass blade (single alpha-tested blade, gradient root→tip) ───────
+  // TROPICAL: a brighter, sunnier gradient — deep green root, clean green
+  // mid, yellow-green lit tip (the island grass is warm, never olive).
+  // USER DIRECTIVE (saturation pass): gradient chroma raised to match the
+  // FOLIAGE_PALETTE blade stops.
   const blade = canvas2d(64, 256);
   blade.ctx.clearRect(0, 0, 64, 256);
   const bg = blade.ctx.createLinearGradient(0, 256, 0, 0);
-  bg.addColorStop(0, "#254d16");
-  bg.addColorStop(0.42, "#3f7d22");
-  bg.addColorStop(0.78, "#68a83a");
-  bg.addColorStop(1, "#a8cf63");
+  bg.addColorStop(0, "#276314");
+  bg.addColorStop(0.42, "#3d9c1e");
+  bg.addColorStop(0.78, "#5fb02e");
+  bg.addColorStop(1, "#a4dc45");
   blade.ctx.fillStyle = bg;
   blade.ctx.beginPath();
   blade.ctx.moveTo(24, 256);
@@ -219,15 +231,18 @@ export function createTextures(anisotropy: number): TextureSet {
   blade.ctx.quadraticCurveTo(28, 128, 32, 8);
   blade.ctx.stroke();
 
-  // ── Ground (soil + dry thatch + pebbles) ─────────────────────────────
+  // ── Ground (tropical sandy loam + dry thatch + grit) ─────────────────
+  // The island's soil is warm and sandy — the old temperate brown painted
+  // every metre of ground the colour of wet clay. The multpliers keep the
+  // value in the same band (the vertex colours carry the art), just warmer.
   const ground = canvas2d(512, 512);
   for (let y = 0; y < 512; y += 2) {
     for (let x = 0; x < 512; x += 2) {
       const f = fbm(x / 40, y / 40, 5, 11);
       const g2 = fbm(x / 9, y / 9, 3, 23);
-      const r = 46 + f * 52 + g2 * 22;
-      const g = 62 + f * 74 + g2 * 20;
-      const b = 28 + f * 34 + g2 * 14;
+      const r = 66 + f * 56 + g2 * 24;
+      const g = 62 + f * 58 + g2 * 22;
+      const b = 42 + f * 40 + g2 * 16;
       ground.ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
       ground.ctx.fillRect(x, y, 2, 2);
     }
@@ -235,7 +250,7 @@ export function createTextures(anisotropy: number): TextureSet {
   for (let i = 0; i < 900; i += 1) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
-    ground.ctx.strokeStyle = `rgba(${120 + Math.random() * 70 | 0},${130 + Math.random() * 60 | 0},60,0.22)`;
+    ground.ctx.strokeStyle = `rgba(${150 + Math.random() * 70 | 0},${140 + Math.random() * 60 | 0},92,0.22)`;
     ground.ctx.lineWidth = 0.8;
     ground.ctx.beginPath();
     ground.ctx.moveTo(x, y);
@@ -243,14 +258,16 @@ export function createTextures(anisotropy: number): TextureSet {
     ground.ctx.stroke();
   }
 
-  // ── Rock ─────────────────────────────────────────────────────────────
+  // ── Rock (warm coral limestone) ──────────────────────────────────────
   const rock = canvas2d(512, 512);
   for (let y = 0; y < 512; y += 2) {
     for (let x = 0; x < 512; x += 2) {
       const f = fbm(x / 34, y / 34, 5, 7);
       const speck = noise2(x, y, 5) > 0.93 ? 34 : 0;
       const lum = 78 + f * 78 + speck;
-      rock.ctx.fillStyle = `rgb(${lum | 0},${(lum * 1.02) | 0},${(lum * 0.98) | 0})`;
+      // Warm, sun-baked limestone: red up, blue down — an island's rock is
+      // bleached by salt and sun, never neutral grey.
+      rock.ctx.fillStyle = `rgb(${(lum * 1.07) | 0},${(lum * 1.0) | 0},${(lum * 0.88) | 0})`;
       rock.ctx.fillRect(x, y, 2, 2);
     }
   }
@@ -438,7 +455,7 @@ export function createTextures(anisotropy: number): TextureSet {
     // Sunlit crown top, shaded underside: the same top-lit rule a real crown
     // obeys, so the impostor still reads as lit by the same sun.
     const up = 1 - Math.min(1, Math.max(0, (cy - 96) / 140));
-    canopyCanvas.ctx.fillStyle = `rgb(${(48 + 46 * shade) | 0},${(74 + 52 * shade) | 0},${(30 + 30 * shade) | 0})`;
+    canopyCanvas.ctx.fillStyle = `rgb(${(44 + 50 * shade) | 0},${(88 + 56 * shade) | 0},${(34 + 28 * shade) | 0})`;
     canopyCanvas.ctx.globalAlpha = 0.55 + up * 0.35;
     canopyCanvas.ctx.beginPath();
     canopyCanvas.ctx.ellipse(cx, cy, r, r * (0.7 + Math.random() * 0.5), Math.random() * 3, 0, Math.PI * 2);
@@ -446,6 +463,115 @@ export function createTextures(anisotropy: number): TextureSet {
   }
   canopyCanvas.ctx.globalAlpha = 1;
   const canopy = toTexture(canopyCanvas.c, anisotropy);
+
+  // ── Palm frond (alpha card) ──────────────────────────────────────────
+  //
+  // One card = one complete pinnate frond: a central rachis with paired
+  // leaflets that shrink toward the tip and fold along a gentle arc. Painted,
+  // not modelled — a palm crown is 8–10 of these cards and the whole crown
+  // costs less than one broadleaf's leaf cluster, which is what makes a
+  // thousand-palm island affordable.
+  const frond = canvas2d(256, 128);
+  frond.ctx.clearRect(0, 0, 256, 128);
+  {
+    const fg = frond.ctx.createLinearGradient(0, 0, 256, 0);
+    fg.addColorStop(0, "#2e5c20");
+    fg.addColorStop(0.55, "#4f8f2c");
+    fg.addColorStop(1, "#8fbe4e");
+    // Rachis: a shallow arc from root (left) to tip (right).
+    frond.ctx.strokeStyle = "#7a6a3e";
+    frond.ctx.lineWidth = 4;
+    frond.ctx.beginPath();
+    frond.ctx.moveTo(6, 64);
+    frond.ctx.quadraticCurveTo(128, 40, 250, 58);
+    frond.ctx.stroke();
+    // Leaflets: paired strokes, longer at the base, shorter at the tip, each
+    // with a slight forward sweep — the V-arrangement that reads as "palm".
+    frond.ctx.strokeStyle = fg;
+    frond.ctx.lineCap = "round";
+    for (let i = 0; i < 22; i += 1) {
+      const t = i / 21;
+      const x = 12 + t * 226;
+      const y = 64 - (1 - Math.abs(t - 0.62) * 1.25) * 20;
+      const len = 52 * (1 - t * 0.72) * (0.85 + Math.random() * 0.3);
+      const sweep = 0.5 + t * 0.3;
+      frond.ctx.lineWidth = 4.6 - t * 2.2;
+      frond.ctx.beginPath();
+      frond.ctx.moveTo(x, y);
+      frond.ctx.quadraticCurveTo(x + len * 0.5, y - len * sweep, x + len * 0.86, y - len * 0.42);
+      frond.ctx.stroke();
+      frond.ctx.beginPath();
+      frond.ctx.moveTo(x, y);
+      frond.ctx.quadraticCurveTo(x + len * 0.5, y + len * sweep * 1.06, x + len * 0.86, y + len * 0.46);
+      frond.ctx.stroke();
+    }
+  }
+  const frondTex = toTexture(frond.c, anisotropy);
+
+  // ── Palm trunk bark (ringed scars) ───────────────────────────────────
+  const palmBark = canvas2d(256, 256);
+  {
+    const pb = palmBark.ctx;
+    pb.fillStyle = "#93805f";
+    pb.fillRect(0, 0, 256, 256);
+    // Growth-ring scars: horizontal bands, slightly irregular, darker in the
+    // gap and lighter on the ridge — the signature palm-texture read.
+    for (let y = 0; y < 256; y += 14 + ((Math.random() * 8) | 0)) {
+      const shade = 0.75 + Math.random() * 0.5;
+      pb.fillStyle = `rgb(${(126 * shade) | 0},${(110 * shade) | 0},${(82 * shade) | 0})`;
+      pb.fillRect(0, y, 256, 5 + ((Math.random() * 4) | 0));
+      pb.fillStyle = `rgba(52,40,26,${0.22 + Math.random() * 0.2})`;
+      pb.fillRect(0, y + 6, 256, 2 + ((Math.random() * 3) | 0));
+    }
+    // Vertical fibre streaks.
+    for (let i = 0; i < 130; i += 1) {
+      const x = Math.random() * 256;
+      pb.strokeStyle = `rgba(60,48,30,${0.1 + Math.random() * 0.16})`;
+      pb.lineWidth = 1;
+      pb.beginPath();
+      pb.moveTo(x, 0);
+      pb.lineTo(x + (Math.random() - 0.5) * 5, 256);
+      pb.stroke();
+    }
+  }
+  const palmBarkTex = toTexture(palmBark.c, anisotropy, [1, 2]);
+
+  // ── Palm impostor silhouette ─────────────────────────────────────────
+  //
+  // At 300 m a palm is a trunk line and a burst of fronds. The card paints
+  // exactly that: a slim curved trunk with a radiating crown, so the distant
+  // forest keeps the palm's unmistakable silhouette instead of a blob.
+  const palmCanopy = canvas2d(128, 256);
+  palmCanopy.ctx.clearRect(0, 0, 128, 256);
+  {
+    const pc = palmCanopy.ctx;
+    // Trunk: a curved tapering line from bottom to upper third.
+    pc.strokeStyle = "#8f7c5c";
+    pc.lineCap = "round";
+    pc.lineWidth = 9;
+    pc.beginPath();
+    pc.moveTo(64, 252);
+    pc.quadraticCurveTo(58, 170, 70, 96);
+    pc.stroke();
+    // Crown: 9 radiating fronds with a drooping arc.
+    pc.strokeStyle = "#4e8a2f";
+    for (let i = 0; i < 9; i += 1) {
+      const a = -Math.PI * 0.92 + (i / 8) * Math.PI * 0.92;
+      const len = 46 + Math.random() * 18;
+      const tx = 70 + Math.cos(a) * len;
+      const ty = 92 + Math.sin(a) * len * 0.78 + len * 0.34;
+      pc.lineWidth = 5.5 - Math.abs(i - 4) * 0.55;
+      pc.beginPath();
+      pc.moveTo(70, 92);
+      pc.quadraticCurveTo(70 + Math.cos(a) * len * 0.6, 92 + Math.sin(a) * len * 0.55 - 8, tx, ty + 12);
+      pc.stroke();
+    }
+    pc.fillStyle = "#5c4a30";
+    pc.beginPath();
+    pc.ellipse(70, 94, 5, 4, 0, 0, Math.PI * 2);
+    pc.fill();
+  }
+  const palmCanopyTex = toTexture(palmCanopy.c, anisotropy);
 
   const barkTex = toTexture(bark.c, anisotropy, [1, 3]);
   // Repeat (1, 1) on purpose: the terrain shells bake their own UV scale so
@@ -468,6 +594,9 @@ export function createTextures(anisotropy: number): TextureSet {
     weather,
     contact,
     canopy,
+    frond: frondTex,
+    palmBark: palmBarkTex,
+    palmCanopy: palmCanopyTex,
     water: waterTex,
     // Normal map for the river's dual-phase flow shader.
     waterNormal: heightToNormal(water.c, 1.5),

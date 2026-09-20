@@ -47,6 +47,7 @@ import {
 } from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
+import { createStructures, type Structures } from "./structures";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
 
 export type CameraMode = "orbit" | "fpp";
@@ -143,6 +144,8 @@ export class Sanctuary {
   private wildlife: Wildlife;
   private water: WaterSystem;
   private sky: SkySystem;
+  /** The bay district: tropical-modern buildings, landmark, jetty, props. */
+  private structures: Structures;
   private board: BoardHandle;
   private student: StudentRig;
   private keyboard: KeyboardInput;
@@ -189,6 +192,8 @@ export class Sanctuary {
   // Hoisted scratch — the loop never allocates.
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
+  /** The tropical brightness push applied on top of the per-hour curve. */
+  private gradeExposure = 1.06;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -213,7 +218,12 @@ export class Sanctuary {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    // TROPICAL GRADE (Phase 20): the per-hour curve in `daylight.ts` is
+    // contract-fixed, so the final brightness push lives here — a single
+    // +6 % on top of it. ACES rolls the highlights off, which is exactly what
+    // bright sand, white walls and white clouds need to hold detail.
+    this.gradeExposure = 1.06;
+    this.renderer.toneMappingExposure = 1.08 * this.gradeExposure;
     if (this.budget.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -296,6 +306,15 @@ export class Sanctuary {
       sun: this.atmosphere.uniforms.uDcSunColor.value,
     });
     this.water.materials.forEach((m) => this.atmosphere.register(m));
+
+    // THE BAY DISTRICT — buildings, beacon, jetty, props, distant islands.
+    // Built from the same height field everything else reads, so the village
+    // sits on the measured shoreline. Its materials join the air like every
+    // other solid: the far islands and the white tower fade into the haze
+    // exactly as the mountains do (Phase 19 — no full-contrast pastes).
+    this.structures = createStructures(this.budget);
+    this.scene.add(this.structures.group);
+    this.atmosphere.registerTree(this.structures.group);
 
     // Light the world for the current moment before the first frame, so the
     // sanctuary never flashes the authored midday look and then correct
@@ -616,12 +635,24 @@ export class Sanctuary {
 
   /**
    * The deepest board element under (x, y) in SCREEN space — the touch's
-   * true target. Last document-order win: a child's rect follows its parent's
-   * (or sits above it), so the last containing element is the one painted on
-   * top where the finger was.
+   * true target.
+   *
+   * Primary: the browser's own `elementFromPoint`. Unlike the compositor
+   * touch path that failed on the device, this is a main-thread layout
+   * query — it honours z-index, absolutely-positioned overlays and
+   * pointer-events, it sees elements the document-order scan below never
+   * could (the editor's dropdown menus are PORTALLED to <body>, outside the
+   * board element entirely), and it is reliable under the 3D transform.
+   *
+   * Fallback: the geometric scan, kept for the case elementFromPoint returns
+   * nothing usable (a hit over bare canvas). Last document-order win: a
+   * child's rect follows its parent's (or sits above it), so the last
+   * containing element is the one painted on top where the finger was.
    */
   private boardTargetAt(screen: BoardScreen, x: number, y: number): Element {
     const root = screen.element;
+    const hit = document.elementFromPoint(x, y);
+    if (hit && this.bridgeMayTarget(screen, hit)) return hit;
     let best: Element = root;
     for (const node of root.querySelectorAll("*")) {
       const el = node as Element;
@@ -630,6 +661,24 @@ export class Sanctuary {
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) best = el;
     }
     return best;
+  }
+
+  /**
+   * May the bridged gesture target this element? YES: anything inside the
+   * board itself, or inside the CSS3D layer. YES, also: page-level UI that a
+   * panel PORTALLED outside the board (dropdown menus, dialogs — they live
+   * under <body>, past both the board and the app root), because that is
+   * exactly what a native tap at this point would have hit. NO: the app's own
+   * chrome (HUD trays, joystick) — those sit beside the canvas inside the app
+   * root, and a bridged board tap must never click them by accident.
+   */
+  private bridgeMayTarget(screen: BoardScreen, hit: Element): boolean {
+    if (screen.element.contains(hit)) return true;
+    if (this.screens.domElement.contains(hit)) return true;
+    if (hit === document.body || hit === document.documentElement) return false;
+    const appRoot = this.opts.dom.parentElement;
+    if (appRoot && appRoot.contains(hit)) return false;
+    return hit instanceof HTMLElement;
   }
 
   /** The overflow boxes under the target, innermost first. */
@@ -648,9 +697,17 @@ export class Sanctuary {
   /**
    * Dispatch one synthetic event into the board. `clientX/Y` are the
    * FINGER's own screen coordinates, so every handler in the panel sees the
-   * touch at exactly the place it happened.
+   * touch at exactly the place it happened. Returns the event so the caller
+   * can honour `preventDefault` (a panel that cancels mousedown is managing
+   * focus itself — the bridge must not fight it).
    */
-  private synthetic(type: string, target: Element, x: number, y: number, pointerId: number) {
+  private synthetic(
+    type: string,
+    target: Element,
+    x: number,
+    y: number,
+    pointerId: number,
+  ): PointerEvent {
     const init: PointerEventInit = {
       bubbles: true,
       cancelable: true,
@@ -667,7 +724,76 @@ export class Sanctuary {
       pointerType: "touch",
       isPrimary: true,
     };
-    target.dispatchEvent(new PointerEvent(type, init));
+    const event = new PointerEvent(type, init);
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  /**
+   * The legacy MOUSE half of the stream. A native gesture delivers
+   * pointerdown → mousedown → … → pointerup → mouseup → click; the bridge
+   * used to replay only the pointer half, so every control wired to
+   * `onMouseDown` — the notes editor's whole formatting toolbar — was dead
+   * under the bridge while working when the same board was pinched out
+   * (where the device's native path runs). The mouse events ride along at
+   * the native moments; handlers that only listen for click see no change.
+   */
+  private syntheticMouse(type: string, target: Element, x: number, y: number): MouseEvent {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      detail: 1,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+      button: 0,
+      buttons: type === "mousedown" ? 1 : 0,
+    });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  /**
+   * A native pointerdown's default action moves FOCUS and places the caret.
+   * Synthetic events carry no default actions — which is why typing in the
+   * notes editor never worked under the bridge ("likha nahi hota"): the
+   * writing surface never got the caret. This reproduces the default action
+   * by hand for editable targets: focus the field the finger touched and put
+   * the caret exactly at the finger's coordinates.
+   */
+  private focusTapTarget(target: Element, screen: BoardScreen, x: number, y: number) {
+    let el: Element | null = target;
+    while (el && screen.element.contains(el)) {
+      if (el instanceof HTMLElement && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+        el.focus({ preventScroll: true });
+        const sel = window.getSelection();
+        if (el.isContentEditable && sel) {
+          const doc = document as Document & {
+            caretRangeFromPoint?(x: number, y: number): Range | null;
+            caretPositionFromPoint?(x: number, y: number): { offsetNode: Node; offset: number } | null;
+          };
+          let range: Range | null = null;
+          if (doc.caretRangeFromPoint) {
+            range = doc.caretRangeFromPoint(x, y);
+          } else if (doc.caretPositionFromPoint) {
+            const pos = doc.caretPositionFromPoint(x, y);
+            if (pos) {
+              range = document.createRange();
+              range.setStart(pos.offsetNode, pos.offset);
+            }
+          }
+          if (range) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+        return;
+      }
+      el = el.parentElement;
+    }
   }
 
   private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }) {
@@ -688,6 +814,10 @@ export class Sanctuary {
       scrollers: this.scrollersUnder(target, screen.element),
     };
     this.synthetic("pointerdown", target, e.clientX, e.clientY, e.pointerId);
+    const mouse = this.syntheticMouse("mousedown", target, e.clientX, e.clientY);
+    // The pointerdown default action (focus + caret), reproduced unless the
+    // panel cancelled the mousedown to manage focus itself.
+    if (!mouse.defaultPrevented) this.focusTapTarget(target, screen, e.clientX, e.clientY);
   }
 
   private moveBridge(e: PointerEvent) {
@@ -737,6 +867,7 @@ export class Sanctuary {
       && Math.hypot(e.clientX - b.startX, e.clientY - b.startY) < 10
       && performance.now() - b.startedAt < 600;
     this.synthetic(cancelled ? "pointercancel" : "pointerup", b.target, e.clientX, e.clientY, b.pointerId);
+    if (!cancelled) this.syntheticMouse("mouseup", b.target, e.clientX, e.clientY);
     // A tap: the click lands on the element under the finger, at the finger's
     // own coordinates — exactly where the learner touched.
     if (wasTap) this.synthetic("click", b.target, e.clientX, e.clientY, b.pointerId);
@@ -846,7 +977,7 @@ export class Sanctuary {
     // towards the sun, so its Y component IS the sine of the elevation.
     this.atmosphere.update(state.sunDir.y, state.sunDir, state.sunColor, state.fog);
     this.scene.background = null;
-    this.renderer.toneMappingExposure = state.exposure;
+    this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();
   }
@@ -1175,6 +1306,8 @@ export class Sanctuary {
       this.grass.update(time, this.wind);
       this.flora.update(time, this.wind);
       this.water.update(adt, time);
+      // The bay's idle motion (boat, umbrellas) rides the same budget.
+      this.structures.update(time);
       // The safari district animates on the same budget as the herds.
       this.safari.update(adt, time);
     }
@@ -1274,6 +1407,7 @@ export class Sanctuary {
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();
+    this.structures.dispose();
     this.sky.dispose();
     this.board.dispose();
     this.student.dispose();

@@ -229,8 +229,10 @@ export function createRockField(
       clusterZ = Math.sin(a) * r;
       const s = siteAt(clusterX, clusterZ, site);
       // Steep ground and drainage lines are where rock shows through. Flat,
-      // deep-soiled meadow keeps its grass, so most flat draws are rejected.
-      if (s.slopeDeg < 5 && rand() < 0.62) continue;
+      // deep-soiled meadow keeps its grass, so most flat draws are rejected —
+      // EXCEPT on the beach, where scattered coral boulders are part of the
+      // shoreline's composition (Phase 10: rocks at the coast, deliberately).
+      if (s.slopeDeg < 5 && rand() < (s.coastal > 0.35 ? 0.22 : 0.62)) continue;
       if (pathWeight(clusterX, clusterZ) > 0.35) continue;
       if (Math.hypot(clusterX, clusterZ) < 14) continue;
       clusterLeft = 3 + ((rand() * 7) | 0);
@@ -301,14 +303,16 @@ export function createRockField(
     wbucket[masterIndex].push(moss, dust, wet);
 
     // Tint: rocks are never one colour. A boulder under trees picks up a
-    // green-grey cast from the canopy, a river rock reads cooler, and the
-    // high scree is paler and bleached (research §10).
+    // green-grey cast from the canopy, a river rock reads cooler, the high
+    // scree is paler and bleached (research §10) — and a BEACH boulder is
+    // the most bleached of all: sun + salt strip it pale and warm.
     const green = moss * 0.22;
     const cool = wet * 0.16 + Math.min(0.12, s.height / 600);
+    const bleach = s.coastal * 0.16;
     tint.setRGB(
-      1 - green * 0.35 + Math.min(0.1, s.height / 500) - cool * 0.15,
-      1 - green * 0.1 + Math.min(0.08, s.height / 700) + cool * 0.02,
-      1 - green * 0.5 + cool * 0.28,
+      1 - green * 0.35 + Math.min(0.1, s.height / 500) - cool * 0.15 + bleach,
+      1 - green * 0.1 + Math.min(0.08, s.height / 700) + cool * 0.02 + bleach * 0.94,
+      1 - green * 0.5 + cool * 0.28 + bleach * 0.78,
     );
     cbucket[masterIndex].push(tint.clone());
 
@@ -353,12 +357,16 @@ export function createRockField(
   };
 
   for (let m = 0; m < MASTER_COUNT; m += 1) {
-    // Same seed → same rock, two resolutions.
+    // Same seed → same rock. USER DIRECTIVE (big-stone design pass): the far
+    // masters used to be sculpted at detail 1 (80 triangles), so every LARGE
+    // boulder read as a smooth featureless lump next to the crisp small ones.
+    // Both buckets now sculpt the SAME detail-2 master — big and small stones
+    // are literally the same design. (Two geometries, not one shared: the
+    // per-instance weather attribute lives ON the geometry, so a shared
+    // master would let the far bucket overwrite the near bucket's weather.)
     const seed = 0x9e37_79b9 + m * 0x45d9_f3b;
-    const near = sculptRock(mulberry32(seed), 2);
-    const far = sculptRock(mulberry32(seed), 1);
-    buildBucket(near, nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
-    buildBucket(far, farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
+    buildBucket(sculptRock(mulberry32(seed), 2), nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
+    buildBucket(sculptRock(mulberry32(seed), 2), farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
   }
 
   // ── Contact decals: one instanced mesh for the whole field ──────────

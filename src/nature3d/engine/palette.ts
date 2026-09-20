@@ -106,15 +106,16 @@ export function clampAlbedoByte(v: number): number {
  */
 export function hueDrift(facing: number, height: number, out: THREE.Color): THREE.Color {
   // Sunlit facets go warm (a hint of ochre); shaded facets go cool (sky
-  // blue). The high ground is bleached and slightly cooler with altitude —
-  // rock loses its iron tone long before it loses its height.
-  const warm = Math.max(0, facing) * 0.045;
-  const cool = Math.max(0, -facing) * 0.05;
-  const bleach = Math.min(0.05, Math.max(0, height - 18) * 0.0016);
+  // cyan). The high ground is bleached harder than a temperate map — salt
+  // wind and hard tropical sun strip the iron tone out of rock early —
+  // which is what keeps the far ridge read pale and crisp.
+  const warm = Math.max(0, facing) * 0.05;
+  const cool = Math.max(0, -facing) * 0.055;
+  const bleach = Math.min(0.075, Math.max(0, height - 14) * 0.0024);
   return out.setRGB(
-    1 + warm - cool * 0.35 + bleach,
-    1 + warm * 0.55 - cool * 0.1,
-    1 - warm * 0.25 + cool * 0.55 + bleach,
+    1 + warm - cool * 0.32 + bleach,
+    1 + warm * 0.55 - cool * 0.08 + bleach * 0.92,
+    1 - warm * 0.22 + cool * 0.55 + bleach * 0.7,
   );
 }
 
@@ -142,52 +143,80 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
- * Ground layer colours.
+ * Ground layer colours — TROPICAL ISLAND KEY.
  *
- * Every value is deliberately a mid-tone: the greens are olive rather than
- * emerald, the rock is a warm grey rather than a neutral one, and the "mud"
- * is a desaturated brown. Values chosen against the albedo range above; the
- * brightest (snow) sits just under the ceiling so the sun can still push it
- * to white with lighting rather than clipping it in the texture.
+ * The sanctuary is now a bright tropical island, so the ground palette is
+ * keyed to what the references actually show: clean saturated (but controlled)
+ * greens, pale warm sand everywhere the sea can reach, warm limestone rock,
+ * and a teal-shifted deep bed for the drowned island edge. Every value is
+ * still a mid-tone under the albedo clamp — "bright" comes from the LIGHT
+ * (see `daylight.ts`), never from pushing albedo to the ceiling, which would
+ * clip under the tone mapper and bleach the character off the screen.
+ *
+ * The `snow` band is retained by name (the whole engine reads the same 52 m
+ * line) but is re-authored as the SUN-BLEACHED CREST: on a tropical island
+ * the highest rock weathers pale, not white-with-snow. It keeps its role
+ * (a bright band that makes the far ridgeline read) with a warm, sun-bleached
+ * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  lush: new THREE.Color(0x54812f),
-  dry: new THREE.Color(0x8a8f47),
-  mud: new THREE.Color(0x4c4335),
-  rock: new THREE.Color(0x717872),
-  gravel: new THREE.Color(0x8b8272),
-  snow: new THREE.Color(0xe6edf3),
-  deep: new THREE.Color(0x33291d),
+  // USER DIRECTIVE (saturation pass): the meadow read washed-out on device —
+  // the greens are pushed up in chroma (lush +18 % sat, dry pulled greener)
+  // while keeping the hue natural; the eye accepts saturated green grass,
+  // it rejects neon.
+  lush: new THREE.Color(0x2f9220),
+  dry: new THREE.Color(0x86a032),
+  mud: new THREE.Color(0x6a593d),
+  rock: new THREE.Color(0x8d8770),
+  gravel: new THREE.Color(0xd2c5a0),
+  sand: new THREE.Color(0xe8d8ae),
+  sandWet: new THREE.Color(0xbfa274),
+  sandUnder: new THREE.Color(0x9db482),
+  snow: new THREE.Color(0xf4efe0),
+  deep: new THREE.Color(0x2e4f4a),
 };
 
-/** Foliage albedo. Mid-green, desaturated — see rule 2. */
+/**
+ * Foliage albedo — TROPICAL KEY.
+ *
+ * The greens move up in chroma and warmth from the old olive meadow set, but
+ * they stay under the art-direction ceiling: a tropical canopy is VIVID, not
+ * neon. Hue runs ~0.23…0.30 (yellow-green → true green) with the deep canopy
+ * carrying a cool blue-green cast so shadowed foliage never goes black.
+ */
 export const FOLIAGE_PALETTE = {
-  /** Grass blades, root … tip. The tip is where new growth and sunlight meet. */
-  bladeRoot: new THREE.Color(0x2c4a1c),
-  bladeMid: new THREE.Color(0x4a7c28),
-  bladeTip: new THREE.Color(0x93b757),
+  /** Grass blades, root … tip. The tip is where new growth and sunlight meet.
+   *  USER DIRECTIVE (saturation pass): all three pushed up in chroma — the
+   *  blade gradient now runs deep saturated green → vivid yellow-green. */
+  bladeRoot: new THREE.Color(0x276314),
+  bladeMid: new THREE.Color(0x3d9c1e),
+  bladeTip: new THREE.Color(0x93d937),
   /** Leaf cards, inner canopy … outer. */
-  leafDeep: new THREE.Color(0x2d4a26),
-  leafLit: new THREE.Color(0x6d8f3f),
+  leafDeep: new THREE.Color(0x235e19),
+  leafLit: new THREE.Color(0x63b32a),
   /** Transmitted light through a leaf (the cheap subsurface term). */
-  transmittance: new THREE.Color(0x9dbb52),
+  transmittance: new THREE.Color(0xa9cf5d),
   /** Bark, young … old (older bark is paler, greyer and more fissured). */
-  barkYoung: new THREE.Color(0x4a3a29),
-  barkOld: new THREE.Color(0x6b6055),
+  barkYoung: new THREE.Color(0x6d5941),
+  barkOld: new THREE.Color(0x9b8a70),
+  /** Palm trunk: pale, ringed, sun-bleached — the signature tropical silhouette. */
+  palmTrunk: new THREE.Color(0xa08b6a),
+  /** Coconut husk. */
+  coconut: new THREE.Color(0x5f4a2e),
   /** Moss: only ever on the damp, shade-side faces. */
-  moss: new THREE.Color(0x4e6b31),
+  moss: new THREE.Color(0x5d7d36),
 };
 
-/** Rock albedo per geological family (research §6, §25). */
+/** Rock albedo per geological family (research §6, §25) — tropical limestone key. */
 export const ROCK_PALETTE = {
-  /** Warm sedimentary — the meadow's boulders and outcrops. */
-  sandstone: new THREE.Color(0x8d8471),
-  /** Cool igneous — the scree on the highland slopes. */
-  basalt: new THREE.Color(0x6d7378),
-  /** Dust settled on up-facing surfaces. */
-  dust: new THREE.Color(0x9c9484),
+  /** Warm coral limestone — the island's boulders and outcrops. */
+  sandstone: new THREE.Color(0xa79a7a),
+  /** Cool volcanic — the scree on the highland slopes. */
+  basalt: new THREE.Color(0x767d7a),
+  /** Dust and salt spray settled on up-facing surfaces. */
+  dust: new THREE.Color(0xc4b795),
   /** Wet stone at the waterline: darker, because water fills the micro-facets. */
-  wet: new THREE.Color(0x4a4e48),
+  wet: new THREE.Color(0x57604f),
 };
 
 /**
@@ -225,12 +254,13 @@ export interface AtmosphereKey {
 }
 
 const KEYS: ReadonlyArray<{ maxElevation: number; key: AtmosphereKey }> = [
-  // Low sun: long, dusty, warm haze; the halo is broad and orange.
-  { maxElevation: 0.25, key: { haze: new THREE.Color(0xd8b18a), sun: new THREE.Color(0xffd9a8), inScatter: 0.75 } },
+  // Low sun: long, warm, golden haze over water; the halo is broad and orange.
+  { maxElevation: 0.25, key: { haze: new THREE.Color(0xf0cfa4), sun: new THREE.Color(0xffdca8), inScatter: 0.72 } },
   // Mid-morning / late afternoon: the "golden" band, still warm, less dust.
-  { maxElevation: 0.55, key: { haze: new THREE.Color(0xdcd6c4), sun: new THREE.Color(0xffeccb), inScatter: 0.5 } },
-  // High sun: cool, blue, clear — the haze is thin and the halo is tight.
-  { maxElevation: 1.01, key: { haze: new THREE.Color(0xd3e0ec), sun: new THREE.Color(0xfff6e4), inScatter: 0.32 } },
+  { maxElevation: 0.55, key: { haze: new THREE.Color(0xe4e6cf), sun: new THREE.Color(0xffeecb), inScatter: 0.52 } },
+  // High sun: the clean, bright, slightly cyan tropical clear — the haze is a
+  // pale turquoise-white and the halo is tight.
+  { maxElevation: 1.01, key: { haze: new THREE.Color(0xdcefef), sun: new THREE.Color(0xfff4dc), inScatter: 0.36 } },
 ];
 
 /** Pick the atmosphere key for a sun elevation (0 = horizon, 1 = zenith). */

@@ -112,11 +112,16 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     depthWrite: false,
     fog: false,
     uniforms: {
-      uZenith: { value: new THREE.Color(0x2a6ec4) },
-      uHorizon: { value: new THREE.Color(0xbfe0f5) },
-      uGround: { value: new THREE.Color(0xd9c9a8) },
+      // TROPICAL DAY KEY. Bright cyan-blue zenith, a pale turquoise-white
+      // horizon and a warm sand haze below the line — the reference sky is
+      // BRIGHTER and cleaner than the old temperate dome, with more air
+      // between the blue and the horizon. (daylight.ts re-authors these live;
+      // these are the boot defaults so the first frame is already tropical.)
+      uZenith: { value: new THREE.Color(0x2f7fd9) },
+      uHorizon: { value: new THREE.Color(0xd2f0fa) },
+      uGround: { value: new THREE.Color(0xeadfc2) },
       uSunDir: { value: sunDir.clone() },
-      uSunColor: { value: new THREE.Color(0xfff0cf) },
+      uSunColor: { value: new THREE.Color(0xfff3d4) },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -154,7 +159,9 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const cloudMat = new THREE.MeshBasicMaterial({
     map: tex.cloud,
     transparent: true,
-    opacity: 0.85,
+    // Bright tropical cumulus: denser and whiter than the old meadow clouds,
+    // so the sky reads as clean fair-weather weather.
+    opacity: 0.92,
     depthWrite: false,
     fog: false,
   });
@@ -235,8 +242,11 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const moteAttr = moteGeo.attributes.position as THREE.BufferAttribute;
 
   // ── Lights ───────────────────────────────────────────────────────────
-  const hemi = new THREE.HemisphereLight(0xfff4e2, 0x4a6b33, 1.05);
-  const sun = new THREE.DirectionalLight(0xfff1d6, 2.35);
+  // TROPICAL KEY: hard clean sun, cyan sky fill, and a ground bounce that is
+  // sunlit foliage rather than dark loam. Shadows stay readable — the hemi
+  // term keeps every shadow a soft blue-green, never black.
+  const hemi = new THREE.HemisphereLight(0xd8f2ff, 0x71893f, 1.1);
+  const sun = new THREE.DirectionalLight(0xfff2d8, 2.45);
   sun.position.copy(sunDir).multiplyScalar(70);
   if (budget.shadowMapSize > 0) {
     sun.castShadow = true;
@@ -250,7 +260,7 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.035;
   }
-  const fill = new THREE.DirectionalLight(0xa8d6ff, 0.5);
+  const fill = new THREE.DirectionalLight(0xb8dcff, 0.55);
   fill.position.set(-40, 26, 34);
 
   group.add(hemi, sun, sun.target, fill);
@@ -297,7 +307,7 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
         // top back slightly to show the shaded base.
         dummy.lookAt(camera.position.x, dummy.position.y, camera.position.z);
         dummy.rotateX(-0.1);
-        dummy.scale.set(s.s * 2.4, s.s, 1);
+        dummy.scale.set(s.s * 2.7, s.s * 1.06, 1);
         dummy.updateMatrix();
         clouds.setMatrixAt(i, dummy.matrix);
       }

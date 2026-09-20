@@ -38,7 +38,7 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
-import { RIVER_CENTER_X, WATER_LEVEL } from "./terrain";
+import { RIVER_CENTER_X, WATER_LEVEL, OCEAN_LEVEL, coastWeight, terrainHeight } from "./terrain";
 import type { TextureSet } from "./textures";
 
 export interface WaterSystem {
@@ -125,8 +125,12 @@ export function createWater(
     // here is dielectric Fresnel — which is what water actually is — and the
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
-    color: 0x2f7fae,
-    roughness: 0.14,
+    // TROPICAL GRADE: the base body is a clear turquoise, not steel blue.
+    // USER DIRECTIVE (blue pass): pushed from turquoise (0x2f9fae) to a
+    // saturated azure — hue 0.58 vs the old 0.53 — so the river reads BLUE
+    // the way the learner asked, with the depth ramp below following.
+    color: 0x1f7fd4,
+    roughness: 0.13,
     metalness: 0.0,
     transparent: true,
     opacity: 0.9,
@@ -207,10 +211,15 @@ export function createWater(
         // The channel is deepest along its centre line, so the distance from
         // that line is a stand-in for the water column that costs no extra
         // geometry or depth pass (principle 39: fake the part nobody checks).
+        // TROPICAL GRADE: shallow water is bright turquoise, the channel
+        // saturates to a clear teal-blue — a tropical river, not a northern one.
+        // USER DIRECTIVE (blue pass): both stops shifted toward saturated
+        // blue — shallow #6fd8cf → #58c8f0, deep #0b4a63 → #0847a0 — so the
+        // gradient runs vivid cyan-blue into deep blue with no green cast.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 4.2, dcBank);
-        vec3 dcDeep = vec3(0.0013, 0.024, 0.063);     // sRGB #061e33
-        vec3 dcShallow = vec3(0.093, 0.470, 0.510);   // sRGB #57b5be
+        vec3 dcDeep = vec3(0.006, 0.078, 0.235);       // sRGB #0847a0
+        vec3 dcShallow = vec3(0.130, 0.560, 0.830);    // sRGB #58c8f0
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
         // ── Sky reflection, read off the atmosphere ─────────────────────
@@ -246,10 +255,11 @@ export function createWater(
   river.renderOrder = 1;
   group.add(river);
 
-  // Wet, dark riverbed under the translucent surface.
+  // Wet sandy riverbed under the translucent surface — a tropical stream
+  // runs over pale grit, not dark slate.
   const bed = new THREE.Mesh(
     new THREE.PlaneGeometry(13.5, RIVER_LENGTH + 2),
-    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x4a5450 }),
+    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x5d7a66 }),
   );
   bed.rotation.x = -Math.PI / 2;
   bed.position.set(RIVER_CENTER_X, WATER_LEVEL - 0.75, 0);
@@ -338,7 +348,7 @@ export function createWater(
 
         // Aeration: clear at the lip, churned white at the base.
         float dcFoam = smoothstep(0.25, 1.0, dcDrop);
-        vec3 dcClear = vec3(0.34, 0.62, 0.85);   // sRGB #9bc4e0 — a body of water
+        vec3 dcClear = vec3(0.36, 0.68, 0.82);   // sRGB #9bd0e0 — tropical water
         vec3 dcCol = mix(dcClear, vec3(1.0), clamp(dcFoam * 0.9 + dcB * 0.25, 0.0, 1.0));
         dcCol *= 0.72 + dcRope * 0.4;
 
@@ -411,12 +421,223 @@ export function createWater(
 
   const attr = pGeo.attributes.position as THREE.BufferAttribute;
 
+  // ── THE OCEAN ──────────────────────────────────────────────────────────
+  //
+  // The island's drowned edge, flooded to OCEAN_LEVEL. Everything about this
+  // mesh is chosen for a mobile budget:
+  //
+  //   * ONE radial disc, ~7 k vertices: rings are spaced by hand so most of
+  //     them sit where the shoreline actually meanders (~1050–1400 m from
+  //     centre) and the far field is a handful of huge rings. ~13 k triangles
+  //     total — less than one mid-distance tree crown.
+  //   * FLOOD MASK BAKED PER VERTEX. Water may only exist where the terrain
+  //     is actually below sea level AND past the coast ring (see
+  //     `coastWeight`) — otherwise the safari's dry basin, which sits below
+  //     sea level 700 m inland, would flood. Vertices whose mask says "dry"
+  //     are dropped 90 m under the ground in the vertex shader, which is the
+  //     standard mobile shoreline trick: no stencil, no depth texture, no
+  //     second pass.
+  //   * DEPTH IS BAKED TOO. `OCEAN_LEVEL − terrainHeight` at build time,
+  //     interpolated per fragment, is what drives the tropical colour ramp
+  //     (shallow turquoise shelf → clear blue → deep) and the foam line,
+  //     for the cost of one attribute — no depth pre-pass, no render target.
+  //   * THE SHADER is the river's recipe retargeted: dual-phase flow normals,
+  //     Schlick Fresnel against the LIVE sky colours, a GGX-ish sun glint on
+  //     the shared sun vector, and depth grades. All analytic, all linear
+  //     pre-tone-map, ~30 ALU + 2 fetches per fragment.
+  const OCEAN_RING_RADII = [
+    0, 160, 340, 540, 740, 900, 970, 1020, 1060, 1095, 1125, 1155, 1185, 1215,
+    1245, 1275, 1310, 1350, 1400, 1470, 1580, 1760, 2050, 2450, 2950, 3450,
+  ];
+  const OCEAN_SEGMENTS = 256;
+  const oceanGeo = new THREE.BufferGeometry();
+  {
+    const ringCount = OCEAN_RING_RADII.length;
+    const vertCount = 1 + (ringCount - 1) * (OCEAN_SEGMENTS + 1);
+    const pos = new Float32Array(vertCount * 3);
+    const depth = new Float32Array(vertCount);
+    // Centre vertex.
+    pos[0] = 0;
+    pos[2] = 0;
+    depth[0] = -1;
+    let v = 1;
+    for (let r = 1; r < ringCount; r += 1) {
+      const radius = OCEAN_RING_RADII[r];
+      for (let s = 0; s <= OCEAN_SEGMENTS; s += 1) {
+        const a = (s / OCEAN_SEGMENTS) * Math.PI * 2;
+        const x = Math.cos(a) * radius;
+        const z = Math.sin(a) * radius;
+        pos[v * 3] = x;
+        pos[v * 3 + 1] = 0;
+        pos[v * 3 + 2] = z;
+        // The flood mask + water column in one number: −1 = dry (collapsed
+        // under the terrain), 0… = metres of water over the bed.
+        depth[v] = coastWeight(x, z) > 0.42
+          ? Math.max(0, OCEAN_LEVEL - terrainHeight(x, z))
+          : -1;
+        v += 1;
+      }
+    }
+    const idx: number[] = [];
+    for (let s = 0; s < OCEAN_SEGMENTS; s += 1) idx.push(0, 1 + s + 1, 1 + s);
+    for (let r = 1; r < ringCount - 1; r += 1) {
+      const a0 = 1 + (r - 1) * (OCEAN_SEGMENTS + 1);
+      const a1 = a0 + OCEAN_SEGMENTS + 1;
+      for (let s = 0; s < OCEAN_SEGMENTS; s += 1) {
+        idx.push(a0 + s, a0 + s + 1, a1 + s);
+        idx.push(a0 + s + 1, a1 + s + 1, a1 + s);
+      }
+    }
+    oceanGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    oceanGeo.setAttribute("aDcDepth", new THREE.BufferAttribute(depth, 1));
+    oceanGeo.setIndex(idx);
+  }
+
+  const oceanNormTex = normTex.clone();
+  oceanNormTex.needsUpdate = true;
+  oceanNormTex.wrapS = THREE.RepeatWrapping;
+  oceanNormTex.wrapT = THREE.RepeatWrapping;
+
+  const oceanMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.11,
+    metalness: 0.0,
+    transparent: true,
+  });
+  oceanMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = { value: 0 };
+    shader.uniforms.uFlowMap = { value: oceanNormTex };
+    shader.uniforms.uSunDir = { value: sunDir };
+    // The same live sky/sun colour objects the river borrows — one write in
+    // `daylight`, every water surface follows.
+    shader.uniforms.uWsky = { value: skyColor };
+    shader.uniforms.uWsun = { value: sunColor };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        /* glsl */ `
+        #include <common>
+        uniform float uTime;
+        attribute float aDcDepth;
+        varying float vDcDepth;
+        varying vec3 vDcWorld;
+        `,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        /* glsl */ `
+        #include <begin_vertex>
+        // Dry vertices sink; wet ones ride a long, low ocean swell. The swell
+        // amplitude is deliberately a few centimetres — a mobile ocean moves,
+        // it does not simulation-slosh.
+        if ( aDcDepth < 0.0 ) {
+          transformed.y -= 90.0;
+          vDcDepth = -1.0;
+        } else {
+          vDcDepth = aDcDepth;
+          transformed.y += sin( transformed.x * 0.011 + uTime * 0.9 ) * 0.05
+                         + sin( transformed.z * 0.013 - uTime * 0.7 ) * 0.045;
+        }
+        vDcWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        `,
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        /* glsl */ `
+        #include <common>
+        uniform float uTime;
+        uniform sampler2D uFlowMap;
+        uniform vec3 uSunDir;
+        uniform vec3 uWsky;
+        uniform vec3 uWsun;
+        varying float vDcDepth;
+        varying vec3 vDcWorld;
+        `,
+      )
+      .replace(
+        "#include <opaque_fragment>",
+        /* glsl */ `
+        #include <opaque_fragment>
+
+        if ( vDcDepth >= 0.0 ) {
+          // Dual-phase flow normals — the same regeneration trick the river
+          // uses, at ocean scale and two crossing directions.
+          vec2 dcUv = vDcWorld.xz * 0.0085;
+          vec2 dcFlowA = vec2( 0.84, 0.31 );
+          vec2 dcFlowB = vec2( -0.42, 0.78 );
+          float dcCycle = 0.16;
+          float dcHalf = 0.5;
+          float dcPhase0 = fract( uTime * dcCycle );
+          float dcPhase1 = fract( uTime * dcCycle + dcHalf );
+          vec3 dcN0 = texture2D( uFlowMap, dcUv - dcFlowA * dcPhase0 ).rgb;
+          vec3 dcN1 = texture2D( uFlowMap, dcUv * 1.41 + 0.19 - dcFlowB * dcPhase1 ).rgb;
+          float dcMix = abs( ( dcPhase0 - dcHalf ) / dcHalf );
+          vec3 dcNrm = normalize( mix( dcN0, dcN1, dcMix ) * 2.0 - 1.0 );
+          // Calm tropics: the normal is mostly UP, with a gentle swell tilt.
+          vec3 dcNormal = normalize( vec3( dcNrm.x * 0.34, 1.0, dcNrm.y * 0.34 ) );
+
+          // Schlick Fresnel, F0 = 0.02 — real water reflectance.
+          vec3 dcView = normalize( cameraPosition - vDcWorld );
+          float dcCos = clamp( dot( dcView, dcNormal ), 0.0, 1.0 );
+          float dcFres = 0.02 + 0.98 * pow( 1.0 - dcCos, 5.0 );
+
+          // THE TROPICAL RAMP (Phase 5): depth decides the hue.
+          //   0–2.5 m   bright turquoise over the sand shelf
+          //   2.5–9 m   clear tropical blue
+          //   9 m +     deep, saturated sea blue
+          float dcD = clamp( vDcDepth, 0.0, 14.0 );
+          vec3 dcShallowC = vec3( 0.120, 0.620, 0.840 );  // USER blue pass: #58cfe6, no green cast
+          vec3 dcMidC     = vec3( 0.016, 0.330, 0.680 );  // saturated azure
+          vec3 dcDeepC    = vec3( 0.004, 0.080, 0.300 );  // deep blue
+          vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
+          dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
+
+          // Sky reflection + sun glint, both on the shared live uniforms.
+          vec3 dcSky = uWsky * 1.3 + uWsun * 0.15;
+          vec3 dcH = normalize( dcView + uSunDir );
+          float dcSpec = pow( max( dot( dcNormal, dcH ), 0.0 ), 240.0 ) * 2.6;
+          float dcSheen = pow( max( dot( dcNormal, dcH ), 0.0 ), 30.0 ) * 0.14;
+          vec3 dcCol = mix( dcBody, dcSky, dcFres ) + uWsun * ( dcSpec + dcSheen );
+
+          // SHORELINE SURF: a foam band where the column thins out, broken up
+          // by the flow noise and pushed in and out by a slow wave phase so
+          // the waterline breathes.
+          float dcBreak = texture2D( uFlowMap, dcUv * 3.1 + vec2( uTime * 0.02, -uTime * 0.017 ) ).r;
+          float dcLine = 0.85 + 0.55 * sin( uTime * 0.7 + vDcWorld.x * 0.05 + vDcWorld.z * 0.043 );
+          float dcFoam = ( 1.0 - smoothstep( 0.0, 1.35 * dcLine, dcD ) ) * smoothstep( 0.35, 0.8, dcBreak * 0.6 + dcNrm.y * 0.4 + 0.3 );
+          dcCol = mix( dcCol, vec3( 0.86, 0.94, 0.95 ), clamp( dcFoam, 0.0, 0.9 ) );
+
+          gl_FragColor.rgb = mix( gl_FragColor.rgb, dcCol, 0.94 );
+          // Clear water over sand near the shore, near-opaque blue offshore.
+          gl_FragColor.a = clamp( mix( 0.62, 0.96, smoothstep( 0.0, 5.0, dcD ) ) + dcFoam * 0.25, 0.0, 1.0 );
+        }
+        `,
+      );
+    oceanMat.userData.shader = shader;
+  };
+
+  const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+  ocean.position.set(0, OCEAN_LEVEL, 0);
+  ocean.renderOrder = 2; // after the river (1), both transparent
+  ocean.frustumCulled = false; // one disc, always in view somewhere
+  ocean.name = "ocean";
+  group.add(ocean);
+
   return {
     group,
-    materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, spray.material as THREE.Material],
+    // NOTE: the ocean materials are APPENDED. The shader harness addresses
+    // the river/fall/spray by index ([0]/[3]/[4]) — keep them stable.
+    materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, spray.material as THREE.Material, oceanMat],
     update(dt, time) {
       const shader = riverMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (shader) shader.uniforms.uTime.value = time;
+
+      // Ocean clock — one uniform per frame for the whole sea.
+      const oceanShader = oceanMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
+      if (oceanShader) oceanShader.uniforms.uTime.value = time;
 
       // Scrolling UVs = flowing water, one float per frame.
       flowTex.offset.y = (time * 0.28) % 1;
