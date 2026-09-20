@@ -333,7 +333,9 @@ check("bay: the district merges into a handful of draw calls",
     const idx = m.geometry.getIndex();
     bayTris += idx ? idx.count / 3 : (m.geometry.attributes.position?.count ?? 0) / 3;
   }
-  check("bay: no material bucket was silently dropped on merge", bayTris > 4500, `${Math.round(bayTris)} tris`);
+  // (District only — the islands mesh is excluded above. Pre-fix the mixed
+  // wood bucket dropped ~2.4 k tris; healthy mass is ~4.4 k.)
+  check("bay: no material bucket was silently dropped on merge", bayTris > 3800, `${Math.round(bayTris)} tris`);
 }
 check("bay: the landmark islands exist as one merged mesh",
   !!structures.group.getObjectByName("distant-islands"));
