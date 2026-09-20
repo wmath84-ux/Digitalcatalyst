@@ -661,9 +661,12 @@ export class Sanctuary {
       const lx = c * dx - s * dz;
       const x = lx / PX_TO_M + SCREEN_PX_WIDTH / 2;
       const y = -dy / PX_TO_M + SCREEN_PX_HEIGHT / 2;
-      if (x < 0 || x > SCREEN_PX_WIDTH || y < 0 || y > SCREEN_PX_HEIGHT) return;
+      const scale = this.boardScale;
+      const localX = SCREEN_PX_WIDTH / 2 + (x - SCREEN_PX_WIDTH / 2) / scale;
+      const localY = SCREEN_PX_HEIGHT / 2 + (y - SCREEN_PX_HEIGHT / 2) / scale;
+      if (localX < 0 || localX > SCREEN_PX_WIDTH || localY < 0 || localY > SCREEN_PX_HEIGHT) return;
       const t = ray.origin.distanceToSquared(this.bridgeHit);
-      if (!best || t < best.t) best = { screen, x, y, t };
+      if (!best || t < best.t) best = { screen, x: localX, y: localY, t };
     });
     return best;
   }
@@ -1214,6 +1217,29 @@ export class Sanctuary {
   }
 
   /**
+   * Grow or shrink the three study boards. Width, gap and reading radius
+   * scale together; the camera must be re-framed by the caller (`focus`)
+   * so a 3× board still fits the desk view with no crop.
+   */
+  setBoardScale(scale: number) {
+    const s = scale < 1.25 ? 1 : scale < 1.75 ? 1.5 : scale < 2.5 ? 2 : 3;
+    if (s === this.boardScale) return;
+    this.boardScale = s;
+    this.screens.setScale(s);
+    this.syncBoardPlanes();
+    this.requestShadowRefresh();
+  }
+
+  private syncBoardPlanes() {
+    this.screens.screens.forEach((s, i) => {
+      const plane = this.boardPlanes[i];
+      if (!plane) return;
+      this.tmpV.set(Math.sin(s.placement.yaw), 0, Math.cos(s.placement.yaw));
+      plane.setFromNormalAndCoplanarPoint(this.tmpV, s.placement.position);
+    });
+  }
+
+  /**
    * Frame ONE board, edge to edge, with a small margin of world showing.
    *
    * The distance is COMPUTED from the live projection rather than stored as a
@@ -1599,20 +1625,6 @@ export class Sanctuary {
     this.board.dispose();
     this.student.dispose();
     this.atmosphere.dispose();
-    this.weathering.dispose();
-    this.textures.dispose();
-    this.scene.traverse((o) => {
-      const m = o as THREE.Mesh;
-      m.geometry?.dispose?.();
-      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-      else mat?.dispose?.();
-    });
-    this.scene.clear();
-    this.renderer.dispose();
-  }
-}
-phere.dispose();
     this.weathering.dispose();
     this.textures.dispose();
     this.scene.traverse((o) => {
