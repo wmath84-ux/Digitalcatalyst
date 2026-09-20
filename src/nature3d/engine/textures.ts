@@ -19,6 +19,28 @@ export interface TextureSet {
   ground: THREE.Texture;
   rock: THREE.Texture;
   rockNormal: THREE.Texture;
+  /**
+   * CHANNEL-PACKED ORM: R = ambient occlusion, G = roughness, B = metalness.
+   *
+   * Three maps' worth of surface variation in one file — the memory and
+   * bandwidth saving the research calls out (principle 36, §20), and the
+   * reason the rock can afford roughness detail at all: as three separate
+   * textures it would cost triple the VRAM for the same look, and on a
+   * mobile budget that trade is never worth making.
+   */
+  rockORM: THREE.Texture;
+  /**
+   * The weathering detail map, one lookup for three effects:
+   * R = moss speckle, G = dust/silt grit, B = vertical water streaks.
+   */
+  weather: THREE.Texture;
+  /**
+   * The contact decal: the soft dark ring a prop leaves on the ground, which
+   * is what merges a hand-placed object into the terrain (principle 50).
+   */
+  contact: THREE.Texture;
+  /** A painted canopy silhouette, stamped on the far-tree impostor cards. */
+  canopy: THREE.Texture;
   water: THREE.Texture;
   waterNormal: THREE.Texture;
   fur: THREE.Texture;
@@ -319,8 +341,118 @@ export function createTextures(anisotropy: number): TextureSet {
   feather.ctx.ellipse(52, 32, 52, 24, 0, 0, Math.PI * 2);
   feather.ctx.fill();
 
+  // ── Rock ORM (R = AO, G = roughness, B = metalness) ──────────────────
+  //
+  // The stone is a dielectric, so metalness is a hard zero everywhere — the
+  // B channel exists only so the channel layout matches the standard ORM
+  // convention and the material can bind one texture to three slots.
+  //
+  // The roughness channel is the interesting one: mineral faces sit ~0.75,
+  // polished/water-scoured patches drop to ~0.62 and weathered pits rise to
+  // ~0.95. That spread is what makes the low sun break across a boulder
+  // instead of washing it out flat (principle 12).
+  const rockORMCanvas = canvas2d(256, 256);
+  const ormImg = rockORMCanvas.ctx.createImageData(256, 256);
+  for (let y = 0; y < 256; y += 1) {
+    for (let x = 0; x < 256; x += 1) {
+      const ao = 0.72 + fbm(x / 48, y / 48, 3, 61) * 0.28;
+      const roughVal = 0.62 + fbm(x / 22, y / 22, 4, 17) * 0.33;
+      const i4 = (y * 256 + x) * 4;
+      ormImg.data[i4] = ao * 255;
+      ormImg.data[i4 + 1] = roughVal * 255;
+      ormImg.data[i4 + 2] = 0;
+      ormImg.data[i4 + 3] = 255;
+    }
+  }
+  rockORMCanvas.ctx.putImageData(ormImg, 0, 0);
+  const rockORM = new THREE.CanvasTexture(rockORMCanvas.c);
+  rockORM.wrapS = THREE.RepeatWrapping;
+  rockORM.wrapT = THREE.RepeatWrapping;
+  rockORM.anisotropy = anisotropy;
+
+  // ── Weathering detail (R moss, G dust, B streaks) ────────────────────
+  const weatherCanvas = canvas2d(256, 256);
+  const wImg = weatherCanvas.ctx.createImageData(256, 256);
+  for (let y = 0; y < 256; y += 1) {
+    for (let x = 0; x < 256; x += 1) {
+      // Moss: clumped blobs, thresholded so it never becomes an even wash —
+      // a uniform green tint reads as paint, a patchy one reads as growth.
+      const mossN = fbm(x / 30, y / 34, 4, 5);
+      const moss = Math.max(0, (mossN - 0.42) / 0.5);
+      // Dust: fine, high-frequency grit.
+      const dust = fbm(x / 7, y / 7, 3, 71) * 0.75 + noise2(x, y, 9) * 0.25;
+      // Streaks: vertical runs, so water marks always travel downhill in
+      // world space (principle 9) rather than in some arbitrary UV direction.
+      const streak = fbm(x / 5, y / 90, 3, 33) * (0.5 + 0.5 * Math.sin(x * 0.35));
+      const i4 = (y * 256 + x) * 4;
+      wImg.data[i4] = Math.min(255, moss * 255);
+      wImg.data[i4 + 1] = Math.min(255, dust * 255);
+      wImg.data[i4 + 2] = Math.min(255, streak * 255);
+      wImg.data[i4 + 3] = 255;
+    }
+  }
+  weatherCanvas.ctx.putImageData(wImg, 0, 0);
+  const weather = new THREE.CanvasTexture(weatherCanvas.c);
+  weather.wrapS = THREE.RepeatWrapping;
+  weather.wrapT = THREE.RepeatWrapping;
+  weather.anisotropy = anisotropy;
+
+  // ── Contact decal (soft, slightly irregular dark ring) ───────────────
+  const contactCanvas = canvas2d(128, 128);
+  const cImg2 = contactCanvas.ctx.createImageData(128, 128);
+  for (let y = 0; y < 128; y += 1) {
+    for (let x = 0; x < 128; x += 1) {
+      const dx = (x - 64) / 64;
+      const dy = (y - 64) / 64;
+      // A wobbled radius: a perfectly circular contact shadow is the same
+      // "too perfect" tell as a perfectly spherical rock (principle 3).
+      const wobble = 0.86 + 0.14 * fbm(x / 18, y / 18, 3, 44);
+      const d = Math.hypot(dx, dy) / wobble;
+      const alpha = Math.pow(1 - Math.min(1, d), 2.1) * 0.66;
+      const i4 = (y * 128 + x) * 4;
+      // Dark brown-black — never pure black, which would read as a hole.
+      cImg2.data[i4] = 30;
+      cImg2.data[i4 + 1] = 26;
+      cImg2.data[i4 + 2] = 20;
+      cImg2.data[i4 + 3] = alpha * 255;
+    }
+  }
+  contactCanvas.ctx.putImageData(cImg2, 0, 0);
+  const contact = toTexture(contactCanvas.c, anisotropy);
+
+  // ── Canopy silhouette (the far-tree impostor card) ───────────────────
+  //
+  // Painted the way a foliage atlas is painted: many overlapping leaf
+  // clusters, each with its own light/dark break-up, plus a jagged alpha
+  // edge. The silhouette does the work — at 300 m the eye reads the shape of
+  // the crown, not the leaves inside it (research §5, §19).
+  const canopyCanvas = canvas2d(256, 256);
+  canopyCanvas.ctx.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 46; i += 1) {
+    const a = Math.random() * Math.PI * 2;
+    const rad = Math.pow(Math.random(), 0.55) * 96;
+    const cx = 128 + Math.cos(a) * rad;
+    const cy = 132 + Math.sin(a) * rad * 0.78;
+    const r = 12 + Math.random() * 26;
+    const shade = 0.55 + Math.random() * 0.45;
+    // Sunlit crown top, shaded underside: the same top-lit rule a real crown
+    // obeys, so the impostor still reads as lit by the same sun.
+    const up = 1 - Math.min(1, Math.max(0, (cy - 96) / 140));
+    canopyCanvas.ctx.fillStyle = `rgb(${(48 + 46 * shade) | 0},${(74 + 52 * shade) | 0},${(30 + 30 * shade) | 0})`;
+    canopyCanvas.ctx.globalAlpha = 0.55 + up * 0.35;
+    canopyCanvas.ctx.beginPath();
+    canopyCanvas.ctx.ellipse(cx, cy, r, r * (0.7 + Math.random() * 0.5), Math.random() * 3, 0, Math.PI * 2);
+    canopyCanvas.ctx.fill();
+  }
+  canopyCanvas.ctx.globalAlpha = 1;
+  const canopy = toTexture(canopyCanvas.c, anisotropy);
+
   const barkTex = toTexture(bark.c, anisotropy, [1, 3]);
-  const groundTex = toTexture(ground.c, anisotropy, [42, 42]);
+  // Repeat (1, 1) on purpose: the terrain shells bake their own UV scale so
+  // every shell gets the same texels per metre (see `terrain.buildTerrain`
+  // and `palette.GROUND_TILE_METRES`). A repeat here would multiply on top of
+  // that and put the near shell and the far shell back out of step.
+  const groundTex = toTexture(ground.c, anisotropy, [1, 1]);
   const rockTex = toTexture(rock.c, anisotropy, [2, 2]);
   const waterTex = toTexture(water.c, anisotropy, [6, 30]);
 
@@ -332,6 +464,10 @@ export function createTextures(anisotropy: number): TextureSet {
     ground: groundTex,
     rock: rockTex,
     rockNormal: heightToNormal(rock.c, 1.8),
+    rockORM,
+    weather,
+    contact,
+    canopy,
     water: waterTex,
     // Normal map for the river's dual-phase flow shader.
     waterNormal: heightToNormal(water.c, 1.5),
@@ -346,6 +482,14 @@ export function createTextures(anisotropy: number): TextureSet {
   };
   set.barkNormal.repeat.set(1, 3);
   set.rockNormal.repeat.set(2, 2);
+  // The ORM map has to tile with the albedo it modulates, or the roughness
+  // and the colour of the same stone would drift apart across the surface.
+  set.rockORM.repeat.set(2, 2);
+  // The weathering detail is projected in WORLD space (see `weathering.ts`),
+  // so it tiles once per unit and the shader supplies the scale — setting a
+  // repeat here would double-apply the scale and make every boulder look
+  // tiled.
+  set.weather.repeat.set(1, 1);
   set.waterNormal.wrapS = THREE.RepeatWrapping;
   set.waterNormal.wrapT = THREE.RepeatWrapping;
   set.waterNormal.repeat.set(6, 30);

@@ -26,6 +26,9 @@ import { createTextures, type TextureSet } from "./textures";
 import { buildTerrain, terrainHeight } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
+import { createAtmosphere, type Atmosphere } from "./atmosphere";
+import { createWeathering, type Weathering } from "./weathering";
+import { createRockField, type RockField } from "./rocks";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
@@ -127,6 +130,15 @@ export class Sanctuary {
   private textures: TextureSet;
   private grass: GrassField;
   private flora: Flora;
+  /**
+   * Air, weathering and the rock kit — the three systems that carry the
+   * research pass (see `atmosphere.ts`, `weathering.ts`, `rocks.ts`). The
+   * atmosphere owns no geometry: it is a set of shared uniforms and a shader
+   * injection every other material opts into.
+   */
+  private atmosphere: Atmosphere;
+  private weathering: Weathering;
+  private rocks: RockField;
   private birds: BirdColony;
   private wildlife: Wildlife;
   private water: WaterSystem;
@@ -219,17 +231,43 @@ export class Sanctuary {
     const aniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.budget.tier === "low" ? 2 : 8);
     this.textures = createTextures(aniso);
 
+    // AIR + WEATHERING are built before any geometry, because every material
+    // created from here on is offered to them as it is made (see below). Both
+    // are pure shader injections with shared uniforms: no passes, no render
+    // targets, no per-frame CPU work.
+    this.atmosphere = createAtmosphere(this.budget);
+    this.weathering = createWeathering(this.textures.weather, this.budget.tier);
+
     // ── Build the world ────────────────────────────────────────────────
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
 
-    this.scene.add(buildTerrain(this.budget, this.textures.ground));
+    const terrain = buildTerrain(this.budget, this.textures.ground);
+    this.scene.add(terrain);
+    // The ground takes the atmosphere pass but NOT the transmission term —
+    // soil does not translucently glow when the sun is behind it.
+    this.atmosphere.registerTree(terrain);
 
-    this.grass = createGrassField(this.textures.grassBlade, this.budget);
+    // ROCKS BEFORE GRASS: the rock kit publishes the base of every boulder it
+    // places, and the grass field plants a skirt of blades around each one
+    // (principle 50 — a rock with nothing growing at its base reads as pasted
+    // on, however good the rock is).
+    this.rocks = createRockField(this.textures, this.budget, this.weathering);
+    this.scene.add(this.rocks.group);
+    this.atmosphere.registerTree(this.rocks.group);
+
+    this.grass = createGrassField(this.textures.grassBlade, this.budget, this.rocks.skirtPoints);
     this.scene.add(this.grass.group);
+    // Grass IS foliage: it gets the backlit transmission term.
+    this.grass.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
 
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
+    // Leaves glow when the sun is behind them; bark, shrubs and flower stems do
+    // not. The factory publishes the two lists rather than leaving the scene to
+    // guess which material is which.
+    this.flora.foliageMaterials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
+    this.flora.solidMaterials.forEach((m) => this.atmosphere.register(m));
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
     this.scene.add(this.birds.group);
@@ -248,7 +286,16 @@ export class Sanctuary {
     this.wildlife = createWildlife({ ...this.budget, animalCount: 0 }, this.textures.fur);
     this.scene.add(this.wildlife.group);
 
-    this.water = createWater(this.textures, this.budget, this.sky.sunDir);
+    // The river is handed the atmosphere's OWN colour objects, and its
+    // materials are registered with the same air the ground breathes: the
+    // reflection tracks the real sky (a 6 pm river reflects a 6 pm sky) and
+    // the far bend of the channel fades into the haze instead of staying a
+    // full-contrast blue ribbon pasted over the hills (research §15, §16).
+    this.water = createWater(this.textures, this.budget, this.sky.sunDir, {
+      sky: this.atmosphere.uniforms.uDcHazeColor.value,
+      sun: this.atmosphere.uniforms.uDcSunColor.value,
+    });
+    this.water.materials.forEach((m) => this.atmosphere.register(m));
 
     // Light the world for the current moment before the first frame, so the
     // sanctuary never flashes the authored midday look and then correct
@@ -783,6 +830,11 @@ export class Sanctuary {
     this.daylight = state;
     this.sky.applyDaylight(state);
     (this.scene.fog as THREE.FogExp2).color.copy(state.fog);
+    // The air is lit by the same sun as the ground: its colour, its in-scatter
+    // and the strength of the foliage transmission term all follow the hour.
+    // Reading `sunDir.y` gives the elevation directly — it is a unit vector
+    // towards the sun, so its Y component IS the sine of the elevation.
+    this.atmosphere.update(state.sunDir.y, state.sunDir, state.sunColor, state.fog);
     this.scene.background = null;
     this.renderer.toneMappingExposure = state.exposure;
     // The sun moved, so every shadow in the world is now wrong.
@@ -1189,6 +1241,7 @@ export class Sanctuary {
     this.avatar.dispose();
     this.keyboard.dispose();
     this.grass.dispose();
+    this.rocks.dispose();
     this.flora.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
@@ -1196,6 +1249,8 @@ export class Sanctuary {
     this.sky.dispose();
     this.board.dispose();
     this.student.dispose();
+    this.atmosphere.dispose();
+    this.weathering.dispose();
     this.textures.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;

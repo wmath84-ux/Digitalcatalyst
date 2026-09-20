@@ -10,6 +10,31 @@
 // The waterfall sheet scrolls a second copy of the same texture vertically and
 // the spray is one `Points` cloud updated with a typed-array loop that touches
 // only Y (never allocates).
+//
+// ── What the research pass changed here (research §15, §16, §17, §29) ───
+//
+//   1. THE SURFACE IS LIT BY THE REAL SKY. The reflection colour used to be a
+//      hard-coded blue, so a 6 am river and a 6 pm river reflected the same
+//      noon sky. It now reads `uDcHazeColor` / `uDcSunColor` off the shared
+//      atmosphere uniforms, which `daylight.ts` writes once per hour change:
+//      the water turns peach at dusk and steel-blue at midday for free, on the
+//      same draw call (principle 23: material response is part of the light).
+//
+//   2. THE GRADE HAPPENS IN LINEAR LIGHT, BEFORE THE TONE MAP. The old mix
+//      ran after `<dithering_fragment>`, i.e. after three had already tone
+//      mapped and sRGB-encoded the frame — colour maths on an encoded signal,
+//      which is why water tanks look "video-gamed". The injection now sits on
+//      `<opaque_fragment>`, so Fresnel, the Beer-Lambert body and the glint
+//      are all combined in the same linear space the rest of the renderer uses.
+//      Its constants are therefore authored as linear triples, annotated with
+//      the sRGB value they came from.
+//
+//   3. THE BANK HAS A FOAM LINE. Water that meets stone is whitewater: the
+//      shallow band at the edge carries the bed's turbulence. One
+//      `smoothstep` on the distance from the channel centre, broken up by the
+//      same flow texture that drives the ripples, paints the shoreline. This is
+//      the cheapest "the water and the bank are touching" cue there is, and it
+//      is what stops the river reading as a decal (research §15, principle 34).
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
@@ -18,6 +43,15 @@ import type { TextureSet } from "./textures";
 
 export interface WaterSystem {
   group: THREE.Group;
+  /**
+   * Every material this system owns.
+   *
+   * The scene registers these with `atmosphere.ts` so the river and the fall
+   * fade into the same air as the ground they run through. Without it a river
+   * is the one object in the frame that keeps full contrast at 900 m, and the
+   * eye reads it as a blue strip pasted over the hills (research §16).
+   */
+  materials: THREE.Material[];
   update(dt: number, time: number): void;
   dispose(): void;
 }
@@ -33,7 +67,19 @@ export function createWater(
    * reflection schedule itself is untouched.
    */
   sunDir: THREE.Vector3,
+  /**
+   * The LIVE sky colours, shared with `atmosphere.ts` (same `THREE.Color`
+   * instances, mutated in place by `daylight.ts`). Water reflects whatever the
+   * sky currently is, so a river at 6 pm has to be lit by a 6 pm sky — a
+   * constant blue here is the single fastest way to make water look like
+   * plastic. Both are optional so the system still builds standalone; the
+   * defaults are the midday values the daylight code produces anyway.
+   */
+  colors: { sky?: THREE.Color; sun?: THREE.Color } = {},
 ): WaterSystem {
+  const skyColor = colors.sky ?? new THREE.Color(0xbcd9ef);
+  const sunColor = colors.sun ?? new THREE.Color(0xfff1d6);
+
   const group = new THREE.Group();
   group.name = "water";
 
@@ -74,9 +120,14 @@ export function createWater(
   normTex.wrapT = THREE.RepeatWrapping;
 
   const riverMat = new THREE.MeshStandardMaterial({
+    // METALNESS IS 0, NOT 0.42 (research §9: a metalness map is 0 or 1 in
+    // practice; values in between are a look, not a material). The reflection
+    // here is dielectric Fresnel — which is what water actually is — and the
+    // injection below supplies it in full; parking metalness at 0.42 on top
+    // would double-count the same highlight and kill the diffuse body.
     color: 0x2f7fae,
     roughness: 0.14,
-    metalness: 0.42,
+    metalness: 0.0,
     transparent: true,
     opacity: 0.9,
     map: flowTex,
@@ -86,6 +137,12 @@ export function createWater(
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uFlowMap = { value: normTex };
     shader.uniforms.uSunDir = { value: sunDir };
+    // Different NAMES, the same Color objects the atmosphere owns. The water
+    // must not redeclare `uDcHazeColor` — a duplicate uniform declaration is a
+    // GLSL redefinition error, not a compiler warning — but it still has to
+    // track the sky, so it borrows the values through its own identifiers.
+    shader.uniforms.uWsky = { value: skyColor };
+    shader.uniforms.uWsun = { value: sunColor };
 
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nuniform float uTime;\nvarying vec3 vDcWorld;")
@@ -109,13 +166,20 @@ export function createWater(
         uniform float uTime;
         uniform sampler2D uFlowMap;
         uniform vec3 uSunDir;
+        uniform vec3 uWsky;
+        uniform vec3 uWsun;
         varying vec3 vDcWorld;
         `,
       )
       .replace(
-        "#include <dithering_fragment>",
+        "#include <opaque_fragment>",
         /* glsl */ `
-        #include <dithering_fragment>
+        #include <opaque_fragment>
+
+        // NOTE the anchor: this runs on the LINEAR, PRE-TONE-MAP colour, so
+        // every constant below is a linear triple with its sRGB source in a
+        // trailing comment. Mixing Fresnel into an already sRGB-encoded frame
+        // is the classic "why does my water look like plastic" bug.
 
         // ── Dual-phase flow (Portal 2 / three.js Water2) ────────────────
         vec2 dcUv = vDcWorld.xz * vec2(0.09, 0.055);
@@ -130,31 +194,48 @@ export function createWater(
         // it has drifted furthest, so no frame ever shows a sliding seam.
         float dcMix = abs((dcPhase0 - dcHalf) / dcHalf);
         vec3 dcNrm = normalize(mix(dcN0, dcN1, dcMix) * 2.0 - 1.0);
+        float dcRipple = abs(dcNrm.x) + abs(dcNrm.y);
         vec3 dcNormal = normalize(vec3(dcNrm.x * 0.45, 1.0, dcNrm.y * 0.45));
 
         vec3 dcView = normalize(cameraPosition - vDcWorld);
 
-        // ── Schlick Fresnel, F0 = 0.02 ──────────────────────────────────
+        // ── Schlick Fresnel, F0 = 0.02 (water's real normal reflectance) ─
         float dcCos = clamp(dot(dcView, dcNormal), 0.0, 1.0);
         float dcFres = 0.02 + 0.98 * pow(1.0 - dcCos, 5.0);
 
-        // ── Depth tint (Beer-Lambert): shallow bright, deep saturated ───
-        vec3 dcShallow = vec3(0.34, 0.72, 0.74);
-        vec3 dcDeep    = vec3(0.03, 0.17, 0.28);
-        float dcDepth = smoothstep(0.0, 4.2, abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)}));
+        // ── Depth tint (Beer-Lambert): shallow edge, deep channel ───────
+        // The channel is deepest along its centre line, so the distance from
+        // that line is a stand-in for the water column that costs no extra
+        // geometry or depth pass (principle 39: fake the part nobody checks).
+        float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
+        float dcDepth = smoothstep(0.0, 4.2, dcBank);
+        vec3 dcDeep = vec3(0.0013, 0.024, 0.063);     // sRGB #061e33
+        vec3 dcShallow = vec3(0.093, 0.470, 0.510);   // sRGB #57b5be
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
-        // ── Sky reflection + GGX-ish sun glint ──────────────────────────
-        vec3 dcSky = mix(vec3(0.72, 0.85, 0.95), vec3(0.20, 0.44, 0.78), 0.45);
+        // ── Sky reflection, read off the atmosphere ─────────────────────
+        vec3 dcSky = uWsky * 1.25 + uWsun * 0.18;
         vec3 dcH = normalize(dcView + uSunDir);
-        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 2.4;
+        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 3.0;
+        // …plus the broad, low-power sheen under it: a sun that only ever
+        // produces a pinpoint glint reads as a laser, not as daylight.
+        float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 26.0) * 0.16;
 
-        vec3 dcCol = mix(dcBody, dcSky, dcFres) + dcSpec;
-        // Whitewater where the surface is steep (riffles over the bed).
-        dcCol += smoothstep(0.55, 1.0, abs(dcNrm.x) + abs(dcNrm.y)) * 0.12;
+        vec3 dcCol = mix(dcBody, dcSky, dcFres) + uWsun * (dcSpec + dcSheen);
+
+        // ── Shoreline foam ──────────────────────────────────────────────
+        // Water that touches stone is whitewater: the shallow band at the
+        // edge carries the turbulence. Broken up by the same flow texture that
+        // drives the ripples, so the foam line is not a smooth stripe.
+        float dcEdge = smoothstep(4.55, 6.15, dcBank);
+        float dcChurn = dcRipple * 0.6 + dcEdge * 0.7;
+        float dcFoam = (dcEdge * 0.8 + smoothstep(0.55, 1.0, dcRipple) * 0.22)
+                     * smoothstep(0.35, 0.85, dcChurn);
+
+        dcCol = mix(dcCol, vec3(0.62, 0.72, 0.75), clamp(dcFoam, 0.0, 0.85)); // sRGB #cfdfe2
 
         gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol, 0.82);
-        gl_FragColor.a = mix(0.72, 0.97, dcFres);
+        gl_FragColor.a = clamp(mix(0.72, 0.97, dcFres) + dcFoam * 0.12, 0.0, 1.0);
         `,
       );
     riverMat.userData.shader = shader;
@@ -222,20 +303,29 @@ export function createWater(
     transparent: true,
     opacity: 0.9,
     roughness: 0.16,
-    metalness: 0.2,
+    // Aerated whitewater is a dielectric scatterer, not a metal (§9 again).
+    metalness: 0.0,
     side: THREE.DoubleSide,
   });
   fallMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
+    shader.uniforms.uWsun = { value: sunColor };
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nuniform float uTime;\nuniform sampler2D map;",
+        "#include <common>\nuniform float uTime;\nuniform vec3 uWsun;",
       )
       .replace(
-        "#include <dithering_fragment>",
+        "#include <opaque_fragment>",
         /* glsl */ `
-        #include <dithering_fragment>
+        #include <opaque_fragment>
+        // Linear, pre-tone-map (see the river above).
+        //
+        // NOTE: there is deliberately NO "uniform sampler2D map;" declaration
+        // here. Three already declares it under USE_MAP, and redeclaring a
+        // uniform is a GLSL error that only surfaces in a real browser — the
+        // line this replaced was exactly that bug.
+        //
         // vMapUv.y runs 0 at the base to 1 at the lip.
         float dcDrop = 1.0 - vMapUv.y;
 
@@ -248,9 +338,15 @@ export function createWater(
 
         // Aeration: clear at the lip, churned white at the base.
         float dcFoam = smoothstep(0.25, 1.0, dcDrop);
-        vec3 dcCol = mix(vec3(0.62, 0.82, 0.93), vec3(1.0), dcFoam * 0.9 + dcB * 0.25);
+        vec3 dcClear = vec3(0.34, 0.62, 0.85);   // sRGB #9bc4e0 — a body of water
+        vec3 dcCol = mix(dcClear, vec3(1.0), clamp(dcFoam * 0.9 + dcB * 0.25, 0.0, 1.0));
+        dcCol *= 0.72 + dcRope * 0.4;
 
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol * (0.72 + dcRope * 0.4), 0.85);
+        // The sun catches the spray: the same colour the sky uses to light the
+        // meadow reaches into the whitewater too.
+        dcCol += uWsun * dcFoam * 0.06;
+
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol, 0.85);
         gl_FragColor.a *= clamp(0.45 + dcDrop * 0.75 + dcB * 0.2, 0.0, 1.0);
         `,
       );
@@ -317,6 +413,7 @@ export function createWater(
 
   return {
     group,
+    materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, spray.material as THREE.Material],
     update(dt, time) {
       const shader = riverMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (shader) shader.uniforms.uTime.value = time;

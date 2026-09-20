@@ -1674,7 +1674,19 @@ test("everything that reads the sun shares one vector", () => {
     !/uSunDir = \{ value: new THREE\.Vector3\(0\.62/.test(WATER),
     "the water must not keep its own frozen sun direction",
   );
-  assert.match(SCENE, /createWater\(this\.textures, this\.budget, this\.sky\.sunDir\)/);
+  // The call grew a fourth argument — the live sky colours the water reflects —
+  // but the contract is unchanged and now covers all THREE shared instances:
+  // the sun vector, the haze colour and the sun colour are handed over by
+  // reference, so `daylight.ts` still writes once and every consumer follows.
+  assert.match(SCENE, /createWater\(this\.textures, this\.budget, this\.sky\.sunDir, \{/);
+  assert.match(SCENE, /sky: this\.atmosphere\.uniforms\.uDcHazeColor\.value/);
+  assert.match(SCENE, /sun: this\.atmosphere\.uniforms\.uDcSunColor\.value/);
+  assert.ok(
+    !/new THREE\.Color\(.*\).*createWater/s.test(SCENE),
+    "the water must borrow the atmosphere's colours, not freeze its own",
+  );
+  // And the river fades into that air with everything else.
+  assert.match(SCENE, /this\.water\.materials\.forEach\(\(m\) => this\.atmosphere\.register\(m\)\)/);
 
   // The shadow-casting light must sit on the real sun direction. The old
   // hardcoded (+44, 48, -50) offset was a permanent morning sun, so shadows

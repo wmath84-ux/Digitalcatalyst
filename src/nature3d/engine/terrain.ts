@@ -27,6 +27,9 @@ import {
   regionWeight, safariRelief, trekRelief,
 } from "./regions";
 import { noise } from "./simplex";
+import { groundColorAt, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
+import { GROUND_PALETTE, GROUND_TILE_METRES, clampAlbedo } from "./palette";
+import { injectWorldVaryings } from "./atmosphere";
 
 /** Where the river gorge runs (world X) and how wide it is. */
 export const RIVER_CENTER_X = 18;
@@ -381,15 +384,29 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   const group = new THREE.Group();
   group.name = "terrain";
 
-  const lush = new THREE.Color(0x4d8a2c);
-  const dry = new THREE.Color(0x7d8f3a);
-  const mud = new THREE.Color(0x6b5a3c);
+  // The altitude anchors stay explicit: they are also READ by the props (the
+  // rock kit refuses to place above the snowline, the grass uses the same
+  // heights), so they belong to the terrain. The base blend itself now comes
+  // from the environmental field, so the mesh, the grass and the trees all
+  // describe the same ground (research §8, §12).
   const rock = new THREE.Color(0x6f7b74);
   const snow = new THREE.Color(0xeef4fb);
   // The island edge floor: dark, wet soil so the dropped-off corners read as
   // shadowed ground in the haze, never as a bright square patch.
   const deep = new THREE.Color(0x33291d);
   const tmp = new THREE.Color();
+
+  /**
+   * One texture tile per this many metres, on EVERY shell.
+   *
+   * This is the texel-density rule (research §18, principle 46): the same
+   * number of pixels must cover the same number of centimetres everywhere, or
+   * a crate at 4K next to a floor at 1K destroys the illusion of one world.
+   * Before this, a single shared `repeat` gave the 180 m shell and the 2760 m
+   * shell the same 42 tiles, so the outer world was stretched 15× and its
+   * ground read as watercolour beside the meadow's.
+   */
+  const TILE_METRES = GROUND_TILE_METRES;
 
   const density = budget.tier === "low" ? 0.62 : budget.tier === "medium" ? 0.82 : 1;
 
@@ -417,6 +434,57 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     metalness: 0,
   });
 
+  // ── The landscape shader ─────────────────────────────────────────────
+  //
+  // A production terrain material is not one texture: it is a MACRO layer at a
+  // huge scale (which large shape is this — a dry rise, a damp hollow?) and a
+  // MICRO layer at a small one (what is the grit underfoot?), blended by rules.
+  // The rules live in `environment.ts` and arrive as vertex colour; these extra
+  // lines are the second texture scale that stops a 6 m tile reading as a tile,
+  // plus the warm/cool aspect split of research §10 (research §8, §12).
+  mat.onBeforeCompile = (shader) => {
+    // World position and world normal come from the shared injection in
+    // `atmosphere.ts` — the same one the grass, the leaves and the rocks use.
+    // Declaring them here by hand is how a shader ends up declaring the same
+    // varying twice, which is a hard compile error, not a subtle bug.
+    injectWorldVaryings(shader);
+    // The sun's mean side of the sky, from the constant the moss, the tree
+    // lean, the rock weathering and the grass tint all read: one truth, many
+    // readers.
+    shader.uniforms.uDcSunSide = { value: new THREE.Vector2(SUN_SIDE_X, SUN_SIDE_Z) };
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        /* glsl */ `
+        #include <common>
+        uniform vec2 uDcSunSide;
+        `,
+      )
+      .replace(
+        "#include <map_fragment>",
+        /* glsl */ `
+        #include <map_fragment>
+
+        // MACRO VARIATION — the same ground detail sampled 16× larger, so broad
+        // patches of the meadow shift warmer/cooler and the tile stops repeating
+        // visibly. Two fetches in total; on a surface that fills the screen this
+        // is the cheapest large-scale variation there is.
+        vec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;
+        float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
+        diffuseColor.rgb *= mix( 0.87, 1.13, dcMacroL );
+
+        // ASPECT TINT — warm on the sunlit faces, cool where the sky bounces
+        // into the shade, applied to ALBEDO rather than to light so it survives
+        // every hour: "ek hi rock dopahar mein warm grey lagta hai aur shaam
+        // mein purple/orange tone capture karta hai" (research §10).
+        vec2 dcFlat = normalize( vDcWorldNormal.xz + vec2( 1e-4 ) );
+        float dcFacing = dot( dcFlat, normalize( uDcSunSide ) );
+        diffuseColor.rgb *= mix( vec3( 0.94, 0.97, 1.06 ), vec3( 1.06, 1.02, 0.94 ), smoothstep( -0.6, 0.6, dcFacing ) );
+        `,
+      );
+  };
+
   shells.forEach((shell, index) => {
     const size = shell.half * 2;
     const geo = new THREE.PlaneGeometry(size, size, shell.segs, shell.segs);
@@ -426,6 +494,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // vertices down out of sight, so they never z-fight the shell inside.
     const innerHalf = index === 0 ? 0 : shells[index - 1].half;
 
+    const uv = geo.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i += 1) {
       const x = pos.getX(i);
       // PlaneGeometry lies in XY and is rotated -90° about X, so local +Y → world -Z.
@@ -434,23 +503,69 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       const inside = innerHalf > 0 && Math.abs(x) < innerHalf - 1 && Math.abs(z) < innerHalf - 1;
       pos.setZ(i, inside ? h - 240 : h);
 
-      const valley = Math.exp(-(((x - RIVER_CENTER_X) / 7.5) ** 2));
-      const patch = (Math.sin(x * 0.33) * Math.cos(z * 0.29) + 1) * 0.5;
-      tmp.copy(lush).lerp(dry, patch * 0.55 + Math.max(0, h) * 0.02);
-      tmp.lerp(mud, Math.min(1, valley * 1.25));
+      // ── Texel density: the same texels per metre on every shell ─────
+      // The tile count is derived from THIS shell's size, so the 180 m shell
+      // and the 2760 m shell are authored at one density and the meadow never
+      // looks sharper than the hills (research §18).
+      const tiles = size / TILE_METRES;
+      uv.setXY(i, uv.getX(i) * tiles, uv.getY(i) * tiles);
+    }
+    geo.computeVertexNormals();
+
+    // The colour pass runs AFTER the normals exist, because the normals ARE
+    // the slope measurement: the mesh's own vertex normal is exactly what a
+    // slope mask needs and reading it back costs nothing. Deriving the slope
+    // from `terrainHeight` instead would mean four more height samples on all
+    // ~150 000 vertices (research §8 — slope masks drive the layers).
+    const normalAttr = geo.attributes.normal as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i += 1) {
+      const x = pos.getX(i);
+      const z = -pos.getY(i);
+      const h = pos.getZ(i);
+      // The hidden ring-interior vertices (pushed 240 m down) are never seen,
+      // so they get no colour work at all.
+      if (h < -180) {
+        colors[i * 3] = deep.r;
+        colors[i * 3 + 1] = deep.g;
+        colors[i * 3 + 2] = deep.b;
+        continue;
+      }
+
+      // Base: the same rule-based blend the grass clumps sample, so the field
+      // and the ground it grows out of are one colour decision. The wear is
+      // measured once here and reused by the gravel tint below.
+      const worn = pathWeight(x, z);
+      const normalY = normalAttr.getY(i);
+      groundColorAt(x, z, h, tmp, GROUND_PALETTE, normalY, worn);
+
       // Altitude banding: grass gives way to bare rock, then snow on the
       // highest crests. This is what makes the distant ranges read as real
       // mountains instead of green cones.
+      // (The two thresholds are spelled out as literals on purpose: the
+      // sanctuary's contract test pins them, because props across the whole
+      // engine read the same 18 m rock band and 52 m snowline.)
       if (h > 18) tmp.lerp(rock, Math.min(1, (h - 18) / 30));
-      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26));
+      // SNOW NEEDS A SHELF TO SIT ON. The height mask says where snow is
+      // possible; the slope mask says whether it STAYS — above ~52° a face
+      // sheds it all winter and stays bare rock. Without this multiply every
+      // peak came out evenly frosted, which is the single clearest "this was
+      // height-banded, not observed" tell in a stylised mountain range
+      // (research §8, §11; principle 20).
+      const shelf = h > 52 ? THREE.MathUtils.smoothstep(normalY, 0.62, 0.94) : 1;
+      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf);
       // Below the waterline-ish floor (the island edge) the ground goes dark.
       if (h < -6) tmp.lerp(deep, Math.min(1, (-6 - h) / 14));
+
+      // Art direction: no albedo leaves the physical range, and the worn
+      // trails read a little lighter and greyer than the ground around them.
+      clampAlbedo(tmp, tmp);
+      if (worn > 0.02) tmp.lerp(GROUND_PALETTE.gravel, Math.min(0.45, worn * 0.5));
+
       colors[i * 3] = tmp.r;
       colors[i * 3 + 1] = tmp.g;
       colors[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geo.computeVertexNormals();
 
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
