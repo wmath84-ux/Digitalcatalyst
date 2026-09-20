@@ -1088,49 +1088,69 @@ test("a missed board tap can never drag the camera", () => {
   assert.match(wheel, /if \(this\.boardTarget\(e\.target\)\) return;/);
 });
 
-test("the focused board is presented as a plain 2D reading page (the BGMI scope)", () => {
-  // Device rounds 1–3 established that on the learner's phone, board
-  // content carried through ANY 3D machinery (matrix3d, a reparented or
-  // scaled element) stops receiving taps at full-screen size, while the
-  // same panels as the ordinary 2D course player tap perfectly. So the
-  // reading experience stops using the 3D path for input: the panels
-  // render into a plain, transform-free DOM page at the HUD-free rect.
+test("board taps are guaranteed by the engine's raycast bridge, not by device hit-testing", () => {
+  // The learner looks at the board ITSELF — the 2D reading page (a flat
+  // overlay standing in for the 3D board) is removed, per the owner. The
+  // device's 3D hit-test is still the only thing between the finger and a
+  // full-size board's buttons, so the engine stops trusting it: when a
+  // touch the device mis-delivers to the canvas lands on a board face by
+  // raycast, the engine replays it into the board's own DOM.
   //
-  // Engine side: a flat stage layer, a presentation switch, and a parked
-  // camera while the page is up.
-  assert.match(SCENE, /setBoardPresented\(slot: LecternSlot \| null\)/);
-  assert.match(SCENE, /stageHost\(\)/);
-  assert.match(SCENE, /insertAdjacentElement\("afterend", this\.stageEl\)/);
-  assert.match(SCENE, /if \(this\.presentedSlot\) return;/);
-  assert.match(SCENE, /if \(!this\.presentedSlot\) this\.orbit\.update\(dt, this\.camera\);/);
-  assert.match(SCENE, /this\.stageEl\?\.remove\(\)/);
+  // The two input paths are mutually exclusive BY CONSTRUCTION: native
+  // delivery is swallowed by the board's stopPropagation before the host
+  // handlers run, so the bridge can never double-fire a click the device
+  // already landed, and on desktop (where native always works) the bridge
+  // stays completely dormant.
 
-  // The presented board's 3D element is force-culled (display:none) no
-  // matter where the camera looks — it is never moved, scaled or
-  // reparented; the page simply covers its place.
-  assert.match(SCREENS, /setPresented\(slot: LecternSlot \| null\): void/);
-  assert.match(SCREENS, /if \(screen\.slot === presented\) visible = false;/);
+  // The 2D reading page is removed from every layer.
+  for (const [name, src] of [["scene", SCENE], ["page", PAGE], ["screens", SCREENS], ["boards", STUDY_BOARDS]]) {
+    for (const gone of ["setBoardPresented", "presentedSlot", "stageHost", "panelRef", "dc-reading-page"]) {
+      assert.ok(!src.includes(gone), `${name} still carries the removed reading-page mechanism: ${gone}`);
+    }
+  }
+  assert.ok(!SCREENS.includes("setPresented"), "the presented-culling fold must be gone");
+  assert.ok(!/createPortal\(/.test(PAGE), "the page must not portal a reading page any more");
 
-  // React side: the presented board's tree portals into the page's inner
-  // div; the other two boards stay on their 3D screens.
-  assert.match(STUDY_BOARDS, /presentedSlot: BoardSlot \| null/);
-  assert.match(STUDY_BOARDS, /presentedSlot === "reading" \? presentedHost : hosts\.reading/);
-  assert.match(STUDY_BOARDS, /presentedSlot === "notes" \? presentedHost : hosts\.notes/);
-  assert.match(STUDY_BOARDS, /presentedSlot === "mindmap" \? presentedHost : hosts\.mindmap/);
+  // The bridge re-aims the touch with pure geometry: a world plane per
+  // board face, a ray from the camera through the exact touch point ...
+  assert.match(SCENE, /private localOnBoard\(/);
+  assert.match(SCENE, /setFromNormalAndCoplanarPoint/);
+  assert.match(SCENE, /intersectPlane\(/);
+  // ... into the board's 1920×1080 layout box, with the exact inverse of
+  // CSS3DRenderer's transform (object +Y is the element's TOP — CSS y is
+  // downward — so the y term is negated).
+  assert.match(SCENE, /const x = lx \/ PX_TO_M \+ SCREEN_PX_WIDTH \/ 2;/);
+  assert.match(SCENE, /const y = -dy \/ PX_TO_M \+ SCREEN_PX_HEIGHT \/ 2;/);
+  // ... and a faithful synthetic replay (pointerdown/up, click, pointercancel).
+  assert.match(SCENE, /new PointerEvent\(/);
+  assert.match(SCENE, /\.dispatchEvent\(/);
+  // The bridge owns the mis-delivered touch the moment it re-aims it.
+  const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
+  assert.match(down, /if \(this\.boardTarget\(e\.target\)\) return;/);
+  assert.match(down, /e\.preventDefault\(\);/);
+  assert.match(down, /this\.localOnBoard\(e\)/);
+  // ... and scrolls the panel's overflow boxes itself, because native touch
+  // scroll is a compositor gesture a synthetic pointermove cannot drive.
+  assert.match(SCENE, /el\.scrollTop = THREE\.MathUtils\.clamp\(el\.scrollTop - dly/);
+  assert.match(SCENE, /el\.scrollLeft = THREE\.MathUtils\.clamp\(el\.scrollLeft - dlx/);
 
-  // The page: a transform-free box at the HUD-free rect (the same insets
-  // the engine frames against), portaled into the stage, with a close
-  // button and no transforms of any kind on its chain.
-  assert.match(PAGE, /createPortal\(/);
-  assert.match(PAGE, /dc-reading-page/);
-  assert.match(PAGE, /left: insets\.left/);
-  assert.match(PAGE, /touchAction: "pan-y"/);
-  assert.match(PAGE, /setBoardPresented\(key\)/);
-  assert.match(PAGE, /setBoardPresented\(null\)/);
-  const readingPage = PAGE.slice(PAGE.indexOf("dc-reading-page"), PAGE.indexOf("ref={panelRef}"));
-  assert.ok(!/transform/.test(readingPage), "the reading page itself must carry no transforms");
-  // And the panel portal targets the page's inner div once it has mounted.
-  assert.match(PAGE, /presentedHost=\{panelReady \? panelRef\.current : null\}/);
+  // Prove the px mapping's constants: with PX_TO_M = 30/1920 the four
+  // corners of the board's object frame must land on the four corners of
+  // the 1920×1080 element (the mirror of the pinned formula above).
+  const L = solveLectern();
+  const pxPerM = L.W / 1920;
+  const H = (L.W * 9) / 16;
+  for (const [lxM, lyM, expectX, expectY] of [
+    [-L.HW, H / 2, 0, 0],
+    [L.HW, H / 2, 1920, 0],
+    [-L.HW, -H / 2, 0, 1080],
+    [L.HW, -H / 2, 1920, 1080],
+  ]) {
+    const x = lxM / pxPerM + 960;
+    const y = -lyM / pxPerM + 540;
+    assert.ok(Math.abs(x - expectX) < 1e-9 && Math.abs(y - expectY) < 1e-9,
+      `board corner (${lxM}, ${lyM}) maps to (${x}, ${y}), not (${expectX}, ${expectY})`);
+  }
 });
 
 test("board framing is square-on the face normal at every aspect", () => {

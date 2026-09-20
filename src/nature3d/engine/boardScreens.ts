@@ -76,7 +76,7 @@ export const SCREEN_PX_WIDTH = 1920;
 export const SCREEN_PX_HEIGHT = 1080;
 
 /** CSS pixels → world metres. 1920 px across a 30 m board. */
-const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
+export const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
 
 export interface BoardScreen {
   slot: LecternSlot;
@@ -95,13 +95,6 @@ export interface BoardScreensHandle {
   /** WebGL-side frames/backings, added to the main scene. */
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
-  /**
-   * The board currently presented as the flat 2D reading page. While a slot
-   * is presented, its 3D element is force-culled (display:none) no matter
-   * where the camera looks — the page covers its place — and it is brought
-   * straight back when the presentation is cleared.
-   */
-  setPresented(slot: LecternSlot | null): void;
   setSize(width: number, height: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
   dispose(): void;
@@ -198,9 +191,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     // or pinch INSIDE the board — those delays and page-level gestures are
     // exactly what made the board's buttons feel dead ("click kabhi hota
     // hai kabhi nahin"). Horizontal gestures and the mind-map's pan/zoom
-    // are pointer-event driven in JS, so they are unaffected. When the board
-    // sits in the flat study overlay, this is the effective touch-action
-    // (no `none` ancestor); inside the 3D host the host's `none` dominates.
+    // are pointer-event driven in JS, so they are unaffected. When the
+    // device's 3D hit-test drops a touch entirely, the engine's input
+    // bridge (scene.ts) replays the same gesture into this element.
     element.style.touchAction = "pan-y";
     // The DOM board is a screen, not a window: nothing inside it should be
     // able to spill past the bezel painted in the WebGL scene.
@@ -239,9 +232,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
   const visibility = new Map<LecternSlot, boolean>();
-  // The reading page covers the presented board's screen, so its 3D element
-  // is pure cost (and a double image) — force-culled while presented.
-  let presented: LecternSlot | null = null;
 
   return {
     screens,
@@ -251,10 +241,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
     byId(slot) {
       return screens.find((s) => s.slot === slot);
-    },
-
-    setPresented(slot) {
-      presented = slot;
     },
 
     setSize(width, height) {
@@ -287,10 +273,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           toCamera.copy(camera.position).sub(screen.placement.position);
           visible = boardNormal.dot(toCamera) > 0;
         }
-
-        // Presented: the flat reading page sits exactly over this board's
-        // screen, so the 3D element is hidden regardless of the camera.
-        if (screen.slot === presented) visible = false;
 
         if (visibility.get(screen.slot) !== visible) {
           visibility.set(screen.slot, visible);

@@ -34,7 +34,14 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
-import { createBoardScreens, type BoardScreensHandle } from "./boardScreens";
+import {
+  createBoardScreens,
+  PX_TO_M,
+  SCREEN_PX_HEIGHT,
+  SCREEN_PX_WIDTH,
+  type BoardScreen,
+  type BoardScreensHandle,
+} from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
@@ -72,6 +79,31 @@ export interface HudInsets {
   bottom: number;
   left: number;
   right: number;
+}
+
+/**
+ * One synthetic gesture being replayed into a board by the input bridge.
+ * The real finger drives the camera's ray; this struct remembers where the
+ * replayed touch is, so the sequence (down → moves → up/click) stays
+ * faithful to the finger's path.
+ */
+interface BoardBridge {
+  pointerId: number;
+  screen: BoardScreen;
+  /** The deepest board element under the finger — where the events land. */
+  target: Element;
+  /** Cached rect of `target`; re-lookup only when the finger leaves it. */
+  targetRect: DOMRect;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  /** Last point on the board, in its 1920×1080 layout px. */
+  lastLocalX: number;
+  lastLocalY: number;
+  startedAt: number;
+  /** Overflow boxes under the finger, innermost first — the bridge scrolls these. */
+  scrollers: HTMLElement[];
 }
 
 export interface SanctuaryOptions {
@@ -149,11 +181,11 @@ export class Sanctuary {
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
 
-  // ── The flat reading stage (see setBoardPresented) ───────────────────
-  /** The board the page is currently presenting as a flat 2D reading page. */
-  private presentedSlot: LecternSlot | null = null;
-  /** The flat layer the reading page lives in (a sibling of the canvas host). */
-  private stageEl: HTMLDivElement | null = null;
+  // ── The board input bridge (see localOnBoard) ─────────────────────────
+  /** The synthetic gesture currently being replayed into a board, if any. */
+  private bridge: BoardBridge | null = null;
+  /** One world-space plane per study board front face — the bridge's ray targets. */
+  private boardPlanes: THREE.Plane[] = [];
 
   constructor(private opts: SanctuaryOptions) {
     const tier = opts.tier ?? detectTier();
@@ -244,15 +276,13 @@ export class Sanctuary {
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
 
-    // The flat reading stage (see setBoardPresented). A sibling of the canvas
-    // host, inserted right after it: it paints above the WebGL canvas and the
-    // CSS3D layer, but below the HUD chrome, which comes later in the page.
-    // The page renders its reading-page div into here; the stage itself never
-    // eats pointer events, so the meadow around the page still orbits.
-    this.stageEl = document.createElement("div");
-    this.stageEl.style.cssText =
-      "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
-    opts.dom.insertAdjacentElement("afterend", this.stageEl);
+    // One world-space plane per board front face. The input bridge raycasts
+    // against these instead of trusting the device's 3D hit-test (the part
+    // of the browser that drops board taps at full size — see there).
+    for (const s of this.screens.screens) {
+      const n = new THREE.Vector3(Math.sin(s.placement.yaw), 0, Math.cos(s.placement.yaw));
+      this.boardPlanes.push(new THREE.Plane().setFromNormalAndCoplanarPoint(n, s.placement.position));
+    }
 
     // ── The lesson board, planted on the hillside ────────────────────────
     //
@@ -347,14 +377,33 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
-    // While a board is presented as the reading page the camera is parked
-    // (the BGMI scope): the page is static, so the world stays with it.
-    if (this.presentedSlot) return;
-    // A touch that STARTED on a board belongs to the board, never to the
-    // camera. Without this guard, a board tap that the device's hit-test
-    // missed leaks in here and the slightest finger wobble drags the world —
-    // the "first tap on the board nudges the camera" symptom.
+    // When the device's hit-test works, the board's own stopPropagation
+    // listeners swallow the touch before these host handlers ever see it —
+    // so reaching this line with a board-area touch is PROOF the device's
+    // 3D hit-test dropped it, and the bridge below re-aims it with geometry.
     if (this.boardTarget(e.target)) return;
+    // A second finger landing while a board gesture is being replayed turns
+    // it into a camera pinch: cancel the synthetic sequence and hand BOTH
+    // fingers to the rig (finger one rejoins at its last known point).
+    if (this.bridge) {
+      const b = this.bridge;
+      this.cancelBridge();
+      this.pointers.set(b.pointerId, { x: b.lastX, y: b.lastY });
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const [a, c] = [...this.pointers.values()];
+      this.pinchPrev = Math.hypot(a.x - c.x, a.y - c.y);
+      return;
+    }
+    // THE CLICKS-MUST-WORK FIX. On some device browsers a tap that visually
+    // lands on a full-size board is delivered here addressed to the canvas
+    // (the "first tap nudges the camera" symptom). Re-aim it: a ray from the
+    // camera through the EXACT touch point, tested against the board faces.
+    const onBoard = this.localOnBoard(e);
+    if (onBoard) {
+      e.preventDefault();
+      this.startBridge(e, onBoard);
+      return;
+    }
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
@@ -366,6 +415,11 @@ export class Sanctuary {
   };
 
   private onPointerMove = (e: PointerEvent) => {
+    // A finger being replayed into a board follows the bridge, not the rig.
+    if (this.bridge && e.pointerId === this.bridge.pointerId) {
+      this.moveBridge(e);
+      return;
+    }
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -389,6 +443,10 @@ export class Sanctuary {
   };
 
   private onPointerUp = (e: PointerEvent) => {
+    if (this.bridge && e.pointerId === this.bridge.pointerId) {
+      this.endBridge(e);
+      return;
+    }
     const start = this.pointers.get(e.pointerId);
     this.pointers.delete(e.pointerId);
     if (this.pointers.size < 2) this.pinchPrev = 0;
@@ -420,12 +478,228 @@ export class Sanctuary {
 
   private onWheel = (e: WheelEvent) => {
     if (this.mode !== "orbit") return;
-    if (this.presentedSlot) return; // the reading page owns the wheel
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
     e.preventDefault();
     this.orbit.zoom(1 + Math.sign(e.deltaY) * 0.1);
   };
+
+  // ───────────────────────────────────────────────────────────────────
+  //  The board input bridge
+  //
+  //  WHY IT EXISTS. Three rounds of device reports pin the failure on the
+  //  browser, not the app: on the learner's phone the hit-test of a large
+  //  3D-transformed element is unreliable — a tap that visually lands on a
+  //  full-screen board is delivered to the CANVAS instead (that is the
+  //  "first tap nudges the camera" symptom), so the board's buttons cannot
+  //  be clicked at the default framing, while the same boards hit-test fine
+  //  once pinched smaller. The 3D board stays the experience — the learner
+  //  looks at the board itself — but the engine stops trusting that hit-test.
+  //
+  //  THE BRIDGE. The two input paths are mutually exclusive BY CONSTRUCTION:
+  //  when the device's hit-test works, the board's own stopPropagation
+  //  listeners swallow the touch before the host handlers run, so the bridge
+  //  stays dormant and the board is touched natively (zero behaviour change
+  //  on desktop, and iframes keep their native events). When the hit-test
+  //  drops the touch, the event arrives at the host addressed to the canvas
+  //  — the only case in which these handlers run for a board-area touch —
+  //  and the bridge re-aims it with pure geometry: a ray from the camera
+  //  through the exact touch point, the board's world-space face plane, and
+  //  the board's 1920×1080 layout box. Nothing in the path relies on the
+  //  device's 3D hit-test, so the click lands EXACTLY where the finger was,
+  //  at any camera angle, distance or orientation — the non-negotiable.
+  //
+  //  The replay is faithful to the gesture:
+  //    • tap  → pointerdown + pointerup + click on the deepest element under
+  //             the finger (buttons, cards, toolbar — the panel's own React
+  //             handlers fire, exactly as in the 2D player);
+  //    • drag → a pointermove stream (the mind-map's JS pan/zoom runs) plus
+  //             the bridge scrolling the panel's overflow boxes itself,
+  //             because native touch scroll is a compositor gesture a
+  //             synthetic event cannot drive;
+  //    • a second finger cancels the replay and takes over as a pinch.
+
+  private bridgeRay = new THREE.Raycaster();
+  private bridgeVec = new THREE.Vector2();
+  private bridgeHit = new THREE.Vector3();
+
+  /**
+   * The board the camera ray through (clientX, clientY) lands on, with the
+   * point's position in that board's 1920×1080 layout px — or null.
+   *
+   * The px mapping is the exact inverse of CSS3DRenderer's transform: the
+   * object's local +X is the element's right, its local +Y is the element's
+   * TOP (CSS y grows downward, and the renderer flips the matrix's y column
+   * to compensate), and 1 layout px = PX_TO_M world metres.
+   */
+  private localOnBoard(
+    e: { clientX: number; clientY: number },
+    restrict?: BoardScreen,
+  ): { screen: BoardScreen; x: number; y: number } | null {
+    const rect = this.opts.dom.getBoundingClientRect();
+    this.bridgeVec.set(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.bridgeRay.setFromCamera(this.bridgeVec, this.camera);
+    const ray = this.bridgeRay.ray;
+    let best: { screen: BoardScreen; x: number; y: number; t: number } | null = null;
+    this.screens.screens.forEach((screen, i) => {
+      if (restrict && screen !== restrict) return;
+      if (!screen.object.visible) return; // culled boards cannot be touched
+      const plane = this.boardPlanes[i];
+      if (plane.distanceToPoint(this.camera.position) < 0) return; // camera behind the face
+      if (!ray.intersectPlane(plane, this.bridgeHit)) return;
+      const p = screen.placement;
+      const dx = this.bridgeHit.x - p.position.x;
+      const dy = this.bridgeHit.y - p.position.y;
+      const dz = this.bridgeHit.z - p.position.z;
+      const c = Math.cos(p.yaw);
+      const s = Math.sin(p.yaw);
+      const lx = c * dx - s * dz;
+      const x = lx / PX_TO_M + SCREEN_PX_WIDTH / 2;
+      const y = -dy / PX_TO_M + SCREEN_PX_HEIGHT / 2;
+      if (x < 0 || x > SCREEN_PX_WIDTH || y < 0 || y > SCREEN_PX_HEIGHT) return;
+      const t = ray.origin.distanceToSquared(this.bridgeHit);
+      if (!best || t < best.t) best = { screen, x, y, t };
+    });
+    return best;
+  }
+
+  /**
+   * The deepest board element under (x, y) in SCREEN space — the touch's
+   * true target. Last document-order win: a child's rect follows its parent's
+   * (or sits above it), so the last containing element is the one painted on
+   * top where the finger was.
+   */
+  private boardTargetAt(screen: BoardScreen, x: number, y: number): Element {
+    const root = screen.element;
+    let best: Element = root;
+    for (const node of root.querySelectorAll("*")) {
+      const el = node as Element;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) best = el;
+    }
+    return best;
+  }
+
+  /** The overflow boxes under the target, innermost first. */
+  private scrollersUnder(target: Element, root: Element): HTMLElement[] {
+    const chain: HTMLElement[] = [];
+    let n: Element | null = target;
+    while (n && n !== root) {
+      if (n instanceof HTMLElement && (n.scrollHeight > n.clientHeight || n.scrollWidth > n.clientWidth)) {
+        chain.unshift(n);
+      }
+      n = n.parentElement;
+    }
+    return chain;
+  }
+
+  /**
+   * Dispatch one synthetic event into the board. `clientX/Y` are the
+   * FINGER's own screen coordinates, so every handler in the panel sees the
+   * touch at exactly the place it happened.
+   */
+  private synthetic(type: string, target: Element, x: number, y: number, pointerId: number) {
+    const init: PointerEventInit = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      detail: 1,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+      button: 0,
+      buttons: type === "pointerup" || type === "click" || type === "pointercancel" ? 0 : 1,
+      pointerId,
+      pointerType: "touch",
+      isPrimary: true,
+    };
+    target.dispatchEvent(new PointerEvent(type, init));
+  }
+
+  private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }) {
+    const screen = onBoard.screen;
+    const target = this.boardTargetAt(screen, e.clientX, e.clientY);
+    this.bridge = {
+      pointerId: e.pointerId,
+      screen,
+      target,
+      targetRect: target.getBoundingClientRect(),
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastLocalX: onBoard.x,
+      lastLocalY: onBoard.y,
+      startedAt: performance.now(),
+      scrollers: this.scrollersUnder(target, screen.element),
+    };
+    this.synthetic("pointerdown", target, e.clientX, e.clientY, e.pointerId);
+  }
+
+  private moveBridge(e: PointerEvent) {
+    const b = this.bridge;
+    if (!b) return;
+    b.lastX = e.clientX;
+    b.lastY = e.clientY;
+    const now = this.localOnBoard(e, b.screen);
+    if (!now) return; // the finger left the board face mid-gesture
+    let dlx = now.x - b.lastLocalX;
+    let dly = now.y - b.lastLocalY;
+    b.lastLocalX = now.x;
+    b.lastLocalY = now.y;
+
+    // The board's own JS gestures (the mind-map pan/zoom) are pointer-driven,
+    // so they receive a real move stream — addressed to whatever is under the
+    // finger now, exactly like native hit-testing would.
+    const r = b.targetRect;
+    if (e.clientX < r.left - 2 || e.clientX > r.right + 2 || e.clientY < r.top - 2 || e.clientY > r.bottom + 2) {
+      b.target = this.boardTargetAt(b.screen, e.clientX, e.clientY);
+      b.targetRect = b.target.getBoundingClientRect();
+    }
+    this.synthetic("pointermove", b.target, e.clientX, e.clientY, b.pointerId);
+
+    // Native touch scroll is a browser-compositor gesture — a synthetic
+    // pointermove cannot drive it — so the bridge scrolls the panel's own
+    // overflow boxes: the innermost one that can move on each axis.
+    for (const el of b.scrollers) {
+      if (dlx !== 0 && el.scrollWidth > el.clientWidth) {
+        el.scrollLeft = THREE.MathUtils.clamp(el.scrollLeft - dlx, 0, el.scrollWidth - el.clientWidth);
+        dlx = 0;
+      }
+      if (dly !== 0 && el.scrollHeight > el.clientHeight) {
+        el.scrollTop = THREE.MathUtils.clamp(el.scrollTop - dly, 0, el.scrollHeight - el.clientHeight);
+        dly = 0;
+      }
+      if (dlx === 0 && dly === 0) break;
+    }
+  }
+
+  private endBridge(e: PointerEvent) {
+    const b = this.bridge;
+    if (!b) return;
+    this.bridge = null;
+    const cancelled = e.type === "pointercancel";
+    const wasTap = !cancelled
+      && Math.hypot(e.clientX - b.startX, e.clientY - b.startY) < 10
+      && performance.now() - b.startedAt < 600;
+    this.synthetic(cancelled ? "pointercancel" : "pointerup", b.target, e.clientX, e.clientY, b.pointerId);
+    // A tap: the click lands on the element under the finger, at the finger's
+    // own coordinates — exactly where the learner touched.
+    if (wasTap) this.synthetic("click", b.target, e.clientX, e.clientY, b.pointerId);
+  }
+
+  private cancelBridge() {
+    const b = this.bridge;
+    if (!b) return;
+    this.bridge = null;
+    this.synthetic("pointercancel", b.target, b.lastX, b.lastY, b.pointerId);
+  }
 
   // ───────────────────────────────────────────────────────────────────
   //  Public API used by React
@@ -436,9 +710,6 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
-    // Leaving orbit mode leaves the reading page behind.
-    this.presentedSlot = null;
-    this.screens.setPresented(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -607,16 +878,12 @@ export class Sanctuary {
    *
    * SQUARE-ON IS LOAD-BEARING. The camera is parked ON THE BOARD'S FACE
    * NORMAL — the orbit target is the board's own centre, pitch 0 — so the
-   * board projects as a perfect rectangle centred on the screen. An earlier
-   * version offset the target so the board centred itself on the HUD-free
-   * rect, which pushed the camera off the normal and sheared the full-screen
-   * board into a trapezoid (2–3 deg on phones); device hit-testing of large
-   * off-axis 3D-transformed elements is exactly where taps started
-   * dropping, and the flat reading page (see setBoardPresented) is sized
-   * against the same square-on projection.
-   * With the camera square-on, the board stays screen-centred, so it clears
-   * each chrome edge by a HALF board — the symmetric limits below — and
-   * every pixel of it stays clickable at any device size.
+   * board projects as a perfect rectangle centred on the screen. Off-axis
+   * full-screen boards shear into a trapezoid, and the input bridge's
+   * screen-space target lookup (see localOnBoard) is at its most exact on a
+   * level rectangle. With the camera square-on the board stays screen-
+   * centred, so it clears each chrome edge by a HALF board — the symmetric
+   * limits below — and every pixel of it stays reachable at any device size.
    */
   private focusBoard(slot: LecternSlot) {
     const placement = lecternPlacements().find((p) => p.slot === slot);
@@ -679,56 +946,6 @@ export class Sanctuary {
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
   }
-
-  // ───────────────────────────────────────────────────────────────────
-  //  The flat reading page (the BGMI scope)
-  // ───────────────────────────────────────────────────────────────────
-  //
-  // THE CLICKS-MUST-WORK RULE, settled.
-  //
-  // Three rounds of device reports established a hard fact: on the
-  // learner's phone, anything that carries a board's panels through the
-  // 3D machinery — the CSS3D matrix3d, a reparented element, a scaled
-  // element — stops receiving taps once it is large on screen, while the
-  // SAME panels running as the ordinary 2D course player (plain DOM, no
-  // transforms, no 3D context) tap perfectly at full screen. The device's
-  // failure is in the 3D compositing/hit-test path, which we cannot fix
-  // from here — so the reading experience simply stops using it.
-  //
-  // When the learner picks a board, the camera flies to frame it (the 3D
-  // board stays a real 3D object in the world) and the page presents the
-  // board's panels in a plain 2D reading page: a fresh, transform-free DOM
-  // box at the HUD-free rect, rendered into `stageEl` — the same DOM shape
-  // as the 2D app the learner already taps on the same phone. The 3D board
-  // element is merely force-culled (display:none) while the page covers
-  // its place: it is never moved, scaled or reparented.
-  //
-  // While the page is up the camera is parked — the BGMI trade where
-  // opening the scope drops the world simulation and spends the frame on
-  // what the player is actually looking at. The world around the page is
-  // still there: close the page (or pick any other view) and the 3D board
-  // is right where you left it, free to orbit.
-
-  /**
-   * Present (or un-present) one board as the flat 2D reading page.
-   *
-   * The page owns the presentation UI (the page div, the close button); the
-   * engine does the three things only it can do:
-   *   • force-cull the presented board's 3D element (see boardScreens),
-   *   • park the camera while the page is up (pointer/wheel guards + the
-   *     frame loop's orbit freeze),
-   *   • hand out `stageHost()` — the flat layer the page renders into.
-   */
-  setBoardPresented(slot: LecternSlot | null) {
-    this.presentedSlot = slot;
-    this.screens.setPresented(slot);
-  }
-
-  /** The flat layer the page renders its reading page into. */
-  stageHost(): HTMLElement | null {
-    return this.stageEl;
-  }
-
 
   resize(width: number, height: number) {
     if (width === 0 || height === 0) return;
@@ -849,9 +1066,7 @@ export class Sanctuary {
       }
       this.avatar.setVisible(true);
     } else {
-      // The reading page parks the camera (the BGMI scope): the page is a
-      // static 2D rect, so the framed world behind it stays put under it.
-      if (!this.presentedSlot) this.orbit.update(dt, this.camera);
+      this.orbit.update(dt, this.camera);
       this.avatar.setVisible(true);
     }
 
@@ -968,8 +1183,6 @@ export class Sanctuary {
     this.disposed = true;
     this.stop();
     this.detachPointer(this.opts.dom);
-    this.stageEl?.remove();
-    this.stageEl = null;
     this.screens.dispose();
     disposeGroup(this.desk);
     this.safari.dispose();
