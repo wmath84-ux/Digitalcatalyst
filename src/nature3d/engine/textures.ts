@@ -170,9 +170,9 @@ export function createTextures(anisotropy: number): TextureSet {
   leaf.ctx.clearRect(0, 0, 256, 256);
   const drawLeaf = (cx: number, cy: number, w: number, h: number, hue: number) => {
     const g = leaf.ctx.createLinearGradient(cx, cy - h, cx, cy + h);
-    g.addColorStop(0, `hsl(${hue},58%,46%)`);
-    g.addColorStop(0.55, `hsl(${hue + 6},54%,34%)`);
-    g.addColorStop(1, `hsl(${hue + 10},52%,22%)`);
+    g.addColorStop(0, `hsl(${hue},72%,48%)`);
+    g.addColorStop(0.55, `hsl(${hue + 4},68%,36%)`);
+    g.addColorStop(1, `hsl(${hue + 8},64%,24%)`);
     leaf.ctx.fillStyle = g;
     leaf.ctx.beginPath();
     leaf.ctx.moveTo(cx, cy - h);
@@ -197,25 +197,22 @@ export function createTextures(anisotropy: number): TextureSet {
     }
   };
   // A cluster card: three overlapping leaves reads as real foliage volume
-  // for the cost of one quad. TROPICAL: the hue sits in the warm green band
-  // (100–118) — brighter and sunnier than the old temperate set, still under
-  // the neon line.
-  drawLeaf(84, 96, 52, 78, 104);
-  drawLeaf(170, 120, 56, 86, 114);
-  drawLeaf(124, 186, 48, 66, 100);
+  // for the cost of one quad. USER DIRECTIVE (natural green): hue sits in
+  // true grass green (112–128), chroma raised so the canopy pops in sun.
+  drawLeaf(84, 96, 52, 78, 118);
+  drawLeaf(170, 120, 56, 86, 128);
+  drawLeaf(124, 186, 48, 66, 112);
 
   // ── Grass blade (single alpha-tested blade, gradient root→tip) ───────
-  // TROPICAL: a brighter, sunnier gradient — deep green root, clean green
-  // mid, yellow-green lit tip (the island grass is warm, never olive).
-  // USER DIRECTIVE (saturation pass): gradient chroma raised to match the
-  // FOLIAGE_PALETTE blade stops.
+  // USER DIRECTIVE (natural green): deep green root, vivid mid, sunlit lime
+  // tip — no straw-yellow, so the field stays grass in afternoon sun.
   const blade = canvas2d(64, 256);
   blade.ctx.clearRect(0, 0, 64, 256);
   const bg = blade.ctx.createLinearGradient(0, 256, 0, 0);
-  bg.addColorStop(0, "#276314");
-  bg.addColorStop(0.42, "#3d9c1e");
-  bg.addColorStop(0.78, "#5fb02e");
-  bg.addColorStop(1, "#a4dc45");
+  bg.addColorStop(0, "#1e6e12");
+  bg.addColorStop(0.42, "#32b01c");
+  bg.addColorStop(0.78, "#4cc828");
+  bg.addColorStop(1, "#72dc3a");
   blade.ctx.fillStyle = bg;
   blade.ctx.beginPath();
   blade.ctx.moveTo(24, 256);
@@ -231,18 +228,18 @@ export function createTextures(anisotropy: number): TextureSet {
   blade.ctx.quadraticCurveTo(28, 128, 32, 8);
   blade.ctx.stroke();
 
-  // ── Ground (tropical sandy loam + dry thatch + grit) ─────────────────
-  // The island's soil is warm and sandy — the old temperate brown painted
-  // every metre of ground the colour of wet clay. The multpliers keep the
-  // value in the same band (the vertex colours carry the art), just warmer.
+  // ── Ground (sunny-afternoon grass grit) ──────────────────────────────
+  // USER DIRECTIVE (natural green): the texture multiplies the vertex colour,
+  // so a brown loam turns even a green albedo muddy. The grit is now
+  // green-dominant; the vertex colours still carry the biome.
   const ground = canvas2d(512, 512);
   for (let y = 0; y < 512; y += 2) {
     for (let x = 0; x < 512; x += 2) {
       const f = fbm(x / 40, y / 40, 5, 11);
       const g2 = fbm(x / 9, y / 9, 3, 23);
-      const r = 66 + f * 56 + g2 * 24;
-      const g = 62 + f * 58 + g2 * 22;
-      const b = 42 + f * 40 + g2 * 16;
+      const r = 42 + f * 36 + g2 * 16;
+      const g = 92 + f * 54 + g2 * 24;
+      const b = 28 + f * 24 + g2 * 12;
       ground.ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
       ground.ctx.fillRect(x, y, 2, 2);
     }
@@ -250,7 +247,7 @@ export function createTextures(anisotropy: number): TextureSet {
   for (let i = 0; i < 900; i += 1) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
-    ground.ctx.strokeStyle = `rgba(${150 + Math.random() * 70 | 0},${140 + Math.random() * 60 | 0},92,0.22)`;
+    ground.ctx.strokeStyle = `rgba(${70 + Math.random() * 50 | 0},${140 + Math.random() * 70 | 0},${40 + Math.random() * 30 | 0},0.22)`;
     ground.ctx.lineWidth = 0.8;
     ground.ctx.beginPath();
     ground.ctx.moveTo(x, y);
@@ -288,7 +285,7 @@ export function createTextures(anisotropy: number): TextureSet {
     for (let x = 0; x < 256; x += 1) {
       const v = (Math.sin(x * 0.12 + fbm(x / 30, y / 30, 3, 2) * 7) + Math.sin(y * 0.09 + x * 0.03)) * 0.25 + 0.5;
       const lum = 120 + v * 110;
-      water.ctx.fillStyle = `rgb(${lum * 0.6 | 0},${lum * 0.85 | 0},${lum | 0})`;
+      water.ctx.fillStyle = `rgb(${lum * 0.42 | 0},${lum * 0.68 | 0},${lum | 0})`;
       water.ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -455,7 +452,7 @@ export function createTextures(anisotropy: number): TextureSet {
     // Sunlit crown top, shaded underside: the same top-lit rule a real crown
     // obeys, so the impostor still reads as lit by the same sun.
     const up = 1 - Math.min(1, Math.max(0, (cy - 96) / 140));
-    canopyCanvas.ctx.fillStyle = `rgb(${(44 + 50 * shade) | 0},${(88 + 56 * shade) | 0},${(34 + 28 * shade) | 0})`;
+    canopyCanvas.ctx.fillStyle = `rgb(${(28 + 40 * shade) | 0},${(110 + 72 * shade) | 0},${(26 + 22 * shade) | 0})`;
     canopyCanvas.ctx.globalAlpha = 0.55 + up * 0.35;
     canopyCanvas.ctx.beginPath();
     canopyCanvas.ctx.ellipse(cx, cy, r, r * (0.7 + Math.random() * 0.5), Math.random() * 3, 0, Math.PI * 2);
@@ -475,9 +472,9 @@ export function createTextures(anisotropy: number): TextureSet {
   frond.ctx.clearRect(0, 0, 256, 128);
   {
     const fg = frond.ctx.createLinearGradient(0, 0, 256, 0);
-    fg.addColorStop(0, "#2e5c20");
-    fg.addColorStop(0.55, "#4f8f2c");
-    fg.addColorStop(1, "#8fbe4e");
+    fg.addColorStop(0, "#227018");
+    fg.addColorStop(0.55, "#3cb024");
+    fg.addColorStop(1, "#6ad438");
     // Rachis: a shallow arc from root (left) to tip (right).
     frond.ctx.strokeStyle = "#7a6a3e";
     frond.ctx.lineWidth = 4;

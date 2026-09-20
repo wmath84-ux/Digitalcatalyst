@@ -183,7 +183,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // temperate bark would undo it.
   const trunkMat = new THREE.MeshLambertMaterial({ map: tex.bark, vertexColors: true });
   const palmTrunkMat = new THREE.MeshLambertMaterial({ map: tex.palmBark, vertexColors: true });
-  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2e6438, vertexColors: true });
+  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2a8a28, vertexColors: true });
 
   // STATIC GEOMETRY IS MERGED, NOT ADDED.
   //
@@ -532,9 +532,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
           palmImpostors.setMatrixAt(palmImpostorIndex, dummy.matrix);
           // A salt-stressed palm is yellower; a sheltered one deeper green.
           color.setHSL(
-            0.24 + Math.random() * 0.035,
-            0.5 + Math.random() * 0.12,
-            0.3 - t.crowding * 0.04 + Math.random() * 0.09,
+            0.30 + Math.random() * 0.03,
+            0.62 + Math.random() * 0.12,
+            0.34 - t.crowding * 0.04 + Math.random() * 0.09,
           );
           palmImpostors.setColorAt(palmImpostorIndex, color);
           palmImpostorIndex += 1;
@@ -580,9 +580,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // deeper, then yellow. Hue jitter keeps no two fronds identical.
         const outer = rank / 2;
         color.setHSL(
-          unhealthy ? 0.19 + Math.random() * 0.03 : 0.262 + outer * 0.018 + Math.random() * 0.014,
-          unhealthy ? 0.55 : 0.52 + outer * 0.1 + Math.random() * 0.08,
-          0.3 + outer * 0.12 + Math.random() * 0.08,
+          unhealthy ? 0.22 + Math.random() * 0.03 : 0.30 + outer * 0.014 + Math.random() * 0.012,
+          unhealthy ? 0.58 : 0.64 + outer * 0.1 + Math.random() * 0.08,
+          0.34 + outer * 0.12 + Math.random() * 0.08,
         );
         target.setColorAt(slot, color);
         if (t.sways) frondSwayIndex += 1;
@@ -748,9 +748,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // Hue follows the tree's own exposure: a crowded crown is darker (it
         // is in shade), an open one is yellow-green.
         color.setHSL(
-          0.25 + Math.random() * 0.035,
-          0.46 + t.crowding * 0.1,
-          0.31 - t.crowding * 0.06 + Math.random() * 0.1,
+          0.30 + Math.random() * 0.03,
+          0.62 + t.crowding * 0.08,
+          0.34 - t.crowding * 0.06 + Math.random() * 0.1,
         );
         impostors.setColorAt(impostorIndex, color);
         impostorIndex += 1;
@@ -787,9 +787,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       // temperate olive — the island canopy is vivid but still varied.
       const outer = Math.min(1, radial / Math.max(0.001, spread));
       color.setHSL(
-        0.255 + outer * 0.04 + Math.random() * 0.028,
-        0.5 + outer * 0.14 + Math.random() * 0.1,
-        0.26 + outer * 0.15 - t.crowding * 0.04 + Math.random() * 0.12,
+        0.30 + outer * 0.025 + Math.random() * 0.02,
+        0.64 + outer * 0.12 + Math.random() * 0.08,
+        0.32 + outer * 0.14 - t.crowding * 0.04 + Math.random() * 0.10,
       );
       target.setColorAt(slot, color);
       if (t.sways) swayIndex += 1;
@@ -863,7 +863,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // TROPICAL: warmer island green; on the beach they thin out so the sand
   // stays the sand (Phase 8: ROCKY/BEACH zones get sparse vegetation).
   const shrubGeo = new THREE.IcosahedronGeometry(0.55, 0);
-  const shrubMat = new THREE.MeshLambertMaterial({ color: 0x43802e, flatShading: true });
+  const shrubMat = new THREE.MeshLambertMaterial({ color: 0x3aaa22, flatShading: true });
   const shrubCount = Math.round(budget.flowers * 0.35);
   const shrubs = new THREE.InstancedMesh(shrubGeo, shrubMat, shrubCount);
   let si = 0;
@@ -881,7 +881,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     dummy.scale.set(sc, sc * 0.78, sc);
     dummy.updateMatrix();
     shrubs.setMatrixAt(si, dummy.matrix);
-    color.setHSL(0.27 + Math.random() * 0.04, 0.52, 0.22 + Math.random() * 0.12);
+    color.setHSL(0.30 + Math.random() * 0.03, 0.66, 0.30 + Math.random() * 0.12);
     shrubs.setColorAt(si, color);
     si += 1;
   }

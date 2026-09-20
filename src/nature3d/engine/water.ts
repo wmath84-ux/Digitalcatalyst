@@ -77,8 +77,8 @@ export function createWater(
    */
   colors: { sky?: THREE.Color; sun?: THREE.Color } = {},
 ): WaterSystem {
-  const skyColor = colors.sky ?? new THREE.Color(0xbcd9ef);
-  const sunColor = colors.sun ?? new THREE.Color(0xfff1d6);
+  const skyColor = colors.sky ?? new THREE.Color(0xaedcfa);
+  const sunColor = colors.sun ?? new THREE.Color(0xfff8e0);
 
   const group = new THREE.Group();
   group.name = "water";
@@ -125,11 +125,10 @@ export function createWater(
     // here is dielectric Fresnel — which is what water actually is — and the
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
-    // TROPICAL GRADE: the base body is a clear turquoise, not steel blue.
-    // USER DIRECTIVE (blue pass): pushed from turquoise (0x2f9fae) to a
-    // saturated azure — hue 0.58 vs the old 0.53 — so the river reads BLUE
-    // the way the learner asked, with the depth ramp below following.
-    color: 0x1f7fd4,
+    // USER DIRECTIVE (natural blue): a real river in afternoon sun is
+    // sapphire, not turquoise and not cyan. Hue ~0.59, chroma high enough
+    // to read as water, not a plastic sheet.
+    color: 0x1470d2,
     roughness: 0.13,
     metalness: 0.0,
     transparent: true,
@@ -211,15 +210,13 @@ export function createWater(
         // The channel is deepest along its centre line, so the distance from
         // that line is a stand-in for the water column that costs no extra
         // geometry or depth pass (principle 39: fake the part nobody checks).
-        // TROPICAL GRADE: shallow water is bright turquoise, the channel
-        // saturates to a clear teal-blue — a tropical river, not a northern one.
-        // USER DIRECTIVE (blue pass): both stops shifted toward saturated
-        // blue — shallow #6fd8cf → #58c8f0, deep #0b4a63 → #0847a0 — so the
-        // gradient runs vivid cyan-blue into deep blue with no green cast.
+        // USER DIRECTIVE (natural blue): shallow is sky-blue, the channel
+        // saturates to sapphire. Green is pulled out of both stops so the
+        // river never reads as turquoise.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 4.2, dcBank);
-        vec3 dcDeep = vec3(0.006, 0.078, 0.235);       // sRGB #0847a0
-        vec3 dcShallow = vec3(0.130, 0.560, 0.830);    // sRGB #58c8f0
+        vec3 dcDeep = vec3(0.006, 0.045, 0.280);       // sRGB #0a3d90
+        vec3 dcShallow = vec3(0.070, 0.360, 0.880);    // sRGB #3a8ef0
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
         // ── Sky reflection, read off the atmosphere ─────────────────────
@@ -259,7 +256,7 @@ export function createWater(
   // runs over pale grit, not dark slate.
   const bed = new THREE.Mesh(
     new THREE.PlaneGeometry(13.5, RIVER_LENGTH + 2),
-    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x5d7a66 }),
+    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x3d6e88 }),
   );
   bed.rotation.x = -Math.PI / 2;
   bed.position.set(RIVER_CENTER_X, WATER_LEVEL - 0.75, 0);
@@ -584,14 +581,14 @@ export function createWater(
           float dcCos = clamp( dot( dcView, dcNormal ), 0.0, 1.0 );
           float dcFres = 0.02 + 0.98 * pow( 1.0 - dcCos, 5.0 );
 
-          // THE TROPICAL RAMP (Phase 5): depth decides the hue.
-          //   0–2.5 m   bright turquoise over the sand shelf
-          //   2.5–9 m   clear tropical blue
+          // USER DIRECTIVE (natural blue): depth decides the hue.
+          //   0–2.5 m   bright sky-blue over the sand shelf
+          //   2.5–9 m   clear sapphire
           //   9 m +     deep, saturated sea blue
           float dcD = clamp( vDcDepth, 0.0, 14.0 );
-          vec3 dcShallowC = vec3( 0.120, 0.620, 0.840 );  // USER blue pass: #58cfe6, no green cast
-          vec3 dcMidC     = vec3( 0.016, 0.330, 0.680 );  // saturated azure
-          vec3 dcDeepC    = vec3( 0.004, 0.080, 0.300 );  // deep blue
+          vec3 dcShallowC = vec3( 0.065, 0.380, 0.900 );  // sky-blue, no green
+          vec3 dcMidC     = vec3( 0.012, 0.180, 0.720 );  // sapphire
+          vec3 dcDeepC    = vec3( 0.004, 0.050, 0.320 );  // deep sea blue
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
 

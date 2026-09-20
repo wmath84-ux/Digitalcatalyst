@@ -160,20 +160,19 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  // USER DIRECTIVE (saturation pass): the meadow read washed-out on device —
-  // the greens are pushed up in chroma (lush +18 % sat, dry pulled greener)
-  // while keeping the hue natural; the eye accepts saturated green grass,
-  // it rejects neon.
-  lush: new THREE.Color(0x2f9220),
-  dry: new THREE.Color(0x86a032),
-  mud: new THREE.Color(0x6a593d),
+  // USER DIRECTIVE (sunny afternoon / natural green): the meadow must read as
+  // REAL grass in hard afternoon sun — true green, not olive, not yellow thatch.
+  // Dry patches stay green-gold rather than straw; wet soil is mossy, not mud.
+  lush: new THREE.Color(0x28b01a),
+  dry: new THREE.Color(0x58b022),
+  mud: new THREE.Color(0x4e6a32),
   rock: new THREE.Color(0x8d8770),
   gravel: new THREE.Color(0xd2c5a0),
   sand: new THREE.Color(0xe8d8ae),
   sandWet: new THREE.Color(0xbfa274),
-  sandUnder: new THREE.Color(0x9db482),
+  sandUnder: new THREE.Color(0x5a9ab0),
   snow: new THREE.Color(0xf4efe0),
-  deep: new THREE.Color(0x2e4f4a),
+  deep: new THREE.Color(0x163a58),
 };
 
 /**
@@ -186,16 +185,16 @@ export const GROUND_PALETTE: GroundPalette = {
  */
 export const FOLIAGE_PALETTE = {
   /** Grass blades, root … tip. The tip is where new growth and sunlight meet.
-   *  USER DIRECTIVE (saturation pass): all three pushed up in chroma — the
-   *  blade gradient now runs deep saturated green → vivid yellow-green. */
-  bladeRoot: new THREE.Color(0x276314),
-  bladeMid: new THREE.Color(0x3d9c1e),
-  bladeTip: new THREE.Color(0x93d937),
+   *  USER DIRECTIVE (sunny afternoon): true green throughout — the tip is a
+   *  sunlit lime, not straw-yellow, so the field stays grass. */
+  bladeRoot: new THREE.Color(0x1e6e12),
+  bladeMid: new THREE.Color(0x32b01c),
+  bladeTip: new THREE.Color(0x6edc32),
   /** Leaf cards, inner canopy … outer. */
-  leafDeep: new THREE.Color(0x235e19),
-  leafLit: new THREE.Color(0x63b32a),
+  leafDeep: new THREE.Color(0x1c6e16),
+  leafLit: new THREE.Color(0x4cc428),
   /** Transmitted light through a leaf (the cheap subsurface term). */
-  transmittance: new THREE.Color(0xa9cf5d),
+  transmittance: new THREE.Color(0x8ee048),
   /** Bark, young … old (older bark is paler, greyer and more fissured). */
   barkYoung: new THREE.Color(0x6d5941),
   barkOld: new THREE.Color(0x9b8a70),
@@ -204,7 +203,7 @@ export const FOLIAGE_PALETTE = {
   /** Coconut husk. */
   coconut: new THREE.Color(0x5f4a2e),
   /** Moss: only ever on the damp, shade-side faces. */
-  moss: new THREE.Color(0x5d7d36),
+  moss: new THREE.Color(0x3a9a22),
 };
 
 /** Rock albedo per geological family (research §6, §25) — tropical limestone key. */

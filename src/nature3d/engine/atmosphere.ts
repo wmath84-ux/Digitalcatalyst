@@ -255,7 +255,7 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
   const uniforms: AtmosphereUniforms = {
     uDcSunDir: { value: new THREE.Vector3(0.62, 0.34, -0.7).normalize() },
     uDcSunColor: { value: new THREE.Color(0xfff0cf) },
-    uDcHazeColor: { value: new THREE.Color(0xbcd9ef) },
+    uDcHazeColor: { value: new THREE.Color(0xaedcfa) },
     uDcInScatter: { value: 0.4 },
     // 46 m of scale height: the meadow's own relief is ~12 m, so the haze
     // thins noticeably as the learner walks up the lesson-board hill but
@@ -263,8 +263,8 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
     uDcHazeHeight: { value: 46 },
     uDcHazeGround: { value: 1.22 },
     uDcAerial: { value: budget.fogDensity > 0.0004 ? 0.85 : 1 },
-    uDcTransmit: { value: 0.34 },
-    uDcTransmitColor: { value: new THREE.Color(0x9dbb52) },
+    uDcTransmit: { value: 0.40 },
+    uDcTransmitColor: { value: new THREE.Color(0x7ee038) },
     uDcPhase: { value: 2.6 },
   };
 
@@ -358,7 +358,7 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
         // makes a backlit canopy at 6 pm glow.
         const low = 1 - Math.min(1, Math.max(0, elevation / 0.55));
         uniforms.uDcAerial.value = 0.82 + low * 0.3;
-        uniforms.uDcTransmit.value = 0.22 + low * 0.34;
+        uniforms.uDcTransmit.value = 0.32 + low * 0.28;
         uniforms.uDcPhase.value = 2.6 + low * 1.4;
       }
     },

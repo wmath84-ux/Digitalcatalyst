@@ -84,7 +84,9 @@ void main() {
   // scattering above supplies the STRUCTURE (gradient, halo, horizon haze),
   // these uniforms supply the colour grade the rest of the scene is lit to.
   vec3 graded = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55));
-  sky = mix(graded, sky * uSunColor, 0.42);
+  // USER DIRECTIVE (sunny afternoon): lean harder on the art-directed
+  // saturated blue so the dome reads as a clear afternoon sky, not haze.
+  sky = mix(graded, sky * uSunColor, 0.32);
 
   // Ground haze below the horizon line.
   sky = mix(uGround, sky, smoothstep(-0.12, 0.05, h));
@@ -112,16 +114,15 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     depthWrite: false,
     fog: false,
     uniforms: {
-      // TROPICAL DAY KEY. Bright cyan-blue zenith, a pale turquoise-white
-      // horizon and a warm sand haze below the line — the reference sky is
-      // BRIGHTER and cleaner than the old temperate dome, with more air
-      // between the blue and the horizon. (daylight.ts re-authors these live;
-      // these are the boot defaults so the first frame is already tropical.)
-      uZenith: { value: new THREE.Color(0x2f7fd9) },
-      uHorizon: { value: new THREE.Color(0xd2f0fa) },
-      uGround: { value: new THREE.Color(0xeadfc2) },
+      // USER DIRECTIVE (sunny afternoon). Saturated afternoon-blue zenith,
+      // a bright pale horizon and a green-gold haze below the line so the
+      // first frame already reads as a clear sunny day. (daylight.ts
+      // re-authors these live.)
+      uZenith: { value: new THREE.Color(0x1f7eef) },
+      uHorizon: { value: new THREE.Color(0xc8eeff) },
+      uGround: { value: new THREE.Color(0xdceec0) },
       uSunDir: { value: sunDir.clone() },
-      uSunColor: { value: new THREE.Color(0xfff3d4) },
+      uSunColor: { value: new THREE.Color(0xfff8e0) },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -242,11 +243,11 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const moteAttr = moteGeo.attributes.position as THREE.BufferAttribute;
 
   // ── Lights ───────────────────────────────────────────────────────────
-  // TROPICAL KEY: hard clean sun, cyan sky fill, and a ground bounce that is
-  // sunlit foliage rather than dark loam. Shadows stay readable — the hemi
-  // term keeps every shadow a soft blue-green, never black.
-  const hemi = new THREE.HemisphereLight(0xd8f2ff, 0x71893f, 1.1);
-  const sun = new THREE.DirectionalLight(0xfff2d8, 2.45);
+  // USER DIRECTIVE (sunny afternoon): hard clean sun, saturated sky fill,
+  // and a ground bounce that is sunlit grass — so every shadow stays a
+  // soft green, never mud or black.
+  const hemi = new THREE.HemisphereLight(0xc4eeff, 0x4e9c28, 1.22);
+  const sun = new THREE.DirectionalLight(0xfff8ea, 2.45);
   sun.position.copy(sunDir).multiplyScalar(70);
   if (budget.shadowMapSize > 0) {
     sun.castShadow = true;

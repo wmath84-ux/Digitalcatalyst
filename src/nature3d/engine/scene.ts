@@ -192,8 +192,8 @@ export class Sanctuary {
   // Hoisted scratch — the loop never allocates.
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
-  /** The tropical brightness push applied on top of the per-hour curve. */
-  private gradeExposure = 1.06;
+  /** The sunny-afternoon brightness push applied on top of the per-hour curve. */
+  private gradeExposure = 1.14;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -218,11 +218,11 @@ export class Sanctuary {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // TROPICAL GRADE (Phase 20): the per-hour curve in `daylight.ts` is
-    // contract-fixed, so the final brightness push lives here — a single
-    // +6 % on top of it. ACES rolls the highlights off, which is exactly what
-    // bright sand, white walls and white clouds need to hold detail.
-    this.gradeExposure = 1.06;
+    // USER DIRECTIVE (sunny afternoon): the per-hour curve in `daylight.ts`
+    // is contract-fixed, so the final brightness push lives here — +14 % on
+    // top of it. ACES rolls the highlights off, which is exactly what
+    // bright grass, white clouds and sun-glint on water need to hold detail.
+    this.gradeExposure = 1.14;
     this.renderer.toneMappingExposure = 1.08 * this.gradeExposure;
     if (this.budget.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
@@ -1105,8 +1105,7 @@ export class Sanctuary {
     this.orbit.panTo(this.tmpV.copy(placement.position), distance, placement.yaw, 0);
   }
 
-  /**
-   * Frame ALL THREE boards from the student's seat — the "Student" preset.
+  * Frame ALL THREE boards from the student's seat — the "Student" preset.
    * Same fitting maths, but against the full width of the trio (the outer
    * corner of a side board, mirrored) so nothing is cut off.
    */
@@ -1423,5 +1422,8 @@ export class Sanctuary {
     });
     this.scene.clear();
     this.renderer.dispose();
+  }
+}
+
   }
 }

@@ -551,13 +551,16 @@ export function groundColorAt(
   const worn = wornIn ?? pathWeight(x, z);
 
   // ── Base: lush ↔ dry ──────────────────────────────────────────────
+  // USER DIRECTIVE (natural green): most of the meadow stays lush. The dry
+  // lerp used to eat 85 % of the field into olive thatch; now it is a
+  // minority accent so the ground reads as grass, not straw.
   const patch =
     (Math.sin(x * 0.031) * Math.cos(z * 0.027) + 1) * 0.5 * 0.5 +
     (noise.noise2D(x * 0.012 + 4.2, z * 0.012 - 1.7) * 0.5 + 0.5) * 0.5;
-  out.copy(palette.lush).lerp(palette.dry, clamp01(patch * 0.85 + h * 0.012));
+  out.copy(palette.lush).lerp(palette.dry, clamp01(patch * 0.38 + h * 0.007));
 
-  // ── Drainage: the wet, dark soil of the channels ──────────────────
-  out.lerp(palette.mud, clamp01(wet * 1.15 - 0.12));
+  // ── Drainage: mossy darkening, not brown mud ──────────────────────
+  out.lerp(palette.mud, clamp01(wet * 0.55 - 0.18));
 
   // ── THE BEACH GRADIENT (Phase 4) ──────────────────────────────────
   //
@@ -605,9 +608,11 @@ export function groundColorAt(
   // ── The worn strip ────────────────────────────────────────────────
   out.lerp(palette.gravel, clamp01(worn * 1.25));
 
-  // ── Hue drift: warm on the sunlit facets, cool on the shaded ones ──
+  // ── Hue drift: sunlit flats go BRIGHTER and MORE SATURATED ────────
+  // USER DIRECTIVE (saturation): the old −2 % sat on flats washed the meadow
+  // out. Afternoon grass in hard sun is the opposite — chroma up, value up.
   const flatFace = clamp01((normalY - 0.83) / 0.17);
-  out.offsetHSL(0, -0.02 * flatFace, 0.012 * flatFace * (1 - wet));
+  out.offsetHSL(0, 0.07 * flatFace, 0.02 * flatFace * (1 - wet));
 
   return out;
 }

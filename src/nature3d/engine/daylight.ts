@@ -142,24 +142,22 @@ export function daylightAt(hour: number): DaylightState {
 
   return {
     sunDir,
-    sunColor: lerpColor(0xfff7e6, 0xff9450, warm).lerp(new THREE.Color(0xff7a40), evening * 0.35),
+    sunColor: lerpColor(0xfff8ea, 0xff9450, warm).lerp(new THREE.Color(0xff7a40), evening * 0.35),
     sunIntensity: THREE.MathUtils.lerp(0.95, 3.15, dayFactor),
-    // TROPICAL AIR. The sky light is a clean, bright cyan-blue (a tropical
-    // sky scatters harder blue than a temperate one) and the ground bounce is
-    // sunlit foliage and pale sand — warm green-gold, never mud. The zenith
-    // holds a saturated but CONTROLLED blue (no neon), the horizon washes to
-    // pale turquoise-white, and the fog is that same bright haze the
-    // references carry: distance on this island is measured in layers of
-    // turquoise air.
-    hemiSky: lerpColor(0xd2f2ff, 0xffcf9e, warm),
-    hemiGround: lerpColor(0x6d8a42, 0x594636, warm),
-    hemiIntensity: THREE.MathUtils.lerp(0.55, 1.15, dayFactor),
-    fillIntensity: THREE.MathUtils.lerp(0.22, 0.55, dayFactor),
-    zenith: lerpColor(0x2f7fd9, 0x35508f, warm),
-    horizon: lerpColor(0xd2f0fa, 0xffbd8c, warm),
-    ground: lerpColor(0xeadfc2, 0x9a7a5c, warm),
-    sunTint: lerpColor(0xfff3d4, 0xffa468, warm),
-    fog: lerpColor(0xc6e9f2, 0xf2c49a, warm),
+    // USER DIRECTIVE (sunny afternoon): a hard, clean, saturated sky — the
+    // zenith is a real afternoon blue, the horizon is bright pale, the ground
+    // bounce is sunlit grass (so shadows stay green, not mud), and the fog
+    // is clear blue air rather than dust. Colour literals are free; the
+    // intensity / exposure formulas stay pinned.
+    hemiSky: lerpColor(0xc4eeff, 0xffcf9e, warm),
+    hemiGround: lerpColor(0x4e9c28, 0x6a5a32, warm),
+    hemiIntensity: THREE.MathUtils.lerp(0.62, 1.28, dayFactor),
+    fillIntensity: THREE.MathUtils.lerp(0.26, 0.62, dayFactor),
+    zenith: lerpColor(0x1f7eef, 0x35508f, warm),
+    horizon: lerpColor(0xc8eeff, 0xffbd8c, warm),
+    ground: lerpColor(0xdceec0, 0x9a7a5c, warm),
+    sunTint: lerpColor(0xfff8e0, 0xffa468, warm),
+    fog: lerpColor(0xaedcfa, 0xf2c49a, warm),
     exposure: THREE.MathUtils.lerp(0.92, 1.16, dayFactor),
     dayFactor,
     hour: h,
