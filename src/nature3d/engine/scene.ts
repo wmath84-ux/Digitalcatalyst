@@ -514,6 +514,9 @@ export class Sanctuary {
       this.startBridge(e, onBoard);
       return;
     }
+    // Framed board: do not orbit. Dragging the camera is what made the 2D
+    // page look like it was spinning on the lectern.
+    if (this.studyFocus) return;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
@@ -546,6 +549,7 @@ export class Sanctuary {
     const dy = (e.clientY - this.pointerPrev.y) * 0.005;
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
+    if (this.studyFocus) return;
     if (this.mode === "orbit") this.orbit.rotate(dx, dy);
     // In walk mode the swipe orbits TerrainTrek's third-person camera around
     // the character, which is also what steers them: its theta is the heading.
@@ -590,6 +594,10 @@ export class Sanctuary {
     if (this.mode !== "orbit") return;
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
+    if (this.studyFocus) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     this.orbit.zoom(1 + Math.sign(e.deltaY) * 0.1);
   };
@@ -1050,6 +1058,7 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
+    this.screens.setReadSlot(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -1176,6 +1185,7 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
+    this.screens.setReadSlot(null);
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
@@ -1279,6 +1289,8 @@ export class Sanctuary {
     const placement = this.screens.byId(slot)?.placement;
     if (!placement) return;
     this.studyFocus = true;
+    this.orbit.autoRotate = false;
+    this.screens.setReadSlot(slot);
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
