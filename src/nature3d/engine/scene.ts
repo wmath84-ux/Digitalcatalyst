@@ -496,6 +496,10 @@ export class Sanctuary {
     // it into a camera pinch: cancel the synthetic sequence and hand BOTH
     // fingers to the rig (finger one rejoins at its last known point).
     if (this.bridge) {
+      // Framed board: a second finger must not become a camera pinch.
+      // Zooming the rig while the page is pinned is what painted a giant
+      // board into the sky.
+      if (this.studyFocus) return;
       const b = this.bridge;
       this.cancelBridge();
       this.pointers.set(b.pointerId, { x: b.lastX, y: b.lastY });
@@ -537,6 +541,7 @@ export class Sanctuary {
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (this.pointers.size >= 2 && this.mode === "orbit") {
+      if (this.studyFocus) return;
       const [a, b] = [...this.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (this.pinchPrev > 0) this.orbit.zoom(this.pinchPrev / Math.max(dist, 1));

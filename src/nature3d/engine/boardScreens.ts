@@ -180,6 +180,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   // they re-enable it on their own elements. Without this the whole canvas
   // would stop receiving the orbit/look drags.
   domElement.style.pointerEvents = "none";
+  domElement.style.overflow = "hidden";
 
   const screens: BoardScreen[] = placements.map((placement) => {
     const element = document.createElement("div");
@@ -250,12 +251,19 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let faceScale = 1;
   let readSlot: LecternSlot | null = null;
   let pinnedSlot: LecternSlot | null = null;
+  let liftedSlot: LecternSlot | null = null;
 
   const clearPin = (screen: BoardScreen) => {
     const el = screen.element;
     el.style.left = "";
     el.style.top = "";
+    el.style.right = "";
+    el.style.bottom = "";
+    el.style.width = `${SCREEN_PX_WIDTH}px`;
+    el.style.height = `${SCREEN_PX_HEIGHT}px`;
+    el.style.transform = "";
     el.style.transformOrigin = "";
+    el.style.position = "absolute";
     el.style.zIndex = "";
   };
 
@@ -272,6 +280,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     for (const sx of [-1, 1]) {
       for (const sy of [-1, 1]) {
         pinCorner.set(p.position.x + sx * hw * c, p.position.y + sy * hh, p.position.z - sx * hw * s).project(camera);
+        if (pinCorner.z < -1.05 || pinCorner.z > 1.05) return false;
         const x = (pinCorner.x * 0.5 + 0.5) * viewW;
         const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
         if (x < minX) minX = x;
@@ -282,7 +291,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     }
     const w = maxX - minX;
     const h = maxY - minY;
-    if (!(w > 8 && h > 8)) return;
+    // Behind the camera (or a pinched-out sky view) NDC explodes and this
+    // 2D face would paint a giant page across the heavens. Refuse it.
+    if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
     const el = screen.element;
     // Lift once onto the untransformed layer so left/top are layer pixels.
     // Do not do this every frame — moving an iframe reloads it.
@@ -295,6 +306,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     el.style.pointerEvents = "auto";
     el.style.zIndex = "2";
     pinnedSlot = screen.slot;
+    return true;
   };
 
   return {
@@ -315,9 +327,15 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
     setReadSlot(slot) {
       if (readSlot === slot) return;
-      if (pinnedSlot) {
-        const prev = screens.find((s) => s.slot === pinnedSlot);
-        if (prev) clearPin(prev);
+      if (liftedSlot) {
+        const prev = screens.find((s) => s.slot === liftedSlot);
+        if (prev) {
+          clearPin(prev);
+          if (prev.object.parent !== cssScene) cssScene.add(prev.object);
+          prev.object.visible = true;
+          prev.element.style.display = "";
+        }
+        liftedSlot = null;
         pinnedSlot = null;
       }
       readSlot = slot;
@@ -372,6 +390,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           toCamera.copy(camera.position).sub(screen.placement.position);
           visible = boardNormal.dot(toCamera) > 0;
         }
+        if (visible) {
+          // A board whose centre projects behind the camera (or far outside
+          // NDC) is the CSS3D "giant page in the sky" — hide it.
+          pinCorner.copy(screen.placement.position).project(camera);
+          if (pinCorner.z < -1 || pinCorner.z > 1 || Math.abs(pinCorner.x) > 2 || Math.abs(pinCorner.y) > 2) {
+            visible = false;
+          }
+        }
 
         if (visibility.get(screen.slot) !== visible) {
           visibility.set(screen.slot, visible);
@@ -384,22 +410,24 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         }
       }
 
-      // Fit-screen clicks need a 2D face (CSS3D drops the centre). Skip the
-      // CSS3DRenderer while framed so its 3D matrix cannot fight the pin —
-      // that fight is what made the page spin on the board.
+      // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
+      // the framed board out of the CSS3D scene so the other two keep their
+      // live pages — hiding them is what painted the neighbour boards black.
       if (readSlot) {
-        if (moved || pinnedSlot !== readSlot) {
-          for (const screen of screens) {
-            const show = screen.slot === readSlot;
-            screen.element.style.display = show ? "" : "none";
-            screen.object.visible = show;
+        const live = screens.find((s) => s.slot === readSlot);
+        if (live && (moved || pinnedSlot !== readSlot)) {
+          if (live.object.parent === cssScene) cssScene.remove(live.object);
+          liftedSlot = live.slot;
+          live.element.style.display = "";
+          if (!pinFace(live, camera)) {
+            // Do not hand it back to CSS3D — that is the sky billboard.
+            clearPin(live);
+            live.element.style.display = "none";
+            pinnedSlot = null;
           }
-          const live = screens.find((s) => s.slot === readSlot);
-          if (live) pinFace(live, camera);
           lastCamPos.copy(camera.position);
           lastCamQuat.copy(camera.quaternion);
         }
-        return;
       }
 
       if (!moved && !changed) return;
