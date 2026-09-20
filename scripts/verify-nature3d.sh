@@ -20,7 +20,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 status=0
-for harness in shaders world; do
+for harness in shaders world avatar; do
   echo "── nature3d :: $harness ──────────────────────────────────────────"
   npx esbuild "scripts/verify-nature3d-$harness.mts" \
     --bundle --format=esm --platform=node \

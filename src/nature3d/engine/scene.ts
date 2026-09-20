@@ -365,6 +365,7 @@ export class Sanctuary {
     // The walking character. It starts seated on the study chair, and stands
     // up the moment the learner takes control in walk mode.
     this.avatar = createTrekAvatar(this.budget.shadowMapSize > 0);
+    this.avatar.setLowEnd(this.budget.tier === "low");
     this.scene.add(this.avatar.group);
     this.trek.reset(0, 3.4);
     this.avatar.setSeated(true, new THREE.Vector3(0, terrainHeight(0, 2.6), 2.6));
@@ -807,6 +808,15 @@ export class Sanctuary {
     this.hudSprint = on;
   }
 
+  /**
+   * Queue a jump for the walking character (HUD jump button).
+   * Edge-triggered and consumed by the next player update — safe to call in
+   * any mode; outside walk mode the flag is simply cleared, never latched.
+   */
+  queueJump() {
+    this.trek.jumpQueued = true;
+  }
+
   setWind(multiplier: number) {
     this.wind = multiplier;
   }
@@ -1034,6 +1044,15 @@ export class Sanctuary {
   }
 
   /**
+   * The aspect-corrected base fov, as last computed by applyFov.
+   *
+   * The walk mode's sprint FOV kick is ADDED to this every frame (see the
+   * tick), so the kick can never fight the narrow-screen correction — the
+   * base stays owned in exactly one place.
+   */
+  private correctedFov = 52;
+
+  /**
    * Apply the mode's fov with the narrow-screen correction folded in, and
    * push it to the projection. Called on resize AND on every mode change, so
    * switching modes can never silently undo the correction.
@@ -1048,6 +1067,7 @@ export class Sanctuary {
     }
     // Never let the correction run away on an extremely tall viewport.
     this.camera.fov = Math.min(fov, 100);
+    this.correctedFov = this.camera.fov;
     this.camera.updateProjectionMatrix();
   }
 
@@ -1111,15 +1131,23 @@ export class Sanctuary {
       // Taking control stands them up off the chair.
       if (this.avatar.seated && active) this.avatar.setSeated(false);
       this.trek.boost = this.keyboard.sprint || this.hudSprint;
+      if (this.keyboard.consumeJump()) this.trek.jumpQueued = true;
       this.trek.update(dt, { x: mx, y: my, active }, this.camera, WORLD_REACH);
       if (!this.avatar.seated) {
         this.avatar.group.position.copy(this.trek.position);
         this.avatar.group.rotation.y = this.trek.rotation;
       }
       this.avatar.setVisible(true);
+      // Pose the rig from the locomotion state (gait, lean, IK, landing).
+      this.avatar.update(dt, time, this.trek, this.camera);
+      // Sprint FOV kick on top of the aspect-corrected base (see applyFov).
+      this.camera.fov = this.correctedFov + this.trek.fovKickDegrees();
+      this.camera.updateProjectionMatrix();
     } else {
       this.orbit.update(dt, this.camera);
       this.avatar.setVisible(true);
+      // Seated: breathing only — the folds stay where setSeated put them.
+      this.avatar.update(dt, time, this.trek, this.camera);
     }
 
     // ── World (staggered) ─────────────────────────────────────────────
