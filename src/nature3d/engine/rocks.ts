@@ -357,12 +357,16 @@ export function createRockField(
   };
 
   for (let m = 0; m < MASTER_COUNT; m += 1) {
-    // Same seed → same rock, two resolutions.
+    // Same seed → same rock. USER DIRECTIVE (big-stone design pass): the far
+    // masters used to be sculpted at detail 1 (80 triangles), so every LARGE
+    // boulder read as a smooth featureless lump next to the crisp small ones.
+    // Both buckets now sculpt the SAME detail-2 master — big and small stones
+    // are literally the same design. (Two geometries, not one shared: the
+    // per-instance weather attribute lives ON the geometry, so a shared
+    // master would let the far bucket overwrite the near bucket's weather.)
     const seed = 0x9e37_79b9 + m * 0x45d9_f3b;
-    const near = sculptRock(mulberry32(seed), 2);
-    const far = sculptRock(mulberry32(seed), 1);
-    buildBucket(near, nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
-    buildBucket(far, farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
+    buildBucket(sculptRock(mulberry32(seed), 2), nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
+    buildBucket(sculptRock(mulberry32(seed), 2), farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
   }
 
   // ── Contact decals: one instanced mesh for the whole field ──────────

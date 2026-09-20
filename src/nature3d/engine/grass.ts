@@ -267,8 +267,10 @@ function buildRing(
       // old temperate olive, and the beach tufts (over pale sand) drift
       // naturally toward dune-grass yellow. Per-blade jitter on top stops
       // any two blades matching.
+      // USER DIRECTIVE (saturation pass): floor raised 0.42 → 0.52 so even a
+      // desaturated patch of ground keeps vivid, natural grass chroma.
       const hue = 0.232 + hsl.l * 0.06 + patch * 0.02 + (Math.random() - 0.5) * opts.colorJitter;
-      const sat = 0.42 + hsl.s * 0.32 + patch * 0.1 + Math.random() * 0.1;
+      const sat = 0.52 + hsl.s * 0.32 + patch * 0.1 + Math.random() * 0.1;
       const lit = 0.27 + hsl.l * 0.36 + Math.random() * 0.16 - patch * 0.04;
       color.setHSL(hue, sat, lit);
       mesh.setColorAt(placed, color);
@@ -363,7 +365,7 @@ function plantSkirt(
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
-      color.setHSL(0.25 + Math.random() * 0.03, 0.48 + Math.random() * 0.12, 0.26 + Math.random() * 0.14);
+      color.setHSL(0.25 + Math.random() * 0.03, 0.56 + Math.random() * 0.12, 0.26 + Math.random() * 0.14);
       mesh.setColorAt(placed, color);
       placed += 1;
     }

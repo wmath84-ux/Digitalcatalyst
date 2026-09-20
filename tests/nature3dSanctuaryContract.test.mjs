@@ -1175,6 +1175,30 @@ test("board taps are guaranteed by the engine's raycast bridge, not by device hi
   // ... and a faithful synthetic replay (pointerdown/up, click, pointercancel).
   assert.match(SCENE, /new PointerEvent\(/);
   assert.match(SCENE, /\.dispatchEvent\(/);
+  // FAITHFUL means the legacy mouse half too: panels wire controls to
+  // onMouseDown (the notes editor's whole formatting toolbar), and a
+  // pointer-only replay left every one of those dead under the bridge while
+  // the same board worked pinched out (native path). mousedown rides at the
+  // native moment (after pointerdown), mouseup before the click.
+  assert.match(SCENE, /private syntheticMouse\(/);
+  assert.match(SCENE, /new MouseEvent\(/);
+  assert.match(SCENE, /this\.syntheticMouse\("mousedown"/);
+  assert.match(SCENE, /this\.syntheticMouse\("mouseup"/);
+  // And the pointerdown DEFAULT ACTION is reproduced by hand: synthetic
+  // events carry no focus/caret, which is why typing in the notes editor
+  // never worked under the bridge. The bridge focuses the editable the
+  // finger touched and places the caret at the finger's coordinates, unless
+  // the panel cancelled mousedown to manage focus itself.
+  assert.match(SCENE, /private focusTapTarget\(/);
+  assert.match(SCENE, /el\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(SCENE, /caretRangeFromPoint|caretPositionFromPoint/);
+  assert.match(SCENE, /if \(!mouse\.defaultPrevented\) this\.focusTapTarget\(/);
+  // Targeting is PAINT ORDER (elementFromPoint), not document order: the
+  // panels portal dropdown menus to <body>, outside the board element, and
+  // overlay viewers stack absolutely-positioned planes — the old
+  // last-in-document-order scan picked the wrong element in both.
+  assert.match(SCENE, /document\.elementFromPoint\(x, y\)/);
+  assert.match(SCENE, /private bridgeMayTarget\(/);
   // The bridge owns the mis-delivered touch the moment it re-aims it.
   const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
   assert.match(down, /if \(this\.boardTarget\(e\.target\)\) return;/);

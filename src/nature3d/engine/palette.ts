@@ -160,8 +160,12 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  lush: new THREE.Color(0x3f8128),
-  dry: new THREE.Color(0x93a048),
+  // USER DIRECTIVE (saturation pass): the meadow read washed-out on device —
+  // the greens are pushed up in chroma (lush +18 % sat, dry pulled greener)
+  // while keeping the hue natural; the eye accepts saturated green grass,
+  // it rejects neon.
+  lush: new THREE.Color(0x2f9220),
+  dry: new THREE.Color(0x86a032),
   mud: new THREE.Color(0x6a593d),
   rock: new THREE.Color(0x8d8770),
   gravel: new THREE.Color(0xd2c5a0),
@@ -181,13 +185,15 @@ export const GROUND_PALETTE: GroundPalette = {
  * carrying a cool blue-green cast so shadowed foliage never goes black.
  */
 export const FOLIAGE_PALETTE = {
-  /** Grass blades, root … tip. The tip is where new growth and sunlight meet. */
-  bladeRoot: new THREE.Color(0x2f5c1e),
-  bladeMid: new THREE.Color(0x54922e),
-  bladeTip: new THREE.Color(0xa4cd58),
+  /** Grass blades, root … tip. The tip is where new growth and sunlight meet.
+   *  USER DIRECTIVE (saturation pass): all three pushed up in chroma — the
+   *  blade gradient now runs deep saturated green → vivid yellow-green. */
+  bladeRoot: new THREE.Color(0x276314),
+  bladeMid: new THREE.Color(0x3d9c1e),
+  bladeTip: new THREE.Color(0x93d937),
   /** Leaf cards, inner canopy … outer. */
-  leafDeep: new THREE.Color(0x2c5626),
-  leafLit: new THREE.Color(0x77a844),
+  leafDeep: new THREE.Color(0x235e19),
+  leafLit: new THREE.Color(0x63b32a),
   /** Transmitted light through a leaf (the cheap subsurface term). */
   transmittance: new THREE.Color(0xa9cf5d),
   /** Bark, young … old (older bark is paler, greyer and more fissured). */

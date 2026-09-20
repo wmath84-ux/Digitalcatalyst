@@ -207,13 +207,15 @@ export function createTextures(anisotropy: number): TextureSet {
   // ── Grass blade (single alpha-tested blade, gradient root→tip) ───────
   // TROPICAL: a brighter, sunnier gradient — deep green root, clean green
   // mid, yellow-green lit tip (the island grass is warm, never olive).
+  // USER DIRECTIVE (saturation pass): gradient chroma raised to match the
+  // FOLIAGE_PALETTE blade stops.
   const blade = canvas2d(64, 256);
   blade.ctx.clearRect(0, 0, 64, 256);
   const bg = blade.ctx.createLinearGradient(0, 256, 0, 0);
-  bg.addColorStop(0, "#2f5c1e");
-  bg.addColorStop(0.42, "#4c8c26");
-  bg.addColorStop(0.78, "#72b13e");
-  bg.addColorStop(1, "#b2d663");
+  bg.addColorStop(0, "#276314");
+  bg.addColorStop(0.42, "#3d9c1e");
+  bg.addColorStop(0.78, "#5fb02e");
+  bg.addColorStop(1, "#a4dc45");
   blade.ctx.fillStyle = bg;
   blade.ctx.beginPath();
   blade.ctx.moveTo(24, 256);

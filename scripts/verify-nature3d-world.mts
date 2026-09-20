@@ -161,9 +161,13 @@ check("rocks: no NaN instance transforms", rockNaNs === 0, `${rockNaNs}`);
 const master = boulders.find((m) => m.name === "rock-master-0");
 const masterFar = boulders.find((m) => m.name === "rock-master-0-far");
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
-check("rocks: the far LOD is cheaper than the near one",
-  !!master && !!masterFar && tris(masterFar.geometry) < tris(master.geometry),
-  master && masterFar ? `${tris(master.geometry)} → ${tris(masterFar.geometry)} tris` : "missing");
+// USER DIRECTIVE (big-stone design pass): the far masters are now the SAME
+// detail-2 sculpt as the near ones — large boulders used to be 80-triangle
+// lumps that read wrong next to the crisp small rocks. Equal triangle cost
+// per boulder is the point, not a regression.
+check("rocks: the far LOD carries the same design as the near one",
+  !!master && !!masterFar && tris(masterFar.geometry) === tris(master.geometry) && tris(master.geometry) > 100,
+  master && masterFar ? `${tris(master.geometry)} = ${tris(masterFar.geometry)} tris` : "missing");
 
 const bake = master?.geometry.getAttribute("aDcBake") as THREE.BufferAttribute | undefined;
 let bakeBad = 0;

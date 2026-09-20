@@ -126,7 +126,10 @@ export function createWater(
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
     // TROPICAL GRADE: the base body is a clear turquoise, not steel blue.
-    color: 0x2f9fae,
+    // USER DIRECTIVE (blue pass): pushed from turquoise (0x2f9fae) to a
+    // saturated azure — hue 0.58 vs the old 0.53 — so the river reads BLUE
+    // the way the learner asked, with the depth ramp below following.
+    color: 0x1f7fd4,
     roughness: 0.13,
     metalness: 0.0,
     transparent: true,
@@ -210,10 +213,13 @@ export function createWater(
         // geometry or depth pass (principle 39: fake the part nobody checks).
         // TROPICAL GRADE: shallow water is bright turquoise, the channel
         // saturates to a clear teal-blue — a tropical river, not a northern one.
+        // USER DIRECTIVE (blue pass): both stops shifted toward saturated
+        // blue — shallow #6fd8cf → #58c8f0, deep #0b4a63 → #0847a0 — so the
+        // gradient runs vivid cyan-blue into deep blue with no green cast.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 4.2, dcBank);
-        vec3 dcDeep = vec3(0.004, 0.052, 0.098);      // sRGB #0b4a63
-        vec3 dcShallow = vec3(0.150, 0.640, 0.600);   // sRGB #6fd8cf
+        vec3 dcDeep = vec3(0.006, 0.078, 0.235);       // sRGB #0847a0
+        vec3 dcShallow = vec3(0.130, 0.560, 0.830);    // sRGB #58c8f0
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
         // ── Sky reflection, read off the atmosphere ─────────────────────
@@ -583,9 +589,9 @@ export function createWater(
           //   2.5–9 m   clear tropical blue
           //   9 m +     deep, saturated sea blue
           float dcD = clamp( vDcDepth, 0.0, 14.0 );
-          vec3 dcShallowC = vec3( 0.160, 0.700, 0.640 );  // sRGB #66deda-ish
-          vec3 dcMidC     = vec3( 0.030, 0.310, 0.480 );  // sRGB #2f9ec4-ish
-          vec3 dcDeepC    = vec3( 0.006, 0.090, 0.220 );  // sRGB #0f66b4-ish
+          vec3 dcShallowC = vec3( 0.120, 0.620, 0.840 );  // USER blue pass: #58cfe6, no green cast
+          vec3 dcMidC     = vec3( 0.016, 0.330, 0.680 );  // saturated azure
+          vec3 dcDeepC    = vec3( 0.004, 0.080, 0.300 );  // deep blue
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
 
