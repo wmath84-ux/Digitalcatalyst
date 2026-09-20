@@ -97,6 +97,11 @@ export interface BoardScreensHandle {
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
   setSize(width: number, height: number): void;
+  /**
+   * The board the camera is parked on. Its DOM is pinned as a 2D face so
+   * native clicks (notes, mind-map, iframes) land; not a separate overlay.
+   */
+  setReadSlot(slot: LecternSlot | null): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
@@ -242,6 +247,62 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
   const visibility = new Map<LecternSlot, boolean>();
+  const pinCorner = new THREE.Vector3();
+  let viewW = 1;
+  let viewH = 1;
+  let faceScale = 1;
+  let readSlot: LecternSlot | null = null;
+  let pinnedSlot: LecternSlot | null = null;
+
+  const clearPin = (screen: BoardScreen) => {
+    const el = screen.element;
+    el.style.left = "";
+    el.style.top = "";
+    el.style.transformOrigin = "";
+    el.style.zIndex = "";
+  };
+
+  const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
+    const p = screen.placement;
+    const c = Math.cos(p.yaw);
+    const s = Math.sin(p.yaw);
+    const hw = (LECTERN_BOARD_WIDTH * faceScale) / 2;
+    const hh = (LECTERN_BOARD_HEIGHT * faceScale) / 2;
+    const px = p.position.x;
+    const py = p.position.y;
+    const pz = p.position.z;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        pinCorner.set(px + sx * hw * c, py + sy * hh, pz - sx * hw * s).project(camera);
+        const x = (pinCorner.x * 0.5 + 0.5) * viewW;
+        const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    const w = maxX - minX;
+    const h = maxY - minY;
+    if (!(w > 8 && h > 8)) return;
+    const el = screen.element;
+    // CSS3DRenderer parents the element under a 3D-transformed camera
+    // node; left/top there are not viewport pixels. Lift it onto the
+    // untransformed layer so the 2D pin hit-tests like a normal page.
+    if (el.parentElement !== domElement) domElement.appendChild(el);
+    el.style.position = "absolute";
+    el.style.left = `${minX}px`;
+    el.style.top = `${minY}px`;
+    el.style.transformOrigin = "0 0";
+    el.style.transform = `scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
+    el.style.pointerEvents = "auto";
+    el.style.zIndex = "2";
+    pinnedSlot = screen.slot;
+  };
 
   return {
     screens,
@@ -254,11 +315,25 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     },
 
     setSize(width, height) {
+      viewW = width;
+      viewH = height;
       renderer.setSize(width, height);
+    },
+
+    setReadSlot(slot) {
+      if (readSlot === slot) return;
+      if (pinnedSlot) {
+        const prev = screens.find((s) => s.slot === pinnedSlot);
+        if (prev) clearPin(prev);
+        pinnedSlot = null;
+      }
+      readSlot = slot;
+      lastCamPos.set(1e9, 1e9, 1e9);
     },
 
     setScale(scale) {
       const s = scale > 0 ? scale : 1;
+      faceScale = s;
       const placements = lecternPlacementsAt(s);
       screens.forEach((screen, i) => {
         const p = placements[i];
@@ -314,6 +389,28 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           screen.object.visible = visible;
           changed = true;
         }
+      }
+
+      // Fit-screen: CSS3D hit-testing drops the centre of a full-size
+      // face (notes heading, mind-map +, YouTube iframe). Pin THAT
+      // board's own element as a 2D rectangle on its projected quad so
+      // native clicks land. Skip CSS3DRenderer while framed — it would
+      // rewrite the 3D camera transform over the pin (and moving the
+      // host would reload iframes). Same host React already portals
+      // into — not a second overlay.
+      if (readSlot) {
+        if (moved || pinnedSlot !== readSlot) {
+          for (const screen of screens) {
+            const show = screen.slot === readSlot;
+            screen.element.style.display = show ? "" : "none";
+            screen.object.visible = show;
+          }
+          const live = screens.find((s) => s.slot === readSlot);
+          if (live) pinFace(live, camera);
+          lastCamPos.copy(camera.position);
+          lastCamQuat.copy(camera.quaternion);
+        }
+        return;
       }
 
       if (!moved && !changed) return;

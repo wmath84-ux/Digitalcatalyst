@@ -1116,6 +1116,33 @@ test("the tray switches boards and the camera turns to the one picked", () => {
   assert.match(SCENE, /\| "reading" \| "notes" \| "mindmap"/);
 });
 
+test("the HUD offers extra board sizes and fit-screen pins the framed face", () => {
+  // Size buttons must actually RENDER — a constant with no JSX is how
+  // this option previously shipped as "not done".
+  assert.match(PAGE, /const BOARD_SCALES/);
+  assert.match(PAGE, /BOARD_SCALES\.map/);
+  for (const label of ["1×", "1½×", "2×", "3×"]) {
+    assert.ok(PAGE.includes(`label: "${label}"`), `missing size ${label}`);
+  }
+  assert.match(PAGE, /engineRef\.current\?\.setBoardScale\(scale\)/);
+  assert.match(SCENE, /setBoardScale\(scale: number\)/);
+  assert.match(SCENE, /this\.screens\.setScale\(s\)/);
+  assert.match(LECTERN, /export function lecternPlacementsAt/);
+  assert.match(LECTERN, /BOARD_SCALE_OPTIONS = \[1, 1\.5, 2, 3\]/);
+  // Fit-screen: pin that board's own DOM as a 2D face so native clicks
+  // (notes heading, mind-map +, YouTube iframe) land. Not a 2D overlay.
+  assert.match(SCREENS, /setReadSlot/);
+  assert.match(SCENE, /this\.screens\.setReadSlot\(slot\)/);
+  assert.match(SCENE, /this\.screens\.setReadSlot\(null\)/);
+  const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
+  assert.match(down, /nativeNested/);
+  for (const [name, src] of [["scene", SCENE], ["page", PAGE], ["screens", SCREENS]]) {
+    for (const gone of ["setBoardPresented", "presentedSlot", "stageHost", "panelRef", "dc-reading-page"]) {
+      assert.ok(!src.includes(gone), `${name} still carries the removed reading-page mechanism: ${gone}`);
+    }
+  }
+});
+
 test("board input does not fight the camera", () => {
   // The board is a child of the element carrying the orbit/look handlers, so
   // without this every click in a panel would also spin the world.

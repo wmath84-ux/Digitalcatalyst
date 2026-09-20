@@ -452,20 +452,28 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
-    // FULL-SCREEN BOARD: CSS3D hit-testing of nested controls is unreliable
-    // in the centre of a 30 m page (notes editor, mind-map nodes). Capture
-    // phase sees the tap first; the geometric bridge re-aims it. Iframes
-    // keep native events — synthetic clicks cannot enter a cross-origin frame.
+    // FULL-SCREEN BOARD: the framed face is pinned as a 2D rectangle, so
+    // nested controls (notes heading/body, mind-map +, YouTube iframe)
+    // hit-test natively. Synthetic events cannot enter an iframe or place
+    // a caret — never steal those. Capture only when CSS3D / the canvas
+    // ate the tap, then the geometric bridge re-aims it.
     if (this.studyFocus) {
+      const nativeNested =
+        e.target instanceof Element &&
+        this.boardTarget(e.target) &&
+        !e.target.classList.contains("nature3d-board-screen");
+      if (nativeNested) return;
+
       const framed = this.localOnBoard(e);
       if (framed) {
         const hit = this.boardTargetAt(framed.screen, e.clientX, e.clientY, framed.x, framed.y);
-        if (!(hit instanceof HTMLIFrameElement) && hit.tagName !== "IFRAME") {
-          e.preventDefault();
-          e.stopPropagation();
-          this.startBridge(e, framed, hit);
+        if (hit instanceof HTMLIFrameElement || hit.tagName === "IFRAME" || hit.closest("iframe")) {
           return;
         }
+        e.preventDefault();
+        e.stopPropagation();
+        this.startBridge(e, framed, hit);
+        return;
       }
     }
     // A hit on the board ROOT (no nested control) is CSS3D missing the
@@ -1042,6 +1050,7 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
+    this.screens.setReadSlot(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -1168,6 +1177,7 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
+    this.screens.setReadSlot(null);
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
@@ -1271,6 +1281,7 @@ export class Sanctuary {
     const placement = this.screens.byId(slot)?.placement;
     if (!placement) return;
     this.studyFocus = true;
+    this.screens.setReadSlot(slot);
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
