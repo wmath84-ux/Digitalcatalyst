@@ -259,6 +259,20 @@ flora.group.traverse((o) => {
   if (mesh.isInstancedMesh && mesh.material === flora.foliageMaterials[3]) palmImpostorCards = mesh.count;
 });
 check("palms: far palms became palm-silhouette impostors", palmImpostorCards > 0, `${palmImpostorCards} cards`);
+// Fronds live in their own root-pivoted buckets (NOT the broadleaf leaf
+// buckets; the frond materials stay internal to the system). Both card
+// geometries are 4-vert planes, so tell the bucket apart by the re-base:
+// frondGeo spans x 0…1 / y ±0.25, leafGeo spans x ±0.5 / y ±0.5.
+let frondCards = 0;
+flora.group.traverse((o) => {
+  const mesh = o as THREE.InstancedMesh;
+  if (!mesh.isInstancedMesh) return;
+  const geo = mesh.geometry as THREE.BufferGeometry;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  if (bb.min.x > -0.01 && Math.abs(bb.max.y - 0.25) < 0.01) frondCards += mesh.count;
+});
+check("palms: near palms carry instanced frond cards", frondCards > 0, `${frondCards} fronds`);
 check("trees: foliage/solid materials are published",
   // 3 leaf materials + the palm impostor; wood + palm wood + pines + shrubs + flowers.
   flora.foliageMaterials.length === 4 && flora.solidMaterials.length === 5);

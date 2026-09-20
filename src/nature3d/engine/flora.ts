@@ -286,6 +286,27 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     m.receiveShadow = shadows;
     m.frustumCulled = false; // canopy spans the whole scene
   }
+
+  // Palm fronds get their OWN bucket pair: the same per-instance wind
+  // mechanics as the leaf cards, but on the root-pivoted frond geometry and
+  // the frond texture — a broadleaf leaf card would read as a blob, and the
+  // centre-pivoted leaf geometry would spin fronds in place instead of
+  // sweeping them around the crown.
+  const frondMatSway = makeLeafMaterial(true, tex.frond);
+  const frondMatStill = makeLeafMaterial(false, tex.frond);
+  const palmSwayTrees = layout.filter((t) => t.kind === "palm" && t.sways && !t.impostor).length;
+  const palmStillTrees = layout.filter((t) => t.kind === "palm" && !t.sways && !t.impostor).length;
+  const maxFrondSway = palmSwayTrees * (budget.leavesPerTree + 6) + 8;
+  const maxFrondStill = palmStillTrees * (budget.leavesPerTree + 6) + 8;
+  const frondSway = new THREE.InstancedMesh(frondGeo, frondMatSway, Math.max(1, maxFrondSway));
+  const frondStill = new THREE.InstancedMesh(frondGeo, frondMatStill, Math.max(1, maxFrondStill));
+  for (const m of [frondSway, frondStill]) {
+    m.castShadow = shadows;
+    m.receiveShadow = shadows;
+    m.frustumCulled = false;
+  }
+  let frondSwayIndex = 0;
+  let frondStillIndex = 0;
   let swayIndex = 0;
   let stillIndex = 0;
   const dummy = new THREE.Object3D();
@@ -445,16 +466,20 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         const tilt = (totalLean / SEGS) * (seg + 0.5);
         const midX = px + leanDirX * Math.sin(tilt) * segLen * 0.5;
         const midZ = pz + leanDirZ * Math.sin(tilt) * segLen * 0.5;
-        bake(
-          palmWoodParts,
-          woodColor(new THREE.CylinderGeometry(r1, r0, segLen * 1.04, 7), "trunk"),
-          midX,
-          py + Math.cos(tilt) * segLen * 0.5,
-          midZ,
-          leanDirZ * tilt,
-          0,
-          -leanDirX * tilt,
-        );
+        // Impostor palms only need the CURVE (for the card's crown anchor) —
+        // the trunk itself is baked by nothing, so skip the geometry.
+        if (!t.impostor) {
+          bake(
+            palmWoodParts,
+            woodColor(new THREE.CylinderGeometry(r1, r0, segLen * 1.04, 7), "trunk"),
+            midX,
+            py + Math.cos(tilt) * segLen * 0.5,
+            midZ,
+            leanDirZ * tilt,
+            0,
+            -leanDirX * tilt,
+          );
+        }
         px += leanDirX * Math.sin(tilt) * segLen;
         pz += leanDirZ * Math.sin(tilt) * segLen;
         py += Math.cos(tilt) * segLen;
@@ -467,20 +492,24 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
 
       // Coconuts: three small husk spheres tucked under the crown. Constant
       // vertex colour (the palette's coconut husk) — no extra material.
-      const nuts = 2 + ((Math.random() * 2) | 0);
-      for (let n = 0; n < nuts; n += 1) {
-        const na = (n / nuts) * Math.PI * 2 + Math.random();
-        const nut = new THREE.SphereGeometry(0.15 * s, 6, 5);
-        const nPos = nut.attributes.position as THREE.BufferAttribute;
-        const nCol = new Float32Array(nPos.count * 3);
-        for (let vi = 0; vi < nPos.count; vi += 1) {
-          nCol[vi * 3] = 0.33;
-          nCol[vi * 3 + 1] = 0.26;
-          nCol[vi * 3 + 2] = 0.16;
+      // (Impostor palms skip them — the silhouette card already implies the
+      // crown cluster, and a nut at 200 m is sub-pixel.)
+      if (!t.impostor) {
+        const nuts = 2 + ((Math.random() * 2) | 0);
+        for (let n = 0; n < nuts; n += 1) {
+          const na = (n / nuts) * Math.PI * 2 + Math.random();
+          const nut = new THREE.SphereGeometry(0.15 * s, 6, 5);
+          const nPos = nut.attributes.position as THREE.BufferAttribute;
+          const nCol = new Float32Array(nPos.count * 3);
+          for (let vi = 0; vi < nPos.count; vi += 1) {
+            nCol[vi * 3] = 0.33;
+            nCol[vi * 3 + 1] = 0.26;
+            nCol[vi * 3 + 2] = 0.16;
+          }
+          nut.setAttribute("color", new THREE.BufferAttribute(nCol, 3));
+          nut.translate(Math.cos(na) * 0.3 * s, -0.24 * s, Math.sin(na) * 0.3 * s);
+          palmWoodParts.push(nut);
         }
-        nut.setAttribute("color", new THREE.BufferAttribute(nCol, 3));
-        nut.translate(Math.cos(na) * 0.3 * s, -0.24 * s, Math.sin(na) * 0.3 * s);
-        palmWoodParts.push(nut);
       }
 
       // ── The frond crown ──────────────────────────────────────────────
@@ -508,8 +537,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         continue;
       }
 
-      const target = t.sways ? leavesSway : leavesStill;
-      const cap = t.sways ? maxSway : maxStill;
+      const target = t.sways ? frondSway : frondStill;
+      const cap = t.sways ? maxFrondSway : maxFrondStill;
       const fronds = Math.min(P.fronds, Math.max(6, budget.leavesPerTree));
       const frondQ = new THREE.Quaternion();
       const frondRoll = new THREE.Quaternion();
@@ -517,7 +546,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       const X_AXIS = new THREE.Vector3(1, 0, 0);
       const unhealthy = t.variant === 2 && Math.random() < 0.4; // some C-palms yellow
       for (let f = 0; f < fronds; f += 1) {
-        const slot = t.sways ? swayIndex : stillIndex;
+        const slot = t.sways ? frondSwayIndex : frondStillIndex;
         if (slot >= cap) break;
         const yaw = (f / fronds) * Math.PI * 2 + Math.random() * 0.5;
         // Fronds near the top stay almost upright; outer ones droop. The
@@ -550,8 +579,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
           0.3 + outer * 0.12 + Math.random() * 0.08,
         );
         target.setColorAt(slot, color);
-        if (t.sways) swayIndex += 1;
-        else stillIndex += 1;
+        if (t.sways) frondSwayIndex += 1;
+        else frondStillIndex += 1;
       }
       // Birds perch in palm crowns — the frond bases ARE the branches.
       perches.push(new THREE.Vector3(crownX + 0.4 * s, crownY + 0.3, crownZ));
@@ -815,6 +844,14 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   }
   group.add(leavesSway, leavesStill);
 
+  frondSway.count = frondSwayIndex;
+  frondStill.count = frondStillIndex;
+  for (const m of [frondSway, frondStill]) {
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
+  group.add(frondSway, frondStill);
+
   // ── Shrubs (instanced spheres of leaf cards would be heavy — use
   //    low-poly icospheres with the bark/leaf palette instead) ──────────
   // TROPICAL: warmer island green; on the beach they thin out so the sand
@@ -892,9 +929,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     foliageMaterials: [leafMatSway, leafMatStill, impostorMat, palmImpostorMat],
     solidMaterials: [trunkMat, palmTrunkMat, pineMat, shrubMat, flowerMat],
     update(time, wind) {
-      // Both wind-animated foliage materials — the near canopy and the distant
-      // impostors — run off the same two uniforms.
-      for (const mat of [leafMatSway, impostorMat]) {
+      // Every wind-animated foliage material — the near canopy, the palm
+      // fronds, and both impostor sets — runs off the same two uniforms.
+      for (const mat of [leafMatSway, impostorMat, palmImpostorMat, frondMatSway]) {
         const shader = mat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
         if (!shader) continue;
         shader.uniforms.uTime.value = time;
