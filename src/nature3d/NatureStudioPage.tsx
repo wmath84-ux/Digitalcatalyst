@@ -16,6 +16,7 @@
 // through a ref. That is what keeps the panel at a locked frame rate.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Compass, Eye, EyeOff, Footprints,
   Maximize2, Minimize2, PawPrint, RotateCw,
@@ -25,7 +26,7 @@ import {
 import Joystick from "./components/Joystick";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
-import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
+import BoardPortals, { type BoardHosts, type BoardSlot } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
 import { hourForMode, type DaylightMode } from "./engine/daylight";
@@ -108,6 +109,19 @@ export default function NatureStudioPage() {
   // the engine has booted, so React portals into them on a second pass.
   const [boardHosts, setBoardHosts] = useState<BoardHosts>({ mindmap: null, reading: null, notes: null });
   const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
+  // The board presented as the flat 2D reading page (the BGMI scope): plain
+  // DOM at the HUD-free rect, no transforms — the same shape as the 2D app.
+  const [presented, setPresented] = useState<BoardSlot | null>(null);
+  // The engine's flat stage layer the reading page is portaled into.
+  const [stageEl, setStageEl] = useState<HTMLElement | null>(null);
+  // The div inside the reading page that receives the panel portal. The ref
+  // only exists once the page has mounted, so the portal targets it one
+  // frame later (the page's entrance animation covers that).
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [panelReady, setPanelReady] = useState(false);
+  // The measured HUD insets, kept here too so the reading page can sit in
+  // exactly the same free rect the engine frames boards against.
+  const [insets, setInsets] = useState({ top: 84, bottom: 112, left: 80, right: 18 });
   // True when the learner has hidden every HUD button (bottom-right toggle).
   // Only the toggle itself stays on screen.
   const [hudHidden, setHudHidden] = useState(false);
@@ -151,6 +165,7 @@ export default function NatureStudioPage() {
     }
     engineRef.current = engine;
     setBoardHosts(engine.boardHosts());
+    setStageEl(engine.stageHost());
 
     const resize = () => {
       const r = host.getBoundingClientRect();
@@ -188,6 +203,9 @@ export default function NatureStudioPage() {
     const engine = engineRef.current;
     if (!engine) return;
     const next: CameraMode = engine.getMode() === "fpp" ? "orbit" : "fpp";
+    // Walking leaves the reading page behind.
+    setPresented(null);
+    engine.setBoardPresented(null);
     engine.setMode(next);
     setMode(next);
     if (next === "fpp") setAutoOrbit(false);
@@ -241,7 +259,9 @@ export default function NatureStudioPage() {
     const eng = engineRef.current;
     if (!eng) return;
     if (hudHidden) {
-      eng.setHudInsets({ top: 10, bottom: 10, left: 10, right: 10 });
+      const v = { top: 10, bottom: 10, left: 10, right: 10 };
+      eng.setHudInsets(v);
+      setInsets(v);
       return;
     }
     const ih = window.innerHeight;
@@ -258,7 +278,9 @@ export default function NatureStudioPage() {
     const left = hudFppRef.current
       ? hudFppRef.current.getBoundingClientRect().right + 16
       : 80;
-    eng.setHudInsets({ top, bottom, left, right: 18 });
+    const v = { top, bottom, left, right: 18 };
+    eng.setHudInsets(v);
+    setInsets(v);
   }, [hudHidden]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
@@ -268,6 +290,32 @@ export default function NatureStudioPage() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [refreshInsets]);
+
+  // The reading page's panel portal can only target its inner div once that
+  // div has mounted; the page's entrance animation covers the one-frame gap.
+  useEffect(() => {
+    if (!presented) {
+      setPanelReady(false);
+      return undefined;
+    }
+    const id = requestAnimationFrame(() => setPanelReady(Boolean(panelRef.current)));
+    return () => cancelAnimationFrame(id);
+  }, [presented, stageEl]);
+
+  /** Close the reading page: the 3D board stays framed where the camera left it. */
+  const closePresented = useCallback(() => {
+    setPresented(null);
+    engineRef.current?.setBoardPresented(null);
+  }, []);
+
+  // While reading, a window resize re-frames the 3D board parked behind the
+  // page, so closing the page finds it exactly centred on the new aspect.
+  useEffect(() => {
+    if (!presented) return undefined;
+    const onResize = () => engineRef.current?.focus(presented);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [presented]);
 
   // Hiding the HUD frees the whole screen: if a board is framed, re-frame it
   // to the new (full-screen) rect so the learner gets a true full-bleed board.
@@ -327,6 +375,39 @@ export default function NatureStudioPage() {
               <p className="mt-3 text-[12px] font-bold tracking-wide text-white/70">Growing the meadow…</p>
             </div>
           </div>
+        ) : null}
+
+        {/* ── The flat reading page (the BGMI scope) ───────────────────
+            When a board is presented, its panels leave the 3D screen and
+            render here: a plain, transform-free DOM box at the HUD-free
+            rect — the same DOM shape as the 2D course player, so taps land
+            exactly where they land there. The 3D board stays framed behind
+            it (force-culled by the engine) and the camera parks. */}
+        {presented && stageEl ? createPortal(
+          <div
+            className="dc-reading-page pointer-events-auto absolute overflow-hidden rounded-2xl border border-white/15 bg-[#070b12] shadow-[0_40px_120px_rgba(0,0,0,0.65)]"
+            style={{
+              left: insets.left,
+              top: insets.top,
+              right: insets.right,
+              bottom: insets.bottom,
+              // Scroll the panels natively; no pinch/double-tap page zoom
+              // inside the page (JS gestures like the mind-map pan are
+              // pointer-event based and unaffected).
+              touchAction: "pan-y",
+            }}
+          >
+            <button
+              type="button"
+              onClick={closePresented}
+              className="absolute right-3 top-3 z-10 grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-slate-950/70 text-white/90 backdrop-blur-xl transition hover:bg-white/15"
+              title="Back to the world"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div ref={panelRef} className="h-full w-full" />
+          </div>,
+          stageEl,
         ) : null}
 
         {/* ── Top bar (hidden with the rest of the HUD by the bottom-right
@@ -440,6 +521,8 @@ export default function NatureStudioPage() {
           courses={ownedCourses}
           loading={coursesLoading}
           uid={user?.id ?? null}
+          presentedSlot={presented}
+          presentedHost={panelReady ? panelRef.current : null}
         />
 
         {/* ── Study-board tray ── */}
@@ -450,7 +533,18 @@ export default function NatureStudioPage() {
               key={key}
               type="button"
               onClick={() => {
-                engineRef.current?.focus(key);
+                const eng = engineRef.current;
+                // A study board opens its flat reading page (plain 2D DOM —
+                // the only path whose taps the learner's device guarantees);
+                // the Desk view just frames the 3D trio.
+                if (key === "mindmap" || key === "reading" || key === "notes") {
+                  setPresented(key);
+                  eng?.setBoardPresented(key);
+                } else {
+                  setPresented(null);
+                  eng?.setBoardPresented(null);
+                }
+                eng?.focus(key);
                 setActiveBoard(key);
               }}
               className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12px] font-bold transition ${
@@ -474,7 +568,12 @@ export default function NatureStudioPage() {
             <button
               key={key}
               type="button"
-              onClick={() => engineRef.current?.focus(key)}
+              onClick={() => {
+                // Any other view closes the reading page first.
+                setPresented(null);
+                engineRef.current?.setBoardPresented(null);
+                engineRef.current?.focus(key);
+              }}
               className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold text-white/85 transition hover:bg-white/20"
             >
               <Icon className="h-3.5 w-3.5" />

@@ -95,6 +95,13 @@ export interface BoardScreensHandle {
   /** WebGL-side frames/backings, added to the main scene. */
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
+  /**
+   * The board currently presented as the flat 2D reading page. While a slot
+   * is presented, its 3D element is force-culled (display:none) no matter
+   * where the camera looks — the page covers its place — and it is brought
+   * straight back when the presentation is cleared.
+   */
+  setPresented(slot: LecternSlot | null): void;
   setSize(width: number, height: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
   dispose(): void;
@@ -232,6 +239,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
   const visibility = new Map<LecternSlot, boolean>();
+  // The reading page covers the presented board's screen, so its 3D element
+  // is pure cost (and a double image) — force-culled while presented.
+  let presented: LecternSlot | null = null;
 
   return {
     screens,
@@ -241,6 +251,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
     byId(slot) {
       return screens.find((s) => s.slot === slot);
+    },
+
+    setPresented(slot) {
+      presented = slot;
     },
 
     setSize(width, height) {
@@ -273,6 +287,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           toCamera.copy(camera.position).sub(screen.placement.position);
           visible = boardNormal.dot(toCamera) > 0;
         }
+
+        // Presented: the flat reading page sits exactly over this board's
+        // screen, so the 3D element is hidden regardless of the camera.
+        if (screen.slot === presented) visible = false;
 
         if (visibility.get(screen.slot) !== visible) {
           visibility.set(screen.slot, visible);

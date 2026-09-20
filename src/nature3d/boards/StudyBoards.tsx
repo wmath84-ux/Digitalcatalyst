@@ -54,6 +54,15 @@ interface BoardPortalsProps {
   courses: Product[];
   loading: boolean;
   uid: string | null;
+  /**
+   * The board currently presented as the flat 2D reading page (null = all
+   * three live on their 3D screens). The presented board's tree is portaled
+   * into `presentedHost` instead of its 3D element — plain DOM, no
+   * transforms, the same shape as the 2D app; the engine force-culls the
+   * 3D element the page now covers.
+   */
+  presentedSlot: BoardSlot | null;
+  presentedHost: HTMLElement | null;
 }
 
 /**
@@ -122,7 +131,14 @@ function useBoardNotes(uid: string | null, productId: string | null) {
   return { notes, onAdd, onEdit, onDelete };
 }
 
-export default function BoardPortals({ hosts, courses, loading, uid }: BoardPortalsProps) {
+export default function BoardPortals({
+  hosts, courses, loading, uid, presentedSlot, presentedHost,
+}: BoardPortalsProps) {
+  // The presented board leaves its 3D screen for the reading page; the other
+  // two stay put on their boards.
+  const readingHost = presentedSlot === "reading" ? presentedHost : hosts.reading;
+  const notesHost = presentedSlot === "notes" ? presentedHost : hosts.notes;
+  const mindmapHost = presentedSlot === "mindmap" ? presentedHost : hosts.mindmap;
   // ── NOTHING IS AUTO-SELECTED ─────────────────────────────────────────
   //
   // This used to be `activeCourse={ownedCourses[0]}` — the first course the
@@ -182,9 +198,9 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
 
   return (
     <>
-      {hosts.reading ? createPortal(readingTree, hosts.reading) : null}
+      {readingHost ? createPortal(readingTree, readingHost) : null}
 
-      {hosts.notes
+      {notesHost
         ? createPortal(
             <BoardFrame title="Note taking" subtitle={activeCourse?.title}>
               {/* The player's panel, untouched — same toolbar, same editor,
@@ -199,11 +215,11 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
                 />
               </div>
             </BoardFrame>,
-            hosts.notes,
+            notesHost,
           )
         : null}
 
-      {hosts.mindmap
+      {mindmapHost
         ? createPortal(
             <BoardFrame title="Mind map" subtitle={activeCourse?.title}>
               <Suspense
@@ -235,7 +251,7 @@ export default function BoardPortals({ hosts, courses, loading, uid }: BoardPort
                 </div>
               </Suspense>
             </BoardFrame>,
-            hosts.mindmap,
+            mindmapHost,
           )
         : null}
     </>

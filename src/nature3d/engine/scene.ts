@@ -34,7 +34,7 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
-import { createBoardScreens, SCREEN_PX_HEIGHT, SCREEN_PX_WIDTH, type BoardScreensHandle } from "./boardScreens";
+import { createBoardScreens, type BoardScreensHandle } from "./boardScreens";
 import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { SAFARI, TREK, WORLD_REACH } from "./regions";
@@ -149,23 +149,11 @@ export class Sanctuary {
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
 
-  // ── The flat study overlay (see updateBoardOverlay) ──────────────────
-  /** The board `focusBoard` is framing — null in every other view. */
-  private focusedSlot: LecternSlot | null = null;
-  /** The board whose DOM element currently sits in the flat 2D layer. */
-  private overlaySlot: LecternSlot | null = null;
-  private overlayHost: HTMLDivElement | null = null;
-  /** The last 2D transform the overlay wrote — identical writes are skipped. */
-  private overlayStyle = "";
-  // Scratch for the overlay maths, hoisted like the rest — the loop allocates
-  // nothing.
-  private ovA = new THREE.Vector3();
-  private ovB = new THREE.Vector3();
-  private ovC0 = new THREE.Vector3();
-  private ovC1 = new THREE.Vector3();
-  private ovC2 = new THREE.Vector3();
-  private ovC3 = new THREE.Vector3();
-  private ovCorners: THREE.Vector3[] = [this.ovC0, this.ovC1, this.ovC2, this.ovC3];
+  // ── The flat reading stage (see setBoardPresented) ───────────────────
+  /** The board the page is currently presenting as a flat 2D reading page. */
+  private presentedSlot: LecternSlot | null = null;
+  /** The flat layer the reading page lives in (a sibling of the canvas host). */
+  private stageEl: HTMLDivElement | null = null;
 
   constructor(private opts: SanctuaryOptions) {
     const tier = opts.tier ?? detectTier();
@@ -256,14 +244,15 @@ export class Sanctuary {
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
 
-    // The flat 2D layer the framed board hands into (see
-    // updateBoardOverlay). A sibling of the canvas host, inserted right after
-    // it: it paints above the WebGL canvas and the CSS3D layer, but below the
-    // HUD chrome, which comes later in the page.
-    this.overlayHost = document.createElement("div");
-    this.overlayHost.style.cssText =
+    // The flat reading stage (see setBoardPresented). A sibling of the canvas
+    // host, inserted right after it: it paints above the WebGL canvas and the
+    // CSS3D layer, but below the HUD chrome, which comes later in the page.
+    // The page renders its reading-page div into here; the stage itself never
+    // eats pointer events, so the meadow around the page still orbits.
+    this.stageEl = document.createElement("div");
+    this.stageEl.style.cssText =
       "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
-    opts.dom.insertAdjacentElement("afterend", this.overlayHost);
+    opts.dom.insertAdjacentElement("afterend", this.stageEl);
 
     // ── The lesson board, planted on the hillside ────────────────────────
     //
@@ -358,6 +347,9 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    // While a board is presented as the reading page the camera is parked
+    // (the BGMI scope): the page is static, so the world stays with it.
+    if (this.presentedSlot) return;
     // A touch that STARTED on a board belongs to the board, never to the
     // camera. Without this guard, a board tap that the device's hit-test
     // missed leaks in here and the slightest finger wobble drags the world —
@@ -428,6 +420,7 @@ export class Sanctuary {
 
   private onWheel = (e: WheelEvent) => {
     if (this.mode !== "orbit") return;
+    if (this.presentedSlot) return; // the reading page owns the wheel
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
     e.preventDefault();
@@ -443,7 +436,9 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
-    this.focusedSlot = null;
+    // Leaving orbit mode leaves the reading page behind.
+    this.presentedSlot = null;
+    this.screens.setPresented(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -543,7 +538,6 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
-    this.focusedSlot = null;
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
@@ -616,14 +610,10 @@ export class Sanctuary {
    * board projects as a perfect rectangle centred on the screen. An earlier
    * version offset the target so the board centred itself on the HUD-free
    * rect, which pushed the camera off the normal and sheared the full-screen
-   * board into a trapezoid (2–3 deg on phones). Two things depended on the
-   * board being an un-sheared rectangle:
-   *   • some device browsers start DROPPING taps on large 3D-transformed
-   *     elements that are off-axis — the exact "buttons dead at full
-   *     framing" failure;
-   *   • the flat study overlay (see `updateBoardOverlay`) can only be
-   *     pixel-exact against a square-on board; a trapezoid leaves dark
-   *     wedges along its edges.
+   * board into a trapezoid (2–3 deg on phones); device hit-testing of large
+   * off-axis 3D-transformed elements is exactly where taps started
+   * dropping, and the flat reading page (see setBoardPresented) is sized
+   * against the same square-on projection.
    * With the camera square-on, the board stays screen-centred, so it clears
    * each chrome edge by a HALF board — the symmetric limits below — and
    * every pixel of it stays clickable at any device size.
@@ -632,7 +622,6 @@ export class Sanctuary {
     const placement = lecternPlacements().find((p) => p.slot === slot);
     if (!placement) return;
     this.studyFocus = true;
-    this.focusedSlot = slot;
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
@@ -692,214 +681,54 @@ export class Sanctuary {
   }
 
   // ───────────────────────────────────────────────────────────────────
-  //  The flat study overlay
+  //  The flat reading page (the BGMI scope)
   // ───────────────────────────────────────────────────────────────────
   //
-  // THE OTHER HALF OF THE CLICKS-MUST-WORK RULE.
+  // THE CLICKS-MUST-WORK RULE, settled.
   //
-  // A framed board is a DOM element 1920 px across, carried through
-  // CSS3DRenderer's preserve-3d camera element as a matrix3d. At framing
-  // size — the board filling most of the screen — device browsers stop
-  // hit-testing that layer: the tap falls THROUGH to the canvas (the rig
-  // guard above keeps the camera from twitching, but the button never
-  // fires), while the very same board tapped at a smaller zoom works fine.
+  // Three rounds of device reports established a hard fact: on the
+  // learner's phone, anything that carries a board's panels through the
+  // 3D machinery — the CSS3D matrix3d, a reparented element, a scaled
+  // element — stops receiving taps once it is large on screen, while the
+  // SAME panels running as the ordinary 2D course player (plain DOM, no
+  // transforms, no 3D context) tap perfectly at full screen. The device's
+  // failure is in the 3D compositing/hit-test path, which we cannot fix
+  // from here — so the reading experience simply stops using it.
   //
-  // The flat overlay removes the failure from the equation on BOTH counts:
+  // When the learner picks a board, the camera flies to frame it (the 3D
+  // board stays a real 3D object in the world) and the page presents the
+  // board's panels in a plain 2D reading page: a fresh, transform-free DOM
+  // box at the HUD-free rect, rendered into `stageEl` — the same DOM shape
+  // as the 2D app the learner already taps on the same phone. The 3D board
+  // element is merely force-culled (display:none) while the page covers
+  // its place: it is never moved, scaled or reparented.
   //
-  //   1. the board's DOM element is moved OUT of the preserve-3d CSS3D
-  //      layer into a plain sibling div — hit-tested like any ordinary DOM
-  //      node, no 3D matrix involved;
-  //   2. it is RESIZED to its projected screen rect and placed with a bare
-  //      translate — NO scale of any kind. This matters: a 1920×1080
-  //      element scaled up to fill the screen makes the compositor build a
-  //      raster far past the mobile GPU's max texture size (1920×1080 at
-  //      3× DPR is 5760×3240) — the layer comes out BLACK and its hit
-  //      region comes out broken, which is exactly what the device showed.
-  //      Sized to the screen, the raster is the screen: always legal,
-  //      always painted, always hit-testable. The panels are fluid
-  //      (they are the 2D app's own phone layouts), so the reflow to a
-  //      phone-sized box is the layout they were designed for — text at
-  //      native size, buttons at thumb size.
-  //
-  // While a board is framed SQUARE-ON (the camera on its face normal —
-  // `focusBoard` guarantees it), the overlay tracks the projection every
-  // frame: the translate is written per frame (compositor-only, no layout)
-  // and the box is re-sized only when it moves by more than a size bucket
-  // (a resize reflows the panels, so we don't do it needlessly). The
-  // handover is content-identical in spirit on both sides: square-on, the
-  // 3D projection of the board IS the rect the overlay draws. When the
-  // learner orbits off the face normal (beyond ~0.35 deg, where a flat rect
-  // would stop matching the 3D trapezoid), or leaves the study view, the
-  // element is handed back to the CSS3D layer at its 1920×1080 layout size.
-  //
-  // FACING_GATE: arccos(0.99999) ≈ 0.35 deg. The framing converges to
-  // exactly 0, so the overlay is active for the whole time the board is
-  // framed straight on — at ANY distance, so pinch-zooming the board while
-  // reading stays on the reliable 2D path.
-
-  private static readonly OVERLAY_FACE_GATE = 0.99999;
-  /** Resize only when the rect moves this much (px) — a resize reflows panels. */
-  private static readonly OVERLAY_SIZE_BUCKET = 16;
-
-  private overlayW = 0;
-  private overlayH = 0;
-
-  private updateBoardOverlay() {
-    const host = this.overlayHost;
-    const slot = this.focusedSlot;
-    if (!host || !slot || !this.studyFocus || this.mode !== "orbit") {
-      if (this.overlaySlot) this.leaveBoardOverlay();
-      return;
-    }
-    const screen = this.screens.byId(slot);
-    if (!screen) return;
-
-    // A DIFFERENT board is in the overlay (the learner jumped straight from
-    // one board button to another): hand it back to the CSS3D layer before
-    // anything else, or it would freeze as a flat ghost on the old screen
-    // rect while the camera flies to the new board.
-    if (this.overlaySlot && this.overlaySlot !== slot) this.leaveBoardOverlay();
-
-    // Project the board's four screen-plane corners to pixels. Square-on the
-    // quad is an axis-aligned rect; within the gate it is still right to
-    // well under a pixel.
-    const P = screen.placement.position;
-    const yaw = screen.placement.yaw;
-    const hw = LECTERN_BOARD_WIDTH / 2;
-    const hh = LECTERN_BOARD_HEIGHT / 2;
-    const rx = Math.cos(yaw);
-    const rz = -Math.sin(yaw);
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let inFront = true;
-    for (let i = 0; i < 4; i++) {
-      const sx = i & 1 ? 1 : -1;
-      const sy = i & 2 ? 1 : -1;
-      const c = this.ovCorners[i];
-      c.set(P.x + rx * hw * sx, P.y + hh * sy, P.z + rz * hw * sx);
-      c.applyMatrix4(this.camera.matrixWorldInverse);
-      if (c.z > -1) inFront = false; // every corner a metre in front of the lens
-      c.applyMatrix4(this.camera.projectionMatrix);
-      const px = ((c.x + 1) / 2) * this.viewW;
-      const py = ((1 - c.y) / 2) * this.viewH;
-      if (px < minX) minX = px;
-      if (py < minY) minY = py;
-      if (px > maxX) maxX = px;
-      if (py > maxY) maxY = py;
-    }
-
-    this.ovA.set(Math.sin(yaw), 0, Math.cos(yaw));
-    this.ovB.copy(this.camera.position).sub(P).normalize();
-    const facing = this.ovA.dot(this.ovB);
-
-    const w = Math.round(maxX - minX);
-    const h = Math.round(maxY - minY);
-
-    if (this.overlaySlot === slot && (!inFront || facing < Sanctuary.OVERLAY_FACE_GATE)) {
-      this.leaveBoardOverlay();
-      return;
-    }
-    if (this.overlaySlot !== slot && inFront && facing >= Sanctuary.OVERLAY_FACE_GATE && w >= 32 && h >= 32) {
-      this.overlaySlot = slot;
-      const el = screen.element;
-      if (el.parentNode !== host) {
-        el.remove();
-        host.appendChild(el);
-      }
-      el.style.transformOrigin = "0 0";
-      // Snap to the screen rect: the element's layout box IS its on-screen
-      // box from this frame on — no scale, ever.
-      el.style.width = `${w}px`;
-      el.style.height = `${h}px`;
-      this.overlayW = w;
-      this.overlayH = h;
-      // Mobile insurance: a subtree that just moved between layer trees can
-      // come out STALE (black until something invalidates it) on some
-      // devices. Force a dedicated layer and flush layout synchronously so
-      // the very first paint of the re-homed element is fresh.
-      el.style.willChange = "transform";
-      void el.offsetHeight;
-    }
-    if (this.overlaySlot === slot) {
-      const el = screen.element;
-      // The translate is the only per-frame write: compositor-only, zero
-      // layout cost, so the fly-in and every orbit stays smooth.
-      const x = Math.round(minX);
-      const y = Math.round(minY);
-      const style = `translate3d(${x}px, ${y}px, 0)`;
-      if (style !== this.overlayStyle) {
-        el.style.transform = style;
-        this.overlayStyle = style;
-      }
-      // A resize re-lays-out the whole panel tree, so it happens only when
-      // the rect actually moved by more than the bucket (pinch-zoom, a
-      // reframe). A still board writes nothing.
-      if (Math.abs(w - this.overlayW) > Sanctuary.OVERLAY_SIZE_BUCKET || Math.abs(h - this.overlayH) > Sanctuary.OVERLAY_SIZE_BUCKET) {
-        el.style.width = `${w}px`;
-        el.style.height = `${h}px`;
-        this.overlayW = w;
-        this.overlayH = h;
-      }
-    }
-  }
-
-  /** Hand the board's element back to the CSS3D layer, pixel-exact. */
-  private leaveBoardOverlay() {
-    const host = this.overlayHost;
-    const slot = this.overlaySlot;
-    this.overlaySlot = null;
-    this.overlayStyle = "";
-    this.overlayW = 0;
-    this.overlayH = 0;
-    if (!host || !slot) return;
-    const screen = this.screens.byId(slot);
-    if (!screen) return;
-    const el = screen.element;
-
-    el.remove(); // out of the flat layer (detached: no reflow until re-home)
-    // Back to the 1920×1080 layout box the 3D representation is built on
-    // (the CSS3D object's PX_TO_M scale turns it back into 30 m).
-    el.style.width = `${SCREEN_PX_WIDTH}px`;
-    el.style.height = `${SCREEN_PX_HEIGHT}px`;
-    // A forced render hands the element BACK to the CSS3D layer — their
-    // renderObject re-appends it to the camera element.
-    this.screens.render(this.camera, true);
-    // The renderer caches its last style string and skips the write when the
-    // camera has not moved, so assert the 3D transform ourselves — the very
-    // computation their renderObject performs — and the handover frame is
-    // exact even on a still camera.
-    el.style.transformOrigin = "";
-    el.style.willChange = "";
-    el.style.transform = this.boardCss3dStyle(screen.object);
-    void el.offsetHeight; // same stale-subtree insurance, in reverse
-  }
+  // While the page is up the camera is parked — the BGMI trade where
+  // opening the scope drops the world simulation and spends the frame on
+  // what the player is actually looking at. The world around the page is
+  // still there: close the page (or pick any other view) and the 3D board
+  // is right where you left it, free to orbit.
 
   /**
-   * The exact `transform` CSS3DRenderer writes for the board:
-   * `translate(-50%,-50%)` + the world matrix as matrix3d (its second column
-   * negated, because CSS's y-axis points down). Mirrors
-   * `getObjectCSSMatrix` in three's CSS3DRenderer, byte for byte.
+   * Present (or un-present) one board as the flat 2D reading page.
+   *
+   * The page owns the presentation UI (the page div, the close button); the
+   * engine does the three things only it can do:
+   *   • force-cull the presented board's 3D element (see boardScreens),
+   *   • park the camera while the page is up (pointer/wheel guards + the
+   *     frame loop's orbit freeze),
+   *   • hand out `stageHost()` — the flat layer the page renders into.
    */
-  private boardCss3dStyle(object: THREE.Object3D): string {
-    const e = object.matrixWorld.elements;
-    const f = (v: number) => (Math.abs(v) < 1e-10 ? 0 : v);
-    return (
-      "translate(-50%,-50%)" +
-      "matrix3d(" +
-      [
-        e[0], e[1], e[2], e[3],
-        -e[4], -e[5], -e[6], -e[7],
-        e[8], e[9], e[10], e[11],
-        e[12], e[13], e[14], e[15],
-      ]
-        .map(f)
-        .join(",") +
-      ")"
-    );
+  setBoardPresented(slot: LecternSlot | null) {
+    this.presentedSlot = slot;
+    this.screens.setPresented(slot);
   }
+
+  /** The flat layer the page renders its reading page into. */
+  stageHost(): HTMLElement | null {
+    return this.stageEl;
+  }
+
 
   resize(width: number, height: number) {
     if (width === 0 || height === 0) return;
@@ -1020,7 +849,9 @@ export class Sanctuary {
       }
       this.avatar.setVisible(true);
     } else {
-      this.orbit.update(dt, this.camera);
+      // The reading page parks the camera (the BGMI scope): the page is a
+      // static 2D rect, so the framed world behind it stays put under it.
+      if (!this.presentedSlot) this.orbit.update(dt, this.camera);
       this.avatar.setVisible(true);
     }
 
@@ -1108,10 +939,6 @@ export class Sanctuary {
     // actually moved or a board crossed a cull boundary, so a still frame
     // costs nothing here.
     this.screens.render(this.camera);
-    // The framed board may have to hand between the CSS3D layer and the flat
-    // 2D one (see updateBoardOverlay). It runs AFTER the CSS render so its
-    // reparent + 2D transform is what this frame paints.
-    this.updateBoardOverlay();
 
     // ── Adaptive resolution + stats ───────────────────────────────────
     const frameMs = performance.now() - frameStart;
@@ -1141,8 +968,8 @@ export class Sanctuary {
     this.disposed = true;
     this.stop();
     this.detachPointer(this.opts.dom);
-    this.overlayHost?.remove();
-    this.overlayHost = null;
+    this.stageEl?.remove();
+    this.stageEl = null;
     this.screens.dispose();
     disposeGroup(this.desk);
     this.safari.dispose();

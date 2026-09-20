@@ -7081,3 +7081,22 @@ html[data-course-player-active="true"] {
 [data-revision-page-main],
 [data-profile-content],
 [data-pdp-scroll] { min-width: 0 !important; width: 100% !important; }
+
+/* ── The 3D sanctuary's flat reading page (the BGMI scope) ─────────────
+   The board's panels are presented as a plain 2D DOM box at the HUD-free
+   rect — no transforms, no 3D context — so taps land the way they do in
+   the 2D course player on the same device. The entrance is a quick fade
+   + settle; it never blocks input. */
+@keyframes dc-reading-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.dc-reading-page {
+  animation: dc-reading-page-in 180ms ease-out;
+}
