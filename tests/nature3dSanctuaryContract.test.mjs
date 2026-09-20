@@ -1075,6 +1075,102 @@ test("board input does not fight the camera", () => {
   assert.match(SCREENS, /element\.style\.pointerEvents = "auto"/);
 });
 
+test("a missed board tap can never drag the camera", () => {
+  // Some device browsers deliver board touches to the host anyway (their
+  // hit-test of the large 3D-transformed element is unreliable). stopPropagation
+  // is the first line of defence; the rig itself must refuse board targets,
+  // or the "first tap nudges the world" symptom comes back.
+  assert.match(SCENE, /private boardTarget\(target: EventTarget \| null\): boolean/);
+  assert.match(SCENE, /closest\("\.nature3d-board-screen"\)/);
+  const down = SCENE.slice(SCENE.indexOf("private onPointerDown"), SCENE.indexOf("private onPointerMove"));
+  assert.match(down, /if \(this\.boardTarget\(e\.target\)\) return;/);
+  const wheel = SCENE.slice(SCENE.indexOf("private onWheel"), SCENE.indexOf("setMode(mode: CameraMode)"));
+  assert.match(wheel, /if \(this\.boardTarget\(e\.target\)\) return;/);
+});
+
+test("the framed board hands to a flat 2D layer so device hit-testing cannot miss it", () => {
+  // While a board is framed square-on, its DOM element is moved out of the
+  // preserve-3d CSS3D layer into a flat sibling layer and placed with a
+  // plain translate+scale at its projected rect — an ordinary DOM node the
+  // browser hit-tests reliably at any size.
+  assert.match(SCENE, /updateBoardOverlay\(\)/);
+  assert.match(SCENE, /insertAdjacentElement\("afterend", this\.overlayHost\)/);
+  assert.match(SCENE, /this\.screens\.render\(this\.camera\);[\s\S]*this\.updateBoardOverlay\(\)/);
+  // The 2D placement is driven by the live projection of the four
+  // screen-plane corners, recomputed every frame (it must track zoom).
+  assert.match(SCENE, /c\.applyMatrix4\(this\.camera\.matrixWorldInverse\)/);
+  assert.match(SCENE, /c\.applyMatrix4\(this\.camera\.projectionMatrix\)/);
+  assert.match(SCENE, /translate3d\(/);
+  // The overlay is only entered square-on the face normal: a flat rect
+  // cannot match a sheared trapezoid without dark wedges at the edges.
+  assert.match(SCENE, /OVERLAY_FACE_GATE = 0\.99999/);
+  assert.match(SCENE, /facing >= Sanctuary\.OVERLAY_FACE_GATE/);
+  // The hand-back must be pixel-exact: re-attach through a forced CSS render
+  // and assert the renderer's own 3D transform (their cache skips the write
+  // on a still camera).
+  assert.match(SCENE, /el\.remove\(\); \/\/ out of the flat layer/);
+  assert.match(SCENE, /this\.screens\.render\(this\.camera, true\);/);
+  assert.match(SCENE, /translate\(-50%,-50%\)/);
+  // And the layer is torn down with the scene.
+  assert.match(SCENE, /this\.overlayHost\?\.remove\(\)/);
+});
+
+test("board framing is square-on the face normal at every aspect", () => {
+  // The camera parks ON the board's face normal (orbit target = the board's
+  // own centre, pitch 0), so the full-screen board projects as an exact
+  // rectangle: the flat overlay stays pixel-exact, and off-axis large
+  // boards — where device hit-testing starts dropping taps — are never
+  // framed. The board still clears the HUD: screen-centred, it needs to
+  // clear each chrome edge by a HALF board.
+  const focusBoard = SCENE.slice(SCENE.indexOf("private focusBoard(slot: LecternSlot)"), SCENE.indexOf("private focusStudentDesk"));
+  assert.match(focusBoard, /this\.orbit\.panTo\(this\.tmpV\.copy\(placement\.position\), distance, placement\.yaw, 0\)/);
+  assert.ok(!/nx|ny|rightX|rightZ/.test(focusBoard), "the target offset that sheared the board is gone");
+  assert.match(focusBoard, /Math\.min\(this\.viewH [\/] 2 - ins\.top, this\.viewH [\/] 2 - ins\.bottom\)/);
+  assert.match(focusBoard, /Math\.min\(this\.viewW [\/] 2 - ins\.left, this\.viewW [\/] 2 - ins\.right\)/);
+
+  // The symmetric fit still keeps every pixel of the board clear of the
+  // chrome at every aspect (the chrome insets here mirror the page's).
+  const L = solveLectern();
+  const H = (L.W * 9) / 16;
+  const margin = 0.5;
+  const chrome = { top: 84, bottom: 152, left: 84, right: 20 };
+  for (const [viewW, viewH] of [[390, 844], [844, 390], [1180, 820], [1920, 1080], [320, 568]]) {
+    const aspect = viewW / viewH;
+    let fov = 52;
+    if (aspect < 16 / 9) {
+      const halfH = (Math.tan((52 * Math.PI) / 360) * (16 / 9)) / aspect;
+      fov = (Math.atan(halfH) * 360) / Math.PI;
+    }
+    fov = Math.min(fov, 100);
+    const v = (fov * Math.PI) / 180;
+    const h = 2 * Math.atan(Math.tan(v / 2) * aspect);
+    const needW = L.W + 2 * margin;
+    const needH = H + 2 * margin;
+    const limitH = Math.max(8, Math.min(viewH / 2 - chrome.top, viewH / 2 - chrome.bottom));
+    const limitW = Math.max(8, Math.min(viewW / 2 - chrome.left, viewW / 2 - chrome.right));
+    const d = Math.max(
+      (needH / 2 / Math.tan(v / 2)) / (2 * limitH / viewH),
+      (needW / 2 / Math.tan(h / 2)) / (2 * limitW / viewW),
+    );
+    const fy = viewH / 2 / Math.tan(v / 2);
+    const pxW = L.W * (fy / d);
+    const pxH = H * (fy / d);
+    // The board is screen-centred: it must clear each chrome edge.
+    assert.ok(viewW / 2 - pxW / 2 >= Math.max(chrome.left, chrome.right) - 0.5, `${viewW}x${viewH}: the board eats the side chrome`);
+    assert.ok(viewH / 2 - pxH / 2 >= Math.max(chrome.top, chrome.bottom) - 0.5, `${viewW}x${viewH}: the board's bottom rows sit under the tray`);
+  }
+});
+
+test("board panels keep native vertical scroll on touch", () => {
+  // `pan-y`: the notes list and library scroll natively on a phone (they
+  // could not while `manipulation`'s wider gesture set — and the old
+  // `manipulation` also let a double-tap inside the board page-zoom the
+  // whole app). JS-driven gestures (mind-map pan/zoom) use pointer events
+  // and are unaffected.
+  assert.match(SCREENS, /element\.style\.touchAction = "pan-y"/);
+  assert.ok(!/touchAction = "manipulation"/.test(SCREENS), "manipulation re-enables the double-tap delay the brief killed");
+});
+
 test("the DOM boards are culled the way BGMI culls the world", () => {
   // 1. An idle camera writes no styles at all.
   assert.match(SCREENS, /if \(!moved && !changed\) return;/);

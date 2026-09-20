@@ -185,12 +185,16 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     element.style.overflow = "hidden";
     element.style.background = "#070b12";
     element.style.pointerEvents = "auto";
-    // A tap must land IMMEDIATELY. Without this, on touch devices the
-    // browser waits ~300 ms to disambiguate a double-tap zoom inside the
-    // 3D-transformed board, so the board's buttons felt dead — exactly the
-    // "click kabhi hota hai kabhi nahin" symptom. `manipulation` keeps pan
-    // and pinch but kills the double-tap-zoom delay.
-    element.style.touchAction = "manipulation";
+    // A tap must land IMMEDIATELY and a list must SCROLL on touch.
+    // `pan-y` keeps native vertical scrolling of the panels (notes list,
+    // library, …) but gives the browser no business doing double-tap zoom
+    // or pinch INSIDE the board — those delays and page-level gestures are
+    // exactly what made the board's buttons feel dead ("click kabhi hota
+    // hai kabhi nahin"). Horizontal gestures and the mind-map's pan/zoom
+    // are pointer-event driven in JS, so they are unaffected. When the board
+    // sits in the flat study overlay, this is the effective touch-action
+    // (no `none` ancestor); inside the 3D host the host's `none` dominates.
+    element.style.touchAction = "pan-y";
     // The DOM board is a screen, not a window: nothing inside it should be
     // able to spill past the bezel painted in the WebGL scene.
     element.style.borderRadius = "6px";
