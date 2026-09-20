@@ -23,7 +23,7 @@
 import * as THREE from "three";
 import { AdaptiveResolution, budgetFor, detectTier, type QualityBudget, type QualityTier } from "./quality";
 import { createTextures, type TextureSet } from "./textures";
-import { buildTerrain, terrainHeight } from "./terrain";
+import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
@@ -193,7 +193,9 @@ export class Sanctuary {
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
   /** The sunny-afternoon brightness push applied on top of the per-hour curve. */
-  private gradeExposure = 1.14;
+  private gradeExposure = 1.52;
+  /** True while the camera (or the walker) is under the water line. */
+  private submerged = false;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -218,11 +220,11 @@ export class Sanctuary {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // USER DIRECTIVE (sunny afternoon): the per-hour curve in `daylight.ts`
-    // is contract-fixed, so the final brightness push lives here — +14 % on
-    // top of it. ACES rolls the highlights off, which is exactly what
-    // bright grass, white clouds and sun-glint on water need to hold detail.
-    this.gradeExposure = 1.14;
+    // USER DIRECTIVE (full daylight): the per-hour curve in `daylight.ts`
+    // is contract-fixed, so the final brightness push lives here — +52 % on
+    // top of it. The land was still reading as dusk even at midday; this is
+    // the grade that makes every surface readable as a clear sunny day.
+    this.gradeExposure = 1.52;
     this.renderer.toneMappingExposure = 1.08 * this.gradeExposure;
     if (this.budget.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
@@ -413,19 +415,23 @@ export class Sanctuary {
   // ───────────────────────────────────────────────────────────────────
 
   private attachPointer(dom: HTMLElement) {
-    dom.addEventListener("pointerdown", this.onPointerDown);
-    dom.addEventListener("pointermove", this.onPointerMove);
-    dom.addEventListener("pointerup", this.onPointerUp);
-    dom.addEventListener("pointercancel", this.onPointerUp);
+    // Capture phase: full-screen boards swallow nested clicks in CSS3D
+    // hit-testing (the centre of the notes/mind-map editor). Seeing the
+    // event BEFORE the board's stopPropagation lets the geometric bridge
+    // re-aim those taps. Native iframe hits are left alone (see onPointerDown).
+    dom.addEventListener("pointerdown", this.onPointerDown, true);
+    dom.addEventListener("pointermove", this.onPointerMove, true);
+    dom.addEventListener("pointerup", this.onPointerUp, true);
+    dom.addEventListener("pointercancel", this.onPointerUp, true);
     dom.addEventListener("wheel", this.onWheel, { passive: false });
     dom.addEventListener("contextmenu", this.onContextMenu);
   }
 
   private detachPointer(dom: HTMLElement) {
-    dom.removeEventListener("pointerdown", this.onPointerDown);
-    dom.removeEventListener("pointermove", this.onPointerMove);
-    dom.removeEventListener("pointerup", this.onPointerUp);
-    dom.removeEventListener("pointercancel", this.onPointerUp);
+    dom.removeEventListener("pointerdown", this.onPointerDown, true);
+    dom.removeEventListener("pointermove", this.onPointerMove, true);
+    dom.removeEventListener("pointerup", this.onPointerUp, true);
+    dom.removeEventListener("pointercancel", this.onPointerUp, true);
     dom.removeEventListener("wheel", this.onWheel);
     dom.removeEventListener("contextmenu", this.onContextMenu);
   }
@@ -444,6 +450,33 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    // FULL-SCREEN BOARD: CSS3D hit-testing of nested controls is unreliable
+    // in the centre of a 30 m page (notes editor, mind-map nodes). Capture
+    // phase sees the tap first; the geometric bridge re-aims it. Iframes
+    // keep native events — synthetic clicks cannot enter a cross-origin frame.
+    if (this.studyFocus) {
+      const framed = this.localOnBoard(e);
+      if (framed) {
+        const hit = this.boardTargetAt(framed.screen, e.clientX, e.clientY, framed.x, framed.y);
+        if (!(hit instanceof HTMLIFrameElement) && hit.tagName !== "IFRAME") {
+          e.preventDefault();
+          e.stopPropagation();
+          this.startBridge(e, framed, hit);
+          return;
+        }
+      }
+    }
+    // A hit on the board ROOT (no nested control) is CSS3D missing the
+    // button — re-aim with the geometric bridge before the native path
+    // swallows it.
+    if (e.target instanceof Element && e.target.classList.contains("nature3d-board-screen")) {
+      const onRoot = this.localOnBoard(e);
+      if (onRoot) {
+        e.preventDefault();
+        this.startBridge(e, onRoot);
+        return;
+      }
+    }
     // When the device's hit-test works, the board's own stopPropagation
     // listeners swallow the touch before these host handlers ever see it —
     // so reaching this line with a board-area touch is PROOF the device's
@@ -649,8 +682,15 @@ export class Sanctuary {
    * child's rect follows its parent's (or sits above it), so the last
    * containing element is the one painted on top where the finger was.
    */
-  private boardTargetAt(screen: BoardScreen, x: number, y: number): Element {
+  private boardTargetAt(screen: BoardScreen, x: number, y: number, localX?: number, localY?: number): Element {
     const root = screen.element;
+    // Layout-space search first when we have the ray's 1920×1080 point:
+    // getBoundingClientRect of a CSS3D child is the flattened AABB, which
+    // is exactly what misses buttons in the centre of a full-size board.
+    if (localX !== undefined && localY !== undefined) {
+      const laid = this.elementAtBoardLayout(root, localX, localY);
+      if (laid !== root) return laid;
+    }
     const hit = document.elementFromPoint(x, y);
     if (hit && this.bridgeMayTarget(screen, hit)) return hit;
     let best: Element = root;
@@ -659,6 +699,39 @@ export class Sanctuary {
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) best = el;
+    }
+    return best;
+  }
+
+  /**
+   * Deepest descendant of `root` whose LAYOUT box (offset chain, not the
+   * CSS3D screen rect) contains (lx, ly) in the board's 1920×1080 space.
+   */
+  private elementAtBoardLayout(root: HTMLElement, lx: number, ly: number): Element {
+    let best: Element = root;
+    let bestArea = Infinity;
+    for (const node of root.querySelectorAll("*")) {
+      const el = node as HTMLElement;
+      if (!(el instanceof HTMLElement)) continue;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w <= 1 || h <= 1) continue;
+      let x = 0;
+      let y = 0;
+      let cur: HTMLElement | null = el;
+      while (cur && cur !== root) {
+        x += cur.offsetLeft - cur.scrollLeft;
+        y += cur.offsetTop - cur.scrollTop;
+        const next = cur.offsetParent as HTMLElement | null;
+        cur = next && (root === next || root.contains(next)) ? next : cur.parentElement;
+      }
+      if (lx >= x && lx <= x + w && ly >= y && ly <= y + h) {
+        const area = w * h;
+        if (area <= bestArea) {
+          best = el;
+          bestArea = area;
+        }
+      }
     }
     return best;
   }
@@ -796,9 +869,9 @@ export class Sanctuary {
     }
   }
 
-  private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }) {
+  private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }, preset?: Element) {
     const screen = onBoard.screen;
-    const target = this.boardTargetAt(screen, e.clientX, e.clientY);
+    const target = preset ?? this.boardTargetAt(screen, e.clientX, e.clientY, onBoard.x, onBoard.y);
     this.bridge = {
       pointerId: e.pointerId,
       screen,
@@ -980,6 +1053,19 @@ export class Sanctuary {
     this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();
+    if (this.submerged) this.applyUnderwater();
+  }
+
+  /**
+   * Full blue when the camera (or the walker) is inside the river / ocean.
+   * Fog density here is runtime-only — the quality-tier values stay pinned.
+   */
+  private applyUnderwater() {
+    const fog = this.scene.fog as THREE.FogExp2;
+    fog.color.set(0x0a58b8);
+    fog.density = 0.06;
+    this.scene.background = fog.color;
+    this.renderer.toneMappingExposure = 0.78;
   }
 
   /** Morning / midday / evening, or "auto" to follow the real clock. */
@@ -1279,6 +1365,30 @@ export class Sanctuary {
       this.avatar.setVisible(true);
       // Seated: breathing only — the folds stay where setSeated put them.
       this.avatar.update(dt, time, this.trek, this.camera);
+    }
+
+    // Underwater: the walker is allowed into the river, and when they (or
+    // the camera) go under the waterline the whole view goes saturated blue
+    // so it reads as being inside the water, not as a transparent sheet.
+    {
+      const cx = this.camera.position.x;
+      const cy = this.camera.position.y;
+      const cz = this.camera.position.z;
+      const camUnder =
+        (insideRiver(cx, cz) && cy < WATER_LEVEL + 0.15) ||
+        (coastWeight(cx, cz) > 0.42 && cy < OCEAN_LEVEL + 0.15);
+      const walkUnder =
+        this.mode === "fpp" &&
+        !this.avatar.seated &&
+        (insideRiver(this.trek.position.x, this.trek.position.z) ||
+          (coastWeight(this.trek.position.x, this.trek.position.z) > 0.42 &&
+            this.trek.position.y < OCEAN_LEVEL + 0.4));
+      const under = camUnder || walkUnder;
+      if (under !== this.submerged) {
+        this.submerged = under;
+        if (under) this.applyUnderwater();
+        else this.applyDaylight();
+      }
     }
 
     // ── World (staggered) ─────────────────────────────────────────────

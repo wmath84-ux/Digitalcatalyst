@@ -498,7 +498,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   const mat = new THREE.MeshStandardMaterial({
     map: groundTexture,
     vertexColors: true,
-    roughness: 0.96,
+    roughness: 0.82,
     metalness: 0,
   });
 
@@ -543,7 +543,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         // is the cheapest large-scale variation there is.
         vec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
-        diffuseColor.rgb *= mix( 0.87, 1.13, dcMacroL );
+        diffuseColor.rgb *= mix( 0.96, 1.22, dcMacroL );
 
         // SHORELINE (per-pixel, Phase 4/5). vDcWorldPos.y is the fragment's own
         // ground height, so distance to the waterline costs one subtract — and

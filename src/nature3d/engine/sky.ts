@@ -188,6 +188,29 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       });
     }
   }
+  // OVERHEAD BANKS. The far ring sits on the horizon, so a seated student
+  // looking straight up at the zenith saw empty blue. These banks live
+  // 70–160 m up and 40–220 m out — the patch of sky the desk look-up
+  // actually points at.
+  const OVERHEAD = budget.tier === "low" ? 4 : 7;
+  for (let c = 0; c < OVERHEAD; c += 1) {
+    const a0 = (c / OVERHEAD) * Math.PI * 2 + Math.random() * 0.8;
+    const r = 48 + Math.random() * 180;
+    const y = 78 + Math.random() * 88;
+    const drift = 0.004 + Math.random() * 0.008;
+    const puffs = 3 + Math.floor(Math.random() * 3);
+    const step = 0.08 + Math.random() * 0.05;
+    for (let p = 0; p < puffs; p += 1) {
+      const off = p - (puffs - 1) / 2;
+      cloudSeeds.push({
+        a: a0 + off * step,
+        r: r * (1 - Math.abs(off) * 0.04),
+        y: y + (Math.random() - 0.5) * 18,
+        s: 32 + Math.random() * 40,
+        drift,
+      });
+    }
+  }
   const cloudCount = cloudSeeds.length;
   const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, cloudCount);
   clouds.renderOrder = -850;
@@ -246,7 +269,7 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   // USER DIRECTIVE (sunny afternoon): hard clean sun, saturated sky fill,
   // and a ground bounce that is sunlit grass — so every shadow stays a
   // soft green, never mud or black.
-  const hemi = new THREE.HemisphereLight(0xc4eeff, 0x4e9c28, 1.22);
+  const hemi = new THREE.HemisphereLight(0xd8f4ff, 0x62b032, 1.72);
   const sun = new THREE.DirectionalLight(0xfff8ea, 2.45);
   sun.position.copy(sunDir).multiplyScalar(70);
   if (budget.shadowMapSize > 0) {

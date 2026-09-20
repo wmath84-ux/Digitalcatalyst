@@ -125,16 +125,18 @@ export function createWater(
     // here is dielectric Fresnel — which is what water actually is — and the
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
-    // USER DIRECTIVE (natural blue): a real river in afternoon sun is
-    // sapphire, not turquoise and not cyan. Hue ~0.59, chroma high enough
-    // to read as water, not a plastic sheet.
-    color: 0x1470d2,
-    roughness: 0.13,
+    // USER DIRECTIVE (water colour): a real river is saturated blue, not a
+    // white-cyan sheet. The albedo map is kept for flow, but the body colour
+    // in the shader owns the look. DoubleSide so a camera under the surface
+    // still sees water instead of a culled backface.
+    color: 0x0d6ad0,
+    roughness: 0.18,
     metalness: 0.0,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.94,
     map: flowTex,
-    envMapIntensity: 1.2,
+    envMapIntensity: 0.55,
+    side: THREE.DoubleSide,
   });
   riverMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
@@ -214,34 +216,30 @@ export function createWater(
         // saturates to sapphire. Green is pulled out of both stops so the
         // river never reads as turquoise.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
-        float dcDepth = smoothstep(0.0, 4.2, dcBank);
-        vec3 dcDeep = vec3(0.006, 0.045, 0.280);       // sRGB #0a3d90
-        vec3 dcShallow = vec3(0.070, 0.360, 0.880);    // sRGB #3a8ef0
+        float dcDepth = smoothstep(0.0, 5.4, dcBank);
+        // Saturated river blue throughout — no white-cyan, no centre stripe.
+        vec3 dcDeep = vec3(0.010, 0.095, 0.420);       // sRGB #0e4cb0
+        vec3 dcShallow = vec3(0.035, 0.220, 0.720);    // sRGB #1a78d6
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
-        // ── Sky reflection, read off the atmosphere ─────────────────────
-        vec3 dcSky = uWsky * 1.25 + uWsun * 0.18;
+        // Sky reflection is kept QUIET so the body stays water-coloured
+        // instead of bleaching to white-blue along the centre line.
+        vec3 dcSky = uWsky * 0.55 + uWsun * 0.06;
         vec3 dcH = normalize(dcView + uSunDir);
-        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 3.0;
-        // …plus the broad, low-power sheen under it: a sun that only ever
-        // produces a pinpoint glint reads as a laser, not as daylight.
-        float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 26.0) * 0.16;
+        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 1.1;
+        float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 36.0) * 0.07;
 
-        vec3 dcCol = mix(dcBody, dcSky, dcFres) + uWsun * (dcSpec + dcSheen);
+        vec3 dcCol = mix(dcBody, dcSky, dcFres * 0.28) + uWsun * (dcSpec + dcSheen);
 
-        // ── Shoreline foam ──────────────────────────────────────────────
-        // Water that touches stone is whitewater: the shallow band at the
-        // edge carries the turbulence. Broken up by the same flow texture that
-        // drives the ripples, so the foam line is not a smooth stripe.
-        float dcEdge = smoothstep(4.55, 6.15, dcBank);
-        float dcChurn = dcRipple * 0.6 + dcEdge * 0.7;
-        float dcFoam = (dcEdge * 0.8 + smoothstep(0.55, 1.0, dcRipple) * 0.22)
-                     * smoothstep(0.35, 0.85, dcChurn);
+        // Shoreline foam — a thin bank only, never a white stripe down the
+        // middle of the channel.
+        float dcEdge = smoothstep(5.15, 6.25, dcBank);
+        float dcFoam = dcEdge * 0.35 * smoothstep(0.45, 0.9, dcRipple);
 
-        dcCol = mix(dcCol, vec3(0.62, 0.72, 0.75), clamp(dcFoam, 0.0, 0.85)); // sRGB #cfdfe2
+        dcCol = mix(dcCol, vec3(0.42, 0.62, 0.78), clamp(dcFoam, 0.0, 0.4));
 
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, dcCol, 0.82);
-        gl_FragColor.a = clamp(mix(0.72, 0.97, dcFres) + dcFoam * 0.12, 0.0, 1.0);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.15, 0.35, 0.85), dcCol, 0.94);
+        gl_FragColor.a = clamp(mix(0.88, 0.98, dcFres * 0.4) + dcFoam * 0.06, 0.0, 1.0);
         `,
       );
     riverMat.userData.shader = shader;
@@ -586,30 +584,25 @@ export function createWater(
           //   2.5–9 m   clear sapphire
           //   9 m +     deep, saturated sea blue
           float dcD = clamp( vDcDepth, 0.0, 14.0 );
-          vec3 dcShallowC = vec3( 0.065, 0.380, 0.900 );  // sky-blue, no green
-          vec3 dcMidC     = vec3( 0.012, 0.180, 0.720 );  // sapphire
-          vec3 dcDeepC    = vec3( 0.004, 0.050, 0.320 );  // deep sea blue
+          vec3 dcShallowC = vec3( 0.030, 0.210, 0.700 );  // water blue
+          vec3 dcMidC     = vec3( 0.012, 0.130, 0.560 );  // mid
+          vec3 dcDeepC    = vec3( 0.004, 0.045, 0.280 );  // deep sea
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
 
-          // Sky reflection + sun glint, both on the shared live uniforms.
-          vec3 dcSky = uWsky * 1.3 + uWsun * 0.15;
+          vec3 dcSky = uWsky * 0.5 + uWsun * 0.05;
           vec3 dcH = normalize( dcView + uSunDir );
-          float dcSpec = pow( max( dot( dcNormal, dcH ), 0.0 ), 240.0 ) * 2.6;
-          float dcSheen = pow( max( dot( dcNormal, dcH ), 0.0 ), 30.0 ) * 0.14;
-          vec3 dcCol = mix( dcBody, dcSky, dcFres ) + uWsun * ( dcSpec + dcSheen );
+          float dcSpec = pow( max( dot( dcNormal, dcH ), 0.0 ), 280.0 ) * 1.05;
+          float dcSheen = pow( max( dot( dcNormal, dcH ), 0.0 ), 40.0 ) * 0.06;
+          vec3 dcCol = mix( dcBody, dcSky, dcFres * 0.26 ) + uWsun * ( dcSpec + dcSheen );
 
-          // SHORELINE SURF: a foam band where the column thins out, broken up
-          // by the flow noise and pushed in and out by a slow wave phase so
-          // the waterline breathes.
           float dcBreak = texture2D( uFlowMap, dcUv * 3.1 + vec2( uTime * 0.02, -uTime * 0.017 ) ).r;
           float dcLine = 0.85 + 0.55 * sin( uTime * 0.7 + vDcWorld.x * 0.05 + vDcWorld.z * 0.043 );
-          float dcFoam = ( 1.0 - smoothstep( 0.0, 1.35 * dcLine, dcD ) ) * smoothstep( 0.35, 0.8, dcBreak * 0.6 + dcNrm.y * 0.4 + 0.3 );
-          dcCol = mix( dcCol, vec3( 0.86, 0.94, 0.95 ), clamp( dcFoam, 0.0, 0.9 ) );
+          float dcFoam = ( 1.0 - smoothstep( 0.0, 1.15 * dcLine, dcD ) ) * smoothstep( 0.45, 0.85, dcBreak * 0.5 + dcNrm.y * 0.3 );
+          dcCol = mix( dcCol, vec3( 0.38, 0.58, 0.76 ), clamp( dcFoam, 0.0, 0.35 ) );
 
-          gl_FragColor.rgb = mix( gl_FragColor.rgb, dcCol, 0.94 );
-          // Clear water over sand near the shore, near-opaque blue offshore.
-          gl_FragColor.a = clamp( mix( 0.62, 0.96, smoothstep( 0.0, 5.0, dcD ) ) + dcFoam * 0.25, 0.0, 1.0 );
+          gl_FragColor.rgb = mix( gl_FragColor.rgb * vec3( 0.12, 0.32, 0.82 ), dcCol, 0.96 );
+          gl_FragColor.a = clamp( mix( 0.86, 0.98, smoothstep( 0.0, 5.0, dcD ) ) + dcFoam * 0.08, 0.0, 1.0 );
         }
         `,
       );

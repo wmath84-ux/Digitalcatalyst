@@ -206,7 +206,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     // behave like an ordinary web page while the meadow around it still
     // responds to drags.
     for (const type of ["pointerdown", "pointermove", "pointerup", "wheel"]) {
-      element.addEventListener(type, (event) => event.stopPropagation());
+      element.addEventListener(type, (event) => {
+        // A hit on the BOARD ROOT (not a nested control) means CSS3D
+        // hit-testing missed the button the learner actually tapped —
+        // the classic "centre of the editor is dead" failure. Let it
+        // bubble so the engine's geometric bridge can re-aim it.
+        if (event.target === element) return;
+        event.stopPropagation();
+      });
     }
     // A cancelled touch (system gesture, call arriving) must not leak to the
     // camera rig either, or the world would lurch at the moment a touch dies.

@@ -48,6 +48,8 @@ import type { VirtualStick } from "./controls";
 /** TerrainTrek's movement speeds, verbatim. */
 export const WALK_SPEED = 10;
 export const BOOST_SPEED = 30;
+/** Visual scale of the walking character (user directive: 3×). */
+export const AVATAR_SCALE = 3;
 
 /** TerrainTrek's third-person camera constants, verbatim. */
 export const CAM_DISTANCE = 15;
@@ -240,6 +242,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
 
   const body = new THREE.Group();
   body.name = "avatar-body";
+  body.scale.setScalar(AVATAR_SCALE);
 
   // TWO materials total: the PBR body (vertex colours × grain) and the
   // glossy shades. Nothing transparent anywhere — hair is a solid shell.
@@ -499,24 +502,26 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     // Hip world position, analytically (no matrix reads — deterministic).
     const s = Math.sin(heading);
     const c = Math.cos(heading);
-    const hx = group.position.x + side * HIP_X * c;
-    const hz = group.position.z - side * HIP_X * s;
+    const hx = group.position.x + side * HIP_X * AVATAR_SCALE * c;
+    const hz = group.position.z - side * HIP_X * AVATAR_SCALE * s;
     // Target relative to the hip, in the facing frame (fwd = −Z local).
     // World move dir for heading h is (−sin h, −cos h); lateral is (cos h, −sin h).
     const dx = tx - hx;
     const dz = tz - hz;
     const fwd = dx * -s + dz * -c;
     // Ankle target: sole on the planted terrain ⇒ ankle ANKLE_H above it.
-    const ankleY = soleY + ANKLE_H;
+    const ankleY = soleY + ANKLE_H * AVATAR_SCALE;
     const rise = hipY - ankleY;
     const dist = Math.hypot(fwd, rise);
-    const maxReach = THIGH_LEN + CALF_LEN - 0.015;
-    const minReach = 0.3;
+    const maxReach = (THIGH_LEN + CALF_LEN - 0.015) * AVATAR_SCALE;
+    const minReach = 0.3 * AVATAR_SCALE;
     const drop = Math.max(0, dist - maxReach);
     const D = THREE.MathUtils.clamp(dist, minReach, maxReach);
+    const thigh = THIGH_LEN * AVATAR_SCALE;
+    const calf = CALF_LEN * AVATAR_SCALE;
     // Knee flexion from the law of cosines (0 = straight, + = bent back).
     const cosK = THREE.MathUtils.clamp(
-      (THIGH_LEN * THIGH_LEN + CALF_LEN * CALF_LEN - D * D) / (2 * THIGH_LEN * CALF_LEN),
+      (thigh * thigh + calf * calf - D * D) / (2 * thigh * calf),
       -1,
       1,
     );
@@ -524,7 +529,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     // Thigh pitch: direction to target, minus the knee's share.
     const aim = Math.atan2(fwd, rise); // 0 = straight down, + = forward
     const cosA = THREE.MathUtils.clamp(
-      (THIGH_LEN * THIGH_LEN + D * D - CALF_LEN * CALF_LEN) / (2 * THIGH_LEN * D),
+      (thigh * thigh + D * D - calf * calf) / (2 * thigh * D),
       -1,
       1,
     );
@@ -805,18 +810,19 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       // Capture the plant once per stance: ahead of the hip by half a stride.
       if (!plant.live) {
         const stride = player.strideLen;
-        const hx = group.position.x + side * HIP_X * hc;
-        const hz = group.position.z - side * HIP_X * hs;
+        const hx = group.position.x + side * HIP_X * AVATAR_SCALE * hc;
+        const hz = group.position.z - side * HIP_X * AVATAR_SCALE * hs;
         plant.x = hx + -hs * stride * 0.5;
         plant.z = hz + -hc * stride * 0.5;
         plant.live = true;
       }
-      // Solve against the REAL terrain under the held plant.
-      const soleY = terrainHeight(plant.x, plant.z);
+      // Solve against the REAL terrain under the held plant. A few centimetres
+      // of sole lift stops the boot mesh sinking into the slope.
+      const soleY = terrainHeight(plant.x, plant.z) + 0.04;
       terrainNormal(plant.x, plant.z, nScratch);
       // Slope pitch in the facing frame: how much the sole must tip.
       const solePitch = Math.atan2(-(nScratch.x * -hs + nScratch.z * -hc), nScratch.y);
-      const hipY = group.position.y + pelvisG.position.y - HIP_DROP;
+      const hipY = group.position.y + (pelvisG.position.y - HIP_DROP) * AVATAR_SCALE;
       sol.drop = solveLeg(side, hip, knee, ankle, heading, hipY, plant.x, plant.z, soleY, solePitch);
       sol.hip = hip.rotation.x;
       sol.knee = knee.rotation.x;
@@ -1020,7 +1026,8 @@ export class TrekPlayer {
         // as weight, and the IK plants the feet anyway).
         const gk = ground > this.smoothY ? 30 : GROUND_SMOOTH_K;
         this.smoothY += (ground - this.smoothY) * damp(gk, dt);
-        this.position.y = this.smoothY;
+        // Never sink: uphill lag used to bury the soles in the slope.
+        this.position.y = Math.max(this.smoothY, ground);
         this.vy = 0;
       }
     }
@@ -1099,8 +1106,13 @@ export class TrekPlayer {
     camera.position.copy(this.target).add(this.sphere);
     camera.lookAt(this.target);
 
-    // Never let the camera end up underground on a steep slope.
-    const floor = terrainHeight(camera.position.x, camera.position.z) + 1.2;
+    // Never let the camera end up underground on a steep slope — or inside
+    // the 3× character. Sample the ground under the LENS, then also stay
+    // above the walker's own chest.
+    const floor = Math.max(
+      terrainHeight(camera.position.x, camera.position.z) + 1.2,
+      this.position.y + 0.55 * AVATAR_SCALE,
+    );
     if (camera.position.y < floor) camera.position.y = floor;
   }
 

@@ -266,8 +266,8 @@ function buildRing(
       // field stays vivid in afternoon sun; lightness is a touch higher so
       // the blades catch the light instead of sitting as a dark carpet.
       const hue = 0.30 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * opts.colorJitter;
-      const sat = 0.64 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
-      const lit = 0.33 + hsl.l * 0.30 + Math.random() * 0.12 - patch * 0.03;
+      const sat = 0.66 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
+      const lit = 0.48 + hsl.l * 0.28 + Math.random() * 0.12 - patch * 0.03;
       color.setHSL(hue, sat, lit);
       mesh.setColorAt(placed, color);
       placed += 1;
@@ -361,7 +361,7 @@ function plantSkirt(
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
-      color.setHSL(0.30 + Math.random() * 0.025, 0.66 + Math.random() * 0.12, 0.32 + Math.random() * 0.12);
+      color.setHSL(0.30 + Math.random() * 0.025, 0.68 + Math.random() * 0.12, 0.46 + Math.random() * 0.12);
       mesh.setColorAt(placed, color);
       placed += 1;
     }

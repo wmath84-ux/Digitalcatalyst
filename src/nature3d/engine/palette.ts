@@ -163,8 +163,8 @@ export const GROUND_PALETTE: GroundPalette = {
   // USER DIRECTIVE (sunny afternoon / natural green): the meadow must read as
   // REAL grass in hard afternoon sun — true green, not olive, not yellow thatch.
   // Dry patches stay green-gold rather than straw; wet soil is mossy, not mud.
-  lush: new THREE.Color(0x28b01a),
-  dry: new THREE.Color(0x58b022),
+  lush: new THREE.Color(0x3cc428),
+  dry: new THREE.Color(0x6ad032),
   mud: new THREE.Color(0x4e6a32),
   rock: new THREE.Color(0x8d8770),
   gravel: new THREE.Color(0xd2c5a0),

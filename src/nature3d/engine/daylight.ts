@@ -149,10 +149,10 @@ export function daylightAt(hour: number): DaylightState {
     // bounce is sunlit grass (so shadows stay green, not mud), and the fog
     // is clear blue air rather than dust. Colour literals are free; the
     // intensity / exposure formulas stay pinned.
-    hemiSky: lerpColor(0xc4eeff, 0xffcf9e, warm),
-    hemiGround: lerpColor(0x4e9c28, 0x6a5a32, warm),
-    hemiIntensity: THREE.MathUtils.lerp(0.62, 1.28, dayFactor),
-    fillIntensity: THREE.MathUtils.lerp(0.26, 0.62, dayFactor),
+    hemiSky: lerpColor(0xd8f4ff, 0xffcf9e, warm),
+    hemiGround: lerpColor(0x62b032, 0x6a5a32, warm),
+    hemiIntensity: THREE.MathUtils.lerp(1.05, 1.85, dayFactor),
+    fillIntensity: THREE.MathUtils.lerp(0.52, 1.05, dayFactor),
     zenith: lerpColor(0x1f7eef, 0x35508f, warm),
     horizon: lerpColor(0xc8eeff, 0xffbd8c, warm),
     ground: lerpColor(0xdceec0, 0x9a7a5c, warm),
