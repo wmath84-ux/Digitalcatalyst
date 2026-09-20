@@ -20,7 +20,8 @@ export interface SkySystem {
   sunDir: THREE.Vector3;
   /** Re-light the whole sky for a moment of the day. */
   applyDaylight(state: DaylightState): void;
-  update(dt: number, time: number, wind: number): void;
+  /** The camera, so the cloud billboards can face the live viewer. */
+  update(dt: number, time: number, wind: number, camera: THREE.Camera): void;
   dispose(): void;
 }
 
@@ -135,29 +136,55 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const ringRadius = budget.farPlane * 0.3;
 
   // ── Clouds ───────────────────────────────────────────────────────────
+  //
+  // THE CHEAP "REAL" CLOUDS — the BGMI way, as asked. No volumetric stuff,
+  // no per-pixel shading: ONE fBm-painted cumulus card (see textures.ts)
+  // stamped on clustered billboard planes. What makes it read as weather
+  // instead of floating white dots:
+  //
+  //   * CLUSTERS, not singles. Each bank is 3–6 puffs strung along the same
+  //     arc at the same height, overlapping edge to edge — a single puff is
+  //     a blob, a row of puffs is a cloud bank.
+  //   * SIZE SPREAD. Puffs span ~60–180 m and the banks sit at 150–450 m,
+  //     so the sky has near clouds and far haze at once (depth).
+  //   * CAMERA BILLBOARDING. Every puff faces the viewer, so a bank never
+  //     turns paper-thin as the camera orbits — the classic billboard tell.
+  //   * A SLIGHT TIP. Each puff is tilted a touch past level so the shaded
+  //     BASE of the texture is visible, which is what sells volume.
   const cloudMat = new THREE.MeshBasicMaterial({
     map: tex.cloud,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.85,
     depthWrite: false,
     fog: false,
   });
   const cloudGeo = new THREE.PlaneGeometry(1, 1);
-  const cloudCount = budget.tier === "low" ? 14 : 30;
-  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, cloudCount);
+  const CLOUD_CLUSTERS = budget.tier === "low" ? 6 : budget.tier === "medium" ? 9 : 12;
   const dummy = new THREE.Object3D();
   const cloudSeeds: Array<{ a: number; r: number; y: number; s: number; drift: number }> = [];
-  for (let i = 0; i < cloudCount; i += 1) {
-    cloudSeeds.push({
-      a: Math.random() * Math.PI * 2,
-      r: ringRadius * (0.55 + Math.random() * 0.8),
-      y: ringRadius * (0.18 + Math.random() * 0.3),
-      s: ringRadius * (0.1 + Math.random() * 0.18),
-      drift: 0.004 + Math.random() * 0.008,
-    });
+  for (let c = 0; c < CLOUD_CLUSTERS; c += 1) {
+    const a0 = (c / CLOUD_CLUSTERS) * Math.PI * 2 + Math.random() * 0.5;
+    const r = ringRadius * (0.55 + Math.random() * 0.7);
+    const y = ringRadius * (0.15 + Math.random() * 0.22);
+    const drift = 0.003 + Math.random() * 0.006;
+    const puffs = 3 + Math.floor(Math.random() * 4);
+    const step = 0.045 + Math.random() * 0.03; // radians between puff centres
+    for (let p = 0; p < puffs; p += 1) {
+      const off = p - (puffs - 1) / 2;
+      cloudSeeds.push({
+        a: a0 + off * step,
+        r: r * (1 - Math.abs(off) * 0.012),
+        y: y + (Math.random() - 0.5) * 26,
+        s: ringRadius * (0.1 + Math.random() * 0.11),
+        drift,
+      });
+    }
   }
+  const cloudCount = cloudSeeds.length;
+  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, cloudCount);
   clouds.renderOrder = -850;
   group.add(clouds);
+  const CLOUD_WHITE = new THREE.Color(0xffffff);
 
   // ── Volumetric sun shafts ────────────────────────────────────────────
   let shafts: THREE.Group | null = null;
@@ -257,14 +284,19 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       hemi.groundColor.copy(state.hemiGround);
       hemi.intensity = state.hemiIntensity;
       fill.intensity = state.fillIntensity;
+      // Clouds pick up the sun's warmth — pure white at sunset is a dead give-away.
+      cloudMat.color.copy(state.sunTint).lerp(CLOUD_WHITE, 0.72);
     },
-    update(dt, time, wind) {
-      // Clouds drift
+    update(dt, time, wind, camera) {
+      // Cloud banks drift
       for (let i = 0; i < cloudCount; i += 1) {
         const s = cloudSeeds[i];
         s.a += s.drift * dt * (0.6 + wind * 0.5);
         dummy.position.set(Math.cos(s.a) * s.r, s.y + Math.sin(time * 0.1 + i) * 1.4, Math.sin(s.a) * s.r);
-        dummy.lookAt(0, s.y * 0.4, 0);
+        // Face the viewer (same height, so the bank never rolls), then tip the
+        // top back slightly to show the shaded base.
+        dummy.lookAt(camera.position.x, dummy.position.y, camera.position.z);
+        dummy.rotateX(-0.1);
         dummy.scale.set(s.s * 2.4, s.s, 1);
         dummy.updateMatrix();
         clouds.setMatrixAt(i, dummy.matrix);

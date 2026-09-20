@@ -62,6 +62,18 @@ export interface SceneStats {
   triangles: number;
 }
 
+/**
+ * Screen space the HUD chrome occupies, in CSS px. When a board is framed it
+ * must fit INSIDE the rect these insets leave free — otherwise the board's
+ * bottom rows land behind the trays and its buttons cannot be clicked.
+ */
+export interface HudInsets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface SanctuaryOptions {
   canvas: HTMLCanvasElement;
   /** Element the pointer handlers attach to (usually the canvas wrapper). */
@@ -102,6 +114,12 @@ export class Sanctuary {
   private mode: CameraMode = "orbit";
 
   private moveStick: VirtualStick = { x: 0, y: 0, active: false };
+
+  /** The HUD chrome keeps a board framing away from the trays (see focusBoard). */
+  private hudInsets: HudInsets = { top: 84, bottom: 152, left: 84, right: 20 };
+  /** Last viewport size, for the safe-rect maths in focusBoard. */
+  private viewW = 1;
+  private viewH = 1;
 
   private clock = new THREE.Clock();
   private adaptive: AdaptiveResolution;
@@ -352,6 +370,10 @@ export class Sanctuary {
   private tapVec = new THREE.Vector2();
 
   private maybeTapBoard(e: PointerEvent) {
+    // While a study board is framed, a background tap is almost always a
+    // mistap at the board's edge — firing the lesson-board raycast here
+    // opened the modal ON TOP of the board and made the board look dead.
+    if (this.studyFocus) return;
     const rect = this.opts.dom.getBoundingClientRect();
     this.tapVec.set(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -513,6 +535,17 @@ export class Sanctuary {
   }
 
   /**
+   * Set the screen area the HUD chrome occupies, in CSS px.
+   *
+   * The next board framing (`focusBoard`) will fit the board inside the rect
+   * this leaves free. The page measures its real trays and pushes the numbers
+   * here — the engine stays free of any knowledge of the HUD layout.
+   */
+  setHudInsets(insets: HudInsets) {
+    this.hudInsets = { ...insets };
+  }
+
+  /**
    * Frame ONE board, edge to edge, with a small margin of world showing.
    *
    * The distance is COMPUTED from the live projection rather than stored as a
@@ -524,6 +557,15 @@ export class Sanctuary {
    *
    * `BOARD_VIEW_MARGIN` is the 0.5 m of air asked for on each side: the board
    * fills the frame but never bleeds off it.
+   *
+   * THE CLICKS-MUST-WORK RULE. The board is fitted against the part of the
+   * viewport the HUD does NOT cover (see `hudInsets`), and centred on that
+   * free rect rather than on the screen. Fitting against the full viewport
+   * used to park the board's bottom rows behind the tray buttons — the
+   * buttons there could never be clicked, which is exactly the "kabhi kabhi
+   * click nahi hota, zoom out karo to chalta hai" bug: zooming out shrank the
+   * board clear of the trays. Now the framed board is large as it can be
+   * while keeping every pixel of it clickable.
    */
   private focusBoard(slot: LecternSlot) {
     const placement = lecternPlacements().find((p) => p.slot === slot);
@@ -534,15 +576,33 @@ export class Sanctuary {
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = LECTERN_BOARD_WIDTH + BOARD_VIEW_MARGIN * 2;
     const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+
+    // The rect the board must fit in: the viewport minus the HUD chrome.
+    const ins = this.hudInsets;
+    const innerW = Math.max(96, this.viewW - ins.left - ins.right);
+    const innerH = Math.max(96, this.viewH - ins.top - ins.bottom);
     const distance = Math.max(
-      needH / 2 / Math.tan(vFov / 2),
-      needW / 2 / Math.tan(hFov / 2),
+      (needH / 2 / Math.tan(vFov / 2)) / (innerH / this.viewH),
+      (needW / 2 / Math.tan(hFov / 2)) / (innerW / this.viewW),
     );
+
+    // Centre the board on the inner rect. The orbit target is the screen
+    // centre, so to move the board to the inner rect's centre the target is
+    // offset off the board by the inner rect's NDC offset, along the camera's
+    // right and up axes at the framing distance.
+    const nx = (ins.left - ins.right) / this.viewW;
+    const ny = -(ins.top - ins.bottom) / this.viewH;
+    const rightX = Math.cos(placement.yaw);
+    const rightZ = -Math.sin(placement.yaw);
+    const target = this.tmpV.copy(placement.position);
+    target.x -= rightX * nx * distance * Math.tan(hFov / 2);
+    target.z -= rightZ * nx * distance * Math.tan(hFov / 2);
+    target.y -= ny * distance * Math.tan(vFov / 2);
 
     // Square on to the board: the orbit yaw that puts the camera on the board's
     // face normal is its yaw, and the pitch is level so the page is not
     // read at a slant.
-    this.orbit.panTo(this.tmpV.copy(placement.position), distance, placement.yaw, 0);
+    this.orbit.panTo(target, distance, placement.yaw, 0);
   }
 
   /**
@@ -584,6 +644,8 @@ export class Sanctuary {
     if (width === 0 || height === 0) return;
     const aspect = width / height;
     this.camera.aspect = aspect;
+    this.viewW = width;
+    this.viewH = height;
 
     // KEEP THE WORLD IN FRAME ON NARROW SCREENS.
     //
@@ -752,7 +814,7 @@ export class Sanctuary {
 
     this.skyClock += dt;
     if (this.skyClock >= (study ? 1 / 8 : 1 / 20)) {
-      this.sky.update(this.skyClock, time, this.wind);
+      this.sky.update(this.skyClock, time, this.wind, this.camera);
       this.skyClock = 0;
     }
 

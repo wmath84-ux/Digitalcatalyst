@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Compass, Eye, Footprints,
+  Compass, Eye, EyeOff, Footprints,
   Maximize2, Minimize2, PawPrint, RotateCw,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
@@ -86,6 +86,11 @@ export default function NatureStudioPage() {
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Sanctuary | null>(null);
   const statsRef = useRef<HTMLSpanElement>(null);
+  // The HUD trays, measured so the engine can frame boards around them.
+  const hudTopRef = useRef<HTMLElement | null>(null);
+  const hudTrayRef = useRef<HTMLDivElement | null>(null);
+  const hudPresetRef = useRef<HTMLDivElement | null>(null);
+  const hudFppRef = useRef<HTMLDivElement | null>(null);
 
   const [supported] = useState(() => webglSupported());
   const [booting, setBooting] = useState(true);
@@ -103,6 +108,9 @@ export default function NatureStudioPage() {
   // the engine has booted, so React portals into them on a second pass.
   const [boardHosts, setBoardHosts] = useState<BoardHosts>({ mindmap: null, reading: null, notes: null });
   const [activeBoard, setActiveBoard] = useState<ViewPreset>("student");
+  // True when the learner has hidden every HUD button (bottom-right toggle).
+  // Only the toggle itself stays on screen.
+  const [hudHidden, setHudHidden] = useState(false);
 
   const { user } = useAuth();
   // Ownership is resolved from ALL five sources the app recognises —
@@ -222,6 +230,66 @@ export default function NatureStudioPage() {
     else void root.requestFullscreen?.().catch(() => {});
   }, []);
 
+  // ── Board click safety ──────────────────────────────────────────────
+  //
+  // Measure the HUD trays and hand their screen insets to the engine. The
+  // engine then frames each study board inside the FREE rect only, which is
+  // what keeps the board's buttons out from under the trays — the reason the
+  // buttons used to "click kabhi-kabhi" at the default full-screen framing
+  // and only worked once the learner pinched out.
+  const refreshInsets = useCallback(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    if (hudHidden) {
+      eng.setHudInsets({ top: 10, bottom: 10, left: 10, right: 10 });
+      return;
+    }
+    const ih = window.innerHeight;
+    const top = hudTopRef.current
+      ? hudTopRef.current.getBoundingClientRect().bottom + 14
+      : 84;
+    const trayTop = hudTrayRef.current
+      ? ih - hudTrayRef.current.getBoundingClientRect().top
+      : 112;
+    const presetTop = hudPresetRef.current
+      ? ih - hudPresetRef.current.getBoundingClientRect().top
+      : 58;
+    const bottom = Math.max(trayTop, presetTop) + 16;
+    const left = hudFppRef.current
+      ? hudFppRef.current.getBoundingClientRect().right + 16
+      : 80;
+    eng.setHudInsets({ top, bottom, left, right: 18 });
+  }, [hudHidden]);
+
+  // Re-measure whenever the HUD set changes or the window resizes.
+  useEffect(() => {
+    refreshInsets();
+    const onResize = () => refreshInsets();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [refreshInsets]);
+
+  // Hiding the HUD frees the whole screen: if a board is framed, re-frame it
+  // to the new (full-screen) rect so the learner gets a true full-bleed board.
+  const reframeActiveBoard = useCallback(() => {
+    if (
+      activeBoard === "reading" ||
+      activeBoard === "notes" ||
+      activeBoard === "mindmap"
+    ) {
+      engineRef.current?.focus(activeBoard);
+    }
+  }, [activeBoard]);
+
+  const toggleHud = useCallback(() => {
+    setHudHidden((v) => !v);
+  }, []);
+
+  useEffect(() => {
+    refreshInsets();
+    reframeActiveBoard();
+  }, [hudHidden]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onMoveStick = useCallback((x: number, y: number, active: boolean) => {
     engineRef.current?.setMoveStick(x, y, active);
   }, []);
@@ -261,8 +329,13 @@ export default function NatureStudioPage() {
           </div>
         ) : null}
 
-        {/* ── Top bar ── */}
-        <header className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
+        {/* ── Top bar (hidden with the rest of the HUD by the bottom-right
+            toggle — the boards gain the full screen back) ── */}
+        {!hudHidden ? (
+        <header
+          ref={hudTopRef}
+          className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2"
+        >
           <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-white/22 bg-slate-950/45 px-3.5 py-2.5 backdrop-blur-xl">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-orange-400 to-emerald-500 text-white shadow-lg shadow-amber-500/25">
               <Sparkles className="h-4 w-4" />
@@ -335,9 +408,11 @@ export default function NatureStudioPage() {
             </HudButton>
           </div>
         </header>
+        ) : null}
 
         {/* ── FPP / camera-mode button ── */}
-        <div className="pointer-events-auto absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-2">
+        {!hudHidden ? (
+        <div ref={hudFppRef} className="pointer-events-auto absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-2">
           <button
             type="button"
             onClick={toggleMode}
@@ -355,6 +430,7 @@ export default function NatureStudioPage() {
             {mode === "fpp" ? "Walking" : "Orbit"}
           </div>
         </div>
+        ) : null}
 
         {/* ── The live board surfaces ───────────────────────────────────
             React owns these trees; the browser's 3D compositor decides where
@@ -367,7 +443,8 @@ export default function NatureStudioPage() {
         />
 
         {/* ── Study-board tray ── */}
-        <div className="pointer-events-auto absolute bottom-16 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/20 bg-slate-950/60 p-1.5 backdrop-blur-xl">
+        {!hudHidden ? (
+        <div ref={hudTrayRef} className="pointer-events-auto absolute bottom-16 left-1/2 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border border-white/20 bg-slate-950/60 p-1.5 backdrop-blur-xl">
           {BOARD_VIEWS.map(({ key, label, Icon }) => (
             <button
               key={key}
@@ -384,13 +461,15 @@ export default function NatureStudioPage() {
               title={`Look at the ${label.toLowerCase()} board`}
             >
               <Icon className="h-4 w-4" />
-              {label}
+              <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
+        ) : null}
 
         {/* ── Viewpoint presets ── */}
-        <div className="pointer-events-auto absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/20 bg-slate-950/50 p-1.5 backdrop-blur-xl">
+        {!hudHidden ? (
+        <div ref={hudPresetRef} className="pointer-events-auto absolute bottom-3 left-1/2 flex max-w-[calc(100vw-6rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border border-white/20 bg-slate-950/50 p-1.5 backdrop-blur-xl">
           {PRESETS.map(({ key, label, Icon }) => (
             <button
               key={key}
@@ -403,11 +482,32 @@ export default function NatureStudioPage() {
             </button>
           ))}
         </div>
+        ) : null}
+
+        {/* ── HUD hide toggle — bottom-right corner. Clicking it hides every
+            other tray button (top bar, both bottom trays, the FPP pad) so
+            only this button and the world remain; clicking again brings the
+            full HUD back. ── */}
+        <div className="pointer-events-auto absolute bottom-3 right-3 z-30">
+          <button
+            type="button"
+            onClick={toggleHud}
+            className={`grid h-12 w-12 place-items-center rounded-full border backdrop-blur-xl transition ${
+              hudHidden
+                ? "border-emerald-300/60 bg-emerald-500/30 text-white shadow-[0_0_24px_rgba(16,185,129,0.45)]"
+                : "border-white/20 bg-slate-950/55 text-white/85 hover:bg-white/15"
+            }`}
+            title={hudHidden ? "Show all buttons" : "Hide all buttons"}
+          >
+            {hudHidden ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+          </button>
+        </div>
 
         {/* ── Twin sticks (FPP only) ─────────────────────────────────────
             Left = walk, right = look. Both are pointer-capture driven, so a
             finger can leave the pad without dropping the input. */}
         {mode === "fpp" ? (
+          hudHidden ? null : (
           <>
             <div className="pointer-events-auto absolute bottom-16 left-4 sm:bottom-20 sm:left-8">
               <Joystick onChange={onMoveStick} label="Move" accent="#34d399" size={128} />
@@ -435,6 +535,7 @@ export default function NatureStudioPage() {
               WASD or the stick to walk · Shift to run · swipe anywhere to look around
             </p>
           </>
+          )
         ) : null}
 
         {/* ── Board placement pad ── */}

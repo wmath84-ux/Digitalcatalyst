@@ -185,6 +185,12 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     element.style.overflow = "hidden";
     element.style.background = "#070b12";
     element.style.pointerEvents = "auto";
+    // A tap must land IMMEDIATELY. Without this, on touch devices the
+    // browser waits ~300 ms to disambiguate a double-tap zoom inside the
+    // 3D-transformed board, so the board's buttons felt dead — exactly the
+    // "click kabhi hota hai kabhi nahin" symptom. `manipulation` keeps pan
+    // and pinch but kills the double-tap-zoom delay.
+    element.style.touchAction = "manipulation";
     // The DOM board is a screen, not a window: nothing inside it should be
     // able to spill past the bezel painted in the WebGL scene.
     element.style.borderRadius = "6px";
@@ -198,6 +204,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     for (const type of ["pointerdown", "pointermove", "pointerup", "wheel"]) {
       element.addEventListener(type, (event) => event.stopPropagation());
     }
+    // A cancelled touch (system gesture, call arriving) must not leak to the
+    // camera rig either, or the world would lurch at the moment a touch dies.
+    element.addEventListener("pointercancel", (event) => event.stopPropagation());
 
     const object = new CSS3DObject(element);
     object.position.copy(placement.position);

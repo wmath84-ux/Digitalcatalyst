@@ -270,14 +270,42 @@ export function createTextures(anisotropy: number): TextureSet {
     fur.ctx.stroke();
   }
 
-  // ── Soft cloud puff (billboards) ─────────────────────────────────────
+  // ── Cloud puff (fBm cumulus, painted once, stamped on billboards) ────
+  // The same cheap trick BGMI-class games use for distant weather: no 3D
+  // puffs, no per-pixel cloud shader — a single fBm-painted alpha card,
+  // stamped on a few dozen instanced billboards that cluster into banks.
+  // Two details are what sell it as a cloud rather than a white blob:
+  //   * DOMAIN WARP — a low-frequency noise offsets the fBm coordinates,
+  //     which stretches the lobes into lumpy, drifting cumulus shapes;
+  //   * FAKE VOLUME — bright white tops, cool grey bases (real clouds are
+  //     lit from above; a uniform white puff always reads as a sticker).
   const cloud = canvas2d(256, 256);
-  const cg = cloud.ctx.createRadialGradient(128, 128, 10, 128, 128, 126);
-  cg.addColorStop(0, "rgba(255,255,255,0.95)");
-  cg.addColorStop(0.45, "rgba(255,255,255,0.55)");
-  cg.addColorStop(1, "rgba(255,255,255,0)");
-  cloud.ctx.fillStyle = cg;
-  cloud.ctx.fillRect(0, 0, 256, 256);
+  const cImg = cloud.ctx.createImageData(256, 256);
+  const cData = cImg.data;
+  const sstep = (a: number, b: number, x: number) => {
+    const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+    return t * t * (3 - 2 * t);
+  };
+  for (let y = 0; y < 256; y += 1) {
+    for (let x = 0; x < 256; x += 1) {
+      const w = fbm(x / 42, y / 42, 3, 91); // warp field
+      const n = fbm(x / 19 + (w - 0.5) * 9, y / 27 + (w - 0.5) * 9, 4, 37);
+      // Elliptical falloff — the card has no hard square edge.
+      const ex = (x - 128) / 132;
+      const ey = (y - 138) / 108;
+      const fall = 1 - (ex * ex + ey * ey);
+      if (fall <= 0) continue;
+      const body = sstep(0.36, 0.62, n) * Math.pow(fall, 1.6);
+      if (body <= 0.004) continue;
+      const lum = 196 + body * 59 + (1 - n) * 26 + (1 - y / 256) * 12;
+      const i4 = (y * 256 + x) * 4;
+      cData[i4] = Math.min(255, lum - 5);
+      cData[i4 + 1] = Math.min(255, lum - 2);
+      cData[i4 + 2] = Math.min(255, lum + 6);
+      cData[i4 + 3] = body * 255;
+    }
+  }
+  cloud.ctx.putImageData(cImg, 0, 0);
 
   // ── Feather / wing card ──────────────────────────────────────────────
   const feather = canvas2d(128, 64);
