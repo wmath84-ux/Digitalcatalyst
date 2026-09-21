@@ -26,6 +26,7 @@ import { createTextures, type TextureSet } from "./textures";
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
+import { createSorrelField, type SorrelField } from "./sorrel";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createWeathering, type Weathering } from "./weathering";
 import { createWinter, winterDaylight, type WinterSystem } from "./winter";
@@ -131,6 +132,13 @@ export class Sanctuary {
   private textures: TextureSet;
   private grass: GrassField;
   private flora: Flora;
+  /**
+   * The sorrel field (the meadow's real 3D ground plants). Its asset is
+   * loaded asynchronously — it is the only world piece that is — so this
+   * stays null until the load resolves, and a failed load leaves it null
+   * instead of taking the sanctuary down.
+   */
+  private sorrel: SorrelField | null = null;
   /**
    * Air, weathering and the rock kit — the three systems that carry the
    * research pass (see `atmosphere.ts`, `weathering.ts`, `rocks.ts`). The
@@ -294,6 +302,25 @@ export class Sanctuary {
     this.flora.solidMaterials.forEach((m) => this.atmosphere.register(m));
     this.flora.foliageMaterials.forEach((m) => this.winter.register(m, "foliage"));
     this.flora.solidMaterials.forEach((m) => this.winter.register(m));
+
+    // THE SORREL FIELD — the meadow's real 3D ground plants. The only
+    // asynchronous piece of the world: the glTF + textures ship in
+    // `public/sanctuary/models/` and land a beat after the rest of the
+    // build. Until then the meadow is simply grass + wildflowers, and a
+    // failed load degrades to exactly that instead of breaking the scene.
+    createSorrelField(this.budget, aniso).then((field) => {
+      if (this.disposed) {
+        field.dispose();
+        return;
+      }
+      this.sorrel = field;
+      this.scene.add(field.group);
+      // Thin leaves glow when the sun is behind them, like the grass.
+      field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
+      field.materials.forEach((m) => this.winter.register(m, "foliage"));
+    }).catch(() => {
+      // createSorrelField already warns; the field stays null.
+    });
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
     this.scene.add(this.birds.group);
@@ -1590,6 +1617,7 @@ export class Sanctuary {
       this.ambientClock = 0;
       this.grass.update(time, this.wind);
       this.flora.update(time, this.wind);
+      this.sorrel?.update(time, this.wind);
       this.water.update(adt, time);
       // The bay's idle motion (boat, umbrellas) rides the same budget.
       this.structures.update(time);
@@ -1687,6 +1715,7 @@ export class Sanctuary {
     this.grass.dispose();
     this.rocks.dispose();
     this.flora.dispose();
+    this.sorrel?.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();

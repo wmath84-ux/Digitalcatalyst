@@ -18,7 +18,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { QualityBudget } from "./quality";
-import { insideRiver, terrainHeight, OCEAN_LEVEL } from "./terrain";
+import { insideRiver, terrainHeight } from "./terrain";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
 import type { TextureSet } from "./textures";
 
@@ -858,38 +858,14 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   }
   group.add(frondSway, frondStill);
 
-  // ── Shrubs (instanced spheres of leaf cards would be heavy — use
-  //    low-poly icospheres with the bark/leaf palette instead) ──────────
-  // TROPICAL: warmer island green; on the beach they thin out so the sand
-  // stays the sand (Phase 8: ROCKY/BEACH zones get sparse vegetation).
-  const shrubGeo = new THREE.IcosahedronGeometry(0.55, 0);
-  const shrubMat = new THREE.MeshLambertMaterial({ color: 0x3aaa22, flatShading: true });
-  const shrubCount = Math.round(budget.flowers * 0.35);
-  const shrubs = new THREE.InstancedMesh(shrubGeo, shrubMat, shrubCount);
-  let si = 0;
-  for (let i = 0; i < shrubCount * 3 && si < shrubCount; i += 1) {
-    const r = 6 + Math.sqrt(Math.random()) * 300;
-    const a = Math.random() * Math.PI * 2;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    if (insideRiver(x, z)) continue;
-    const sy = terrainHeight(x, z);
-    if (sy < OCEAN_LEVEL + 1.6 && Math.random() < 0.85) continue; // beach: very sparse
-    dummy.position.set(x, sy + 0.2, z);
-    dummy.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
-    const sc = 0.6 + Math.random() * 1.3;
-    dummy.scale.set(sc, sc * 0.78, sc);
-    dummy.updateMatrix();
-    shrubs.setMatrixAt(si, dummy.matrix);
-    color.setHSL(0.30 + Math.random() * 0.03, 0.66, 0.30 + Math.random() * 0.12);
-    shrubs.setColorAt(si, color);
-    si += 1;
-  }
-  shrubs.count = si;
-  shrubs.instanceMatrix.needsUpdate = true;
-  if (shrubs.instanceColor) shrubs.instanceColor.needsUpdate = true;
-  shrubs.castShadow = shadows;
-  group.add(shrubs);
+  // ── Shrubs live in `sorrel.ts` now ──────────────────────────────────
+  //
+  // The old placeholder was one icosahedron repeated 50–147 times — the
+  // "one mesh, many placements" shortcut the research warns about (§6).
+  // The meadow's shrubby ground layer is now the real authored plant:
+  // "Shrub Sorrel 01" (Poly Haven, CC0), instanced across the field by
+  // `createSorrelField` with patch-noise clumping and the environmental
+  // veto (river, trails, beach, rock, closed canopy).
 
   // ── Wildflowers ──────────────────────────────────────────────────────
   // TROPICAL: the island's blooms — hibiscus, plumeria, bougainvillea and
@@ -933,7 +909,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     group,
     perches,
     foliageMaterials: [leafMatSway, leafMatStill, impostorMat, palmImpostorMat, frondMatSway, frondMatStill],
-    solidMaterials: [trunkMat, palmTrunkMat, pineMat, shrubMat, flowerMat],
+    solidMaterials: [trunkMat, palmTrunkMat, pineMat, flowerMat],
     update(time, wind) {
       // Every wind-animated foliage material — the near canopy, the palm
       // fronds, and both impostor sets — runs off the same two uniforms.
