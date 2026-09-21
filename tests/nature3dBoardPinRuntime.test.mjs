@@ -244,10 +244,17 @@ test("framing a board lifts its face onto the layer and hides its 3D host", () =
   );
   assert.equal(reading.hostDisplay, "none", "the framed board's 3D host must be hidden");
 
-  // Neighbours are hidden for the duration of the pin, in both layers.
+  // …and the two boards beside it stay in the world. Framing one board used to
+  // put the neighbours away in both layers, which emptied the lectern the
+  // moment the learner opened a board ("kisi bhi board par shift hota hun to
+  // baaki sab boards hide ho jaate hain") — all three boards are meant to be
+  // seen together, at every distance and from every side.
   for (const b of state.filter((s) => s.slot !== "reading")) {
-    assert.equal(b.hostDisplay, "none", `${b.slot} must not paint while reading is framed`);
-    assert.equal(b.objectVisible, false, `${b.slot}'s object must be culled while reading is framed`);
+    assert.equal(b.faceInsideHost, true, `${b.slot} must not be lifted with the framed board`);
+    assert.equal(b.hostDisplay, "", `${b.slot}'s page must stay up while reading is framed`);
+    assert.ok(b.objectInScene, `${b.slot} must still be in the CSS3D scene while reading is framed`);
+    assert.equal(b.objectVisible, true, `${b.slot} must not be culled while reading is framed`);
+    assert.equal(b.shellVisible, true, `${b.slot}'s board must still stand while reading is framed`);
   }
 });
 
@@ -365,7 +372,7 @@ test("a pin that cannot be projected leaves the board a live 3D board", () => {
   const framed = boards().find((b) => b.slot === "reading");
   assert.ok(framed.faceInLayer, "precondition: the reading board is framed");
   for (const b of boards().filter((x) => x.slot !== "reading")) {
-    assert.equal(b.hostDisplay, "none", `${b.slot}: neighbours start put away`);
+    assert.equal(b.hostDisplay, "", `${b.slot}: the neighbours stay up while a board is framed`);
   }
 
   // 10 m out the board is visible (the cull keeps it) but its projected face is
@@ -398,6 +405,7 @@ test("a pin that cannot be projected leaves the board a live 3D board", () => {
   for (const b of world) {
     assert.equal(b.hostDisplay, "", `${b.slot}: the board must be standing after a refused pin`);
     assert.equal(b.objectVisible, true, `${b.slot}: the object must be visible after a refused pin`);
+    assert.equal(b.shellVisible, true, `${b.slot}: the board itself must be standing after a refused pin`);
   }
 });
 

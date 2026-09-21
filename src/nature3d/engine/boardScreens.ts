@@ -622,9 +622,17 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       }
 
       // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
-      // the framed board's surface out of the CSS3D layer so the other two
-      // keep their live pages — hiding them is what painted the neighbour
-      // boards black.
+      // the framed board's surface out of the CSS3D layer — the board itself,
+      // and the two boards beside it, stay exactly where they are.
+      //
+      // The neighbours used to be put away here ("at this close square-on
+      // camera CSS3D-explode into a 60 m page"), which is why framing one
+      // board made the whole lectern vanish — the owner's "kisi bhi board par
+      // shift hota hun to baaki sab boards hide ho jaate hain". That hiding
+      // was a workaround for the projection bug the cull now owns: a page is
+      // only ever painted while its whole face is in front of the eye (see
+      // `projectFace`), so a neighbour the framed camera cannot describe
+      // honestly puts its own screen away and nothing else has to be touched.
       lastCamera = camera;
       if (readSlot) {
         const live = screens.find((s) => s.slot === readSlot);
@@ -638,19 +646,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
               // pinned face — and every live iframe inside it — untouched.
               if (live.object.parent === cssScene) cssScene.remove(live.object);
             }
-            // Neighbours at this close square-on camera CSS3D-explode into a
-            // 60 m page. Hide their DOM AND their black WebGL shells.
-            screens.forEach((screen, i) => {
-              if (screen.slot === live.slot) {
-                const shell = shells.children[i];
-                if (shell) shell.visible = true;
-                return;
-              }
-              screen.host.style.display = "none";
-              screen.object.visible = false;
-              const shell = shells.children[i];
-              if (shell) shell.visible = false;
-            });
+            // The framed board is the one being read: its shell is the frame
+            // around the pinned page, so make sure it is drawn.
+            const shell = shells.children[screens.indexOf(live)];
+            if (shell) shell.visible = true;
           } else if (liftedSlot === live.slot) {
             // A face that was lifted stopped being projectable (a resize to a
             // sliver, the board behind the near plane…). Put the board back
@@ -659,11 +658,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
             // retried next frame.
             releaseBoard(live);
             liftedSlot = null;
-            // The pin hid the neighbours without touching the cull's own
-            // bookkeeping (it keeps its entries "visible" so the pin's hiding
-            // is not undone every frame). Drop that bookkeeping now, so the
-            // next cull re-writes the neighbours the pin put away instead of
-            // trusting an entry that says they are already up.
+            // The lifted board's entry was written before the pin took its
+            // object out of the scene, so let the next cull re-decide the
+            // whole trio from scratch.
             visibility.clear();
           }
           lastCamPos.copy(camera.position);
