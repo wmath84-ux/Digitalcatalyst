@@ -15,6 +15,8 @@ import { terrainHeight } from "./terrain";
 
 export interface StudentRig {
   group: THREE.Group;
+  /** Physical furniture, separate from the learner for seasonal treatments. */
+  chair: THREE.Group;
   /** Eye height in world space — the FPP camera anchor when seated. */
   eyePosition: THREE.Vector3;
   update(time: number): void;
@@ -41,6 +43,7 @@ export function createStudent(budget: QualityBudget): StudentRig {
 
   // ── Chair ────────────────────────────────────────────────────────────
   const chair = new THREE.Group();
+  chair.name = "student-chair";
   const seat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.08, 0.95), wood);
   seat.position.y = 0.78;
   seat.castShadow = shadows;
@@ -163,6 +166,7 @@ export function createStudent(budget: QualityBudget): StudentRig {
 
   return {
     group,
+    chair,
     eyePosition,
     update(time) {
       if (!group.visible) return;

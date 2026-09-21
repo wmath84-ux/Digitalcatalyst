@@ -19,11 +19,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff, Footprints,
   Maximize2, Minimize2, PawPrint, RotateCw,
-  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Rabbit,
+  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
   ChevronsUp,
 } from "lucide-react";
 import Joystick from "./components/Joystick";
+import "./winter.css";
 import { Sanctuary, type CameraMode, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
@@ -38,12 +39,11 @@ const WIND_STEPS = [
 ];
 
 const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
-  // The whole connected world first, then the three districts, then the
+  // The whole connected world first, then the two districts, then the
   // points of interest inside the home district.
   { key: "world", label: "World", Icon: Globe2 },
   { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
-  { key: "safari", label: "Safari", Icon: Rabbit },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
@@ -96,6 +96,7 @@ export default function NatureStudioPage() {
   const [booting, setBooting] = useState(true);
   const [mode, setMode] = useState<CameraMode>("orbit");
   const [windIdx, setWindIdx] = useState(1);
+  const [iceAge, setIceAge] = useState(false);
   const [daylight, setDaylight] = useState<DaylightMode>("auto");
   // Shown next to the buttons so "Auto" is legible — otherwise the learner
   // cannot tell which hour the scene decided on. Ticks once a minute.
@@ -345,11 +346,11 @@ export default function NatureStudioPage() {
               <h1 className="flex items-center gap-2 text-[13px] font-black tracking-tight text-white">
                 Morning Nature Sanctuary
                 <span className="rounded-full border border-emerald-400/40 bg-emerald-500/25 px-2 py-0.5 text-[9px] font-bold text-emerald-200">
-                  Living biome
+                  {iceAge ? "Ice Age" : "Living biome"}
                 </span>
               </h1>
               <p className="text-[11px] text-white/55">
-                1 km valley · Waterfall · Grazing herds
+                {iceAge ? "Frozen world · Drifting snow · Frosted study space" : "Highlands · Waterfall · Living forest"}
               </p>
             </div>
           </div>
@@ -392,6 +393,27 @@ export default function NatureStudioPage() {
                 </span>
               ) : null}
             </div>
+
+            <button
+              type="button"
+              aria-pressed={iceAge}
+              aria-label="Ice Age"
+              disabled={booting || Boolean(error)}
+              onClick={() => {
+                const next = !iceAge;
+                engineRef.current?.setIceAge(next);
+                setIceAge(next);
+              }}
+              title={iceAge ? "Turn off Ice Age — restore the living biome" : "Turn on Ice Age — transform the world into winter"}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold backdrop-blur-xl transition disabled:opacity-40 ${
+                iceAge
+                  ? "border-cyan-200/60 bg-cyan-300/25 text-cyan-50 shadow-[0_0_20px_rgba(103,232,249,0.25)]"
+                  : "border-white/18 bg-slate-950/45 text-white/80 hover:bg-white/15"
+              }`}
+            >
+              <Snowflake className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Ice Age</span>
+            </button>
 
             <HudButton onClick={cycleWind} title="Wind strength">
               <Wind className="h-3.5 w-3.5 text-sky-200" />

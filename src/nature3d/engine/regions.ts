@@ -1,30 +1,11 @@
-// src/nature3d/engine/regions.ts
-//
-// THE ONE CONTINUOUS WORLD.
-//
-// There are no longer three separate 3D pages. There is one Sanctuary, and
-// the other two areas are districts inside it that you can walk to:
-//
-//        ── TREK ──        ── SANCTUARY ──        ── SAFARI ──
-//      (TerrainTrek)         (the meadow,          (Clay Safari's
-//       eroded ridges,        the board,            river valley and
-//       open highland)        the student)          its animals)
-//         x ≈ -900               x = 0                x ≈ +900
-//
-// They are laid out along the X axis and joined by land bridges, so you can
-// start at the board, walk west into the highlands or east into the safari
-// valley, and never hit a loading screen or a wall.
-//
-// This module owns the LAYOUT and the height contribution of each district.
-// `terrain.ts` calls into it so that one height field still answers for the
-// entire world — which is what keeps grass, trees, animals, the student's
-// feet and the board clamp all agreeing about where the ground is.
+// One continuous Sanctuary: the home meadow and the western Highlands.
+// This layout and its shared height field drive terrain, vegetation and walking.
 
 import { noise } from "./simplex";
 
 /** Centre of each district in world space, and how far its core reaches. */
 export interface Region {
-  id: "sanctuary" | "safari" | "trek";
+  id: "sanctuary" | "trek";
   centerX: number;
   centerZ: number;
   /** Radius of the district's own terrain treatment. */
@@ -33,12 +14,11 @@ export interface Region {
 
 // The districts sit 700 m apart. That is far enough that each reads as its
 // own place from the middle of it, and close enough that from the default
-// camera — which looks along the whole chain — all three are visible at once.
+// camera — which looks along the whole chain — both are visible at once.
 export const SANCTUARY: Region = { id: "sanctuary", centerX: 0, centerZ: 0, radius: 430 };
-export const SAFARI: Region = { id: "safari", centerX: 700, centerZ: 0, radius: 300 };
 export const TREK: Region = { id: "trek", centerX: -700, centerZ: 0, radius: 380 };
 
-export const REGIONS: readonly Region[] = [TREK, SANCTUARY, SAFARI];
+export const REGIONS: readonly Region[] = [TREK, SANCTUARY];
 
 /**
  * How far the whole connected world reaches from the origin. The walk limit
@@ -64,34 +44,6 @@ export function regionWeight(r: Region, x: number, z: number): number {
   // meet the plain. Fading from 35% to 190% of the radius turns that into a
   // foothill approach you can walk up.
   return 1 - smoothstep(r.radius * 0.35, r.radius * 1.9, d);
-}
-
-/**
- * The Clay Safari district's ground.
- *
- * The safari world is authored on its own small map (84 x 60) with a gentle
- * bowl and an S-bend river. Here we only need its LARGE-SCALE shape, because
- * the safari's own props are placed on top of it: a shallow basin so the
- * valley reads as lower ground you descend into, with soft dunes around the
- * rim. The props themselves are positioned in local coordinates and then
- * offset into the district (see `safariToWorld`).
- */
-export function safariRelief(x: number, z: number): number {
-  const lx = x - SAFARI.centerX;
-  const lz = z - SAFARI.centerZ;
-  const d = Math.hypot(lx, lz);
-
-  // A basin: the valley floor sits a few metres below the surrounding plain.
-  const basin = -4.5 * (1 - smoothstep(0, SAFARI.radius * 0.85, d));
-  // Dunes on the rim so the district has a horizon of its own.
-  const dunes =
-    (Math.sin(lx * 0.021 + 1.1) * Math.cos(lz * 0.018 - 0.4) * 3.1 +
-      Math.sin(lx * 0.045 - lz * 0.038) * 1.2) *
-    smoothstep(SAFARI.radius * 0.5, SAFARI.radius * 1.1, d);
-  // The authored map itself is kept flat-ish so the GLB animals and trees
-  // stand level; only outside it does the ground start to roll.
-  const flatCore = 1 - smoothstep(55, 120, d);
-  return basin + dunes * (1 - flatCore);
 }
 
 /**
@@ -175,9 +127,4 @@ export function trekRelief(x: number, z: number): number {
   if (elevation < 0) elevation *= 0.28;
 
   return elevation;
-}
-
-/** Local safari coordinates -> world coordinates. */
-export function safariToWorld(lx: number, lz: number): [number, number] {
-  return [lx + SAFARI.centerX, lz + SAFARI.centerZ];
 }

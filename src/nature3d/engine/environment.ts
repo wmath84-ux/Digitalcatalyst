@@ -226,7 +226,7 @@ const TRAILS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   [[0, 2.6], [7.5, -1.5], [14.5, -6.5]],
   // Chair → the lesson-board hill: the climb.
   [[0, 0], [-26, -24], [-58, -58], [-96, -98]],
-  // East, towards the safari district: the long trail out of the meadow.
+  // East, towards the open meadow: the long trail out of the meadow.
   [[1.5, 1.5], [34, 6], [120, 10], [240, 6], [360, -4]],
   // West, towards the highlands.
   [[-1.5, 1.5], [-30, 7], [-110, 14], [-215, 8], [-330, -6]],
@@ -468,7 +468,7 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
   // COASTAL — how close this spot is to the open sea. Two masks, both from
   // the same source of truth: the height above OCEAN_LEVEL (the level the
   // ocean mesh actually floods to) AND the geographic coast ring. The ring is
-  // what keeps inland low spots — the safari basin at −4.5 m, the study
+  // what keeps inland low spots — the sheltered hollows, the study
   // clearing at 0 m — grass-green: they are low, but they are nowhere near
   // the sea. The height band is generous, 11 m above the sea, because the
   // beach is a ZONE (dry crest, light sand, wet sand), not a line.

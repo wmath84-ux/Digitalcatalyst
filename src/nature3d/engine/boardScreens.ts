@@ -193,6 +193,8 @@ export interface BoardScreensHandle {
   setSize(width: number, height: number): void;
   /** Pin one board as a 2D face for native clicks; CSS3D resumes when null. */
   setReadSlot(slot: LecternSlot | null): void;
+  /** Frost the perimeter without changing content, hit targets or CSS3D poses. */
+  setWinter(enabled: boolean): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
@@ -503,6 +505,13 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       viewW = width;
       viewH = height;
       renderer.setSize(width, height);
+    },
+
+    setWinter(enabled) {
+      for (const screen of screens) {
+        if (enabled) screen.element.dataset.iceAge = "true";
+        else delete screen.element.dataset.iceAge;
+      }
     },
 
     setReadSlot(slot) {

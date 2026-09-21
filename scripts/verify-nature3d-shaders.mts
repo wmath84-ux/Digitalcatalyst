@@ -145,10 +145,9 @@ check(
 const decalMat = new THREE.MeshBasicMaterial({ map: new THREE.Texture(), transparent: true });
 atmosphere.register(decalMat);
 const decal = compile(decalMat);
-// MeshBasicMaterial DOES carry a normal attribute (env-map lighting), so the
-// world normal is legal there — the earlier worry (a fragment `in` with no
-// vertex `out`) is covered by the orphan check at the bottom.
-check("decal: world normal injection is legal", decal.vs.includes("objectNormal") && decal.vs.includes("vDcWorldNormal"));
+// Basic normals only exist when USE_ENVMAP or USE_SKINNING is enabled.
+// A plain decal must not reference them outside that preprocessor guard.
+check("decal: no unconditional world normal", !decal.vs.includes("vDcWorldNormal") && !decal.fs.includes("vDcWorldNormal"));
 check("decal: world position IS published", count(decal.fs, "varying vec3 vDcWorldPos;") === 1 && decal.vs.includes("vDcWorldPos ="));
 
 // ── 4. Terrain: the landscape shader's anchors ────────────────────────

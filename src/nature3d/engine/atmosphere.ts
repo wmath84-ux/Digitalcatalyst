@@ -143,8 +143,12 @@ export function injectWorldVaryings(shader: ShaderLike): boolean {
   const marked = shader as MarkedShader;
   if (marked.dcWorldVaryings !== undefined) return marked.dcWorldVaryings;
 
-  // A vertex shader with no normal attribute cannot feed a world normal.
+  // MeshBasicMaterial contains beginnormal_vertex too, but only inside
+  // USE_ENVMAP / USE_SKINNING. Plain contact decals do not define either,
+  // so objectNormal does not exist. Require the unconditional lit-material
+  // normal pipeline rather than just the presence of a conditional chunk.
   const withNormal =
+    shader.vertexShader.includes("#include <normal_pars_vertex>") &&
     shader.vertexShader.includes("#include <beginnormal_vertex>") &&
     shader.vertexShader.includes("#include <project_vertex>");
 

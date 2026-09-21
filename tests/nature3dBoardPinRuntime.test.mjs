@@ -540,6 +540,39 @@ test("no camera pose paints a page the eye has stepped into", () => {
   assert.ok(painted > 100, `the sweep must actually paint pages (painted ${painted})`);
 });
 
+test("board frost survives pin/switch/unpin without obscuring or replacing content", () => {
+  screens.setReadSlot(null);
+  const reading = screens.byId("reading");
+  const content = window.document.createElement("button");
+  content.textContent = "Continue lesson";
+  let clicked = 0;
+  content.addEventListener("click", () => clicked++);
+  reading.element.appendChild(content);
+  const originals = boards().map((b) => b.host.style.transform);
+  screens.setWinter(true);
+  for (const [i, b] of boards().entries()) {
+    assert.equal(b.face.dataset.iceAge, "true");
+    assert.equal(b.host.style.transform, originals[i], "winter never changes CSS3D's pose");
+  }
+  for (const slot of ["reading", "notes", null]) {
+    if (slot) fixture.frame(screens, camera, slot);
+    screens.setReadSlot(slot);
+    screens.render(camera, true);
+    assert.equal(reading.element.dataset.iceAge, "true");
+    assert.ok(reading.element.contains(content));
+    content.click();
+    assertNoStrayPage(boards(), `winter: ${slot}`);
+  }
+  assert.equal(clicked, 3);
+  screens.setWinter(false);
+  for (const b of boards()) assert.equal(b.face.dataset.iceAge, undefined);
+  assert.equal(reading.element.firstChild, content);
+  const css = fs.readFileSync(path.join(ROOT, "src/nature3d/winter.css"), "utf8");
+  assert.match(css, /pointer-events: none/);
+  assert.doesNotMatch(css, /backdrop-filter|filter:|transform:/, "frost must not blur lessons or alter poses");
+  content.remove();
+});
+
 /* ── 9. a face is never left behind when the sanctuary unmounts ───────────── */
 
 test("disposal removes every board element, pinned or not", () => {

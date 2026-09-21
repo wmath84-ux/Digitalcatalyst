@@ -20,6 +20,7 @@ export interface SkySystem {
   sunDir: THREE.Vector3;
   /** Re-light the whole sky for a moment of the day. */
   applyDaylight(state: DaylightState): void;
+  setWinter(enabled: boolean): void;
   /** The camera, so the cloud billboards can face the live viewer. */
   update(dt: number, time: number, wind: number, camera: THREE.Camera): void;
   dispose(): void;
@@ -336,6 +337,9 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
      * camera so a finite shadow map stays useful) — only its direction,
      * colour and intensity are decided here.
      */
+    setWinter(enabled) {
+      motes.visible = !enabled;
+    },
     applyDaylight(state) {
       sunDir.copy(state.sunDir);
       domeMat.uniforms.uSunDir.value.copy(state.sunDir);
