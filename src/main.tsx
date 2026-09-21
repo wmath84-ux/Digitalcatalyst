@@ -62,10 +62,6 @@ const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
 const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
 const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage"));
-// The 3D sanctuary is a heavy chunk (three.js + the procedural world), so it
-// is lazy like every other route — nothing is downloaded until the learner
-// opens it from the rail.
-const NatureStudioPage = lazyRoute(() => import("./nature3d/NatureStudioPage"));
 const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
@@ -182,7 +178,6 @@ const PROFILE_HASH = "#/profile";
 const SETTINGS_HASH = "#/settings";
 const STUDY_LIBRARY_HASH = "#/study-library";
 const STUDY_PACK_HASH = "#/pack/";
-const NATURE_STUDIO_HASH = "#/nature-studio";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -562,7 +557,6 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
-  if (hash.startsWith(NATURE_STUDIO_HASH)) return NatureStudioPage;
   if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
@@ -684,10 +678,6 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
     || hash.startsWith(OPENING_PREVIEW_HASH)
-    // The 3D Study Sanctuary is a full-screen WebGL experience: the rail,
-    // the top bar and the page scroller all have to get out of the way so
-    // the canvas owns the entire viewport.
-    || hash.startsWith(NATURE_STUDIO_HASH)
   ) {
     return <>{children}</>;
   }
@@ -702,11 +692,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
             ? "Subscription"
             : hash.startsWith(PRODUCT_HASH)
               ? "Product details"
-              : hash.startsWith(STUDY_LIBRARY_HASH)
-                ? "My Study Library"
-                : hash.startsWith(NATURE_STUDIO_HASH)
-                  ? "3D Study Sanctuary"
-                  : undefined
+            : hash.startsWith(STUDY_LIBRARY_HASH)
+              ? "My Study Library"
+              : undefined
       }
       pageSubtitle={
         hash.startsWith("#/flowpath")
@@ -715,11 +703,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
             ? "Compare plans, add courses and features, and review before you buy"
             : hash.startsWith(PRODUCT_HASH)
               ? "Everything about this resource, before you buy"
-              : hash.startsWith(STUDY_LIBRARY_HASH)
-                ? "Modules, saved resources and recent learning"
-                : hash.startsWith(NATURE_STUDIO_HASH)
-                  ? "Walk the meadow, place the board, study with the herd"
-                  : undefined
+            : hash.startsWith(STUDY_LIBRARY_HASH)
+              ? "Modules, saved resources and recent learning"
+              : undefined
       }
     >
       {children}
@@ -1728,7 +1714,6 @@ function RootPage(): ReactNode {
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
-  if (hash.startsWith(NATURE_STUDIO_HASH)) return <NatureStudioPage />;
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) {
     // The boundary keeps a Study Library render crash contained to this route:
