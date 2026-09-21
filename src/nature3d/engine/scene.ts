@@ -27,6 +27,8 @@ import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WAT
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
+import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
+import { createMossBank, type MossBank } from "./moss";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createWeathering, type Weathering } from "./weathering";
 import { createWinter, winterDaylight, type WinterSystem } from "./winter";
@@ -139,6 +141,10 @@ export class Sanctuary {
    * instead of taking the sanctuary down.
    */
   private sorrel: SorrelField | null = null;
+  /** Real 3D grass clumps (Grass Medium 02, five variants) — see `grassTufts.ts`. */
+  private grassTufts: GrassTuftField | null = null;
+  /** The mossy edge lining both banks of the river — see `moss.ts`. */
+  private mossBank: MossBank | null = null;
   /**
    * Air, weathering and the rock kit — the three systems that carry the
    * research pass (see `atmosphere.ts`, `weathering.ts`, `rocks.ts`). The
@@ -320,6 +326,36 @@ export class Sanctuary {
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
     }).catch(() => {
       // createSorrelField already warns; the field stays null.
+    });
+
+    // THE GRASS TUFT FIELD — real 3D clumps (Grass Medium 02, all five
+    // variants) decorating the meadow between the blades and the sorrel.
+    createGrassTuftField(this.budget, aniso).then((field) => {
+      if (this.disposed) {
+        field.dispose();
+        return;
+      }
+      this.grassTufts = field;
+      this.scene.add(field.group);
+      field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
+      field.materials.forEach((m) => this.winter.register(m, "foliage"));
+    }).catch(() => {
+      // createGrassTuftField already warns; the field stays null.
+    });
+
+    // THE MOSS BANK — twelve moss variants lining both banks of the river,
+    // at least a clump per metre of bank.
+    createMossBank(this.budget, aniso).then((field) => {
+      if (this.disposed) {
+        field.dispose();
+        return;
+      }
+      this.mossBank = field;
+      this.scene.add(field.group);
+      field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
+      field.materials.forEach((m) => this.winter.register(m, "foliage"));
+    }).catch(() => {
+      // createMossBank already warns; the field stays null.
     });
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
@@ -1618,6 +1654,8 @@ export class Sanctuary {
       this.grass.update(time, this.wind);
       this.flora.update(time, this.wind);
       this.sorrel?.update(time, this.wind);
+      this.grassTufts?.update(time, this.wind);
+      this.mossBank?.update(time, this.wind);
       this.water.update(adt, time);
       // The bay's idle motion (boat, umbrellas) rides the same budget.
       this.structures.update(time);
@@ -1716,6 +1754,8 @@ export class Sanctuary {
     this.rocks.dispose();
     this.flora.dispose();
     this.sorrel?.dispose();
+    this.grassTufts?.dispose();
+    this.mossBank?.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();

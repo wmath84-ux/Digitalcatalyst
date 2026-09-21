@@ -74,11 +74,12 @@ const ALPHA_URL = "sanctuary/models/textures/shrub_sorrel_01_alpha_1k.png";
 
 /**
  * The model is authored TINY — the whole plant is 0.084 m wide in its own
- * space (Poly Haven's "0.4 m wide" is the plant at ~5× this scale, which is
- * the size we want it at in the meadow: a ground-cover rosette a head above
- * the grass, well short of a bush).
+ * space. At ~5× it reads as a 0.4 m ground-cover rosette; the field needs it
+ * BIGGER — a shrub the learner actually notices while walking — so the
+ * shipped scale is 15× (≈1.26 m across at the midpoint, 0.9–2.3 m with the
+ * per-instance variation): head-height sorrel clumps, not a ground cover.
  */
-const BASE_SCALE = 5;
+const BASE_SCALE = 15;
 
 /** The plant's height in its own (pre-scale) space, for the wind bend curve. */
 const MODEL_HEIGHT = 0.058;
@@ -197,7 +198,11 @@ export function createSorrelField(budget: QualityBudget, anisotropy: number): Pr
         material.alphaMap = alphaTex;
         material.alphaTest = 0.5;
         material.side = THREE.DoubleSide;
-        for (const tex of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap, alphaTex]) {
+        // The Poly Haven ARM pack is R=AO, G=rough, B=metal — the same image
+        // can serve as the AO map (three reads the red channel).
+        material.aoMap = material.metalnessMap ?? material.roughnessMap ?? null;
+        if (material.aoMap) material.aoMapIntensity = 0.7;
+        for (const tex of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap, material.aoMap, alphaTex]) {
           if (tex) tex.anisotropy = anisotropy;
         }
 
