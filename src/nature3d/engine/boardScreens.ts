@@ -268,7 +268,20 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     el.style.zIndex = "";
   };
 
-  const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
+  // CSS3DRenderer caches the last matrix3d string per object. clearPin wipes
+  // the element's transform; a cache hit then skips the write and leaves a
+  // 1920×1080 identity overlay inside the camera element — the giant page
+  // in the centre of the world. Nudging the pose forces a different string.
+  let cssCacheSalt = 1e-5;
+  const bustCssCache = (screen: BoardScreen) => {
+    screen.object.position.y += cssCacheSalt;
+  };
+
+  let pinMinX = 0;
+  let pinMinY = 0;
+  let pinW = 0;
+  let pinH = 0;
+  const measurePin = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
     const p = screen.placement;
     const c = Math.cos(p.yaw);
     const s = Math.sin(p.yaw);
@@ -295,19 +308,48 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     // Behind the camera (or a pinched-out sky view) NDC explodes and this
     // 2D face would paint a giant page across the heavens. Refuse it.
     if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
+    pinMinX = minX;
+    pinMinY = minY;
+    pinW = w;
+    pinH = h;
+    return true;
+  };
+
+  const applyPin = (screen: BoardScreen) => {
     const el = screen.element;
     // Lift once onto the untransformed layer so left/top are layer pixels.
     // Do not do this every frame — moving an iframe reloads it.
     if (el.parentElement !== domElement) domElement.appendChild(el);
     el.style.position = "absolute";
-    el.style.left = `${minX}px`;
-    el.style.top = `${minY}px`;
+    el.style.left = `${pinMinX}px`;
+    el.style.top = `${pinMinY}px`;
     el.style.transformOrigin = "0 0";
-    el.style.transform = `scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
+    el.style.transform = `scale(${pinW / SCREEN_PX_WIDTH}, ${pinH / SCREEN_PX_HEIGHT})`;
     el.style.pointerEvents = "auto";
     el.style.zIndex = "2";
+    el.style.display = "";
     pinnedSlot = screen.slot;
-    return true;
+  };
+
+  const restowScreen = (screen: BoardScreen) => {
+    clearPin(screen);
+    screen.element.style.display = "";
+    screen.object.visible = true;
+    if (screen.object.parent !== cssScene) cssScene.add(screen.object);
+    const shell = shells.children[screens.indexOf(screen)];
+    if (shell) shell.visible = true;
+    bustCssCache(screen);
+  };
+
+  const paintRestow = (screen: BoardScreen, camera: THREE.PerspectiveCamera | null) => {
+    screen.element.style.opacity = "0";
+    restowScreen(screen);
+    cssCacheSalt = -cssCacheSalt;
+    if (camera) {
+      camera.updateMatrixWorld();
+      renderer.render(cssScene, camera);
+    }
+    screen.element.style.opacity = "";
   };
 
   return {
@@ -330,27 +372,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       if (readSlot === slot) return;
       if (liftedSlot) {
         const prev = screens.find((s) => s.slot === liftedSlot);
-        if (prev) {
-          clearPin(prev);
-          // Hide until CSS3D writes a real matrix — otherwise a 1920×1080
-          // untransformed overlay sits on the layer as a 60 m+ page.
-          prev.element.style.opacity = "0";
-        }
+        if (prev) paintRestow(prev, lastCamera);
         liftedSlot = null;
         pinnedSlot = null;
       }
-      // Neighbours were display:none / visible=false while framed. Put the
-      // whole trio back in CSS3D so the page you just left is not a black slab.
-      for (const screen of screens) {
-        clearPin(screen);
-        screen.element.style.display = "";
-        if (screen.object.parent !== cssScene) cssScene.add(screen.object);
-        screen.object.visible = true;
-        const shell = shells.children[screens.indexOf(screen)];
-        if (shell) shell.visible = true;
-      }
-      if (lastCamera) renderer.render(cssScene, lastCamera);
-      for (const screen of screens) screen.element.style.opacity = "";
       visibility.clear();
       readSlot = slot;
       lastCamPos.set(1e9, 1e9, 1e9);
@@ -393,6 +418,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
       let changed = false;
       for (const screen of screens) {
+        // The framed 2D pin owns this element's display. Culling it here
+        // would paint the live page black mid-read.
+        if (screen.slot === readSlot && liftedSlot === screen.slot) continue;
         sphere.center.copy(screen.placement.position);
         let visible = frustum.intersectsSphere(sphere);
 
@@ -424,37 +452,24 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       }
 
       // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
-      // the framed board out of the CSS3D scene so the other two keep their
-      // live pages — hiding them is what painted the neighbour boards black.
+      // the framed board, and only when its projection is a sane rectangle.
+      // Neighbours stay in CSS3D — hiding them is what painted the previous
+      // board black.
       lastCamera = camera;
       if (readSlot) {
         const live = screens.find((s) => s.slot === readSlot);
         if (live) {
-          if (live.object.parent === cssScene) cssScene.remove(live.object);
-          liftedSlot = live.slot;
-          live.element.style.display = "";
-          if (!pinFace(live, camera)) {
-            // Do not hand it back to CSS3D — that is the sky billboard.
-            clearPin(live);
-            live.element.style.display = "none";
+          if (measurePin(live, camera)) {
+            if (live.object.parent === cssScene) cssScene.remove(live.object);
+            liftedSlot = live.slot;
+            applyPin(live);
+          } else if (liftedSlot === live.slot) {
+            // Camera left the face (zoom-out). Restow so the page stays on
+            // the lectern instead of becoming a 60 m identity overlay.
+            paintRestow(live, camera);
+            liftedSlot = null;
             pinnedSlot = null;
-          } else {
-            // Neighbours at this close square-on camera CSS3D-explode into a
-            // 60 m page. Hide their DOM AND their black WebGL shells.
-            screens.forEach((screen, i) => {
-              if (screen.slot === readSlot) {
-                const shell = shells.children[i];
-                if (shell) shell.visible = true;
-                return;
-              }
-              screen.element.style.display = "none";
-              screen.object.visible = false;
-              const shell = shells.children[i];
-              if (shell) shell.visible = false;
-            });
           }
-          lastCamPos.copy(camera.position);
-          lastCamQuat.copy(camera.quaternion);
         }
       }
 
