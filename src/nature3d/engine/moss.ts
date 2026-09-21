@@ -238,9 +238,10 @@ export function createMossBank(budget: QualityBudget, anisotropy: number): Promi
               const mesh = meshes[(ai * 7 + k * 5 + (side + 1) * 3) % variants.length];
               const slot = mesh.count;
               if (slot >= mesh.instanceMatrix.count) continue; // buffer full: skip
-              // Mossy stems stand 0.3–0.65 m; the two "tall" variants
-              // carry the tallest reach on their own.
-              const s = 0.3 + Math.random() * 0.35;
+              // Mossy stems stand 1.8–3.9 m (6× the original 0.3–0.65 m per
+              // the owner's directive); the two "tall" variants carry the
+              // tallest reach on their own.
+              const s = 1.8 + Math.random() * 2.1;
               dummy.position.set(x, y - 0.02, z);
               dummy.rotation.set(
                 (Math.random() - 0.5) * 0.16,

@@ -74,12 +74,12 @@ const ALPHA_URL = "sanctuary/models/textures/shrub_sorrel_01_alpha_1k.png";
 
 /**
  * The model is authored TINY — the whole plant is 0.084 m wide in its own
- * space. At ~5× it reads as a 0.4 m ground-cover rosette; the field needs it
- * BIGGER — a shrub the learner actually notices while walking — so the
- * shipped scale is 15× (≈1.26 m across at the midpoint, 0.9–2.3 m with the
- * per-instance variation): head-height sorrel clumps, not a ground cover.
+ * space. The field wants them BIG — head-height at 15×, and the owner's
+ * directive is 6× that: a giant sorrel thicket (≈7.6 m across at the
+ * midpoint, 5.3–10.4 m with the per-instance variation) — the meadow's
+ * dominant plant, on par with the young trees.
  */
-const BASE_SCALE = 15;
+const BASE_SCALE = 90;
 
 /** The plant's height in its own (pre-scale) space, for the wind bend curve. */
 const MODEL_HEIGHT = 0.058;

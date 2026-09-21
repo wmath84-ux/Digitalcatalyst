@@ -25,8 +25,11 @@ CDN at runtime (same convention as the safari kit in `public/safari/models/`).
 
 ## Files
 
-- `src/nature3d/engine/sorrel.ts` — sorrel field (15× base scale ≈ 1.26 m
-  clumps; the earlier 5× read too small on the walk-through)
+- `src/nature3d/engine/sorrel.ts` — sorrel field (90× base scale ≈ 7.6 m
+  clumps — the owner's 6× directive on the earlier 15×, which still read
+  small on the walk-through; the field is now a giant sorrel thicket)
+- **All three fields are sized 6×** (owner directive, 2026-09-21): sorrel
+  15×→90×, tufts 0.42–0.7 m→2.52–4.32 m, moss 0.3–0.65 m→1.8–3.9 m
 - `src/nature3d/engine/grassTufts.ts` — the five tuft variants, one
   InstancedMesh each (5 draw calls), all five always in use
 - `src/nature3d/engine/moss.ts` — the twelve moss variants lining both banks
@@ -56,7 +59,12 @@ CDN at runtime (same convention as the safari kit in `public/safari/models/`).
   - tufts: low 150/40 · medium 400/100 · high 700/180 · ultra 1000/280
   - moss: anchor spacing 1.5 / 1.2 / 0.9 / 0.7 m per bank
 - **Failure-safe:** each field loads asynchronously; a failed load degrades
-  to the remaining layers and warns in the console.
+  to the remaining layers and warns in the console. The tuft field loads its
+  five variants with `Promise.allSettled` — a single dropped variant used to
+  silently kill the ENTIRE field (a `Promise.all` reject + an empty
+  `.catch`), which is exactly how it vanished in the browser. Now the field
+  keeps whatever loads and warns about the rest; the scene-level `.catch`
+  also warns, so no plant field can ever fail silently again.
 
 ## How they stay natural
 

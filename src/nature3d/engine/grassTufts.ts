@@ -152,9 +152,20 @@ export function createGrassTuftField(budget: QualityBudget, anisotropy: number):
   const shadows = budget.shadowMapSize > 0;
 
   return (async () => {
-    // All five variants in parallel; if ANY fails the whole field degrades
-    // out (the meadow keeps grass + sorrel + moss) rather than half-loading.
-    const variants = await Promise.all(VARIANT_URLS.map((u) => loadVariant(loader, u)));
+    // All five variants in parallel. A FAILED variant must not kill the
+    // whole field — the old Promise.all did exactly that, silently, and a
+    // single dropped asset made the entire tuft field vanish in the
+    // browser with nothing in the console. Keep whatever loads; warn about
+    // the rest. Only if NOTHING loads does the field degrade out.
+    const results = await Promise.allSettled(VARIANT_URLS.map((u) => loadVariant(loader, u)));
+    const variants: THREE.BufferGeometry[] = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") variants.push(r.value);
+      else console.warn(`[sanctuary] grass tuft variant v${i + 1} failed to load`, r.reason);
+    });
+    if (variants.length === 0) {
+      throw new Error("grassTufts: none of the five variants could be loaded");
+    }
 
     // ── One material for all five variants ─────────────────────────────
     //
@@ -346,9 +357,10 @@ function placeAt(
   hsl: { h: number; s: number; l: number },
 ): void {
   const slot = mesh.count;
-  // Target clump height 0.42–0.7 m in the near ring; the far ring grows the
-  // clumps ×1.7 so the sparse far field still reads as continuous turf.
-  const s = (0.42 + Math.random() * 0.3) * gain;
+  // Target clump height 2.5–4.3 m in the near ring (6× the original 0.42–0.7
+  // m per the owner's directive); the far ring grows the clumps ×1.7 on top
+  // so the sparse far field still reads as continuous turf.
+  const s = (2.52 + Math.random() * 1.8) * gain;
   dummy.position.set(x, y - 0.015, z);
   dummy.rotation.set(
     (Math.random() - 0.5) * 0.1,

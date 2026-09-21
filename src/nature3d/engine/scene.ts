@@ -324,8 +324,10 @@ export class Sanctuary {
       // Thin leaves glow when the sun is behind them, like the grass.
       field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
-    }).catch(() => {
-      // createSorrelField already warns; the field stays null.
+    }).catch((err) => {
+      // createSorrelField already warns on a load failure; this catches
+      // anything later in the wiring so a broken field is never silent.
+      console.warn("[sanctuary] sorrel field failed", err);
     });
 
     // THE GRASS TUFT FIELD — real 3D clumps (Grass Medium 02, all five
@@ -339,8 +341,10 @@ export class Sanctuary {
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
-    }).catch(() => {
-      // createGrassTuftField already warns; the field stays null.
+    }).catch((err) => {
+      // createGrassTuftField already warns per failed variant; this catches
+      // anything later in the wiring so a broken field is never silent.
+      console.warn("[sanctuary] grass tuft field failed", err);
     });
 
     // THE MOSS BANK — twelve moss variants lining both banks of the river,
@@ -354,8 +358,10 @@ export class Sanctuary {
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
-    }).catch(() => {
-      // createMossBank already warns; the field stays null.
+    }).catch((err) => {
+      // createMossBank already warns on a load failure; this catches
+      // anything later in the wiring so a broken field is never silent.
+      console.warn("[sanctuary] moss bank failed", err);
     });
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
