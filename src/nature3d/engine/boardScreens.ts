@@ -70,6 +70,24 @@
 //      entire subtree — iframes, video, the mind-map canvas — out of the
 //      browser's layout, paint and compositing work. Looking away from a
 //      board genuinely stops paying for it.
+//
+//      That cull is about the SCREEN. The WebGL SHELL (frame, backing plate,
+//      legs) is a physical object and follows the frustum alone: walk round
+//      the lectern and you must still see three boards standing there. The two
+//      used to share one flag, so crossing a board's face deleted the whole
+//      board from the world — the owner's "board cut ho gaya, pura board dikhta
+//      hi nahin piche se".
+//
+//      A screen is also only ever painted while the WHOLE face projects in
+//      front of the eye (all four corners inside the near/far range). With
+//      only the board's centre tested, a camera standing in the board's own
+//      plane left corners behind the eye, where one CSS3D matrix is a page of
+//      tens of thousands of pixels sliced across the view — the "board cut ho
+//      gaya" the owner met when walking up to a board. And because the DOM
+//      layer has no depth buffer, a hill cannot hide a board by itself: the
+//      sight line is tested against the same height field the ground mesh is
+//      built from (see `terrainBlocksSight`), so boards are not painted on the
+//      hillside when the learner walks behind it.
 //   3. OFF-SCREEN CONTENT IS SUSPENDED, NOT HIDDEN. `visibility:hidden` keeps
 //      a YouTube iframe decoding video forever. `display:none` does not, and
 //      that is the difference between one live video and three.
@@ -101,6 +119,48 @@ export const SCREEN_PX_HEIGHT = 1080;
 
 /** CSS pixels → world metres. 1920 px across a 30 m board. */
 export const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
+
+/**
+ * ── THE SCREEN HAS NO DEPTH BUFFER, THE WORLD DOES ─────────────────────
+ *
+ * A board's page is painted by the BROWSER, in a DOM layer that sits over the
+ * WebGL canvas. Nothing in that layer knows the hill is there, so a board
+ * behind a hill used to hang in mid-air on the hillside — walking round the
+ * back of the sanctuary made all three boards look like they had been planted
+ * on the mountain ("pahad ke piche se bhi dikhte hain").
+ *
+ * The ground is an analytic height field (`terrain.ts`), and the mesh the
+ * learner sees is built from that same function, so the sight line can be
+ * tested directly against it: march from the eye towards the board and watch
+ * for terrain standing above the line. Only the SCREEN is hidden this way —
+ * the WebGL shell (frame, plate, legs) is depth-tested by the GPU and is
+ * already occluded correctly.
+ *
+ * `OCCLUSION_MARGIN` is how far the terrain must stand above the line before
+ * the board is put away: the mesh is a coarse sampling of this same function,
+ * and a board flickering on the crest would be worse than the bug. Boards
+ * closer than `OCCLUSION_MIN_DISTANCE` skip the test — nothing in the study
+ * clearing can hide a board from inside it, and that is the common case.
+ */
+const OCCLUSION_MARGIN = 1.5;
+const OCCLUSION_MIN_DISTANCE = 60;
+const OCCLUSION_STEP = 30;
+
+/** Is the terrain standing between the eye and the board? */
+function terrainBlocksSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
+  const dx = target.x - eye.x;
+  const dy = target.y - eye.y;
+  const dz = target.z - eye.z;
+  const length = Math.hypot(dx, dy, dz);
+  if (length < OCCLUSION_MIN_DISTANCE) return false;
+  const steps = Math.min(24, Math.max(6, Math.round(length / OCCLUSION_STEP)));
+  for (let i = 1; i < steps; i += 1) {
+    const t = i / steps;
+    const y = eye.y + dy * t;
+    if (terrainHeight(eye.x + dx * t, eye.z + dz * t) - y > OCCLUSION_MARGIN) return true;
+  }
+  return false;
+}
 
 export interface BoardScreen {
   slot: LecternSlot;
@@ -297,7 +357,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const toCamera = new THREE.Vector3();
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
-  const visibility = new Map<LecternSlot, boolean>();
+  const visibility = new Map<LecternSlot, number>();
+  const occluded = new Map<LecternSlot, boolean>();
   const pinCorner = new THREE.Vector3();
   let viewW = 1;
   let viewH = 1;
@@ -305,6 +366,51 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let readSlot: LecternSlot | null = null;
   let liftedSlot: LecternSlot | null = null;
   let lastCamera: THREE.PerspectiveCamera | null = null;
+
+  /**
+   * The face's projected screen rectangle, taken from its four corners.
+   *
+   * `ok` is false when any corner leaves the near/far range, i.e. when the
+   * camera stands in — or has crossed — the board's own plane. There the board
+   * is no longer a rectangle in front of the eye at all, and one CSS3D matrix
+   * becomes a page of tens of thousands of pixels sliced into the view: the
+   * "board cut ho gaya, pura board dikhta hi nahin" report. Callers that can
+   * live with a partial view (the pin) refuse such a face instead.
+   *
+   * The numbers are written into one shared record, because this runs in the
+   * render path and must not allocate.
+   */
+  const faceRect = { ok: true, minX: 0, minY: 0, w: 0, h: 0 };
+  const projectFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
+    const p = screen.placement;
+    const c = Math.cos(p.yaw);
+    const s = Math.sin(p.yaw);
+    const hw = (LECTERN_BOARD_WIDTH * faceScale) / 2;
+    const hh = (LECTERN_BOARD_HEIGHT * faceScale) / 2;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let ok = true;
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        pinCorner.set(p.position.x + sx * hw * c, p.position.y + sy * hh, p.position.z - sx * hw * s).project(camera);
+        if (pinCorner.z < -1.05 || pinCorner.z > 1.05) ok = false;
+        const x = (pinCorner.x * 0.5 + 0.5) * viewW;
+        const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    faceRect.ok = ok;
+    faceRect.minX = minX;
+    faceRect.minY = minY;
+    faceRect.w = maxX - minX;
+    faceRect.h = maxY - minY;
+    return faceRect;
+  };
 
   /**
    * Hand a board's surface home to its renderer-owned host.
@@ -342,31 +448,11 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
    * hid its page on a refusal, which left a black slab standing in the meadow.
    */
   const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
-    const p = screen.placement;
-    const c = Math.cos(p.yaw);
-    const s = Math.sin(p.yaw);
-    const hw = (LECTERN_BOARD_WIDTH * faceScale) / 2;
-    const hh = (LECTERN_BOARD_HEIGHT * faceScale) / 2;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
-        pinCorner.set(p.position.x + sx * hw * c, p.position.y + sy * hh, p.position.z - sx * hw * s).project(camera);
-        if (pinCorner.z < -1.05 || pinCorner.z > 1.05) return false;
-        const x = (pinCorner.x * 0.5 + 0.5) * viewW;
-        const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
-    }
-    const w = maxX - minX;
-    const h = maxY - minY;
+    const rect = projectFace(screen, camera);
     // Behind the camera (or a pinched-out sky view) NDC explodes and this
     // 2D face would paint a giant page across the heavens. Refuse it.
+    if (!rect.ok) return false;
+    const { minX, minY, w, h } = rect;
     if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
     const el = screen.element;
     // Lift once onto the untransformed layer so left/top are layer pixels.
@@ -480,24 +566,48 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         // out of the CSS3D scene, so the cull has no business writing to it.
         if (screen.slot === liftedSlot) continue;
         sphere.center.copy(screen.placement.position);
-        let visible = frustum.intersectsSphere(sphere);
+        // Is the board in the frustum at all? This one drives the WebGL SHELL
+        // — frame, backing plate and the legs. The shell is a PHYSICAL object,
+        // so it stays visible from every side: walk round the lectern and you
+        // are looking at the back of three boards. Hiding the shell with the
+        // screen (the two used to share one flag) took the whole board out of
+        // the world the moment the camera crossed its face — the owner's
+        // "board cut ho gaya, pura board dikhta hi nahin piche se".
+        const inView = frustum.intersectsSphere(sphere);
+        let visible = inView;
 
         if (visible) {
-          // Back-face cull. A board's face normal is +Z rotated by its yaw;
-          // if the camera is behind that plane the learner is looking at the
-          // back of the board and the DOM is pure cost.
+          // Back-face cull of the SCREEN. A board's face normal is +Z rotated
+          // by its yaw; if the camera is behind that plane the learner is
+          // looking at the back of the board and the DOM is pure cost.
           boardNormal.set(Math.sin(screen.placement.yaw), 0, Math.cos(screen.placement.yaw));
           toCamera.copy(camera.position).sub(screen.placement.position);
           visible = boardNormal.dot(toCamera) > 0;
         }
         if (visible) {
-          // Behind the camera CSS3D explodes into a giant page. Hide that.
-          pinCorner.copy(screen.placement.position).project(camera);
-          if (pinCorner.z < -1 || pinCorner.z > 1) visible = false;
+          // The WHOLE face has to project inside the near/far range, not just
+          // the board's centre. A camera standing in the board's own plane
+          // leaves corners behind the eye, where one CSS3D matrix turns into a
+          // page of tens of thousands of pixels sliced across the view — the
+          // "board cut ho gaya / 60 m board" the owner kept meeting. A board
+          // the eye has walked into shows its shell instead.
+          visible = projectFace(screen, camera).ok;
+        }
+        if (visible) {
+          // The screen is painted by the browser, over the canvas, with no
+          // depth buffer between them — so a hill cannot hide a board on its
+          // own. Ask the ground itself (same height field the mesh is built
+          // from) whether it stands in the way. Sticky while the camera is
+          // still, because sampling the terrain is the one costly step here.
+          if (moved) occluded.set(screen.slot, terrainBlocksSight(camera.position, screen.placement.position));
+          if (occluded.get(screen.slot) === true) visible = false;
         }
 
-        if (visibility.get(screen.slot) !== visible) {
-          visibility.set(screen.slot, visible);
+        // One number per board — bit 0 the screen, bit 1 the shell — so an
+        // idle camera still writes nothing (see the early return below).
+        const shown = (visible ? 1 : 0) | (inView ? 2 : 0);
+        if (visibility.get(screen.slot) !== shown) {
+          visibility.set(screen.slot, shown);
           // `display:none` (not `visibility:hidden`) — this is what actually
           // stops an off-screen YouTube iframe from decoding video and the
           // mind-map canvas from compositing. It goes on the HOST: the host is
@@ -506,7 +616,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           screen.host.style.display = visible ? "" : "none";
           screen.object.visible = visible;
           const shell = shells.children[screens.indexOf(screen)];
-          if (shell) shell.visible = visible;
+          if (shell) shell.visible = inView;
           changed = true;
         }
       }

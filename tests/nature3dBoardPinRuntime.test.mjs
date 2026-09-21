@@ -47,6 +47,9 @@ const ROOT = process.cwd();
 const FIXTURE = `
 import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
+import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
+
+export { terrainHeight };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -79,6 +82,10 @@ export function boards(screens: any, THREE_: any) {
     rendererTransform: s.object.element.style.transform,
     rendererDisplay: s.object.element.style.display,
     hostDisplay: s.host.style.display,
+    // The WebGL shell — frame, backing plate and legs. This is the PHYSICAL
+    // board: it must survive every pose the screen cannot (looking at a
+    // board's back, a hill in the way, the eye standing in the face's plane).
+    shellVisible: Boolean(screens.shells.children[screens.screens.indexOf(s)]?.visible),
     faceTransform: s.element.style.transform,
     faceDisplay: s.element.style.display,
     faceInsideHost: s.element.parentElement === s.host,
@@ -394,7 +401,138 @@ test("a pin that cannot be projected leaves the board a live 3D board", () => {
   }
 });
 
-/* ── 6. a face is never left behind when the sanctuary unmounts ───────────── */
+/* ── 6. the hill between the eye and the board ────────────────────────────── */
+
+test("a hill in the way hides the screen, not the board", () => {
+  // The page is painted by the browser, over the canvas: there is no depth
+  // buffer between the two, so a board behind a hill used to hang on the
+  // hillside ("pahad ke piche se bhi dikhte hain, jaise board pahad par aa
+  // gaye ho"). The engine asks the ground itself — the same height field the
+  // mesh is built from — whether it stands in the way.
+  screens.setReadSlot(null);
+  const reading = () => boards().find((b) => b.slot === "reading");
+  const board = screens.byId("reading").placement.position;
+
+  const standAt = (z) => {
+    // Eye height of the walker, standing on the ground at this azimuth.
+    camera.position.set(0, fixture.terrainHeight(0, z) + 1.7, z);
+    camera.lookAt(board.x, board.y, board.z);
+    camera.updateMatrixWorld(true);
+    screens.render(camera, true);
+    screens.render(camera, true);
+  };
+
+  // Square on, inside the study clearing: nothing can be in the way.
+  standAt(100 - 5.4);
+  assert.equal(reading().hostDisplay, "", "in the clearing the page must be up");
+  assert.equal(reading().shellVisible, true, "the board itself must be up");
+
+  // 460 m out the sanctuary's hill rim stands between the eye and the board
+  // (the analytic clearance there is metres, not centimetres).
+  standAt(460 - 5.4);
+  assert.equal(
+    reading().hostDisplay,
+    "none",
+    "the page must not be painted through the hill standing in front of it",
+  );
+  assert.equal(
+    reading().shellVisible,
+    true,
+    "the WebGL shell is depth-tested by the GPU — it must be left alone",
+  );
+
+  // …and back in the clearing the page returns: the test must not be hiding
+  // boards for good.
+  standAt(100 - 5.4);
+  assert.equal(reading().hostDisplay, "", "the page must come back in the open");
+});
+
+/* ── 7. the same board, seen from behind ──────────────────────────────────── */
+
+test("walking round to a board's back leaves the board standing", () => {
+  // The screen faces one way: you cannot read it from behind, and hiding it
+  // is right. Hiding the whole BOARD with it was not — the frame, backing
+  // plate and legs disappeared the moment the camera crossed the face, which
+  // is the owner's "board cut ho gaya, pura board dikhta hi nahin piche se".
+  screens.setReadSlot(null);
+  const p = screens.byId("notes").placement;
+  const normal = new fixture.THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+  const notes = () => boards().find((b) => b.slot === "notes");
+
+  camera.position.copy(p.position).addScaledVector(normal, 30);
+  camera.lookAt(p.position);
+  camera.updateMatrixWorld(true);
+  screens.render(camera, true);
+  assert.equal(notes().hostDisplay, "", "in front, the page is up");
+  assert.equal(notes().shellVisible, true, "in front, the board is up");
+
+  camera.position.copy(p.position).addScaledVector(normal, -30);
+  camera.lookAt(p.position);
+  camera.updateMatrixWorld(true);
+  screens.render(camera, true);
+
+  assert.equal(notes().hostDisplay, "none", "from behind, the page must not be painted");
+  assert.equal(notes().objectVisible, false, "from behind, the screen is not touchable");
+  assert.equal(
+    notes().shellVisible,
+    true,
+    "from behind, the BOARD must still be there — a physical board is not hidden by facing away",
+  );
+});
+
+/* ── 8. a page is never painted with a corner behind the eye ──────────────── */
+
+test("no camera pose paints a page the eye has stepped into", () => {
+  // The board's own plane is the one place a CSS3D page cannot be trusted:
+  // with corners behind the eye, one matrix turns into tens of thousands of
+  // pixels sliced across the view — the "board cut ho gaya / 60 m board"
+  // symptom. The engine now refuses to let CSS3D paint such a face. Swept
+  // here over a full orbit grid: any page that IS up must have all four of
+  // its corners in front of the eye.
+  screens.setReadSlot(null);
+  const corner = new fixture.THREE.Vector3();
+  let painted = 0;
+
+  for (const d of [6, 12, 20, 30, 45, 80, 200, 600, 1200]) {
+    for (let deg = 0; deg < 360; deg += 15) {
+      const yaw = (deg * Math.PI) / 180;
+      for (const pitch of [0.12, 0.6, 1.2]) {
+        camera.position.set(
+          Math.sin(yaw) * Math.cos(pitch) * d,
+          12 + Math.sin(pitch) * d,
+          Math.cos(yaw) * Math.cos(pitch) * d - 5.4,
+        );
+        camera.lookAt(0, 12, -5.4);
+        camera.updateMatrixWorld(true);
+        screens.render(camera, true);
+
+        for (const b of boards()) {
+          if (b.hostDisplay === "none") continue;
+          painted += 1;
+          const p = screens.byId(b.slot).placement;
+          const c = Math.cos(p.yaw);
+          const sn = Math.sin(p.yaw);
+          for (const sx of [-1, 1]) {
+            for (const sy of [-1, 1]) {
+              corner
+                .set(p.position.x + sx * 15 * c, p.position.y + sy * 8.4375, p.position.z - sx * 15 * sn)
+                .project(camera);
+              assert.ok(
+                corner.z >= -1.05 && corner.z <= 1.05,
+                `${b.slot} at ${d} m / ${deg} deg / pitch ${pitch}: a page painted with a corner ` +
+                  `behind the eye (ndc z ${corner.z.toFixed(2)}) — that is the sliced, board-sized page`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  assert.ok(painted > 100, `the sweep must actually paint pages (painted ${painted})`);
+});
+
+/* ── 9. a face is never left behind when the sanctuary unmounts ───────────── */
 
 test("disposal removes every board element, pinned or not", () => {
   screens.setReadSlot(null);
