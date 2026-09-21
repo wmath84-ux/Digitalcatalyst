@@ -752,7 +752,12 @@ export class Sanctuary {
    * restore the 3D matrix before the next frame paints.
    */
   private elementAtBoardFlat(screen: BoardScreen, clientX: number, clientY: number): Element | null {
-    const root = screen.element;
+    // The HOST is the element CSS3DRenderer gives the 3D matrix to — the
+    // board's box in the world. Flattening it (rather than the panel surface
+    // inside it) keeps this query measuring exactly what it measured before
+    // the pin started lifting a separate surface: the host is the node whose
+    // transform is the projection, and the panel that fills it rides along.
+    const root = screen.host;
     const visual = root.getBoundingClientRect();
     if (visual.width < 2 || visual.height < 2) return null;
     const prevTransform = root.style.transform;
