@@ -39,6 +39,7 @@ import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
+import { createDayBed, type DayBed } from "./dayBed";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -165,6 +166,8 @@ export class Sanctuary {
   private structures: Structures;
   private board: BoardHandle;
   private student: StudentRig;
+  /** The Vintage Day Bed — the learner's seat, loaded async (dayBed.ts). */
+  private dayBed: DayBed | null = null;
   private keyboard: KeyboardInput;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
@@ -412,6 +415,21 @@ export class Sanctuary {
     this.student = createStudent(this.budget);
     this.scene.add(this.student.group);
     this.winter.registerTree(this.student.chair);
+
+    // THE VINTAGE DAY BED — the real seat the boy occupies ("chair ki
+    // jagah"): loaded async like the plant fields, placed around the
+    // student in `dayBed.ts`, snowable like any other solid.
+    createDayBed(this.budget, aniso)
+      .then((bed) => {
+        if (this.disposed) {
+          bed.dispose();
+          return;
+        }
+        this.dayBed = bed;
+        this.scene.add(bed.group);
+        this.winter.registerTree(bed.group);
+      })
+      .catch((err) => console.warn("[sanctuary] day bed failed", err));
 
     // ── The study lectern: a desk and three 30 m boards ───────────────
     //
@@ -1769,6 +1787,7 @@ export class Sanctuary {
     this.sky.dispose();
     this.board.dispose();
     this.student.dispose();
+    this.dayBed?.dispose();
     this.atmosphere.dispose();
     this.weathering.dispose();
     this.winter.dispose();

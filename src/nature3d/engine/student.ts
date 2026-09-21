@@ -1,6 +1,6 @@
 // src/nature3d/engine/student.ts
 //
-// The seated student + the rustic chair.
+// The seated student (his seat — the vintage day bed — is in `dayBed.ts`).
 //
 // In THIRD PERSON the boy is fully visible, breathing, blinking, legs
 // swinging. The moment FIRST-PERSON mode is entered the whole group is hidden
@@ -33,7 +33,6 @@ export function createStudent(budget: QualityBudget): StudentRig {
   const groundY = terrainHeight(0, seatZ);
   group.position.set(0, groundY, seatZ);
 
-  const wood = new THREE.MeshStandardMaterial({ color: 0x7c4925, roughness: 0.75, metalness: 0.04 });
   const skin = new THREE.MeshStandardMaterial({ color: 0xf2c49b, roughness: 0.55 });
   const hair = new THREE.MeshStandardMaterial({ color: 0x33200f, roughness: 0.8 });
   const shirt = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.85 });
@@ -41,35 +40,14 @@ export function createStudent(budget: QualityBudget): StudentRig {
   const shoe = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.4 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x11151c });
 
-  // ── Chair ────────────────────────────────────────────────────────────
+  // ── Seat ────────────────────────────────────────────────────────
+  // The old procedural chair (seat + legs + backrest) was replaced by the
+  // real Poly Haven "Vintage Day Bed" — see `dayBed.ts`, loaded async in
+  // scene.ts and placed around the boy. This group is kept as the named
+  // anchor so the StudentRig API (and the winter registration on it) is
+  // unchanged.
   const chair = new THREE.Group();
   chair.name = "student-chair";
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.08, 0.95), wood);
-  seat.position.y = 0.78;
-  seat.castShadow = shadows;
-  seat.receiveShadow = shadows;
-  chair.add(seat);
-  const legGeo = new THREE.CylinderGeometry(0.042, 0.035, 0.78, 8);
-  for (const [x, z] of [[-0.44, -0.35], [0.44, -0.35], [-0.44, 0.35], [0.44, 0.35]] as const) {
-    const leg = new THREE.Mesh(legGeo, wood);
-    leg.position.set(x, 0.39, z);
-    leg.castShadow = shadows;
-    chair.add(leg);
-  }
-  for (const x of [-0.44, 0.44]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 1.05, 8), wood);
-    post.position.set(x, 1.25, 0.4);
-    post.rotation.x = -0.1;
-    post.castShadow = shadows;
-    chair.add(post);
-  }
-  for (const y of [1.05, 1.25, 1.45]) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.12, 0.04), wood);
-    slat.position.set(0, y, 0.4 + (y - 1.0) * -0.1);
-    slat.rotation.x = -0.1;
-    slat.castShadow = shadows;
-    chair.add(slat);
-  }
   group.add(chair);
 
   // ── Boy ──────────────────────────────────────────────────────────────
