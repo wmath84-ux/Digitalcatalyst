@@ -52,6 +52,8 @@ export interface WaterSystem {
    * eye reads it as a blue strip pasted over the hills (research §16).
    */
   materials: THREE.Material[];
+  iceMaterials: THREE.Material[];
+  setFrozen(frozen: boolean): void;
   update(dt: number, time: number): void;
   dispose(): void;
 }
@@ -427,7 +429,7 @@ export function createWater(
   //     total — less than one mid-distance tree crown.
   //   * FLOOD MASK BAKED PER VERTEX. Water may only exist where the terrain
   //     is actually below sea level AND past the coast ring (see
-  //     `coastWeight`) — otherwise the safari's dry basin, which sits below
+  //     `coastWeight`) — otherwise a dry inland basin that sits below
   //     sea level 700 m inland, would flood. Vertices whose mask says "dry"
   //     are dropped 90 m under the ground in the vertex shader, which is the
   //     standard mobile shoreline trick: no stencil, no depth texture, no
@@ -616,12 +618,19 @@ export function createWater(
   ocean.name = "ocean";
   group.add(ocean);
 
+  let frozen = false;
   return {
     group,
     // NOTE: the ocean materials are APPENDED. The shader harness addresses
     // the river/fall/spray by index ([0]/[3]/[4]) — keep them stable.
     materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, spray.material as THREE.Material, oceanMat],
+    iceMaterials: [riverMat, fallMat, oceanMat],
+    setFrozen(value) {
+      frozen = value;
+      spray.visible = !value;
+    },
     update(dt, time) {
+      if (frozen) return;
       const shader = riverMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (shader) shader.uniforms.uTime.value = time;
 

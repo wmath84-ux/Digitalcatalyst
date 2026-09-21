@@ -23,8 +23,8 @@
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import {
-  REGIONS, SAFARI, SANCTUARY, TREK, WORLD_REACH,
-  regionWeight, safariRelief, trekRelief,
+  REGIONS, SANCTUARY, TREK, WORLD_REACH,
+  regionWeight, trekRelief,
 } from "./regions";
 import { noise } from "./simplex";
 import { groundColorAt, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
@@ -120,7 +120,7 @@ const ISLAND_FLOOR = -18;
 /**
  * Where the COAST's influence becomes trustworthy, in metres from the centre.
  *
- * Height alone cannot pick out the beach — the safari basin sits at −4.5 m
+ * Height alone cannot pick out the beach — inland hollows can sit below sea level
  * and the study clearing at 0 m, both far inland, and both must stay grass.
  * The coast is a GEOGRAPHIC band past this radius, so every coastal consumer
  * (sand colour, palms, grass thinning, rock bleaching) ANDs the height band
@@ -190,7 +190,7 @@ function distantReliefRaw(x: number, z: number, rise: number): number {
  * The OUTER mountain arc — the edge of the world, hills on every side.
  *
  * `outerRim` is added to the height field directly (not weighted by the
- * sanctuary's region blend) so the arc is COMPLETE: east of the safari and
+ * sanctuary's region blend) so the arc is COMPLETE: east of the meadow and
  * west of the trek the district weights have gone to zero, and a wSanct-
  * weighted ring would simply vanish there, leaving flat corners of the plate.
  *
@@ -305,13 +305,12 @@ export function terrainHeight(x: number, z: number): number {
   const rollAmp = 2.4 + 9.8 * smoothstep(70, 470, dist);
   const rollingGround = rolling * rollAmp * rollIn;
 
-  // ── The three districts ─────────────────────────────────────────────
+  // ── The connected districts ─────────────────────────────────────────────
   //
-  // The sanctuary's own relief fades out as you leave it, and the safari and
-  // trek reliefs fade in as you arrive, so the world is one continuous
+  // The sanctuary's own relief fades out as you leave it, and the
+  // trek relief fades in as you arrive, so the world is one continuous
   // surface with no seam, no cliff and no invisible boundary between areas.
   const wSanct = regionWeight(SANCTUARY, x, z);
-  const wSafari = regionWeight(SAFARI, x, z);
   const wTrek = regionWeight(TREK, x, z);
 
   // The sanctuary's general relief. `outerRim` is deliberately NOT part of
@@ -336,9 +335,8 @@ export function terrainHeight(x: number, z: number): number {
 
   const districtBlend =
     sanctuaryBase * wSanct +
-    (safariRelief(x, z) + linkRoll * 0.35) * wSafari +
     trekRelief(x, z) * wTrek +
-    linkRoll * Math.max(0, 1 - wSanct - wSafari - wTrek) +
+    linkRoll * Math.max(0, 1 - wSanct - wTrek) +
     // The full-arc mountain ring, unweighted — see `outerRim`.
     outerRim(x, z);
 

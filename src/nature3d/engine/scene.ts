@@ -28,6 +28,7 @@ import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createWeathering, type Weathering } from "./weathering";
+import { createWinter, winterDaylight, type WinterSystem } from "./winter";
 import { createRockField, type RockField } from "./rocks";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createWater, type WaterSystem } from "./water";
@@ -45,10 +46,9 @@ import {
   type BoardScreen,
   type BoardScreensHandle,
 } from "./boardScreens";
-import { createSafariDistrict, setSafariCamera, type SafariDistrict } from "./safariDistrict";
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { createStructures, type Structures } from "./structures";
-import { SAFARI, TREK, WORLD_REACH } from "./regions";
+import { TREK, WORLD_REACH } from "./regions";
 
 export type CameraMode = "orbit" | "fpp";
 /**
@@ -61,7 +61,7 @@ const BOARD_VIEW_MARGIN = 0.5;
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
-  | "safari" | "trek" | "world"
+  | "trek" | "world"
   // The three study boards. Each frames ONE board edge-to-edge.
   | "reading" | "notes" | "mindmap";
 
@@ -139,6 +139,9 @@ export class Sanctuary {
    */
   private atmosphere: Atmosphere;
   private weathering: Weathering;
+  private winter: WinterSystem;
+  private iceAge = false;
+  private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private rocks: RockField;
   private birds: BirdColony;
   private wildlife: Wildlife;
@@ -149,7 +152,6 @@ export class Sanctuary {
   private board: BoardHandle;
   private student: StudentRig;
   private keyboard: KeyboardInput;
-  private safari: SafariDistrict;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
   /** The three live course-player boards + their WebGL frames. */
@@ -254,6 +256,8 @@ export class Sanctuary {
     // targets, no per-frame CPU work.
     this.atmosphere = createAtmosphere(this.budget);
     this.weathering = createWeathering(this.textures.weather, this.budget.tier);
+    this.winter = createWinter(this.budget.tier);
+    this.scene.add(this.winter.group);
 
     // ── Build the world ────────────────────────────────────────────────
     this.sky = createSky(this.textures, this.budget);
@@ -264,6 +268,7 @@ export class Sanctuary {
     // The ground takes the atmosphere pass but NOT the transmission term —
     // soil does not translucently glow when the sun is behind it.
     this.atmosphere.registerTree(terrain);
+    this.winter.registerTree(terrain, "ground");
 
     // ROCKS BEFORE GRASS: the rock kit publishes the base of every boulder it
     // places, and the grass field plants a skirt of blades around each one
@@ -272,11 +277,13 @@ export class Sanctuary {
     this.rocks = createRockField(this.textures, this.budget, this.weathering);
     this.scene.add(this.rocks.group);
     this.atmosphere.registerTree(this.rocks.group);
+    this.winter.registerTree(this.rocks.group);
 
     this.grass = createGrassField(this.textures.grassBlade, this.budget, this.rocks.skirtPoints);
     this.scene.add(this.grass.group);
     // Grass IS foliage: it gets the backlit transmission term.
     this.grass.materials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
+    this.grass.materials.forEach((m) => this.winter.register(m, "foliage"));
 
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
@@ -285,6 +292,8 @@ export class Sanctuary {
     // guess which material is which.
     this.flora.foliageMaterials.forEach((m) => this.atmosphere.register(m, { foliage: true }));
     this.flora.solidMaterials.forEach((m) => this.atmosphere.register(m));
+    this.flora.foliageMaterials.forEach((m) => this.winter.register(m, "foliage"));
+    this.flora.solidMaterials.forEach((m) => this.winter.register(m));
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
     this.scene.add(this.birds.group);
@@ -313,6 +322,7 @@ export class Sanctuary {
       sun: this.atmosphere.uniforms.uDcSunColor.value,
     });
     this.water.materials.forEach((m) => this.atmosphere.register(m));
+    this.water.iceMaterials.forEach((m) => this.winter.register(m, "ice"));
 
     // THE BAY DISTRICT — buildings, beacon, jetty, props, distant islands.
     // Built from the same height field everything else reads, so the village
@@ -322,6 +332,7 @@ export class Sanctuary {
     this.structures = createStructures(this.budget);
     this.scene.add(this.structures.group);
     this.atmosphere.registerTree(this.structures.group);
+    this.winter.registerTree(this.structures.group);
 
     // Light the world for the current moment before the first frame, so the
     // sanctuary never flashes the authored midday look and then correct
@@ -331,6 +342,7 @@ export class Sanctuary {
 
     this.student = createStudent(this.budget);
     this.scene.add(this.student.group);
+    this.winter.registerTree(this.student.chair);
 
     // ── The study lectern: a desk and three 30 m boards ───────────────
     //
@@ -342,9 +354,11 @@ export class Sanctuary {
     // caret — and stay sharp at any board size.
     this.desk = createDesk(this.budget.shadowMapSize > 0);
     this.scene.add(this.desk);
+    this.winter.registerTree(this.desk);
 
     this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
     this.scene.add(this.screens.shells);
+    this.winter.registerTree(this.screens.shells);
     // The CSS3D layer is a sibling of the canvas, sharing its camera. It is
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
@@ -375,18 +389,16 @@ export class Sanctuary {
     this.board.group.rotation.y = BOARD_HILL.yaw;
     this.board.group.scale.setScalar(BOARD_HILL.scale);
     this.scene.add(this.board.group);
-    this.scene.add(createBoardStand(BOARD_HILL, this.budget.shadowMapSize > 0));
+    // The lesson face gets frost at its edges, not over the readable text.
+    const boardMaterials = this.board.panel.material as THREE.Material[];
+    this.winter.register(boardMaterials[4], "board");
+    this.winter.registerTree(this.board.group);
+    const boardStand = createBoardStand(BOARD_HILL, this.budget.shadowMapSize > 0);
+    this.scene.add(boardStand);
+    this.winter.registerTree(boardStand);
 
 // The board is scenery now: no controller, no drag, no resize, no
     // persistence. Nothing to restore either — its place is fixed in code.
-
-    // ── The other two districts of the same world ────────────────────
-    //
-    // The safari is built into the SAME scene, 900 m east, so walking there
-    // is just walking. Its models stream in asynchronously.
-    setSafariCamera(this.camera);
-    this.safari = createSafariDistrict();
-    this.scene.add(this.safari.group);
 
     // The walking character. It starts seated on the study chair, and stands
     // up the moment the learner takes control in walk mode.
@@ -404,8 +416,8 @@ export class Sanctuary {
     // old default sat almost on top of the board, which hid the world.
     // OPENING SHOT: the whole connected world in one frame. The camera pulls
     // back far enough along the district chain that the TerrainTrek highlands
-    // (west), the Sanctuary meadow (centre) and the Clay Safari valley (east)
-    // are all on screen together, which is how the learner discovers there
+    // (west) and the Sanctuary meadow (centre)
+    // are both on screen together, which is how the learner discovers there
     // is somewhere to walk to.
     this.orbit.panTo(new THREE.Vector3(0, 30, 0), 1500, -0.30, 0.34);
     this.fpp.reset(0, 3.4, Math.PI);
@@ -1153,9 +1165,12 @@ export class Sanctuary {
    */
   private applyDaylight() {
     const state = daylightAt(hourForMode(this.daylightMode));
+    if (this.iceAge) winterDaylight(state);
     this.daylight = state;
     this.sky.applyDaylight(state);
-    (this.scene.fog as THREE.FogExp2).color.copy(state.fog);
+    const fog = this.scene.fog as THREE.FogExp2;
+    fog.color.copy(state.fog);
+    fog.density = this.budget.fogDensity * (this.iceAge ? 1.18 : 1);
     // The air is lit by the same sun as the ground: its colour, its in-scatter
     // and the strength of the foliage transmission term all follow the hour.
     // Reading `sunDir.y` gives the elevation directly — it is a unit vector
@@ -1178,6 +1193,17 @@ export class Sanctuary {
     fog.density = 0.06;
     this.scene.background = fog.color;
     this.renderer.toneMappingExposure = 0.78;
+  }
+
+  /** Season and daylight are independent: keep the selected hour when toggling. */
+  setIceAge(enabled: boolean) {
+    if (this.iceAge === enabled) return;
+    this.iceAge = enabled;
+    this.winter.setEnabled(enabled);
+    this.water.setFrozen(enabled);
+    this.sky.setWinter(enabled);
+    this.screens.setWinter(enabled);
+    this.applyDaylight();
   }
 
   /** Morning / midday / evening, or "auto" to follow the real clock. */
@@ -1214,9 +1240,6 @@ export class Sanctuary {
         break;
       case "waterfall":
         this.orbit.panTo(this.tmpV.set(18, 5, -34), 20, 0.5, 0.25);
-        break;
-      case "safari":
-        this.orbit.panTo(this.tmpV.set(SAFARI.centerX, 6, SAFARI.centerZ), 210, -0.5, 0.34);
         break;
       case "trek":
         this.orbit.panTo(this.tmpV.set(TREK.centerX, 30, TREK.centerZ), 320, 0.6, 0.30);
@@ -1570,8 +1593,6 @@ export class Sanctuary {
       this.water.update(adt, time);
       // The bay's idle motion (boat, umbrellas) rides the same budget.
       this.structures.update(time);
-      // The safari district animates on the same budget as the herds.
-      this.safari.update(adt, time);
     }
 
     this.aiClock += dt;
@@ -1624,6 +1645,7 @@ export class Sanctuary {
     }
 
 
+    this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
     this.renderer.render(this.scene, this.camera);
     // The DOM boards share this camera. The call is a no-op unless the camera
     // actually moved or a board crossed a cull boundary, so a still frame
@@ -1660,7 +1682,6 @@ export class Sanctuary {
     this.detachPointer(this.opts.dom);
     this.screens.dispose();
     disposeGroup(this.desk);
-    this.safari.dispose();
     this.avatar.dispose();
     this.keyboard.dispose();
     this.grass.dispose();
@@ -1675,6 +1696,7 @@ export class Sanctuary {
     this.student.dispose();
     this.atmosphere.dispose();
     this.weathering.dispose();
+    this.winter.dispose();
     this.textures.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;

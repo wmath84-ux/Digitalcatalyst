@@ -932,7 +932,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   return {
     group,
     perches,
-    foliageMaterials: [leafMatSway, leafMatStill, impostorMat, palmImpostorMat],
+    foliageMaterials: [leafMatSway, leafMatStill, impostorMat, palmImpostorMat, frondMatSway, frondMatStill],
     solidMaterials: [trunkMat, palmTrunkMat, pineMat, shrubMat, flowerMat],
     update(time, wind) {
       // Every wind-animated foliage material — the near canopy, the palm

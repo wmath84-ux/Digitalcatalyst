@@ -24,13 +24,12 @@
 // same `node --test` pass as the rest of the suite.
 
 import { strict as assert } from "node:assert";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const ROOT = new URL("../", import.meta.url);
 const exists = (p) => existsSync(new URL(p, ROOT));
-const listDir = (p) => readdirSync(new URL(p, ROOT));
 
 const DESKTOP_SHELL = read("src/components/DesktopShell.tsx");
 const MAIN = read("src/main.tsx");
@@ -653,22 +652,19 @@ test("there is ONE 3D route — the districts are not separate pages", () => {
   assert.ok(study > 0 && nature > study, "the 3D button stays directly under Study Library");
 });
 
-test("the world is one connected chain of three districts", () => {
+test("the world connects Sanctuary and Highlands without Safari", () => {
   const regions = read("src/nature3d/engine/regions.ts");
-  for (const id of ["sanctuary", "safari", "trek"]) {
+  for (const id of ["sanctuary", "trek"]) {
     assert.ok(regions.includes(`id: "${id}"`), `${id} must be a district of the world`);
   }
   // They are laid out along X, and the world reaches past the outermost.
-  const safariX = Number(/SAFARI: Region = \{ id: "safari", centerX: (-?\d+)/.exec(regions)[1]);
   const trekX = Number(/TREK: Region = \{ id: "trek", centerX: (-?\d+)/.exec(regions)[1]);
   const reach = Number(/WORLD_REACH = (\d+)/.exec(regions)[1]);
-  assert.ok(safariX > 0 && trekX < 0, "the districts must flank the sanctuary");
-  assert.ok(reach > Math.max(Math.abs(safariX), Math.abs(trekX)), "the world must contain every district");
+  assert.ok(reach > Math.abs(trekX), "the world must contain every district");
 
   // ONE height field answers for all of them — that is what makes it walkable.
-  assert.match(TERRAIN, /import \{[\s\S]*?regionWeight,\s*safariRelief,\s*trekRelief,[\s\S]*?\} from "\.\/regions"/);
+  assert.match(TERRAIN, /import \{[\s\S]*?regionWeight,\s*trekRelief,[\s\S]*?\} from "\.\/regions"/);
   assert.match(TERRAIN, /const wSanct = regionWeight\(SANCTUARY, x, z\)/);
-  assert.match(TERRAIN, /const wSafari = regionWeight\(SAFARI, x, z\)/);
   assert.match(TERRAIN, /const wTrek = regionWeight\(TREK, x, z\)/);
   // The ring of hills is opened up so the districts are not walled off.
   assert.match(TERRAIN, /corridor/, "the sanctuary's hill ring needs passes to the neighbours");
@@ -677,13 +673,13 @@ test("the world is one connected chain of three districts", () => {
   assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
 });
 
-test("all three districts are framed by the default opening view", () => {
+test("both districts are framed by the default opening view", () => {
   // The establishing shot pulls back far enough to hold the whole chain.
   const m = /panTo\(new THREE\.Vector3\(0, 30, 0\), (\d+), /.exec(SCENE);
   assert.ok(m, "expected the opening establishing shot");
   const dist = Number(m[1]);
   const regions = read("src/nature3d/engine/regions.ts");
-  const spread = Number(/SAFARI: Region = \{ id: "safari", centerX: (\d+)/.exec(regions)[1]);
+  const spread = Math.abs(Number(/TREK: Region = \{ id: "trek", centerX: (-?\d+)/.exec(regions)[1]));
   // Half-width `spread` must fit in half the 52-degree fov at `dist`.
   const needed = spread / Math.tan((52 * Math.PI) / 180 / 2);
   assert.ok(dist >= needed * 0.98, `camera at ${dist}m cannot frame districts ${spread}m out (needs ~${Math.round(needed)}m)`);
@@ -704,33 +700,17 @@ test("all three districts are framed by the default opening view", () => {
   const visibility = Math.exp(-((fog * (settled + spread)) ** 2));
   assert.ok(visibility > 0.15, `fog leaves only ${(visibility * 100).toFixed(0)}% of the far district visible`);
   // And there are HUD presets to fly to each district.
-  for (const key of ["world", "trek", "safari"]) {
+  for (const key of ["world", "trek"]) {
     assert.ok(PAGE.includes(`key: "${key}"`), `the HUD needs a ${key} view preset`);
     assert.ok(SCENE.includes(`case "${key}":`), `the engine needs a ${key} preset`);
   }
 });
 
-test("the safari is built into the one scene, without a second sky or sun", () => {
-  const district = read("src/nature3d/engine/safariDistrict.ts");
-  assert.match(district, /group\.position\.set\(SAFARI\.centerX, 0, SAFARI\.centerZ\)/);
-  assert.match(district, /buildWorld\(group, \{ isMobile: false, district: true \}\)/);
-  // A district must not bring its own global lighting: that would mean two
-  // directional lights and two shadow passes.
-  const world = read("src/nature3d/safari/world.js");
-  assert.match(world, /export function buildWorld\(scene, \{ isMobile, district = false \}\)/);
-  assert.match(world, /\/\/ ---- lights & sky \(own-world only\)\s*\n\s*if \(!district\) \{/);
-  assert.match(world, /\/\/ ---- clouds \(own-world only[\s\S]{0,80}\n\s*if \(!district\) \{/);
-  // The animals still ship and still load.
-  assert.match(district, /new Creature\(def, model, world, i\)/);
-  const models = listDir("public/safari/models").filter((f) => f.endsWith(".glb"));
-  assert.ok(models.length >= 15, `expected the safari models, found ${models.length}`);
-  // The scene wires it in and disposes it.
-  assert.match(SCENE, /this\.safari = createSafariDistrict\(\)/);
-  assert.match(SCENE, /this\.scene\.add\(this\.safari\.group\)/);
-  // The safari runs on the shared ambient budget (Group 13), so its dt is the
-  // accumulated ambient step rather than the raw frame dt.
-  assert.match(SCENE, /this\.safari\.update\(adt, time\)/);
-  assert.match(SCENE, /this\.safari\.dispose\(\)/);
+test("Safari is removed from navigation, scene lifecycle and the height field", () => {
+  assert.doesNotMatch(PAGE, /key: "safari"|label: "Safari"/);
+  assert.doesNotMatch(SCENE, /safariDistrict|this\.safari|case "safari"|SAFARI/);
+  assert.doesNotMatch(TERRAIN, /safariRelief|wSafari|SAFARI/);
+  assert.doesNotMatch(read("src/nature3d/engine/regions.ts"), /SAFARI|id: "safari"/);
 });
 
 test("the walking character keeps TerrainTrek's gameplay constants", () => {
@@ -1458,7 +1438,6 @@ test("the establishing shot still frames all three districts after the cap", () 
 // ─────────────────────────────────────────────────────────────────────────
 
 const OWNED = read("src/nature3d/boards/useOwnedCourses.ts");
-const SAFARI_DISTRICT = read("src/nature3d/engine/safariDistrict.ts");
 
 test("course ownership is resolved from every source, not just the legacy one", () => {
   // `purchasedIds` alone is only `users/{uid}/purchases/*` — the narrowest of
@@ -1534,32 +1513,8 @@ test("animals standing on the ground are gone, birds are not", () => {
   // honest. (Verified separately: every tier yields 0 meshes.)
   assert.match(SCENE, /createWildlife\(\{ \.\.\.this\.budget, animalCount: 0 \}/);
 
-  // The safari floor: filtered on the AUTHORED placement rather than a
-  // hand-typed id list, so a new entry in data.js classifies itself.
-  assert.match(SAFARI_DISTRICT, /const isGroundAnimal =/);
-  assert.match(SAFARI_DISTRICT, /item\.kind === "animal" && \(item\.y === "ground" \|\| item\.y === "rock"\)/);
-  assert.match(SAFARI_DISTRICT, /\.filter\(\s*\(item\) => !isGroundAnimal\(item\),?\s*\)/);
-
-  // Prove the filter keeps what it should. Birds stay, as asked; so do the
-  // perched monkey, the water creatures and every prop.
-  const data = read("src/nature3d/safari/data.js");
-  const items = [...data.matchAll(/\{ id: '([a-z]+)',\s*kind: '(\w+)'[^}]*?y: '?([\w.]+)'?/g)];
-  assert.ok(items.length >= 17, `expected the safari item table, parsed ${items.length}`);
-  const removed = items.filter(([, , kind, y]) => kind === "animal" && (y === "ground" || y === "rock"));
-  const kept = items.filter((m) => !removed.includes(m));
-  assert.deepEqual(
-    removed.map(([, id]) => id).sort(),
-    ["crocodile", "elephant", "giraffe", "lion", "snake", "zebra"],
-    "exactly the ground/rock animals must be dropped",
-  );
-  assert.ok(kept.some(([, id]) => id === "bird"), "the bird must stay");
-  assert.ok(kept.some(([, id]) => id === "monkey"), "the perched monkey is not on the ground");
-  for (const id of ["hippo", "fish"]) {
-    assert.ok(kept.some(([, k]) => k === id), `${id} is in the water, not on the ground`);
-  }
-  for (const id of ["flower", "bone", "stump", "banana", "truck", "camera", "binoculars"]) {
-    assert.ok(kept.some(([, k]) => k === id), `prop ${id} must be untouched`);
-  }
+  assert.match(SCENE, /this\.birds = createBirds/);
+  assert.doesNotMatch(SCENE, /createSafariDistrict/);
 });
 
 test("looking up must not flip the picture upside down", () => {
@@ -1787,4 +1742,28 @@ test("the learner can switch lighting from the top tray", () => {
   // Moving the sun invalidates every shadow in the static shadow map.
   const applyBody = SCENE.slice(SCENE.indexOf("private applyDaylight()"));
   assert.match(applyBody.slice(0, applyBody.indexOf("\n  }")), /this\.requestShadowRefresh\(\)/);
+});
+
+
+test("Ice Age is an accessible reversible top-tray toggle independent of daylight", () => {
+  assert.match(PAGE, /useState\(false\)/);
+  assert.match(PAGE, /aria-pressed=\{iceAge\}/);
+  assert.match(PAGE, /aria-label="Ice Age"/);
+  assert.match(PAGE, /engineRef\.current\?\.setIceAge\(next\)/);
+  const seasonal = SCENE.slice(SCENE.indexOf("setIceAge(enabled"), SCENE.indexOf("setDaylightMode(mode"));
+  assert.match(seasonal, /this\.winter\.setEnabled\(enabled\)/);
+  assert.match(seasonal, /this\.water\.setFrozen\(enabled\)/);
+  assert.match(seasonal, /this\.applyDaylight\(\)/);
+  assert.doesNotMatch(seasonal, /this\.daylightMode =/);
+  for (const target of ["terrain", "this.rocks.group", "this.structures.group", "this.student.chair", "this.desk", "this.screens.shells", "boardStand"]) {
+    assert.ok(SCENE.includes(`this.winter.registerTree(${target}`));
+  }
+  assert.match(SCENE, /this\.winter\.dispose\(\)/);
+});
+
+
+test("winter reaches board faces and every palm frond material", () => {
+  assert.match(SCENE, /this\.winter\.register\(boardMaterials\[4\], "board"\)/);
+  assert.match(SCENE, /this\.screens\.setWinter\(enabled\)/);
+  assert.match(FLORA, /foliageMaterials: \[[^\]]*frondMatSway, frondMatStill\]/);
 });
