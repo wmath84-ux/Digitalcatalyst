@@ -187,6 +187,9 @@ export class Sanctuary {
   private ambientClock = 0;
   /** True while the camera is parked on one study board (see the frame loop). */
   private studyFocus = false;
+  /** Board to pin once the orbit pan has settled square-on. */
+  private pendingReadSlot: LecternSlot | null = null;
+  private pendingPinAge = 0;
   /** Face-size multiplier vs the pinned 30 m board. 1 / 1.5 / 2 / 3. */
   private boardScale = 1;
   private disposed = false;
@@ -1063,6 +1066,8 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
+    this.pendingReadSlot = null;
+    this.pendingPinAge = 0;
     this.screens.setReadSlot(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
@@ -1190,6 +1195,8 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
+    this.pendingReadSlot = null;
+    this.pendingPinAge = 0;
     this.screens.setReadSlot(null);
     switch (preset) {
       case "board":
@@ -1295,7 +1302,11 @@ export class Sanctuary {
     if (!placement) return;
     this.studyFocus = true;
     this.orbit.autoRotate = false;
-    this.screens.setReadSlot(slot);
+    // Pin AFTER the pan lands. Unpinning the live board while the camera is
+    // still looking at it is what painted the previous page black, and pinning
+    // the next one off-axis is what spawned the 60 m sky page.
+    this.pendingReadSlot = slot;
+    this.pendingPinAge = 0;
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
@@ -1490,6 +1501,14 @@ export class Sanctuary {
       this.camera.updateProjectionMatrix();
     } else {
       this.orbit.update(dt, this.camera);
+      if (this.pendingReadSlot) {
+        this.pendingPinAge += dt;
+        if (this.orbit.settled() || this.pendingPinAge > 0.85) {
+          this.screens.setReadSlot(this.pendingReadSlot);
+          this.pendingReadSlot = null;
+          this.pendingPinAge = 0;
+        }
+      }
       this.avatar.setVisible(true);
       // Seated: breathing only — the folds stay where setSeated put them.
       this.avatar.update(dt, time, this.trek, this.camera);

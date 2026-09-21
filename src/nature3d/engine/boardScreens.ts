@@ -252,6 +252,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let readSlot: LecternSlot | null = null;
   let pinnedSlot: LecternSlot | null = null;
   let liftedSlot: LecternSlot | null = null;
+  let lastCamera: THREE.PerspectiveCamera | null = null;
 
   const clearPin = (screen: BoardScreen) => {
     const el = screen.element;
@@ -331,13 +332,26 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         const prev = screens.find((s) => s.slot === liftedSlot);
         if (prev) {
           clearPin(prev);
-          if (prev.object.parent !== cssScene) cssScene.add(prev.object);
-          prev.object.visible = true;
-          prev.element.style.display = "";
+          // Hide until CSS3D writes a real matrix — otherwise a 1920×1080
+          // untransformed overlay sits on the layer as a 60 m+ page.
+          prev.element.style.opacity = "0";
         }
         liftedSlot = null;
         pinnedSlot = null;
       }
+      // Neighbours were display:none / visible=false while framed. Put the
+      // whole trio back in CSS3D so the page you just left is not a black slab.
+      for (const screen of screens) {
+        clearPin(screen);
+        screen.element.style.display = "";
+        if (screen.object.parent !== cssScene) cssScene.add(screen.object);
+        screen.object.visible = true;
+        const shell = shells.children[screens.indexOf(screen)];
+        if (shell) shell.visible = true;
+      }
+      if (lastCamera) renderer.render(cssScene, lastCamera);
+      for (const screen of screens) screen.element.style.opacity = "";
+      visibility.clear();
       readSlot = slot;
       lastCamPos.set(1e9, 1e9, 1e9);
     },
@@ -391,12 +405,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           visible = boardNormal.dot(toCamera) > 0;
         }
         if (visible) {
-          // A board whose centre projects behind the camera (or far outside
-          // NDC) is the CSS3D "giant page in the sky" — hide it.
+          // Behind the camera CSS3D explodes into a giant page. Hide that.
           pinCorner.copy(screen.placement.position).project(camera);
-          if (pinCorner.z < -1 || pinCorner.z > 1 || Math.abs(pinCorner.x) > 2 || Math.abs(pinCorner.y) > 2) {
-            visible = false;
-          }
+          if (pinCorner.z < -1 || pinCorner.z > 1) visible = false;
         }
 
         if (visibility.get(screen.slot) !== visible) {
@@ -406,6 +417,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           // mind-map canvas from compositing.
           screen.element.style.display = visible ? "" : "none";
           screen.object.visible = visible;
+          const shell = shells.children[screens.indexOf(screen)];
+          if (shell) shell.visible = visible;
           changed = true;
         }
       }
@@ -413,9 +426,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
       // the framed board out of the CSS3D scene so the other two keep their
       // live pages — hiding them is what painted the neighbour boards black.
+      lastCamera = camera;
       if (readSlot) {
         const live = screens.find((s) => s.slot === readSlot);
-        if (live && (moved || pinnedSlot !== readSlot)) {
+        if (live) {
           if (live.object.parent === cssScene) cssScene.remove(live.object);
           liftedSlot = live.slot;
           live.element.style.display = "";
@@ -424,6 +438,20 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
             clearPin(live);
             live.element.style.display = "none";
             pinnedSlot = null;
+          } else {
+            // Neighbours at this close square-on camera CSS3D-explode into a
+            // 60 m page. Hide their DOM AND their black WebGL shells.
+            screens.forEach((screen, i) => {
+              if (screen.slot === readSlot) {
+                const shell = shells.children[i];
+                if (shell) shell.visible = true;
+                return;
+              }
+              screen.element.style.display = "none";
+              screen.object.visible = false;
+              const shell = shells.children[i];
+              if (shell) shell.visible = false;
+            });
           }
           lastCamPos.copy(camera.position);
           lastCamQuat.copy(camera.quaternion);

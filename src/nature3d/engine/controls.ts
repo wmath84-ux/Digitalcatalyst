@@ -184,6 +184,15 @@ export class OrbitRig {
     if (pitch !== undefined) this.targetPitch = pitch;
   }
 
+  /** True when the live pose has caught the last panTo / zoom target. */
+  settled(): boolean {
+    const dyaw = Math.atan2(Math.sin(this.yaw - this.targetYaw), Math.cos(this.yaw - this.targetYaw));
+    return Math.abs(dyaw) < 0.14
+      && Math.abs(this.pitch - this.targetPitch) < 0.1
+      && Math.abs(this.distance - this.targetDistance) < 2.8
+      && this.lookUp < 0.06;
+  }
+
   update(dt: number, camera: THREE.PerspectiveCamera) {
     if (this.autoRotate) this.targetYaw += dt * 0.12;
 
