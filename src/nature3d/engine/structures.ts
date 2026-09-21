@@ -122,7 +122,7 @@ export function createStructures(budget: QualityBudget): Structures {
   const concreteMat = new THREE.MeshStandardMaterial({ color: 0xd9d3c3, roughness: 0.95, vertexColors: true });
   const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf7f5ef, roughness: 0.7 });
   const hullMat = new THREE.MeshStandardMaterial({ color: 0x2e86a8, roughness: 0.6, vertexColors: true });
-  const islandMat = new THREE.MeshLambertMaterial({ color: 0x7ba294 });
+  const islandMat = new THREE.MeshLambertMaterial({ color: 0x3aaa48 });
 
   const parts: Array<{ mat: THREE.Material; list: THREE.BufferGeometry[] }> = [
     { mat: wallMat, list: [] },

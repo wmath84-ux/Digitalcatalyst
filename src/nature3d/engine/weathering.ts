@@ -90,7 +90,7 @@ export function createWeathering(tex: THREE.Texture, tier: QualityTier): Weather
     // Which way the sky is shaded, from the same constant the moss, the tree
     // lean and the terrain tint read (see `environment.SUN_SIDE_*`).
     uDcShadeAxis: { value: new THREE.Vector2(SUN_SIDE_X, SUN_SIDE_Z) },
-    uDcMossColor: { value: new THREE.Color(0x4e6b31) },
+    uDcMossColor: { value: new THREE.Color(0x3a9a22) },
     uDcDustColor: { value: new THREE.Color(0x9c9484) },
     uDcMossAmount: { value: 1 },
     uDcDustAmount: { value: 0.85 },

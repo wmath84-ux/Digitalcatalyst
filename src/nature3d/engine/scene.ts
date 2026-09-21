@@ -23,7 +23,7 @@
 import * as THREE from "three";
 import { AdaptiveResolution, budgetFor, detectTier, type QualityBudget, type QualityTier } from "./quality";
 import { createTextures, type TextureSet } from "./textures";
-import { buildTerrain, terrainHeight } from "./terrain";
+import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
@@ -36,7 +36,7 @@ import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { FirstPersonRig, KeyboardInput, OrbitRig, type VirtualStick } from "./controls";
-import { createDesk, disposeGroup, lecternPlacements, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
+import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
   createBoardScreens,
   PX_TO_M,
@@ -187,13 +187,20 @@ export class Sanctuary {
   private ambientClock = 0;
   /** True while the camera is parked on one study board (see the frame loop). */
   private studyFocus = false;
+  /** Board to pin once the orbit pan has settled square-on. */
+  private pendingReadSlot: LecternSlot | null = null;
+  private pendingPinAge = 0;
+  /** Face-size multiplier vs the pinned 30 m board. 1 / 1.5 / 2 / 3. */
+  private boardScale = 1;
   private disposed = false;
 
   // Hoisted scratch — the loop never allocates.
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
-  /** The tropical brightness push applied on top of the per-hour curve. */
-  private gradeExposure = 1.06;
+  /** The sunny-afternoon brightness push applied on top of the per-hour curve. */
+  private gradeExposure = 1.52;
+  /** True while the camera (or the walker) is under the water line. */
+  private submerged = false;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -218,11 +225,11 @@ export class Sanctuary {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // TROPICAL GRADE (Phase 20): the per-hour curve in `daylight.ts` is
-    // contract-fixed, so the final brightness push lives here — a single
-    // +6 % on top of it. ACES rolls the highlights off, which is exactly what
-    // bright sand, white walls and white clouds need to hold detail.
-    this.gradeExposure = 1.06;
+    // USER DIRECTIVE (full daylight): the per-hour curve in `daylight.ts`
+    // is contract-fixed, so the final brightness push lives here — +52 % on
+    // top of it. The land was still reading as dusk even at midday; this is
+    // the grade that makes every surface readable as a clear sunny day.
+    this.gradeExposure = 1.52;
     this.renderer.toneMappingExposure = 1.08 * this.gradeExposure;
     if (this.budget.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
@@ -236,7 +243,7 @@ export class Sanctuary {
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
 
-    this.scene.fog = new THREE.FogExp2(0xbcd9ef, this.budget.fogDensity);
+    this.scene.fog = new THREE.FogExp2(0xaedcfa, this.budget.fogDensity);
 
     const aniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.budget.tier === "low" ? 2 : 8);
     this.textures = createTextures(aniso);
@@ -413,19 +420,23 @@ export class Sanctuary {
   // ───────────────────────────────────────────────────────────────────
 
   private attachPointer(dom: HTMLElement) {
-    dom.addEventListener("pointerdown", this.onPointerDown);
-    dom.addEventListener("pointermove", this.onPointerMove);
-    dom.addEventListener("pointerup", this.onPointerUp);
-    dom.addEventListener("pointercancel", this.onPointerUp);
+    // Capture phase: full-screen boards swallow nested clicks in CSS3D
+    // hit-testing (the centre of the notes/mind-map editor). Seeing the
+    // event BEFORE the board's stopPropagation lets the geometric bridge
+    // re-aim those taps. Native iframe hits are left alone (see onPointerDown).
+    dom.addEventListener("pointerdown", this.onPointerDown, true);
+    dom.addEventListener("pointermove", this.onPointerMove, true);
+    dom.addEventListener("pointerup", this.onPointerUp, true);
+    dom.addEventListener("pointercancel", this.onPointerUp, true);
     dom.addEventListener("wheel", this.onWheel, { passive: false });
     dom.addEventListener("contextmenu", this.onContextMenu);
   }
 
   private detachPointer(dom: HTMLElement) {
-    dom.removeEventListener("pointerdown", this.onPointerDown);
-    dom.removeEventListener("pointermove", this.onPointerMove);
-    dom.removeEventListener("pointerup", this.onPointerUp);
-    dom.removeEventListener("pointercancel", this.onPointerUp);
+    dom.removeEventListener("pointerdown", this.onPointerDown, true);
+    dom.removeEventListener("pointermove", this.onPointerMove, true);
+    dom.removeEventListener("pointerup", this.onPointerUp, true);
+    dom.removeEventListener("pointercancel", this.onPointerUp, true);
     dom.removeEventListener("wheel", this.onWheel);
     dom.removeEventListener("contextmenu", this.onContextMenu);
   }
@@ -444,6 +455,41 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    // FULL-SCREEN BOARD: the framed face is pinned as a 2D rectangle, so
+    // nested controls (notes heading/body, mind-map +, YouTube iframe)
+    // hit-test natively. Synthetic events cannot enter an iframe or place
+    // a caret — never steal those. Capture only when CSS3D / the canvas
+    // ate the tap, then the geometric bridge re-aims it.
+    if (this.studyFocus) {
+      const nativeNested =
+        e.target instanceof Element &&
+        this.boardTarget(e.target) &&
+        !e.target.classList.contains("nature3d-board-screen");
+      if (nativeNested) return;
+
+      const framed = this.localOnBoard(e);
+      if (framed) {
+        const hit = this.boardTargetAt(framed.screen, e.clientX, e.clientY, framed.x, framed.y);
+        if (hit instanceof HTMLIFrameElement || hit.tagName === "IFRAME" || hit.closest("iframe")) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        this.startBridge(e, framed, hit);
+        return;
+      }
+    }
+    // A hit on the board ROOT (no nested control) is CSS3D missing the
+    // button — re-aim with the geometric bridge before the native path
+    // swallows it.
+    if (e.target instanceof Element && e.target.classList.contains("nature3d-board-screen")) {
+      const onRoot = this.localOnBoard(e);
+      if (onRoot) {
+        e.preventDefault();
+        this.startBridge(e, onRoot);
+        return;
+      }
+    }
     // When the device's hit-test works, the board's own stopPropagation
     // listeners swallow the touch before these host handlers ever see it —
     // so reaching this line with a board-area touch is PROOF the device's
@@ -453,6 +499,10 @@ export class Sanctuary {
     // it into a camera pinch: cancel the synthetic sequence and hand BOTH
     // fingers to the rig (finger one rejoins at its last known point).
     if (this.bridge) {
+      // Framed board: a second finger must not become a camera pinch.
+      // Zooming the rig while the page is pinned is what painted a giant
+      // board into the sky.
+      if (this.studyFocus) return;
       const b = this.bridge;
       this.cancelBridge();
       this.pointers.set(b.pointerId, { x: b.lastX, y: b.lastY });
@@ -471,6 +521,9 @@ export class Sanctuary {
       this.startBridge(e, onBoard);
       return;
     }
+    // Framed board: do not orbit. Dragging the camera is what made the 2D
+    // page look like it was spinning on the lectern.
+    if (this.studyFocus) return;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
@@ -491,6 +544,7 @@ export class Sanctuary {
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (this.pointers.size >= 2 && this.mode === "orbit") {
+      if (this.studyFocus) return;
       const [a, b] = [...this.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (this.pinchPrev > 0) this.orbit.zoom(this.pinchPrev / Math.max(dist, 1));
@@ -503,6 +557,7 @@ export class Sanctuary {
     const dy = (e.clientY - this.pointerPrev.y) * 0.005;
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
+    if (this.studyFocus) return;
     if (this.mode === "orbit") this.orbit.rotate(dx, dy);
     // In walk mode the swipe orbits TerrainTrek's third-person camera around
     // the character, which is also what steers them: its theta is the heading.
@@ -547,6 +602,10 @@ export class Sanctuary {
     if (this.mode !== "orbit") return;
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
+    if (this.studyFocus) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     this.orbit.zoom(1 + Math.sign(e.deltaY) * 0.1);
   };
@@ -626,9 +685,12 @@ export class Sanctuary {
       const lx = c * dx - s * dz;
       const x = lx / PX_TO_M + SCREEN_PX_WIDTH / 2;
       const y = -dy / PX_TO_M + SCREEN_PX_HEIGHT / 2;
-      if (x < 0 || x > SCREEN_PX_WIDTH || y < 0 || y > SCREEN_PX_HEIGHT) return;
+      const scale = this.boardScale;
+      const localX = SCREEN_PX_WIDTH / 2 + (x - SCREEN_PX_WIDTH / 2) / scale;
+      const localY = SCREEN_PX_HEIGHT / 2 + (y - SCREEN_PX_HEIGHT / 2) / scale;
+      if (localX < 0 || localX > SCREEN_PX_WIDTH || localY < 0 || localY > SCREEN_PX_HEIGHT) return;
       const t = ray.origin.distanceToSquared(this.bridgeHit);
-      if (!best || t < best.t) best = { screen, x, y, t };
+      if (!best || t < best.t) best = { screen, x: localX, y: localY, t };
     });
     return best;
   }
@@ -649,8 +711,17 @@ export class Sanctuary {
    * child's rect follows its parent's (or sits above it), so the last
    * containing element is the one painted on top where the finger was.
    */
-  private boardTargetAt(screen: BoardScreen, x: number, y: number): Element {
+  private boardTargetAt(screen: BoardScreen, x: number, y: number, localX?: number, localY?: number): Element {
     const root = screen.element;
+    // Layout-space search first when we have the ray's 1920×1080 point:
+    // getBoundingClientRect of a CSS3D child is the flattened AABB, which
+    // is exactly what misses buttons in the centre of a full-size board.
+    if (localX !== undefined && localY !== undefined) {
+      const flat = this.elementAtBoardFlat(screen, x, y);
+      if (flat && flat !== root) return this.preferInteractive(flat, root, localX, localY);
+      const laid = this.elementAtBoardLayout(root, localX, localY);
+      if (laid !== root) return laid;
+    }
     const hit = document.elementFromPoint(x, y);
     if (hit && this.bridgeMayTarget(screen, hit)) return hit;
     let best: Element = root;
@@ -661,6 +732,106 @@ export class Sanctuary {
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) best = el;
     }
     return best;
+  }
+
+  private isBoardInteractive(el: Element): boolean {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    if (tag === "BUTTON" || tag === "A" || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "LABEL") {
+      return true;
+    }
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute("role");
+    return role === "button" || role === "textbox" || role === "menuitem";
+  }
+
+  /**
+   * CSS3D hit-testing of a full-size board drops the CENTRE (notes +, rename,
+   * heading/body). Flatten the 1920×1080 element onto its visual rectangle
+   * for one layout query so elementFromPoint sees ordinary 2D boxes, then
+   * restore the 3D matrix before the next frame paints.
+   */
+  private elementAtBoardFlat(screen: BoardScreen, clientX: number, clientY: number): Element | null {
+    const root = screen.element;
+    const visual = root.getBoundingClientRect();
+    if (visual.width < 2 || visual.height < 2) return null;
+    const prevTransform = root.style.transform;
+    const prevOrigin = root.style.transformOrigin;
+    const prevPosition = root.style.position;
+    const prevLeft = root.style.left;
+    const prevTop = root.style.top;
+    const prevWidth = root.style.width;
+    const prevHeight = root.style.height;
+    const prevZ = root.style.zIndex;
+    root.style.position = "fixed";
+    root.style.left = `${visual.left}px`;
+    root.style.top = `${visual.top}px`;
+    root.style.width = `${SCREEN_PX_WIDTH}px`;
+    root.style.height = `${SCREEN_PX_HEIGHT}px`;
+    root.style.transformOrigin = "0 0";
+    root.style.transform = `scale(${visual.width / SCREEN_PX_WIDTH}, ${visual.height / SCREEN_PX_HEIGHT})`;
+    root.style.zIndex = "2147483646";
+    let hit: Element | null = null;
+    try {
+      hit = document.elementFromPoint(clientX, clientY);
+    } finally {
+      root.style.transform = prevTransform;
+      root.style.transformOrigin = prevOrigin;
+      root.style.position = prevPosition;
+      root.style.left = prevLeft;
+      root.style.top = prevTop;
+      root.style.width = prevWidth;
+      root.style.height = prevHeight;
+      root.style.zIndex = prevZ;
+    }
+    return hit && root.contains(hit) ? hit : null;
+  }
+
+  private preferInteractive(hit: Element, root: HTMLElement, lx: number, ly: number): Element {
+    if (this.isBoardInteractive(hit)) return hit;
+    const laid = this.elementAtBoardLayout(root, lx, ly);
+    if (laid !== root) return laid;
+    return hit;
+  }
+
+  /**
+   * Deepest descendant of `root` whose LAYOUT box (offset chain, not the
+   * CSS3D screen rect) contains (lx, ly) in the board's 1920×1080 space.
+   * Interactive controls win over the large wrappers that fill the centre.
+   */
+  private elementAtBoardLayout(root: HTMLElement, lx: number, ly: number): Element {
+    let best: Element = root;
+    let bestArea = Infinity;
+    let bestInteractive: Element | null = null;
+    let bestInteractiveArea = Infinity;
+    for (const node of root.querySelectorAll("*")) {
+      const el = node as HTMLElement;
+      if (!(el instanceof HTMLElement)) continue;
+      const w = Math.max(el.offsetWidth, el.clientWidth);
+      const h = Math.max(el.offsetHeight, el.clientHeight);
+      if (w <= 1 || h <= 1) continue;
+      let x = 0;
+      let y = 0;
+      let cur: HTMLElement | null = el;
+      while (cur && cur !== root) {
+        x += cur.offsetLeft - cur.scrollLeft;
+        y += cur.offsetTop - cur.scrollTop;
+        const next = cur.offsetParent as HTMLElement | null;
+        cur = next && (root === next || root.contains(next)) ? next : cur.parentElement;
+      }
+      if (lx >= x && lx <= x + w && ly >= y && ly <= y + h) {
+        const area = w * h;
+        if (area <= bestArea) {
+          best = el;
+          bestArea = area;
+        }
+        if (this.isBoardInteractive(el) && area <= bestInteractiveArea) {
+          bestInteractive = el;
+          bestInteractiveArea = area;
+        }
+      }
+    }
+    return bestInteractive ?? best;
   }
 
   /**
@@ -765,6 +936,12 @@ export class Sanctuary {
    * the caret exactly at the finger's coordinates.
    */
   private focusTapTarget(target: Element, screen: BoardScreen, x: number, y: number) {
+    // A layout miss lands on a wrapper around the heading/body. Walk DOWN
+    // into the editable if the target itself isn't one.
+    if (target instanceof HTMLElement && !target.isContentEditable && target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+      const inner = target.querySelector("[contenteditable], input, textarea");
+      if (inner) target = inner;
+    }
     let el: Element | null = target;
     while (el && screen.element.contains(el)) {
       if (el instanceof HTMLElement && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
@@ -796,9 +973,9 @@ export class Sanctuary {
     }
   }
 
-  private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }) {
+  private startBridge(e: PointerEvent, onBoard: { screen: BoardScreen; x: number; y: number }, preset?: Element) {
     const screen = onBoard.screen;
-    const target = this.boardTargetAt(screen, e.clientX, e.clientY);
+    const target = preset ?? this.boardTargetAt(screen, e.clientX, e.clientY, onBoard.x, onBoard.y);
     this.bridge = {
       pointerId: e.pointerId,
       screen,
@@ -889,6 +1066,9 @@ export class Sanctuary {
     this.mode = mode;
     this.keyboard.enabled = mode === "fpp";
     this.studyFocus = false;
+    this.pendingReadSlot = null;
+    this.pendingPinAge = 0;
+    this.screens.setReadSlot(null);
     if (mode === "fpp") {
       // Take control of the walking character. They get up from the chair and
       // the camera drops in behind them — this is a third-person walk, so the
@@ -980,6 +1160,19 @@ export class Sanctuary {
     this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();
+    if (this.submerged) this.applyUnderwater();
+  }
+
+  /**
+   * Full blue when the camera (or the walker) is inside the river / ocean.
+   * Fog density here is runtime-only — the quality-tier values stay pinned.
+   */
+  private applyUnderwater() {
+    const fog = this.scene.fog as THREE.FogExp2;
+    fog.color.set(0x0a58b8);
+    fog.density = 0.06;
+    this.scene.background = fog.color;
+    this.renderer.toneMappingExposure = 0.78;
   }
 
   /** Morning / midday / evening, or "auto" to follow the real clock. */
@@ -1002,6 +1195,9 @@ export class Sanctuary {
     if (this.mode === "fpp") this.setMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
+    this.pendingReadSlot = null;
+    this.pendingPinAge = 0;
+    this.screens.setReadSlot(null);
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
@@ -1051,6 +1247,29 @@ export class Sanctuary {
   }
 
   /**
+   * Grow or shrink the three study boards. Width, gap and reading radius
+   * scale together; the camera must be re-framed by the caller (`focus`)
+   * so a 3× board still fits the desk view with no crop.
+   */
+  setBoardScale(scale: number) {
+    const s = scale < 1.25 ? 1 : scale < 1.75 ? 1.5 : scale < 2.5 ? 2 : 3;
+    if (s === this.boardScale) return;
+    this.boardScale = s;
+    this.screens.setScale(s);
+    this.syncBoardPlanes();
+    this.requestShadowRefresh();
+  }
+
+  private syncBoardPlanes() {
+    this.screens.screens.forEach((s, i) => {
+      const plane = this.boardPlanes[i];
+      if (!plane) return;
+      this.tmpV.set(Math.sin(s.placement.yaw), 0, Math.cos(s.placement.yaw));
+      plane.setFromNormalAndCoplanarPoint(this.tmpV, s.placement.position);
+    });
+  }
+
+  /**
    * Frame ONE board, edge to edge, with a small margin of world showing.
    *
    * The distance is COMPUTED from the live projection rather than stored as a
@@ -1079,14 +1298,20 @@ export class Sanctuary {
    * limits below — and every pixel of it stays reachable at any device size.
    */
   private focusBoard(slot: LecternSlot) {
-    const placement = lecternPlacements().find((p) => p.slot === slot);
+    const placement = this.screens.byId(slot)?.placement;
     if (!placement) return;
     this.studyFocus = true;
+    this.orbit.autoRotate = false;
+    // Pin AFTER the pan lands. Unpinning the live board while the camera is
+    // still looking at it is what painted the previous page black, and pinning
+    // the next one off-axis is what spawned the 60 m sky page.
+    this.pendingReadSlot = slot;
+    this.pendingPinAge = 0;
 
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const needW = LECTERN_BOARD_WIDTH + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const needW = LECTERN_BOARD_WIDTH * this.boardScale + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
 
     // The board projects to the screen centre, so each side has to clear the
     // chrome from the centre line: the nearer edge on that axis wins. The 8 px
@@ -1111,13 +1336,13 @@ export class Sanctuary {
    * corner of a side board, mirrored) so nothing is cut off.
    */
   private focusStudentDesk() {
-    const placements = lecternPlacements();
+    const placements = this.screens.screens.map((s) => s.placement);
     let halfSpan = 0;
     let sumZ = 0;
+    const half = (LECTERN_BOARD_WIDTH * this.boardScale) / 2;
     for (const p of placements) {
       const ax = Math.cos(p.yaw);
       const az = -Math.sin(p.yaw);
-      const half = LECTERN_BOARD_WIDTH / 2;
       halfSpan = Math.max(
         halfSpan,
         Math.abs(p.position.x + half * ax),
@@ -1130,7 +1355,7 @@ export class Sanctuary {
     const vFov = (this.camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT + BOARD_VIEW_MARGIN * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
     const distance = Math.max(
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
@@ -1276,9 +1501,41 @@ export class Sanctuary {
       this.camera.updateProjectionMatrix();
     } else {
       this.orbit.update(dt, this.camera);
+      if (this.pendingReadSlot) {
+        this.pendingPinAge += dt;
+        if (this.orbit.settled() || this.pendingPinAge > 0.85) {
+          this.screens.setReadSlot(this.pendingReadSlot);
+          this.pendingReadSlot = null;
+          this.pendingPinAge = 0;
+        }
+      }
       this.avatar.setVisible(true);
       // Seated: breathing only — the folds stay where setSeated put them.
       this.avatar.update(dt, time, this.trek, this.camera);
+    }
+
+    // Underwater: the walker is allowed into the river, and when they (or
+    // the camera) go under the waterline the whole view goes saturated blue
+    // so it reads as being inside the water, not as a transparent sheet.
+    {
+      const cx = this.camera.position.x;
+      const cy = this.camera.position.y;
+      const cz = this.camera.position.z;
+      const camUnder =
+        (insideRiver(cx, cz) && cy < WATER_LEVEL + 0.15) ||
+        (coastWeight(cx, cz) > 0.42 && cy < OCEAN_LEVEL + 0.15);
+      const walkUnder =
+        this.mode === "fpp" &&
+        !this.avatar.seated &&
+        (insideRiver(this.trek.position.x, this.trek.position.z) ||
+          (coastWeight(this.trek.position.x, this.trek.position.z) > 0.42 &&
+            this.trek.position.y < OCEAN_LEVEL + 0.4));
+      const under = camUnder || walkUnder;
+      if (under !== this.submerged) {
+        this.submerged = under;
+        if (under) this.applyUnderwater();
+        else this.applyDaylight();
+      }
     }
 
     // ── World (staggered) ─────────────────────────────────────────────

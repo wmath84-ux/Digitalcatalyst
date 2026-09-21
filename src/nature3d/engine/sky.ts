@@ -84,7 +84,9 @@ void main() {
   // scattering above supplies the STRUCTURE (gradient, halo, horizon haze),
   // these uniforms supply the colour grade the rest of the scene is lit to.
   vec3 graded = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55));
-  sky = mix(graded, sky * uSunColor, 0.42);
+  // USER DIRECTIVE (sunny afternoon): lean harder on the art-directed
+  // saturated blue so the dome reads as a clear afternoon sky, not haze.
+  sky = mix(graded, sky * uSunColor, 0.32);
 
   // Ground haze below the horizon line.
   sky = mix(uGround, sky, smoothstep(-0.12, 0.05, h));
@@ -112,16 +114,15 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     depthWrite: false,
     fog: false,
     uniforms: {
-      // TROPICAL DAY KEY. Bright cyan-blue zenith, a pale turquoise-white
-      // horizon and a warm sand haze below the line — the reference sky is
-      // BRIGHTER and cleaner than the old temperate dome, with more air
-      // between the blue and the horizon. (daylight.ts re-authors these live;
-      // these are the boot defaults so the first frame is already tropical.)
-      uZenith: { value: new THREE.Color(0x2f7fd9) },
-      uHorizon: { value: new THREE.Color(0xd2f0fa) },
-      uGround: { value: new THREE.Color(0xeadfc2) },
+      // USER DIRECTIVE (sunny afternoon). Saturated afternoon-blue zenith,
+      // a bright pale horizon and a green-gold haze below the line so the
+      // first frame already reads as a clear sunny day. (daylight.ts
+      // re-authors these live.)
+      uZenith: { value: new THREE.Color(0x1f7eef) },
+      uHorizon: { value: new THREE.Color(0xc8eeff) },
+      uGround: { value: new THREE.Color(0xdceec0) },
       uSunDir: { value: sunDir.clone() },
-      uSunColor: { value: new THREE.Color(0xfff3d4) },
+      uSunColor: { value: new THREE.Color(0xfff8e0) },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -187,9 +188,64 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       });
     }
   }
+  // OVERHEAD BANKS. The far ring sits on the horizon, so a seated student
+  // looking straight up at the zenith saw empty blue. These banks live
+  // 70–160 m up and 40–220 m out — the patch of sky the desk look-up
+  // actually points at.
+  const OVERHEAD = budget.tier === "low" ? 4 : 7;
+  for (let c = 0; c < OVERHEAD; c += 1) {
+    const a0 = (c / OVERHEAD) * Math.PI * 2 + Math.random() * 0.8;
+    const r = 48 + Math.random() * 180;
+    const y = 78 + Math.random() * 88;
+    const drift = 0.004 + Math.random() * 0.008;
+    const puffs = 3 + Math.floor(Math.random() * 3);
+    const step = 0.08 + Math.random() * 0.05;
+    for (let p = 0; p < puffs; p += 1) {
+      const off = p - (puffs - 1) / 2;
+      cloudSeeds.push({
+        a: a0 + off * step,
+        r: r * (1 - Math.abs(off) * 0.04),
+        y: y + (Math.random() - 0.5) * 18,
+        s: 32 + Math.random() * 40,
+        drift,
+      });
+    }
+  }
+  // ZENITH BANKS. The horizon ring and the mid-sky OVERHEAD banks still
+  // leave a hole at the pole: looking straight up (desk look-up, FPP pitch
+  // π/2) pointed at empty blue. These sit at small radius / high +Y so they
+  // fill that patch. Y is clamped well above the terrain — a flipped vector
+  // here parks the cards underground and they vanish.
+  const ZENITH = budget.tier === "low" ? 3 : 5;
+  for (let c = 0; c < ZENITH; c += 1) {
+    const a0 = (c / ZENITH) * Math.PI * 2 + Math.random() * 1.1;
+    const r = 6 + Math.random() * 34;
+    const y = 210 + Math.random() * 130;
+    const drift = 0.003 + Math.random() * 0.006;
+    const puffs = 2 + Math.floor(Math.random() * 3);
+    const step = 0.12 + Math.random() * 0.08;
+    for (let p = 0; p < puffs; p += 1) {
+      const off = p - (puffs - 1) / 2;
+      cloudSeeds.push({
+        a: a0 + off * step,
+        r: Math.max(0, r * (1 - Math.abs(off) * 0.05)),
+        y: y + (Math.random() - 0.5) * 16,
+        s: 36 + Math.random() * 44,
+        drift,
+      });
+    }
+  }
+  cloudSeeds.push({ a: 0, r: 0, y: 280, s: 52, drift: 0.002 });
   const cloudCount = cloudSeeds.length;
   const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, cloudCount);
   clouds.renderOrder = -850;
+  // InstancedMesh frustum-culls against the UNIT plane at the origin. Looking
+  // up puts that origin-sphere outside the frustum even though the instances
+  // are in the sky, so the whole bank vanished at the zenith.
+  clouds.frustumCulled = false;
+  cloudGeo.computeBoundingSphere();
+  if (cloudGeo.boundingSphere) cloudGeo.boundingSphere.radius = 4000;
+  cloudMat.side = THREE.DoubleSide;
   group.add(clouds);
   const CLOUD_WHITE = new THREE.Color(0xffffff);
 
@@ -242,11 +298,11 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const moteAttr = moteGeo.attributes.position as THREE.BufferAttribute;
 
   // ── Lights ───────────────────────────────────────────────────────────
-  // TROPICAL KEY: hard clean sun, cyan sky fill, and a ground bounce that is
-  // sunlit foliage rather than dark loam. Shadows stay readable — the hemi
-  // term keeps every shadow a soft blue-green, never black.
-  const hemi = new THREE.HemisphereLight(0xd8f2ff, 0x71893f, 1.1);
-  const sun = new THREE.DirectionalLight(0xfff2d8, 2.45);
+  // USER DIRECTIVE (sunny afternoon): hard clean sun, saturated sky fill,
+  // and a ground bounce that is sunlit grass — so every shadow stays a
+  // soft green, never mud or black.
+  const hemi = new THREE.HemisphereLight(0xd8f4ff, 0x62b032, 1.72);
+  const sun = new THREE.DirectionalLight(0xfff8ea, 2.45);
   sun.position.copy(sunDir).multiplyScalar(70);
   if (budget.shadowMapSize > 0) {
     sun.castShadow = true;
@@ -302,11 +358,17 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       for (let i = 0; i < cloudCount; i += 1) {
         const s = cloudSeeds[i];
         s.a += s.drift * dt * (0.6 + wind * 0.5);
-        dummy.position.set(Math.cos(s.a) * s.r, s.y + Math.sin(time * 0.1 + i) * 1.4, Math.sin(s.a) * s.r);
-        // Face the viewer (same height, so the bank never rolls), then tip the
-        // top back slightly to show the shaded base.
-        dummy.lookAt(camera.position.x, dummy.position.y, camera.position.z);
-        dummy.rotateX(-0.1);
+        dummy.position.set(
+          Math.cos(s.a) * s.r,
+          Math.max(40, s.y + Math.sin(time * 0.1 + i) * 1.4),
+          Math.sin(s.a) * s.r,
+        );
+        // Full billboard — Y-locking lookAt left the cards edge-on (and the
+        // instanced mesh culled) the moment the camera looked up. Horizon
+        // banks still take a slight tip so the shaded base reads; zenith
+        // cards skip it so they stay face-on at the pole.
+        dummy.lookAt(camera.position);
+        if (s.r > 70) dummy.rotateX(-0.1);
         dummy.scale.set(s.s * 2.7, s.s * 1.06, 1);
         dummy.updateMatrix();
         clouds.setMatrixAt(i, dummy.matrix);

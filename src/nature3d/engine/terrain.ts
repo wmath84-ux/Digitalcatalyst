@@ -459,9 +459,9 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   // it instead of grey.
   const rock = new THREE.Color(0x8d8770);
   const snow = new THREE.Color(0xf4efe0);
-  // The island edge floor under the sea: dark lagoon bed so the dropped-off
-  // corners read as deep water in the haze, never as a bright square patch.
-  const deep = new THREE.Color(0x2e4f4a);
+  // The island edge floor under the sea: deep blue bed so the dropped-off
+  // corners read as water in the haze, never as a bright square patch.
+  const deep = new THREE.Color(0x163a58);
   const tmp = new THREE.Color();
 
   /**
@@ -498,7 +498,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   const mat = new THREE.MeshStandardMaterial({
     map: groundTexture,
     vertexColors: true,
-    roughness: 0.96,
+    roughness: 0.82,
     metalness: 0,
   });
 
@@ -543,7 +543,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         // is the cheapest large-scale variation there is.
         vec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
-        diffuseColor.rgb *= mix( 0.87, 1.13, dcMacroL );
+        diffuseColor.rgb *= mix( 0.96, 1.22, dcMacroL );
 
         // SHORELINE (per-pixel, Phase 4/5). vDcWorldPos.y is the fragment's own
         // ground height, so distance to the waterline costs one subtract — and
@@ -570,7 +570,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
           // Under the water: teal shift with depth, so the shelf reads through
           // the transparent ocean instead of as raw sand.
           float dcBed = clamp( -dcShore / 10.0, 0.0, 1.0 );
-          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.075, 0.18, 0.17 ), dcBed * 0.85 );
+          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.035, 0.10, 0.22 ), dcBed * 0.85 );
         }
 
         // ASPECT TINT — warm on the sunlit faces, cool where the sky bounces

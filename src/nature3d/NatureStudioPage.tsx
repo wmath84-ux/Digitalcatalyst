@@ -45,7 +45,6 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
   { key: "safari", label: "Safari", Icon: Rabbit },
   { key: "board", label: "Board", Icon: Rows3 },
-  { key: "student", label: "Student", Icon: Eye },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
 ];
@@ -276,7 +275,8 @@ export default function NatureStudioPage() {
     if (
       activeBoard === "reading" ||
       activeBoard === "notes" ||
-      activeBoard === "mindmap"
+      activeBoard === "mindmap" ||
+      activeBoard === "student"
     ) {
       engineRef.current?.focus(activeBoard);
     }

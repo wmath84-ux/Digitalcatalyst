@@ -260,18 +260,14 @@ function buildRing(
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
 
-      // Hue drifts with the ground's own hue and lightness, so a clump on
-      // pale dry soil comes out yellower and one over wet dark soil comes out
-      // deep green. TROPICAL: the base hue sits warmer (0.232) and the
-      // saturation floor is higher — the island's grass is sunnier than the
-      // old temperate olive, and the beach tufts (over pale sand) drift
-      // naturally toward dune-grass yellow. Per-blade jitter on top stops
-      // any two blades matching.
-      // USER DIRECTIVE (saturation pass): floor raised 0.42 → 0.52 so even a
-      // desaturated patch of ground keeps vivid, natural grass chroma.
-      const hue = 0.232 + hsl.l * 0.06 + patch * 0.02 + (Math.random() - 0.5) * opts.colorJitter;
-      const sat = 0.52 + hsl.s * 0.32 + patch * 0.1 + Math.random() * 0.1;
-      const lit = 0.27 + hsl.l * 0.36 + Math.random() * 0.16 - patch * 0.04;
+      // Hue drifts with the ground's own hue and lightness. USER DIRECTIVE
+      // (natural green): base hue 0.30 is true grass (~108°), not the old
+      // yellow-green 0.232 that read as straw. Saturation floor 0.64 so the
+      // field stays vivid in afternoon sun; lightness is a touch higher so
+      // the blades catch the light instead of sitting as a dark carpet.
+      const hue = 0.30 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * opts.colorJitter;
+      const sat = 0.66 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
+      const lit = 0.48 + hsl.l * 0.28 + Math.random() * 0.12 - patch * 0.03;
       color.setHSL(hue, sat, lit);
       mesh.setColorAt(placed, color);
       placed += 1;
@@ -365,7 +361,7 @@ function plantSkirt(
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
-      color.setHSL(0.25 + Math.random() * 0.03, 0.56 + Math.random() * 0.12, 0.26 + Math.random() * 0.14);
+      color.setHSL(0.30 + Math.random() * 0.025, 0.68 + Math.random() * 0.12, 0.46 + Math.random() * 0.12);
       mesh.setColorAt(placed, color);
       placed += 1;
     }

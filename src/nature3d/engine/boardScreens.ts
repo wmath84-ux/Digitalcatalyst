@@ -58,6 +58,7 @@ import {
   LECTERN_BOARD_HEIGHT,
   LECTERN_BOARD_WIDTH,
   lecternPlacements,
+  lecternPlacementsAt,
   type LecternPlacement,
   type LecternSlot,
 } from "./lectern";
@@ -96,6 +97,10 @@ export interface BoardScreensHandle {
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
   setSize(width: number, height: number): void;
+  /** Pin one board as a 2D face for native clicks; CSS3D resumes when null. */
+  setReadSlot(slot: LecternSlot | null): void;
+  /** Relayout the trio at `scale` × the pinned 30 m face. */
+  setScale(scale: number): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
   dispose(): void;
 }
@@ -175,6 +180,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   // they re-enable it on their own elements. Without this the whole canvas
   // would stop receiving the orbit/look drags.
   domElement.style.pointerEvents = "none";
+  domElement.style.overflow = "hidden";
 
   const screens: BoardScreen[] = placements.map((placement) => {
     const element = document.createElement("div");
@@ -206,7 +212,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     // behave like an ordinary web page while the meadow around it still
     // responds to drags.
     for (const type of ["pointerdown", "pointermove", "pointerup", "wheel"]) {
-      element.addEventListener(type, (event) => event.stopPropagation());
+      element.addEventListener(type, (event) => {
+        // A hit on the BOARD ROOT (not a nested control) means CSS3D
+        // hit-testing missed the button the learner actually tapped —
+        // the classic "centre of the editor is dead" failure. Let it
+        // bubble so the engine's geometric bridge can re-aim it.
+        if (event.target === element) return;
+        event.stopPropagation();
+      });
     }
     // A cancelled touch (system gesture, call arriving) must not leak to the
     // camera rig either, or the world would lurch at the moment a touch dies.
@@ -232,6 +245,70 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
   const visibility = new Map<LecternSlot, boolean>();
+  const pinCorner = new THREE.Vector3();
+  let viewW = 1;
+  let viewH = 1;
+  let faceScale = 1;
+  let readSlot: LecternSlot | null = null;
+  let pinnedSlot: LecternSlot | null = null;
+  let liftedSlot: LecternSlot | null = null;
+  let lastCamera: THREE.PerspectiveCamera | null = null;
+
+  const clearPin = (screen: BoardScreen) => {
+    const el = screen.element;
+    el.style.left = "";
+    el.style.top = "";
+    el.style.right = "";
+    el.style.bottom = "";
+    el.style.width = `${SCREEN_PX_WIDTH}px`;
+    el.style.height = `${SCREEN_PX_HEIGHT}px`;
+    el.style.transform = "";
+    el.style.transformOrigin = "";
+    el.style.position = "absolute";
+    el.style.zIndex = "";
+  };
+
+  const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
+    const p = screen.placement;
+    const c = Math.cos(p.yaw);
+    const s = Math.sin(p.yaw);
+    const hw = (LECTERN_BOARD_WIDTH * faceScale) / 2;
+    const hh = (LECTERN_BOARD_HEIGHT * faceScale) / 2;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        pinCorner.set(p.position.x + sx * hw * c, p.position.y + sy * hh, p.position.z - sx * hw * s).project(camera);
+        if (pinCorner.z < -1.05 || pinCorner.z > 1.05) return false;
+        const x = (pinCorner.x * 0.5 + 0.5) * viewW;
+        const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    const w = maxX - minX;
+    const h = maxY - minY;
+    // Behind the camera (or a pinched-out sky view) NDC explodes and this
+    // 2D face would paint a giant page across the heavens. Refuse it.
+    if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
+    const el = screen.element;
+    // Lift once onto the untransformed layer so left/top are layer pixels.
+    // Do not do this every frame — moving an iframe reloads it.
+    if (el.parentElement !== domElement) domElement.appendChild(el);
+    el.style.position = "absolute";
+    el.style.left = `${minX}px`;
+    el.style.top = `${minY}px`;
+    el.style.transformOrigin = "0 0";
+    el.style.transform = `scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
+    el.style.pointerEvents = "auto";
+    el.style.zIndex = "2";
+    pinnedSlot = screen.slot;
+    return true;
+  };
 
   return {
     screens,
@@ -244,7 +321,61 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     },
 
     setSize(width, height) {
+      viewW = width;
+      viewH = height;
       renderer.setSize(width, height);
+    },
+
+    setReadSlot(slot) {
+      if (readSlot === slot) return;
+      if (liftedSlot) {
+        const prev = screens.find((s) => s.slot === liftedSlot);
+        if (prev) {
+          clearPin(prev);
+          // Hide until CSS3D writes a real matrix — otherwise a 1920×1080
+          // untransformed overlay sits on the layer as a 60 m+ page.
+          prev.element.style.opacity = "0";
+        }
+        liftedSlot = null;
+        pinnedSlot = null;
+      }
+      // Neighbours were display:none / visible=false while framed. Put the
+      // whole trio back in CSS3D so the page you just left is not a black slab.
+      for (const screen of screens) {
+        clearPin(screen);
+        screen.element.style.display = "";
+        if (screen.object.parent !== cssScene) cssScene.add(screen.object);
+        screen.object.visible = true;
+        const shell = shells.children[screens.indexOf(screen)];
+        if (shell) shell.visible = true;
+      }
+      if (lastCamera) renderer.render(cssScene, lastCamera);
+      for (const screen of screens) screen.element.style.opacity = "";
+      visibility.clear();
+      readSlot = slot;
+      lastCamPos.set(1e9, 1e9, 1e9);
+    },
+
+    setScale(scale) {
+      const s = scale > 0 ? scale : 1;
+      faceScale = s;
+      const placements = lecternPlacementsAt(s);
+      screens.forEach((screen, i) => {
+        const p = placements[i];
+        if (!p) return;
+        screen.placement = p;
+        screen.object.position.copy(p.position);
+        screen.object.rotation.y = p.yaw;
+        screen.object.scale.setScalar(PX_TO_M * s);
+      });
+      shells.children.forEach((board, i) => {
+        const p = placements[i];
+        if (!p) return;
+        board.position.copy(p.position);
+        board.rotation.y = p.yaw;
+        board.scale.setScalar(s);
+      });
+      sphere.radius = LECTERN_BOARD_WIDTH * s * 0.62;
     },
 
     render(camera, force = false) {
@@ -273,6 +404,11 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           toCamera.copy(camera.position).sub(screen.placement.position);
           visible = boardNormal.dot(toCamera) > 0;
         }
+        if (visible) {
+          // Behind the camera CSS3D explodes into a giant page. Hide that.
+          pinCorner.copy(screen.placement.position).project(camera);
+          if (pinCorner.z < -1 || pinCorner.z > 1) visible = false;
+        }
 
         if (visibility.get(screen.slot) !== visible) {
           visibility.set(screen.slot, visible);
@@ -281,7 +417,44 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           // mind-map canvas from compositing.
           screen.element.style.display = visible ? "" : "none";
           screen.object.visible = visible;
+          const shell = shells.children[screens.indexOf(screen)];
+          if (shell) shell.visible = visible;
           changed = true;
+        }
+      }
+
+      // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
+      // the framed board out of the CSS3D scene so the other two keep their
+      // live pages — hiding them is what painted the neighbour boards black.
+      lastCamera = camera;
+      if (readSlot) {
+        const live = screens.find((s) => s.slot === readSlot);
+        if (live) {
+          if (live.object.parent === cssScene) cssScene.remove(live.object);
+          liftedSlot = live.slot;
+          live.element.style.display = "";
+          if (!pinFace(live, camera)) {
+            // Do not hand it back to CSS3D — that is the sky billboard.
+            clearPin(live);
+            live.element.style.display = "none";
+            pinnedSlot = null;
+          } else {
+            // Neighbours at this close square-on camera CSS3D-explode into a
+            // 60 m page. Hide their DOM AND their black WebGL shells.
+            screens.forEach((screen, i) => {
+              if (screen.slot === readSlot) {
+                const shell = shells.children[i];
+                if (shell) shell.visible = true;
+                return;
+              }
+              screen.element.style.display = "none";
+              screen.object.visible = false;
+              const shell = shells.children[i];
+              if (shell) shell.visible = false;
+            });
+          }
+          lastCamPos.copy(camera.position);
+          lastCamQuat.copy(camera.quaternion);
         }
       }
 
