@@ -61,12 +61,27 @@ const FAR_IN = 300 * 300;
 
 const DETAIL = new Set(["warehouse-steps", "warehouse-metal", "warehouse-door"]);
 
-/** Concrete lip under the walls, from just above the slab down into the yard. */
+/**
+ * How far the floor is sunk into the yard.
+ *
+ * The baked concrete curb tops out at 0.435 m. A 0.12 m bite left that curb
+ * standing clear of the dirt, so the shell read as sitting on a plinth.
+ * Half a metre buries the curb and the bottom of the corrugation comes out
+ * of the ground.
+ */
+const SINK = 0.5;
+
+/**
+ * Concrete lip under the walls. The group origin is `SINK` metres below the
+ * yard, so the ground line is at local y = SINK. The lip starts just under
+ * that line — buried on the flat yard, visible only if a coarse terrain
+ * triangle dips, where it reads as foundation instead of a gap.
+ */
 function foundationSkirt(shadows: boolean): THREE.Mesh {
   const hx = 13.2;
   const hz = 15.2;
-  const y0 = 0.04;
-  const y1 = -0.55;
+  const y0 = SINK - 0.08;
+  const y1 = -0.2;
   const positions = new Float32Array(4 * 6 * 3);
   const colors = new Float32Array(4 * 6 * 3);
   const corners: Array<[number, number]> = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]];
@@ -100,8 +115,7 @@ function foundationSkirt(shadows: boolean): THREE.Mesh {
 }
 
 /**
- * The levelled pad under the footprint, minus a few centimetres so the slab
- * bites the dirt instead of z-fighting it. The yard is flat (see
+ * The levelled pad under the footprint, minus `SINK`. The yard is flat (see
  * `levelWarehouseGround`), so the min of the samples IS the pad. Once, at load.
  */
 function seatY(): number {
@@ -119,7 +133,7 @@ function seatY(): number {
       if (h < min) min = h;
     }
   }
-  return min - 0.12;
+  return min - SINK;
 }
 
 export function createWarehouse(budget: QualityBudget, anisotropy: number): Promise<Warehouse> {
@@ -216,10 +230,8 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
           group.add(hull);
         }
 
-        // A buried concrete lip under the walls. The yard is level, so this
-        // stays in the dirt — it only shows if a coarse terrain triangle dips,
-        // and then it reads as foundation instead of a gap under the slab.
-        // Eight triangles, no texture, hidden with the shell past the far LOD.
+        // Buried concrete under the walls. Eight triangles, no texture,
+        // hidden with the shell past the far LOD. See foundationSkirt.
         const skirt = foundationSkirt(shadows);
         group.add(skirt);
         shell.push(skirt);

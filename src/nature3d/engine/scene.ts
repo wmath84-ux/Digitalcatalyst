@@ -1382,14 +1382,15 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // On the glazed end, pitched down so the slab is seen meeting the
-        // levelled yard. The yaw is the same one that turned that face
-        // toward the meadow (warehouseSite.ts).
+        // Eye level on the glazed approach, a little off the face so the
+        // corner and the ground line are both in frame. A steep look-down
+        // from the roof hid the contact; this is the view where the wall
+        // is seen coming out of the yard (warehouseSite.ts).
         this.orbit.panTo(
-          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 0.7, WAREHOUSE_Z),
-          30,
-          WAREHOUSE_YAW,
-          0.42,
+          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 1.05, WAREHOUSE_Z),
+          24,
+          WAREHOUSE_YAW + 0.22,
+          0.1,
         );
         break;
       case "reading":

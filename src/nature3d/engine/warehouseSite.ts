@@ -3,32 +3,30 @@
 // Where the abandoned warehouse stands, and the one test every scatter uses
 // to stay out of it.
 //
-// The site is the flattest pad the height field has outside the board fan,
-// the river and the trails: (−169, −28), about 171 m west-southwest of the
-// seat. The raw hill still rises ~1.8 m under the slab and falls away in
-// front of the glazed end, so a rigid floor either buried the uphill wall
-// or hung in the air. `levelWarehouseGround` cuts one level yard under the
-// walls and out past the Warehouse camera, then eases back to the hill.
-// The west trail stays outside that blend.
+// The site is (−168, −44), just south of the old ridge. Facing the origin
+// from that ridge put the glazed end over a 3 m drop; filling the drop so
+// the slab stayed level left the building on a berm, which is why it never
+// read as sitting on the ground. Here the glazed end points world +Z, the
+// only approach where the hill stays within about a metre of the slab for
+// 50 m. `levelWarehouseGround` cuts the yard down to the lowest point under
+// the walls — a cut, never a fill — so the slab meets dirt instead of
+// sitting on a platform. The west trail passes 9 m outside that blend.
 //
 // The baked clerestory faces local +Z (measured off the shipped window
-// normals, not the source file). The yaw turns that face toward the origin,
-// so the learner looking out from the sanctuary sees the glazed end.
+// normals, not the source file). Yaw 0 keeps that face on the continuous
+// approach. Turning it toward the origin puts it back over the drop.
 
 /** World X of the baked model's centre. */
-export const WAREHOUSE_X = -169;
+export const WAREHOUSE_X = -168;
 /** World Z of the baked model's centre. */
-export const WAREHOUSE_Z = -28;
-
-const TO_ORIGIN_X = -WAREHOUSE_X;
-const TO_ORIGIN_Z = -WAREHOUSE_Z;
+export const WAREHOUSE_Z = -44;
 
 /**
- * three.js Y rotation that maps local +Z (the glazed end) onto the direction
- * toward the origin. The orbit preset uses the same angle: the camera sits
- * on that face, looking back at the shell.
+ * three.js Y rotation. 0 keeps local +Z (the glazed end) on world +Z, the
+ * approach the yard was cut for. The Warehouse preset adds a small offset
+ * so the corner and the ground line are both in frame.
  */
-export const WAREHOUSE_YAW = Math.atan2(TO_ORIGIN_X, TO_ORIGIN_Z);
+export const WAREHOUSE_YAW = 0;
 
 /**
  * Local half-extents of the baked shell (12.99 × 15.00) plus a 1.4 m apron,
@@ -45,23 +43,23 @@ const HALF_DIAG = 22;
 /**
  * Level yard, in the building's local frame. +Z is the glazed end.
  *
- * Walls sit at ±13 × ±15. The flat zone runs 12 m past them — more than
- * one cell of the coarsest ground shell here (~7 m) — and continues out to
- * local +Z = 42, past the Warehouse camera, so the ground in that view is
- * the same height as the slab. The blend back to the hill is short on X
- * because the west trail passes 33 m off that side and must stay natural.
+ * Walls sit at ±13 × ±15. The flat zone is a few metres past them — more
+ * than one cell of the coarsest ground shell here (~7 m) — and a little
+ * further on +Z, where the camera stands. The blend back to the hill is
+ * long enough that a 2 m cut reads as a grade, not a quarry wall. It stops
+ * short of the west trail, which passes about 9 m beyond the +Z edge.
  */
-const PAD_FLAT_X = 25;
-const PAD_FLAT_Z_NEG = 27;
-const PAD_FLAT_Z_POS = 42;
-const PAD_BLEND_X = 6;
-const PAD_BLEND_Z_NEG = 12;
-const PAD_BLEND_Z_POS = 8;
+const PAD_FLAT_X = 16;
+const PAD_FLAT_Z_NEG = 18;
+const PAD_FLAT_Z_POS = 22;
+const PAD_BLEND_X = 14;
+const PAD_BLEND_Z_NEG = 18;
+const PAD_BLEND_Z_POS = 20;
 const PAD_OUTER_X = PAD_FLAT_X + PAD_BLEND_X;
 const PAD_OUTER_Z_NEG = PAD_FLAT_Z_NEG + PAD_BLEND_Z_NEG;
 const PAD_OUTER_Z_POS = PAD_FLAT_Z_POS + PAD_BLEND_Z_POS;
-/** Axis-aligned reach of the rotated blend box, plus a metre. */
-const PAD_REACH = 64;
+/** Axis-aligned reach of the blend box, plus a metre. Yaw is 0, so this is the box. */
+const PAD_REACH = 48;
 
 let padY = NaN;
 let sealing = false;
@@ -71,8 +69,9 @@ let sealing = false;
  *
  * Called from `terrainHeight` on every sample. The common case — anywhere
  * but this one yard — is two comparisons and a return. Inside the yard the
- * height is the natural height at the building's centre, so the slab, the
- * mesh and the grass all share one floor. `naturalAt` is `terrainHeight`
+ * height is the lowest natural sample under the walls, so the slab, the
+ * mesh and the grass share a floor that is cut into the hill, not built
+ * up on top of it. `naturalAt` is `terrainHeight`
  * itself; `sealing` stops that callback from re-entering the blend while
  * the pad height is being captured.
  */
@@ -89,7 +88,21 @@ export function levelWarehouseGround(
   if (dz > PAD_REACH || dz < -PAD_REACH) return natural;
   if (padY !== padY) {
     sealing = true;
-    padY = naturalAt(WAREHOUSE_X, WAREHOUSE_Z);
+    // The lowest point under the walls. Cutting down to it means the yard
+    // is never a fill: a fill is the berm that made the slab look perched.
+    let min = Infinity;
+    for (let ix = -2; ix <= 2; ix += 1) {
+      for (let iz = -2; iz <= 2; iz += 1) {
+        const lx = ix * 6.5;
+        const lz = iz * 7.5;
+        const h = naturalAt(
+          WAREHOUSE_X + lx * COS + lz * SIN,
+          WAREHOUSE_Z - lx * SIN + lz * COS,
+        );
+        if (h < min) min = h;
+      }
+    }
+    padY = min;
     sealing = false;
   }
   const lx = COS * dx - SIN * dz;
