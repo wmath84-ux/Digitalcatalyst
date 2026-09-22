@@ -8,7 +8,9 @@
 //
 // The sanctuary is OFFLINE-FIRST, so the runtime files are a mobile-diet bake
 // of that model in `public/sanctuary/models/` — nothing here is hot-linked.
-// Longest side 30 m, floor at local y = 0, XZ centred. Seven textured meshes
+// Plan is the baked 30 m (XZ centred, floor at local y = 0). The walls are
+// scaled to 60 m above the yard — height only, so the footprint still fits
+// 30 m to the student's right. Seven textured meshes
 // (wall, roof, concrete, steps, metal, window, door — 3 666 triangles) plus
 // a 236-triangle vertex-colour impostor.
 //
@@ -62,14 +64,24 @@ const FAR_IN = 300 * 300;
 const DETAIL = new Set(["warehouse-steps", "warehouse-metal", "warehouse-door"]);
 
 /**
- * How far the floor is sunk into the yard.
+ * How far the floor is sunk into the yard, after the height scale.
  *
- * The baked concrete curb tops out at 0.435 m. A 0.12 m bite left that curb
- * standing clear of the dirt, so the shell read as sitting on a plinth.
- * Half a metre buries the curb and the bottom of the corrugation comes out
- * of the ground.
+ * The bake is 5.4 m tall. The wall the learner has to be able to see is
+ * 60 m, so the geometry is scaled on Y only — the plan stays the 30 m the
+ * yard was cut for, which is what lets the glazed face sit 30 m to the
+ * student's right instead of covering the chair. The concrete curb is
+ * 0.435 m in the bake; after that scale it stands about 4.8 m proud of the
+ * floor. Sinking by that plus a bite buries the curb, and the corrugation
+ * comes out of the dirt.
  */
-const SINK = 0.5;
+const AUTHORED_HEIGHT = 5.4;
+const TARGET_HEIGHT = 60;
+const CURB_TOP = 0.435;
+const BITE = 0.35;
+// The curb is buried, so a scale of 60/5.4 would leave the roof 5 m short of
+// the ground line. Scale so the roof, not the buried floor, is 60 m up.
+const SCALE_Y = (TARGET_HEIGHT + BITE) / (AUTHORED_HEIGHT - CURB_TOP);
+const SINK = CURB_TOP * SCALE_Y + BITE;
 
 /**
  * Concrete lip under the walls. The group origin is `SINK` metres below the
@@ -78,10 +90,15 @@ const SINK = 0.5;
  * triangle dips, where it reads as foundation instead of a gap.
  */
 function foundationSkirt(shadows: boolean): THREE.Mesh {
-  const hx = 13.2;
-  const hz = 15.2;
-  const y0 = SINK - 0.08;
-  const y1 = -0.2;
+  // Inside the wall faces. A skirt proud of the walls reads as a concrete
+  // pad, which is the thing that made the shell look perched.
+  const hx = 12.4;
+  const hz = 14.4;
+  // Ground is at local y = SINK (the group origin is that far below the
+  // yard). The skirt's top sits just under that line. These are world
+  // metres: the height scale is baked into the shell, not the group.
+  const y0 = SINK - 0.18;
+  const y1 = SINK - 1.35;
   const positions = new Float32Array(4 * 6 * 3);
   const colors = new Float32Array(4 * 6 * 3);
   const corners: Array<[number, number]> = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]];
@@ -158,6 +175,13 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
           // group carries one matrix and every child is identity. The bake
           // already authors identity nodes; this keeps a future re-bake honest.
           mesh.geometry.applyMatrix4(mesh.matrixWorld);
+          // Height only. A uniform scale to 60 m would make a ~300 m footprint
+          // and the building would cover the chair it is supposed to stand
+          // beside. The plan stays the baked 30 m. The steps are left at
+          // their authored height: stretching them lifts a 0.6 m stoop into
+          // a plinth beside the wall, which is the "not on the ground" read.
+          // Unscaled, they sit at the floor, and the sink buries them.
+          if (mesh.name !== "warehouse-steps") mesh.geometry.scale(1, SCALE_Y, 1);
           mesh.position.set(0, 0, 0);
           mesh.rotation.set(0, 0, 0);
           mesh.scale.set(1, 1, 1);
@@ -196,8 +220,12 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
             // The other maps are atlas crops and stay in 0–1, so repeat is
             // harmless on them and required on the clerestory.
             if (mesh.name === "warehouse-window") {
+              // The pane is authored in the bake's metres. Clone so the
+              // height scale retile does not stretch a shared atlas.
+              mat.map = mat.map.clone();
               mat.map.wrapS = THREE.RepeatWrapping;
               mat.map.wrapT = THREE.RepeatWrapping;
+              mat.map.repeat.y = SCALE_Y;
             }
             textures.push(mat.map);
           }

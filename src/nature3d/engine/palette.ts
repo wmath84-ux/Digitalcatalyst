@@ -160,11 +160,12 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  // USER DIRECTIVE (sunny afternoon / natural green): the meadow must read as
-  // REAL grass in hard afternoon sun — true green, not olive, not yellow thatch.
-  // Dry patches stay green-gold rather than straw; wet soil is mossy, not mud.
+  // Lush hollows stay true grass. Dry rises are dusty earth — the same
+  // ochre a fallow field has — so a dry belt reads as desert, not as a
+  // lighter green. The ground grit is neutral; this vertex colour is what
+  // decides which one you see.
   lush: new THREE.Color(0x3cc428),
-  dry: new THREE.Color(0x6ad032),
+  dry: new THREE.Color(0xc4a06a),
   mud: new THREE.Color(0x4e6a32),
   rock: new THREE.Color(0x8d8770),
   gravel: new THREE.Color(0xd2c5a0),

@@ -49,7 +49,7 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
 import { createWarehouse, type Warehouse } from "./warehouse";
-import { WAREHOUSE_X, WAREHOUSE_YAW, WAREHOUSE_Z } from "./warehouseSite";
+import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { OrbitRig } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -1382,15 +1382,15 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // Eye level on the glazed approach, a little off the face so the
-        // corner and the ground line are both in frame. A steep look-down
-        // from the roof hid the contact; this is the view where the wall
-        // is seen coming out of the yard (warehouseSite.ts).
+        // Eye level on the student side of the wall (world −X). Yaw −π/2
+        // puts the camera there; the small offset shows the corner so the
+        // wall reads as a volume, and the shallow pitch keeps the ground
+        // line in frame. A look down from the roof hid that contact.
         this.orbit.panTo(
-          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 1.05, WAREHOUSE_Z),
-          24,
-          WAREHOUSE_YAW + 0.22,
-          0.1,
+          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 1.4, WAREHOUSE_Z),
+          32,
+          -Math.PI / 2 + 0.28,
+          0.12,
         );
         break;
       case "reading":
@@ -1526,10 +1526,17 @@ export class Sanctuary {
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
     const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
-    const distance = Math.max(
+    const boardDistance = Math.max(
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
     );
+    // The warehouse is 30 m to the student's right and closer to this camera
+    // than the boards. Perspective narrows toward the camera, so a fit that
+    // only clears the boards crops the wall. Back up until its right edge
+    // is inside the frustum; the boards stay fully in frame, smaller.
+    const warehouseDistance =
+      (Math.abs(WAREHOUSE_X) + 14) / Math.tan(hFov / 2) - centreZ + WAREHOUSE_Z + 8;
+    const distance = Math.max(boardDistance, warehouseDistance);
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);

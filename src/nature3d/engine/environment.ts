@@ -513,6 +513,38 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
+ * How dry the soil is here, 0 (lush hollow) … 1 (bare rise).
+ *
+ * One low-frequency noise sample, wavelength a few hundred metres, so a dry
+ * tract is a field. It is then cut by the drainage grid and by height: a
+ * channel stays green even inside a dry belt, and a rise goes fallow even
+ * inside a green one. That is a real plain — dry ground in every district,
+ * following the land, not speckled ovals. The study clearing stays mostly
+ * lawn, but the rises there still show a little dry soil.
+ *
+ * One noise2D plus the wetness lookup the caller already paid for. This is
+ * the terrain's vertex-colour loop (≈150 k) and the grass scatter (≈60 k);
+ * do not add another octave.
+ */
+export function dryCover(x: number, z: number, h: number, wet = 0): number {
+  // The belt only changes how dry a rise gets. The shape is the height
+  // field: ridges shed water, hollows and channels stay grass. A noise
+  // oval would be the random patch the learner already rejected.
+  const belt = noise.noise2D(x * 0.0022 + 4.8, z * 0.0019 - 2.2) * 0.5 + 0.5;
+  const drained = 1 - Math.min(1, wet * 1.8);
+  const rise = Math.min(1, Math.max(0, (h + 0.35) / 2.0));
+  let dry = rise * (0.42 + 0.58 * belt);
+  dry *= 0.3 + 0.7 * drained;
+  // Every district keeps some bare earth on its rises, even inside a
+  // greener belt, so the land is never only green.
+  if (dry < rise * 0.28 * drained) dry = rise * 0.28 * drained;
+  const clearing = 1 - smoothstep(22, 48, Math.hypot(x, z));
+  dry *= 1 - clearing * 0.35;
+  return dry < 0 ? 0 : dry > 1 ? 1 : dry;
+}
+
+
+/**
  * The albedo of the ground at a point, as a rule-based blend.
  *
  * This is the game-engine version of a Landscape Material with weight-blended
@@ -551,13 +583,11 @@ export function groundColorAt(
   const worn = wornIn ?? pathWeight(x, z);
 
   // ── Base: lush ↔ dry ──────────────────────────────────────────────
-  // USER DIRECTIVE (natural green): most of the meadow stays lush. The dry
-  // lerp used to eat 85 % of the field into olive thatch; now it is a
-  // minority accent so the ground reads as grass, not straw.
-  const patch =
-    (Math.sin(x * 0.031) * Math.cos(z * 0.027) + 1) * 0.5 * 0.5 +
-    (noise.noise2D(x * 0.012 + 4.2, z * 0.012 - 1.7) * 0.5 + 0.5) * 0.5;
-  out.copy(palette.lush).lerp(palette.dry, clamp01(patch * 0.38 + h * 0.007));
+  // Dry belts follow drainage and the broad soil field (dryCover), not a
+  // sine speckle. The lerp is strong enough that a rise in a dry belt reads
+  // as earth, not as green with a tint.
+  const dry = dryCover(x, z, h, wet);
+  out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.92));
 
   // ── Drainage: mossy darkening, not brown mud ──────────────────────
   out.lerp(palette.mud, clamp01(wet * 0.55 - 0.18));

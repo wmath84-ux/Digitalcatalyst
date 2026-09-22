@@ -44,7 +44,7 @@ import { TextureLoader } from "three";
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
-import { createSite, siteAt, pathWeight, groundColorAt, type Site } from "./environment";
+import { createSite, dryCover, siteAt, pathWeight, groundColorAt, type Site } from "./environment";
 import { GROUND_PALETTE } from "./palette";
 import { noise } from "./simplex";
 
@@ -116,6 +116,9 @@ function acceptsTuft(
   if (site.slopeDeg > 30) return false;
   if (site.soil < 0.2) return false;
   if (site.wetness > 0.85 && Math.random() < 0.7) return false;
+  const dry = dryCover(x, z, y, site.wetness);
+  if (dry > 0.62 && Math.random() < 0.8) return false;
+  if (dry > 0.38 && Math.random() < 0.45) return false;
   if (site.crowding > 0.75 && Math.random() < (ring === "far" ? 0.85 : 0.4)) return false;
   return true;
 }

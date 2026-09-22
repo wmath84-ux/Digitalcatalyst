@@ -45,7 +45,7 @@ import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
 import { GROUND_PALETTE } from "./palette";
-import { groundColorAt, pathWeight } from "./environment";
+import { dryCover, flowWetness, groundColorAt, pathWeight } from "./environment";
 
 export interface GrassField {
   group: THREE.Group;
@@ -237,6 +237,11 @@ function buildRing(
     // ragged in life, and a hard cutoff would draw a line along the path.
     if (worn > 0.62) return false;
     if (worn > 0.18 && Math.random() < worn * 1.45) return false;
+    // Dry rises keep a few blades. A full sward there hides the earth and
+    // the land reads as green everywhere. Wet hollows are not touched.
+    const dry = dryCover(x, z, y, flowWetness(x, z));
+    if (dry > 0.62 && Math.random() < 0.86) return false;
+    if (dry > 0.38 && Math.random() < 0.5) return false;
     return true;
   };
 
