@@ -1,0 +1,40 @@
+/* Attached to the inner screen, so frost follows both CSS3D and pinned views.
+   Only a narrow perimeter is painted; the lesson and its controls stay clear. */
+.nature3d-board-screen[data-ice-age="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 5px 3px rgba(244, 252, 255, 0.95),
+    inset 0 0 0 2px rgba(193, 231, 252, 0.8),
+    inset 0 0 14px 3px rgba(193, 230, 250, 0.5);
+  background:
+    radial-gradient(ellipse at 0 0, rgba(238, 251, 255, 0.85), transparent 70%) 0 0 / 56px 24px no-repeat,
+    radial-gradient(ellipse at 100% 0, rgba(238, 251, 255, 0.85), transparent 70%) 100% 0 / 56px 24px no-repeat,
+    repeating-linear-gradient(118deg, transparent 0 16px, rgba(241, 250, 255, 0.45) 17px 19px, transparent 20px 38px) 0 0 / 100% 5px no-repeat;
+}
+
+/* ── Low-tier HUD diet (the research's UI-overdraw rule) ───────────────
+   `backdrop-filter: blur()` repaints a fullscreen sample + gaussian blur
+   per chrome element, per frame — on a Mali/Adreno tile GPU that is one of
+   the most expensive things CSS can ask for, and the sanctuary's glass
+   chips were using it liberally (menu button, dropdown, stats chip, eye
+   toggle, lesson modal, sticks). On the low tier (`sanctuary-lite` on the
+   page root) the blur radius is dropped to 2 px: the glass read survives,
+   the per-frame fullscreen blurs do not. Tailwind v4 composes the filter
+   from the --tw-backdrop-blur variable, so overriding the variable keeps
+   every other backdrop-filter term (brightness etc.) intact. */
+.sanctuary-lite .backdrop-blur-xl,
+.sanctuary-lite .backdrop-blur-md {
+  --tw-backdrop-blur: blur(2px);
+}
+
+/* The spinnner-on-glass boot veil and the lesson modal dim use the same
+   trickle of full-screen blends; on the diet tier their dim stays, and any
+   heavier shadow glows are quietly skipped as pure cost. */
+.sanctuary-lite .shadow-2xl {
+  box-shadow: 0 8px 24px rgba(2, 8, 23, 0.45);
+}
