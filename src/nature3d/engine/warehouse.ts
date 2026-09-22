@@ -61,9 +61,48 @@ const FAR_IN = 300 * 300;
 
 const DETAIL = new Set(["warehouse-steps", "warehouse-metal", "warehouse-door"]);
 
+/** Concrete lip under the walls, from just above the slab down into the yard. */
+function foundationSkirt(shadows: boolean): THREE.Mesh {
+  const hx = 13.2;
+  const hz = 15.2;
+  const y0 = 0.04;
+  const y1 = -0.55;
+  const positions = new Float32Array(4 * 6 * 3);
+  const colors = new Float32Array(4 * 6 * 3);
+  const corners: Array<[number, number]> = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]];
+  let p = 0;
+  for (let i = 0; i < 4; i += 1) {
+    const [x0, z0] = corners[i];
+    const [x1, z1] = corners[(i + 1) % 4];
+    const quad = [x0, y0, z0, x1, y0, z1, x1, y1, z1, x0, y0, z0, x1, y1, z1, x0, y1, z0];
+    for (let k = 0; k < quad.length; k += 3) {
+      positions[p] = quad[k];
+      positions[p + 1] = quad[k + 1];
+      positions[p + 2] = quad[k + 2];
+      const buried = quad[k + 1] < 0 ? 0.55 : 0.72;
+      colors[p] = buried;
+      colors[p + 1] = buried * 0.96;
+      colors[p + 2] = buried * 0.88;
+      p += 3;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  mesh.name = "warehouse-skirt";
+  mesh.castShadow = false;
+  mesh.receiveShadow = shadows;
+  mesh.frustumCulled = true;
+  mesh.matrixAutoUpdate = false;
+  return mesh;
+}
+
 /**
- * Lowest terrain sample under the rotated footprint, minus a few centimetres
- * so a hollow the grid missed cannot float the slab. Once, at load.
+ * The levelled pad under the footprint, minus a few centimetres so the slab
+ * bites the dirt instead of z-fighting it. The yard is flat (see
+ * `levelWarehouseGround`), so the min of the samples IS the pad. Once, at load.
  */
 function seatY(): number {
   const c = Math.cos(WAREHOUSE_YAW);
@@ -80,7 +119,7 @@ function seatY(): number {
       if (h < min) min = h;
     }
   }
-  return min - 0.06;
+  return min - 0.12;
 }
 
 export function createWarehouse(budget: QualityBudget, anisotropy: number): Promise<Warehouse> {
@@ -177,6 +216,14 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
           group.add(hull);
         }
 
+        // A buried concrete lip under the walls. The yard is level, so this
+        // stays in the dirt — it only shows if a coarse terrain triangle dips,
+        // and then it reads as foundation instead of a gap under the slab.
+        // Eight triangles, no texture, hidden with the shell past the far LOD.
+        const skirt = foundationSkirt(shadows);
+        group.add(skirt);
+        shell.push(skirt);
+
         group.position.set(WAREHOUSE_X, seatY(), WAREHOUSE_Z);
         group.rotation.y = WAREHOUSE_YAW;
         group.updateMatrix();
@@ -227,6 +274,7 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
             });
             // Hull and impostor share one geometry — dispose it once.
             far.geometry.dispose();
+            skirt.geometry.dispose();
             mats.forEach((m) => m.dispose());
             for (let i = 0; i < textures.length; i += 1) textures[i].dispose();
             group.clear();
