@@ -48,6 +48,8 @@ import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
+import { createWarehouse, type Warehouse } from "./warehouse";
+import { WAREHOUSE_X, WAREHOUSE_YAW, WAREHOUSE_Z } from "./warehouseSite";
 import { OrbitRig } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -73,7 +75,7 @@ const BOARD_VIEW_MARGIN = 0.5;
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
-  | "trek" | "world"
+  | "trek" | "world" | "warehouse"
   // The three study boards. Each frames ONE board edge-to-edge.
   | "reading" | "notes" | "mindmap";
 
@@ -176,6 +178,8 @@ export class Sanctuary {
   private student: StudentRig;
   /** The Vintage Day Bed — the learner's seat, loaded async (dayBed.ts). */
   private dayBed: DayBed | null = null;
+  /** The abandoned warehouse, loaded async (warehouse.ts). */
+  private warehouse: Warehouse | null = null;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
   /** The three live course-player boards + their WebGL frames. */
@@ -498,6 +502,39 @@ export class Sanctuary {
         this.winter.registerTree(bed.group);
       })
       .catch((err) => console.warn("[sanctuary] day bed failed", err));
+
+    // THE ABANDONED WAREHOUSE. Same async, fail-soft load as the day bed.
+    // Its shadow hull lives on layer 1 so the colour camera never draws it.
+    // three r180's shadow walk tests the COLOUR camera's layers, not the
+    // light's shadow camera, so layer 1 is enabled only for that walk and
+    // cleared before the colour pass — two bit flips, no extra draw.
+    if (this.budget.shadowMapSize > 0) {
+      const shadowMap = this.renderer.shadowMap;
+      const renderShadows = shadowMap.render;
+      shadowMap.render = (lights, scene, camera) => {
+        camera.layers.enable(1);
+        try {
+          renderShadows.call(shadowMap, lights, scene, camera);
+        } finally {
+          camera.layers.disable(1);
+        }
+      };
+    }
+    createWarehouse(this.budget, aniso)
+      .then((building) => {
+        if (this.disposed) {
+          building.dispose();
+          return;
+        }
+        this.warehouse = building;
+        this.scene.add(building.group);
+        building.group.updateMatrixWorld(true);
+        this.atmosphere.registerTree(building.group);
+        this.winter.registerTree(building.group);
+        if (this.budget.halfPrecision) halfPrecisionTree(building.group);
+        building.update(this.camera.position);
+      })
+      .catch((err) => console.warn("[sanctuary] warehouse failed", err));
 
     // ── The study lectern: a desk and three 30 m boards ───────────────
     //
@@ -1344,6 +1381,16 @@ export class Sanctuary {
         this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
         break;
       }
+      case "warehouse":
+        // On the glazed end, looking back at the shell. The yaw is the same
+        // one that turned that face toward the meadow (warehouseSite.ts).
+        this.orbit.panTo(
+          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 2.6, WAREHOUSE_Z),
+          42,
+          WAREHOUSE_YAW,
+          0.2,
+        );
+        break;
       case "reading":
       case "notes":
       case "mindmap":
@@ -1706,6 +1753,10 @@ export class Sanctuary {
       this.water.update(adt, time, this.camera.position);
       // The bay's idle motion (boat, umbrellas) rides the same budget.
       this.structures.update(time);
+      // One squared-distance compare. Hidden meshes are skipped by the
+      // renderer entirely, so a far warehouse is a single impostor draw
+      // and an off-screen one is nothing.
+      this.warehouse?.update(this.camera.position);
     }
 
     this.aiClock += dt;
@@ -1822,6 +1873,7 @@ export class Sanctuary {
     this.board.dispose();
     this.student.dispose();
     this.dayBed?.dispose();
+    this.warehouse?.dispose();
     this.atmosphere.dispose();
     this.weathering.dispose();
     this.winter.dispose();
