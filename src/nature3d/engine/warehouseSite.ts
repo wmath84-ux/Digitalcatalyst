@@ -3,62 +3,53 @@
 // Where the abandoned warehouse stands, and the one test every scatter uses
 // to stay out of it.
 //
-// The learner sits at (0, 2.6), facing −Z, so his right is +X. The wall he
-// should see is 30 m that way. The river occupies x ≈ 12–24, and the first
-// ground past it is a bank, not a pan — a building dropped on the bank sits
-// in a cut. `levelWarehouseGround` cuts the yard down to the lowest point
-// under the walls (never a fill, which is the berm that made the slab look
-// perched) and blends back to the hill. The student side of that blend stops
-// at the river bank; the north side stops short of the east trail.
-//
-// The baked clerestory is the +X face (window vertices sit at x 0.7–12).
-// Yaw π turns that face onto world −X, toward the chair, so the wall the
-// camera already looks past is the wall of the building.
+// The learner sits at (0, 2.6), facing −Z, so his left is −X. The left board
+// (mind map) stands at about (−28, −33). The warehouse is on that same
+// meadow — not on the lesson hill 170 m west — 40 m further left than the
+// board's outer edge, and set back so it is not in line with the board.
+// The glazed face points at the boards. `levelWarehouseGround` cuts the yard
+// down to the lowest point under the walls (a cut, never a fill) so the slab
+// meets the meadow instead of sitting on a berm or sinking into a ridge.
 
-/** World X of the baked model's centre. The glazed face is 13 m west of this. */
-export const WAREHOUSE_X = 43;
-/** World Z of the baked model's centre. North edge clears the east trail. */
-export const WAREHOUSE_Z = -12;
+/** World X of the baked model's centre. The glazed face is 26 m east of this. */
+export const WAREHOUSE_X = -106;
+/** World Z of the baked model's centre. Set back from the left board, not in line. */
+export const WAREHOUSE_Z = -46;
 
 /**
- * three.js Y rotation. π maps local +X (the glazed wall) onto world −X,
- * which is the student's right-hand side. The Warehouse preset stands on
- * that side so the wall and the ground line are the same view.
+ * three.js Y rotation. 0 keeps local +X (the glazed wall) on world +X, facing
+ * the boards. The Warehouse preset stands on that side.
  */
-export const WAREHOUSE_YAW = Math.PI;
+export const WAREHOUSE_YAW = 0;
 
 /**
- * Local half-extents of the baked shell (12.99 × 15.00) plus a 1.4 m apron,
- * so a blade or a boulder cannot grow through the wall. The height scale
- * does not change the plan.
+ * Local half-extents of the shell after the uniform 60 m scale (26 × 30)
+ * plus a 1.6 m apron, so a blade or a boulder cannot grow through the wall.
  */
-export const WAREHOUSE_HALF_X = 14.4;
-export const WAREHOUSE_HALF_Z = 16.4;
+export const WAREHOUSE_HALF_X = 27.6;
+export const WAREHOUSE_HALF_Z = 31.6;
 
 const COS = Math.cos(WAREHOUSE_YAW);
 const SIN = Math.sin(WAREHOUSE_YAW);
 /** Half-diagonal of the apron box. The early-out below is this, plus margin. */
-const HALF_DIAG = 22;
+const HALF_DIAG = 42;
 
 /**
- * Level yard, in the building's local frame.
- *
- * Yaw is π, so local +X is world −X (the student, and the river) and local
- * −Z is world +Z (the east trail). The student-side blend is short so it
- * dies on the bank instead of filling the channel; the north blend is short
- * so the trail stays a trail. The east and south blends are long, because
- * that is where the cut has to climb back to the hill without a quarry wall.
+ * Level yard, in the building's local frame. Yaw is 0, so local +X is the
+ * board side. The flat zone is a few metres past the walls (they sit at
+ * ±26 × ±30 after the size scale). The blend back to the meadow is longer
+ * on the board side, where the learner approaches.
  */
-const PAD_FLAT_X_POS = 15;
-const PAD_BLEND_X_POS = 4;
-const PAD_FLAT_X_NEG = 16;
+const PAD_FLAT_X_POS = 28;
+const PAD_BLEND_X_POS = 20;
+const PAD_FLAT_X_NEG = 28;
 const PAD_BLEND_X_NEG = 14;
-const PAD_FLAT_Z_POS = 18;
-const PAD_BLEND_Z_POS = 12;
-const PAD_FLAT_Z_NEG = 16;
-const PAD_BLEND_Z_NEG = 2;
+const PAD_FLAT_Z_POS = 32;
+const PAD_BLEND_Z_POS = 14;
+const PAD_FLAT_Z_NEG = 32;
+const PAD_BLEND_Z_NEG = 14;
 /** Axis-aligned reach of the widest blend, plus a metre. */
-const PAD_REACH = 40;
+const PAD_REACH = 54;
 
 let padY = NaN;
 let sealing = false;
@@ -84,9 +75,9 @@ function sideBlend(
  * Called from `terrainHeight` on every sample. The common case — anywhere
  * but this one yard — is two comparisons and a return. Inside the yard the
  * height is the lowest natural sample under the walls, so the slab, the
- * mesh and the grass share a floor that is cut into the bank, not built up
- * on top of it. `naturalAt` is `terrainHeight` itself; `sealing` stops that
- * callback from re-entering the blend while the pad height is being captured.
+ * mesh and the grass share a floor that is cut into the meadow, not built
+ * up on top of it. `naturalAt` is `terrainHeight` itself; `sealing` stops
+ * that callback from re-entering the blend while the pad height is captured.
  */
 export function levelWarehouseGround(
   x: number,
@@ -101,13 +92,11 @@ export function levelWarehouseGround(
   if (dz > PAD_REACH || dz < -PAD_REACH) return natural;
   if (padY !== padY) {
     sealing = true;
-    // The lowest point under the walls. Cutting down to it means the yard
-    // is never a fill: a fill is the berm that made the slab look perched.
     let min = Infinity;
     for (let ix = -2; ix <= 2; ix += 1) {
       for (let iz = -2; iz <= 2; iz += 1) {
-        const lx = ix * 6.5;
-        const lz = iz * 7.5;
+        const lx = ix * 13;
+        const lz = iz * 15;
         const h = naturalAt(
           WAREHOUSE_X + lx * COS + lz * SIN,
           WAREHOUSE_Z - lx * SIN + lz * COS,
@@ -142,7 +131,6 @@ export function insideWarehouse(x: number, z: number, margin = 0): boolean {
   const dz = z - WAREHOUSE_Z;
   const limit = HALF_DIAG + margin;
   if (dx * dx + dz * dz > limit * limit) return false;
-  // Inverse of three's Y rotation.
   const lx = COS * dx - SIN * dz;
   const lz = SIN * dx + COS * dz;
   return Math.abs(lx) < WAREHOUSE_HALF_X + margin && Math.abs(lz) < WAREHOUSE_HALF_Z + margin;
