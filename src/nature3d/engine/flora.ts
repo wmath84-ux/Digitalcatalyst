@@ -40,7 +40,13 @@ export interface Flora {
 
 export interface BirdColony {
   group: THREE.Group;
-  update(dt: number, time: number, wind: number): void;
+  /**
+   * `camPos` + `flyerCullSq` (metres²) implement the screen-size cull from
+   * `cull.ts`: a flying bird farther than the ~4 px cutoff is a speck of
+   * noise, so its trig amble (position, banking, flap cycle) sleeps until it
+   * is readable again. Perched birds keep their own 45 m gate.
+   */
+  update(dt: number, time: number, wind: number, camPos?: THREE.Vector3, flyerCullSq?: number): void;
   dispose(): void;
 }
 
@@ -1086,7 +1092,7 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
 
   return {
     group,
-    update(dt, time, wind) {
+    update(dt, time, wind, camPos, flyerCullSq = Infinity) {
       for (let i = 0; i < perched.length; i += 1) {
         const b = perched[i];
         b.next -= dt;
@@ -1124,6 +1130,15 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
       // convincing bird from a flapping cardboard cut-out.
       for (let i = 0; i < flyers.length; i += 1) {
         const f = flyers[i];
+        // Screen-size cull (research: UE MinScreenRadius). Past the pixel
+        // cutoff the bird is unresolvable — skip ALL the trig; the frozen
+        // pose is never distinguishable from motion at that size.
+        if (camPos) {
+          const dx = f.g.position.x - camPos.x;
+          const dy = f.g.position.y - camPos.y;
+          const dz = f.g.position.z - camPos.z;
+          if (dx * dx + dy * dy + dz * dz > flyerCullSq) continue;
+        }
         f.angle += f.speed * dt;
 
         // Wandering radius and height so the path is never a clean circle.
