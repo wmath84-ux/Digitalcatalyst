@@ -3,11 +3,12 @@
 // THE WALKING CHARACTER — TerrainTrek's player, upgraded to a premium
 // mobile-shooter feel while keeping its gameplay constants.
 //
-// WHAT STAYS VERBATIM (gameplay continuity — the contract pins these):
+// ROLE TODAY: the figure only ever SITS at the study desk and breathes —
+// the walk mode (locomotion, third-person camera, jump physics) was removed
+// with the first-person feature, and its tuning constants went with it.
 //
-//   movement  walk 10 u/s, boost 30 u/s (WALK_SPEED / BOOST_SPEED)
-//   camera    distance 15, phi PI*0.45, theta -PI*0.25, aboveOffset 2,
-//             phi clamped to [0.1, PI-0.1], zoom clamped to [3, 90]
+// WHAT STAYS VERBATIM:
+//
 //   seating   hips drop, thighs fold, facing PI (the board side)
 //
 // WHAT WAS UPGRADED (the character-quality bar):
@@ -30,12 +31,11 @@
 //             the air and at dash speed, where IK would be unjudgeable.
 //   camera    the same spherical placement, now damped (no touch jitter),
 //             with a shoulder offset, a sprint FOV kick and a landing dip.
-//   jump      new: buffered + coyote-time jump with a landing absorb.
 //
 // ARCHITECTURE (input → render):
 //
-//   Joystick/Keyboard → VirtualStick → TrekPlayer.update (moves + camera)
-//   → scene copies position/heading → TrekAvatar.update (poses the rig)
+//   the figure is static (seated) — the scene just drives
+//   TrekAvatar.update (breathes the seated rig each frame).
 //
 // Both updates are allocation-free: every temp is hoisted, the frame loop
 // stays clean, and there is no Math.random anywhere (deterministic).
@@ -43,61 +43,16 @@
 import * as THREE from "three";
 import { terrainHeight, terrainNormal } from "./terrain";
 import { damp } from "./controls";
-import type { VirtualStick } from "./controls";
 
-/** TerrainTrek's movement speeds, verbatim. */
+/** The walk speed the seat-idle pose is scaled against. */
 export const WALK_SPEED = 10;
-export const BOOST_SPEED = 30;
-/** Visual scale of the walking character (user directive: 3×). */
+/** Visual scale of the seated character (user directive: 3×). */
 export const AVATAR_SCALE = 3;
-
-/** TerrainTrek's third-person camera constants, verbatim. */
-export const CAM_DISTANCE = 15;
-export const CAM_PHI = Math.PI * 0.45;
-export const CAM_THETA = -Math.PI * 0.25;
-export const CAM_ABOVE_OFFSET = 2;
-export const PHI_MIN = 0.1;
-export const PHI_MAX = Math.PI - 0.1;
-
-// ─────────────────────────────────────────────────────────────────────────
-// Locomotion tuning — the "feel" numbers, all in SI-feel units
-// ─────────────────────────────────────────────────────────────────────────
-
-/** How fast speed chases the stick: brisk push-off, never a snap. */
-const ACCEL_K = 6.5;
-/** Stopping is faster than starting (braking), but still visibly absorbed. */
-const DECEL_K = 9.0;
-/** Air control is deliberately weak — momentum commits. */
-const AIR_CONTROL_K = 1.6;
-/** Turn rate at standstill → at full run (wide committed turns at speed). */
-const TURN_FAST = 11;
-const TURN_SLOW = 4.6;
-/** Jump: 7.4 u/s against 21 u/s² ≈ 1.3 m high, ≈ 0.7 s airborne. */
-const JUMP_V = 7.4;
-const GRAVITY = 21;
-/** Forgiveness windows that make jumping feel reliable on touch. */
-const COYOTE = 0.1;
-const JUMP_BUFFER = 0.12;
-/** Ground follow is fast — it only removes slope pops, feet stay planted. */
-const GROUND_SMOOTH_K = 14;
-/** Camera smoothing: angles tight, distance softer (gentle speed pullback). */
-const CAM_ANGLE_K = 11;
-const CAM_DIST_K = 6;
-/** Over-shoulder offset, in metres, to the camera's right. */
-const SHOULDER_RIGHT = 0.55;
-/** Sprint FOV kick, in degrees, applied by the scene (it owns the base). */
-const FOV_KICK_DEG = 8;
 
 /** Locomotion states — gait SELECTION only; the pose itself is continuous. */
 export type LocoState =
   | "idle" | "start" | "walk" | "jog" | "run" | "sprint" | "dash"
   | "stop" | "turn" | "jump" | "fall" | "land";
-
-/** Speed thresholds (u/s) with hysteresis applied at selection time. */
-const S_WALK = 3.2;
-const S_JOG = 6.8;
-const S_RUN = 11;
-const S_SPRINT = 20;
 
 // ─────────────────────────────────────────────────────────────────────────
 // The character — an original procedural trail guide
@@ -219,14 +174,6 @@ function paint(
     colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-}
-
-/** Shortest signed angle from a to b, in (−PI, PI]. Shared by turn + pose. */
-function angDiff(a: number, b: number): number {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
 }
 
 /**
@@ -854,20 +801,18 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
  * heading turns toward its wish at a speed-dependent rate instead of popping.
  * The camera keeps the source's spherical placement, damped per frame.
  */
+/**
+ * The seated figure's pose state. The locomotion/camera machinery left with
+ * the walk mode — what remains is only what the breathing-seat pose still
+ * reads (gait phase, lean, landing envelopes all parked at idle values).
+ */
 export class TrekPlayer {
   position = new THREE.Vector3(0, 0, 0);
   rotation = 0;
   /** Smoothed planar speed, metres/second. */
   speed = 0;
 
-  // Camera orbit state — TerrainTrek's starting values.
-  distance = CAM_DISTANCE;
-  phi = CAM_PHI;
-  theta = CAM_THETA;
-
-  boost = false;
-
-  // ── Locomotion state (read by the avatar pose, written here) ──────
+  // ── Locomotion state (read by the avatar pose) ────────────────────
   state: LocoState = "idle";
   /** Gait phase, radians; advances by distance/stride so feet cannot skate. */
   gaitPhase = 0;
@@ -882,271 +827,18 @@ export class TrekPlayer {
   landAbsorb = 0;
   /** Seconds since leaving the ground (drives the air tuck). */
   airTime = 0;
-  /** Sprint FOV kick 0..1 (the scene applies it — it owns the base fov). */
-  fovKick = 0;
-  /** Set by input (Space / jump button); consumed by update. */
-  jumpQueued = false;
-
-  private vel = new THREE.Vector3();
-  private vy = 0;
-  private smoothY = 0;
-  private coyote = 0;
-  private buffer = 0;
-  private landTimer = 0;
-  private smoothDist = CAM_DISTANCE;
-  private smoothPhi = CAM_PHI;
-  private smoothTheta = CAM_THETA;
-  private dipY = 0;
-
-  private previous = new THREE.Vector3();
-  private sphere = new THREE.Vector3();
-  private target = new THREE.Vector3();
-  private right = new THREE.Vector3();
 
   reset(x: number, z: number) {
     this.position.set(x, terrainHeight(x, z), z);
-    this.previous.copy(this.position);
-    this.phi = CAM_PHI;
-    this.theta = CAM_THETA;
-    this.distance = CAM_DISTANCE;
-    this.smoothPhi = CAM_PHI;
-    this.smoothTheta = CAM_THETA;
-    this.smoothDist = CAM_DISTANCE;
     this.rotation = 0;
     this.speed = 0;
-    this.vel.set(0, 0, 0);
-    this.vy = 0;
-    this.smoothY = this.position.y;
-    this.grounded = true;
     this.state = "idle";
     this.gaitPhase = 0;
     this.strideLen = 0.8;
     this.accelSm = 0;
     this.turnLean = 0;
+    this.grounded = true;
     this.landAbsorb = 0;
     this.airTime = 0;
-    this.fovKick = 0;
-    this.jumpQueued = false;
-    this.coyote = 0;
-    this.buffer = 0;
-    this.landTimer = 0;
-    this.dipY = 0;
-  }
-
-  /** Drag/swipe look. TerrainTrek scales the normalised delta by 2. */
-  look(dx: number, dy: number) {
-    this.phi -= dy * 2;
-    this.theta -= dx * 2;
-    if (this.phi < PHI_MIN) this.phi = PHI_MIN;
-    if (this.phi > PHI_MAX) this.phi = PHI_MAX;
-  }
-
-  zoom(factor: number) {
-    this.distance = THREE.MathUtils.clamp(this.distance * factor, 3, 90);
-  }
-
-  /**
-   * Advance the player and place the camera.
-   *
-   * Pipeline: stick → wish heading + wish speed → accel/decel → turn-rate
-   * limited heading → integrate → ground/jump physics → gait phase →
-   * damped camera. The heading reference is still the camera's theta, as in
-   * the source — only the snap table is gone.
-   */
-  update(dt: number, stick: VirtualStick, camera: THREE.PerspectiveCamera, limit: number) {
-    const DEAD = 0.25; // TerrainTrek's joystick threshold
-    const mag = Math.min(1, Math.hypot(stick.x, stick.y));
-    const pushing = stick.active && mag > DEAD;
-
-    // ── Wish heading + speed from the analog stick ──────────────────
-    // Screen-up is forward (away from the camera); the stick ANGLE offsets
-    // the camera theta continuously — the eight compass pops are gone but
-    // the "run where you look" contract is identical.
-    const top = this.boost ? BOOST_SPEED : WALK_SPEED;
-    const wishSpeed = pushing ? (mag - DEAD) / (1 - DEAD) * top : 0;
-    let wishHeading = this.rotation;
-    if (pushing) wishHeading = this.theta - Math.atan2(stick.x, -stick.y);
-
-    // ── Speed: asymmetric accel/decel, weak air control ─────────────
-    const rate = !this.grounded ? AIR_CONTROL_K : wishSpeed > this.speed ? ACCEL_K : DECEL_K;
-    const prevSpeed = this.speed;
-    this.speed += (wishSpeed - this.speed) * damp(rate, dt);
-    if (!pushing && this.speed < 0.02) this.speed = 0;
-    const accel = dt > 1e-5 ? (this.speed - prevSpeed) / dt : 0;
-    this.accelSm += (accel - this.accelSm) * damp(8, dt);
-
-    // ── Heading: turn toward the wish, never snap ───────────────────
-    const speed01 = THREE.MathUtils.clamp(this.speed / WALK_SPEED, 0, 1);
-    const maxTurn = TURN_FAST + (TURN_SLOW - TURN_FAST) * speed01;
-    const dHead = angDiff(this.rotation, wishHeading);
-    const canTurn = pushing || this.speed > 0.4;
-    const turn = canTurn ? THREE.MathUtils.clamp(dHead, -maxTurn * dt, maxTurn * dt) : 0;
-    this.rotation += turn;
-    // Lean into the turn, scaled by how fast the body is actually moving.
-    const turnRate = dt > 1e-5 ? turn / dt : 0;
-    const leanTarget = THREE.MathUtils.clamp(-turnRate * 0.028 * (0.3 + speed01), -0.2, 0.2);
-    this.turnLean += (leanTarget - this.turnLean) * damp(7, dt);
-
-    // ── Integrate (move dir = local −Z of the heading frame) ────────
-    const dirX = -Math.sin(this.rotation);
-    const dirZ = -Math.cos(this.rotation);
-    this.vel.x = dirX * this.speed;
-    this.vel.z = dirZ * this.speed;
-    const nx = this.position.x + this.vel.x * dt;
-    const nz = this.position.z + this.vel.z * dt;
-    // Keep the walker inside the connected world (per-axis slide, as before).
-    if (Math.hypot(nx, this.position.z) < limit) this.position.x = nx;
-    if (Math.hypot(this.position.x, nz) < limit) this.position.z = nz;
-
-    // ── Jump + gravity (buffered input, coyote time) ────────────────
-    if (this.jumpQueued) {
-      this.buffer = JUMP_BUFFER;
-      this.jumpQueued = false;
-    } else if (this.buffer > 0) {
-      this.buffer -= dt;
-    }
-    if (this.grounded) this.coyote = COYOTE;
-    else if (this.coyote > 0) this.coyote -= dt;
-
-    const ground = terrainHeight(this.position.x, this.position.z);
-    if (this.grounded) {
-      if (this.buffer > 0 && this.coyote > 0) {
-        // Take off: leave the ground with jump velocity, keep the pose.
-        this.grounded = false;
-        this.vy = JUMP_V;
-        this.airTime = 0;
-        this.buffer = 0;
-        this.coyote = 0;
-        this.position.y = ground;
-        this.smoothY = ground;
-      } else {
-        // Stand on the ground — smoothed so slopes walk, not pop.
-        // ASYMMETRIC: climbing follows fast (feet must never sink into an
-        // uphill step), descending follows softly (a floating instant reads
-        // as weight, and the IK plants the feet anyway).
-        const gk = ground > this.smoothY ? 30 : GROUND_SMOOTH_K;
-        this.smoothY += (ground - this.smoothY) * damp(gk, dt);
-        // Never sink: uphill lag used to bury the soles in the slope.
-        this.position.y = Math.max(this.smoothY, ground);
-        this.vy = 0;
-      }
-    }
-    if (!this.grounded) {
-      this.airTime += dt;
-      this.vy -= GRAVITY * dt;
-      this.position.y += this.vy * dt;
-      if (this.position.y <= ground && this.vy <= 0) {
-        // Land: the impact drives the absorb envelope + camera dip.
-        this.grounded = true;
-        this.landTimer = 0.32;
-        this.landAbsorb = THREE.MathUtils.clamp(-this.vy / 13, 0.25, 1);
-        this.dipY = this.landAbsorb;
-        this.position.y = ground;
-        this.smoothY = ground;
-        this.vy = 0;
-      }
-    }
-    if (this.landTimer > 0) {
-      this.landTimer -= dt;
-      if (this.landTimer <= 0) this.landTimer = 0;
-    }
-    const landTarget = this.landTimer > 0 ? this.landTimer / 0.32 : 0;
-    this.landAbsorb += (landTarget * this.landAbsorb - this.landAbsorb) * damp(10, dt);
-    if (this.landTimer <= 0) this.landAbsorb += (0 - this.landAbsorb) * damp(10, dt);
-    this.dipY += (0 - this.dipY) * damp(7, dt);
-
-    // ── Gait phase: distance over stride — the no-skate law ─────────
-    // A full 2π cycle covers two strides; the phase advances exactly as far
-    // as the body travelled, so stance feet hold still by construction.
-    this.strideLen = !this.grounded
-      ? this.strideLen
-      : Math.min(0.7 + 0.145 * this.speed, this.speed > 12 ? 4.4 : 2.3);
-    if (this.grounded && this.speed > 0.05) {
-      this.gaitPhase += (this.speed * dt) / this.strideLen * Math.PI;
-    }
-
-    // ── State selection (with hysteresis against flicker) ───────────
-    this.state = this.selectState(pushing, wishSpeed, Math.abs(dHead));
-
-    // ── Sprint FOV kick target (the scene owns the base fov) ────────
-    const kickTarget = !this.grounded ? 0.35 : this.boost && this.speed > 8 ? 1 : this.speed > 9 ? 0.5 : 0;
-    this.fovKick += (kickTarget - this.fovKick) * damp(4, dt);
-
-    this.previous.copy(this.position);
-
-    // ── Third-person camera: the source's spherical placement, damped ──
-    // The RAW theta/phi/distance are the gesture targets; these smoothed
-    // copies are what the lens uses, so touch jitter never reaches the eye.
-    const ka = damp(CAM_ANGLE_K, dt);
-    this.smoothTheta += (this.theta - this.smoothTheta) * ka;
-    this.smoothPhi += (this.phi - this.smoothPhi) * ka;
-    // Distance breathes with speed: a gentle pullback at a sprint.
-    const wantDist = this.distance + speed01 * 1.2;
-    this.smoothDist += (wantDist - this.smoothDist) * damp(CAM_DIST_K, dt);
-
-    // Over-shoulder target: above the pelvis, offset to the camera's right.
-    const st = Math.sin(this.smoothTheta);
-    const ct = Math.cos(this.smoothTheta);
-    this.right.set(ct, 0, -st);
-    this.target.copy(this.position)
-      .addScaledVector(this.right, SHOULDER_RIGHT);
-    this.target.y = this.position.y + CAM_ABOVE_OFFSET - this.dipY * 0.45;
-
-    // Soft placement limit: the input clamp still spans [0.1, PI-0.1], but
-    // the lens never descends more than ~20 degrees below the look target —
-    // past that the camera dives under the character and the floor clamp
-    // shoves it back up through the head (a real clip the sweep caught).
-    const placePhi = Math.min(this.smoothPhi, Math.PI / 2 + 0.35);
-    const sinPhiRadius = Math.sin(placePhi) * this.smoothDist;
-    this.sphere.set(
-      sinPhiRadius * st,
-      Math.cos(placePhi) * this.smoothDist,
-      sinPhiRadius * ct,
-    );
-    camera.position.copy(this.target).add(this.sphere);
-    camera.lookAt(this.target);
-
-    // Never let the camera end up underground on a steep slope — or inside
-    // the 3× character. Sample the ground under the LENS, then also stay
-    // above the walker's own chest.
-    const floor = Math.max(
-      terrainHeight(camera.position.x, camera.position.z) + 1.2,
-      this.position.y + 0.55 * AVATAR_SCALE,
-    );
-    if (camera.position.y < floor) camera.position.y = floor;
-  }
-
-  /** FOV kick in degrees, for the scene to add to its corrected base. */
-  fovKickDegrees(): number {
-    return this.fovKick * FOV_KICK_DEG;
-  }
-
-  private selectState(pushing: boolean, wishSpeed: number, headErr: number): LocoState {
-    if (!this.grounded) return this.vy > 1 ? "jump" : "fall";
-    if (this.landTimer > 0.12) return "land";
-    const s = this.speed;
-    const h = 0.35; // hysteresis band
-    switch (this.state) {
-      case "jump":
-      case "fall":
-      case "land":
-        if (s < 0.25) return "idle";
-        break;
-      default:
-        break;
-    }
-    if (!pushing && s < 0.25) return "idle";
-    if (!pushing && s >= 0.25) return "stop";
-    if (pushing && headErr > 0.9) return "turn";
-    if (pushing && s < 1.8 && wishSpeed > s + 1.5) return "start";
-    if (s < S_WALK - h) return "walk";
-    if (s < S_WALK + h) return this.state === "jog" || this.state === "run" ? this.state : "walk";
-    if (s < S_JOG - h) return "jog";
-    if (s < S_JOG + h) {
-      return this.state === "walk" ? "walk" : this.state === "run" || this.state === "sprint" ? this.state : "jog";
-    }
-    if (s < S_RUN) return this.boost ? "sprint" : "run";
-    if (s < S_SPRINT) return "sprint";
-    return "dash";
   }
 }

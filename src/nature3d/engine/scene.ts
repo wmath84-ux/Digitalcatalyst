@@ -61,6 +61,7 @@ import {
 import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
+import { cullDistanceForPx } from "./cull";
 
 /**
  * Air left around a board when it is framed on its own, in metres. The brief
@@ -1709,8 +1710,15 @@ export class Sanctuary {
 
     this.aiClock += dt;
     if (this.aiClock >= (study ? 1 / 12 : 1 / 30)) {
-      this.wildlife.update(this.aiClock, time, this.camera.position);
-      this.birds.update(this.aiClock, time, this.wind);
+      // Screen-size culling, the UE "Cull Distance Volume" rule computed live
+      // (research doc §4): things projecting under ~3–4 px cannot be read, so
+      // they sleep. Smaller viewports cull CLOSER — exactly right for phones.
+      const fov = this.camera.fov;
+      const viewH = this.viewH;
+      const herdCull = cullDistanceForPx(1.1, 3.2, fov, viewH);
+      const flyerCull = cullDistanceForPx(0.3, 3.5, fov, viewH);
+      this.wildlife.update(this.aiClock, time, this.camera.position, herdCull * herdCull);
+      this.birds.update(this.aiClock, time, this.wind, this.camera.position, flyerCull * flyerCull);
       this.student.update(time);
       this.aiClock = 0;
     }

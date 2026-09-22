@@ -91,6 +91,14 @@ interface RingOptions {
   width: number;
   colorJitter: number;
   /**
+   * Compile the wind sway into this ring's shader? The FAR ring turns it off
+   * ENTIRELY: its blades all live past the shader's own 95 m amplitude
+   * cutoff, so the sway is invisible — compiling the three sines out of the
+   * far program removes real per-vertex ALU across the largest instance
+   * count in the scene (research: "WPO/wind OFF on lower LODs").
+   */
+  windSway?: boolean;
+  /**
    * How much bigger a blade gets at the rim of the ring. Sparse far grass
    * only reads as a continuous meadow if each clump covers more ground, so
    * the far ring grows its blades with distance instead of adding instances.
@@ -124,6 +132,10 @@ function buildRing(
   });
 
   // ── Wind + view-space thickening, injected into the stock shader ──────
+  // Skipped entirely for rings that opt OUT (windSway:false — the far ring):
+  // no onBeforeCompile means no wind chunk, no uniforms, no per-vertex sine
+  // work in that ring's compiled program at all.
+  if (opts.windSway !== false)
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uWind = { value: 1 };
@@ -411,6 +423,11 @@ export function createGrassField(
       count: budget.grassFar,
       innerRadius: budget.grassNearRadius - 3,
       outerRadius: budget.grassFarRadius,
+      // Research rule: wind OFF beyond the near LOD. Every far blade lives
+      // past the shader's 95 m fade anyway, so the whole wind program is
+      // compiled OUT of this ring — thousands of far instances × 3 sines per
+      // vertex simply stop existing as GPU work.
+      windSway: false,
       // Far blades are single-quad cards but noticeably wider + taller, which
       // is how a sparse far field still reads as a solid meadow to the horizon.
       segments: 1,
@@ -456,7 +473,9 @@ export function createGrassField(
     update(time, windStrength) {
       for (const mat of materials) {
         const shader = mat.userData.shader as { uniforms: Record<string, { value: unknown }> } | undefined;
-        if (!shader) continue;
+        // Rings with windSway:false carry no wind uniforms (and the
+        // atmosphere pass may set userData.shader without uTime).
+        if (!shader?.uniforms?.uTime || !shader?.uniforms?.uWind) continue;
         shader.uniforms.uTime.value = time;
         shader.uniforms.uWind.value = windStrength;
       }

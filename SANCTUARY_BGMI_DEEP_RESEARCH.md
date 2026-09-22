@@ -60,11 +60,11 @@ by size→distance tables in Cull Distance Volumes
 Per-class `foliage.CullDistanceScale` scales them together
 ([r/unrealengine](https://www.reddit.com/r/unrealengine/comments/1nvgseo/configurable_foliage_distance_culling/)).
 
-**Sanctuary status: 🟡 partial.** We cull by hand-tuned radii per system
-(wildlife 28/60 m animation LOD, birds 45 m, spray 90 m, far grass radius per
-tier). Gap: no *automatic* "projects below N pixels → skip" check for small
-props. Adding it is ~20 lines (boundingSphere.projectedScreenSize < ε →
-skip) and makes every future small prop free by default.
+**Sanctuary status: ✅ IMPLEMENTED (2026-09-22).** `cull.ts` computes the
+size→distance cutoff live from `fov`×`viewH` (UE's per-frame equivalent of
+`CullDistanceScale`), and the wildlife herd + flying birds sleep past their
+~3 px distances. Perched birds, spray, grass radii keep their hand-tuned
+gates on top.
 
 ### 5. Occlusion culling by design — let terrain hide the world
 UE runs hardware/software occlusion queries; level designers place "occluders"
@@ -113,12 +113,13 @@ texture), roughness baked to constants on far LODs, **shadows disabled on
 small/low-LOD objects**, masked cutout instead of translucency (overdraw!),
 and density/scale *jitter* so you need fewer instances for the same look.
 
-**Sanctuary status: 🟡 mostly matching.** Procedural texture set ≈ atlas
-discipline, halveTextureSet ≈ far-mip bias, fp16 on plant shaders, cheap
-Lambert on low tier, wind is a shader-uniform so per-ring scaling is trivial.
-Gaps for new content: (a) far-ring WIND scale-down (wind uniform → 0 beyond
-far radius), (b) castShadow=false policy line for all new small props,
-(c) keep cutout-alpha, never three.js `transparent: true` on foliage.
+**Sanctuary status: ✅ matching (wind gap closed 2026-09-22).** Procedural
+texture set ≈ atlas discipline, halveTextureSet ≈ far-mip bias, fp16 on
+plant shaders, cheap Lambert on low tier, and the far grass ring now ships
+with the wind program **compiled out entirely** (`windSway:false`) — the UE
+"wind OFF on lower LODs" rule, made static at compile time. Small-prop
+shadow policy verified compliant (all ground foliage `castShadow=false`);
+cutout-alpha only, never `transparent: true` on foliage.
 
 ### 9. Spend the frame on what the player is looking at
 PUBG's scope-in swaps the world for the scoped view. Our study-mode does the
@@ -148,10 +149,34 @@ is built into every plant ring and the sorrel variants.
 | Frame spent on the looked-at thing | ✅ done | scene.ts study-focus rate |
 | Mip bias / texture diet | ✅ done | textures.ts halveTextureSet |
 | No-shadows / cheap materials on low tier | ✅ done | quality.ts shadowMapSize, cheapPlants |
-| Screen-size auto-cull for small props | ❌ gap — add helper | new: projectedSize check |
+| Screen-size auto-cull for small props | ✅ DONE (2026-09-22) | cull.ts → wildlife/flyers sleep past ~3 px |
 | Occlusion by level design | 🟡 keep doing it | districts behind ridges |
-| Wind/WPO off on far ring | ❌ gap — uniform scale | grass/sorrel shaders |
+| Wind/WPO off on far ring | ✅ DONE (2026-09-22) | grass.ts windSway:false — wind **compiled out** of the far ring |
+| No-shadow policy on small props | ✅ verified compliant | all ground foliage/impostors castShadow=false already |
 | Distance streaming (>4 km²) | ⏸ N/A until map grows | — |
+
+## Applied now (post-research implementation)
+
+1. **Screen-size culling** (`cull.ts`): `cullDistanceForPx(radius, minPx, fov,
+   viewH)` converts the UE size→distance table into a per-frame runtime
+   cutoff — smaller screens cull CLOSER, which is exactly right. Wired to:
+   wildlife (herd sleeps past its ~3 px distance — locomotion, matrices,
+   behaviour all freeze) and flying birds (per-flyer trig sleeps past the
+   cutoff; perched birds keep their own 45 m gate).
+2. **Wind compiled OUT of the far grass ring** (`windSway:false`): the shader
+   already faded amplitude to zero past 95 m but still spent three sines per
+   far vertex; now the far ring's compiled program has no wind code at all
+   (the largest instance count in the scene × 3 sines/frame, gone — real
+   vertex-ALU saving on the weakest GPUs).
+3. **Shadow audit**: every ground-foliage system already renders with
+   `castShadow=false` (grass, tufts, moss, sorrel, impostors); big trees and
+   structures keep theirs on the shadow tiers. Policy confirmed, rule #6
+   stands for new content.
+4. **Dead-code prune after FPP removal**: FirstPersonRig/KeyboardInput/
+   VirtualStick/WALK_LIMIT (controls.ts), the whole TrekPlayer locomotion +
+   third-person camera block and its tuning constants (trekAvatar.ts)
+   deleted — the seated avatar keeps only the fields its breathing pose
+   reads. ~300 lines of dead engine gone; chunk −4 kB.
 
 ## Rules for everything we add next (the "super smooth" checklist)
 

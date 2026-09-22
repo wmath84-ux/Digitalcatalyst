@@ -103,7 +103,13 @@ interface Animal {
 
 export interface Wildlife {
   group: THREE.Group;
-  update(dt: number, time: number, cameraPos: THREE.Vector3): void;
+  /**
+   * `sleepDistSq` (optional, metres²) is the screen-size sleep gate from
+   * `cull.ts`: an animal projecting under ~3 px cannot be read as moving, so
+   * everything past it freezes — locomotion, matrices, animation all skip,
+   * exactly the UE cull-distance rule BGMI applies to distant agents.
+   */
+  update(dt: number, time: number, cameraPos: THREE.Vector3, sleepDistSq?: number): void;
   dispose(): void;
 }
 
@@ -587,11 +593,16 @@ export function createWildlife(budget: QualityBudget, furTex: THREE.Texture): Wi
 
   return {
     group,
-    update(dt, time, cameraPos) {
+    update(dt, time, cameraPos, sleepDistSq) {
       for (let i = 0; i < animals.length; i += 1) {
         const a = animals[i];
         const pos = a.group.position;
         a.distance = Math.hypot(pos.x - cameraPos.x, pos.z - cameraPos.z);
+
+        // Subpixel sleep: beyond the screen-size cutoff the animal reads as a
+        // coloured dot, so no walking, no matrix churn, no behaviour — it
+        // wakes the moment the camera makes it readable again.
+        if (sleepDistSq !== undefined && a.distance * a.distance > sleepDistSq) continue;
 
         a.timer -= dt;
         if (a.timer <= 0) rethink(a);
