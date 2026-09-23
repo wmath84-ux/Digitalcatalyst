@@ -3,24 +3,23 @@
 // Where the abandoned warehouse stands, and the one test every scatter uses
 // to stay out of it.
 //
-// The learner sits at (0, 2.6), facing −Z, so his left is −X. The left board
-// (mind map) stands at about (−28, −33). The warehouse is on that same
-// meadow — not on the lesson hill 170 m west — 40 m further left than the
-// board's outer edge, and set back so it is not in line with the board.
-// The glazed face points at the boards. `levelWarehouseGround` cuts the yard
-// down to the lowest point under the walls (a cut, never a fill) so the slab
-// meets the meadow instead of sitting on a berm or sinking into a ridge.
+// The right board (notes) stands at about (28, −33); its outer edge is at
+// x ≈ 40. The warehouse is on that same meadow, 10 m further right than
+// that edge — beside the board, not on the hills. The glazed face points
+// at the boards. `levelWarehouseGround` cuts the yard down to the lowest
+// point under the walls (a cut, never a fill) so the slab meets the meadow.
+// The board-side blend stops before the river.
 
-/** World X of the baked model's centre. The glazed face is 26 m east of this. */
-export const WAREHOUSE_X = -106;
-/** World Z of the baked model's centre. Set back from the left board, not in line. */
-export const WAREHOUSE_Z = -46;
+/** World X of the baked model's centre. The glazed face is 26 m west of this. */
+export const WAREHOUSE_X = 75.5;
+/** World Z of the baked model's centre. Beside the right board. */
+export const WAREHOUSE_Z = -40;
 
 /**
- * three.js Y rotation. 0 keeps local +X (the glazed wall) on world +X, facing
- * the boards. The Warehouse preset stands on that side.
+ * three.js Y rotation. π maps local +X (the glazed wall) onto world −X,
+ * toward the boards. The Warehouse preset stands on that side.
  */
-export const WAREHOUSE_YAW = 0;
+export const WAREHOUSE_YAW = Math.PI;
 
 /**
  * Local half-extents of the shell after the uniform 60 m scale (26 × 30)
@@ -35,13 +34,13 @@ const SIN = Math.sin(WAREHOUSE_YAW);
 const HALF_DIAG = 42;
 
 /**
- * Level yard, in the building's local frame. Yaw is 0, so local +X is the
- * board side. The flat zone is a few metres past the walls (they sit at
- * ±26 × ±30 after the size scale). The blend back to the meadow is longer
- * on the board side, where the learner approaches.
+ * Level yard, in the building's local frame. Yaw is π, so local +X is
+ * world −X (the boards, and the river). The flat zone is a few metres past
+ * the walls (they sit at ±26 × ±30). The board-side blend is short so it
+ * dies on the bank and does not fill the channel.
  */
 const PAD_FLAT_X_POS = 28;
-const PAD_BLEND_X_POS = 20;
+const PAD_BLEND_X_POS = 12;
 const PAD_FLAT_X_NEG = 28;
 const PAD_BLEND_X_NEG = 14;
 const PAD_FLAT_Z_POS = 32;

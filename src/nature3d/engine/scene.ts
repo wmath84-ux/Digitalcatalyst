@@ -1382,13 +1382,13 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // Eye level on the board side of the wall (world +X). Yaw π/2 puts
+        // Eye level on the board side of the wall (world −X). Yaw −π/2 puts
         // the camera there; the offset shows the corner, and the shallow
         // pitch keeps the ground line in frame.
         this.orbit.panTo(
           this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 2, WAREHOUSE_Z),
-          48,
-          Math.PI / 2 - 0.32,
+          42,
+          -Math.PI / 2 + 0.3,
           0.12,
         );
         break;
@@ -1525,10 +1525,16 @@ export class Sanctuary {
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
     const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
-    const distance = Math.max(
+    const boardDistance = Math.max(
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
     );
+    // The warehouse is 10 m past the right board. This view looks at the
+    // boards, so pull back until that near wall is in the frame beside them.
+    const nearFace = Math.abs(WAREHOUSE_X) - 26;
+    const warehouseDistance =
+      nearFace / Math.tan(hFov / 2) - centreZ + WAREHOUSE_Z + 10;
+    const distance = Math.max(boardDistance, warehouseDistance);
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
