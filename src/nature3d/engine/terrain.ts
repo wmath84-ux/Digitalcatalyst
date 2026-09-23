@@ -550,11 +550,20 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         // diffuseColor here is exactly the map texel (the material colour is
         // white), so the photo costs ONE fetch; the macro fetch adds the
         // broad warm/cool drift that stops the tile reading as a tile.
+        // The aerial scan is intentionally only a subtle micro-detail source.
+        // Letting it drive albedo made the whole sanctuary read as pale beige
+        // farmland and erased the biome masks baked into vColor. The terrain
+        // colour is now a real layered ground: vertex colour carries grass,
+        // soil, wet mud and exposed rock while the scan contributes grit and
+        // macro breakup only.
         vec3 dcTexel = diffuseColor.rgb;
-        vec3 dcMacro = texture2D( map, vMapUv * 0.25 ).rgb;
+        vec3 dcMacro = texture2D( map, vMapUv * 0.18 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
-        vec3 dcGrade = mix( vec3( 1.0 ), vColor, 0.42 ) * mix( 0.94, 1.14, dcMacroL );
-        vec3 dcGround = dcTexel * dcGrade * 1.22;
+        float dcMicro = 0.92 + dcMacroL * 0.16;
+        vec3 dcGround = vColor * dcMicro;
+        // Keep a restrained amount of authored surface detail without
+        // reintroducing its washed-out colour cast.
+        dcGround = mix( dcGround, dcGround * (0.72 + dcTexel * 0.42), 0.18 );
 
         // SHORELINE (per-pixel, Phase 4/5) — unchanged bands, now applied to
         // the photo-dominant colour so the tide still reads on it.
