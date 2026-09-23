@@ -3,17 +3,18 @@
 // Where the abandoned warehouse stands, and the one test every scatter uses
 // to stay out of it.
 //
-// The right board (notes) stands at about (28, −33); its outer edge is at
-// x ≈ 40. The warehouse is on that same meadow, 10 m further right than
-// that edge — beside the board, not on the hills. The glazed face points
-// at the boards. `levelWarehouseGround` cuts the yard down to the lowest
-// point under the walls (a cut, never a fill) so the slab meets the meadow.
-// The board-side blend stops before the river.
+// The previous seat (75.5, −40) is the spot the Warehouse button framed and
+// the learner found empty — a 10 m shed does not read as a warehouse. This
+// seat is 30 m due east of that spot, still on the same meadow, clear of the
+// east trail (it passes ~19 m north of the wall) and clear of the river.
+// The glazed face still points at the boards. Height is 60 m; see warehouse.ts.
 
-/** World X of the baked model's centre. The glazed face is 26 m west of this. */
-export const WAREHOUSE_X = 75.5;
-/** World Z of the baked model's centre. Beside the right board. */
+/** World X of the model's centre. 30 m east of the rejected seat. */
+export const WAREHOUSE_X = 105.5;
+/** World Z of the model's centre. Same meadow, not the hills. */
 export const WAREHOUSE_Z = -40;
+/** How tall the shell stands above the yard, in metres. */
+export const WAREHOUSE_HEIGHT = 60;
 
 /**
  * three.js Y rotation. π maps local +X (the glazed wall) onto world −X,
@@ -22,33 +23,33 @@ export const WAREHOUSE_Z = -40;
 export const WAREHOUSE_YAW = Math.PI;
 
 /**
- * Local half-extents of the shell after the uniform 60 m scale (26 × 30)
- * plus a 1.6 m apron, so a blade or a boulder cannot grow through the wall.
+ * Local half-extents after the 60 m length scale, plus apron. A square
+ * 32 m covers both the 52 × 60 bake and a 60 m upload.
  */
-export const WAREHOUSE_HALF_X = 27.6;
-export const WAREHOUSE_HALF_Z = 31.6;
+export const WAREHOUSE_HALF_X = 32;
+export const WAREHOUSE_HALF_Z = 32;
 
 const COS = Math.cos(WAREHOUSE_YAW);
 const SIN = Math.sin(WAREHOUSE_YAW);
 /** Half-diagonal of the apron box. The early-out below is this, plus margin. */
-const HALF_DIAG = 42;
+const HALF_DIAG = 48;
 
 /**
  * Level yard, in the building's local frame. Yaw is π, so local +X is
  * world −X (the boards, and the river). The flat zone is a few metres past
- * the walls (they sit at ±26 × ±30). The board-side blend is short so it
+ * the walls (a 60 m shell sits at ±30). The board-side blend is short so it
  * dies on the bank and does not fill the channel.
  */
-const PAD_FLAT_X_POS = 28;
+const PAD_FLAT_X_POS = 34;
 const PAD_BLEND_X_POS = 12;
-const PAD_FLAT_X_NEG = 28;
+const PAD_FLAT_X_NEG = 34;
 const PAD_BLEND_X_NEG = 14;
-const PAD_FLAT_Z_POS = 32;
+const PAD_FLAT_Z_POS = 34;
 const PAD_BLEND_Z_POS = 14;
-const PAD_FLAT_Z_NEG = 32;
+const PAD_FLAT_Z_NEG = 34;
 const PAD_BLEND_Z_NEG = 14;
 /** Axis-aligned reach of the widest blend, plus a metre. */
-const PAD_REACH = 54;
+const PAD_REACH = 56;
 
 let padY = NaN;
 let sealing = false;
@@ -94,7 +95,7 @@ export function levelWarehouseGround(
     let min = Infinity;
     for (let ix = -2; ix <= 2; ix += 1) {
       for (let iz = -2; iz <= 2; iz += 1) {
-        const lx = ix * 13;
+        const lx = ix * 15;
         const lz = iz * 15;
         const h = naturalAt(
           WAREHOUSE_X + lx * COS + lz * SIN,

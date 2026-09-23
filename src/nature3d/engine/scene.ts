@@ -49,7 +49,7 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
 import { createWarehouse, type Warehouse } from "./warehouse";
-import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
+import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { OrbitRig } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -1382,15 +1382,18 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // Whole building, from the board side, slightly off the face so the
-        // corner, the rust roof and the ground line are all in frame. 42 m
-        // put the camera on the wall; 88 m holds the 60 m length.
+        // 30 m east of the empty seat. Look at the lower third of a 60 m
+        // wall so the roof and the ground line both stay inside the frame.
         this.orbit.autoRotate = false;
         this.orbit.panTo(
-          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 3.2, WAREHOUSE_Z),
-          88,
-          -Math.PI / 2 + 0.58,
-          0.18,
+          this.tmpV.set(
+            WAREHOUSE_X,
+            terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + WAREHOUSE_HEIGHT * 0.38,
+            WAREHOUSE_Z,
+          ),
+          118,
+          -Math.PI / 2 + 0.4,
+          0.1,
         );
         break;
       case "reading":
@@ -1530,12 +1533,9 @@ export class Sanctuary {
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
     );
-    // The warehouse is 10 m past the right board. This view looks at the
-    // boards, so pull back until that near wall is in the frame beside them.
-    const nearFace = Math.abs(WAREHOUSE_X) - 26;
-    const warehouseDistance =
-      nearFace / Math.tan(hFov / 2) - centreZ + WAREHOUSE_Z + 10;
-    const distance = Math.max(boardDistance, warehouseDistance);
+    // The warehouse has its own preset. This shot is the boards, not the
+    // building — pulling back to hold a 60 m tower made the desk unreadable.
+    const distance = boardDistance;
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
