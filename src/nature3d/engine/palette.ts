@@ -65,11 +65,17 @@ export const TEXELS_PER_METRE = 512;
 /**
  * One ground-texture tile covers this many metres, on every terrain shell.
  *
- * 512 px over 6 m ≈ 85 px/m: the whole terrain, near and far, is authored at
- * one density, which is what makes the meadow and the far hills read as the
- * same material (research §18, principle 46).
+ * The ground map is the aerial farmland scan (`sanctuary/ground_field.jpg`,
+ * extracted from `field_and_garden.glb`): its parcels, plough rows and
+ * tractor tracks read at FIELD scale, not grit scale, so one tile now spans
+ * 34 m (the 512 px procedural grit tiled every 6 m). At 2048 px per tile
+ * that is ~60 px/m under the camera — and because every shell derives its
+ * tile count from this constant, the same photo clothes the whole distance,
+ * meadow to the 2.7 km horizon, at one texels-per-metre (research §18,
+ * principle 46). No seam mismatch: shells blend their vertex colours, and
+ * the photo's own parcel boundaries read as the field pattern everywhere.
  */
-export const GROUND_TILE_METRES = 6;
+export const GROUND_TILE_METRES = 34;
 
 /** Hoisted scratch: `clampAlbedo` runs once per terrain vertex and per clump. */
 const SCRATCH = new THREE.Color();

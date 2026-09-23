@@ -30,7 +30,7 @@ import {
   type QualityBudget,
   type QualityTier,
 } from "./quality";
-import { createTextures, halveTextureSet, type TextureSet } from "./textures";
+import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GROUND_PHOTO_URL, type TextureSet } from "./textures";
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
@@ -72,6 +72,9 @@ import { cullDistanceForPx } from "./cull";
  * fullscreen page that has lost its place in the world.
  */
 const BOARD_VIEW_MARGIN = 0.5;
+
+/** The anime skybox panorama (equirect JPEG extracted from the Sketchfab GLB). */
+const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
@@ -166,6 +169,13 @@ export class Sanctuary {
   private weathering: Weathering;
   private winter: WinterSystem;
   private iceAge = false;
+  /**
+   * The anime skybox (see `sky.ts`): the wanted state, and the lazily-loaded
+   * panorama shared for the life of the scene so toggling never re-downloads.
+   * A failed load resolves to null and the procedural dome simply stays.
+   */
+  private animeSkyWanted = false;
+  private animeSkyTexture: Promise<THREE.Texture | null> | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private rocks: RockField;
   private birds: BirdColony;
@@ -310,6 +320,11 @@ export class Sanctuary {
     // cap now (1 on low, 4 medium, 8 desktop), not a one-off low/else split.
     const aniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.budget.maxAniso);
     this.textures = createTextures(aniso);
+    // The aerial farmland scan streams in over the procedural grit (frame one
+    // is already dressed; the photo simply gains its fields). Low tier takes a
+    // 1024 px copy — the full 2048 scan is a bandwidth consumer it skipped
+    // for every procedural map above.
+    patchGroundPhoto(this.textures.ground, GROUND_PHOTO_URL, this.budget.cheapPlants ? 1024 : 2048);
     // MIPMAP BIAS diet, low tier: every procedural texture repainted at half
     // size before its first upload — a quarter of the VRAM and of the
     // per-frame texture bandwidth (see textures.ts#halveTextureSet).
@@ -470,11 +485,20 @@ export class Sanctuary {
       this.water.iceMaterials.forEach(halfPrecisionMaterial);
     }
 
-    // THE BAY DISTRICT — buildings, beacon, jetty, props, distant islands.
-    // Built from the same height field everything else reads, so the village
-    // sits on the measured shoreline. Its materials join the air like every
-    // other solid: the far islands and the white tower fade into the haze
-    // exactly as the mountains do (Phase 19 — no full-contrast pastes).
+    // USER DIRECTIVE (the "small flat cube of water" GLB): its exact baked
+    // water maps — caustics, roughness glint, photographic surface — stream
+    // onto EVERY water (the centre river, the ocean, the fall) with the
+    // procedural water as the instant frame-one look and the permanent
+    // fallback. Pure shader-side animation; nothing new on the CPU.
+    void loadWaterPhotos(aniso).then((photos) => {
+      if (photos) this.water.setPhotos(photos);
+    });
+
+    // THE BAY DISTRICT — jetty, props, distant islands.
+    // Built from the same height field everything else reads, so the bay
+    // furniture sits on the measured shoreline. Its materials join the air
+    // like every other solid: the far islands fade into the haze exactly as
+    // the mountains do (Phase 19 — no full-contrast pastes).
     this.structures = createStructures(this.budget);
     this.scene.add(this.structures.group);
     this.atmosphere.registerTree(this.structures.group);
@@ -1450,6 +1474,42 @@ export class Sanctuary {
     this.applyDaylight();
   }
 
+  /**
+   * Swap the procedural sky dome for the baked anime panorama
+   * (`sanctuary/skybox_anime_sky.jpg`, extracted from the Sketchfab
+   * "free - skybox anime sky" GLB). Daylight keeps grading it, so this is
+   * safe with any hour and with the Ice Age. The first enable starts one
+   * 2.5 MB download; every later toggle is instant.
+   */
+  setAnimeSky(enabled: boolean) {
+    this.animeSkyWanted = enabled;
+    if (enabled && !this.animeSkyTexture) {
+      this.animeSkyTexture = new THREE.TextureLoader()
+        .loadAsync(ANIME_SKY_URL)
+        .then((t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.mapping = THREE.EquirectangularReflectionMapping;
+          t.wrapS = THREE.RepeatWrapping;
+          t.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+          return t;
+        })
+        .catch((err) => {
+          // A missing skybox is cosmetic — the procedural dome carries on.
+          console.warn("[sanctuary] anime skybox failed to load:", err);
+          return null;
+        });
+    }
+    if (!this.animeSkyTexture) {
+      this.sky.setAnimeSkybox(null);
+      return;
+    }
+    void this.animeSkyTexture.then((t) => {
+      // Honour the LAST wish, not the wish at call time (fast toggles while
+      // the texture is still in flight).
+      this.sky.setAnimeSkybox(this.animeSkyWanted ? t : null);
+    });
+  }
+
   /** Morning / midday / evening, or "auto" to follow the real clock. */
   setDaylightMode(mode: DaylightMode) {
     this.daylightMode = mode;
@@ -1992,6 +2052,8 @@ export class Sanctuary {
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();
+    // The anime panorama is scene-owned (cached for instant re-toggles).
+    void this.animeSkyTexture?.then((t) => t?.dispose());
     this.board.dispose();
     this.student.dispose();
     this.dayBed?.dispose();

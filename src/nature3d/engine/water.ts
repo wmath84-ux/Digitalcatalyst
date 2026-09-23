@@ -39,7 +39,7 @@
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import { RIVER_CENTER_X, WATER_LEVEL, OCEAN_LEVEL, coastWeight, terrainHeight } from "./terrain";
-import type { TextureSet } from "./textures";
+import type { TextureSet, WaterPhotoSet } from "./textures";
 
 export interface WaterSystem {
   group: THREE.Group;
@@ -55,6 +55,13 @@ export interface WaterSystem {
   iceMaterials: THREE.Material[];
   setFrozen(frozen: boolean): void;
   update(dt: number, time: number, cameraPos?: THREE.Vector3): void;
+  /**
+   * Swap the procedural water detail for the baked maps of the Sketchfab
+   * "small flat cube of water" GLB (see `textures.loadWaterPhotos`). Purely
+   * live-uniform and live-image writes: no recompile, no relayout, and the
+   * animation stays the shader's own — nothing new runs on the CPU.
+   */
+  setPhotos(photos: WaterPhotoSet): void;
   dispose(): void;
 }
 
@@ -127,11 +134,11 @@ export function createWater(
     // here is dielectric Fresnel — which is what water actually is — and the
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
-    // USER DIRECTIVE (water colour): a real river is saturated blue, not a
-    // white-cyan sheet. The albedo map is kept for flow, but the body colour
-    // in the shader owns the look. DoubleSide so a camera under the surface
-    // still sees water instead of a culled backface.
-    color: 0x0d6ad0,
+    // USER DIRECTIVE (the "small flat cube of water" GLB): the water IS the
+    // GLB's bright turquoise — baseColorFactor (0.35, 0.86, 0.88) ≈ #59dce1.
+    // The albedo map is kept for flow, but the body colour in the shader owns
+    // the look. DoubleSide so a camera under the surface still sees water.
+    color: 0x59dce1,
     roughness: 0.18,
     metalness: 0.0,
     transparent: true,
@@ -140,9 +147,20 @@ export function createWater(
     envMapIntensity: 0.55,
     side: THREE.DoubleSide,
   });
+  // USER DIRECTIVE (the "small flat cube of water" GLB): the baked caustics
+  // ride EVERY water surface. On the low tier the roughness-glint modulation
+  // and the photographic layer are compiled OUT (one fetch instead of four);
+  // the caustics stay — they are the point of the directive.
+  if (budget.tier === "low") (riverMat as THREE.Material & { defines?: Record<string, string> }).defines = { DC_WATER_LOW: "" };
+  // Arrives async from `loadWaterPhotos`; until then the flow normal map is
+  // a harmless grey-noise placeholder for all three slots.
+  let waterPhotos: WaterPhotoSet | null = null;
   riverMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uFlowMap = { value: normTex };
+    shader.uniforms.uCaustics = { value: waterPhotos?.caustics ?? normTex };
+    shader.uniforms.uRoughTex = { value: waterPhotos?.roughness ?? normTex };
+    shader.uniforms.uEmis = { value: waterPhotos?.emissive ?? normTex };
     shader.uniforms.uSunDir = { value: sunDir };
     // Different NAMES, the same Color objects the atmosphere owns. The water
     // must not redeclare `uDcHazeColor` — a duplicate uniform declaration is a
@@ -172,6 +190,9 @@ export function createWater(
         #include <common>
         uniform float uTime;
         uniform sampler2D uFlowMap;
+        uniform sampler2D uCaustics;
+        uniform sampler2D uRoughTex;
+        uniform sampler2D uEmis;
         uniform vec3 uSunDir;
         uniform vec3 uWsky;
         uniform vec3 uWsun;
@@ -214,15 +235,31 @@ export function createWater(
         // The channel is deepest along its centre line, so the distance from
         // that line is a stand-in for the water column that costs no extra
         // geometry or depth pass (principle 39: fake the part nobody checks).
-        // USER DIRECTIVE (natural blue): shallow is sky-blue, the channel
-        // saturates to sapphire. Green is pulled out of both stops so the
-        // river never reads as turquoise.
+        // USER DIRECTIVE (the GLB cube): the whole channel lives in the GLB's
+        // turquoise — bright #7fe7ea over the shelf, saturated #0aa0c4 in the
+        // deep current. The caustic noise then carves bright wave threads
+        // through it, strongly (0.45 → 1.35), so the texture is unmistakable.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 5.4, dcBank);
-        // Saturated river blue throughout — no white-cyan, no centre stripe.
-        vec3 dcDeep = vec3(0.010, 0.095, 0.420);       // sRGB #0e4cb0
-        vec3 dcShallow = vec3(0.035, 0.220, 0.720);    // sRGB #1a78d6
+        vec3 dcDeep = vec3(0.007, 0.330, 0.500);       // sRGB #0aa0c4
+        vec3 dcShallow = vec3(0.210, 0.790, 0.820);    // sRGB #7fe7ea — the GLB base
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
+
+        // ── THE GLB WATER TEXTURE (small_flat_cube_of_water.glb) ────────
+        // The baked caustic-wave noise, dual-phase scrolled like the normal:
+        // two samples drift against each other and cross-fade, so the
+        // pattern is ALWAYS moving and never visibly slides. It multiplies
+        // the body into bright caustic threads and dark troughs — wave
+        // animation straight in the shader, zero CPU.
+        #ifdef DC_WATER_LOW
+        float dcCau = texture2D(uCaustics, dcUv * 1.7 + dcFlow * (dcPhase0 - 0.5) * 1.3).r;
+        #else
+        float dcCau = mix(
+          texture2D(uCaustics, dcUv * 1.7 + dcFlow * (dcPhase0 - 0.5) * 1.3).r,
+          texture2D(uCaustics, dcUv * 2.3 + 0.41 - dcFlow * (dcPhase1 - 0.5) * 1.3).r,
+          dcMix);
+        #endif
+        dcBody *= 0.45 + dcCau * 0.90;
 
         // Sky reflection is kept QUIET so the body stays water-coloured
         // instead of bleaching to white-blue along the centre line.
@@ -230,13 +267,34 @@ export function createWater(
         vec3 dcH = normalize(dcView + uSunDir);
         float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 1.1;
         float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 36.0) * 0.07;
+        // The GLB's roughness map decides where the sun really BITES: the
+        // smooth patches (low roughness) catch a hard glint, the choppy
+        // ones stay matte — that variation is most of what reads as SHINE.
+        #ifndef DC_WATER_LOW
+        float dcRgh = texture2D(uRoughTex, dcUv * 1.3 + vec2(dcPhase1 * 0.2, 0.0)).g;
+        float dcGlint = mix(1.75, 0.4, dcRgh);
+        dcSpec *= dcGlint;
+        dcSheen *= dcGlint * 0.8;
+        #endif
 
         vec3 dcCol = mix(dcBody, dcSky, dcFres * 0.28) + uWsun * (dcSpec + dcSheen);
+
+        // The GLB's own photographic surface, drifting slower than the
+        // caustics — a mid-depth photo layer the body sits ON. Sun/sky tint
+        // keeps it honest at every hour (never glowing at midnight).
+        #ifndef DC_WATER_LOW
+        vec3 dcPhoto = texture2D(uEmis, dcUv * 0.6 + vec2(uTime * 0.008, 0.0)).rgb;
+        dcCol = mix(dcCol, dcPhoto * (uWsun * 0.85 + uWsky * 0.45) * 1.35, 0.12);
+        #endif
 
         // Shoreline foam — a thin bank only, never a white stripe down the
         // middle of the channel.
         float dcEdge = smoothstep(5.15, 6.25, dcBank);
         float dcFoam = dcEdge * 0.35 * smoothstep(0.45, 0.9, dcRipple);
+
+        // Caustic-driven sparkles: the sun's hot spot rides the SAME moving
+        // caustic pattern — shine that dances with the waves.
+        dcCol += uWsun * pow(max(dot(dcNormal, dcH), 0.0), 60.0) * dcCau * 0.22;
 
         dcCol = mix(dcCol, vec3(0.42, 0.62, 0.78), clamp(dcFoam, 0.0, 0.4));
 
@@ -501,9 +559,15 @@ export function createWater(
     metalness: 0.0,
     transparent: true,
   });
+  // Same low-tier contract as the river: caustics stay, the roughness-glint
+  // and photographic layers compile out (see the river block above).
+  if (budget.tier === "low") (oceanMat as THREE.Material & { defines?: Record<string, string> }).defines = { DC_WATER_LOW: "" };
   oceanMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uFlowMap = { value: oceanNormTex };
+    shader.uniforms.uCaustics = { value: waterPhotos?.caustics ?? oceanNormTex };
+    shader.uniforms.uRoughTex = { value: waterPhotos?.roughness ?? oceanNormTex };
+    shader.uniforms.uEmis = { value: waterPhotos?.emissive ?? oceanNormTex };
     shader.uniforms.uSunDir = { value: sunDir };
     // The same live sky/sun colour objects the river borrows — one write in
     // `daylight`, every water surface follows.
@@ -547,6 +611,9 @@ export function createWater(
         #include <common>
         uniform float uTime;
         uniform sampler2D uFlowMap;
+        uniform sampler2D uCaustics;
+        uniform sampler2D uRoughTex;
+        uniform sampler2D uEmis;
         uniform vec3 uSunDir;
         uniform vec3 uWsky;
         uniform vec3 uWsun;
@@ -586,17 +653,51 @@ export function createWater(
           //   2.5–9 m   clear sapphire
           //   9 m +     deep, saturated sea blue
           float dcD = clamp( vDcDepth, 0.0, 14.0 );
-          vec3 dcShallowC = vec3( 0.030, 0.210, 0.700 );  // water blue
-          vec3 dcMidC     = vec3( 0.012, 0.130, 0.560 );  // mid
-          vec3 dcDeepC    = vec3( 0.004, 0.045, 0.280 );  // deep sea
+          // USER DIRECTIVE (the GLB cube): turquoise sea — bright shelf,
+          // saturated mid, teal deep. No navy anywhere.
+          vec3 dcShallowC = vec3( 0.130, 0.750, 0.790 );  // sRGB #66e0e6
+          vec3 dcMidC     = vec3( 0.026, 0.480, 0.550 );  // sRGB #2cb8c4
+          vec3 dcDeepC    = vec3( 0.004, 0.210, 0.350 );  // sRGB #0e7c9e
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
+
+          // ── THE GLB WATER TEXTURE (small_flat_cube_of_water.glb) ──────
+          // The same caustic noise the river wears, at ocean scale: broad
+          // drifting bands of light over the swell, dual-phase cross-faded
+          // so the pattern regenerates forever.
+          #ifdef DC_WATER_LOW
+          float dcCau = texture2D( uCaustics, dcUv * 4.1 + dcFlowA * ( dcPhase0 - 0.5 ) * 0.8 ).r;
+          #else
+          float dcCau = mix(
+            texture2D( uCaustics, dcUv * 4.1 + dcFlowA * ( dcPhase0 - 0.5 ) * 0.8 ).r,
+            texture2D( uCaustics, dcUv * 5.6 + 0.27 - dcFlowB * ( dcPhase1 - 0.5 ) * 0.8 ).r,
+            dcMix );
+          #endif
+          dcBody *= 0.46 + dcCau * 0.92;
 
           vec3 dcSky = uWsky * 0.5 + uWsun * 0.05;
           vec3 dcH = normalize( dcView + uSunDir );
           float dcSpec = pow( max( dot( dcNormal, dcH ), 0.0 ), 280.0 ) * 1.05;
           float dcSheen = pow( max( dot( dcNormal, dcH ), 0.0 ), 40.0 ) * 0.06;
+          // The GLB's roughness map: smooth patches throw a hard sun glint,
+          // choppy ones stay matte — the SHINE is textured, not uniform.
+          #ifndef DC_WATER_LOW
+          float dcRgh = texture2D( uRoughTex, dcUv * 5.2 + vec2( dcPhase1 * 0.14, 0.0 ) ).g;
+          float dcGlint = mix( 1.8, 0.4, dcRgh );
+          dcSpec *= dcGlint;
+          dcSheen *= dcGlint * 0.8;
+          #endif
           vec3 dcCol = mix( dcBody, dcSky, dcFres * 0.26 ) + uWsun * ( dcSpec + dcSheen );
+
+          // The GLB's photographic ocean, drifting slowly under everything —
+          // a deep-water photo layer tinted by the live sun/sky so it stays
+          // honest at every hour.
+          #ifndef DC_WATER_LOW
+          vec3 dcPhoto = texture2D( uEmis, dcUv * 2.3 + vec2( uTime * 0.006, -uTime * 0.004 ) ).rgb;
+          dcCol = mix( dcCol, dcPhoto * ( uWsun * 0.85 + uWsky * 0.45 ) * 1.35, 0.15 );
+          #endif
+
+          dcCol += uWsun * pow( max( dot( dcNormal, dcH ), 0.0 ), 60.0 ) * dcCau * 0.22;
 
           float dcBreak = texture2D( uFlowMap, dcUv * 3.1 + vec2( uTime * 0.02, -uTime * 0.017 ) ).r;
           float dcLine = 0.85 + 0.55 * sin( uTime * 0.7 + vDcWorld.x * 0.05 + vDcWorld.z * 0.043 );
@@ -628,6 +729,26 @@ export function createWater(
     setFrozen(value) {
       frozen = value;
       spray.visible = !value;
+    },
+    setPhotos(photos) {
+      waterPhotos = photos;
+      // Live uniform swap on whichever shaders are already compiled; the
+      // onBeforeCompile closures read the same reference for the rest.
+      for (const mat of [riverMat, oceanMat]) {
+        const sh = mat.userData.shader as { uniforms: Record<string, { value: unknown }> } | undefined;
+        if (!sh) continue;
+        sh.uniforms.uCaustics.value = photos.caustics;
+        sh.uniforms.uRoughTex.value = photos.roughness;
+        sh.uniforms.uEmis.value = photos.emissive;
+      }
+      // The GLB caustics also BECOME the river's and the fall's albedo maps
+      // (the map slot animates by scrolling UV, already driven per frame).
+      if (photos.caustics.image) {
+        flowTex.image = photos.caustics.image;
+        flowTex.needsUpdate = true;
+        fallTex.image = photos.caustics.image;
+        fallTex.needsUpdate = true;
+      }
     },
     update(dt, time, cameraPos) {
       if (frozen) return;
@@ -694,6 +815,11 @@ export function createWater(
       });
       flowTex.dispose();
       fallTex.dispose();
+      if (waterPhotos) {
+        waterPhotos.caustics.dispose();
+        waterPhotos.roughness.dispose();
+        waterPhotos.emissive.dispose();
+      }
       group.clear();
     },
   };
