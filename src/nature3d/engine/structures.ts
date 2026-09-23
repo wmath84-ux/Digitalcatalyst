@@ -5,8 +5,8 @@
 // Everything here is ORIGINAL, composed from one modular kit, and authored to
 // the same tropical-modern language as the rest of the island (Phase 1/12):
 //
-//   * light warm-white walls, large glass, deep flat overhangs
-//   * ONE accent colour (lagoon teal) reused everywhere
+//   * timber, packed earth and thatch — never a white wall
+//   * ONE accent colour (moss green) reused everywhere
 //   * natural materials where the tropics put them (wood decks, thatch)
 //   * plinths and piles so nothing floats on sloping ground
 //
@@ -108,22 +108,23 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── ONE MATERIAL LANGUAGE (Phase 13) ─────────────────────────────────
   // Ten flat, cheap materials; every part merges into the matching one.
-  // Jungle houses, not white villas. Timber, packed earth, thatch, moss.
+  // Painted, and dark enough that distance haze cannot lift them to white.
   // Vertex AO multiplies these, so a cream albedo was what read as white.
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x6a4630, roughness: 0.94, vertexColors: true });
-  const accentMat = new THREE.MeshStandardMaterial({ color: 0x3e6b34, roughness: 0.78 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x8d5a30, roughness: 0.92, vertexColors: true });
-  const thatchMat = new THREE.MeshLambertMaterial({ color: 0xb08448 });
+  // No metal, no sky reflection: a specular lobe under this sun clips white.
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x5c3a24, roughness: 0.94, metalness: 0, envMapIntensity: 0, vertexColors: true });
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0x2f6a2c, roughness: 0.9, metalness: 0, envMapIntensity: 0 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a4218, roughness: 0.94, metalness: 0, envMapIntensity: 0, vertexColors: true });
+  const thatchMat = new THREE.MeshLambertMaterial({ color: 0x9a6a32 });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x6e8c74,
-    roughness: 0.42,
-    metalness: 0.04,
-    envMapIntensity: 0.55,
+    color: 0x3d6e58,
+    roughness: 0.72,
+    metalness: 0,
+    envMapIntensity: 0,
   });
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.88, vertexColors: true });
-  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x7a654c, roughness: 0.96, vertexColors: true });
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0x8a6240, roughness: 0.84 });
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x2e86a8, roughness: 0.6, vertexColors: true });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.92, metalness: 0, envMapIntensity: 0, vertexColors: true });
+  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x6a5340, roughness: 0.96, metalness: 0, envMapIntensity: 0, vertexColors: true });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0x6a4328, roughness: 0.92, metalness: 0, envMapIntensity: 0 });
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0x2e86a8, roughness: 0.72, metalness: 0, envMapIntensity: 0, vertexColors: true });
   const islandMat = new THREE.MeshLambertMaterial({ color: 0x3aaa48 });
 
   const parts: Array<{ mat: THREE.Material; list: THREE.BufferGeometry[] }> = [
@@ -159,7 +160,7 @@ export function createStructures(budget: QualityBudget): Structures {
   // Wall / window / door / roof / balcony / stair / railing / pillar. Every
   // building below is a composition of exactly these.
 
-  /** Glazed wall bay: glass pane + white frame, proud of the wall face. */
+  /** Glazed wall bay: green glass pane + timber frame, proud of the wall face. */
   const windowModule = (x: number, y: number, z: number, w: number, h: number, ry: number, face = 1) => {
     add(glassMat, box(w, h, 0.06), x, y, z + face * 0.02, ry, false);
     add(whiteMat, box(w + 0.24, 0.12, 0.14), x, y + h / 2 + 0.06, z, ry, false);
@@ -182,28 +183,6 @@ export function createStructures(budget: QualityBudget): Structures {
     for (let i = 0; i <= posts; i += 1) {
       const t = (i / posts - 0.5) * w;
       add(whiteMat, box(0.06, 0.95, 0.06), x + cx * t, y + 0.475, z - sx * t, 0, false);
-    }
-  };
-
-  const balcony = (x: number, y: number, z: number, w: number, d: number, ry: number) => {
-    add(concreteMat, box(w, 0.22, d), x, y, z, ry);
-    railing(x, y + 0.11, z + d / 2 - 0.05, w, ry);
-  };
-
-  const stairModule = (x: number, z: number, ry: number, rise: number, run = 1.4) => {
-    const steps = 5;
-    for (let i = 0; i < steps; i += 1) {
-      const t = (i + 0.5) / steps;
-      const cx = Math.cos(ry);
-      const sx = Math.sin(ry);
-      add(
-        concreteMat,
-        box(run, rise * (i + 1) / steps + 0.06, 1.25),
-        x + cx * (t - 0.5) * (run * steps),
-        (rise * (i + 1)) / steps - 0.03,
-        z - sx * (t - 0.5) * (run * steps),
-        ry,
-      );
     }
   };
 
@@ -239,7 +218,8 @@ export function createStructures(budget: QualityBudget): Structures {
   ];
   // The houses stood on this azimuth 1.1 km out and read as white specks.
   // They now sit 40 m past the notes board (outer corner ≈ 39.5, −42),
-  // facing the study, clear of the warehouse yard and the river. The jetty
+  // facing the study. The villa itself is the rusty-roof model behind the
+  // student, not one of these huts, and not behind the board. The jetty
   // and the boat stay on the water — they are not houses.
   const HAMLET_YAW = Math.atan2(66, -72 - 2.6);
   const groundAt = (x: number, z: number) => terrainHeight(x, z);
@@ -256,36 +236,8 @@ export function createStructures(budget: QualityBudget): Structures {
     return g + 0.28;
   };
 
-  // ── 1. COVE VILLA (two storey, the village hero) ─────────────────────
-  {
-    const [x, z] = [52, -82];
-    const ry = HAMLET_YAW;
-    const g = padTop(x, z, 9.5, 7.5, ry);
-    const fh = 3.05;
-    // Ground floor: solid back + glass front.
-    add(wallMat, box(9.5, fh, 0.26), x, g + fh / 2, z + 3.6, ry);
-    add(wallMat, box(9.5, fh, 0.26), x, g + fh / 2, z - 3.6, ry);
-    add(wallMat, box(0.26, fh, 7.5), x - 4.6, g + fh / 2, z, ry);
-    add(wallMat, box(2.4, fh, 7.5), x + 3.55, g + fh / 2, z, ry);
-    windowModule(x - 1.1, g + fh / 2, z - 3.6, 4.6, 1.9, ry, -1);
-    doorModule(x + 2.9, g + 1.15, z - 3.72, ry, 1.2, 2.3);
-    // First floor, set back on the sea side → covered terrace.
-    const f2 = g + fh + 0.18;
-    add(wallMat, box(9.5, fh, 0.26), x, f2 + fh / 2, z + 3.6, ry);
-    add(wallMat, box(9.5, fh, 0.26), x, f2 + fh / 2, z - 1.4, ry);
-    add(wallMat, box(0.26, fh, 5.2), x - 4.6, f2 + fh / 2, z + 1.05, ry);
-    add(wallMat, box(0.26, fh, 5.2), x + 4.6, f2 + fh / 2, z + 1.05, ry);
-    windowModule(x - 1.6, f2 + fh / 2, z - 1.4, 5.6, 1.85, ry, -1);
-    windowModule(x + 3.2, f2 + fh / 2, z - 1.4, 1.7, 1.85, ry, -1);
-    // Slab between floors + balcony rail on the terrace edge.
-    balcony(x, g + fh + 0.09, z - 2.5, 9.5, 2.3, ry);
-    // Roof + parapet.
-    flatRoof(x, g + fh * 2 + 0.32, z, 9.5, 6.2, ry, 0.55);
-    // Stair to the terrace, on the land side.
-    stairModule(x - 5.9, z + 0.4, ry + Math.PI / 2, fh + 0.2);
-    // Accent awning over the ground glazing.
-    add(accentMat, box(7.4, 0.12, 1.7), x - 0.6, g + 2.62, z - 4.5, ry, false);
-  }
+  // The cove villa used to stand here, beside the boards. It is gone.
+  // The rusty-roof model behind the student is the villa now.
 
   // ── 2. PALM HOUSE (single storey L, wide shade roof) ─────────────────
   {
@@ -371,7 +323,7 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── 6. THE BAY BEACON (original landmark, Phase 22) ──────────────────
   //
-  // A white cylindrical observation tower on the north headland: the one
+  // A timber observation tower on the north headland: the one
   // vertical accent the whole coastline composes around. Readable from the
   // meadow vista, from the sea angle, and from everywhere on the beach.
   {
@@ -533,7 +485,7 @@ export function createStructures(budget: QualityBudget): Structures {
       return geo;
     };
     const merged = mergeGeometries(
-      [paint(hullGeo, 0x2e86a8), paint(innerGeo, 0xe8ddc4), paint(benchGeo, 0x8a6a44)],
+      [paint(hullGeo, 0x2e86a8), paint(innerGeo, 0xb08a58), paint(benchGeo, 0x6a4a2c)],
       false,
     );
     if (merged) boat.geometry.dispose(), (boat.geometry = merged);

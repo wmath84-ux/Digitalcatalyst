@@ -225,20 +225,23 @@ const FOG_CHUNK = /* glsl */ `
       float dcFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
       dcFog = clamp( dcFog, 0.0, 1.0 );
 
-      // AERIAL PERSPECTIVE. Air in front of a distant surface has been lit by
-      // the sun, so the haze is not the fog colour — it is the fog colour
-      // pushed towards the sun's own colour, most strongly when the surface
-      // is in the sun's direction from the viewer.
+      // AERIAL PERSPECTIVE. A little sky tint at range, never a replacement.
+      // The old mix used a near-white haze as the destination, so a long
+      // view bleached every surface to white and the colour was gone.
+      // Distance may cool a colour toward the sky. It must not lift it, and
+      // it must leave the surface's own colour the majority at any range.
       vec3 dcEye = normalize( vDcWorldPos - cameraPosition );
       float dcToward = max( dot( dcEye, uDcSunDir ), 0.0 );
-      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter );
+      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.22 );
 
-      // Mie forward lobe: a tight halo right at the sun, plus the broad band.
-      dcHaze += uDcSunColor * ( pow( dcToward, 8.0 ) * 0.05 + pow( dcToward, 2.0 ) * 0.02 ) * uDcInScatter;
-
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcFog * uDcAerial );
+      float dcWash = min( dcFog * uDcAerial, 0.22 );
+      float dcLum = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+      float dcHazeLum = max( dot( dcHaze, vec3( 0.2126, 0.7152, 0.0722 ) ), 0.001 );
+      dcHaze *= min( 1.0, ( dcLum + 0.02 ) / dcHazeLum );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcWash );
     #else
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, smoothstep( fogNear, fogFar, vFogDepth ) );
+      float dcLin = smoothstep( fogNear, fogFar, vFogDepth );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, min( dcLin, 0.22 ) );
     #endif
   #endif
 `;
@@ -361,7 +364,9 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
         // more forward-scattered light through the leaves, which is what
         // makes a backlit canopy at 6 pm glow.
         const low = 1 - Math.min(1, Math.max(0, elevation / 0.55));
-        uniforms.uDcAerial.value = 0.82 + low * 0.3;
+        // Kept low on purpose. The fog chunk also caps the mix, so a long
+        // view cannot bleach a surface to white even if this drifts up.
+        uniforms.uDcAerial.value = 0.4 + low * 0.15;
         uniforms.uDcTransmit.value = 0.32 + low * 0.28;
         uniforms.uDcPhase.value = 2.6 + low * 1.4;
       }

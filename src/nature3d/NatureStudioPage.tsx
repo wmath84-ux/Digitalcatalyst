@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff,
   Maximize2, Minimize2, PawPrint, RotateCw,
-  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Warehouse,
+  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
   MoreVertical,
 } from "lucide-react";
@@ -43,7 +43,7 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "world", label: "World", Icon: Globe2 },
   { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
-  { key: "warehouse", label: "Warehouse", Icon: Warehouse },
+  { key: "warehouse", label: "Villa", Icon: Home },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },

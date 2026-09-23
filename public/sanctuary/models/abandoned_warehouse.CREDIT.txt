@@ -1,7 +1,0 @@
-Abandoned Warehouse
-Author: Arsen Ismailov (https://sketchfab.com/fdgasd7)
-Source: https://sketchfab.com/3d-models/abandoned-warehouse-698a34300af34095ac6593f348585daa
-License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
-Baked for the sanctuary: 30 m on the long side, six JPEG maps, a
-3666-triangle near shell plus a 236-triangle vertex-colour impostor.
-The original export and its 44 MB texture set are not shipped.

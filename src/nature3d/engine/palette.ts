@@ -254,13 +254,14 @@ export interface AtmosphereKey {
 }
 
 const KEYS: ReadonlyArray<{ maxElevation: number; key: AtmosphereKey }> = [
-  // Low sun: long, warm, golden haze over water; the halo is broad and orange.
-  { maxElevation: 0.25, key: { haze: new THREE.Color(0xf0cfa4), sun: new THREE.Color(0xffdca8), inScatter: 0.72 } },
-  // Mid-morning / late afternoon: the "golden" band, still warm, less dust.
-  { maxElevation: 0.55, key: { haze: new THREE.Color(0xe4e6cf), sun: new THREE.Color(0xffeecb), inScatter: 0.52 } },
-  // High sun: the clean, bright, slightly cyan tropical clear — the haze is a
-  // pale turquoise-white and the halo is tight.
-  { maxElevation: 1.01, key: { haze: new THREE.Color(0xdcefef), sun: new THREE.Color(0xfff4dc), inScatter: 0.36 } },
+  // Low sun: warm air, but not a cream sheet. A pale haze tint multiplied
+  // into the fog colour was what turned a long view white.
+  { maxElevation: 0.25, key: { haze: new THREE.Color(0xc49262), sun: new THREE.Color(0xffdca8), inScatter: 0.28 } },
+  // Mid-morning / late afternoon: still warm, still a colour.
+  { maxElevation: 0.55, key: { haze: new THREE.Color(0xa8b48a), sun: new THREE.Color(0xffeecb), inScatter: 0.16 } },
+  // High sun: a real sky blue. The old 0xdcefef was near-white, and that is
+  // what the far meadow bleached into.
+  { maxElevation: 1.01, key: { haze: new THREE.Color(0x6a9eb8), sun: new THREE.Color(0xfff4dc), inScatter: 0.1 } },
 ];
 
 /** Pick the atmosphere key for a sun elevation (0 = horizon, 1 = zenith). */

@@ -1,55 +1,56 @@
 // src/nature3d/engine/warehouseSite.ts
 //
-// Where the abandoned warehouse stands, and the one test every scatter uses
-// to stay out of it.
+// Where the rusty-roof villa stands, and the one test every scatter uses
+// to stay out of it. The abandoned warehouse that used to live on the
+// meadow east of the boards is gone; these names stay so the grass, the
+// trees and the terrain pad do not each grow a second import.
 //
-// The previous seat (75.5, −40) is the spot the Warehouse button framed and
-// the learner found empty — a 10 m shed does not read as a warehouse. This
-// seat is 30 m due east of that spot, still on the same meadow, clear of the
-// east trail (it passes ~19 m north of the wall) and clear of the river.
-// The glazed face still points at the boards. Height is 60 m; see warehouse.ts.
+// The student at the chair faces −Z, toward the boards. Behind them is +Z.
+// The villa is 60 m from the chair on that side, shifted west so its east
+// wall stays clear of the river bank (the bank blend reaches x ≈ −2.5).
+// It is not behind the boards.
 
-/** World X of the model's centre. 30 m east of the rejected seat. */
-export const WAREHOUSE_X = 105.5;
-/** World Z of the model's centre. Same meadow, not the hills. */
-export const WAREHOUSE_Z = -40;
+/** World X of the model's centre. West of the river, not the old yard. */
+export const WAREHOUSE_X = -26;
+/** World Z of the model's centre. +Z is behind the student. hypot(26, 54.1) = 60. */
+export const WAREHOUSE_Z = 54.1;
 /** How tall the shell stands above the yard, in metres. */
-export const WAREHOUSE_HEIGHT = 60;
+export const WAREHOUSE_HEIGHT = 30;
 
 /**
- * three.js Y rotation. π maps local +X (the glazed wall) onto world −X,
- * toward the boards. The Warehouse preset stands on that side.
+ * three.js Y rotation. 0 keeps local −Z aimed at the chair, so the face
+ * the student sees when they turn around is the authored front.
  */
-export const WAREHOUSE_YAW = Math.PI;
+export const WAREHOUSE_YAW = 0;
 
 /**
- * Local half-extents after the 60 m length scale, plus apron. A square
- * 32 m covers both the 52 × 60 bake and a 60 m upload.
+ * Local half-extents after the uniform 30 m height scale, plus a metre of
+ * apron. Authored bounds are about ±0.42 × ±0.50; at 30 / 0.71 that is
+ * roughly ±18 × ±21. The extra metre keeps a blade off the wall.
  */
-export const WAREHOUSE_HALF_X = 32;
-export const WAREHOUSE_HALF_Z = 32;
+export const WAREHOUSE_HALF_X = 20;
+export const WAREHOUSE_HALF_Z = 24;
 
 const COS = Math.cos(WAREHOUSE_YAW);
 const SIN = Math.sin(WAREHOUSE_YAW);
 /** Half-diagonal of the apron box. The early-out below is this, plus margin. */
-const HALF_DIAG = 48;
+const HALF_DIAG = 34;
 
 /**
- * Level yard, in the building's local frame. Yaw is π, so local +X is
- * world −X (the boards, and the river). The flat zone is a few metres past
- * the walls (a 60 m shell sits at ±30). The board-side blend is short so it
- * dies on the bank and does not fill the channel.
+ * Level yard, in the building's local frame. The flat zone stops inside
+ * the walls. The blend is short on every side so it dies before the river
+ * bank (the bank starts near x = −2.5; the east blend ends near x = −3).
  */
-const PAD_FLAT_X_POS = 34;
-const PAD_BLEND_X_POS = 12;
-const PAD_FLAT_X_NEG = 34;
-const PAD_BLEND_X_NEG = 14;
-const PAD_FLAT_Z_POS = 34;
-const PAD_BLEND_Z_POS = 14;
-const PAD_FLAT_Z_NEG = 34;
-const PAD_BLEND_Z_NEG = 14;
+const PAD_FLAT_X_POS = 17;
+const PAD_BLEND_X_POS = 6;
+const PAD_FLAT_X_NEG = 17;
+const PAD_BLEND_X_NEG = 6;
+const PAD_FLAT_Z_POS = 20;
+const PAD_BLEND_Z_POS = 6;
+const PAD_FLAT_Z_NEG = 20;
+const PAD_BLEND_Z_NEG = 6;
 /** Axis-aligned reach of the widest blend, plus a metre. */
-const PAD_REACH = 56;
+const PAD_REACH = 32;
 
 let padY = NaN;
 let sealing = false;
@@ -70,7 +71,7 @@ function sideBlend(
 }
 
 /**
- * Seat the ground under the warehouse.
+ * Seat the ground under the villa.
  *
  * Called from `terrainHeight` on every sample. The common case — anywhere
  * but this one yard — is two comparisons and a return. Inside the yard the
@@ -95,8 +96,8 @@ export function levelWarehouseGround(
     let min = Infinity;
     for (let ix = -2; ix <= 2; ix += 1) {
       for (let iz = -2; iz <= 2; iz += 1) {
-        const lx = ix * 15;
-        const lz = iz * 15;
+        const lx = ix * 8;
+        const lz = iz * 8;
         const h = naturalAt(
           WAREHOUSE_X + lx * COS + lz * SIN,
           WAREHOUSE_Z - lx * SIN + lz * COS,

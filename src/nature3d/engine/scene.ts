@@ -506,7 +506,8 @@ export class Sanctuary {
       })
       .catch((err) => console.warn("[sanctuary] day bed failed", err));
 
-    // THE ABANDONED WAREHOUSE. Same async, fail-soft load as the day bed.
+    // THE RUSTY-ROOF VILLA. Same async, fail-soft load as the day bed.
+    // It stands behind the student; the warehouse it replaced is gone.
     // Its shadow hull lives on layer 1 so the colour camera never draws it.
     // three r180's shadow walk tests the COLOUR camera's layers, not the
     // light's shadow camera, so layer 1 is enabled only for that walk and
@@ -1494,18 +1495,19 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // 30 m east of the empty seat. Look at the lower third of a 60 m
-        // wall so the roof and the ground line both stay inside the frame.
+        // Behind the student, from the chair side. A 30 m house at 58 m
+        // fills the frame without standing on the roof. Yaw π puts the
+        // camera south of the villa, looking at the face the student sees.
         this.orbit.autoRotate = false;
         this.orbit.panTo(
           this.tmpV.set(
             WAREHOUSE_X,
-            terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + WAREHOUSE_HEIGHT * 0.38,
+            terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + WAREHOUSE_HEIGHT * 0.42,
             WAREHOUSE_Z,
           ),
-          118,
-          -Math.PI / 2 + 0.4,
-          0.1,
+          58,
+          Math.PI,
+          0.22,
         );
         break;
       case "reading":
