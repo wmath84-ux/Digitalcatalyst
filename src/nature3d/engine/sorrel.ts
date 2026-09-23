@@ -53,6 +53,7 @@ import { TextureLoader } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
+import { insideWarehouse } from "./warehouseSite";
 import { createSite, siteAt, pathWeight, groundColorAt, type Site } from "./environment";
 import { GROUND_PALETTE } from "./palette";
 import { noise } from "./simplex";
@@ -127,6 +128,9 @@ function acceptsPlant(
   worn: number, site: Site, ring: "near" | "far",
 ): boolean {
   if (insideRiver(x, z)) return false;
+  // A sorrel at this scale is ~8 m across — the centre has to miss the
+  // walls by more than a blade's width.
+  if (insideWarehouse(x, z, 6)) return false;
   // The bare shingle the river scours: thin it out, keep a few stragglers
   // so the bank's edge is ragged, not drawn (mirrors the grass rule).
   if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.7) return false;

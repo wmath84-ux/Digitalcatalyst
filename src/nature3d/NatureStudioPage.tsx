@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff,
   Maximize2, Minimize2, PawPrint, RotateCw,
-  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake,
+  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
   MoreVertical,
 } from "lucide-react";
@@ -43,6 +43,7 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "world", label: "World", Icon: Globe2 },
   { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
+  { key: "warehouse", label: "Villa", Icon: Home },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
@@ -360,6 +361,11 @@ export default function NatureStudioPage() {
             the fifth button; every other control lives inside that menu.
             The tray can be hidden from inside the menu itself, and one tap
             on the bottom-right eye brings every button back. ── */}
+        {!hudHidden && trayVisible ? (
+        <p className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md">
+          Two fingers fly · double-tap to go
+        </p>
+        ) : null}
         {!hudHidden && trayVisible ? (
         <nav
           ref={hudTrayRef}

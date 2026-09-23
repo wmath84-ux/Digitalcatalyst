@@ -28,6 +28,7 @@ import {
 } from "./regions";
 import { noise } from "./simplex";
 import { groundColorAt, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
+import { levelWarehouseGround } from "./warehouseSite";
 import { GROUND_PALETTE, GROUND_TILE_METRES, clampAlbedo } from "./palette";
 import { injectWorldVaryings } from "./atmosphere";
 
@@ -392,12 +393,12 @@ export function terrainHeight(x: number, z: number): number {
   // `bankBlend` is 1 in the channel and 0 out on the flats.
   const fromCentre = Math.abs(x - RIVER_CENTER_X);
   let bankBlend = 1 - smoothstep(RIVER_HALF_WIDTH, RIVER_HALF_WIDTH * 3.2, fromCentre);
-  if (bankBlend <= 0) return base;
+  if (bankBlend <= 0) return levelWarehouseGround(x, z, base, terrainHeight);
   // The study clearing sits only 18 m from the channel, well inside the bank
   // blend. Without this the near bank tips the clearing into the water and the
   // chair, board and student all end up on a slope. The clearing wins.
   bankBlend *= smoothstep(CLEARING_RADIUS, CLEARING_RADIUS + 7, dist);
-  if (bankBlend <= 0) return base;
+  if (bankBlend <= 0) return levelWarehouseGround(x, z, base, terrainHeight);
 
   // Concave bed: deepest at the centre line, rising to the waterline at the
   // channel edge. Always at least 0.8 m of water, so the plane never clips.
@@ -405,7 +406,12 @@ export function terrainHeight(x: number, z: number): number {
   const bedDepth = 3.4 - across * across * 2.2;
   const bed = WATER_LEVEL - 0.8 - bedDepth;
 
-  return base * (1 - bankBlend) + Math.min(bed, base) * bankBlend;
+  return levelWarehouseGround(
+    x,
+    z,
+    base * (1 - bankBlend) + Math.min(bed, base) * bankBlend,
+    terrainHeight,
+  );
 }
 
 /** True when the position sits inside the river bed (no grass / no animals). */

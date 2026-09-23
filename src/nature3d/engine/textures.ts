@@ -258,18 +258,20 @@ export function createTextures(anisotropy: number): TextureSet {
   blade.ctx.quadraticCurveTo(28, 128, 32, 8);
   blade.ctx.stroke();
 
-  // ── Ground (sunny-afternoon grass grit) ──────────────────────────────
-  // USER DIRECTIVE (natural green): the texture multiplies the vertex colour,
-  // so a brown loam turns even a green albedo muddy. The grit is now
-  // green-dominant; the vertex colours still carry the biome.
+  // ── Ground (neutral warm grit) ───────────────────────────────────────
+  // The texture multiplies the vertex colour. A green-dominant grit turned
+  // a desert vertex back into olive, which is why the land read as green
+  // everywhere. The grit is now a warm grey; lush and dry vertex colours
+  // are what make a hollow grass and a rise earth.
   const ground = canvas2d(512, 512);
   for (let y = 0; y < 512; y += 2) {
     for (let x = 0; x < 512; x += 2) {
       const f = fbm(x / 40, y / 40, 5, 11);
       const g2 = fbm(x / 9, y / 9, 3, 23);
-      const r = 42 + f * 36 + g2 * 16;
-      const g = 92 + f * 54 + g2 * 24;
-      const b = 28 + f * 24 + g2 * 12;
+      const tone = 168 + f * 42 + g2 * 20;
+      const r = tone + 10;
+      const g = tone - 2;
+      const b = tone - 16;
       ground.ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
       ground.ctx.fillRect(x, y, 2, 2);
     }
@@ -277,7 +279,7 @@ export function createTextures(anisotropy: number): TextureSet {
   for (let i = 0; i < 900; i += 1) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
-    ground.ctx.strokeStyle = `rgba(${70 + Math.random() * 50 | 0},${140 + Math.random() * 70 | 0},${40 + Math.random() * 30 | 0},0.22)`;
+    ground.ctx.strokeStyle = `rgba(${150 + Math.random() * 40 | 0},${140 + Math.random() * 36 | 0},${110 + Math.random() * 28 | 0},0.22)`;
     ground.ctx.lineWidth = 0.8;
     ground.ctx.beginPath();
     ground.ctx.moveTo(x, y);

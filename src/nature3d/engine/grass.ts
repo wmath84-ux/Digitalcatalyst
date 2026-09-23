@@ -43,8 +43,9 @@
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
+import { insideWarehouse } from "./warehouseSite";
 import { GROUND_PALETTE } from "./palette";
-import { groundColorAt, pathWeight } from "./environment";
+import { dryCover, flowWetness, groundColorAt, pathWeight } from "./environment";
 
 export interface GrassField {
   group: THREE.Group;
@@ -221,6 +222,8 @@ function buildRing(
    */
   const acceptsBlade = (x: number, z: number, y: number, worn: number): boolean => {
     if (insideRiver(x, z)) return false;
+    // The warehouse pad. A blade through the wall is the pasted-asset tell.
+    if (insideWarehouse(x, z, 0.6)) return false;
     if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.72) return false;
     if (Math.hypot(x, z + 1.35) < 1.9) return false;
     if (y < -1.1) return false;
@@ -234,6 +237,11 @@ function buildRing(
     // ragged in life, and a hard cutoff would draw a line along the path.
     if (worn > 0.62) return false;
     if (worn > 0.18 && Math.random() < worn * 1.45) return false;
+    // Dry rises keep a few blades. A full sward there hides the earth and
+    // the land reads as green everywhere. Wet hollows are not touched.
+    const dry = dryCover(x, z, y, flowWetness(x, z));
+    if (dry > 0.7 && Math.random() < 0.72) return false;
+    if (dry > 0.5 && Math.random() < 0.32) return false;
     return true;
   };
 
@@ -369,7 +377,7 @@ function plantSkirt(
       const rad = radius * (0.75 + Math.random() * 0.7);
       const x = cx + Math.cos(a) * rad;
       const z = cz + Math.sin(a) * rad;
-      if (insideRiver(x, z)) continue;
+      if (insideRiver(x, z) || insideWarehouse(x, z, 0.6)) continue;
       const y = terrainHeight(x, z);
       if (y < -1.1) continue;
       dummy.position.set(x, y, z);

@@ -1,0 +1,6 @@
+Rusty-roof villa.
+
+Source file: rusty-roof-house-3d-model-free.zip on this repository's main branch.
+The albedo, the normal and the proportions are the authored model. This bake
+only resizes the maps to 1024 and simplifies the mesh for phones. It is not
+recolored and it is not stretched.

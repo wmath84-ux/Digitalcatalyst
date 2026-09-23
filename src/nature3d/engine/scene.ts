@@ -31,7 +31,7 @@ import {
   type QualityTier,
 } from "./quality";
 import { createTextures, halveTextureSet, type TextureSet } from "./textures";
-import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL } from "./terrain";
+import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
@@ -48,6 +48,8 @@ import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
 import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
+import { createWarehouse, type Warehouse } from "./warehouse";
+import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { OrbitRig } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -73,7 +75,7 @@ const BOARD_VIEW_MARGIN = 0.5;
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
-  | "trek" | "world"
+  | "trek" | "world" | "warehouse"
   // The three study boards. Each frames ONE board edge-to-edge.
   | "reading" | "notes" | "mindmap";
 
@@ -176,6 +178,8 @@ export class Sanctuary {
   private student: StudentRig;
   /** The Vintage Day Bed — the learner's seat, loaded async (dayBed.ts). */
   private dayBed: DayBed | null = null;
+  /** The abandoned warehouse, loaded async (warehouse.ts). */
+  private warehouse: Warehouse | null = null;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
   /** The three live course-player boards + their WebGL frames. */
@@ -238,7 +242,10 @@ export class Sanctuary {
   private submerged = false;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
+  private pinchMid = { x: 0, y: 0, ready: false };
   private pointers = new Map<number, { x: number; y: number }>();
+  private keys = new Set<string>();
+  private lastGroundTap = 0;
   /**
    * Foliage atmosphere registration option. On the plant-diet tier the
    * per-fragment sun-transmission chain (one pow + several dot products over
@@ -499,6 +506,40 @@ export class Sanctuary {
       })
       .catch((err) => console.warn("[sanctuary] day bed failed", err));
 
+    // THE RUSTY-ROOF VILLA. Same async, fail-soft load as the day bed.
+    // It stands behind the student; the warehouse it replaced is gone.
+    // Its shadow hull lives on layer 1 so the colour camera never draws it.
+    // three r180's shadow walk tests the COLOUR camera's layers, not the
+    // light's shadow camera, so layer 1 is enabled only for that walk and
+    // cleared before the colour pass — two bit flips, no extra draw.
+    if (this.budget.shadowMapSize > 0) {
+      const shadowMap = this.renderer.shadowMap;
+      const renderShadows = shadowMap.render;
+      shadowMap.render = (lights, scene, camera) => {
+        camera.layers.enable(1);
+        try {
+          renderShadows.call(shadowMap, lights, scene, camera);
+        } finally {
+          camera.layers.disable(1);
+        }
+      };
+    }
+    createWarehouse(this.budget, aniso)
+      .then((building) => {
+        if (this.disposed) {
+          building.dispose();
+          return;
+        }
+        this.warehouse = building;
+        this.scene.add(building.group);
+        building.group.updateMatrixWorld(true);
+        this.atmosphere.registerTree(building.group);
+        this.winter.registerTree(building.group);
+        if (this.budget.halfPrecision) halfPrecisionTree(building.group);
+        building.update(this.camera.position);
+      })
+      .catch((err) => console.warn("[sanctuary] warehouse failed", err));
+
     // ── The study lectern: a desk and three 30 m boards ───────────────
     //
     // The desk goes between the chair and the boards; the three boards stand
@@ -594,6 +635,8 @@ export class Sanctuary {
     dom.addEventListener("pointercancel", this.onPointerUp, true);
     dom.addEventListener("wheel", this.onWheel, { passive: false });
     dom.addEventListener("contextmenu", this.onContextMenu);
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
   }
 
   private detachPointer(dom: HTMLElement) {
@@ -603,6 +646,9 @@ export class Sanctuary {
     dom.removeEventListener("pointercancel", this.onPointerUp, true);
     dom.removeEventListener("wheel", this.onWheel);
     dom.removeEventListener("contextmenu", this.onContextMenu);
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+    this.keys.clear();
   }
 
   private onContextMenu = (e: Event) => e.preventDefault();
@@ -672,7 +718,7 @@ export class Sanctuary {
       this.pointers.set(b.pointerId, { x: b.lastX, y: b.lastY });
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const [a, c] = [...this.pointers.values()];
-      this.pinchPrev = Math.hypot(a.x - c.x, a.y - c.y);
+      this.armPinch(a.x, a.y, c.x, c.y);
       return;
     }
     // THE CLICKS-MUST-WORK FIX. On some device browsers a tap that visually
@@ -692,7 +738,7 @@ export class Sanctuary {
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
-      this.pinchPrev = Math.hypot(a.x - b.x, a.y - b.y);
+      this.armPinch(a.x, a.y, b.x, b.y);
       return;
     }
     this.pointerPrev = { x: e.clientX, y: e.clientY, id: e.pointerId, down: true };
@@ -711,8 +757,21 @@ export class Sanctuary {
       if (this.studyFocus) return;
       const [a, b] = [...this.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (this.pinchPrev > 0) this.orbit.zoom(this.pinchPrev / Math.max(dist, 1));
+      const midX = (a.x + b.x) * 0.5;
+      const midY = (a.y + b.y) * 0.5;
+      if (this.pinchPrev > 0) {
+        const ratio = this.pinchPrev / Math.max(dist, 1);
+        // A pure slide barely changes the finger gap. Ignore that noise so
+        // flying does not also zoom.
+        if (ratio > 1.012 || ratio < 0.988) this.orbit.zoom(ratio);
+      }
+      if (this.pinchMid.ready) {
+        this.orbit.flyByDrag(midX - this.pinchMid.x, midY - this.pinchMid.y);
+      }
       this.pinchPrev = dist;
+      this.pinchMid.x = midX;
+      this.pinchMid.y = midY;
+      this.pinchMid.ready = true;
       return;
     }
 
@@ -732,31 +791,122 @@ export class Sanctuary {
     }
     const start = this.pointers.get(e.pointerId);
     this.pointers.delete(e.pointerId);
-    if (this.pointers.size < 2) this.pinchPrev = 0;
+    if (this.pointers.size < 2) {
+      this.pinchPrev = 0;
+      this.pinchMid.ready = false;
+    }
     if (e.pointerId === this.pointerPrev.id) this.pointerPrev.down = false;
 
-    // A tap (no drag, no board move) on the board opens the lesson modal.
+    // A tap on the board opens the lesson. A double tap on the ground flies
+    // the drone there — the far village is a kilometre out, and orbiting the
+    // study can never reach it.
     if (start) {
       const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-      if (moved < 6) this.maybeTapBoard(e);
+      if (moved < 8) this.onTap(e);
     }
   };
 
   private tapRay = new THREE.Raycaster();
   private tapVec = new THREE.Vector2();
 
-  private maybeTapBoard(e: PointerEvent) {
-    // While a study board is framed, a background tap is almost always a
-    // mistap at the board's edge — firing the lesson-board raycast here
-    // opened the modal ON TOP of the board and made the board look dead.
+  private armPinch(ax: number, ay: number, bx: number, by: number) {
+    this.pinchPrev = Math.hypot(ax - bx, ay - by);
+    this.pinchMid.x = (ax + bx) * 0.5;
+    this.pinchMid.y = (ay + by) * 0.5;
+    this.pinchMid.ready = true;
+  }
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    const t = e.target;
+    if (t instanceof HTMLElement && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+    if (e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
+    this.keys.add(e.code);
+  };
+
+  private onKeyUp = (e: KeyboardEvent) => {
+    this.keys.delete(e.code);
+  };
+
+  /** WASD / arrows fly, Q and E climb. Held keys, so it rides the frame. */
+  private flyKeys(dt: number) {
+    if (this.studyFocus || this.keys.size === 0) return;
+    let ahead = 0;
+    let strafe = 0;
+    let lift = 0;
+    if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) ahead += 1;
+    if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) ahead -= 1;
+    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) strafe += 1;
+    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) strafe -= 1;
+    if (this.keys.has("KeyE") || this.keys.has("Space")) lift += 1;
+    if (this.keys.has("KeyQ")) lift -= 1;
+    if (ahead === 0 && strafe === 0 && lift === 0) return;
+    const boost = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? 2.6 : 1;
+    const speed = Math.max(this.orbit.distance, 8) * 0.62 * boost;
+    this.orbit.autoRotate = false;
+    this.orbit.fly(strafe * speed * dt, ahead * speed * dt, lift * speed * dt);
+  }
+
+  private onTap(e: PointerEvent) {
     if (this.studyFocus) return;
+    if (this.tapHitsBoard(e)) {
+      this.opts.onBoardTap?.();
+      return;
+    }
+    const now = performance.now();
+    if (now - this.lastGroundTap < 340) {
+      this.lastGroundTap = 0;
+      this.flyToGround(e);
+      return;
+    }
+    this.lastGroundTap = now;
+  }
+
+  private tapHitsBoard(e: PointerEvent): boolean {
     const rect = this.opts.dom.getBoundingClientRect();
     this.tapVec.set(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.tapRay.setFromCamera(this.tapVec, this.camera);
-    if (this.tapRay.intersectObject(this.board.panel, false).length > 0) this.opts.onBoardTap?.();
+    return this.tapRay.intersectObject(this.board.panel, false).length > 0;
+  }
+
+  /**
+   * Double-tap the ground and the drone flies there. Analytic march against
+   * `terrainHeight` — no mesh pick, no allocation, so a tap cannot hitch.
+   */
+  private flyToGround(e: PointerEvent) {
+    this.tapHitsBoard(e);
+    const origin = this.tapRay.ray.origin;
+    const dir = this.tapRay.ray.direction;
+    let t = 2;
+    let px = origin.x;
+    let py = origin.y;
+    let pz = origin.z;
+    let ph = terrainHeight(px, pz);
+    for (let i = 0; i < 56; i += 1) {
+      t += Math.max(3, t * 0.32);
+      if (t > 6000) break;
+      const x = origin.x + dir.x * t;
+      const y = origin.y + dir.y * t;
+      const z = origin.z + dir.z * t;
+      if (Math.abs(x) > WORLD_HALF || Math.abs(z) > WORLD_HALF) break;
+      const h = terrainHeight(x, z);
+      if (py > ph && y <= h) {
+        const span = (py - ph) - (y - h);
+        const u = span !== 0 ? (py - ph) / span : 0;
+        const hx = px + (x - px) * u;
+        const hz = pz + (z - pz) * u;
+        const hh = terrainHeight(hx, hz);
+        this.orbit.autoRotate = false;
+        this.orbit.panTo(this.tmpV.set(hx, hh + 1.8, hz), 42, this.orbit.yaw, 0.38);
+        return;
+      }
+      px = x;
+      py = y;
+      pz = z;
+      ph = h;
+    }
   }
 
   private onWheel = (e: WheelEvent) => {
@@ -1344,6 +1494,22 @@ export class Sanctuary {
         this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
         break;
       }
+      case "warehouse":
+        // Behind the student, from the chair side. A 30 m house at 58 m
+        // fills the frame without standing on the roof. Yaw π puts the
+        // camera south of the villa, looking at the face the student sees.
+        this.orbit.autoRotate = false;
+        this.orbit.panTo(
+          this.tmpV.set(
+            WAREHOUSE_X,
+            terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + WAREHOUSE_HEIGHT * 0.42,
+            WAREHOUSE_Z,
+          ),
+          58,
+          Math.PI,
+          0.22,
+        );
+        break;
       case "reading":
       case "notes":
       case "mindmap":
@@ -1477,10 +1643,13 @@ export class Sanctuary {
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
     const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
-    const distance = Math.max(
+    const boardDistance = Math.max(
       needH / 2 / Math.tan(vFov / 2),
       needW / 2 / Math.tan(hFov / 2),
     );
+    // The warehouse has its own preset. This shot is the boards, not the
+    // building — pulling back to hold a 60 m tower made the desk unreadable.
+    const distance = boardDistance;
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
@@ -1641,9 +1810,9 @@ export class Sanctuary {
     const time = this.clock.elapsedTime;
 
     // ── Camera ────────────────────────────────────────────────────────
-    // One camera only now — orbit. (The first-person walk mode and its
-    // visible character rig were removed: the body never read well on the
-    // small screens this page mostly serves.)
+    // One camera only now — orbit, plus drone flight (two-finger drag,
+    // double-tap, or WASD). The old first-person body stays gone.
+    this.flyKeys(dt);
     this.orbit.update(dt, this.camera);
     if (this.pendingReadSlot) {
       this.pendingPinAge += dt;
@@ -1706,6 +1875,10 @@ export class Sanctuary {
       this.water.update(adt, time, this.camera.position);
       // The bay's idle motion (boat, umbrellas) rides the same budget.
       this.structures.update(time);
+      // One squared-distance compare. Hidden meshes are skipped by the
+      // renderer entirely, so a far warehouse is a single impostor draw
+      // and an off-screen one is nothing.
+      this.warehouse?.update(this.camera.position);
     }
 
     this.aiClock += dt;
@@ -1822,6 +1995,7 @@ export class Sanctuary {
     this.board.dispose();
     this.student.dispose();
     this.dayBed?.dispose();
+    this.warehouse?.dispose();
     this.atmosphere.dispose();
     this.weathering.dispose();
     this.winter.dispose();
