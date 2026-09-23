@@ -541,11 +541,13 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         /* glsl */ `
         #include <map_fragment>
 
-        // MACRO VARIATION — the same ground detail sampled 16× larger, so broad
+        // MACRO VARIATION — the same ground detail sampled 4× larger, so broad
         // patches of the meadow shift warmer/cooler and the tile stops repeating
         // visibly. Two fetches in total; on a surface that fills the screen this
-        // is the cheapest large-scale variation there is.
-        vec3 dcMacro = texture2D( map, vMapUv * 0.0625 ).rgb;
+        // is the cheapest large-scale variation there is. (With the 34 m
+        // field-photo tile the macro fetch spans ~136 m — the photo's own
+        // parcel variety carries the mid scale, this keeps only the broad drift.)
+        vec3 dcMacro = texture2D( map, vMapUv * 0.25 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
         diffuseColor.rgb *= mix( 0.96, 1.22, dcMacroL );
 

@@ -30,7 +30,7 @@ import {
   type QualityBudget,
   type QualityTier,
 } from "./quality";
-import { createTextures, halveTextureSet, type TextureSet } from "./textures";
+import { createTextures, halveTextureSet, patchGroundPhoto, GROUND_PHOTO_URL, type TextureSet } from "./textures";
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
@@ -320,6 +320,11 @@ export class Sanctuary {
     // cap now (1 on low, 4 medium, 8 desktop), not a one-off low/else split.
     const aniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.budget.maxAniso);
     this.textures = createTextures(aniso);
+    // The aerial farmland scan streams in over the procedural grit (frame one
+    // is already dressed; the photo simply gains its fields). Low tier takes a
+    // 1024 px copy — the full 2048 scan is a bandwidth consumer it skipped
+    // for every procedural map above.
+    patchGroundPhoto(this.textures.ground, GROUND_PHOTO_URL, this.budget.cheapPlants ? 1024 : 2048);
     // MIPMAP BIAS diet, low tier: every procedural texture repainted at half
     // size before its first upload — a quarter of the VRAM and of the
     // per-frame texture bandwidth (see textures.ts#halveTextureSet).

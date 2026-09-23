@@ -94,6 +94,43 @@ export function halveTextureSet(set: TextureSet): void {
   }
 }
 
+/** The aerial farmland scan (from `field_and_garden.glb`) the ground wears. */
+export const GROUND_PHOTO_URL = "sanctuary/ground_field.jpg";
+
+/**
+ * Swap the placeholder grit for the aerial farmland photo once it streams
+ * in. Purely an image swap on the LIVE texture: colour space, wrap and the
+ * shells' baked UV scale stay untouched, so the world never relayouts — the
+ * mud under the student simply gains its fields. The procedural canvas is
+ * the permanent fallback if the photo never lands, and `maxSide` downsizes
+ * the scan for low-tier devices (the scene passes its budget's verdict).
+ */
+export function patchGroundPhoto(tex: THREE.Texture, url: string, maxSide: number): void {
+  const img = new Image();
+  img.decoding = "async";
+  img.onload = () => {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return;
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    if (scale < 1) {
+      const small = document.createElement("canvas");
+      small.width = Math.round(w * scale);
+      small.height = Math.round(h * scale);
+      const sctx = small.getContext("2d");
+      if (!sctx) return;
+      sctx.drawImage(img, 0, 0, small.width, small.height);
+      tex.image = small;
+    } else {
+      tex.image = img;
+    }
+    tex.needsUpdate = true;
+  };
+  img.onerror = () =>
+    console.warn("[sanctuary] ground photo failed to load; keeping the procedural grit");
+  img.src = url;
+}
+
 function toTexture(c: HTMLCanvasElement, anisotropy: number, repeat?: [number, number]): THREE.Texture {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -258,11 +295,16 @@ export function createTextures(anisotropy: number): TextureSet {
   blade.ctx.quadraticCurveTo(28, 128, 32, 8);
   blade.ctx.stroke();
 
-  // ── Ground (neutral warm grit) ───────────────────────────────────────
+  // ── Ground (neutral warm grit — the instant placeholder) ─────────────
   // The texture multiplies the vertex colour. A green-dominant grit turned
   // a desert vertex back into olive, which is why the land read as green
   // everywhere. The grit is now a warm grey; lush and dry vertex colours
   // are what make a hollow grass and a rise earth.
+  //
+  // ROLE: this canvas is what the ground shows on frame one and forever if
+  // the aerial farmland photo never lands — `patchGroundPhoto` (below)
+  // swaps the image out from under the same texture once the photo
+  // streams in, keeping wrap, colour space and the shells' baked UVs.
   const ground = canvas2d(512, 512);
   for (let y = 0; y < 512; y += 2) {
     for (let x = 0; x < 512; x += 2) {
