@@ -1382,14 +1382,15 @@ export class Sanctuary {
         break;
       }
       case "warehouse":
-        // Eye level on the board side of the wall (world −X). Yaw −π/2 puts
-        // the camera there; the offset shows the corner, and the shallow
-        // pitch keeps the ground line in frame.
+        // Whole building, from the board side, slightly off the face so the
+        // corner, the rust roof and the ground line are all in frame. 42 m
+        // put the camera on the wall; 88 m holds the 60 m length.
+        this.orbit.autoRotate = false;
         this.orbit.panTo(
-          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 2, WAREHOUSE_Z),
-          42,
-          -Math.PI / 2 + 0.3,
-          0.12,
+          this.tmpV.set(WAREHOUSE_X, terrainHeight(WAREHOUSE_X, WAREHOUSE_Z) + 3.2, WAREHOUSE_Z),
+          88,
+          -Math.PI / 2 + 0.58,
+          0.18,
         );
         break;
       case "reading":

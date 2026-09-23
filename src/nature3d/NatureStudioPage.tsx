@@ -43,10 +43,10 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "world", label: "World", Icon: Globe2 },
   { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
+  { key: "warehouse", label: "Warehouse", Icon: Warehouse },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },
-  { key: "warehouse", label: "Warehouse", Icon: Warehouse },
 ];
 
 /**
