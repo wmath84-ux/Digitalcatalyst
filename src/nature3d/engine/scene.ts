@@ -30,7 +30,7 @@ import {
   type QualityBudget,
   type QualityTier,
 } from "./quality";
-import { createTextures, halveTextureSet, patchGroundPhoto, GROUND_PHOTO_URL, type TextureSet } from "./textures";
+import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GROUND_PHOTO_URL, type TextureSet } from "./textures";
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
@@ -484,6 +484,15 @@ export class Sanctuary {
       this.water.materials.forEach(halfPrecisionMaterial);
       this.water.iceMaterials.forEach(halfPrecisionMaterial);
     }
+
+    // USER DIRECTIVE (the "small flat cube of water" GLB): its exact baked
+    // water maps — caustics, roughness glint, photographic surface — stream
+    // onto EVERY water (the centre river, the ocean, the fall) with the
+    // procedural water as the instant frame-one look and the permanent
+    // fallback. Pure shader-side animation; nothing new on the CPU.
+    void loadWaterPhotos(aniso).then((photos) => {
+      if (photos) this.water.setPhotos(photos);
+    });
 
     // THE BAY DISTRICT — jetty, props, distant islands.
     // Built from the same height field everything else reads, so the bay

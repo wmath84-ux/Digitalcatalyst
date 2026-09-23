@@ -98,6 +98,48 @@ export function halveTextureSet(set: TextureSet): void {
 export const GROUND_PHOTO_URL = "sanctuary/ground_field.jpg";
 
 /**
+ * The three baked maps of the Sketchfab "small flat cube of water" GLB —
+ * the exact material the owner asked to wear every water surface:
+ *
+ *   • `caustics`  — greyscale wave-caustic noise (the GLB's base-colour
+ *     multiply / specular map). THE visible water pattern, animated.
+ *   • `roughness` — the GLB's metallicRoughness map, kept as PNG because its
+ *     smooth/rough information lives in the red/green separation and 4:2:0
+ *     JPEG chroma subsampling would average it away.
+ *   • `emissive`  — the GLB's own photographic ocean surface.
+ *
+ * Loaded once, lazily; a failed fetch resolves to null and the procedural
+ * water carries on unchanged (a missing photo is cosmetic, never fatal).
+ */
+export interface WaterPhotoSet {
+  caustics: THREE.Texture;
+  roughness: THREE.Texture;
+  emissive: THREE.Texture;
+}
+
+export function loadWaterPhotos(anisotropy: number): Promise<WaterPhotoSet | null> {
+  const loader = new THREE.TextureLoader();
+  const load = (url: string, srgb: boolean) =>
+    loader.loadAsync(`sanctuary/${url}`).then((t) => {
+      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = Math.min(4, anisotropy);
+      return t;
+    });
+  return Promise.all([
+    load("water_caustics.jpg", true),
+    load("water_roughness.png", false), // data, not colour — must stay linear
+    load("water_surface.jpg", true),
+  ])
+    .then(([caustics, roughness, emissive]) => ({ caustics, roughness, emissive }))
+    .catch((err) => {
+      console.warn("[sanctuary] water photos failed to load; keeping the procedural water:", err);
+      return null;
+    });
+}
+
+/**
  * Swap the placeholder grit for the aerial farmland photo once it streams
  * in. Purely an image swap on the LIVE texture: colour space, wrap and the
  * shells' baked UV scale stay untouched, so the world never relayouts — the
