@@ -537,55 +537,47 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         `,
       )
       .replace(
-        "#include <map_fragment>",
+        "#include <color_fragment>",
         /* glsl */ `
-        #include <map_fragment>
+        #include <color_fragment>
 
-        // MACRO VARIATION — the same ground detail sampled 4× larger, so broad
-        // patches of the meadow shift warmer/cooler and the tile stops repeating
-        // visibly. Two fetches in total; on a surface that fills the screen this
-        // is the cheapest large-scale variation there is. (With the 34 m
-        // field-photo tile the macro fetch spans ~136 m — the photo's own
-        // parcel variety carries the mid scale, this keeps only the broad drift.)
+        // USER DIRECTIVE ("field ka exact design"): the ground IS the aerial
+        // farmland photo — its own greens, parcels and plough rows lead, and
+        // the vertex colours (grass/rock/snow bands) only GRADE them. The old
+        // multiply-only treatment let the biome tint swamp the photo, which
+        // is why the field never changed visually.
+        //
+        // diffuseColor here is exactly the map texel (the material colour is
+        // white), so the photo costs ONE fetch; the macro fetch adds the
+        // broad warm/cool drift that stops the tile reading as a tile.
+        vec3 dcTexel = diffuseColor.rgb;
         vec3 dcMacro = texture2D( map, vMapUv * 0.25 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
-        diffuseColor.rgb *= mix( 0.96, 1.22, dcMacroL );
+        vec3 dcGrade = mix( vec3( 1.0 ), vColor, 0.42 ) * mix( 0.94, 1.14, dcMacroL );
+        vec3 dcGround = dcTexel * dcGrade * 1.22;
 
-        // SHORELINE (per-pixel, Phase 4/5). vDcWorldPos.y is the fragment's own
-        // ground height, so distance to the waterline costs one subtract — and
-        // unlike a vertex-colour band it stays razor-crisp on the outer shell,
-        // whose vertices are ~9 m apart. Three bands:
-        //   wet sand  — the tide's reach, darkened and saturated;
-        //   foam line — the surf left ON THE SAND right at the waterline,
-        //               broken up with the macro texture so it never reads
-        //               as a painted stripe;
-        //   bed       — below the waterline the sand sinks toward the deep
-        //               lagoon bed, which is what the transparent ocean
-        //               composites over.
+        // SHORELINE (per-pixel, Phase 4/5) — unchanged bands, now applied to
+        // the photo-dominant colour so the tide still reads on it.
         float dcShore = vDcWorldPos.y - uDcOceanLevel;
         float dcSwash = dcMacroL * 1.4;
         if ( dcShore < 3.2 ) {
-          // Wet band: 0 at the waterline → gone by ~+2.4 m.
           float dcWet = 1.0 - smoothstep( 0.1 + dcSwash, 2.2 + dcSwash, dcShore );
-          diffuseColor.rgb *= mix( 1.0, 0.66, dcWet * 0.85 );
-          // Surf foam hugging the waterline on the wet band only.
+          dcGround *= mix( 1.0, 0.66, dcWet * 0.85 );
           float dcFoam = ( 1.0 - smoothstep( 0.02 + dcSwash * 0.4, 0.5 + dcSwash * 0.6, dcShore ) )
                        * step( 0.0, dcShore )
                        * smoothstep( 0.35, 0.75, dcMacroL + 0.25 * sin( vDcWorldPos.x * 0.7 + vDcWorldPos.z * 0.5 ) );
-          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.92, 0.97, 0.97 ), clamp( dcFoam, 0.0, 1.0 ) * 0.8 );
-          // Under the water: teal shift with depth, so the shelf reads through
-          // the transparent ocean instead of as raw sand.
+          dcGround = mix( dcGround, vec3( 0.92, 0.97, 0.97 ), clamp( dcFoam, 0.0, 1.0 ) * 0.8 );
           float dcBed = clamp( -dcShore / 10.0, 0.0, 1.0 );
-          diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.035, 0.10, 0.22 ), dcBed * 0.85 );
+          dcGround = mix( dcGround, vec3( 0.035, 0.10, 0.22 ), dcBed * 0.85 );
         }
 
-        // ASPECT TINT — warm on the sunlit faces, cool where the sky bounces
-        // into the shade, applied to ALBEDO rather than to light so it survives
-        // every hour: "ek hi rock dopahar mein warm grey lagta hai aur shaam
-        // mein purple/orange tone capture karta hai" (research §10).
+        // ASPECT TINT — warm on the sunlit faces, cool in sky-bounced shade
+        // (research §10); on albedo so it survives every hour.
         vec2 dcFlat = normalize( vDcWorldNormal.xz + vec2( 1e-4 ) );
         float dcFacing = dot( dcFlat, normalize( uDcSunSide ) );
-        diffuseColor.rgb *= mix( vec3( 0.94, 0.97, 1.06 ), vec3( 1.06, 1.02, 0.94 ), smoothstep( -0.6, 0.6, dcFacing ) );
+        dcGround *= mix( vec3( 0.94, 0.97, 1.06 ), vec3( 1.06, 1.02, 0.94 ), smoothstep( -0.6, 0.6, dcFacing ) );
+
+        diffuseColor.rgb = dcGround;
         `,
       );
   };

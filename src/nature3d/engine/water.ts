@@ -134,11 +134,11 @@ export function createWater(
     // here is dielectric Fresnel — which is what water actually is — and the
     // injection below supplies it in full; parking metalness at 0.42 on top
     // would double-count the same highlight and kill the diffuse body.
-    // USER DIRECTIVE (water colour): a real river is saturated blue, not a
-    // white-cyan sheet. The albedo map is kept for flow, but the body colour
-    // in the shader owns the look. DoubleSide so a camera under the surface
-    // still sees water instead of a culled backface.
-    color: 0x0d6ad0,
+    // USER DIRECTIVE (the "small flat cube of water" GLB): the water IS the
+    // GLB's bright turquoise — baseColorFactor (0.35, 0.86, 0.88) ≈ #59dce1.
+    // The albedo map is kept for flow, but the body colour in the shader owns
+    // the look. DoubleSide so a camera under the surface still sees water.
+    color: 0x59dce1,
     roughness: 0.18,
     metalness: 0.0,
     transparent: true,
@@ -235,14 +235,14 @@ export function createWater(
         // The channel is deepest along its centre line, so the distance from
         // that line is a stand-in for the water column that costs no extra
         // geometry or depth pass (principle 39: fake the part nobody checks).
-        // USER DIRECTIVE (natural blue): shallow is sky-blue, the channel
-        // saturates to sapphire. Green is pulled out of both stops so the
-        // river never reads as turquoise.
+        // USER DIRECTIVE (the GLB cube): the whole channel lives in the GLB's
+        // turquoise — bright #7fe7ea over the shelf, saturated #0aa0c4 in the
+        // deep current. The caustic noise then carves bright wave threads
+        // through it, strongly (0.45 → 1.35), so the texture is unmistakable.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 5.4, dcBank);
-        // Saturated river blue throughout — no white-cyan, no centre stripe.
-        vec3 dcDeep = vec3(0.010, 0.095, 0.420);       // sRGB #0e4cb0
-        vec3 dcShallow = vec3(0.035, 0.220, 0.720);    // sRGB #1a78d6
+        vec3 dcDeep = vec3(0.007, 0.330, 0.500);       // sRGB #0aa0c4
+        vec3 dcShallow = vec3(0.210, 0.790, 0.820);    // sRGB #7fe7ea — the GLB base
         vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
 
         // ── THE GLB WATER TEXTURE (small_flat_cube_of_water.glb) ────────
@@ -259,7 +259,7 @@ export function createWater(
           texture2D(uCaustics, dcUv * 2.3 + 0.41 - dcFlow * (dcPhase1 - 0.5) * 1.3).r,
           dcMix);
         #endif
-        dcBody *= 0.66 + dcCau * 0.70;
+        dcBody *= 0.45 + dcCau * 0.90;
 
         // Sky reflection is kept QUIET so the body stays water-coloured
         // instead of bleaching to white-blue along the centre line.
@@ -284,13 +284,17 @@ export function createWater(
         // keeps it honest at every hour (never glowing at midnight).
         #ifndef DC_WATER_LOW
         vec3 dcPhoto = texture2D(uEmis, dcUv * 0.6 + vec2(uTime * 0.008, 0.0)).rgb;
-        dcCol = mix(dcCol, dcPhoto * (uWsun * 0.85 + uWsky * 0.45) * 1.35, 0.26);
+        dcCol = mix(dcCol, dcPhoto * (uWsun * 0.85 + uWsky * 0.45) * 1.35, 0.12);
         #endif
 
         // Shoreline foam — a thin bank only, never a white stripe down the
         // middle of the channel.
         float dcEdge = smoothstep(5.15, 6.25, dcBank);
         float dcFoam = dcEdge * 0.35 * smoothstep(0.45, 0.9, dcRipple);
+
+        // Caustic-driven sparkles: the sun's hot spot rides the SAME moving
+        // caustic pattern — shine that dances with the waves.
+        dcCol += uWsun * pow(max(dot(dcNormal, dcH), 0.0), 60.0) * dcCau * 0.22;
 
         dcCol = mix(dcCol, vec3(0.42, 0.62, 0.78), clamp(dcFoam, 0.0, 0.4));
 
@@ -649,9 +653,11 @@ export function createWater(
           //   2.5–9 m   clear sapphire
           //   9 m +     deep, saturated sea blue
           float dcD = clamp( vDcDepth, 0.0, 14.0 );
-          vec3 dcShallowC = vec3( 0.030, 0.210, 0.700 );  // water blue
-          vec3 dcMidC     = vec3( 0.012, 0.130, 0.560 );  // mid
-          vec3 dcDeepC    = vec3( 0.004, 0.045, 0.280 );  // deep sea
+          // USER DIRECTIVE (the GLB cube): turquoise sea — bright shelf,
+          // saturated mid, teal deep. No navy anywhere.
+          vec3 dcShallowC = vec3( 0.130, 0.750, 0.790 );  // sRGB #66e0e6
+          vec3 dcMidC     = vec3( 0.026, 0.480, 0.550 );  // sRGB #2cb8c4
+          vec3 dcDeepC    = vec3( 0.004, 0.210, 0.350 );  // sRGB #0e7c9e
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
 
@@ -667,7 +673,7 @@ export function createWater(
             texture2D( uCaustics, dcUv * 5.6 + 0.27 - dcFlowB * ( dcPhase1 - 0.5 ) * 0.8 ).r,
             dcMix );
           #endif
-          dcBody *= 0.68 + dcCau * 0.66;
+          dcBody *= 0.46 + dcCau * 0.92;
 
           vec3 dcSky = uWsky * 0.5 + uWsun * 0.05;
           vec3 dcH = normalize( dcView + uSunDir );
@@ -688,8 +694,10 @@ export function createWater(
           // honest at every hour.
           #ifndef DC_WATER_LOW
           vec3 dcPhoto = texture2D( uEmis, dcUv * 2.3 + vec2( uTime * 0.006, -uTime * 0.004 ) ).rgb;
-          dcCol = mix( dcCol, dcPhoto * ( uWsun * 0.85 + uWsky * 0.45 ) * 1.35, 0.30 );
+          dcCol = mix( dcCol, dcPhoto * ( uWsun * 0.85 + uWsky * 0.45 ) * 1.35, 0.15 );
           #endif
+
+          dcCol += uWsun * pow( max( dot( dcNormal, dcH ), 0.0 ), 60.0 ) * dcCau * 0.22;
 
           float dcBreak = texture2D( uFlowMap, dcUv * 3.1 + vec2( uTime * 0.02, -uTime * 0.017 ) ).r;
           float dcLine = 0.85 + 0.55 * sin( uTime * 0.7 + vDcWorld.x * 0.05 + vDcWorld.z * 0.043 );
