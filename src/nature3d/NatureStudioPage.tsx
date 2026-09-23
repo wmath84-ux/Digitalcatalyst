@@ -362,6 +362,11 @@ export default function NatureStudioPage() {
             The tray can be hidden from inside the menu itself, and one tap
             on the bottom-right eye brings every button back. ── */}
         {!hudHidden && trayVisible ? (
+        <p className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md">
+          Two fingers fly · double-tap to go
+        </p>
+        ) : null}
+        {!hudHidden && trayVisible ? (
         <nav
           ref={hudTrayRef}
           aria-label="Study boards and all controls"

@@ -17,7 +17,7 @@
 // never stutters when a frame is long.
 
 import * as THREE from "three";
-import { terrainHeight, WORLD_HALF } from "./terrain";
+import { OCEAN_LEVEL, terrainHeight, WORLD_HALF } from "./terrain";
 
 /** Frame-rate independent smoothing factor. */
 export function damp(k: number, dt: number): number {
@@ -163,6 +163,44 @@ export class OrbitRig {
     // world-derived one above, so pulling back always lands on a view of the
     // world rather than on empty sky beyond its edge.
     this.targetDistance = THREE.MathUtils.clamp(this.targetDistance * factor, 2.4, this.maxDistance);
+  }
+
+  /**
+   * Slide the whole rig, in metres. `strafe` is camera-right, `ahead` is
+   * along the look direction flattened onto the ground, `lift` is world up.
+   * The look point stays on the meadow unless the drone is climbing, so a
+   * flight across the island never stares into the sky or the dirt.
+   */
+  fly(strafe: number, ahead: number, lift: number) {
+    const yaw = this.yaw;
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+    const rx = Math.cos(yaw);
+    const rz = -Math.sin(yaw);
+    this.target.x += rx * strafe + fx * ahead;
+    this.target.z += rz * strafe + fz * ahead;
+    const lim = WORLD_HALF * 0.92;
+    this.target.x = THREE.MathUtils.clamp(this.target.x, -lim, lim);
+    this.target.z = THREE.MathUtils.clamp(this.target.z, -lim, lim);
+    const sampled = terrainHeight(this.target.x, this.target.z);
+    // Over the river or the sea the analytic bed is below the water. The
+    // drone skims the surface instead of diving.
+    const ground = sampled < OCEAN_LEVEL ? OCEAN_LEVEL : sampled;
+    if (lift !== 0) {
+      this.target.y = THREE.MathUtils.clamp(this.target.y + lift, ground + 0.6, ground + 900);
+    } else {
+      this.target.y = ground + 1.8;
+    }
+  }
+
+  /**
+   * Two-finger drag, in CSS pixels. The ground follows the fingers — drag a
+   * far house to the centre and the drone flies there. Speed scales with
+   * distance, so one swipe crosses the island and a close swipe is precise.
+   */
+  flyByDrag(sx: number, sy: number) {
+    const speed = Math.max(this.distance, 6) * 0.0032;
+    this.fly(-sx * speed, sy * speed, 0);
   }
 
   panTo(target: THREE.Vector3, distance: number, yaw?: number, pitch?: number) {
