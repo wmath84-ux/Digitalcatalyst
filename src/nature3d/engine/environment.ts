@@ -527,20 +527,23 @@ export function siteAt(x: number, z: number, out: Site = createSite()): Site {
  * do not add another octave.
  */
 export function dryCover(x: number, z: number, h: number, wet = 0): number {
-  // The belt only changes how dry a rise gets. The shape is the height
-  // field: ridges shed water, hollows and channels stay grass. A noise
-  // oval would be the random patch the learner already rejected.
+  // Green is the ground. Desert is the rises that shed water, plus a thin
+  // wash on drained soil so no district is only lawn. The old rise started
+  // at h = −0.35, so ordinary meadow counted as desert and the whole island
+  // went to sand. Hollows and the study stay grass. A noise oval is still
+  // not the shape — height and drainage are.
   const belt = noise.noise2D(x * 0.0022 + 4.8, z * 0.0019 - 2.2) * 0.5 + 0.5;
-  const drained = 1 - Math.min(1, wet * 1.8);
-  const rise = Math.min(1, Math.max(0, (h + 0.35) / 2.0));
-  let dry = rise * (0.42 + 0.58 * belt);
-  dry *= 0.3 + 0.7 * drained;
-  // Every district keeps some bare earth on its rises, even inside a
-  // greener belt, so the land is never only green.
-  if (dry < rise * 0.28 * drained) dry = rise * 0.28 * drained;
-  const clearing = 1 - smoothstep(22, 48, Math.hypot(x, z));
-  dry *= 1 - clearing * 0.35;
-  return dry < 0 ? 0 : dry > 1 ? 1 : dry;
+  const drained = 1 - Math.min(1, wet * 2.1);
+  const rise = smoothstep(1.35, 4.6, h);
+  const wash = 0.07 * drained * (0.35 + 0.65 * belt);
+  let dry = rise * (0.28 + 0.55 * belt) * (0.2 + 0.8 * drained);
+  if (dry < wash) dry = wash;
+  // A little bare earth on every rise, even inside a greener belt.
+  const floor = rise * 0.12 * drained;
+  if (dry < floor) dry = floor;
+  const clearing = 1 - smoothstep(16, 40, Math.hypot(x, z));
+  dry *= 1 - clearing * 0.55;
+  return dry < 0 ? 0 : dry > 0.78 ? 0.78 : dry;
 }
 
 
@@ -583,11 +586,11 @@ export function groundColorAt(
   const worn = wornIn ?? pathWeight(x, z);
 
   // ── Base: lush ↔ dry ──────────────────────────────────────────────
-  // Dry belts follow drainage and the broad soil field (dryCover), not a
-  // sine speckle. The lerp is strong enough that a rise in a dry belt reads
-  // as earth, not as green with a tint.
+  // Dry ground follows drainage and the rises (dryCover), not a speckle.
+  // The lerp is held back so a dry rise reads as earth and the flats stay
+  // grass — green is the majority, desert shows through on the high ground.
   const dry = dryCover(x, z, h, wet);
-  out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.92));
+  out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.84));
 
   // ── Drainage: mossy darkening, not brown mud ──────────────────────
   out.lerp(palette.mud, clamp01(wet * 0.55 - 0.18));

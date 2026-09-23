@@ -156,9 +156,9 @@ function boxImpostor(halfX: number, halfZ: number): THREE.Mesh {
   const roofY = WAREHOUSE_HEIGHT * 0.82;
   for (let i = 0; i < position.count; i += 1) {
     const roof = position.getY(i) > roofY;
-    color[i * 3] = roof ? 0.55 : 0.34;
-    color[i * 3 + 1] = roof ? 0.3 : 0.32;
-    color[i * 3 + 2] = roof ? 0.16 : 0.29;
+    color[i * 3] = roof ? 0.62 : 0.45;
+    color[i * 3 + 1] = roof ? 0.32 : 0.28;
+    color[i * 3 + 2] = roof ? 0.12 : 0.16;
   }
   geo.setAttribute("color", new THREE.BufferAttribute(color, 3));
   geo.computeBoundingSphere();
@@ -197,6 +197,17 @@ function prepareMaterial(
     std.side = THREE.DoubleSide;
     if (!map) std.color.set(0x8a8174);
   }
+  // The bake's photos are grey metal. A multiply pulls them toward timber,
+  // rust thatch and packed earth so the shell reads as a jungle house, not
+  // a white box. Door and window keep their own maps.
+  const tint = mesh.name === "warehouse-roof" ? 0xc46832
+    : mesh.name === "warehouse-wall" || mesh.name === "warehouse-metal" ? 0x8a5a38
+    : mesh.name === "warehouse-concrete" || mesh.name === "warehouse-steps" ? 0x8a7050
+    : mesh.name === "warehouse-door" ? 0x6a4030
+    : mesh.name === "warehouse-window" ? 0xc5d2bc
+    : 0xffffff;
+  const matNow = mesh.material as THREE.MeshStandardMaterial;
+  if (matNow?.color) matNow.color.setHex(tint);
   if (map) {
     map.anisotropy = anisotropy;
     map.colorSpace = THREE.SRGBColorSpace;

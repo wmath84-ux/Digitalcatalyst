@@ -240,8 +240,8 @@ function buildRing(
     // Dry rises keep a few blades. A full sward there hides the earth and
     // the land reads as green everywhere. Wet hollows are not touched.
     const dry = dryCover(x, z, y, flowWetness(x, z));
-    if (dry > 0.62 && Math.random() < 0.86) return false;
-    if (dry > 0.38 && Math.random() < 0.5) return false;
+    if (dry > 0.7 && Math.random() < 0.72) return false;
+    if (dry > 0.5 && Math.random() < 0.32) return false;
     return true;
   };
 

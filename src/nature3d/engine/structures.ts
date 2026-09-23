@@ -108,19 +108,21 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── ONE MATERIAL LANGUAGE (Phase 13) ─────────────────────────────────
   // Ten flat, cheap materials; every part merges into the matching one.
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1eada, roughness: 0.92, vertexColors: true });
-  const accentMat = new THREE.MeshStandardMaterial({ color: 0x17a2ab, roughness: 0.55 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0xe9e3d2, roughness: 0.85, vertexColors: true });
-  const thatchMat = new THREE.MeshLambertMaterial({ color: 0xc7a566 });
+  // Jungle houses, not white villas. Timber, packed earth, thatch, moss.
+  // Vertex AO multiplies these, so a cream albedo was what read as white.
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x6a4630, roughness: 0.94, vertexColors: true });
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0x3e6b34, roughness: 0.78 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x8d5a30, roughness: 0.92, vertexColors: true });
+  const thatchMat = new THREE.MeshLambertMaterial({ color: 0xb08448 });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x9fd4e8,
-    roughness: 0.14,
-    metalness: 0.25,
-    envMapIntensity: 1.4,
+    color: 0x6e8c74,
+    roughness: 0.42,
+    metalness: 0.04,
+    envMapIntensity: 0.55,
   });
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a7648, roughness: 0.8, vertexColors: true });
-  const concreteMat = new THREE.MeshStandardMaterial({ color: 0xd9d3c3, roughness: 0.95, vertexColors: true });
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf7f5ef, roughness: 0.7 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.88, vertexColors: true });
+  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x7a654c, roughness: 0.96, vertexColors: true });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0x8a6240, roughness: 0.84 });
   const hullMat = new THREE.MeshStandardMaterial({ color: 0x2e86a8, roughness: 0.6, vertexColors: true });
   const islandMat = new THREE.MeshLambertMaterial({ color: 0x3aaa48 });
 
@@ -235,6 +237,11 @@ export function createStructures(budget: QualityBudget): Structures {
     cosA * (shoreR + sea) - sinA * along,
     sinA * (shoreR + sea) + cosA * along,
   ];
+  // The houses stood on this azimuth 1.1 km out and read as white specks.
+  // They now sit 40 m past the notes board (outer corner ≈ 39.5, −42),
+  // facing the study, clear of the warehouse yard and the river. The jetty
+  // and the boat stay on the water — they are not houses.
+  const HAMLET_YAW = Math.atan2(66, -72 - 2.6);
   const groundAt = (x: number, z: number) => terrainHeight(x, z);
   const tooWorn = (x: number, z: number) => pathWeight(x, z) > 0.45;
 
@@ -251,8 +258,8 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── 1. COVE VILLA (two storey, the village hero) ─────────────────────
   {
-    const [x, z] = at(-16, -108);
-    const ry = BAY_AZIMUTH + Math.PI / 2 + Math.PI; // face the sea
+    const [x, z] = [52, -82];
+    const ry = HAMLET_YAW;
     const g = padTop(x, z, 9.5, 7.5, ry);
     const fh = 3.05;
     // Ground floor: solid back + glass front.
@@ -282,8 +289,8 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── 2. PALM HOUSE (single storey L, wide shade roof) ─────────────────
   {
-    const [x, z] = at(14, -104);
-    const ry = BAY_AZIMUTH + Math.PI / 2;
+    const [x, z] = [68, -88];
+    const ry = HAMLET_YAW;
     const g = padTop(x, z, 8.5, 6.5, ry);
     const fh = 3.2;
     // Two wall ranges forming the L, glass toward the water.
@@ -305,30 +312,31 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── 3. THE REEF PAVILION (open-sided, thatched — the village heart) ──
   {
-    const [x, z] = at(0, -96);
+    const [x, z] = [56, -98];
+    const ry = HAMLET_YAW;
     if (tooWorn(x, z)) { /* the trail threads the pavilion — floor only */ }
     const g = groundAt(x, z);
     add(concreteMat, box(13, 0.55, 9), x, g - 0.05, z);
     const fh = 3.6;
     // Six columns carry the big hip roof.
     for (const [px, pz] of [[-5.4, -3.4], [0, -3.4], [5.4, -3.4], [-5.4, 3.4], [0, 3.4], [5.4, 3.4]]) {
-      const cxc = Math.cos(BAY_AZIMUTH + Math.PI / 2);
-      const szc = Math.sin(BAY_AZIMUTH + Math.PI / 2);
+      const cxc = Math.cos(ry);
+      const szc = Math.sin(ry);
       pillar(x + px * cxc + pz * szc, g + 0.22, z - px * szc + pz * cxc, 0.16, fh);
     }
     hipRoof(x, g + 0.2 + fh, z, 8.6, 3.1);
     // Back wall + long reception counter (accent front).
-    add(wallMat, box(10.8, fh - 0.4, 0.24), x, g + 0.22 + (fh - 0.4) / 2, z + 4.35, BAY_AZIMUTH + Math.PI / 2);
-    add(woodMat, box(5.6, 1.05, 0.7), x, g + 0.22 + 0.52, z + 1.6, BAY_AZIMUTH + Math.PI / 2);
-    add(accentMat, box(5.6, 0.1, 0.78), x, g + 0.22 + 1.08, z + 1.6, BAY_AZIMUTH + Math.PI / 2, false);
+    add(wallMat, box(10.8, fh - 0.4, 0.24), x, g + 0.22 + (fh - 0.4) / 2, z + 4.35, ry);
+    add(woodMat, box(5.6, 1.05, 0.7), x, g + 0.22 + 0.52, z + 1.6, ry);
+    add(accentMat, box(5.6, 0.1, 0.78), x, g + 0.22 + 1.08, z + 1.6, ry, false);
     // Sign board over the counter.
-    add(woodMat, box(3.4, 0.8, 0.1), x, g + 0.22 + 2.9, z + 4.15, BAY_AZIMUTH + Math.PI / 2, false);
+    add(woodMat, box(3.4, 0.8, 0.1), x, g + 0.22 + 2.9, z + 4.15, ry, false);
   }
 
   // ── 4. LAGOON SHOPS (3-unit strip) ───────────────────────────────────
   {
-    const [x, z] = at(34, -78);
-    const ry = BAY_AZIMUTH + Math.PI / 2;
+    const [x, z] = [74, -104];
+    const ry = HAMLET_YAW;
     const g = padTop(x, z, 14, 5.4, ry);
     const fh = 3.1;
     add(wallMat, box(14, fh, 0.24), x, g + fh / 2, z + 2.6, ry);
@@ -347,8 +355,8 @@ export function createStructures(budget: QualityBudget): Structures {
 
   // ── 5. UTILITY SHED (small, quiet, believable) ───────────────────────
   {
-    const [x, z] = at(-26, -86);
-    const ry = BAY_AZIMUTH + Math.PI / 2 + 0.3;
+    const [x, z] = [44, -90];
+    const ry = HAMLET_YAW;
     const g = padTop(x, z, 4.4, 3.4, ry);
     const fh = 2.4;
     add(concreteMat, box(4.4, fh, 0.18), x, g + fh / 2, z + 1.65, ry);
@@ -367,7 +375,7 @@ export function createStructures(budget: QualityBudget): Structures {
   // vertical accent the whole coastline composes around. Readable from the
   // meadow vista, from the sea angle, and from everywhere on the beach.
   {
-    const [x, z] = at(-46, -118);
+    const [x, z] = [66, -72];
     const g = groundAt(x, z);
     add(concreteMat, box(5, 1.1, 5), x, g - 0.1, z);
     const shaftH = 11.5;
@@ -461,37 +469,41 @@ export function createStructures(budget: QualityBudget): Structures {
       umbrellas.push(canopy);
     }
   }
-  // Benches along the village path.
-  for (const [along, sea] of [[-9, -88], [22, -84]] as const) {
-    const [x, z] = at(along, sea);
+  // Benches in the hamlet, not on the empty bay.
+  for (const [x, z] of [[58, -90], [70, -96]] as const) {
     const g = groundAt(x, z);
-    const ry = BAY_AZIMUTH + Math.PI / 2;
+    const ry = HAMLET_YAW;
     add(woodMat, box(1.8, 0.09, 0.5), x, g + 0.45, z, ry);
     add(woodMat, box(1.8, 0.5, 0.08), x, g + 0.68, z + 0.24, ry, false);
-    for (const s of [-0.7, 0.7]) {
-      add(woodMat, box(0.09, 0.45, 0.42), x + Math.cos(ry) * s, g + 0.22, z - Math.sin(ry) * s, ry, false);
+    for (const side of [-0.7, 0.7]) {
+      add(woodMat, box(0.09, 0.45, 0.42), x + Math.cos(ry) * side, g + 0.22, z - Math.sin(ry) * side, ry, false);
     }
   }
-  // A driftwood sign at the village entrance + one at the jetty start.
-  for (const [along, sea, text] of [[42, -60, 1], [-4, -18, 0]] as const) {
-    const [x, z] = at(along, sea);
-    const g = groundAt(x, z);
-    add(woodMat, new THREE.CylinderGeometry(0.06, 0.08, 2.2, 6), x, g + 1.1, z, 0, false);
-    const board = box(1.35, 0.5, 0.07);
-    board.rotateZ(text ? 0.05 : -0.04);
-    add(woodMat, board, x, g + 1.85, z, BAY_AZIMUTH + Math.PI / 2 + (text ? 0.5 : 0.2), false);
-  }
-  // Fence runs framing the pavilion approach (stops the village reading as
-  // objects floating in sand — it has edges).
+  // Driftwood sign at the hamlet entrance, and one still at the jetty.
   {
-    for (let i = 0; i < 9; i += 1) {
-      const [x, z] = at(9 + i * 1.35, -90);
+    const [jx, jz] = at(-4, -18);
+    const spots: Array<[number, number, number, number]> = [
+      [60, -68, 1, HAMLET_YAW],
+      [jx, jz, 0, BAY_AZIMUTH + Math.PI / 2],
+    ];
+    for (const [x, z, text, ry] of spots) {
+      const g = groundAt(x, z);
+      add(woodMat, new THREE.CylinderGeometry(0.06, 0.08, 2.2, 6), x, g + 1.1, z, 0, false);
+      const board = box(1.35, 0.5, 0.07);
+      board.rotateZ(text ? 0.05 : -0.04);
+      add(woodMat, board, x, g + 1.85, z, ry + (text ? 0.5 : 0.2), false);
+    }
+  }
+  // A short fence on the hamlet's near side, so the huts read as a place.
+  {
+    for (let i = 0; i < 8; i += 1) {
+      const x = 48 + i * 1.35;
+      const z = -76;
       const g = groundAt(x, z);
       add(woodMat, box(0.08, 1.0, 0.08), x, g + 0.5, z, 0, false);
-      if (i < 8) {
-        const [x2, z2] = at(9 + (i + 0.5) * 1.35, -90);
-        add(woodMat, box(1.4, 0.07, 0.05), x2, g + 0.82, z2, BAY_AZIMUTH + Math.PI / 2, false);
-        add(woodMat, box(1.4, 0.07, 0.05), x2, g + 0.42, z2, BAY_AZIMUTH + Math.PI / 2, false);
+      if (i < 7) {
+        add(woodMat, box(1.4, 0.07, 0.05), x + 0.67, g + 0.82, z, HAMLET_YAW, false);
+        add(woodMat, box(1.4, 0.07, 0.05), x + 0.67, g + 0.42, z, HAMLET_YAW, false);
       }
     }
   }

@@ -117,8 +117,8 @@ function acceptsTuft(
   if (site.soil < 0.2) return false;
   if (site.wetness > 0.85 && Math.random() < 0.7) return false;
   const dry = dryCover(x, z, y, site.wetness);
-  if (dry > 0.62 && Math.random() < 0.8) return false;
-  if (dry > 0.38 && Math.random() < 0.45) return false;
+  if (dry > 0.7 && Math.random() < 0.68) return false;
+  if (dry > 0.5 && Math.random() < 0.28) return false;
   if (site.crowding > 0.75 && Math.random() < (ring === "far" ? 0.85 : 0.4)) return false;
   return true;
 }
