@@ -23,6 +23,30 @@ import { insideWarehouse } from "./warehouseSite";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
 import type { TextureSet } from "./textures";
 
+// Sanctuary scattering is reproducible: the same seed gives identical
+// placement, silhouettes and ground contact on every load. Keeping one tiny
+// PRNG here also avoids Math.random changing the world between hot reloads.
+let seededRandom = (() => {
+  let state = 0x6d2b79f5;
+  return () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+})();
+
+function resetVegetationSeed(seed = 0x4e415455): void {
+  let state = seed | 0;
+  seededRandom = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export interface Flora {
   group: THREE.Group;
   /** World positions of branch perches, for the bird colony. */
@@ -113,8 +137,8 @@ function treeLayout(count: number): TreeLayout[] {
   while (out.length < count && guard < count * 30) {
     guard += 1;
     // sqrt keeps the density even per unit AREA instead of bunching at the centre.
-    const r = 9 + Math.sqrt(Math.random()) * maxRadius;
-    const a = Math.random() * Math.PI * 2;
+    const r = 9 + Math.sqrt(seededRandom()) * maxRadius;
+    const a = seededRandom() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     if (insideRiver(x, z)) continue;
@@ -134,7 +158,7 @@ function treeLayout(count: number): TreeLayout[] {
     // Ask the environmental field what this spot is like before the tree is
     // built: soil depth decides whether the roots show, crowding decides how
     // much bare trunk it grows, and both are geography, not chance (§1).
-    const roll = Math.random();
+    const roll = seededRandom();
     // THE TROPICAL DISTRIBUTION (Phase 7/8): the coast belongs to the coconut
     // palm; the inland woods stay lush broadleaf with a savanna accent; only
     // the high ground keeps a handful of iron-pines for altitude variety.
@@ -150,8 +174,8 @@ function treeLayout(count: number): TreeLayout[] {
     // Beach palms reach — more sun, less competition, salt wind. Inland
     // palms are the slender, taller variant.
     const scale = site.coastal > 0.3
-      ? 1.0 + Math.random() * 0.5
-      : 0.85 + Math.random() * 0.85;
+      ? 1.0 + seededRandom() * 0.5
+      : 0.85 + seededRandom() * 0.85;
     out.push({
       x,
       z,
@@ -159,17 +183,17 @@ function treeLayout(count: number): TreeLayout[] {
       kind,
       // ~55 % of close trees sway, dropping to ~8 % past 150 m. Over the whole
       // forest that lands near "3 in 10", which is what was asked for.
-      sways: Math.random() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
+      sways: seededRandom() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
       crowding: site.crowding,
       soil: site.soil,
-      variant: (Math.random() * 5) | 0,
+      variant: (seededRandom() * 5) | 0,
       // Beach palms lean OUT TO SEA — the outward radial — with a few
       // rebellious leaners for naturalism. Inland palms keep a small
       // random lean; broadleaf/pine/acacia ignore it.
       leanAngle: kind === "palm"
-        ? (site.coastal > 0.3 && Math.random() < 0.72
+        ? (site.coastal > 0.3 && seededRandom() < 0.72
             ? Math.atan2(z, x)
-            : Math.random() * Math.PI * 2)
+            : seededRandom() * Math.PI * 2)
         : 0,
       coastal: site.coastal,
       impostor: r > IMPOSTOR_RADIUS,
@@ -179,6 +203,7 @@ function treeLayout(count: number): TreeLayout[] {
 }
 
 export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
+  resetVegetationSeed();
   const group = new THREE.Group();
   group.name = "flora";
   const shadows = budget.shadowMapSize > 0;
@@ -459,12 +484,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         { h: 5.0, bend: 0.11, crown: 2.4, fronds: 9, droop: 0.95 },  // E: the stout one
       ] as const;
       const P = PALMS[t.variant % PALMS.length];
-      const trunkH = P.h * s * (0.92 + Math.random() * 0.18);
+      const trunkH = P.h * s * (0.92 + seededRandom() * 0.18);
       const leanDirX = Math.cos(t.leanAngle);
       const leanDirZ = Math.sin(t.leanAngle);
       // Beach palms commit to the lean (salt wind, phototropism over open
       // water); inland palms only suggest it.
-      const totalLean = P.bend * (t.coastal > 0.3 ? 1 : 0.45) * (0.75 + Math.random() * 0.5);
+      const totalLean = P.bend * (t.coastal > 0.3 ? 1 : 0.45) * (0.75 + seededRandom() * 0.5);
       const SEGS = 5;
       let px = t.x;
       let pz = t.z;
@@ -510,9 +535,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       // (Impostor palms skip them — the silhouette card already implies the
       // crown cluster, and a nut at 200 m is sub-pixel.)
       if (!t.impostor) {
-        const nuts = 2 + ((Math.random() * 2) | 0);
+        const nuts = 2 + ((seededRandom() * 2) | 0);
         for (let n = 0; n < nuts; n += 1) {
-          const na = (n / nuts) * Math.PI * 2 + Math.random();
+          const na = (n / nuts) * Math.PI * 2 + seededRandom();
           const nut = new THREE.SphereGeometry(0.15 * s, 6, 5);
           const nPos = nut.attributes.position as THREE.BufferAttribute;
           const nCol = new Float32Array(nPos.count * 3);
@@ -535,15 +560,15 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         for (let k = 0; k < 2; k += 1) {
           if (palmImpostorIndex >= palmImpostors.instanceMatrix.count) break;
           dummy.position.set(t.x, baseY + imH / 2, t.z);
-          dummy.rotation.set(0, (k * Math.PI) / 2 + Math.random() * 0.4, 0);
+          dummy.rotation.set(0, (k * Math.PI) / 2 + seededRandom() * 0.4, 0);
           dummy.scale.set(imW, imH, 1);
           dummy.updateMatrix();
           palmImpostors.setMatrixAt(palmImpostorIndex, dummy.matrix);
           // A salt-stressed palm is yellower; a sheltered one deeper green.
           color.setHSL(
-            0.30 + Math.random() * 0.03,
-            0.62 + Math.random() * 0.12,
-            0.34 - t.crowding * 0.04 + Math.random() * 0.09,
+            0.30 + seededRandom() * 0.03,
+            0.62 + seededRandom() * 0.12,
+            0.34 - t.crowding * 0.04 + seededRandom() * 0.09,
           );
           palmImpostors.setColorAt(palmImpostorIndex, color);
           palmImpostorIndex += 1;
@@ -559,29 +584,29 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       const frondRoll = new THREE.Quaternion();
       const frondDir = new THREE.Vector3();
       const X_AXIS = new THREE.Vector3(1, 0, 0);
-      const unhealthy = t.variant === 2 && Math.random() < 0.4; // some C-palms yellow
+      const unhealthy = t.variant === 2 && seededRandom() < 0.4; // some C-palms yellow
       for (let f = 0; f < fronds; f += 1) {
         const slot = t.sways ? frondSwayIndex : frondStillIndex;
         if (slot >= cap) break;
-        const yaw = (f / fronds) * Math.PI * 2 + Math.random() * 0.5;
+        const yaw = (f / fronds) * Math.PI * 2 + seededRandom() * 0.5;
         // Fronds near the top stay almost upright; outer ones droop. The
         // archetype's `droop` scales the whole fan — archetype D sags hardest.
         const rank = f % 3; // 0 upright, 1 mid, 2 outer
         const pitch = rank === 0
-          ? 0.1 + Math.random() * 0.16
+          ? 0.1 + seededRandom() * 0.16
           : rank === 1
-            ? 0.42 + Math.random() * 0.2
-            : (0.78 + Math.random() * 0.26) * P.droop;
+            ? 0.42 + seededRandom() * 0.2
+            : (0.78 + seededRandom() * 0.26) * P.droop;
         const cp = Math.cos(pitch);
         frondDir.set(Math.cos(yaw) * cp, -Math.sin(pitch), Math.sin(yaw) * cp).normalize();
         frondQ.setFromUnitVectors(X_AXIS, frondDir);
         // A little twist around the frond's own axis so cards never pair up
         // into visible mirrored planes.
-        frondRoll.setFromAxisAngle(frondDir, (Math.random() - 0.5) * 0.55);
+        frondRoll.setFromAxisAngle(frondDir, (seededRandom() - 0.5) * 0.55);
         frondQ.premultiply(frondRoll);
         dummy.position.set(crownX, crownY + 0.08 * s, crownZ);
         dummy.quaternion.copy(frondQ);
-        const len = crownR * (1.25 + Math.random() * 0.4);
+        const len = crownR * (1.25 + seededRandom() * 0.4);
         dummy.scale.set(len, len * 0.52, 1);
         dummy.updateMatrix();
         target.setMatrixAt(slot, dummy.matrix);
@@ -589,9 +614,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // deeper, then yellow. Hue jitter keeps no two fronds identical.
         const outer = rank / 2;
         color.setHSL(
-          unhealthy ? 0.22 + Math.random() * 0.03 : 0.30 + outer * 0.014 + Math.random() * 0.012,
-          unhealthy ? 0.58 : 0.64 + outer * 0.1 + Math.random() * 0.08,
-          0.34 + outer * 0.12 + Math.random() * 0.08,
+          unhealthy ? 0.22 + seededRandom() * 0.03 : 0.30 + outer * 0.014 + seededRandom() * 0.012,
+          unhealthy ? 0.58 : 0.64 + outer * 0.1 + seededRandom() * 0.08,
+          0.34 + outer * 0.12 + seededRandom() * 0.08,
         );
         target.setColorAt(slot, color);
         if (t.sways) frondSwayIndex += 1;
@@ -652,10 +677,10 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
 
     // Buttress roots — only where the soil is thin enough to have exposed them.
     if (t.soil < 0.6) {
-      const roots = 4 + ((Math.random() * 3) | 0);
+      const roots = 4 + ((seededRandom() * 3) | 0);
       for (let r = 0; r < roots; r += 1) {
-        const ra = (r / roots) * Math.PI * 2 + Math.random() * 0.5;
-        const rl = (0.7 + Math.random() * 0.6) * s;
+        const ra = (r / roots) * Math.PI * 2 + seededRandom() * 0.5;
+        const rl = (0.7 + seededRandom() * 0.6) * s;
         bake(
           woodParts,
           woodColor(new THREE.CylinderGeometry(0.05 * s, 0.16 * s, rl, 5), "branch"),
@@ -679,9 +704,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     const boughCount = isAcacia ? 5 : 4;
     const leading = 1 + Math.round(t.crowding * 2); // crowded trees lead harder for the light
     for (let b = 0; b < boughCount; b += 1) {
-      const even = (b / boughCount) * Math.PI * 2 + Math.random();
-      const toward = sunAzimuth + (Math.random() - 0.5) * 1.2;
-      const heightFrac = 0.72 + Math.random() * 0.2;
+      const even = (b / boughCount) * Math.PI * 2 + seededRandom();
+      const toward = sunAzimuth + (seededRandom() - 0.5) * 1.2;
+      const heightFrac = 0.72 + seededRandom() * 0.2;
       // Upper boughs chase the sun hardest; lower ones keep their radial spread.
       const pull = (b < leading ? 0.55 : 0.18) * heightFrac;
       const vx = Math.cos(even) + Math.cos(toward) * pull;
@@ -718,15 +743,15 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
     // stay. Two or three bare stubs is the cheapest possible proof that this
     // tree has spent years competing (research §5, §11).
     if (t.crowding > 0.5) {
-      const dead = 2 + ((Math.random() * 2) | 0);
+      const dead = 2 + ((seededRandom() * 2) | 0);
       for (let d = 0; d < dead; d += 1) {
-        const da = Math.random() * Math.PI * 2;
-        const dl = (0.5 + Math.random() * 0.5) * s;
+        const da = seededRandom() * Math.PI * 2;
+        const dl = (0.5 + seededRandom() * 0.5) * s;
         bake(
           woodParts,
           woodColor(new THREE.CylinderGeometry(0.02 * s, 0.05 * s, dl, 5), "branch"),
           t.x + Math.cos(da) * dl * 0.4,
-          baseY + trunkH * (0.42 + Math.random() * 0.12),
+          baseY + trunkH * (0.42 + seededRandom() * 0.12),
           t.z + Math.sin(da) * dl * 0.4,
           Math.sin(da) * 1.5,
           0,
@@ -750,16 +775,16 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       for (let k = 0; k < 2; k += 1) {
         if (impostorIndex >= impostors.instanceMatrix.count) break;
         dummy.position.set(t.x, canopyY + spread * 0.35, t.z);
-        dummy.rotation.set(0, (k * Math.PI) / 2 + Math.random() * 0.5, 0);
+        dummy.rotation.set(0, (k * Math.PI) / 2 + seededRandom() * 0.5, 0);
         dummy.scale.set(imScale, imScale * 1.05, imScale);
         dummy.updateMatrix();
         impostors.setMatrixAt(impostorIndex, dummy.matrix);
         // Hue follows the tree's own exposure: a crowded crown is darker (it
         // is in shade), an open one is yellow-green.
         color.setHSL(
-          0.30 + Math.random() * 0.03,
+          0.30 + seededRandom() * 0.03,
           0.62 + t.crowding * 0.08,
-          0.34 - t.crowding * 0.06 + Math.random() * 0.1,
+          0.34 - t.crowding * 0.06 + seededRandom() * 0.1,
         );
         impostors.setColorAt(impostorIndex, color);
         impostorIndex += 1;
@@ -773,10 +798,10 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       const slot = t.sways ? swayIndex : stillIndex;
       if (slot >= cap) break;
       // Hemisphere: cosine-weighted towards the top of the crown.
-      const u = Math.random();
+      const u = seededRandom();
       const cosT = 1 - Math.pow(u, 1.35);
       const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
-      const phi = Math.random() * Math.PI * 2;
+      const phi = seededRandom() * Math.PI * 2;
       // Sunward stretch: the crown is fatter on the side the light comes from.
       const sunward = Math.max(0, Math.cos(phi) * SUN_SIDE_X + Math.sin(phi) * SUN_SIDE_Z);
       const radial = spread * (0.55 + 0.45 * sunward) * sinT;
@@ -785,8 +810,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         canopyY + cosT * spread * (isAcacia ? 0.5 : 0.95) - spread * 0.25,
         t.z + Math.sin(phi) * radial,
       );
-      dummy.rotation.set((Math.random() - 0.5) * 1.6, Math.random() * Math.PI, (Math.random() - 0.5) * 1.6);
-      const size = (1.5 + Math.random() * 1.3) * s;
+      dummy.rotation.set((seededRandom() - 0.5) * 1.6, seededRandom() * Math.PI, (seededRandom() - 0.5) * 1.6);
+      const size = (1.5 + seededRandom() * 1.3) * s;
       dummy.scale.set(size, size, size);
       dummy.updateMatrix();
       target.setMatrixAt(slot, dummy.matrix);
@@ -796,9 +821,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       // temperate olive — the island canopy is vivid but still varied.
       const outer = Math.min(1, radial / Math.max(0.001, spread));
       color.setHSL(
-        0.30 + outer * 0.025 + Math.random() * 0.02,
-        0.64 + outer * 0.12 + Math.random() * 0.08,
-        0.32 + outer * 0.14 - t.crowding * 0.04 + Math.random() * 0.10,
+        0.30 + outer * 0.025 + seededRandom() * 0.02,
+        0.64 + outer * 0.12 + seededRandom() * 0.08,
+        0.32 + outer * 0.14 - t.crowding * 0.04 + seededRandom() * 0.10,
       );
       target.setColorAt(slot, color);
       if (t.sways) swayIndex += 1;
@@ -885,17 +910,17 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   const palette = [0xe8446e, 0xfff0d0, 0xc23fb0, 0xf2a03d, 0xff6b81];
   let fi = 0;
   for (let i = 0; i < budget.flowers * 3 && fi < budget.flowers; i += 1) {
-    const r = 3 + Math.sqrt(Math.random()) * 34;
-    const a = Math.random() * Math.PI * 2;
+    const r = 3 + Math.sqrt(seededRandom()) * 34;
+    const a = seededRandom() * Math.PI * 2;
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     if (insideRiver(x, z)) continue;
     dummy.position.set(x, terrainHeight(x, z) + 0.28, z);
-    dummy.rotation.set(0, Math.random() * Math.PI, 0);
-    dummy.scale.setScalar(0.7 + Math.random() * 0.8);
+    dummy.rotation.set(0, seededRandom() * Math.PI, 0);
+    dummy.scale.setScalar(0.7 + seededRandom() * 0.8);
     dummy.updateMatrix();
     flowers.setMatrixAt(fi, dummy.matrix);
-    color.set(palette[(Math.random() * palette.length) | 0]);
+    color.set(palette[(seededRandom() * palette.length) | 0]);
     flowers.setColorAt(fi, color);
     fi += 1;
   }
@@ -1025,17 +1050,17 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
   const perched: Perched[] = [];
 
   // Shuffle the perches so the birds are spread around the whole forest.
-  const shuffled = perches.slice().sort(() => Math.random() - 0.5);
+  const shuffled = perches.slice().sort(() => seededRandom() - 0.5);
   const wanted = Math.min(budget.perchedBirds, shuffled.length);
   for (let i = 0; i < wanted; i += 1) {
     const p = shuffled[i];
     const g = new THREE.Group();
     g.position.copy(p);
     g.position.y += 0.1;
-    g.rotation.y = Math.random() * Math.PI * 2;
-    g.scale.setScalar(0.8 + Math.random() * 0.5);
+    g.rotation.y = seededRandom() * Math.PI * 2;
+    g.scale.setScalar(0.8 + seededRandom() * 0.5);
 
-    const bodyMesh = new THREE.Mesh(bodyGeos[(Math.random() * bodyGeos.length) | 0], birdMat);
+    const bodyMesh = new THREE.Mesh(bodyGeos[(seededRandom() * bodyGeos.length) | 0], birdMat);
     g.add(bodyMesh);
 
     const wings: [THREE.Object3D, THREE.Object3D] = [new THREE.Group(), new THREE.Group()];
@@ -1053,7 +1078,7 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
     // `head` points at the merged body: the "head flick" is a small yaw on the
     // whole bird, which reads identically at bird scale for a fraction of the
     // cost of a separate skull mesh.
-    perched.push({ g, wings, head: bodyMesh, phase: Math.random() * 10, next: 1 + Math.random() * 6, state: "idle" });
+    perched.push({ g, wings, head: bodyMesh, phase: seededRandom() * 10, next: 1 + seededRandom() * 6, state: "idle" });
   }
 
   // ── Circling birds in the sky ────────────────────────────────────────
@@ -1086,10 +1111,10 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
     flyers.push({
       g,
       wings,
-      radius: 34 + Math.random() * 40,
-      speed: 0.1 + Math.random() * 0.12,
-      height: 16 + Math.random() * 14,
-      angle: Math.random() * Math.PI * 2,
+      radius: 34 + seededRandom() * 40,
+      speed: 0.1 + seededRandom() * 0.12,
+      height: 16 + seededRandom() * 14,
+      angle: seededRandom() * Math.PI * 2,
     });
   }
 
@@ -1100,9 +1125,9 @@ export function createBirds(perches: THREE.Vector3[], tex: TextureSet, budget: Q
         const b = perched[i];
         b.next -= dt;
         if (b.next <= 0) {
-          const roll = Math.random();
+          const roll = seededRandom();
           b.state = roll < 0.45 ? "idle" : roll < 0.7 ? "preen" : roll < 0.9 ? "flutter" : "hop";
-          b.next = 1.2 + Math.random() * 5;
+          b.next = 1.2 + seededRandom() * 5;
         }
         const t = time + b.phase;
         // Branch bob follows the wind so the bird belongs to the tree.
