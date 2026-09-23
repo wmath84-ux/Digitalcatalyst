@@ -73,6 +73,9 @@ import { cullDistanceForPx } from "./cull";
  */
 const BOARD_VIEW_MARGIN = 0.5;
 
+/** The anime skybox panorama (equirect JPEG extracted from the Sketchfab GLB). */
+const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
+
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
   | "trek" | "world" | "warehouse"
@@ -166,6 +169,13 @@ export class Sanctuary {
   private weathering: Weathering;
   private winter: WinterSystem;
   private iceAge = false;
+  /**
+   * The anime skybox (see `sky.ts`): the wanted state, and the lazily-loaded
+   * panorama shared for the life of the scene so toggling never re-downloads.
+   * A failed load resolves to null and the procedural dome simply stays.
+   */
+  private animeSkyWanted = false;
+  private animeSkyTexture: Promise<THREE.Texture | null> | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private rocks: RockField;
   private birds: BirdColony;
@@ -470,11 +480,11 @@ export class Sanctuary {
       this.water.iceMaterials.forEach(halfPrecisionMaterial);
     }
 
-    // THE BAY DISTRICT — buildings, beacon, jetty, props, distant islands.
-    // Built from the same height field everything else reads, so the village
-    // sits on the measured shoreline. Its materials join the air like every
-    // other solid: the far islands and the white tower fade into the haze
-    // exactly as the mountains do (Phase 19 — no full-contrast pastes).
+    // THE BAY DISTRICT — jetty, props, distant islands.
+    // Built from the same height field everything else reads, so the bay
+    // furniture sits on the measured shoreline. Its materials join the air
+    // like every other solid: the far islands fade into the haze exactly as
+    // the mountains do (Phase 19 — no full-contrast pastes).
     this.structures = createStructures(this.budget);
     this.scene.add(this.structures.group);
     this.atmosphere.registerTree(this.structures.group);
@@ -1450,6 +1460,42 @@ export class Sanctuary {
     this.applyDaylight();
   }
 
+  /**
+   * Swap the procedural sky dome for the baked anime panorama
+   * (`sanctuary/skybox_anime_sky.jpg`, extracted from the Sketchfab
+   * "free - skybox anime sky" GLB). Daylight keeps grading it, so this is
+   * safe with any hour and with the Ice Age. The first enable starts one
+   * 2.5 MB download; every later toggle is instant.
+   */
+  setAnimeSky(enabled: boolean) {
+    this.animeSkyWanted = enabled;
+    if (enabled && !this.animeSkyTexture) {
+      this.animeSkyTexture = new THREE.TextureLoader()
+        .loadAsync(ANIME_SKY_URL)
+        .then((t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.mapping = THREE.EquirectangularReflectionMapping;
+          t.wrapS = THREE.RepeatWrapping;
+          t.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+          return t;
+        })
+        .catch((err) => {
+          // A missing skybox is cosmetic — the procedural dome carries on.
+          console.warn("[sanctuary] anime skybox failed to load:", err);
+          return null;
+        });
+    }
+    if (!this.animeSkyTexture) {
+      this.sky.setAnimeSkybox(null);
+      return;
+    }
+    void this.animeSkyTexture.then((t) => {
+      // Honour the LAST wish, not the wish at call time (fast toggles while
+      // the texture is still in flight).
+      this.sky.setAnimeSkybox(this.animeSkyWanted ? t : null);
+    });
+  }
+
   /** Morning / midday / evening, or "auto" to follow the real clock. */
   setDaylightMode(mode: DaylightMode) {
     this.daylightMode = mode;
@@ -1992,6 +2038,8 @@ export class Sanctuary {
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();
+    // The anime panorama is scene-owned (cached for instant re-toggles).
+    void this.animeSkyTexture?.then((t) => t?.dispose());
     this.board.dispose();
     this.student.dispose();
     this.dayBed?.dispose();

@@ -100,6 +100,7 @@ export default function NatureStudioPage() {
   const [liteFx, setLiteFx] = useState(false);
   const [windIdx, setWindIdx] = useState(1);
   const [iceAge, setIceAge] = useState(false);
+  const [animeSky, setAnimeSky] = useState(false);
   const [daylight, setDaylight] = useState<DaylightMode>("auto");
   // Shown next to the buttons so "Auto" is legible — otherwise the learner
   // cannot tell which hour the scene decided on. Ticks once a minute.
@@ -523,6 +524,17 @@ export default function NatureStudioPage() {
                             const next = !iceAge;
                             engineRef.current?.setIceAge(next);
                             setIceAge(next);
+                          }}
+                        />
+                        <MenuItem
+                          Icon={Sparkles}
+                          label="Anime sky"
+                          active={animeSky}
+                          right={animeSky ? "On" : "Off"}
+                          onClick={() => {
+                            const next = !animeSky;
+                            engineRef.current?.setAnimeSky(next);
+                            setAnimeSky(next);
                           }}
                         />
                         <MenuItem

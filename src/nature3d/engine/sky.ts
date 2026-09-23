@@ -18,6 +18,12 @@ export interface SkySystem {
   hemi: THREE.HemisphereLight;
   /** Current sun direction, shared (not copied) with everything that reads it. */
   sunDir: THREE.Vector3;
+  /**
+   * Swap the procedural gradient dome for a baked equirect panorama (or back
+   * with `null`). The texture is owned by the caller (cached across toggles);
+   * the dome mesh and its material are owned here.
+   */
+  setAnimeSkybox(map: THREE.Texture | null): void;
   /** Re-light the whole sky for a moment of the day. */
   applyDaylight(state: DaylightState): void;
   setWinter(enabled: boolean): void;
@@ -131,6 +137,34 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const dome = new THREE.Mesh(new THREE.SphereGeometry(budget.farPlane * 0.46, 32, 20), domeMat);
   dome.renderOrder = -1000;
   group.add(dome);
+
+  // ── Anime panorama dome (optional) ───────────────────────────────────
+  //
+  // `sanctuary/skybox_anime_sky.jpg` — the equirect texture pulled out of the
+  // Sketchfab "free - skybox anime sky" GLB. The GLB itself is not loaded at
+  // runtime: its only content of value is this baked JPEG (the mesh is a
+  // bare sphere), and modern three dropped the KHR_materials_pbrSpecular-
+  // Glossiness extension the file is authored with, so GLTFLoader would hand
+  // back an untextured ball. Drawn instead on OUR sphere with a basic
+  // material, which keeps one draw call and lets daylight keep grading it.
+  //
+  // Nudge this fraction to spin the panorama around the compass (0.25 = 90°).
+  const ANIME_SKY_OFFSET_U = 0.0;
+  let animeMat: THREE.MeshBasicMaterial | null = null;
+  let animeDome: THREE.Mesh | null = null;
+  // Kept from the last applyDaylight so a texture arriving mid-session is
+  // graded on arrival, not lit like noon for a frame.
+  let lastDaylight: DaylightState | null = null;
+  const ANIME_DAY = new THREE.Color(0xffffff);
+  const ANIME_NIGHT = new THREE.Color(0x2a3550);
+  const gradeAnime = (state: DaylightState) => {
+    if (!animeMat) return;
+    // The panorama is baked at noon: stay true to its art in daylight, lean
+    // on the sun's tint near the edges of the day, and sink to a deep blue
+    // multiply at night — never glowing at midnight.
+    animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.1);
+    animeMat.color.lerp(ANIME_NIGHT, 1 - state.dayFactor);
+  };
 
   // ── No mountain ring ─────────────────────────────────────────────────
   //
@@ -340,7 +374,43 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     setWinter(enabled) {
       motes.visible = !enabled;
     },
+    setAnimeSkybox(map) {
+      if (!map) {
+        // Back to the procedural dome. The texture stays cached upstream —
+        // toggling off must not cost a re-download on the next on.
+        if (animeDome) {
+          group.remove(animeDome);
+          animeMat?.dispose();
+          animeMat = null;
+          animeDome = null;
+        }
+        dome.visible = true;
+        return;
+      }
+      if (animeDome) {
+        animeMat!.map = map;
+        animeMat!.needsUpdate = true;
+      } else {
+        animeMat = new THREE.MeshBasicMaterial({
+          map,
+          side: THREE.BackSide,
+          depthWrite: false,
+          fog: false,
+        });
+        map.offset.x = ANIME_SKY_OFFSET_U;
+        map.wrapS = THREE.RepeatWrapping;
+        // Same sphere as the shader dome (shared geometry, one sphere of
+        // VRAM), same draw slot — it REPLACES the dome, never stacks on it.
+        animeDome = new THREE.Mesh(dome.geometry, animeMat);
+        animeDome.renderOrder = -1000;
+        animeDome.frustumCulled = false;
+        group.add(animeDome);
+        dome.visible = false;
+      }
+      if (lastDaylight) gradeAnime(lastDaylight);
+    },
     applyDaylight(state) {
+      lastDaylight = state;
       sunDir.copy(state.sunDir);
       domeMat.uniforms.uSunDir.value.copy(state.sunDir);
       (domeMat.uniforms.uSunColor.value as THREE.Color).copy(state.sunTint);
@@ -356,6 +426,8 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       fill.intensity = state.fillIntensity;
       // Clouds pick up the sun's warmth — pure white at sunset is a dead give-away.
       cloudMat.color.copy(state.sunTint).lerp(CLOUD_WHITE, 0.72);
+      // The anime panorama (when enabled) rides the same hour.
+      gradeAnime(state);
     },
     update(dt, time, wind, camera) {
       // Cloud banks drift
