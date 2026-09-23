@@ -1,18 +1,15 @@
 // src/nature3d/engine/structures.ts
 //
-// THE BAY DISTRICT — buildings, landmark, jetty, props and distant islands.
+// THE BAY DISTRICT — jetty, props and distant islands.
 //
-// Everything here is ORIGINAL, composed from one modular kit, and authored to
-// the same tropical-modern language as the rest of the island (Phase 1/12):
-//
-//   * timber, packed earth and thatch — never a white wall
-//   * ONE accent colour (moss green) reused everywhere
-//   * natural materials where the tropics put them (wood decks, thatch)
-//   * plinths and piles so nothing floats on sloping ground
+// The hamlet buildings (Palm House, Reef Pavilion, Lagoon Shops, Utility
+// Shed and the Bay Beacon) are gone from the Sanctuary: the bay now keeps
+// only the jetty, the beach props, the moored boat and the distant islands.
 //
 // PERFORMANCE SHAPE (Phase 25/26):
 //   * every part is a primitive box/cylinder/cone — no imported models
-//   * parts are MERGED per material, so the whole district is ~10 draw calls
+//   * parts are MERGED per material, so the whole district is a handful of
+//     draw calls
 //   * vertex-colour AO replaces lightmap/AO textures on every module
 //   * the district is static: matrices freeze, bounds are computed once,
 //     frustum culling culls the whole village when it is behind you
@@ -107,35 +104,14 @@ export function createStructures(budget: QualityBudget): Structures {
   const rand = mulberry32(0xba11_05e5);
 
   // ── ONE MATERIAL LANGUAGE (Phase 13) ─────────────────────────────────
-  // Ten flat, cheap materials; every part merges into the matching one.
-  // Painted, and dark enough that distance haze cannot lift them to white.
-  // Vertex AO multiplies these, so a cream albedo was what read as white.
+  // Flat, cheap materials; every part merges into the matching one.
   // No metal, no sky reflection: a specular lobe under this sun clips white.
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x5c3a24, roughness: 0.94, metalness: 0, envMapIntensity: 0, vertexColors: true });
-  const accentMat = new THREE.MeshStandardMaterial({ color: 0x2f6a2c, roughness: 0.9, metalness: 0, envMapIntensity: 0 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a4218, roughness: 0.94, metalness: 0, envMapIntensity: 0, vertexColors: true });
-  const thatchMat = new THREE.MeshLambertMaterial({ color: 0x9a6a32 });
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x3d6e58,
-    roughness: 0.72,
-    metalness: 0,
-    envMapIntensity: 0,
-  });
   const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.92, metalness: 0, envMapIntensity: 0, vertexColors: true });
-  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x6a5340, roughness: 0.96, metalness: 0, envMapIntensity: 0, vertexColors: true });
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0x6a4328, roughness: 0.92, metalness: 0, envMapIntensity: 0 });
   const hullMat = new THREE.MeshStandardMaterial({ color: 0x2e86a8, roughness: 0.72, metalness: 0, envMapIntensity: 0, vertexColors: true });
   const islandMat = new THREE.MeshLambertMaterial({ color: 0x3aaa48 });
 
   const parts: Array<{ mat: THREE.Material; list: THREE.BufferGeometry[] }> = [
-    { mat: wallMat, list: [] },
-    { mat: accentMat, list: [] },
-    { mat: roofMat, list: [] },
-    { mat: thatchMat, list: [] },
-    { mat: glassMat, list: [] },
     { mat: woodMat, list: [] },
-    { mat: concreteMat, list: [] },
-    { mat: whiteMat, list: [] },
   ];
 
   /** Add one box/cylinder/cone to a material bucket, AO-baked and placed. */
@@ -156,55 +132,6 @@ export function createStructures(budget: QualityBudget): Structures {
   };
   const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
 
-  // ── MODULES (Phase 12) ───────────────────────────────────────────────
-  // Wall / window / door / roof / balcony / stair / railing / pillar. Every
-  // building below is a composition of exactly these.
-
-  /** Glazed wall bay: green glass pane + timber frame, proud of the wall face. */
-  const windowModule = (x: number, y: number, z: number, w: number, h: number, ry: number, face = 1) => {
-    add(glassMat, box(w, h, 0.06), x, y, z + face * 0.02, ry, false);
-    add(whiteMat, box(w + 0.24, 0.12, 0.14), x, y + h / 2 + 0.06, z, ry, false);
-    add(whiteMat, box(w + 0.24, 0.12, 0.14), x, y - h / 2 - 0.06, z, ry, false);
-    add(whiteMat, box(0.12, h + 0.24, 0.14), x - w / 2 - 0.06, y, z, ry, false);
-    add(whiteMat, box(0.12, h + 0.24, 0.14), x + w / 2 + 0.06, y, z, ry, false);
-  };
-
-  const doorModule = (x: number, y: number, z: number, ry: number, w = 1.1, h = 2.25) => {
-    add(accentMat, box(w, h, 0.1), x, y, z, ry, false);
-    add(whiteMat, box(w + 0.3, 0.12, 0.16), x, y + h / 2 + 0.06, z, ry, false);
-  };
-
-  const railing = (x: number, y: number, z: number, w: number, ry: number) => {
-    add(whiteMat, box(w, 0.07, 0.07), x, y + 0.95, z, ry, false);
-    add(whiteMat, box(w, 0.05, 0.05), x, y + 0.5, z, ry, false);
-    const posts = Math.max(2, Math.round(w / 1.1));
-    const cx = Math.cos(ry);
-    const sx = Math.sin(ry);
-    for (let i = 0; i <= posts; i += 1) {
-      const t = (i / posts - 0.5) * w;
-      add(whiteMat, box(0.06, 0.95, 0.06), x + cx * t, y + 0.475, z - sx * t, 0, false);
-    }
-  };
-
-  const flatRoof = (x: number, y: number, z: number, w: number, d: number, ry: number, overhang = 0.7) => {
-    add(roofMat, box(w + overhang * 2, 0.3, d + overhang * 2), x, y, z, ry);
-    // Slim fascia band in the accent colour — the kit's visual signature.
-    add(accentMat, box(w + overhang * 2 + 0.08, 0.14, d + overhang * 2 + 0.08), x, y - 0.2, z, ry, false);
-  };
-
-  /** Hip roof (4-sided pyramid) — the pavilion's big shade giver. */
-  const hipRoof = (x: number, y: number, z: number, r: number, h: number) => {
-    const roof = new THREE.ConeGeometry(r, h, 4);
-    roof.rotateY(Math.PI / 4);
-    withAO(roof);
-    roof.translate(x, y + h / 2, z);
-    parts.find((p) => p.mat === thatchMat)!.list.push(roof);
-  };
-
-  const pillar = (x: number, y: number, z: number, r: number, h: number) => {
-    add(whiteMat, new THREE.CylinderGeometry(r * 0.85, r, h, 8), x, y + h / 2, z, 0, false);
-  };
-
   // ═════════════════════════════════════════════════════════════════════
   //  SITE SURVEY — the measured bay
   // ═════════════════════════════════════════════════════════════════════
@@ -216,135 +143,14 @@ export function createStructures(budget: QualityBudget): Structures {
     cosA * (shoreR + sea) - sinA * along,
     sinA * (shoreR + sea) + cosA * along,
   ];
-  // The houses stood on this azimuth 1.1 km out and read as white specks.
-  // They now sit 40 m past the notes board (outer corner ≈ 39.5, −42),
-  // facing the study. The villa itself is the rusty-roof model behind the
-  // student, not one of these huts, and not behind the board. The jetty
-  // and the boat stay on the water — they are not houses.
+  // The hamlet buildings once stood on this azimuth past the notes board;
+  // they are gone now. The villa behind the student is the rusty-roof model,
+  // and the jetty and the boat stay on the water.
   const HAMLET_YAW = Math.atan2(66, -72 - 2.6);
   const groundAt = (x: number, z: number) => terrainHeight(x, z);
   const tooWorn = (x: number, z: number) => pathWeight(x, z) > 0.45;
 
-  // ═════════════════════════════════════════════════════════════════════
-  //  THE BUILDINGS (all ORIGINAL, all from the kit)
-  // ═════════════════════════════════════════════════════════════════════
-
-  /** Ground datum helper: plinth top for a footprint centred at (x, z). */
-  const padTop = (x: number, z: number, w: number, d: number, ry: number) => {
-    const g = groundAt(x, z);
-    add(concreteMat, box(w + 1.6, 1.5, d + 1.6), x, g - 0.48, z, ry);
-    return g + 0.28;
-  };
-
-  // The cove villa used to stand here, beside the boards. It is gone.
-  // The rusty-roof model behind the student is the villa now.
-
-  // ── 2. PALM HOUSE (single storey L, wide shade roof) ─────────────────
-  {
-    const [x, z] = [68, -88];
-    const ry = HAMLET_YAW;
-    const g = padTop(x, z, 8.5, 6.5, ry);
-    const fh = 3.2;
-    // Two wall ranges forming the L, glass toward the water.
-    add(wallMat, box(8.5, fh, 0.26), x, g + fh / 2, z + 3.1, ry);
-    add(wallMat, box(0.26, fh, 6.5), x + 4.1, g + fh / 2, z, ry);
-    add(wallMat, box(3.4, fh, 0.26), x - 2.5, g + fh / 2, z - 3.1, ry);
-    windowModule(x + 1.6, g + fh / 2, z - 3.1, 3.6, 2.0, ry, 1);
-    doorModule(x - 0.7, g + 1.2, z - 3.22, ry);
-    // Deep flat roof on thin posts over the open deck side.
-    flatRoof(x, g + fh + 0.24, z, 8.5, 7.6, ry, 0.95);
-    pillar(x - 3.7, g, z - 4.1, 0.12, fh);
-    pillar(x + 0.6, g, z - 4.1, 0.12, fh);
-    // Wood screen: vertical slats on the west wall (the kit's warm material).
-    for (let i = 0; i < 7; i += 1) {
-      add(woodMat, box(0.09, fh - 0.3, 0.09), x - 2.5 + (i - 3) * 0.32, g + (fh - 0.3) / 2, z + 2.95, ry, false);
-    }
-    railing(x, g + 0.05, z - 4.35, 5.6, ry);
-  }
-
-  // ── 3. THE REEF PAVILION (open-sided, thatched — the village heart) ──
-  {
-    const [x, z] = [56, -98];
-    const ry = HAMLET_YAW;
-    if (tooWorn(x, z)) { /* the trail threads the pavilion — floor only */ }
-    const g = groundAt(x, z);
-    add(concreteMat, box(13, 0.55, 9), x, g - 0.05, z);
-    const fh = 3.6;
-    // Six columns carry the big hip roof.
-    for (const [px, pz] of [[-5.4, -3.4], [0, -3.4], [5.4, -3.4], [-5.4, 3.4], [0, 3.4], [5.4, 3.4]]) {
-      const cxc = Math.cos(ry);
-      const szc = Math.sin(ry);
-      pillar(x + px * cxc + pz * szc, g + 0.22, z - px * szc + pz * cxc, 0.16, fh);
-    }
-    hipRoof(x, g + 0.2 + fh, z, 8.6, 3.1);
-    // Back wall + long reception counter (accent front).
-    add(wallMat, box(10.8, fh - 0.4, 0.24), x, g + 0.22 + (fh - 0.4) / 2, z + 4.35, ry);
-    add(woodMat, box(5.6, 1.05, 0.7), x, g + 0.22 + 0.52, z + 1.6, ry);
-    add(accentMat, box(5.6, 0.1, 0.78), x, g + 0.22 + 1.08, z + 1.6, ry, false);
-    // Sign board over the counter.
-    add(woodMat, box(3.4, 0.8, 0.1), x, g + 0.22 + 2.9, z + 4.15, ry, false);
-  }
-
-  // ── 4. LAGOON SHOPS (3-unit strip) ───────────────────────────────────
-  {
-    const [x, z] = [74, -104];
-    const ry = HAMLET_YAW;
-    const g = padTop(x, z, 14, 5.4, ry);
-    const fh = 3.1;
-    add(wallMat, box(14, fh, 0.24), x, g + fh / 2, z + 2.6, ry);
-    add(wallMat, box(0.24, fh, 5.4), x - 7, g + fh / 2, z, ry);
-    add(wallMat, box(0.24, fh, 5.4), x + 7, g + fh / 2, z, ry);
-    // Three units: glass front, accent door, awning, sign band.
-    for (let u = -1; u <= 1; u += 1) {
-      const ux = x + u * 4.6;
-      windowModule(ux - 0.6, g + 1.62, z - 2.6, 2.9, 1.75, ry, 1);
-      doorModule(ux + 1.55, g + 1.14, z - 2.72, ry, 1.0, 2.2);
-      add(accentMat, box(4.3, 0.12, 1.5), ux, g + 2.86, z - 3.2, ry, false);
-      add(woodMat, box(2.6, 0.62, 0.09), ux, g + 2.35, z - 2.72, ry, false);
-    }
-    flatRoof(x, g + fh + 0.26, z, 14, 5.4, ry, 0.5);
-  }
-
-  // ── 5. UTILITY SHED (small, quiet, believable) ───────────────────────
-  {
-    const [x, z] = [44, -90];
-    const ry = HAMLET_YAW;
-    const g = padTop(x, z, 4.4, 3.4, ry);
-    const fh = 2.4;
-    add(concreteMat, box(4.4, fh, 0.18), x, g + fh / 2, z + 1.65, ry);
-    add(concreteMat, box(4.4, fh, 0.18), x, g + fh / 2, z - 1.65, ry);
-    add(concreteMat, box(0.18, fh, 3.4), x + 2.15, g + fh / 2, z, ry);
-    add(accentMat, box(0.1, 1.9, 1.0), x - 2.2, g + 0.95, z, ry, false);
-    // Lean-to mono roof.
-    const roof = box(4.9, 0.14, 4.1);
-    roof.rotateX(0.12);
-    add(roofMat, roof, x, g + fh + 0.16, z, ry);
-  }
-
-  // ── 6. THE BAY BEACON (original landmark, Phase 22) ──────────────────
-  //
-  // A timber observation tower on the north headland: the one
-  // vertical accent the whole coastline composes around. Readable from the
-  // meadow vista, from the sea angle, and from everywhere on the beach.
-  {
-    const [x, z] = [66, -72];
-    const g = groundAt(x, z);
-    add(concreteMat, box(5, 1.1, 5), x, g - 0.1, z);
-    const shaftH = 11.5;
-    add(whiteMat, new THREE.CylinderGeometry(1.05, 1.45, shaftH, 12), x, g + 1.0 + shaftH / 2, z, 0, false);
-    // Teal band + deck ring.
-    add(accentMat, new THREE.CylinderGeometry(1.28, 1.28, 0.55, 12), x, g + 1.0 + shaftH * 0.72, z, 0, false);
-    add(whiteMat, new THREE.CylinderGeometry(2.1, 1.7, 0.5, 12), x, g + 1.0 + shaftH + 0.25, z, 0, false);
-    railing(x, g + 1.0 + shaftH + 0.5, z, 3.4, 0);
-    // Lantern room (merged with the other glass — nothing needs its own draw
-    // call here) + cone cap in the accent colour.
-    add(glassMat, new THREE.CylinderGeometry(1.0, 1.0, 1.5, 10), x, g + 1.0 + shaftH + 1.25, z, 0, false);
-    add(accentMat, new THREE.ConeGeometry(1.35, 1.1, 10), x, g + 1.0 + shaftH + 2.55, z, 0, false);
-    // Door at the base.
-    doorModule(x, g + 1.15, z - 1.5, 0, 1.0, 2.1);
-  }
-
-  // ── 7. THE JETTY (wood, walking out over the water) ──────────────────
+  // ── 1. THE JETTY (wood, walking out over the water) ──────────────────
   {
     const deckY = OCEAN_LEVEL + 1.15;
     const start = -14;
@@ -378,7 +184,7 @@ export function createStructures(budget: QualityBudget): Structures {
     add(woodMat, box(3.4, 0.12, 2.4), lx, deckY, lz, BAY_AZIMUTH + Math.PI / 2);
   }
 
-  // ── 8. PROPS (Phase 21 — every one earns its place) ──────────────────
+  // ── 2. PROPS (Phase 21 — every one earns its place) ──────────────────
   // Beach umbrellas: two coral, one teal, one sun-yellow, clustered near the
   // jetty line — the "people were here" story of the bay. The POLES merge
   // into the static wood bucket (they never move); only the canopies stay as
@@ -446,7 +252,7 @@ export function createStructures(budget: QualityBudget): Structures {
       add(woodMat, board, x, g + 1.85, z, ry + (text ? 0.5 : 0.2), false);
     }
   }
-  // A short fence on the hamlet's near side, so the huts read as a place.
+  // A short fence on the hamlet's near side, so the clearing reads as a place.
   {
     for (let i = 0; i < 8; i += 1) {
       const x = 48 + i * 1.35;
@@ -460,7 +266,7 @@ export function createStructures(budget: QualityBudget): Structures {
     }
   }
 
-  // ── 9. THE MOORED BOAT (original, bobbing on the swell) ──────────────
+  // ── 3. THE MOORED BOAT (original, bobbing on the swell) ──────────────
   // ONE merged mesh with baked vertex colour: teal hull, cream gunwale,
   // wood bench — a rowboat is 1 draw call, not 3.
   const boat = new THREE.Mesh(new THREE.BufferGeometry(), hullMat);
@@ -496,7 +302,7 @@ export function createStructures(budget: QualityBudget): Structures {
     group.add(boat);
   }
 
-  // ── 10. DISTANT ISLANDS (Phase 11/22 — depth beyond the coast) ───────
+  // ── 4. DISTANT ISLANDS (Phase 11/22 — depth beyond the coast) ────────
   //
   // Original silhouette ranges out in the haze: cheap merged cones with a
   // ridged displacement, no shadows, atmosphere-registered so the aerial
