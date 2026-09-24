@@ -126,29 +126,35 @@ const BASE: Record<QualityTier, QualityBudget> = {
   // silicon), so this tier IS the product for most learners. It used to be a
   // lightly-trimmed desktop budget and it lagged; it is now tuned the way
   // the owner's research prescribes: content that fits a Mali-class tile
-  // GPU, a 30 fps cadence, fp16 fragments, HALF the pixel ratio.
+  // GPU, a 30 fps cadence, fp16 fragments and adaptive native-ish clarity.
   low: {
     tier: "low",
-    grassNear: 11000,
-    grassFar: 15000,
-    hillGrass: 30000,
-    grassNearRadius: 28,
-    grassFarRadius: 145,
-    treeCount: 105,
-    leavesPerTree: 9,
+    // Clarity pass: a modest density lift fills the closest meadow without
+    // enabling any new draw calls/material passes. Every field stays instanced
+    // and the existing thermal ladder can still trim it allocation-free.
+    grassNear: 13000,
+    grassFar: 17500,
+    hillGrass: 36000,
+    grassNearRadius: 30,
+    grassFarRadius: 155,
+    treeCount: 112,
+    leavesPerTree: 10,
     animalCount: 54,
     perchedBirds: 7,
     flyingBirds: 3,
     butterflies: 3,
     driftingLeaves: 12,
     waterfallParticles: 100,
-    flowers: 115,
-    rocks: 95,
+    flowers: 135,
+    rocks: 105,
     shadowMapSize: 0,
     richBoardMaterial: false,
     antialias: false,
-    maxPixelRatio: 0.85,
-    minPixelRatio: 0.5,
+    // 0.85 DPR made texturing and foliage visibly soft even when the GPU had
+    // headroom. Start at a native-ish 1.05 and let wall-clock DRS step down to
+    // 0.65 only when the phone actually misses its locked 30 fps budget.
+    maxPixelRatio: 1.05,
+    minPixelRatio: 0.65,
     sunShafts: false,
     farPlane: 3500,
     fogDensity: 0.00028,
@@ -156,7 +162,9 @@ const BASE: Record<QualityTier, QualityBudget> = {
     fpsCap: 30,
     cheapPlants: true,
     plantTextureDetail: "1k",
-    maxAniso: 1,
+    // 2× is a small, bounded sampler cost and dramatically improves the
+    // ground/paths at the grazing angles used by the desk camera.
+    maxAniso: 2,
   },
   medium: {
     tier: "medium",
@@ -299,7 +307,8 @@ export function detectTier(): QualityTier {
   const mobileGpu = /adreno|mali|powervr|apple a\d/.test(gpu);
   // Flagship phone silicon (Adreno 640+, Mali-G77+, Apple A14+) CAN carry the
   // medium tier — the blanket mobile penalty used to pin even these to low,
-  // and low is tuned for genuinely low-end parts (it starts at 0.85× pixels).
+  // and low is tuned for genuinely low-end parts (1.05× clarity start with a
+  // DRS floor, rather than permanently blurring every phone at 0.85×).
   const fastMobileGpu = /adreno (6[4-9]\d|7\d\d|8\d\d)|mali-g(7[7-9]|[89]\d|\d\d\d)|apple a1[4-9]|apple a\d pro|apple m[1-9]|tensor g[3-9]|dimensity (8|9)\d\d\d|xclipse/.test(gpu);
 
   if (software || weakIntel || cores <= 2 || memory <= 2) return "low";

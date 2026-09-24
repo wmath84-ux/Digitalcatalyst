@@ -38,40 +38,52 @@ import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 
 /**
  * Below this width a seven-tab dock cannot keep 44 px plates inside the
- * capsule, so GlassDock switches to its `compact` plates (38 px — still above
- * the 32 px minimum, and the magnification wave keeps working because the size
- * is driven in JS, not frozen by CSS). The gap/padding rhythm that goes with it
- * lives in src/index.css under the same breakpoint.
+ * capsule, so GlassDock switches to its `compact` plates. Home optionally has
+ * an eighth, dinosaur-backed Sanctuary destination: it switches to 38 px a
+ * little earlier and to the 34 px dense plates on very narrow phones. Sizes
+ * stay JS-driven, so the magnification spring is never frozen by CSS.
  */
 export const COMPACT_FIT_QUERY = "(max-width: 349px)";
+export const EIGHT_TAB_COMPACT_FIT_QUERY = "(max-width: 479px)";
+export const EIGHT_TAB_DENSE_FIT_QUERY = "(max-width: 349px)";
 
-const useCompactFit = (): boolean => {
-  const [compact, setCompact] = useState<boolean>(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-    try {
-      return window.matchMedia(COMPACT_FIT_QUERY).matches;
-    } catch {
-      return false;
-    }
-  });
+type FooterFit = "default" | "compact" | "dense";
+
+const readFooterFit = (itemCount: number): FooterFit => {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "default";
+  try {
+    if (itemCount >= 8 && window.matchMedia(EIGHT_TAB_DENSE_FIT_QUERY).matches) return "dense";
+    if (itemCount >= 8 && window.matchMedia(EIGHT_TAB_COMPACT_FIT_QUERY).matches) return "compact";
+    if (window.matchMedia(COMPACT_FIT_QUERY).matches) return "compact";
+  } catch {
+    return "default";
+  }
+  return "default";
+};
+
+const useCompactFit = (itemCount: number): FooterFit => {
+  const [fit, setFit] = useState<FooterFit>(() => readFooterFit(itemCount));
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    let query: MediaQueryList;
+    const queryStrings = itemCount >= 8
+      ? [EIGHT_TAB_COMPACT_FIT_QUERY, EIGHT_TAB_DENSE_FIT_QUERY]
+      : [COMPACT_FIT_QUERY];
+    let queries: MediaQueryList[];
     try {
-      query = window.matchMedia(COMPACT_FIT_QUERY);
+      queries = queryStrings.map((query) => window.matchMedia(query));
     } catch {
       return;
     }
-    const onChange = () => setCompact(query.matches);
+    const onChange = () => setFit(readFooterFit(itemCount));
     onChange();
     // `addEventListener` everywhere this app runs (browserslist floor: Chrome
     // 96 / Safari 15); the legacy `addListener` path is deliberately absent.
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    queries.forEach((query) => query.addEventListener("change", onChange));
+    return () => queries.forEach((query) => query.removeEventListener("change", onChange));
+  }, [itemCount]);
 
-  return compact;
+  return fit;
 };
 
 export type SiteFooterNavProps = {
@@ -99,7 +111,9 @@ export default function SiteFooterNav({
   position = "absolute",
   dataAttrs,
 }: SiteFooterNavProps) {
-  const compact = useCompactFit();
+  const fit = useCompactFit(items.length);
+  const compact = fit !== "default";
+  const dense = fit === "dense";
 
   return (
     <nav
@@ -115,7 +129,7 @@ export default function SiteFooterNav({
       aria-label={label}
     >
       <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
-        <GlassDock siteFooter compact={compact} items={items} onSelect={onSelect} leading={leading} />
+        <GlassDock siteFooter compact={compact} items={items} dense={dense} onSelect={onSelect} leading={leading} />
       </div>
     </nav>
   );

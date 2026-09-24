@@ -7022,6 +7022,37 @@ html[data-nature-studio-active="true"] {
  * so nothing here touches them — `[data-dock-count="7"]` keeps their spacing
  * exactly as designed.
  * ════════════════════════════════════════════════════════════════════════ */
+/* Home has one extra, mobile-only destination: the dinosaur Sanctuary button
+   immediately after FlowPath. Eight destinations still stay in ONE capsule;
+   the wrapper selects 38 px plates through 479 px and 34 px through 349 px,
+   while these rules only solve the remaining gap/padding arithmetic. */
+@media (max-width: 479px) {
+  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+}
+@media (max-width: 379px) {
+  [data-site-footer-nav][data-dock-count="8"] {
+    padding-inline: 8px;
+  }
+  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
+    gap: 2px;
+    padding-inline: 6px;
+  }
+}
+@media (max-width: 349px) {
+  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
+    gap: 2px;
+    padding-inline: 4px;
+  }
+}
+@media (max-width: 319px) {
+  [data-site-footer-nav][data-dock-count="8"] {
+    padding-inline: 2px;
+  }
+}
+
 @media (max-width: 429px) {
   [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
     gap: 4px;

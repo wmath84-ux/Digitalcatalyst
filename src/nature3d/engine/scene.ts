@@ -231,6 +231,13 @@ export class Sanctuary {
   /** Last viewport size, for the safe-rect maths in focusBoard. */
   private viewW = 1;
   private viewH = 1;
+  /**
+   * The fit-controlled study camera currently selected. Keeping this in the
+   * engine (rather than only in React) lets resize/orientation changes and HUD
+   * inset changes recompute the projection immediately — essential on phones,
+   * where browser chrome and landscape rotation change the usable rectangle.
+   */
+  private fittedStudyPreset: "student" | LecternSlot | null = null;
 
   private clock = new THREE.Clock();
   private adaptive: AdaptiveResolution;
@@ -1660,12 +1667,18 @@ export class Sanctuary {
     return this.daylight.hour;
   }
 
-    focus(preset: ViewPreset) {
+  focus(preset: ViewPreset) {
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
     this.pendingReadSlot = null;
     this.pendingPinAge = 0;
     this.screens.setReadSlot(null);
+    // Only these four views own a projection-aware "fit". Scenery views and
+    // manual exploration must not suddenly snap back after a later resize.
+    this.fittedStudyPreset =
+      preset === "student" || preset === "reading" || preset === "notes" || preset === "mindmap"
+        ? preset
+        : null;
     switch (preset) {
       case "board":
         this.orbit.panTo(this.tmpV.copy(this.board.group.position), 6.4, Math.PI, 0.12);
@@ -1737,7 +1750,23 @@ export class Sanctuary {
    * here — the engine stays free of any knowledge of the HUD layout.
    */
   setHudInsets(insets: HudInsets) {
-    this.hudInsets = { ...insets };
+    const next = {
+      top: Math.max(0, insets.top),
+      bottom: Math.max(0, insets.bottom),
+      left: Math.max(0, insets.left),
+      right: Math.max(0, insets.right),
+    };
+    const old = this.hudInsets;
+    const changed =
+      Math.abs(old.top - next.top) > 0.5 ||
+      Math.abs(old.bottom - next.bottom) > 0.5 ||
+      Math.abs(old.left - next.left) > 0.5 ||
+      Math.abs(old.right - next.right) > 0.5;
+    this.hudInsets = next;
+    // Hiding/showing the bottom-right eye changes the free rectangle. Re-fit
+    // here, synchronously, so every study camera uses that newly available
+    // space instead of retaining one shared/stale mobile zoom.
+    if (changed && this.fittedStudyPreset) this.focus(this.fittedStudyPreset);
   }
 
   /**
@@ -1814,10 +1843,25 @@ export class Sanctuary {
     const ins = this.hudInsets;
     const limitH = Math.max(8, Math.min(this.viewH / 2 - ins.top, this.viewH / 2 - ins.bottom));
     const limitW = Math.max(8, Math.min(this.viewW / 2 - ins.left, this.viewW / 2 - ins.right));
-    const distance = Math.max(
+    let distance = Math.max(
       (needH / 2 / Math.tan(vFov / 2)) / (2 * limitH / this.viewH),
       (needW / 2 / Math.tan(hFov / 2)) / (2 * limitW / this.viewW),
     );
+
+    // CONTENT-AWARE MOBILE FIT. All three physical boards are the same size,
+    // which used to give Reading, Notes and Mind map one indistinguishable
+    // default zoom. Reading gets the tight, text-first fit; Notes keeps a
+    // little room around its editor chrome; Mind map gets the widest overview
+    // so edge nodes and its toolbar are visible before the first pinch. No
+    // profile crops — these multipliers only pull back from the proven fit.
+    if (this.viewW < 960) {
+      const mobileFit: Record<LecternSlot, number> = {
+        reading: 1,
+        notes: 1.06,
+        mindmap: 1.12,
+      };
+      distance *= mobileFit[slot];
+    }
 
     // The orbit target is the board's own centre: with pitch 0 the camera
     // sits exactly on the face normal, square on the page, at every size.
@@ -1870,13 +1914,22 @@ export class Sanctuary {
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
     const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
+    // Desk is a fit camera too. The old calculation used the entire viewport,
+    // unlike the three single-board cameras, so on a phone its outer boards
+    // sat under the top chip/bottom tray and the eye toggle appeared to keep
+    // the same zoom. Fit the whole triptych into the SAME measured safe rect.
+    const ins = this.hudInsets;
+    const limitH = Math.max(8, Math.min(this.viewH / 2 - ins.top, this.viewH / 2 - ins.bottom));
+    const limitW = Math.max(8, Math.min(this.viewW / 2 - ins.left, this.viewW / 2 - ins.right));
     const boardDistance = Math.max(
-      needH / 2 / Math.tan(vFov / 2),
-      needW / 2 / Math.tan(hFov / 2),
+      (needH / 2 / Math.tan(vFov / 2)) / (2 * limitH / this.viewH),
+      (needW / 2 / Math.tan(hFov / 2)) / (2 * limitW / this.viewW),
     );
     // The warehouse has its own preset. This shot is the boards, not the
     // building — pulling back to hold a 60 m tower made the desk unreadable.
-    const distance = boardDistance;
+    // Four percent of breathing room on mobile keeps the curved outer boards
+    // from kissing a rounded screen corner; desktop retains the exact fit.
+    const distance = boardDistance * (this.viewW < 960 ? 1.04 : 1);
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
@@ -1908,6 +1961,10 @@ export class Sanctuary {
     // The CSS layer caches the last camera pose, so a resize has to force one
     // render — the pose is unchanged but the projection is not.
     this.screens.render(this.camera, true);
+    // Rotation, split-screen resizing and mobile browser-bar changes all alter
+    // the projection. Recompute the selected study fit against the new aspect
+    // instead of carrying over a desktop/portrait distance.
+    if (this.fittedStudyPreset) this.focus(this.fittedStudyPreset);
     this.requestShadowRefresh();
   }
 
