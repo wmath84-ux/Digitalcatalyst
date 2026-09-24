@@ -101,7 +101,7 @@ test("the builder gives modules and resources full CRUD, confirmations and non-d
   assert.doesNotMatch(api, /resources\.forEach\(\(item, index\) => tx\.update/);
 });
 
-test("official player actions snapshot stable references, are single-flight and submit through the API", () => {
+test("official player actions write into the NEW My Study Library (myCourses) single-flight", () => {
   assert.match(playerPanel, /Add to My Module/);
   assert.match(playerPanel, /Save for later/);
   assert.match(player, /officialDialogTarget/);
@@ -109,11 +109,22 @@ test("official player actions snapshot stable references, are single-flight and 
   assert.match(player, /productId: String\(product\.id\)/);
   assert.match(player, /moduleId: String\(selectedOfficialModule\.id\)/);
   assert.match(player, /resourceId: String\(selectedFile\.id\)/);
-  assert.match(addDialog, /Create new/);
+  // Owner brief 2026-09-24: both settings rows now land in the learner-owned
+  // `users/{uid}/myCourses` shelf — "Add to My Module" through the
+  // course+module destination dialog, "Save for later" through the reserved
+  // shelf course — via the same live useMyCourses controller the library
+  // page reads. The old server call (`destination: "saved"`) is gone.
+  assert.match(player, /useMyCourses\(\)/);
+  assert.match(player, /SAVED_FOR_LATER_COURSE_ID = "saved-for-later"/);
+  assert.match(player, /myLibrary\.save\(/);
+  assert.match(player, /findDuplicateResource/);
+  assert.match(addDialog, /New course/);
+  assert.match(addDialog, /Choose a course/);
   assert.match(addDialog, /Already added/);
   assert.match(addDialog, /role="status"/);
+  // The old personal-modules API still exists for the in-player
+  // "My Modules" manager (official courses only).
   assert.match(client, /"personalCourse\.official\.add"/);
-  assert.match(player, /destination: "saved"/);
   assert.match(hook, /addOfficialResource/);
 });
 

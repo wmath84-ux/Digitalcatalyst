@@ -1,5 +1,94 @@
 # Google login on the web — "picker khula, account chuna, wapas aaya, login nahin hua"
 
+## 2026-09-24 — the picker now opens WITHOUT the Chrome toolbar (FedCM One Tap)
+
+### The report
+
+> "Jo Google ID picker page open hota hai, vah Chrome toolbar ke saath open
+> hota hai" — website, PWA aur APK, teeno jagah.
+
+### Root cause (deep-dive)
+
+`signInWithPopup()` asks the browser for a popup window via `window.open`,
+but **mobile Chrome cannot open popup windows at all** — ever since Chrome 59
+(crbug.com/723655) every `window.open` on Android becomes a **full browser
+tab** with the toolbar and address bar. So on phones, tablets and installed
+PWAs the Google account chooser always appeared as a separate Chrome page:
+the learner left the app, picked an account inside Chrome's UI, and was
+bounced back through a tab switch. (Desktop Chrome still opens a real
+chromeless popup; that is why desktop looked fine.) The redirect fallback was
+worse — a full-page navigation. No Firebase option changes this: it is
+browser behaviour, not a Firebase bug.
+
+### The fix — Google's native account sheet (GIS One Tap + FedCM)
+
+Google's documented replacement for the popup chooser is the **One Tap
+prompt with FedCM** (developers.google.com/identity/gsi/web/guides/
+fedcm-migration): the *browser itself* draws a "Choose an account" sheet
+INSIDE the page — a bottom sheet on phones, an anchored card on desktop —
+no new tab, no toolbar, no third-party cookies needed (Chrome 120+). The
+learner never leaves the app.
+
+Flow (`src/lib/googleIdentity.ts` + `src/context/AuthContext.tsx`):
+
+1. `https://accounts.google.com/gsi/client` is loaded lazily (only on the
+   auth path), then `google.accounts.id.initialize({ client_id, callback,
+   use_fedcm_for_prompt: true, use_fedcm_for_button: true, itp_support: true })`.
+2. Tapping "Continue with Google" calls `google.accounts.id.prompt()`.
+3. The returned ID token is exchanged with
+   `signInWithCredential(auth, GoogleAuthProvider.credential(idToken))` —
+   the exact same web-SDK session the popup produced, so profile sync,
+   Firestore rules and every screen are unchanged (this is also how the APK's
+   native sheet already signs in).
+
+Every failure degrades to the previous popup flow — never a dead button:
+
+| Outcome | Meaning | Behaviour |
+| --- | --- | --- |
+| `credential` | learner picked an account | sign in, done |
+| `dismissed` | learner closed the sheet | treated as a cancel (same message as closing the popup) |
+| `skipped` | no Google session in the browser, One Tap cooldown (Google suppresses re-prompts after a dismissal), FedCM-less browser (older Chrome/Firefox), or this origin missing from the client | falls back to `signInWithPopup()` |
+| `unavailable` | GIS script blocked/failed to load | falls back to `signInWithPopup()` |
+
+`loginWithGoogle()` AND `loginAdminWithGoogle()` both take this path on the
+web. The APK keeps its native Play-Services sheet
+(`@capacitor-firebase/authentication`) — that sheet is a system UI with no
+Chrome chrome, and if it is ever unavailable the build explains itself
+(`auth/native-google-plugin-missing` / `auth/native-google-misconfigured`).
+
+### Required console setup (one-time)
+
+The One Tap client must be a **Web** OAuth client in the SAME Google Cloud
+project as Firebase (`my-website-761e9` / `930483750234`). The default used
+by the app is the project's existing web client
+`930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com`
+(the one `capacitor.config.ts` already ships). In Google Cloud Console →
+APIs & Services → Credentials → that client → **Authorized JavaScript
+origins**, add every origin the app is served from:
+
+- `https://eduvora.shop`
+- `https://www.eduvora.shop` (if served)
+- every Vercel preview/production domain used
+- `http://localhost:5173` (local dev)
+
+Override the client at build time with `VITE_GOOGLE_WEB_CLIENT_ID` if you
+create a dedicated one. **A missing origin is not a failure** — Google then
+never shows the sheet and the app quietly uses the popup flow as before.
+
+### Notes & limits (documented by Google)
+
+- FedCM requires Chrome 117+ (older browsers → popup fallback).
+- After the learner closes the sheet, Google enforces a cooldown before the
+  prompt may show again; during it the popup fallback runs instead.
+- With FedCM, `isDisplayed()`/`isNotDisplayed()` notifications are not
+  delivered — the code relies only on `skipped`/`dismissed`/callback.
+- Inside embedded WebViews (in-app browsers) the app refuses web Google
+  sign-in outright (Google's Secure Browser Policy) and says so.
+
+---
+
+# Original report — "picker khula, account chuna, wapas aaya, login nahin hua"
+
 ## The report
 
 > Google login per click karta hun, Google ID picker open hota hai, main wahan se

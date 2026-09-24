@@ -13,6 +13,83 @@ function accessLabel(product: Product): string {
     : "Watch Now";
 }
 
+/**
+ * One purchased product on the My Purchases page.
+ *
+ * Owner brief (2026-09-24): the card is the STORE's square-grid card
+ * (`data-store-grid` columns + the exact ProductCard material —
+ * `dc-store-glass` light-blue lens, 4:3 artwork, radius 22) but it carries
+ * ONLY the thumbnail, the title and the My Purchases "Watch Now" button
+ * (src/components/ui/WatchActionButton.tsx — the uiverse "spicy-liger-32"
+ * control the owner had built for this page). No price, rating, instructor,
+ * category chip, "Owned" pill or wishlist control: everything else a store
+ * card shows is deliberately absent here.
+ */
+function PurchasedProductCard({
+  item,
+  onOpenCourse,
+}: {
+  item: Product;
+  onOpenCourse: (course: { id: string; title: string }) => void;
+}) {
+  const label = accessLabel(item);
+  return (
+    <GlassCard
+      onClick={() => onOpenCourse({ id: item.id, title: item.title })}
+      contentClassName="p-0"
+      /* Same light-blue lens as the store grid card (owner brief: "card ka
+         design vaise hi rakho jaise store page ka Card hai"). */
+      tint={0.62}
+      tintColor="173,216,255"
+      blur={0}
+      radius={22}
+      /* The pack's content wrapper must become the flex column — same fix the
+         store's ProductCard ships (see the comment there): the wrapper is a
+         BLOCK box, so without it the copy never hugs the artwork. */
+      className="dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col"
+      data-purchase-entry={item.id}
+    >
+      {/* Artwork — the store card's exact 4:3 box. `absolute inset-0` keeps
+          the <img> cropped: index.css's unlayered `img { height: auto }`
+          (640–1366px) would beat a Tailwind `h-full`. */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
+        <img
+          src={item.image}
+          alt={item.title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+        <div aria-hidden className="dc-store-card-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
+      </div>
+
+      {/* Copy stack — title + the Watch Now button, NOTHING else. */}
+      <div className="relative z-20 flex flex-1 flex-col gap-2 p-3">
+        <h3 className="dc-store-card-title line-clamp-2">{item.title}</h3>
+        <div className="mt-auto">
+          <WatchActionButton
+            label={label}
+            ariaLabel={`${label} — ${item.title}`}
+            /* The reference control is authored in `em`, so one font-size
+               scales the whole button (shell, padding, goo layers, press) as
+               a single unit — here down to the store card's CTA size. The
+               size rides an inline style on purpose: watch-action-button.css
+               is unlayered author CSS, so a Tailwind `text-[11px]` utility
+               (layered) could never beat its 18px default. */
+            style={{ fontSize: "11px" }}
+            className="w-full"
+            data-purchase-access={item.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenCourse({ id: item.id, title: item.title });
+            }}
+          />
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 export function PurchasesTab({
   purchased,
   onOpenCourse,
@@ -65,7 +142,7 @@ export function PurchasesTab({
   }
 
   return (
-    <div data-library-list className="space-y-4 px-4 pb-8 pt-6">
+    <div className="px-3 pb-8 pt-6 sm:px-4">
       {/* Header — lifetime access + count badge */}
       <GlassCard contentClassName="p-4">
         <div className="flex items-center justify-between gap-3">
@@ -77,7 +154,7 @@ export function PurchasesTab({
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-white/55">
-              Lifetime access · Tap <span className="font-semibold text-white/80">Watch / Open</span> to continue in the Course Player.
+              Lifetime access · Tap <span className="font-semibold text-white/80">Watch Now</span> to continue in the Course Player.
             </p>
           </div>
           <span className="hidden shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70 sm:inline-flex">
@@ -87,7 +164,7 @@ export function PurchasesTab({
       </GlassCard>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative mt-4">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35">
           <SearchIcon className="h-4 w-4" />
         </span>
@@ -101,50 +178,20 @@ export function PurchasesTab({
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-10 text-center backdrop-blur">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-10 text-center backdrop-blur">
           <p className="text-sm font-bold text-white/80">No matches</p>
           <p className="mt-1 text-xs text-white/45">Try a different search — e.g. course title or instructor.</p>
         </div>
       ) : (
-        items.map((item) => (
-          <div key={item.id} data-purchase-entry={item.id} className="space-y-2">
-            <div className="flex justify-end">
-              <WatchActionButton
-                label={accessLabel(item)}
-                ariaLabel={`${accessLabel(item)} — ${item.title}`}
-                data-purchase-access={item.id}
-                onClick={() => onOpenCourse({ id: item.id, title: item.title })}
-              />
-            </div>
-            <GlassCard
-              onClick={() => onOpenCourse({ id: item.id, title: item.title })}
-              contentClassName="flex items-center gap-3 p-3"
-              className="group relative cursor-pointer overflow-hidden transition-all duration-300 hover:-translate-y-0.5 active:scale-[0.99]"
-            >
-              <img
-                src={item.image}
-                alt={item.title}
-                loading="lazy"
-                decoding="async"
-                width={96}
-                height={64}
-                className="relative h-16 w-24 shrink-0 rounded-xl object-cover ring-1 ring-inset ring-white/10"
-              />
-              <div className="relative min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-white">{item.title}</p>
-                <p className="truncate text-xs text-white/55">by {item.instructor}</p>
-                {item.category ? (
-                  <span className="mt-1 inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/60">
-                    {item.category}
-                  </span>
-                ) : null}
-              </div>
-              <span className="relative shrink-0 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
-                Owned
-              </span>
-            </GlassCard>
-          </div>
-        ))
+        /* The STORE's square grid, verbatim: same container attribute
+           (`data-store-grid`, so index.css's tablet/desktop auto-fill rules
+           keep the tiles in lockstep with the store) and same mobile
+           column/gap rhythm (2-up, gap-3). */
+        <div data-store-grid data-purchases-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+          {items.map((item) => (
+            <PurchasedProductCard key={item.id} item={item} onOpenCourse={onOpenCourse} />
+          ))}
+        </div>
       )}
     </div>
   );
