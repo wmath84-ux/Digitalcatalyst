@@ -38,6 +38,7 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
+import type { CourseAccessResolution } from "../utils/courseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import {
   enterCoursePlayerFullscreen,
@@ -73,7 +74,28 @@ interface CoursePlayerProps {
    * learner, the normal first-lesson / resume behaviour applies.
    */
   initialModuleId?: string;
+  /**
+   * Set when this player is opening a course the learner AUTHORED in My Study
+   * Library (route `#/my-course/<courseId>`), not a catalogue product.
+   *
+   * The player is byte-identical to the official one — same viewer stack,
+   * Modules tab, Brain tab, Notes, Mind map, AI chat and Player settings —
+   * with exactly three differences, because there is nothing to buy and
+   * nothing official to copy:
+   *
+   *   1. the Paid ("premium") tab is removed from the footer dock,
+   *   2. the Player settings drop the "Get personal access", "Add to My
+   *      Module" and "Save for later" rows — all three are about official
+   *      course resources, and there are none here,
+   *   3. everything the learner writes (progress, notes, playback positions,
+   *      mind maps) is stored under `mine-<courseId>`, so it can never mix
+   *      with an official course's data.
+   */
+  mine?: { courseId: string } | null;
 }
+
+/** Tabs the learner's own course never shows (nothing is purchasable in it). */
+const MINE_HIDDEN_TABS: DockTab[] = ["paid"];
 
 const numericPrice = (value?: string) => { const number = Number(String(value || "0").replace(/[^0-9.-]/g, "")); return Number.isFinite(number) ? Math.max(0, number) : 0; };
 const accessId = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -343,12 +365,63 @@ const fileActionsSignature = (actions: CourseFileActions): string =>
     actions.editMode ? "1" : "0",
   ].join("");
 
-export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId }: CoursePlayerProps) {
+export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId, mine = null }: CoursePlayerProps) {
   const { user } = useAuth();
   const { logoUrl, appName } = useBranding();
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
-  const { resolution, hasActiveSubscription } = useCourseAccess({ product });
+  /**
+   * Is this a course the LEARNER built in My Study Library?
+   * Everything below that differs between "a course they bought" and "a
+   * course they authored" reads this one flag.
+   */
+  const isMine = Boolean(mine);
+  /**
+   * The id every per-course store is keyed on: notes, playback positions,
+   * mind maps, progress and the AI chat. For the learner's own course it is
+   * namespaced (`mine-<courseId>`) so nothing they write here can ever touch
+   * an official course's data (or vice versa).
+   */
+  const storageProductId = isMine && mine ? `mine-${mine.courseId}` : String(product.id);
+  /** Tabs this player shows — a learner-authored course has nothing to sell. */
+  const hiddenTabs = useMemo<DockTab[]>(() => (isMine ? MINE_HIDDEN_TABS : []), [isMine]);
+  const visibleTabOrder = useMemo(
+    () => STUDY_TAB_ORDER.filter((tab) => !hiddenTabs.includes(tab)),
+    [hiddenTabs],
+  );
+  const accessState = useCourseAccess({ product, skip: isMine });
+  /**
+   * Access resolution. For the learner's OWN course there is nothing to
+   * resolve — every module in the tree is theirs — so the player skips the
+   * entitlement / purchase / subscription listeners entirely and grants the
+   * whole tree.
+   */
+  const resolution = useMemo<CourseAccessResolution>(() => {
+    if (!isMine) return accessState.resolution;
+    const ids = new Set<string>();
+    const visit = (nodes: CourseModule[]) => nodes.forEach((node) => {
+      ids.add(String(node.id));
+      visit(node.modules || []);
+    });
+    visit(modules);
+    return {
+      hasFullProductAccess: true,
+      ownedModuleIds: ids,
+      ownedResourceIds: new Set<string>(),
+      ownedUpdateIds: new Set<string>(),
+      subscriptionGrantedModuleIds: new Set<string>(),
+      accessibleModuleIds: ids,
+      accessibleResourceIds: new Set<string>(),
+      lockedModuleIds: new Set<string>(),
+      previewModuleIds: new Set<string>(),
+      moduleAccessSources: {},
+      resourceAccessSources: {},
+      unmetDependencies: {},
+    };
+  }, [accessState.resolution, isMine, modules]);
+  // A personal course is owned outright — there is no subscription badge to
+  // show, and no "preview mode" either.
+  const hasActiveSubscription = isMine ? false : accessState.hasActiveSubscription;
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
   // Tracks whether the LEARNER has manually picked a file this session. The
   // first-lesson auto-selection and the saved-position resume both set
@@ -383,6 +456,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const [playbackReady, setPlaybackReady] = useState(false);
   // Bottom dock state — which of the seven footer tabs the study pane shows.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
+  // A hidden tab can never be the open one (a learner-authored course drops
+  // the Paid tab): if the tab list ever loses the active tab, the pane falls
+  // back to Modules instead of rendering an empty surface.
+  useEffect(() => {
+    if (hiddenTabs.includes(dockTab)) setDockTab("modules");
+  }, [dockTab, hiddenTabs]);
   /**
    * The Brain practice set the learner just tapped in the Modules list (or
    * resumed). The Brain tab opens it once and hands the pin back — the panel
@@ -591,7 +670,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const activeMindMapModuleTitle = activeMindMapModuleId ? moduleTitleById[activeMindMapModuleId] || "" : "";
   const mindMap = useCourseMindMap({
     uid: user?.id,
-    productId: product.id,
+    productId: storageProductId,
     moduleId: activeMindMapModuleId,
     rootTopic: activeMindMapModuleTitle || product.title,
   });
@@ -699,7 +778,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   useEffect(() => () => resetDocumentViewportMode(), []);
 
-  const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
+  // Progress lives under the SAME namespaced id: a learner-authored course
+  // gets its own progress document, so completing a lesson they wrote can
+  // never move an official course's percentage (and vice versa).
+  const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", storageProductId) : null), [storageProductId, user]);
 
   useEffect(() => {
     if (!user || !progressRef) return undefined;
@@ -713,8 +795,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // Notes live in localStorage (per user + product), not Firestore.
   useEffect(() => {
-    setNotes(user?.id ? loadLocalNotes(user.id, product.id) : []);
-  }, [user, product.id]);
+    setNotes(user?.id ? loadLocalNotes(user.id, storageProductId) : []);
+  }, [user, storageProductId]);
 
   // ── Panel session reset on exit ─────────────────────────────────────────
   // While the player is open, the Notes and Mind Map panels keep their place
@@ -739,32 +821,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
                   html: safeHtml,
                   createdAt: Date.now(),
                 },
-                ...loadLocalNotes(user.id, product.id),
+                ...loadLocalNotes(user.id, storageProductId),
               ];
-              persistLocalNotes(user.id, product.id, next);
+              persistLocalNotes(user.id, storageProductId, next);
             } else {
-              const next = loadLocalNotes(user.id, product.id).map((note) =>
+              const next = loadLocalNotes(user.id, storageProductId).map((note) =>
                 note.id === sessionNotes.noteId
                   ? { ...note, text: plain, html: safeHtml, updatedAt: Date.now() }
                   : note,
               );
-              persistLocalNotes(user.id, product.id, next);
+              persistLocalNotes(user.id, storageProductId, next);
             }
           }
         }
       }
       resetCoursePanelSession();
     };
-  }, [user, product.id]);
+  }, [user, storageProductId]);
 
   // Restore the saved "where did I leave off" snapshot for this course. It
   // covers every file type, so a YouTube lesson, an MP4, a podcast, a PDF and
   // a zoomed diagram all reopen exactly where the learner stopped.
   useEffect(() => {
-    playbackRef.current = user?.id ? loadPlaybackStore(user.id, product.id) : {};
+    playbackRef.current = user?.id ? loadPlaybackStore(user.id, storageProductId) : {};
     setPlaybackReady(true);
     return () => { setPlaybackReady(false); };
-  }, [user, product.id]);
+  }, [user, storageProductId]);
 
   /**
    * Record the live position of a file. Called continuously by the viewers
@@ -775,13 +857,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const reportPlayback = useCallback((fileId: string, patch: CoursePlaybackPatch) => {
     if (!fileId || !playbackPatchChanged(playbackRef.current[fileId], patch)) return;
     mergePlaybackEntry(playbackRef.current, fileId, patch);
-    if (user?.id) persistPlaybackStore(user.id, product.id, playbackRef.current);
-  }, [product.id, user]);
+    if (user?.id) persistPlaybackStore(user.id, storageProductId, playbackRef.current);
+  }, [storageProductId, user]);
 
   // Flush the snapshot when the tab is hidden / closed so nothing is lost.
   useEffect(() => {
     if (!user?.id) return undefined;
-    const flush = () => persistPlaybackStore(user.id, product.id, playbackRef.current);
+    const flush = () => persistPlaybackStore(user.id, storageProductId, playbackRef.current);
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flush);
     return () => {
@@ -789,7 +871,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", flush);
     };
-  }, [product.id, user]);
+  }, [storageProductId, user]);
 
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
@@ -864,7 +946,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (completing) playSfxComplete();
     else playSfxRemove();
     await setDoc(progressRef, {
-      productId: product.id,
+      productId: storageProductId,
       completedFileIds: completing ? arrayUnion(selectedFile.id) : arrayRemove(selectedFile.id),
       lastOpenedFileId: selectedFile.id,
       lastOpenedAt: serverTimestamp(),
@@ -916,7 +998,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       ...notes,
     ];
     setNotes(next);
-    persistLocalNotes(user.id, product.id, next);
+    persistLocalNotes(user.id, storageProductId, next);
     playSfxAdd();
   };
 
@@ -928,7 +1010,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       ? { ...note, text: richTextToPlain(safeHtml), html: safeHtml, updatedAt: Date.now() }
       : note);
     setNotes(next);
-    persistLocalNotes(user.id, product.id, next);
+    persistLocalNotes(user.id, storageProductId, next);
   };
 
   const deleteNote = (id: string) => {
@@ -943,7 +1025,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         ? { ...note, links: note.links.filter((linkId) => linkId !== id) }
         : note);
     setNotes(next);
-    persistLocalNotes(user.id, product.id, next);
+    persistLocalNotes(user.id, storageProductId, next);
     playSfxRemove();
   };
 
@@ -977,7 +1059,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       return changed ? { ...note, links: [...current] } : note;
     });
     setNotes(next);
-    persistLocalNotes(user.id, product.id, next);
+    persistLocalNotes(user.id, storageProductId, next);
   };
 
   /**
@@ -991,11 +1073,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (!user || !progressRef) return;
     setCompletedIds((current) => (current.has(fileId) ? current : new Set([...current, fileId])));
     await setDoc(progressRef, {
-      productId: product.id,
+      productId: storageProductId,
       completedFileIds: arrayUnion(fileId),
       updatedAt: serverTimestamp(),
     }, { merge: true });
-  }, [product.id, progressRef, user]);
+  }, [storageProductId, progressRef, user]);
 
   const selectFile = (file: CourseFile) => {
     // A Brain resource is not a document to open — it is the practice set on
@@ -1018,7 +1100,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // Personal content (My Modules) never touches course progress — no
     // lastOpenedFileId, no resume entry, no completion ids.
     if (user && progressRef && String(file.source || "") !== "personal") {
-      void setDoc(progressRef, { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
+      void setDoc(progressRef, { productId: storageProductId, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
     }
   };
 
@@ -1033,7 +1115,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }, [selectedFile]);
 
   // A different course resets the stack.
-  useEffect(() => { setVisitedFiles([]); userSelectedRef.current = false; }, [product.id]);
+  useEffect(() => { setVisitedFiles([]); userSelectedRef.current = false; }, [storageProductId]);
 
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;
@@ -1071,13 +1153,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     const onKey = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       const index = Number.parseInt(event.key, 10);
-      if (!Number.isFinite(index) || index < 1 || index > STUDY_TAB_ORDER.length) return;
+      if (!Number.isFinite(index) || index < 1 || index > visibleTabOrder.length) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) return;
       const shell = playerShellRef.current;
       if (shell && target && target !== document.body && !shell.contains(target)) return;
       event.preventDefault();
-      const next = STUDY_TAB_ORDER[index - 1];
+      const next = visibleTabOrder[index - 1];
       if (next !== dockTab) setDockTab(next);
     };
     window.addEventListener("keydown", onKey);
@@ -1198,7 +1280,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       isDone={isDone}
       activeFilePersonal={activeFileIsPersonal}
       fileActions={fileActions?.model ?? null}
-      showPersonalLibraryActions={Boolean(selectedOfficialReference)}
+      showPersonalLibraryActions={Boolean(selectedOfficialReference) && !isMine}
       personalLibraryActionBusy={personalLibraryActionBusy}
       onAddToPersonalModule={() => {
         if (!selectedOfficialReference || personalActionRef.current) return;
@@ -1220,8 +1302,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
-      gateFile={selectedFile && gateResourceKind(selectedFile) ? { id: getGateSourceFileId(selectedFile) || null, url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
-      productId={product.id}
+      /**
+       * The learner's OWN course: "Add to My Module", "Save for later" and
+       * "Gate personal access" are all about OFFICIAL course resources (copy
+       * one into the library, ask the owner for Drive access). There is no
+       * official resource here, so those rows are gone — the rest of the
+       * settings (snowfall, desktop view, status bar, footer dock) stay.
+       */
+      mine={isMine}
+      gateFile={!isMine && selectedFile && gateResourceKind(selectedFile) ? { id: getGateSourceFileId(selectedFile) || null, url: String(selectedFile.url || selectedFile.embedUrl || ""), name: String(selectedFile.name || "") } : null}
+      productId={storageProductId}
       moduleId={selectedFile ? String(owningModuleForFile(modules, String(selectedFile.id))?.id || "") : null}
     />
   );
@@ -1246,6 +1336,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onSelectFile={selectFile}
       onBuyModule={handleBuyModule}
       onBuyUpdate={onPurchaseUpdate}
+      // A learner-authored course has nothing to sell: the Paid ("premium")
+      // tab is removed from the footer dock and from the ⌘/Ctrl+1… shortcuts.
+      hiddenTabs={hiddenTabs}
       notes={notes}
       onAddNote={(text) => saveNote(text)}
       onEditNote={(id, text) => editNote(id, text)}
@@ -1305,7 +1398,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onExit={() => setPersonalModulesOpen(false)}
         />
       )}
-      personalModulesEntry={personalModulesEntry}
+      // Their own course IS the content: the "My Modules" manager (which
+      // borrows resources OUT of an official course) has no meaning here.
+      personalModulesEntry={isMine ? null : personalModulesEntry}
       onOpenPersonalModules={openPersonalModules}
       // PEEK mode: the footer navigation lives at the bottom centre of the
       // whole player (<CoursePeekDock /> below), so the study pane renders no
@@ -1316,7 +1411,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // reports completions into the learner's progress.
       brainPanel={
         <CourseBrainPanel
-          productId={product.id}
+          productId={storageProductId}
           sets={brainSets}
           activeModuleId={activeBrainModuleId}
           completedFileIds={completedIds}
@@ -1337,9 +1432,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             )}
           >
             <LumenChat
-              key={product.id}
+              key={storageProductId}
               uid={user.id}
-              productId={product.id}
+              productId={storageProductId}
               courseTitle={product.title}
               courseShort={product.title.length > 18 ? `${product.title.slice(0, 18).trimEnd()}…` : product.title}
               moduleId={selectedOfficialModule ? String(selectedOfficialModule.id) : (selectedFile?.personalModuleId || null)}
@@ -1456,7 +1551,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <SplitDeck
           axis={useLandscapeRails ? "row" : "column"}
           orientation={useLandscapeRails ? "landscape" : "portrait"}
-          courseId={product.id}
+          courseId={storageProductId}
           accent={activeStudyTab.color}
           studyIcon={activeStudyTab.icon}
           lesson={viewerStack}
@@ -1509,7 +1604,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           while the keyboard is open — src/course/CoursePeekDock.tsx), so the
           footer can never ride above the keyboard, between the keyboard and
           the writing surface. */}
-      {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} /> : null}
+      {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} /> : null}
       {snowMode ? <SnowOverlay /> : null}
       {/* ── Uiverse "Card" folder burst on the Module dock button ──────────
           The existing Module tab is untouched; on click the uiverse

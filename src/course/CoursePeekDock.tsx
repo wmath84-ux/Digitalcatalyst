@@ -53,9 +53,12 @@ const DRAG_SELECT_THRESHOLD = 12
 export default function CoursePeekDock({
   tab,
   onTabChange,
+  hiddenTabs,
 }: {
   tab: DockTab
   onTabChange: (tab: DockTab) => void
+  /** Tabs this player hides — a learner-authored course has no Paid tab. */
+  hiddenTabs?: DockTab[]
 }) {
   // The player's one keyboard state: while it says the keyboard is open, this
   // footer navigation is hidden entirely (rule + reasoning in the header).
@@ -118,7 +121,7 @@ export default function CoursePeekDock({
     [],
   )
 
-  const items: GlassDockItem[] = buildDockItems(tab)
+  const items: GlassDockItem[] = buildDockItems(tab, hiddenTabs)
 
   /** The tab whose dock item's horizontal centre is nearest `clientX`. */
   const tabAtX = useCallback((clientX: number): string | null => {

@@ -60,10 +60,10 @@ test("resumePosition ignores a barely-started or already-finished lesson", () =>
 });
 
 test("CoursePlayer loads, reports and flushes the playback snapshot", () => {
-  assert.match(coursePlayer, /loadPlaybackStore\(user\.id, product\.id\)/);
+  assert.match(coursePlayer, /loadPlaybackStore\(user\.id, storageProductId\)/);
   assert.match(coursePlayer, /const reportPlayback = useCallback/);
   assert.match(coursePlayer, /mergePlaybackEntry\(playbackRef\.current, fileId, patch\)/);
-  assert.match(coursePlayer, /persistPlaybackStore\(user\.id, product\.id, playbackRef\.current\)/);
+  assert.match(coursePlayer, /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/);
   // Hiding / closing the tab must not lose the position.
   assert.match(coursePlayer, /window\.addEventListener\("pagehide", flush\)/);
   assert.match(coursePlayer, /document\.addEventListener\("visibilitychange", flush\)/);
@@ -79,7 +79,7 @@ test("Every opened file stays mounted so switching modules never reloads it", ()
   assert.match(coursePlayer, /onPlaybackChange=\{reportPlayback\}/);
   // A different course starts a fresh stack AND clears the "user navigated"
   // flag so a saved resume position can take over again on the next open.
-  assert.match(coursePlayer, /setVisitedFiles\(\[\]\); userSelectedRef\.current = false; \}, \[product\.id\]\)/);
+  assert.match(coursePlayer, /setVisitedFiles\(\[\]\); userSelectedRef\.current = false; \}, \[storageProductId\]\)/);
 });
 
 test("ResourceViewer accepts the active flag and the playback wiring", () => {

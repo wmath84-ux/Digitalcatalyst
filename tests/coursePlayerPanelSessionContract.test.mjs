@@ -93,7 +93,7 @@ test("leaving the player resets the session and preserves an open notes draft", 
   // The unmount cleanup saves any open draft as a note first…
   assert.match(coursePlayer, /const sessionNotes = getCoursePanelSession\(\)\.notes/);
   assert.match(coursePlayer, /combineHtml\(sessionNotes\.title, sessionNotes\.draft\)/);
-  assert.match(coursePlayer, /loadLocalNotes\(user\.id, product\.id\)/);
+  assert.match(coursePlayer, /loadLocalNotes\(user\.id, storageProductId\)/);
   // …then resets the whole panel session for the next entry.
   assert.match(coursePlayer, /resetCoursePanelSession\(\);/);
 });

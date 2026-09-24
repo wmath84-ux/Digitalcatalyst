@@ -91,6 +91,13 @@ interface UseCourseAccessArgs {
    * flag defaults to `true` to match the Part 1 contract.
    */
   requireBaseCourseForUpdate?: boolean;
+  /**
+   * Skip every access subscription. Used by the learner's OWN course
+   * (My Study Library → `#/my-course/<id>`), where there is nothing to
+   * resolve: they own all of it, so no entitlement / purchase / subscription
+   * listener is opened at all.
+   */
+  skip?: boolean;
 }
 
 interface UseCourseAccessResult {
@@ -125,7 +132,7 @@ interface EntitlementDoc {
  *   const { resolution, loading } = useCourseAccess({ product });
  *   if (resolution.accessibleModuleIds.has(moduleId)) ...
  */
-export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: UseCourseAccessArgs): UseCourseAccessResult => {
+export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, skip = false }: UseCourseAccessArgs): UseCourseAccessResult => {
   const { user } = useAuth();
   const uid = user?.id || null;
 
@@ -138,7 +145,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
 
   // Subscribe to canonical entitlements (Part 6 / Part 9).
   useEffect(() => {
-    if (!uid) {
+    if (skip || !uid) {
       setEntitlementDocs([]);
       return undefined;
     }
@@ -179,7 +186,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
 
   // Subscribe to the current subscription record (Part 9).
   useEffect(() => {
-    if (!uid) {
+    if (skip || !uid) {
       setSubscription(null);
       return undefined;
     }
@@ -218,7 +225,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
   // dual-writer) for `purchasedProductIds` +
   // `purchasedProductUpdateIds`.
   useEffect(() => {
-    if (!uid) {
+    if (skip || !uid) {
       setLegacyProductIds([]);
       setLegacyUpdateIds([]);
       return undefined;
@@ -250,7 +257,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
   // Subscribe to the legacy `users/{uid}/purchases/*` subcollection
   // (Part 6 dual-writer) for base product ownership.
   useEffect(() => {
-    if (!uid) {
+    if (skip || !uid) {
       setLegacyPurchaseProductIds([]);
       return undefined;
     }
@@ -281,7 +288,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
   // The "loading" state is true until the entitlement +
   // subscription listeners have all fired at least once.
   useEffect(() => {
-    if (!uid) {
+    if (skip || !uid) {
       setLoading(false);
       return;
     }

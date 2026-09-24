@@ -327,12 +327,15 @@ test("The divider is fully keyboard driven", () => {
 
 test("⌘/Ctrl+1…6 walks the study tabs while the deck is up", () => {
   assert.match(coursePlayer, /if \(!\(event\.metaKey \|\| event\.ctrlKey\) \|\| event\.altKey\) return;/);
-  assert.match(coursePlayer, /index > STUDY_TAB_ORDER\.length\) return;/);
+  // The walk follows the VISIBLE tab order: a learner-authored course hides the
+  // Paid tab, so there is one fewer shortcut and the numbering stays honest.
+  assert.match(coursePlayer, /index > visibleTabOrder\.length\) return;/);
+  assert.match(coursePlayer, /const visibleTabOrder = useMemo\(\s*\(\) => STUDY_TAB_ORDER\.filter\(\(tab\) => !hiddenTabs\.includes\(tab\)\),/);
   // Never hijack a browser shortcut aimed at a text field…
   assert.match(coursePlayer, /target\.isContentEditable \|\| \/\^\(input\|textarea\|select\)\$\/i\.test\(target\.tagName\)/);
   // …or at anything outside the player.
   assert.match(coursePlayer, /if \(shell && target && target !== document\.body && !shell\.contains\(target\)\) return;/);
-  assert.match(coursePlayer, /const next = STUDY_TAB_ORDER\[index - 1\];/);
+  assert.match(coursePlayer, /const next = visibleTabOrder\[index - 1\];/);
   assert.match(overlay, /export const STUDY_TAB_ORDER: DockTab\[\] = TABS\.map\(\(\{ key \}\) => key\);/);
 });
 

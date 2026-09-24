@@ -14,6 +14,12 @@ const desktop = read("src/components/DesktopShell.tsx");
 const profile = read("src/profile/ProfileLayout.tsx");
 const profileApp = read("src/profile/App.tsx");
 const study = read("src/personal-library/StudyLibraryPage.tsx");
+const editor = read("src/personal-library/MyCourseEditorPage.tsx");
+const myCard = read("src/personal-library/MyCourseCard.tsx");
+const myPlayer = read("src/personal-library/MyCoursePlayerPage.tsx");
+const myClient = read("src/lib/myCourseClient.ts");
+const myAdapter = read("src/lib/myCourseAdapter.ts");
+const brain = read("src/personal-library/MyCourseBrainEditor.tsx");
 const addDialog = read("src/personal-library/AddOfficialResourceDialog.tsx");
 const player = read("src/CoursePlayerApp.tsx");
 const playerPanel = read("src/course/PlayerPanel.tsx");
@@ -37,36 +43,62 @@ test("My Study Library is one lazy authenticated route reachable from desktop an
   assert.match(profileApp, /window\.location\.hash = "#\/study-library"/);
 });
 
-test("central workspace exposes Saved, recent, search/type/module/state filters and plan usage", () => {
+test("central workspace is a course shelf: product-card grid + a '+' that opens the builder", () => {
   assert.match(study, /My Study Library/);
-  assert.match(study, /Saved for Later/);
-  assert.match(study, /Recently added/);
-  assert.match(study, /Recently opened/);
-  assert.match(study, /aria-label="Search study library"/);
-  assert.match(study, /<FilterSelect label="Type"/);
-  assert.match(study, /<FilterSelect label="Module"/);
-  assert.match(study, /<FilterSelect label="State"/);
-  assert.match(study, /data-library-plan-usage/);
-  assert.match(study, /moduleLimit/);
-  assert.match(study, /resourceLimit/);
-  assert.match(study, /usageAtPerModuleLimit/);
+  // Every course the learner built is a card drawn with the store's own
+  // product-card material, carrying only cover, title, Play and Edit.
+  assert.match(study, /data-my-course-grid/);
+  assert.match(study, /<MyCourseCard key=\{course\.id\} course=\{course\} onPlay=\{openCourse\} onEdit=\{editCourse\} \/>/);
+  assert.match(myCard, /dc-scene-plate/);
+  assert.match(myCard, /aspect-\[4\/3\]/);
+  assert.match(myCard, /data-my-course-play/);
+  assert.match(myCard, /data-my-course-edit/);
+  // The "+" is a tile in the grid AND a floating button, both opening the
+  // builder route (new module / folder, image, title, type, name, resource).
+  assert.match(study, /data-my-course-create/);
+  assert.match(study, /data-my-course-create-fab/);
+  assert.match(study, /data-my-course-create-empty/);
+  assert.match(study, /MY_COURSE_NEW_HASH = "#\/my-course\/new"/);
+  assert.match(study, /myCoursePlayHash\(course\.id\)/);
+  assert.match(study, /myCourseEditHash\(course\.id\)/);
+  // The old link-organiser surface is gone for good.
+  assert.doesNotMatch(study, /Saved for Later/);
+  assert.doesNotMatch(study, /data-library-plan-usage/);
+  assert.doesNotMatch(study, /usageAtPerModuleLimit/);
 });
 
-test("module/resource organization has CRUD, confirmations, move and non-drag reorder controls", () => {
-  assert.match(study, /createModule/);
-  assert.match(study, /updateModule/);
-  assert.match(study, /deleteModule/);
-  assert.match(study, /createResource/);
-  assert.match(study, /updateResource/);
-  assert.match(study, /deleteResource/);
-  assert.match(study, /moveResourceTo/);
-  assert.match(study, /ConfirmDialog/);
-  assert.match(study, /Move module up/);
-  assert.match(study, /Move resource down/);
-  assert.match(study, /Move to another module/);
+test("the builder gives modules and resources full CRUD, confirmations and non-drag reorder", () => {
+  // Modules: create (incl. nested folders), rename, reorder, delete — with a
+  // confirmation before a destructive one.
+  assert.match(editor, /createMyModule/);
+  assert.match(editor, /addChildNode\(draft\.modules, parentId, createMyModule\(/);
+  assert.match(editor, /removeNode/);
+  assert.match(editor, /moveNode/);
+  assert.match(editor, /updateNode/);
+  assert.match(editor, /ConfirmDialog/);
+  assert.match(editor, /data-my-module-add-child/);
+  assert.match(editor, /Move module up/);
+  assert.match(editor, /Move module down/);
+  // Resources: name, file type, link OR upload, description, reorder, delete.
+  assert.match(editor, /createMyResource/);
+  assert.match(editor, /data-my-resource-type-select/);
+  assert.match(editor, /data-my-resource-url/);
+  assert.match(editor, /uploadMyCourseResourceFile/);
+  assert.match(editor, /Move resource up/);
+  assert.match(editor, /Move resource down/);
+  assert.match(editor, /data-my-course-cover-input/);
+  assert.match(editor, /uploadMyCourseCover/);
+  // The Brain (MCQ) builder — the same capability the admin has.
+  assert.match(editor, /MyCourseBrainEditor/);
+  // …including the bulk paste (the shared parser) and hand-written questions.
+  assert.match(brain, /parseQuestionText/);
+  assert.match(brain, /data-my-brain-add/);
+  assert.match(brain, /data-my-brain-option-mark/);
+  assert.match(myClient, /MY_COURSES_COLLECTION = "myCourses"/);
+  assert.match(myClient, /saveMyCourse/);
+  assert.match(myClient, /deleteMyCourse/);
   assert.match(api, /applyOrderMove/);
   assert.doesNotMatch(api, /resources\.forEach\(\(item, index\) => tx\.update/);
-  assert.match(study, /No matching resources/);
 });
 
 test("official player actions snapshot stable references, are single-flight and submit through the API", () => {
@@ -133,14 +165,21 @@ test("all creation paths use live cycle entitlements and transactionally reconci
   assert.match(api, /TYPE_NOT_ALLOWED/);
 });
 
-test("downgrades preserve reads/organization while every additional create remains gated", () => {
+test("a learner's own courses are never plan-gated — no entitlement, no usage meter, no upsell", () => {
+  // The shelf and the builder carry no plan state at all: what the learner
+  // authors belongs to them outright (the old saved-link surface was a paid
+  // feature with cycle limits; this one is not).
+  assert.doesNotMatch(study, /View plans/);
+  assert.doesNotMatch(study, /usageAtModuleLimit|usageAtResourceLimit|data-library-limit-state/);
+  assert.doesNotMatch(editor, /View plans|personalModules|allowedTypes/);
+  assert.doesNotMatch(myClient, /personalCourse|entitlement/i);
+  // The old saved-link API keeps its own gating untouched (it still serves
+  // the Course Player's "My Modules" surface inside OFFICIAL courses).
   const listBody = api.slice(api.indexOf("async function listLibrary"), api.indexOf("async function createModule"));
   assert.match(listBody, /readEntitlement/);
   assert.doesNotMatch(listBody, /assertCreationEntitled/);
   assert.match(api, /assertCreationEntitled/);
   assert.match(personalPanel, /Existing content remains readable and organisable/);
-  assert.match(study, /Opening, renaming, moving, reordering and deleting retained content remain available/);
-  assert.match(study, /View plans/);
 });
 
 test("official data is resolved server-side and copied only into owner-scoped personal documents", () => {
@@ -163,7 +202,7 @@ test("Saved is a first-class state and moving it is one authoritative transactio
   assert.match(api, /tx\.delete\(sourceResource\.ref\)/);
   assert.match(api, /tx\.create\(targetRef/);
   assert.match(client, /movePersonalResourceToDestination/);
-  assert.match(study, /personal\.moveResourceTo/);
+  assert.match(personalPanel, /personal\.moveResource\(/);
 });
 
 test("concurrent deletes and moves cannot underflow usage or write into deleting modules", () => {
@@ -177,14 +216,34 @@ test("concurrent deletes and moves cannot underflow usage or write into deleting
 });
 
 test("personal resources reuse ResourceViewer and cannot mutate official progress/completion", () => {
-  assert.match(study, /ResourceViewer/);
-  assert.match(study, /personalResourceToCourseFile/);
   assert.match(client, /source: "personal"/);
   assert.match(player, /activeFileIsPersonal/);
   assert.match(player, /!activeFileIsPersonal/);
   assert.match(player, /selectedFile\.source \|\| ""\) === "personal"/);
   assert.match(viewer, /CourseFile/);
   assert.doesNotMatch(study, /mark.*Complete/i);
+});
+
+test("a learner-authored course opens the SAME Course Player, on its own namespaced storage", () => {
+  // Same player component — only the product projection differs…
+  assert.match(myPlayer, /lazy\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
+  assert.match(myPlayer, /<CoursePlayer/);
+  assert.match(myAdapter, /export const myCourseToProduct/);
+  assert.match(myAdapter, /courseContent: course\.modules\.map\(toCourseModule\)/);
+  assert.match(myAdapter, /id: myCourseStorageId\(course\.id\)/);
+  // …and it is flagged `mine`, which is what removes the Paid tab, hides the
+  // official-resource rows and namespaces every store (`mine-<courseId>`).
+  assert.match(myPlayer, /mine=\{\{ courseId: course\.id \}\}/);
+  assert.match(player, /mine\?: \{ courseId: string \} \| null/);
+  assert.match(player, /MINE_HIDDEN_TABS: DockTab\[\] = \["paid"\]/);
+  assert.match(player, /storageProductId = isMine && mine \? `mine-\$\{mine\.courseId\}` : String\(product\.id\)/);
+  assert.match(player, /hiddenTabs=\{hiddenTabs\}/);
+  assert.match(player, /useCourseAccess\(\{ product, skip: isMine \}\)/);
+  // Settings stay, the three official-resource rows do not.
+  assert.match(playerPanel, /mine\?: boolean;/);
+  assert.match(playerPanel, /!mine && showPersonalLibraryActions && onAddToPersonalModule/);
+  assert.match(playerPanel, /!mine && showPersonalLibraryActions && onSaveForLater/);
+  assert.match(playerPanel, /!mine && gateFile/);
 });
 
 test("dialogs use visualViewport bounds and mobile-safe scrolling rather than keyboard constants", () => {

@@ -139,7 +139,7 @@ test("The animation runs its FULL length, then closes back to icon form", () => 
 
 test("The existing dock button is untouched", () => {
   // The dock still selects tabs through the same shared item builder…
-  assert.match(overlay, /const dockItems: GlassDockItem\[\] = buildDockItems\(tab\);/);
+  assert.match(overlay, /const dockItems: GlassDockItem\[\] = buildDockItems\(tab, props\.hiddenTabs\);/);
   assert.match(overlay, /onSelect=\{\(id\) => props\.onTabChange\(id as DockTab\)\}/);
   // …with its data hooks intact — the burst adds an overlay, it does not
   // modify the button.
