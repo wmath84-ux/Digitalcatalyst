@@ -105,7 +105,10 @@ export default function NatureStudioPage() {
   const [liteFx, setLiteFx] = useState(false);
   const [windIdx, setWindIdx] = useState(1);
   const [iceAge, setIceAge] = useState(false);
-  const [animeSky, setAnimeSky] = useState(false);
+  // OWNER DIRECTIVE: the anime sky is the sanctuary's DEFAULT sky — the
+  // toggle stays in the Scene menu for turning it off, but the world opens
+  // under the panorama, not the procedural dome.
+  const [animeSky, setAnimeSky] = useState(true);
   const [daylight, setDaylight] = useState<DaylightMode>("auto");
   // Shown next to the buttons so "Auto" is legible — otherwise the learner
   // cannot tell which hour the scene decided on. Ticks once a minute.
@@ -188,6 +191,10 @@ export default function NatureStudioPage() {
     };
     resize();
     engine.start();
+    // The anime sky is the default (owner directive): the engine boots on
+    // the procedural dome, so the first enable is issued here — the state
+    // above mirrors it for the menu.
+    engine.setAnimeSky(true);
     // Two frames in, the first render has landed — drop the boot veil.
     const revealTimer = window.setTimeout(() => setBooting(false), 240);
 

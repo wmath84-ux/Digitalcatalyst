@@ -17,7 +17,7 @@
 // never stutters when a frame is long.
 
 import * as THREE from "three";
-import { OCEAN_LEVEL, terrainHeight, WORLD_HALF } from "./terrain";
+import { FLY_LIMIT_RADIUS, OCEAN_LEVEL, terrainHeight, WORLD_HALF } from "./terrain";
 
 /** Frame-rate independent smoothing factor. */
 export function damp(k: number, dt: number): number {
@@ -170,6 +170,13 @@ export class OrbitRig {
    * along the look direction flattened onto the ground, `lift` is world up.
    * The look point stays on the meadow unless the drone is climbing, so a
    * flight across the island never stares into the sky or the dirt.
+   *
+   * THE LIMIT IS A CIRCLE, not a square (owner directive: "kinare ko is
+   * tarah fit karo taki camera bahar na jaaye"). The old clamp bounded x
+   * and z independently — a square with perfectly straight invisible walls
+   * that a forward flight ran straight into while land carried on past it.
+   * Clamping the RADIUS instead means every direction ends the same way:
+   * over the island's own coast ring, short of the open sea.
    */
   fly(strafe: number, ahead: number, lift: number) {
     const yaw = this.yaw;
@@ -179,9 +186,12 @@ export class OrbitRig {
     const rz = -Math.sin(yaw);
     this.target.x += rx * strafe + fx * ahead;
     this.target.z += rz * strafe + fz * ahead;
-    const lim = WORLD_HALF * 0.92;
-    this.target.x = THREE.MathUtils.clamp(this.target.x, -lim, lim);
-    this.target.z = THREE.MathUtils.clamp(this.target.z, -lim, lim);
+    const r = Math.hypot(this.target.x, this.target.z);
+    if (r > FLY_LIMIT_RADIUS) {
+      const s = FLY_LIMIT_RADIUS / r;
+      this.target.x *= s;
+      this.target.z *= s;
+    }
     const sampled = terrainHeight(this.target.x, this.target.z);
     // Over the river or the sea the analytic bed is below the water. The
     // drone skims the surface instead of diving.

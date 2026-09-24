@@ -699,13 +699,31 @@ export function createWater(
 
           dcCol += uWsun * pow( max( dot( dcNormal, dcH ), 0.0 ), 60.0 ) * dcCau * 0.22;
 
+          // ── THE SURF ZONE (owner directive: "jo water hai kinare kinare
+          // usko aisa design karo") — the coastline gets the three layers
+          // every tropical shore is read by, all analytic:
+          //
+          //   1. THE LAGOON SHELF — under ~0.6 m the water goes glassy and
+          //      pale over the sand, so the beach dissolves into clear
+          //      water instead of hitting a hard colour edge.
+          //   2. THE ROLLING SURF — foam bands that travel shoreward
+          //      (down the depth gradient) and pulse, offset by the noise
+          //      so they arrive as broken arcs, never as laser lines.
+          //   3. THE BEACH LINE — the last metre of depth stays white
+          //      where the chop breaks, the classic rim of a tropical bay.
           float dcBreak = texture2D( uFlowMap, dcUv * 3.1 + vec2( uTime * 0.02, -uTime * 0.017 ) ).r;
-          float dcLine = 0.85 + 0.55 * sin( uTime * 0.7 + vDcWorld.x * 0.05 + vDcWorld.z * 0.043 );
-          float dcFoam = ( 1.0 - smoothstep( 0.0, 1.15 * dcLine, dcD ) ) * smoothstep( 0.45, 0.85, dcBreak * 0.5 + dcNrm.y * 0.3 );
-          dcCol = mix( dcCol, vec3( 0.38, 0.58, 0.76 ), clamp( dcFoam, 0.0, 0.35 ) );
+          float dcShelf = 1.0 - smoothstep( 0.12, 0.62, dcD );
+          dcCol = mix( dcCol, vec3( 0.60, 0.80, 0.78 ), dcShelf * 0.45 );
+          float dcWave = sin( dcD * 2.4 - uTime * 1.35 + dcBreak * 4.6 );
+          float dcSurfBand = smoothstep( 0.5, 0.95, dcWave ) * ( 1.0 - smoothstep( 0.7, 3.6, dcD ) );
+          float dcLineFoam = ( 1.0 - smoothstep( 0.0, 0.85, dcD ) )
+                           * smoothstep( 0.32, 0.8, dcBreak * 0.6 + dcNrm.y * 0.25 );
+          float dcFoam = clamp( dcSurfBand * 0.85 + dcLineFoam, 0.0, 1.0 );
+          dcCol = mix( dcCol, vec3( 0.93, 0.98, 0.99 ), dcFoam * 0.78 );
 
           gl_FragColor.rgb = mix( gl_FragColor.rgb * vec3( 0.12, 0.32, 0.82 ), dcCol, 0.96 );
-          gl_FragColor.a = clamp( mix( 0.86, 0.98, smoothstep( 0.0, 5.0, dcD ) ) + dcFoam * 0.08, 0.0, 1.0 );
+          // The shelf is glassy (the sand shows through), deep water opaque.
+          gl_FragColor.a = clamp( mix( 0.58, 0.97, smoothstep( 0.0, 4.5, dcD ) ) + dcFoam * 0.1, 0.0, 1.0 );
         }
         `,
       );

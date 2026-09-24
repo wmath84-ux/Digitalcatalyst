@@ -160,10 +160,12 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   const gradeAnime = (state: DaylightState) => {
     if (!animeMat) return;
     // The panorama is baked at noon: stay true to its art in daylight, lean
-    // on the sun's tint near the edges of the day, and sink to a deep blue
-    // multiply at night — never glowing at midnight.
+    // on the sun's tint near the edges of the day. At night it dips toward
+    // a deep blue multiply but never more than 55 % — the owner studies at
+    // night and the panorama must stay READABLE ("sky to dikh hi nahin
+    // raha hai"), not sink into a black dome.
     animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.1);
-    animeMat.color.lerp(ANIME_NIGHT, 1 - state.dayFactor);
+    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.55);
   };
 
   // ── No mountain ring ─────────────────────────────────────────────────

@@ -70,9 +70,11 @@ test("the GLB is never loaded at runtime — the extracted JPEG is the asset", (
 
 test("the tile constant carries the photo across every shell at field scale", () => {
   assert.match(PALETTE, /export const GROUND_TILE_METRES = 34/, "field-scale tile (was 6 m grit)");
-  // The shells must still derive their own tile count from the constant —
-  // a shared repeat would stretch the far world and undo the spread.
-  assert.match(TERRAIN, /const tiles = size \/ TILE_METRES/, "per-shell texel density");
+  // The shells must still derive their texel density from the constant —
+  // a shared repeat would stretch the far world and undo the spread. (The
+  // ground is built from round radial shells now, so every vertex's UV IS
+  // its world position over the tile size — same rule, per vertex.)
+  assert.match(TERRAIN, /u\[i \* 2\] = x \/ TILE_METRES/, "per-vertex texel density");
 });
 
 test("the macro-variation fetch follows the new tile scale", () => {
