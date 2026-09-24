@@ -104,6 +104,7 @@ import {
   terrainHeight,
 } from "./terrain";
 import { insideWarehouse, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
+import { insideBeachHouse } from "./beachHouseSite";
 import {
   createSite,
   pathWeight,
@@ -256,6 +257,8 @@ function acceptsPlant(
   // The villa is 30 m of geometry a 20 m card would stand inside. (The six
   // foundation plants are placed by hand — see the cluster below.)
   if (insideWarehouse(x, z, 9)) return false;
+  // 7–20 m plants: anything inside the wall box would swallow the roof.
+  if (insideBeachHouse(x, z, 9)) return false;
   // The STUDY ZONE: the three 30 m boards stand on a 26 m arc around the
   // chair (lectern.ts, LECTERN_RADIUS/PIVOT). This field's plants grow to
   // 20 m — twice a board's height — so a plant inside the arc would sit

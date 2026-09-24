@@ -29,7 +29,17 @@ import {
   SUN_SIDE_Z,
 } from "../src/nature3d/engine/environment";
 import { GROUND_PALETTE, ALBEDO_CEILING, ALBEDO_FLOOR } from "../src/nature3d/engine/palette";
-import { terrainHeight, RIVER_CENTER_X } from "../src/nature3d/engine/terrain";
+import { terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL } from "../src/nature3d/engine/terrain";
+import {
+  BEACH_HOUSE_COUNT,
+  ensureBeachHouseSites,
+} from "../src/nature3d/engine/beachHouses";
+import {
+  beachHousesInstalled,
+  insideBeachHouse,
+  levelBeachHouseGround,
+} from "../src/nature3d/engine/beachHouseSite";
+import { WAREHOUSE_X, WAREHOUSE_Z } from "../src/nature3d/engine/warehouseSite";
 import type { TextureSet } from "../src/nature3d/engine/textures";
 
 let failures = 0;
@@ -370,6 +380,75 @@ check("bay: no NaN vertices in the merged geometry", bayNaN === 0, `${bayNaN}`);
     Math.hypot(c.x, c.z) > 900 && Math.hypot(c.x, c.z) < 1350, `r=${Math.hypot(c.x, c.z).toFixed(0)}`);
 }
 structures.dispose();
+
+// ── 5b. The beach-house district ──────────────────────────────────────
+//
+// The sites are SOLVED, not hand-placed, so the assertions have to be about
+// the properties the solve promises — that is where a regression would hide.
+const houseSites = ensureBeachHouseSites();
+check("houses: the district installs its pads", beachHousesInstalled() && houseSites.length === BEACH_HOUSE_COUNT,
+  `${houseSites.length} of ${BEACH_HOUSE_COUNT}`);
+check("houses: the solve is deterministic", (() => {
+  const again = ensureBeachHouseSites();
+  return again.every((s, i) =>
+    s.x === houseSites[i].x && s.z === houseSites[i].z && s.yaw === houseSites[i].yaw &&
+    s.scale === houseSites[i].scale && s.padY === houseSites[i].padY);
+})(), "same six placements on a second call");
+
+let houseBad = "";
+for (const s of houseSites) {
+  const r = Math.hypot(s.x, s.z);
+  if (r < 130 || r > 520) houseBad += ` r=${r.toFixed(0)}`;
+  else if (!(s.scale > 0.7 && s.scale < 1.1)) houseBad += ` scale=${s.scale}`;
+  else if (!Number.isFinite(s.yaw)) houseBad += " yaw";
+  else if (Math.abs(s.x - RIVER_CENTER_X) < 18) houseBad += " river";
+  else if (Math.hypot(s.x - WAREHOUSE_X, s.z - WAREHOUSE_Z) < 60) houseBad += " villa";
+}
+check("houses: every site is in the sanctuary's fields, off the river and the villa",
+  houseBad === "", houseBad || "6 sites clear");
+
+let minSep = Infinity;
+for (let i = 0; i < houseSites.length; i += 1) {
+  for (let j = i + 1; j < houseSites.length; j += 1) {
+    minSep = Math.min(minSep, Math.hypot(houseSites[i].x - houseSites[j].x, houseSites[i].z - houseSites[j].z));
+  }
+}
+check("houses: they stand door-door, never in a row of two", minSep > 250, `closest pair ${minSep.toFixed(0)} m`);
+
+// The pad is the contract the TERRAIN has to honour: flat under the walls,
+// feathered back to natural ground at the rim, and never a step.
+let flatBad = "";
+for (const s of houseSites) {
+  let mn = Infinity;
+  let mx = -Infinity;
+  for (let ix = -2; ix <= 2; ix += 1) {
+    for (let iz = -2; iz <= 2; iz += 1) {
+      const h = terrainHeight(s.x + (ix / 2) * (s.halfX + 2), s.z + (iz / 2) * (s.halfZ + 2));
+      mn = Math.min(mn, h);
+      mx = Math.max(mx, h);
+    }
+  }
+  if (mx - mn > 0.05) flatBad += ` (${s.x.toFixed(0)},${s.z.toFixed(0)})=${(mx - mn).toFixed(2)}m`;
+}
+check("houses: the ground under every wall is flat to 5 cm", flatBad === "", flatBad || "6 pads level");
+
+{
+  const s = houseSites[0];
+  const rim = levelBeachHouseGround(s.x + s.halfX + 40, s.z, terrainHeight(s.x + s.halfX + 40, s.z));
+  check("houses: the pad releases the ground at its rim",
+    Math.abs(rim - terrainHeight(s.x + s.halfX + 40, s.z)) < 1e-9, `${rim.toFixed(3)}`);
+  check("houses: the pad is cut DOWN to the lowest sample, never built up",
+    s.padY <= terrainHeight(s.x, s.z) + 1e-9, `padY=${s.padY.toFixed(2)} centre=${terrainHeight(s.x, s.z).toFixed(2)}`);
+  check("houses: the yard reads as trodden ground",
+    pathWeight(s.x, s.z) > 0.5, `worn=${pathWeight(s.x, s.z).toFixed(2)}`);
+}
+
+check("houses: nothing grows through the walls",
+  insideBeachHouse(houseSites[0].x, houseSites[0].z) &&
+  !insideBeachHouse(houseSites[0].x + 40, houseSites[0].z), "core in, 40 m out");
+check("houses: no site sits on the beach or in the sea",
+  houseSites.every((s) => terrainHeight(s.x, s.z) > OCEAN_LEVEL + 1.5),
+  houseSites.map((s) => terrainHeight(s.x, s.z).toFixed(1)).join(" / "));
 
 // ── 6. Disposal is honest ─────────────────────────────────────────────
 let threw = "";

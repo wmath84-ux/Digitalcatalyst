@@ -49,6 +49,7 @@ import { ROUGHNESS_RANGE } from "./palette";
 import { bakeCurvature, type Weathering } from "./weathering";
 import { insideRiver, terrainHeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
+import { insideBeachHouse } from "./beachHouseSite";
 import type { TextureSet } from "./textures";
 
 export interface RockField {
@@ -343,6 +344,7 @@ export function createRockField(
       // Don't start an outcrop on the warehouse pad — the per-rock test
       // below still catches a cluster that grew in from outside.
       if (insideWarehouse(clusterX, clusterZ, 12)) continue;
+      if (insideBeachHouse(clusterX, clusterZ, 12)) continue;
       clusterLeft = 3 + ((rand() * 7) | 0);
       clusterWet = Math.max(s.nearWater, s.wetness) * (s.slopeDeg < 26 ? 1 : 0.4);
     }
@@ -356,6 +358,7 @@ export function createRockField(
 
     if (insideRiver(x, z)) continue;
     if (insideWarehouse(x, z, 3)) continue;
+    if (insideBeachHouse(x, z, 3)) continue;
     if (pathWeight(x, z) > 0.6) continue;
     const distOrigin = Math.hypot(x, z);
     if (distOrigin < 9) continue;

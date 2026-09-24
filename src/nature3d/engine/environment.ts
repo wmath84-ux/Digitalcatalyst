@@ -43,6 +43,7 @@
 
 import * as THREE from "three";
 import { terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
+import { beachHouseYardWeight } from "./beachHouseSite";
 import { noise } from "./simplex";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -316,7 +317,9 @@ export function pathWeight(x: number, z: number): number {
   const b = TRAIL_BOUNDS;
   if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) {
     const dc = Math.hypot(x, z);
-    return Math.max(0, 0.82 * (1 - smoothstep(2.0, 4.4, dc)));
+    const clearing = Math.max(0, 0.82 * (1 - smoothstep(2.0, 4.4, dc)));
+    const yard = 0.62 * beachHouseYardWeight(x, z);
+    return yard > clearing ? yard : clearing;
   }
 
   let w = 0;
@@ -341,6 +344,13 @@ export function pathWeight(x: number, z: number): number {
   // The clearing: the trodden disc under the chair, desk and lectern.
   const d = Math.hypot(x, z);
   w = Math.max(w, 0.82 * (1 - smoothstep(2.0, 4.4, d)));
+  // THE HOMESTEADS: the ground each beach house stands on reads as a lived-in
+  // yard — bare, swept, compacted — which is what makes a house look occupied
+  // instead of dropped. It is fed through THIS function (rather than each
+  // scatter learning about houses) so the bare ground, the missing grass, the
+  // thinned plants and the packed dirt tint all come from one number.
+  // Until `beachHouses.ts` installs its sites this is a single length check.
+  w = Math.max(w, 0.62 * beachHouseYardWeight(x, z));
   return Math.min(1, w);
 }
 

@@ -20,6 +20,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
+import { insideBeachHouse } from "./beachHouseSite";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
 import type { TextureSet } from "./textures";
 
@@ -144,6 +145,8 @@ function treeLayout(count: number): TreeLayout[] {
     if (insideRiver(x, z)) continue;
     // A trunk against the wall puts its crown on the roof. 8 m clears it.
     if (insideWarehouse(x, z, 8)) continue;
+    // A crown must not sit on a beach house's ridge either.
+    if (insideBeachHouse(x, z, 9)) continue;
     if (Math.hypot(x, z) < 8) continue;
     if (Math.abs(x) < 4 && z > -6 && z < 6) continue; // keep the board sightline clear
     const h = terrainHeight(x, z);

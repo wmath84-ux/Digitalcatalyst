@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff,
-  Maximize2, Minimize2, PawPrint, RotateCw,
+  Maximize2, Minimize2, PawPrint, RotateCw, Trees,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
   MoreVertical,
@@ -48,6 +48,7 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
   { key: "trek", label: "Highlands", Icon: Mountain },
   { key: "sanctuary", label: "Sanctuary", Icon: Compass },
   { key: "warehouse", label: "Villa", Icon: Home },
+  { key: "houses", label: "Beach Houses", Icon: Trees },
   { key: "board", label: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", Icon: Waves },
   { key: "wildlife", label: "Wildlife", Icon: PawPrint },

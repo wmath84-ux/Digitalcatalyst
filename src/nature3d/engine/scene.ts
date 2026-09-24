@@ -51,7 +51,13 @@ import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./b
 import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
 import { createWarehouse, type Warehouse } from "./warehouse";
+import {
+  createBeachHouses,
+  ensureBeachHouseSites,
+  type BeachHouses,
+} from "./beachHouses";
 import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
+import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
 import { OrbitRig } from "./controls";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -80,7 +86,7 @@ const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
-  | "trek" | "world" | "warehouse"
+  | "trek" | "world" | "warehouse" | "houses"
   // The three study boards. Each frames ONE board edge-to-edge.
   | "reading" | "notes" | "mindmap";
 
@@ -205,6 +211,13 @@ export class Sanctuary {
   private dayBed: DayBed | null = null;
   /** The abandoned warehouse, loaded async (warehouse.ts). */
   private warehouse: Warehouse | null = null;
+  /**
+   * THE BEACH-HOUSE DISTRICT — the owner's uploaded house, six times over
+   * (beachHouses.ts). Its SITES are solved before the first scatter, so
+   * the grass, the plants, the trees and the rocks already know the pads
+   * are there; the model itself is async and fail-soft.
+   */
+  private beachHouses: BeachHouses | null = null;
   private avatar: TrekAvatar;
   private trek = new TrekPlayer();
   /** The three live course-player boards + their WebGL frames. */
@@ -372,6 +385,17 @@ export class Sanctuary {
     this.scene.add(this.winter.group);
 
     // ── Build the world ────────────────────────────────────────────────
+    //
+    // THE BEACH-HOUSE PADS COME FIRST. `ensureBeachHouseSites()` solves the
+    // six placements against the NATURAL height field and installs them into
+    // `beachHouseSite.ts`; from this line on, `terrainHeight` levels a yard
+    // under every one of them. It has to happen before the ground mesh is
+    // built (150 000 samples), before the grass and before the tropical
+    // field, or those passes would describe a world that never exists —
+    // grass standing where a floor is, houses floating over a green hollow.
+    // Deterministic and idempotent: the same six sites on every machine.
+    ensureBeachHouseSites();
+
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
     // The sky dome fills the whole screen every frame — one of the best
@@ -631,6 +655,33 @@ export class Sanctuary {
         building.update(this.camera.position);
       })
       .catch((err) => console.warn("[sanctuary] warehouse failed", err));
+
+    // THE BEACH-HOUSE DISTRICT — the owner's uploaded house, standing six
+    // times across the sanctuary's own fields (see `beachHouses.ts` for the
+    // site solve and `beachHouseSite.ts` for the pads the scatter already
+    // respects). Same async, fail-soft load as the villa and the day bed: a
+    // dropped download leaves six levelled yards and warns once.
+    createBeachHouses(this.budget, aniso)
+      .then((district) => {
+        if (this.disposed) {
+          district.dispose();
+          return;
+        }
+        this.beachHouses = district;
+        this.scene.add(district.group);
+        district.group.updateMatrixWorld(true);
+        this.atmosphere.registerTree(district.group);
+        this.winter.registerTree(district.group);
+        if (this.budget.halfPrecision) halfPrecisionTree(district.group);
+        console.info(
+          `[sanctuary] beach houses placed: ${district.count} sites (` +
+          district.sites
+            .map((s) => `${Math.round(s.x)},${Math.round(s.z)}`)
+            .join(" · ") +
+          ")",
+        );
+      })
+      .catch((err) => console.warn("[sanctuary] beach houses failed", err));
 
     // ── The study lectern: a desk and three 30 m boards ───────────────
     //
@@ -1637,6 +1688,19 @@ export class Sanctuary {
         this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
         break;
       }
+      case "houses": {
+        // The homestead row, from above the meadow: whichever house the site
+        // solve put nearest the study clearing is the one in frame.
+        const site = this.focusHouseSite();
+        this.orbit.autoRotate = false;
+        this.orbit.panTo(
+          this.tmpV.set(site.x, terrainHeight(site.x, site.z) + HOUSE_RIDGE * 0.45, site.z),
+          46,
+          site.yaw + Math.PI,
+          0.22,
+        );
+        break;
+      }
       case "warehouse":
         // Behind the student, from the chair side. A 30 m house at 58 m
         // fills the frame without standing on the roof. Yaw π puts the
@@ -1765,6 +1829,26 @@ export class Sanctuary {
    * Same fitting maths, but against the full width of the trio (the outer
    * corner of a side board, mirrored) so nothing is cut off.
    */
+  /**
+   * The beach house nearest the study clearing — the one the "houses" camera
+   * preset frames. Falls back to the origin if the sites were never solved
+   * (which can only happen if the camera preset is used before the world is
+   * built, i.e. never).
+   */
+  private focusHouseSite(): { x: number; z: number; yaw: number } {
+    const sites = this.beachHouses?.sites ?? beachHouseSites();
+    let best = sites[0];
+    let bestD = Infinity;
+    for (let i = 0; i < sites.length; i += 1) {
+      const d = sites[i].x * sites[i].x + sites[i].z * sites[i].z;
+      if (d < bestD) {
+        bestD = d;
+        best = sites[i];
+      }
+    }
+    return best ?? { x: 0, z: 0, yaw: 0 };
+  }
+
   private focusStudentDesk() {
     const placements = this.screens.screens.map((s) => s.placement);
     let halfSpan = 0;
@@ -2026,6 +2110,8 @@ export class Sanctuary {
       // renderer entirely, so a far warehouse is a single impostor draw
       // and an off-screen one is nothing.
       this.warehouse?.update(this.camera.position);
+      // The homesteads are static; the call exists so the loop reads alike.
+      this.beachHouses?.update();
     }
 
     this.aiClock += dt;
@@ -2147,6 +2233,7 @@ export class Sanctuary {
     this.student.dispose();
     this.dayBed?.dispose();
     this.warehouse?.dispose();
+    this.beachHouses?.dispose();
     this.atmosphere.dispose();
     this.weathering.dispose();
     this.winter.dispose();
