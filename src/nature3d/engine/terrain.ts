@@ -27,7 +27,7 @@ import {
   regionWeight, trekRelief,
 } from "./regions";
 import { noise } from "./simplex";
-import { groundColorAt, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
+import { groundColorAt, hillTurf, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
 import { levelWarehouseGround } from "./warehouseSite";
 import { GROUND_PALETTE, GROUND_TILE_METRES, clampAlbedo } from "./palette";
 import { injectWorldVaryings } from "./atmosphere";
@@ -663,7 +663,18 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       // (The two thresholds are spelled out as literals on purpose: the
       // sanctuary's contract test pins them, because props across the whole
       // engine read the same 18 m rock band and 52 m snowline.)
-      if (h > 18) tmp.lerp(rock, Math.min(1, (h - 18) / 30));
+      //
+      // ── GRASS ON EVERY PAHAD (owner directive) ────────────────────────
+      // Height alone was painting the sanctuary's whole rim, the lesson hill
+      // and the western Highlands as bare rock from 18 m up, and as bleached
+      // crest from 52 m up — under a three-belt mat of grass grown on the
+      // very same slopes by `hillGrass.ts`. The bands are now scaled by
+      // `hillTurf`, the SAME two measurements the cover itself uses: a slope
+      // that can hold turf (soil, sun, under ~52°) keeps its green, and the
+      // rock and crest bands keep the cliffs, the scree chutes and the
+      // shattered tops — which is what they were written for.
+      const turf = hillTurf(h, normalY, coastWeight(x, z));
+      if (h > 18) tmp.lerp(rock, Math.min(1, (h - 18) / 30) * (1 - 0.62 * turf));
       // SNOW NEEDS A SHELF TO SIT ON. The height mask says where snow is
       // possible; the slope mask says whether it STAYS — above ~52° a face
       // sheds it all winter and stays bare rock. Without this multiply every
@@ -671,7 +682,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       // height-banded, not observed" tell in a stylised mountain range
       // (research §8, §11; principle 20).
       const shelf = h > 52 ? THREE.MathUtils.smoothstep(normalY, 0.62, 0.94) : 1;
-      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf);
+      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf * (1 - 0.55 * turf));
       // Below the waterline-ish floor (the island edge) the ground goes dark.
       if (h < -6) tmp.lerp(deep, Math.min(1, (-6 - h) / 14));
 

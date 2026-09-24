@@ -167,7 +167,17 @@ function loadVariant(loader: GLTFLoader, url: string): Promise<THREE.BufferGeome
   });
 }
 
-export function createGrassTuftField(budget: QualityBudget, anisotropy: number): Promise<GrassTuftField> {
+export function createGrassTuftField(
+  budget: QualityBudget,
+  anisotropy: number,
+  /**
+   * Up-facing points on the rock kit's boulders, as (x, y, z, size) quads —
+   * see `rocks.ts`. Each one gets a couple of clumps, which is the brief's
+   * "stones pe bhi grass" done with real geometry, at the range where a real
+   * clump is still worth its triangles.
+   */
+  stonePoints?: Float32Array,
+): Promise<GrassTuftField> {
   const group = new THREE.Group();
   group.name = "grass-tuft-field";
   const loader = new GLTFLoader();
@@ -278,14 +288,29 @@ export function createGrassTuftField(budget: QualityBudget, anisotropy: number):
     // ── Five InstancedMeshes, one per variant ──────────────────────────
     const [nearCount, farCount] = tuftCounts(budget);
     const [nearRadius, farRadius] = tuftRadii(budget);
-    const perVariant = (total: number) => Math.ceil(total / variants.length) + 1;
+    // A boulder's top is a small, high-value piece of ground: two clumps per
+    // anchor is what reads as "the stone has grown a crop", and the capacity
+    // is reserved on top of the ring scatter's, never taken out of it.
+    const stoneAnchors = stonePoints ? stonePoints.length >> 2 : 0;
+    // A clump of real 3-D grass is 714–2 489 triangles whether it grows in the
+    // meadow or out of a crack in a boulder, so the stone crop is CAPPED at a
+    // fifth of the near ring's own count: enough that most boulders in sight
+    // carry a tuft, never enough to out-spend the meadow it stands in.
+    const stoneBudget = stoneAnchors > 0 ? Math.max(variants.length, Math.round(nearCount * 0.2)) : 0;
+    const stonePerVariant = Math.ceil(stoneBudget / variants.length) + 2;
+    const perVariant = (total: number) => Math.ceil(total / variants.length) + 1 + stonePerVariant;
     const nearMeshes = variants.map((g) => makeMesh(g, material, perVariant(nearCount), shadows));
     const farMeshes = variants.map((g) => makeMesh(g, material, perVariant(farCount), shadows));
     group.add(...nearMeshes, ...farMeshes);
 
     const site: Site = createSite();
-    scatterInto(nearMeshes, variants.length, 4, nearRadius, 1, nearCount, site);
-    scatterInto(farMeshes, variants.length, nearRadius - 4, farRadius, 1.7, farCount, site);
+    // STONES FIRST. The near rings are written from slot 0 and trimmed from
+    // the END by the fail-safe ladder, so the clumps that live on the boulders
+    // take the first slots and survive every rung — the same discipline the
+    // blade field uses for its rock skirts.
+    const planted = plantOnStones(nearMeshes, variants.length, stonePoints, stoneBudget);
+    scatterInto(nearMeshes, variants.length, 4, nearRadius, 1, nearCount, site, planted);
+    scatterInto(farMeshes, variants.length, nearRadius - 4, farRadius, 1.7, farCount, site, 0);
 
     // Thermal fail-safe ladder — allocation-free count trims (see grass).
     const fullNear = nearMeshes.map((m) => m.count);
@@ -294,7 +319,10 @@ export function createGrassTuftField(budget: QualityBudget, anisotropy: number):
         m.visible = level < 1;
       });
       nearMeshes.forEach((m, i) => {
-        m.count = level >= 2 ? Math.floor(fullNear[i] * 0.5) : fullNear[i];
+        // The stone crop holds its slots at the FRONT of each buffer, so it is
+        // the last thing the ladder may take: a trimmed ring loses meadow
+        // clumps before it loses the grass growing on the rocks.
+        m.count = level >= 2 ? Math.max(stonePerVariant, Math.floor(fullNear[i] * 0.5)) : fullNear[i];
       });
     };
 
@@ -341,6 +369,88 @@ function makeMesh(
 }
 
 /**
+ * GRASS ON THE STONES.
+ *
+ * A boulder that has stood in a meadow for a season grows a crop on top of
+ * it — seed lodges in its crevices, dust and rain collect there, and the
+ * shoulders come up green while the flanks stay bare. That is the one thing a
+ * skirt of blades around the base can never say, and the owner's brief names
+ * it directly ("stones pe bhi grass").
+ *
+ * The anchors come from `rocks.ts`, which probes each boulder's own tilted
+ * geometry, so a clump lands on a facet that really exists — a shoulder, a
+ * bedding ledge, the flat top — and never in mid-air beside the stone.
+ * Stone-top turf is SHORTER than meadow turf (it is growing out of a crack
+ * with a few centimetres of soil), it leans with the facet, and it is paler:
+ * bleached by the same sun that dries the stone under it.
+ *
+ * Capacity is guaranteed by the caller (`stonePerVariant` per mesh), and the
+ * guard below is a failsafe, not a policy: an anchor past the end of a mesh's
+ * buffer is dropped rather than wrapping into a slot someone already owns.
+ */
+function plantOnStones(
+  meshes: THREE.InstancedMesh[],
+  variants: number,
+  points: Float32Array | undefined,
+  budget: number,
+): number {
+  if (!points || points.length < 4 || budget <= 0) return 0;
+  const anchors = points.length >> 2;
+  // Rocks are spread over the whole district, so the budget is spent ACROSS
+  // them (a stride through the anchor list) rather than on the first few:
+  // every corner of the meadow keeps its stony little tufts.
+  const stride = Math.max(1, Math.ceil((anchors * 1.5) / budget));
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  let placed = 0;
+  for (let a = 0; a < anchors && placed < budget; a += stride) {
+    const i = a * 4;
+    const anchorX = points[i];
+    const anchorY = points[i + 1];
+    const anchorZ = points[i + 2];
+    const size = points[i + 3];
+    // A big block gets a pair of clumps, a cobble gets one.
+    const clumps = placed + 1 < budget && size > 1.1 ? 2 : 1;
+    for (let c = 0; c < clumps && placed < budget; c += 1) {
+      const mesh = meshes[placed % variants];
+      const slot = mesh.count;
+      if (slot >= (mesh.instanceMatrix as THREE.InstancedBufferAttribute).count) break;
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.random() * size * 0.45;
+      // The anchor is ON the facet; only the clump's own jitter moves it, and
+      // it is sunk a centimetre so the root never shows a seam against stone.
+      const height = (0.42 + Math.random() * 0.5) * size;
+      dummy.position.set(
+        anchorX + Math.cos(ang) * rad,
+        anchorY - 0.02 + Math.random() * 0.03,
+        anchorZ + Math.sin(ang) * rad,
+      );
+      dummy.rotation.set(
+        (Math.random() - 0.5) * 0.34,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.34,
+      );
+      dummy.scale.set(
+        height * (0.85 + Math.random() * 0.3),
+        height,
+        height * (0.85 + Math.random() * 0.3),
+      );
+      dummy.updateMatrix();
+      mesh.setMatrixAt(slot, dummy.matrix);
+      color.setHSL(
+        0.285 + Math.random() * 0.025,
+        0.42 + Math.random() * 0.18,
+        0.44 + Math.random() * 0.16,
+      );
+      mesh.setColorAt(slot, color);
+      mesh.count = slot + 1;
+      placed += 1;
+    }
+  }
+  return placed;
+}
+
+/**
  * Fill one ring across all five variant meshes. The instance counter runs
  * GLOBALLY (not per variant) and round-robins `placed % variants`, so the
  * five clump shapes are interleaved evenly — a glance across the meadow
@@ -354,6 +464,8 @@ function scatterInto(
   gain: number,
   total: number,
   site: Site,
+  /** Slots already written by an earlier pass (the stone clumps). */
+  startPlaced = 0,
 ): void {
   const ring: "near" | "far" = gain > 1.5 ? "far" : "near";
   const dummy = new THREE.Object3D();
@@ -361,14 +473,14 @@ function scatterInto(
   const ground = new THREE.Color();
   const hsl = { h: 0, s: 0, l: 0 };
   const span = outerRadius - innerRadius;
-  // Each mesh starts EMPTY; placeAt bumps `count` as it fills slots, and the
-  // round-robin above can never outrun the per-variant capacity (which was
-  // sized to ceil(total / variants) + 1).
-  for (const m of meshes) m.count = 0;
-  let placed = 0;
+  // The ring scatter CONTINUES from whatever a previous pass wrote (the stone
+  // clumps own slots 0…startPlaced-1); `placeAt` bumps `count` as it fills
+  // slots, and the round-robin below can never outrun the per-variant
+  // capacity, which reserves the stone pass's share on top.
+  let placed = startPlaced;
   let guard = 0;
 
-  while (placed < total && guard < total * 14) {
+  while (placed < startPlaced + total && guard < total * 14) {
     guard += 1;
     const r = Math.sqrt(Math.random()) * span + innerRadius;
     const a = Math.random() * Math.PI * 2;

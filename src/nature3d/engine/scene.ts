@@ -36,6 +36,7 @@ import { createGrassField, type GrassField } from "./grass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
+import { createHillGrassField, type HillGrassField } from "./hillGrass";
 import { createMossBank, type MossBank } from "./moss";
 import { createTropicalField, type TropicalField } from "./tropicalFlora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
@@ -149,6 +150,12 @@ export class Sanctuary {
   private textures: TextureSet;
   private grass: GrassField;
   private flora: Flora;
+  /**
+   * THE HILL COVER — grass on every hill, slope and pahad past the meadow's
+   * own fields, in the recipe measured off the owner's reference file
+   * `pahadon ke upar gras replace hill.blend` — see `hillGrass.ts`.
+   */
+  private hillGrass: HillGrassField;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -400,6 +407,19 @@ export class Sanctuary {
     this.grass.materials.forEach((m) => this.winter.register(m, "foliage"));
     if (this.budget.halfPrecision) this.grass.materials.forEach(halfPrecisionMaterial);
 
+    // THE HILL COVER. The blade field above stops at `grassFarRadius` (145 m
+    // on the phone tier, 420 m on ultra) — everything past it, which is every
+    // pahad in the world, was bare ground. Three belts of clumps now carry the
+    // cover from there to the mountain arc at 1 180 m, in the family mix,
+    // scale band and tilt distribution measured off the owner's reference
+    // file (`hillGrass.ts`). It is created from data only — no assets to
+    // wait for — so the hills are dressed on the very first frame.
+    this.hillGrass = createHillGrassField(this.textures.grassBlade, this.budget);
+    this.scene.add(this.hillGrass.group);
+    this.hillGrass.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
+    this.hillGrass.materials.forEach((m) => this.winter.register(m, "foliage"));
+    if (this.budget.halfPrecision) this.hillGrass.materials.forEach(halfPrecisionMaterial);
+
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
     // Leaves glow when the sun is behind them; bark, shrubs and flower stems do
@@ -441,7 +461,7 @@ export class Sanctuary {
 
     // THE GRASS TUFT FIELD — real 3D clumps (Grass Medium 02, all five
     // variants) decorating the meadow between the blades and the sorrel.
-    createGrassTuftField(this.budget, aniso).then((field) => {
+    createGrassTuftField(this.budget, aniso, this.rocks.grassPoints).then((field) => {
       if (this.disposed) {
         field.dispose();
         return;
@@ -1857,6 +1877,7 @@ export class Sanctuary {
     this.grass.setDetail(this.shedLevel);
     this.sorrel?.setShed(this.shedLevel);
     this.grassTufts?.setShed(this.shedLevel);
+    this.hillGrass.setShed(this.shedLevel);
     this.mossBank?.setShed(this.shedLevel);
     this.tropical?.setShed(this.shedLevel);
   }
@@ -1995,6 +2016,7 @@ export class Sanctuary {
       this.flora.update(time, this.wind);
       this.sorrel?.update(time, this.wind);
       this.grassTufts?.update(time, this.wind);
+      this.hillGrass.update(time, this.wind);
       this.mossBank?.update(time, this.wind);
       this.tropical?.update(time, this.wind);
       // The camera position lets the water cull its plunge-pool debris when
@@ -2109,6 +2131,7 @@ export class Sanctuary {
     disposeGroup(this.desk);
     this.avatar.dispose();
     this.grass.dispose();
+    this.hillGrass.dispose();
     this.rocks.dispose();
     this.flora.dispose();
     this.sorrel?.dispose();

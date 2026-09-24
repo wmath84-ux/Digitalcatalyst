@@ -32,6 +32,22 @@ export interface QualityBudget {
   grassNearRadius: number;
   /** Radius of the far grass field. */
   grassFarRadius: number;
+  /**
+   * THE HILL COVER (three belts, see `hillGrass.ts`).
+   *
+   * Where the two fields above dress the meadow the learner stands in, these
+   * three counts dress the world AROUND it: the foothills (wind-swayed),
+   * the ridges behind them, and the mountain ranges on the horizon — every
+   * hill, slope and pahad the camera can see, in the recipe measured off
+   * `pahadon ke upar gras replace hill.blend`.
+   *
+   * One clump is 2–3 alpha-tested blade cards (4–6 triangles), so a belt is
+   * cheap per instance and the budget is spent on how far the cover reaches,
+   * not on how many triangles a clump has.
+   */
+  hillGrassNear: number;
+  hillGrassFar: number;
+  hillGrassHaze: number;
   /** Trees around the clearing. */
   treeCount: number;
   /** Leaf cards per tree canopy. */
@@ -126,6 +142,9 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 15000,
     grassNearRadius: 28,
     grassFarRadius: 145,
+    hillGrassNear: 9000,
+    hillGrassFar: 3000,
+    hillGrassHaze: 1200,
     treeCount: 105,
     leavesPerTree: 9,
     animalCount: 54,
@@ -156,6 +175,9 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 46000,
     grassNearRadius: 38,
     grassFarRadius: 240,
+    hillGrassNear: 18000,
+    hillGrassFar: 8000,
+    hillGrassHaze: 3500,
     treeCount: 240,
     leavesPerTree: 14,
     animalCount: 34,
@@ -186,6 +208,9 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 88000,
     grassNearRadius: 46,
     grassFarRadius: 330,
+    hillGrassNear: 27000,
+    hillGrassFar: 15000,
+    hillGrassHaze: 7000,
     treeCount: 380,
     leavesPerTree: 18,
     animalCount: 78,
@@ -216,6 +241,9 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 130000,
     grassNearRadius: 54,
     grassFarRadius: 420,
+    hillGrassNear: 36000,
+    hillGrassFar: 21000,
+    hillGrassHaze: 11000,
     treeCount: 520,
     leavesPerTree: 22,
     animalCount: 104,
