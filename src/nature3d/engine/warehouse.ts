@@ -12,8 +12,11 @@
 // is not stretched into a cube.
 //
 //   * Static. The group matrix is written once and frozen.
-//   * Past ~260 m a 12-triangle timber box stands in, so the 1.5 km boot
-//     shot does not draw the shell. Inside ~210 m the real mesh returns.
+//   * Past ~1 km a 12-triangle timber box stands in, so the 1.5 km boot
+//     shot does not draw the shell. Inside ~850 m the real mesh returns —
+//     the shell is what the learner sees at every distance they can
+//     actually orbit to (the old 260 m swap made the villa read as a bare
+//     box the moment they zoomed out).
 //   * The colour camera never draws the shadow hull. It lives on layer 1.
 //   * Metalness is forced to 0. A Tripo roughness map often carries a
 //     metal channel, and metal under this sun reads as a white box. The
@@ -37,10 +40,17 @@ export interface Warehouse {
 
 const MODEL_URL = "/sanctuary/models/rusty_roof_house.glb";
 
+// The shell is the model all the way to a full kilometre. The orbit camera
+// legitimately reaches ~1.3 km out, and the owner's world is now worth
+// zooming out to see — at 260 m the villa used to swap to a 12-triangle
+// timber box, which is exactly the "zoom out and the villa is just a
+// square box, nothing else" report. 14 k triangles for one house is a
+// rounding error next to the ~300 k of the jungle field, so the impostor
+// survives only for the 1.5 km+ establishing boot shot.
 /** Impostor only, past this. */
-const FAR_OUT = 260 * 260;
+const FAR_OUT = 1000 * 1000;
 /** Shell returns inside this. */
-const FAR_IN = 210 * 210;
+const FAR_IN = 850 * 850;
 
 /** How far the floor is buried so the wall meets the dirt, not a gap. */
 const BITE = 0.4;

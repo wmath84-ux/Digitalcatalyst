@@ -261,6 +261,23 @@ export class Sanctuary {
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pinchMid = { x: 0, y: 0, ready: false };
+  /**
+   * Where each finger went DOWN. Tap detection must measure movement
+   * against this, not against the last move event: `pointers` tracks the
+   * live position, so a finger that paused before lifting measured
+   * ~0 px of movement and EVERY drag that ended in a stillness fired a
+   * phantom tap.
+   */
+  private downPos: { x: number; y: number; id: number } | null = null;
+  /**
+   * The pointers that took part in a two-finger pinch. A pinch is NEVER a
+   * tap: lifting the two fingers of a pinch-out lands inside the 340 ms
+   * double-tap window, and the ground-double-tap used to fire — the drone
+   * "flew" to the spot under the fingers at a fixed 42 m the instant the
+   * user let go. That is the reported "pinch out, lift, zoom snaps back"
+   * bug.
+   */
+  private pinchTainted = new Set<number>();
   private pointers = new Map<number, { x: number; y: number }>();
   private keys = new Set<string>();
   private lastGroundTap = 0;
@@ -798,6 +815,7 @@ export class Sanctuary {
       this.armPinch(a.x, a.y, b.x, b.y);
       return;
     }
+    this.downPos = { x: e.clientX, y: e.clientY, id: e.pointerId };
     this.pointerPrev = { x: e.clientX, y: e.clientY, id: e.pointerId, down: true };
   };
 
@@ -857,16 +875,30 @@ export class Sanctuary {
     // A tap on the board opens the lesson. A double tap on the ground flies
     // the drone there — the far village is a kilometre out, and orbiting the
     // study can never reach it.
-    if (start) {
-      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-      if (moved < 8) this.onTap(e);
+    //
+    // Two guards before a lifted finger may count as a tap:
+    //   * a PINCH finger is never a tap — lifting the two fingers of a
+    //     pinch-out inside the 340 ms double-tap window used to fire the
+    //     ground fly, and the drone flew back to 42 m the moment the user
+    //     let go (the "zoom snaps back" bug);
+    //   * "moved" is measured against POINTER DOWN (downPos), not the last
+    //     move event, so a drag that ends in a pause is not a tap either.
+    if (start && !this.pinchTainted.delete(e.pointerId)) {
+      const down = this.downPos;
+      if (down && down.id === e.pointerId) {
+        const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+        if (moved < 8) this.onTap(e);
+      }
     }
+    if (this.downPos && this.downPos.id === e.pointerId) this.downPos = null;
   };
 
   private tapRay = new THREE.Raycaster();
   private tapVec = new THREE.Vector2();
 
   private armPinch(ax: number, ay: number, bx: number, by: number) {
+    // Both fingers are now camera-pinch, never taps (see pinchTainted).
+    for (const id of this.pointers.keys()) this.pinchTainted.add(id);
     this.pinchPrev = Math.hypot(ax - bx, ay - by);
     this.pinchMid.x = (ax + bx) * 0.5;
     this.pinchMid.y = (ay + by) * 0.5;
