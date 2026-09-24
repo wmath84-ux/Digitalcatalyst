@@ -634,19 +634,17 @@ test("the learner can look straight up and all the way behind", () => {
 });
 
 test("the student faces the board, not the backrest", () => {
+  // He is the SAME rig as the Explore walker — one design, two poses.
+  assert.match(STUDENT, /createRealisticMale/);
   assert.ok(
-    !/boy\.rotation\.y = Math\.PI/.test(STUDENT),
-    "the boy is authored facing -Z already; a half-turn seats him backwards",
+    !/rotation\.y = Math\.PI/.test(STUDENT),
+    "the rig faces -Z already; a half-turn seats him backwards",
   );
-  // The pose really is authored on the board side: everything that should
-  // point at the board sits at negative z, and the chair back is at +z.
-  for (const part of [
-    /eye\.position\.set\(x, 0\.02, -0\.19\)/,
-    /thigh\.position\.set\(x, 0\.86, -0\.2\)/,
-    /hand\.position\.set\(0, -0\.4, -0\.24\)/,
-  ]) {
-    assert.match(STUDENT, part, "the boy's front must stay on the -Z (board) side");
-  }
+  // The seated pose is authored on the joints: thighs forward, calves
+  // hanging, head tipped to the board.
+  assert.match(STUDENT, /UpLeg/);
+  assert.match(STUDENT, /rotation\.set\(1\.45, 0/);
+  assert.match(STUDENT, /J\.Head\.rotation\.set\(0\.1, 0, 0\)/);
   // The procedural chair is gone (the day bed replaced it), but the named
   // anchor stays so the rig API and the winter treatment are unchanged.
   assert.match(STUDENT, /chair\.name = "student-chair"/);
@@ -753,22 +751,28 @@ test("Safari is removed from navigation, scene lifecycle and the height field", 
 });
 
 test("the explorer's tuning lives in one config object", () => {
-  // Walk / jog / sprint speeds are the brief's starting parameters.
-  assert.match(CHAR_CONFIG, /walkSpeed: 1\.4/);
-  assert.match(CHAR_CONFIG, /jogSpeed: 2\.7/);
-  assert.match(CHAR_CONFIG, /sprintSpeed: 5\.2/);
-  assert.match(CHAR_CONFIG, /crouchSpeed: 1\.3/);
-  assert.match(CHAR_CONFIG, /proneSpeed: 0\.7/);
+  // Locomotion matches the reference feel (UE cm → m): walk 160, run 500,
+  // crouch 200, with the jog gear as this project's analog bridge.
+  assert.match(CHAR_CONFIG, /walkSpeed: 1\.6/);
+  assert.match(CHAR_CONFIG, /jogSpeed: 3\.2/);
+  assert.match(CHAR_CONFIG, /sprintSpeed: 5\.0/);
+  assert.match(CHAR_CONFIG, /crouchSpeed: 2\.0/);
+  assert.match(CHAR_CONFIG, /proneSpeed: 0\.9/);
   // Human scale is a named constant, used by the rig and the IK.
   assert.match(CHAR_CONFIG, /CHARACTER_SCALE = 1/);
   assert.match(CHAR_RIG, /CHARACTER_SCALE/);
   assert.match(CHAR_IK, /CHARACTER_SCALE/);
   // Vertical motion, slopes and the follow camera are configured, not magic.
-  assert.match(CHAR_CONFIG, /gravity: -14/);
-  assert.match(CHAR_CONFIG, /jumpVelocity: 5\.2/);
+  assert.match(CHAR_CONFIG, /gravity: -13/);
+  assert.match(CHAR_CONFIG, /jumpVelocity: 7\.0/);
   assert.match(CHAR_CONFIG, /maxWalkableSlope/);
-  assert.match(CHAR_CONFIG, /cameraDistance: 3\.2/);
-  assert.match(CHAR_CONFIG, /cameraPivotHeight: 1\.5/);
+  // The reference's RotationRate (500°/s) caps the yaw, hard.
+  assert.match(CHAR_CONFIG, /maxYawRate: \(500 \* Math\.PI\) \/ 180/);
+  // The reference's camera: 4 m boom, low pivot, centred, FOV 90.
+  assert.match(CHAR_CONFIG, /cameraDistance: 4\.0/);
+  assert.match(CHAR_CONFIG, /cameraPivotHeight: 1\.1/);
+  assert.match(CHAR_CONFIG, /cameraShoulder: 0/);
+  assert.match(CHAR_CONFIG, /cameraFov: 90/);
   // Character fidelity follows the Sanctuary tier ladder (LOW/MEDIUM/HIGH).
   assert.match(CHAR_CONFIG, /characterQualityForTier/);
   assert.match(SCENE, /characterQualityForTier\(this\.budget\.tier\)/);
@@ -778,7 +782,9 @@ test("locomotion is analog with shortest-angle rotation — no snap tables", () 
   // The heading turns toward its wish through the shortest angle at a
   // damped sharpness — never an 8-way compass pop.
   assert.match(CHAR_CTRL, /shortestAngle\(this\.yaw, targetYaw\)/);
-  assert.match(CHAR_CTRL, /this\.yaw \+= delta \* damp\(sharp, dt\)/);
+  assert.match(CHAR_CTRL, /const step = delta \* damp\(sharp, dt\)/);
+  assert.match(CHAR_CTRL, /const cap = T\.maxYawRate \* dt/);
+  assert.match(CHAR_CTRL, /MathUtils\.clamp\(step, -cap, cap\)/);
   assert.match(CHAR_STATES, /export function shortestAngle/);
   const code = CHAR_CTRL.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/this\.yaw \+= Math\.PI/.test(code), "compass snap is back");
@@ -835,8 +841,8 @@ test("the explorer is a realistic male rig on a named skeleton contract", () => 
   }
   assert.match(CHAR_RIG, /export const BONE_NAMES/);
   assert.match(CHAR_RIG, /export interface PlayerRig/);
-  // Full-body authored detail: face, eyes, hair, tactical gear, boots.
-  for (const part of ["iris", "crown", "vestF", "pouch", "laces", "thumb", "pocket"]) {
+  // Full-body authored detail: face, eyes, hair, athletic kit, sneakers.
+  for (const part of ["iris", "mouth", "collar", "STRIPE", "laces", "thumb", "WAIST"]) {
     assert.ok(CHAR_RIG.includes(part), `the rig must author ${part}`);
   }
   // PBR materials, vertex-baked folds, opaque everywhere.
@@ -860,13 +866,16 @@ test("jump, camera feel and the scene wiring exist", () => {
   // Landing is graded by impact velocity.
   assert.match(CHAR_CTRL, /landStrength/);
   assert.match(CHAR_CTRL, /heavyLandSpeed/);
-  // Camera: damped boom with collision pull-in, shoulder offset, sprint
-  // FOV kick and a landing dip.
+  // Camera: damped boom with collision pull-in, centred framing (the
+  // reference runs no shoulder offset), a kick envelope (0 in the reference
+  // tune) that never stomps the scene's aspect-corrected base, and a
+  // landing dip.
   assert.match(CHAR_CAM, /class ThirdPersonCameraController/);
   assert.match(CHAR_CAM, /insideWarehouse\(px, pz/);
   assert.match(CHAR_CAM, /insideBeachHouse\(px, pz/);
   assert.match(CHAR_CAM, /cameraShoulder/);
   assert.match(CHAR_CAM, /sprintFovKick/);
+  assert.match(CHAR_CAM, /fovBase/);
   assert.match(CHAR_CAM, /landAbsorb \* 0\.28/);
   // Foot IK: staggered two-bone solves with sole-to-slope pitch.
   assert.match(CHAR_IK, /class FootIKController/);

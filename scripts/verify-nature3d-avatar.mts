@@ -23,6 +23,8 @@ import {
   ThirdPersonCameraController,
 } from "../src/nature3d/engine/character";
 import { RIVER_CENTER_X, terrainHeight, WORLD_HALF } from "../src/nature3d/engine/terrain";
+import { createStudent } from "../src/nature3d/engine/student";
+import { budgetFor } from "../src/nature3d/engine/quality";
 import { WAREHOUSE_HALF_X, WAREHOUSE_HALF_Z, WAREHOUSE_X, WAREHOUSE_Z } from "../src/nature3d/engine/warehouseSite";
 import { insideBeachHouse, installBeachHouseSites } from "../src/nature3d/engine/beachHouseSite";
 import { insideWarehouse } from "../src/nature3d/engine/warehouseSite";
@@ -124,7 +126,7 @@ function countTris(root: THREE.Object3D): number {
     predPhase += ((s.speed * DT) / s.strideLen) * Math.PI;
   }
   const err = Math.abs(controller.snapshot.gaitPhase - startPhase - predPhase);
-  check("loco: jog cruise reaches 2.7 m/s", Math.abs(controller.snapshot.speed - T.jogSpeed) / T.jogSpeed < 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
+  check("loco: jog cruise reaches 3.2 m/s", Math.abs(controller.snapshot.speed - T.jogSpeed) / T.jogSpeed < 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
   check("loco: no speed snap (accel-smoothed)", maxDSpeed < 0.5, `max Δv=${maxDSpeed.toFixed(3)}`);
   check("loco: no rotation snap (shortest-angle)", maxDYaw < 0.2, `max Δyaw=${maxDYaw.toFixed(3)}`);
   check("loco: gait phase locked to distance (no-skate law)", err < 1e-6, `err=${err.toExponential(1)}`);
@@ -144,7 +146,7 @@ function countTris(root: THREE.Object3D): number {
   input.setMoveVector(0, 1, true);
   input.setSprintToggle(true);
   for (let i = 0; i < 300; i += 1) controller.update(DT, input, 0, 0.18);
-  check("loco: sprint cruise reaches 5.2 m/s", Math.abs(controller.snapshot.speed - T.sprintSpeed) / T.sprintSpeed < 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
+  check("loco: sprint cruise reaches 5.0 m/s", Math.abs(controller.snapshot.speed - T.sprintSpeed) / T.sprintSpeed < 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
   check("loco: sprint state + blend engage", controller.snapshot.locomotion === "sprint" && controller.snapshot.sprint01 > 0.9);
   // Strafe + sprint stays jog-class (no sideways sprint).
   input.setMoveVector(1, 0, true);
@@ -202,7 +204,7 @@ function countTris(root: THREE.Object3D): number {
   controller.spawn(5, 9, 0);
   input.queueJump();
   controller.update(DT, input, 0, 0.18);
-  check("jump: takeoff leaves the ground at jump velocity", !controller.isGrounded && controller.snapshot.verticalVel > 4.5, `vy=${controller.snapshot.verticalVel.toFixed(2)}`);
+  check("jump: takeoff leaves the ground at jump velocity", !controller.isGrounded && controller.snapshot.verticalVel > 6.0, `vy=${controller.snapshot.verticalVel.toFixed(2)}`);
   const air: string[] = [];
   for (let i = 0; i < 240 && !controller.isGrounded; i += 1) {
     controller.update(DT, input, 0, 0.18);
@@ -253,7 +255,7 @@ function countTris(root: THREE.Object3D): number {
     if (seq[seq.length - 1] !== st) seq.push(st);
   }
   check("stance: stand → crouch stages through a transition", seq.join(",") === "stand,standToCrouch,crouch", seq.join(","));
-  check("stance: crouch caps speed at 1.3 m/s", controller.snapshot.speed <= T.crouchSpeed + 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
+  check("stance: crouch caps speed at 2.0 m/s", controller.snapshot.speed <= T.crouchSpeed + 0.05, `${controller.snapshot.speed.toFixed(2)} m/s`);
   input.toggleProne();
   seq.length = 0;
   seq.push(controller.stanceState);
@@ -444,12 +446,51 @@ function countTris(root: THREE.Object3D): number {
     anim.update(DT, i * DT, controller.snapshot, rig);
   }
   check("anim: crouch drops the hips and bends the knees", rig.joints.Hips.position.y < 0.7 && rig.joints.LeftLeg.rotation.x < -0.8, `hips=${rig.joints.Hips.position.y.toFixed(2)}`);
+  check("anim: crouch brings the arms forward ready", rig.joints.LeftArm.rotation.x > 0.3 && rig.joints.RightArm.rotation.x > 0.3, `arm.x=${rig.joints.LeftArm.rotation.x.toFixed(2)}`);
   input.toggleProne();
   for (let i = 0; i < 240; i += 1) {
     controller.update(DT, input, 0, 0.18);
     anim.update(DT, i * DT, controller.snapshot, rig);
   }
   check("anim: prone lays the body flat near the dirt", rig.joints.Hips.rotation.x < -1.0 && rig.joints.Hips.position.y < 0.55, `pitch=${rig.joints.Hips.rotation.x.toFixed(2)} y=${rig.joints.Hips.position.y.toFixed(2)}`);
+  rig.dispose();
+}
+{
+  // Prone staging: mid-blend kneels (deep knees, hands planting), full
+  // blend stretches into the high-crawl (elbows down, head up, toes back).
+  const rig = createRealisticMale(false);
+  const anim = new CharacterAnimationController();
+  const { controller } = makeWalker();
+  controller.spawn(5, 9, 0);
+  const snap = controller.snapshot;
+  snap.grounded = true;
+  snap.speed = 0;
+  snap.prone01 = 0.3;
+  snap.crouch01 = 1;
+  for (let i = 0; i < 120; i += 1) anim.update(DT, i * DT, snap, rig);
+  check("anim: prone transition passes through a kneel", rig.joints.LeftLeg.rotation.x < -1.0 && rig.joints.Hips.position.y > 0.45 && rig.joints.Hips.position.y < 0.75, `knee=${rig.joints.LeftLeg.rotation.x.toFixed(2)} hips=${rig.joints.Hips.position.y.toFixed(2)}`);
+  snap.prone01 = 1;
+  for (let i = 0; i < 180; i += 1) anim.update(DT, i * DT, snap, rig);
+  check("anim: prone idle is elbows-down, head-up, toes-back",
+    rig.joints.LeftArm.rotation.x > 0.5 && rig.joints.Head.rotation.x > 0.8 && rig.joints.LeftFoot.rotation.x > 0.8 && rig.joints.LeftLeg.rotation.x > -0.35,
+    `arm=${rig.joints.LeftArm.rotation.x.toFixed(2)} head=${rig.joints.Head.rotation.x.toFixed(2)} foot=${rig.joints.LeftFoot.rotation.x.toFixed(2)} knee=${rig.joints.LeftLeg.rotation.x.toFixed(2)}`);
+  // The crawl: diagonal elbow-plant + knee-drive over two cycles.
+  snap.speed = 0.9;
+  const crawlInput = new CharacterInputManager();
+  let kneeMin = 0;
+  let armMax = 0;
+  for (let i = 0; i < 360; i += 1) {
+    crawlInput.setMoveVector(0, 1, true);
+    controller.update(DT, crawlInput, 0, 0.18);
+    const live = controller.snapshot;
+    live.prone01 = 1;
+    live.crouch01 = 1;
+    live.speed = Math.max(live.speed, 0.9);
+    anim.update(DT, i * DT, live, rig);
+    kneeMin = Math.min(kneeMin, rig.joints.LeftLeg.rotation.x, rig.joints.RightLeg.rotation.x);
+    armMax = Math.max(armMax, rig.joints.LeftArm.rotation.x, rig.joints.RightArm.rotation.x);
+  }
+  check("anim: crawl drives knees and reaches elbows", kneeMin < -0.5 && armMax > 1.0, `kneeMin=${kneeMin.toFixed(2)} armMax=${armMax.toFixed(2)}`);
   rig.dispose();
 }
 {
@@ -466,6 +507,7 @@ function countTris(root: THREE.Object3D): number {
   snap.speed = 2;
   for (let i = 0; i < 90; i += 1) anim.update(DT, i * DT, snap, rig);
   check("anim: falling spreads the arms", rig.joints.LeftArm.rotation.z > 0.3 && rig.joints.RightArm.rotation.z < -0.3);
+  check("anim: falling raises the arms (+x is forward)", rig.joints.LeftArm.rotation.x > 0.3 && rig.joints.RightArm.rotation.x > 0.3, `arm.x=${rig.joints.LeftArm.rotation.x.toFixed(2)}`);
   snap.grounded = true;
   snap.airborne = "ground";
   snap.speed = 0;
@@ -480,28 +522,30 @@ function countTris(root: THREE.Object3D): number {
 {
   const { controller, input } = makeWalker();
   const cam = new ThirdPersonCameraController();
-  const camera = new THREE.PerspectiveCamera(65, 16 / 9, 0.1, 4000);
+  const camera = new THREE.PerspectiveCamera(T.cameraFov, 16 / 9, 0.1, 4000);
   controller.spawn(5, 9, 0);
   cam.snapBehind(controller.yaw, controller.position);
   input.setMoveVector(0.2, 0.95, true);
   input.setSprintToggle(true);
   let ok = true;
+  let fovMin = Infinity;
   let fovMax = 0;
   for (let i = 0; i < 300; i += 1) {
     controller.update(DT, input, cam.lookYaw, cam.lookPitch);
     cam.update(DT, camera, controller.position, controller.snapshot);
     if (camera.position.y < terrainHeight(camera.position.x, camera.position.z) + 0.15) ok = false;
     if (insideWarehouse(camera.position.x, camera.position.z, 0)) ok = false;
+    fovMin = Math.min(fovMin, camera.fov);
     fovMax = Math.max(fovMax, camera.fov);
   }
   check("camera: 5 s sprint keeps the lens over the dirt and out of walls", ok);
-  check("camera: sprint FOV kick stays in range", fovMax > 65 && fovMax <= 65 + T.sprintFovKick + 0.05, `max fov=${fovMax.toFixed(2)}`);
+  check("camera: FOV holds the scene base (no kick in the reference tune)", fovMin === 90 && fovMax === 90, `fov=${fovMin.toFixed(1)}..${fovMax.toFixed(1)}`);
 }
 {
   // Boom pull-in: a wall between pivot and lens shortens the boom.
   const { controller } = makeWalker();
   const cam = new ThirdPersonCameraController();
-  const camera = new THREE.PerspectiveCamera(65, 16 / 9, 0.1, 4000);
+  const camera = new THREE.PerspectiveCamera(T.cameraFov, 16 / 9, 0.1, 4000);
   controller.spawn(WAREHOUSE_X, WAREHOUSE_Z + WAREHOUSE_HALF_Z + 1.4, 0);
   cam.snapBehind(Math.PI, controller.position);
   for (let i = 0; i < 60; i += 1) cam.update(DT, camera, controller.position, controller.snapshot);
@@ -524,7 +568,29 @@ function countTris(root: THREE.Object3D): number {
   check("input: stance toggles are edge-triggered", input.consumeCrouchToggle() && input.consumeProneToggle() && !input.consumeCrouchToggle());
 }
 
-// ── 9. Determinism ───────────────────────────────────────────────────
+// ── 9. The seated student is the same rig, seated ────────────────────
+{
+  const student = createStudent(budgetFor("low"));
+  const byName = (n: string) => student.group.getObjectByName(n) as THREE.Group | undefined;
+  const hips = byName("Hips");
+  const head = byName("Head");
+  const upLeg = byName("LeftUpLeg");
+  check("student: built on the walker's skeleton contract", Boolean(hips && head && upLeg) && BONE_NAMES.every((b) => Boolean(byName(b))), `${BONE_NAMES.length} bones`);
+  check("student: seated pose (thighs forward, calves down)", (upLeg?.rotation.x ?? 0) > 1.2 && (byName("LeftLeg")?.rotation.x ?? 0) < -1.2, `thigh=${upLeg?.rotation.x.toFixed(2)} calf=${byName("LeftLeg")?.rotation.x.toFixed(2)}`);
+  let ok = true;
+  for (let i = 0; i < 600; i += 1) {
+    student.update(i * DT);
+    student.group.traverse((o) => {
+      if (!finite(o.rotation.x) || !finite(o.position.y)) ok = false;
+    });
+  }
+  check("student: 10 s of idle stays finite (breath/blink/swing)", ok);
+  const eyeH = student.eyePosition.y - terrainHeight(0, 2.6);
+  check("student: eye anchor sits at seated head height", eyeH > 1.4 && eyeH < 1.9, `eye=+${eyeH.toFixed(2)}m`);
+  student.dispose();
+}
+
+// ── 10. Determinism ──────────────────────────────────────────────────
 {
   const runOnce = () => {
     const { controller, input } = makeWalker();

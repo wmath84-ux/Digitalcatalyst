@@ -33,7 +33,8 @@ export class ThirdPersonCameraController {
   private pivotInit = false;
   private fovKick = 0;
   private dip = 0;
-  private baseFov = T.cameraFov;
+  /** Last scene-owned fov (aspect-corrected) — the kick rides on top. */
+  private fovBase = T.cameraFov;
 
   /** Place behind the character facing the same way. */
   snapBehind(bodyYaw: number, feetPos: THREE.Vector3): void {
@@ -155,14 +156,20 @@ export class ThirdPersonCameraController {
     this.fovKick += (snap.sprint01 * T.sprintFovKick - this.fovKick) * damp(5, dt);
     const wantDip = snap.landAbsorb * 0.28;
     this.dip += (wantDip - this.dip) * damp(snap.landAbsorb > this.dip ? 18 : 7, dt);
-    const fov = this.baseFov + this.fovKick;
-    if (Math.abs(camera.fov - fov) > 0.02) {
-      camera.fov = fov;
-      camera.updateProjectionMatrix();
+    // The scene owns the base fov (aspect-corrected per mode); the camera
+    // only adds the kick envelope on top, never stomping the base.
+    if (Math.abs(this.fovKick) > 0.02) {
+      const fov = this.fovBase + this.fovKick;
+      if (Math.abs(camera.fov - fov) > 0.02) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+    } else {
+      this.fovBase = camera.fov;
     }
   }
 
   setBaseFov(fov: number): void {
-    this.baseFov = fov;
+    this.fovBase = fov;
   }
 }

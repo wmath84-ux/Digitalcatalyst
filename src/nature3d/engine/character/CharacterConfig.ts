@@ -5,6 +5,14 @@
 // from here — nothing tunes itself with a literal buried in a method.
 //
 // Units are metres / seconds / radians throughout. 1 world unit = 1 metre.
+//
+// Locomotion feel follows the VeryHotShark RealisticThirdPersonCharacter
+// reference (UE5 units converted cm → m): run 500 cm/s, rotation 500°/s,
+// jump 700 cm/s, braking 2000 cm/s², 4 m camera boom, FOV 90. The middle
+// jog gear is this project's analog bridge between the reference's walk
+// and run; the reference has no prone or cover here (cover stays out of
+// scope) — prone is an original military high-crawl built to the same
+// quality bar.
 
 /** World scale of the player character. The rig is authored ~1.8 m tall. */
 export const CHARACTER_SCALE = 1;
@@ -39,6 +47,8 @@ export interface CharacterTuning {
   // ── Rotation (rad/s and smoothing) ───────────────────────────────
   rotationSharpness: number;
   idleRotationSharpness: number;
+  /** Hard yaw-rate cap — the reference's RotationRate, 500°/s. */
+  maxYawRate: number;
   turnInPlaceRate: number;
   turnInPlaceThreshold: number;
   turnInPlaceDelay: number;
@@ -89,44 +99,45 @@ export interface CharacterTuning {
 }
 
 export const CHARACTER_TUNING: CharacterTuning = {
-  walkSpeed: 1.4,
-  jogSpeed: 2.7,
-  sprintSpeed: 5.2,
-  crouchSpeed: 1.3,
-  proneSpeed: 0.7,
+  walkSpeed: 1.6,
+  jogSpeed: 3.2,
+  sprintSpeed: 5.0,
+  crouchSpeed: 2.0,
+  proneSpeed: 0.9,
   backpedalScale: 0.75,
   strafeScale: 0.9,
   waterSlowScale: 0.5,
 
-  walkAcceleration: 7,
-  walkDeceleration: 9,
-  jogAcceleration: 6,
-  jogDeceleration: 8,
-  sprintAcceleration: 4.5,
-  sprintDeceleration: 5.5,
-  airAcceleration: 2.2,
-  crouchAcceleration: 6,
-  proneAcceleration: 4,
+  walkAcceleration: 8,
+  walkDeceleration: 12,
+  jogAcceleration: 7,
+  jogDeceleration: 10,
+  sprintAcceleration: 6,
+  sprintDeceleration: 8,
+  airAcceleration: 2.5,
+  crouchAcceleration: 7,
+  proneAcceleration: 4.5,
 
-  rotationSharpness: 10,
-  idleRotationSharpness: 4,
+  rotationSharpness: 12,
+  idleRotationSharpness: 5,
+  maxYawRate: (500 * Math.PI) / 180,
   turnInPlaceRate: 2.4,
   turnInPlaceThreshold: Math.PI / 3,
   turnInPlaceDelay: 0.45,
   cameraStillThreshold: 0.18,
 
-  gravity: -14,
-  jumpVelocity: 5.2,
-  coyoteTime: 0.1,
+  gravity: -13,
+  jumpVelocity: 7.0,
+  coyoteTime: 0.12,
   jumpBufferTime: 0.15,
   groundStickDistance: 0.45,
   stepOffset: 0.45,
-  heavyLandSpeed: 7.5,
+  heavyLandSpeed: 9.0,
 
   capsuleRadius: 0.38,
   standHeight: 1.8,
   crouchHeight: 1.15,
-  proneHeight: 0.55,
+  proneHeight: 0.5,
   stanceBlendTime: 0.28,
   proneBlendTime: 0.85,
 
@@ -134,19 +145,19 @@ export const CHARACTER_TUNING: CharacterTuning = {
   maxSprintSlope: (32 * Math.PI) / 180,
   slopeSlideSpeed: 3.5,
 
-  cameraDistance: 3.2,
+  cameraDistance: 4.0,
   cameraMinDistance: 1.6,
-  cameraMaxDistance: 6.5,
-  cameraPivotHeight: 1.5,
-  cameraCrouchPivot: 1.0,
-  cameraPronePivot: 0.55,
-  cameraShoulder: 0.55,
+  cameraMaxDistance: 7.5,
+  cameraPivotHeight: 1.1,
+  cameraCrouchPivot: 0.75,
+  cameraPronePivot: 0.45,
+  cameraShoulder: 0,
   cameraDamping: 12,
-  cameraFov: 65,
-  sprintFovKick: 7,
+  cameraFov: 90,
+  sprintFovKick: 0,
   lookSensitivity: 0.0042,
-  pitchMin: -0.45,
-  pitchMax: 1.1,
+  pitchMin: -1.1,
+  pitchMax: 1.25,
 
   gaitBlendSharpness: 12,
   lookYawClamp: 0.62,

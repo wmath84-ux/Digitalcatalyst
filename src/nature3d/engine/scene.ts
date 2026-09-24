@@ -73,6 +73,7 @@ import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
 import { cullDistanceForPx } from "./cull";
 import {
+  CHARACTER_TUNING,
   CharacterAnimationController,
   CharacterController,
   CharacterDebugVisuals,
@@ -2045,9 +2046,9 @@ export class Sanctuary {
     this.requestShadowRefresh();
   }
 
-  /** The fov before the aspect correction (orbit 52, explore 65). */
+  /** The fov before the aspect correction (orbit 52, explore 90). */
   private get baseFovForMode() {
-    return this.exploreMode ? 65 : 52;
+    return this.exploreMode ? CHARACTER_TUNING.cameraFov : 52;
   }
 
   /**

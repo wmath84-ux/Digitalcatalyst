@@ -337,7 +337,10 @@ export class CharacterController {
       const delta = shortestAngle(this.yaw, targetYaw);
       this.headingError = delta;
       const sharp = hasInput ? T.rotationSharpness : T.idleRotationSharpness;
-      this.yaw += delta * damp(sharp, dt);
+      // Exponential track + the reference's hard 500°/s rotation rate.
+      const step = delta * damp(sharp, dt);
+      const cap = T.maxYawRate * dt;
+      this.yaw += THREE.MathUtils.clamp(step, -cap, cap);
     } else {
       this.headingError = 0;
     }

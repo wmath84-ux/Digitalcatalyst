@@ -5,10 +5,12 @@
 // Why procedural instead of a GLB: the Sanctuary ships offline-first inside
 // a Capacitor shell — a multi-megabyte character download with an uncertain
 // licence is the wrong trade. So the body is authored here as original
-// geometry: athletic adult-male proportions (~1.8 m), a full joint rig with
-// Mixamo-conventional bone names, PBR materials (skin / fabric / leather /
-// hair / eyes), vertex-baked fabric folds and joint shading, and tactical
-// outdoor gear (plate carrier, cargo pants, boots, gloves, pack).
+// geometry in the reference animset's athletic design language (fitted
+// heather-grey crew tee, dark navy joggers, white-sole sneakers, short
+// faded crop, clean shave): athletic adult-male proportions (~1.8 m), a
+// full joint rig with Mixamo-conventional bone names, PBR materials (skin /
+// fabric / rubber / hair / eyes) and vertex-baked fabric folds and joint
+// shading.
 //
 // THE SKELETON CONTRACT (for a future GLB swap): joints are Groups named
 // exactly Hips, Spine, Spine1, Neck, Head, LeftShoulder, LeftArm,
@@ -57,7 +59,7 @@ export const RIG_SEGMENTS = {
   chestLen: 0.2,
   neckLen: 0.09,
   headLen: 0.12,
-  shoulderX: 0.21,
+  shoulderX: 0.225,
   shoulderY: 0.17,
   upperArmLen: 0.3,
   foreArmLen: 0.27,
@@ -81,33 +83,27 @@ export interface PlayerRig {
   dispose(): void;
 }
 
-// ── Palette: tactical-outdoor male ─────────────────────────────────────
+// ── Palette: athletic male (animset design language) ───────────────────
 
 const SKIN = new THREE.Color(0xb97f52);
 const SKIN_SHADE = new THREE.Color(0x8a5a36);
 const SKIN_DEEP = new THREE.Color(0x6e4527);
-const SHIRT = new THREE.Color(0x4a5b3f); // ranger green combat shirt
-const SHIRT_SHADE = new THREE.Color(0x35422e);
-const SLEEVE = new THREE.Color(0x5c6b4c);
-const PANTS = new THREE.Color(0x6b6248); // coyote-tan cargo
-const PANTS_SHADE = new THREE.Color(0x4c452f);
-const VEST = new THREE.Color(0x3d3a2e); // plate carrier
-const VEST_SHADE = new THREE.Color(0x2a2921);
-const STRAP = new THREE.Color(0x24231d);
-const BELT = new THREE.Color(0x1f1e19);
-const BOOT = new THREE.Color(0x4a3420); // leather
-const BOOT_SHADE = new THREE.Color(0x2e2012);
-const SOLE = new THREE.Color(0x171310);
-const GLOVE = new THREE.Color(0x2e2c26);
-const PACK = new THREE.Color(0x51563c);
-const PACK_SHADE = new THREE.Color(0x383c29);
-const HAIR = new THREE.Color(0x241811);
-const HAIR_HI = new THREE.Color(0x3a2818);
+const TEE = new THREE.Color(0x8a8f94); // heather grey
+const TEE_SHADE = new THREE.Color(0x5f6469);
+const TEE_DARK = new THREE.Color(0x4a4e53); // collar / cuffs
+const JOGGER = new THREE.Color(0x232a38); // dark navy
+const JOGGER_SHADE = new THREE.Color(0x151a26);
+const STRIPE = new THREE.Color(0xd8dce2); // side stripe / drawstrings
+const WAIST = new THREE.Color(0x191e2a); // waistband / ankle cuffs
+const SHOE = new THREE.Color(0x9aa0a8); // sneaker upper
+const SHOE_SHADE = new THREE.Color(0x6e737b);
+const SOLE = new THREE.Color(0xf2f3f5); // white sole / toe cap
+const LACE = new THREE.Color(0xe4e7eb);
+const HAIR = new THREE.Color(0x1c1410);
+const HAIR_HI = new THREE.Color(0x352820);
 const BROW = new THREE.Color(0x1d130c);
 const EYE_WHITE = new THREE.Color(0xe8e4da);
-const IRIS = new THREE.Color(0x2b1d12);
-const KNEE = new THREE.Color(0x23221d);
-const WATCH = new THREE.Color(0x14161a);
+const IRIS = new THREE.Color(0x3a2417);
 
 function seededRandom(seed: number): () => number {
   let s = seed >>> 0;
@@ -189,6 +185,12 @@ function folds(y01: number, freq: number, amp: number, out: THREE.Color, shade: 
   out.lerp(shade, f * f * amp);
 }
 
+/** Heather mix: fine two-tone knit for the tee. */
+function heather(y01: number, out: THREE.Color): void {
+  const h = 0.5 + 0.5 * Math.sin(y01 * 90 + Math.sin(y01 * 31) * 2);
+  out.lerp(TEE_SHADE, h * 0.22);
+}
+
 export function createRealisticMale(shadows: boolean): PlayerRig {
   const S = RIG_SEGMENTS;
   const group = new THREE.Group();
@@ -215,8 +217,8 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
   const gearMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     map: grain,
-    roughness: 0.62,
-    metalness: 0.08,
+    roughness: 0.55,
+    metalness: 0.05,
   });
   const hairMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -256,93 +258,65 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
     return g;
   }
 
-  // ── Hips / pelvis: cargo pants + belt ────────────────────────────────
+  // ── Hips / pelvis: jogger seat + waistband + drawstrings ─────────────
   const hips = joint(body, "Hips", 0, S.hipsHeight, 0);
   {
-    const g = new THREE.BoxGeometry(0.32, 0.21, 0.22);
+    const g = new THREE.BoxGeometry(0.3, 0.2, 0.21);
     paint(g, (y01, _ny, _nx, _nz, out) => {
-      if (y01 > 0.8) out.copy(BELT);
+      if (y01 > 0.78) out.copy(WAIST);
       else {
-        out.copy(PANTS);
-        folds(y01, 5, 0.25, out, PANTS_SHADE);
-        if (y01 < 0.22) out.lerp(PANTS_SHADE, 0.5);
+        out.copy(JOGGER);
+        folds(y01, 5, 0.25, out, JOGGER_SHADE);
+        if (y01 < 0.22) out.lerp(JOGGER_SHADE, 0.5);
       }
     });
     part(g, hips, 0, 0, 0);
-    // Belt buckle.
-    const buckle = new THREE.BoxGeometry(0.07, 0.045, 0.02);
-    paint(buckle, (_y, _ny, _nx, _nz, out) => out.copy(STRAP));
-    part(buckle, hips, 0, 0.075, -0.115, gearMat);
+    // Drawstring tips.
+    for (const sx of [-0.03, 0.03]) {
+      const tip = new THREE.BoxGeometry(0.016, 0.07, 0.014);
+      paint(tip, (_y, _ny, _nx, _nz, out) => out.copy(STRIPE));
+      part(tip, hips, sx, 0.03, -0.108, gearMat, false);
+    }
   }
 
-  // ── Spine: shirt, tucked ─────────────────────────────────────────────
+  // ── Spine: tapered waist, tee tucked ──────────────────────────────────
   const spine = joint(hips, "Spine", 0, 0.11, 0);
   {
-    const g = new THREE.CapsuleGeometry(0.145, 0.09, 3, 12);
+    const g = new THREE.CapsuleGeometry(0.135, 0.09, 3, 12);
     paint(g, (y01, _ny, _nx, _nz, out) => {
-      if (y01 < 0.14) out.copy(BELT);
+      if (y01 < 0.14) out.copy(WAIST);
       else {
-        out.copy(SHIRT);
-        folds(y01, 6, 0.3, out, SHIRT_SHADE);
+        out.copy(TEE);
+        heather(y01, out);
+        folds(y01, 6, 0.22, out, TEE_SHADE);
       }
     });
     part(g, spine, 0, 0.07, 0);
   }
 
-  // ── Chest: shirt + plate carrier + pack ──────────────────────────────
+  // ── Chest: athletic chest + crew collar ───────────────────────────────
   const chest = joint(spine, "Spine1", 0, S.spineLen + 0.02, 0);
   {
-    const g = new THREE.CapsuleGeometry(0.165, 0.17, 3, 14);
-    paint(g, (y01, ny, _nx, _nz, out) => {
-      out.copy(SHIRT);
-      folds(y01, 7, 0.28, out, SHIRT_SHADE);
-      if (y01 > 0.88) out.lerp(SHIRT_SHADE, 0.65); // collar
-      if (y01 < 0.2) out.lerp(SHIRT_SHADE, 0.5);
-      if (ny < -0.2) out.lerp(SHIRT_SHADE, 0.25);
+    const g = new THREE.CapsuleGeometry(0.16, 0.17, 3, 14);
+    paint(g, (y01, ny, nx, _nz, out) => {
+      out.copy(TEE);
+      heather(y01, out);
+      folds(y01, 7, 0.2, out, TEE_SHADE);
+      // Pecs read: a soft shade band across the upper chest.
+      if (y01 > 0.52 && y01 < 0.72 && Math.abs(nx) < 0.55) out.lerp(TEE_SHADE, 0.18);
+      if (y01 > 0.9) out.lerp(TEE_DARK, 0.6); // collar seat
+      if (y01 < 0.18) out.lerp(TEE_SHADE, 0.45);
+      if (ny < -0.2) out.lerp(TEE_SHADE, 0.25);
     });
     part(g, chest, 0, 0.1, 0);
-    // Plate carrier front + back (tactical vest).
-    const vestF = new THREE.BoxGeometry(0.28, 0.3, 0.07);
-    paint(vestF, (y01, _ny, _nx, _nz, out) => {
-      out.copy(VEST);
-      folds(y01, 4, 0.35, out, VEST_SHADE);
-      if (y01 > 0.3 && y01 < 0.7) out.lerp(STRAP, 0.35); // MOLLE rows
-    });
-    part(vestF, chest, 0, 0.1, -0.15);
-    const vestB = new THREE.BoxGeometry(0.28, 0.3, 0.06);
-    paint(vestB, (y01, _ny, _nx, _nz, out) => {
-      out.copy(VEST);
-      folds(y01, 4, 0.3, out, VEST_SHADE);
-    });
-    part(vestB, chest, 0, 0.1, 0.155);
-    // Shoulder straps over the traps.
-    for (const sx of [-0.11, 0.11]) {
-      const strap = new THREE.BoxGeometry(0.07, 0.05, 0.3);
-      paint(strap, (_y, _ny, _nx, _nz, out) => out.copy(STRAP));
-      part(strap, chest, sx, 0.26, 0.0, gearMat);
-    }
-    // Backpack: shell + lid + side pouches.
-    const pack = new THREE.BoxGeometry(0.3, 0.38, 0.17);
-    paint(pack, (y01, _ny, _nx, _nz, out) => {
-      out.copy(PACK).lerp(PACK_SHADE, (1 - y01) * 0.55);
-      if (y01 > 0.44 && y01 < 0.56) out.lerp(STRAP, 0.8);
-      folds(y01, 5, 0.2, out, PACK_SHADE);
-    });
-    part(pack, chest, 0, 0.1, 0.27, gearMat);
-    const lid = new THREE.BoxGeometry(0.26, 0.09, 0.15);
-    paint(lid, (_y, _ny, _nx, _nz, out) => out.copy(PACK_SHADE));
-    part(lid, chest, 0, 0.32, 0.27, gearMat);
-    for (const sx of [-0.17, 0.17]) {
-      const pouch = new THREE.BoxGeometry(0.07, 0.2, 0.12);
-      paint(pouch, (y01, _ny, _nx, _nz, out) => {
-        out.copy(PACK);
-        if (y01 > 0.75) out.lerp(STRAP, 0.7);
-      });
-      part(pouch, chest, sx, 0.02, 0.27, gearMat);
-    }
+    // Ribbed crew collar.
+    const collar = new THREE.TorusGeometry(0.068, 0.02, 8, 18);
+    paint(collar, (_y, _ny, _nx, _nz, out) => out.copy(TEE_DARK));
+    const collarMesh = part(collar, chest, 0, 0.245, 0.005, clothMat, false);
+    collarMesh.rotation.x = Math.PI / 2 - 0.12;
   }
 
-  // ── Neck + head: face, eyes, hair ────────────────────────────────────
+  // ── Neck + head: clean-shaven face, faded crop ────────────────────────
   const neck = joint(chest, "Neck", 0, 0.22, 0);
   {
     const g = new THREE.CapsuleGeometry(0.055, 0.05, 2, 10);
@@ -351,21 +325,25 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
   }
   const head = joint(neck, "Head", 0, S.neckLen, 0);
   {
-    // Skull: skin with jaw + brow shading; slightly squared (male).
+    // Skull: skin with a light jaw shade; slimmer than the tactical build.
     const g = new THREE.SphereGeometry(0.118, 20, 16);
-    g.scale(0.92, 1.08, 0.98);
+    g.scale(0.94, 1.06, 0.98);
     paint(g, (y01, ny, _nx, nz, out) => {
       out.copy(SKIN);
-      if (y01 < 0.32) out.lerp(SKIN_SHADE, 0.55 * (1 - y01 / 0.32)); // jaw
-      if (y01 > 0.62 && y01 < 0.78 && nz < -0.4) out.lerp(SKIN_DEEP, 0.25); // brow band
+      if (y01 < 0.3) out.lerp(SKIN_SHADE, 0.4 * (1 - y01 / 0.3)); // jaw
+      if (y01 > 0.62 && y01 < 0.78 && nz < -0.4) out.lerp(SKIN_DEEP, 0.22); // brow band
       if (ny < -0.3) out.lerp(SKIN_SHADE, 0.3);
     });
     part(g, head, 0, 0.11, -0.005, skinMat);
-    // Nose: a small masculine wedge.
-    const nose = new THREE.ConeGeometry(0.022, 0.055, 6);
+    // Nose: small straight bridge.
+    const nose = new THREE.ConeGeometry(0.018, 0.045, 6);
     paint(nose, (_y, _ny, _nx, _nz, out) => out.copy(SKIN_SHADE));
-    const noseMesh = part(nose, head, 0, 0.095, -0.115, skinMat, false);
+    const noseMesh = part(nose, head, 0, 0.098, -0.112, skinMat, false);
     noseMesh.rotation.x = -Math.PI / 2 + 0.25;
+    // Mouth: a quiet closed line (reads at conversation distance).
+    const mouth = new THREE.BoxGeometry(0.042, 0.008, 0.01);
+    paint(mouth, (_y, _ny, _nx, _nz, out) => out.copy(SKIN_DEEP));
+    part(mouth, head, 0, 0.062, -0.104, skinMat, false);
     // Ears.
     for (const sx of [-0.108, 0.108]) {
       const ear = new THREE.SphereGeometry(0.028, 8, 6);
@@ -373,7 +351,7 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
       paint(ear, (_y, _ny, _nx, _nz, out) => out.copy(SKIN_SHADE));
       part(ear, head, sx, 0.1, 0.005, skinMat, false);
     }
-    // Eyes: sclera + iris + catchlight-less pupil (gameplay distance).
+    // Eyes: sclera + warm brown iris.
     for (const sx of [-0.045, 0.045]) {
       const white = new THREE.SphereGeometry(0.021, 10, 8);
       white.scale(1.15, 0.8, 0.6);
@@ -384,96 +362,77 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
       paint(iris, (_y, _ny, _nx, _nz, out) => out.copy(IRIS));
       part(iris, head, sx, 0.125, -0.109, eyeMat, false);
     }
-    // Eyebrows: thick straight bars.
+    // Eyebrows: neat tapered bars.
     for (const sx of [-0.045, 0.045]) {
-      const brow = new THREE.BoxGeometry(0.045, 0.011, 0.014);
+      const brow = new THREE.BoxGeometry(0.04, 0.009, 0.012);
       paint(brow, (_y, _ny, _nx, _nz, out) => out.copy(BROW));
       const browMesh = part(brow, head, sx, 0.155, -0.1, hairMat, false);
       browMesh.rotation.z = sx < 0 ? 0.08 : -0.08;
     }
-    // Hair: short textured crop — shell + crown volume + fade sides.
-    const shell = new THREE.SphereGeometry(0.125, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    shell.scale(0.94, 1.04, 1.0);
+    // Hair: short faded crop — tight shell, flat textured top, clean sides.
+    const shell = new THREE.SphereGeometry(0.122, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42);
+    shell.scale(0.95, 1.0, 1.0);
     paint(shell, (y01, _ny, _nx, _nz, out) => {
-      out.copy(HAIR).lerp(HAIR_HI, 0.35 * Math.sin(y01 * 21) * 0.5 + 0.18);
+      out.copy(HAIR).lerp(HAIR_HI, 0.3 * Math.sin(y01 * 24) * 0.5 + 0.15);
     });
-    const shellMesh = part(shell, head, 0, 0.118, 0.014, hairMat);
-    shellMesh.rotation.x = -0.3;
-    const crown = new THREE.SphereGeometry(0.085, 12, 8);
-    crown.scale(1.0, 0.55, 1.05);
-    paint(crown, (y01, _ny, _nx, _nz, out) => {
-      out.copy(HAIR_HI).lerp(HAIR, y01 * 0.6);
+    const shellMesh = part(shell, head, 0, 0.122, 0.016, hairMat);
+    shellMesh.rotation.x = -0.22;
+    const top = new THREE.SphereGeometry(0.08, 12, 8);
+    top.scale(1.0, 0.42, 1.05);
+    paint(top, (y01, _ny, _nx, _nz, out) => {
+      out.copy(HAIR_HI).lerp(HAIR, y01 * 0.55);
     });
-    part(crown, head, 0, 0.225, 0.01, hairMat);
-    // Light stubble jaw (darkens the lower face shell already painted).
-    const beard = new THREE.SphereGeometry(0.119, 16, 8, 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.2);
-    beard.scale(0.92, 1.06, 0.97);
-    paint(beard, (_y, _ny, _nx, nz, out) => {
-      if (nz < -0.15) out.copy(SKIN_DEEP);
-      else out.copy(SKIN).lerp(SKIN_SHADE, 0.4);
-    });
-    part(beard, head, 0, 0.108, -0.004, skinMat, false);
+    part(top, head, 0, 0.218, 0.012, hairMat);
   }
 
-  // ── Arms ─────────────────────────────────────────────────────────────
+  // ── Arms: short sleeves, bare athletic forearms, bare hands ───────────
   function buildArm(side: -1 | 1): { shoulder: THREE.Group; arm: THREE.Group; foreArm: THREE.Group; hand: THREE.Group } {
     const shoulder = joint(chest, side < 0 ? "LeftShoulder" : "RightShoulder", side * S.shoulderX, S.shoulderY, 0);
     const arm = joint(shoulder, side < 0 ? "LeftArm" : "RightArm", side * 0.02, -0.02, 0);
     {
-      // Sleeve with shoulder-cap shading + fold stripes.
-      const g = new THREE.CapsuleGeometry(0.062, 0.2, 3, 10);
+      // Short sleeve over the bicep + bare skin below the cuff.
+      const g = new THREE.CapsuleGeometry(0.06, 0.2, 3, 10);
       paint(g, (y01, _ny, _nx, _nz, out) => {
-        out.copy(SLEEVE);
-        folds(y01, 6, 0.3, out, SHIRT_SHADE);
-        if (y01 > 0.85) out.lerp(SHIRT_SHADE, 0.5);
-        if (y01 < 0.18) out.lerp(SHIRT_SHADE, 0.55); // cuff shadow
+        if (y01 > 0.42) {
+          out.copy(TEE);
+          heather(y01, out);
+          folds(y01, 5, 0.22, out, TEE_SHADE);
+          if (y01 > 0.85) out.lerp(TEE_SHADE, 0.45); // shoulder cap
+        } else if (y01 > 0.32) {
+          out.copy(TEE_DARK); // cuff band
+        } else {
+          out.copy(SKIN).lerp(SKIN_SHADE, (0.32 - y01) * 0.6);
+        }
       });
-      part(g, arm, 0, -0.15, 0);
-      // Elbow pad.
-      const pad = new THREE.SphereGeometry(0.055, 10, 8);
-      pad.scale(1, 0.9, 0.9);
-      paint(pad, (_y, _ny, _nx, _nz, out) => out.copy(KNEE));
-      part(pad, arm, 0, -0.28, 0.035, gearMat);
+      part(g, arm, 0, -0.15, 0, skinMat);
     }
     const foreArm = joint(arm, side < 0 ? "LeftForeArm" : "RightForeArm", 0, -S.upperArmLen, 0);
     {
-      // Rolled sleeve → forearm skin.
-      const g = new THREE.CapsuleGeometry(0.05, 0.17, 3, 10);
+      // Bare forearm with muscle shading.
+      const g = new THREE.CapsuleGeometry(0.048, 0.17, 3, 10);
       paint(g, (y01, _ny, _nx, _nz, out) => {
-        if (y01 > 0.62) {
-          out.copy(SLEEVE);
-          folds(y01, 5, 0.3, out, SHIRT_SHADE);
-        } else {
-          out.copy(SKIN).lerp(SKIN_SHADE, (0.62 - y01) * 0.5);
-        }
+        out.copy(SKIN).lerp(SKIN_SHADE, 0.25 + (0.5 - Math.abs(y01 - 0.5)) * 0.3);
       });
       part(g, foreArm, 0, -0.125, 0, skinMat);
-      if (side < 0) {
-        // Field watch on the left wrist.
-        const watch = new THREE.CylinderGeometry(0.052, 0.052, 0.035, 12);
-        paint(watch, (_y, _ny, _nx, _nz, out) => out.copy(WATCH));
-        part(watch, foreArm, 0, -0.22, 0, gearMat, false);
-      }
     }
     const hand = joint(foreArm, side < 0 ? "LeftHand" : "RightHand", 0, -S.foreArmLen, 0);
     {
-      // Tactical glove: palm + 4 curled fingers + thumb.
-      const palm = new THREE.BoxGeometry(0.075, 0.1, 0.05);
+      // Bare hand: palm + 4 relaxed fingers + thumb.
+      const palm = new THREE.BoxGeometry(0.07, 0.095, 0.045);
       paint(palm, (y01, _ny, _nx, _nz, out) => {
-        out.copy(GLOVE);
-        folds(y01, 3, 0.4, out, STRAP);
+        out.copy(SKIN).lerp(SKIN_SHADE, y01 * 0.3);
       });
-      part(palm, hand, 0, -0.05, -0.008, gearMat, false);
+      part(palm, hand, 0, -0.048, -0.006, skinMat, false);
       for (let f = 0; f < 4; f += 1) {
-        const fx = -0.027 + f * 0.018;
-        const finger = new THREE.CapsuleGeometry(0.0115, 0.05, 2, 6);
-        paint(finger, (_y, _ny, _nx, _nz, out) => out.copy(GLOVE));
-        const fm = part(finger, hand, fx, -0.125, -0.014, gearMat, false);
-        fm.rotation.x = 0.5; // relaxed curl
+        const fx = -0.025 + f * 0.017;
+        const finger = new THREE.CapsuleGeometry(0.0105, 0.048, 2, 6);
+        paint(finger, (_y, _ny, _nx, _nz, out) => out.copy(SKIN).lerp(SKIN_SHADE, 0.15));
+        const fm = part(finger, hand, fx, -0.12, -0.012, skinMat, false);
+        fm.rotation.x = 0.45; // relaxed curl
       }
-      const thumb = new THREE.CapsuleGeometry(0.012, 0.04, 2, 6);
-      paint(thumb, (_y, _ny, _nx, _nz, out) => out.copy(GLOVE));
-      const tm = part(thumb, hand, side * -0.045, -0.06, -0.012, gearMat, false);
+      const thumb = new THREE.CapsuleGeometry(0.011, 0.038, 2, 6);
+      paint(thumb, (_y, _ny, _nx, _nz, out) => out.copy(SKIN));
+      const tm = part(thumb, hand, side * -0.042, -0.055, -0.01, skinMat, false);
       tm.rotation.z = side * 0.7;
       tm.rotation.x = 0.35;
     }
@@ -482,67 +441,66 @@ export function createRealisticMale(shadows: boolean): PlayerRig {
   const armL = buildArm(-1);
   const armR = buildArm(1);
 
-  // ── Legs ─────────────────────────────────────────────────────────────
+  // ── Legs: navy joggers, side stripe, cuffed ankles, sneakers ──────────
   function buildLeg(side: -1 | 1): { upLeg: THREE.Group; leg: THREE.Group; foot: THREE.Group; toe: THREE.Group } {
     const upLeg = joint(hips, side < 0 ? "LeftUpLeg" : "RightUpLeg", side * S.hipX, -S.hipDrop, 0);
     {
-      // Cargo thigh with fold stripes + hip-joint shade.
-      const g = new THREE.CapsuleGeometry(0.085, 0.27, 3, 12);
-      paint(g, (y01, _ny, _nx, _nz, out) => {
-        out.copy(PANTS);
-        folds(y01, 7, 0.3, out, PANTS_SHADE);
-        if (y01 > 0.82) out.lerp(PANTS_SHADE, 0.5);
+      // Athletic thigh + light side stripe down the outer seam.
+      const g = new THREE.CapsuleGeometry(0.088, 0.27, 3, 12);
+      paint(g, (y01, _ny, nx, _nz, out) => {
+        const outer = side < 0 ? nx < -0.72 : nx > 0.72;
+        if (outer && y01 > 0.12 && y01 < 0.9) out.copy(STRIPE);
+        else {
+          out.copy(JOGGER);
+          folds(y01, 7, 0.28, out, JOGGER_SHADE);
+          if (y01 > 0.85) out.lerp(JOGGER_SHADE, 0.5); // hip shade
+          if (y01 < 0.16) out.lerp(JOGGER_SHADE, 0.55); // knee seat
+        }
       });
       part(g, upLeg, 0, -0.2, 0);
-      // Cargo pocket on the outer thigh.
-      const pocket = new THREE.BoxGeometry(0.03, 0.13, 0.13);
-      paint(pocket, (y01, _ny, _nx, _nz, out) => {
-        out.copy(PANTS_SHADE);
-        if (y01 > 0.7) out.lerp(STRAP, 0.5);
-      });
-      part(pocket, upLeg, side * 0.09, -0.22, 0, clothMat, false);
-      // Knee pad.
-      const pad = new THREE.SphereGeometry(0.075, 10, 8);
-      pad.scale(0.95, 1.0, 0.7);
-      paint(pad, (_y, _ny, _nx, _nz, out) => out.copy(KNEE));
-      part(pad, upLeg, 0, -0.4, -0.045, gearMat);
     }
     const leg = joint(upLeg, side < 0 ? "LeftLeg" : "RightLeg", 0, -S.thighLen, 0);
     {
-      // Calf bloused into the boot.
-      const g = new THREE.CapsuleGeometry(0.064, 0.26, 3, 10);
-      paint(g, (y01, _ny, _nx, _nz, out) => {
-        if (y01 < 0.3) out.copy(BOOT).lerp(BOOT_SHADE, (0.3 - y01) * 1.6);
+      // Tapered calf + ankle cuff.
+      const g = new THREE.CapsuleGeometry(0.058, 0.26, 3, 10);
+      paint(g, (y01, _ny, nx, _nz, out) => {
+        const outer = side < 0 ? nx < -0.7 : nx > 0.7;
+        if (y01 < 0.16) out.copy(WAIST); // ankle cuff
+        else if (outer && y01 < 0.9) out.copy(STRIPE);
         else {
-          out.copy(PANTS);
-          folds(y01, 6, 0.32, out, PANTS_SHADE);
+          out.copy(JOGGER);
+          folds(y01, 6, 0.3, out, JOGGER_SHADE);
         }
       });
       part(g, leg, 0, -0.18, 0);
     }
     const foot = joint(leg, side < 0 ? "LeftFoot" : "RightFoot", 0, -S.calfLen, 0);
     {
-      // Leather boot: vamp + sole.
-      const boot = new THREE.BoxGeometry(0.11, 0.1, 0.2);
-      paint(boot, (y01, _ny, _nx, _nz, out) => {
-        if (y01 < 0.2) out.copy(SOLE);
-        else out.copy(BOOT).lerp(BOOT_SHADE, (1 - y01) * 0.4);
+      // Sneaker: white midsole + grey upper + lace strip.
+      const sole = new THREE.BoxGeometry(0.11, 0.035, 0.24);
+      paint(sole, (_y, _ny, _nx, _nz, out) => out.copy(SOLE));
+      part(sole, foot, 0, -0.075, -0.045, gearMat, false);
+      const upper = new THREE.BoxGeometry(0.105, 0.07, 0.19);
+      paint(upper, (y01, _ny, _nx, _nz, out) => {
+        out.copy(SHOE).lerp(SHOE_SHADE, (1 - y01) * 0.5);
       });
-      part(boot, foot, 0, -0.04, -0.035, gearMat);
-      // Lace stay.
-      const laces = new THREE.BoxGeometry(0.05, 0.05, 0.1);
-      paint(laces, (_y, _ny, _nx, _nz, out) => out.copy(BOOT_SHADE));
-      part(laces, foot, 0, -0.005, -0.075, gearMat, false);
+      part(upper, foot, 0, -0.028, -0.035, gearMat);
+      const laces = new THREE.BoxGeometry(0.05, 0.018, 0.1);
+      paint(laces, (_y, _ny, _nx, _nz, out) => out.copy(LACE));
+      part(laces, foot, 0, 0.012, -0.06, gearMat, false);
+      const heel = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+      paint(heel, (_y, _ny, _nx, _nz, out) => out.copy(SHOE_SHADE));
+      part(heel, foot, 0, 0.0, 0.062, gearMat, false);
     }
     const toe = joint(foot, side < 0 ? "LeftToeBase" : "RightToeBase", 0, -0.075, -0.13);
     {
-      // Toe cap + lug sole front.
-      const cap = new THREE.BoxGeometry(0.105, 0.065, 0.1);
+      // Toe cap + front sole.
+      const cap = new THREE.BoxGeometry(0.105, 0.05, 0.09);
       paint(cap, (y01, _ny, _nx, _nz, out) => {
-        if (y01 < 0.3) out.copy(SOLE);
-        else out.copy(BOOT);
+        if (y01 < 0.35) out.copy(SOLE);
+        else out.copy(SHOE);
       });
-      part(cap, toe, 0, -0.01, -0.03, gearMat, false);
+      part(cap, toe, 0, -0.012, -0.03, gearMat, false);
     }
     return { upLeg, leg, foot, toe };
   }

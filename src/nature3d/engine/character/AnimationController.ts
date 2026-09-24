@@ -36,6 +36,12 @@ function resetTargets(): void {
   }
 }
 
+/** Smoothstep of a 0..1 progress value (clamped). Allocation-free. */
+function smooth01(t: number): number {
+  const x = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return x * x * (3 - 2 * x);
+}
+
 function ensureTargets(): void {
   if (_targets.Hips) return;
   const names: BoneName[] = [
@@ -117,9 +123,9 @@ export class CharacterAnimationController {
     _targets.Spine1.x = -lean * 0.5 - crouch * 0.3 + breath * 0.01 - land * 0.25;
     _targets.Spine1.y = moving ? -0.04 * Math.sin(phase) * speed01 : 0;
 
-    // Arms: counter-swing; crouch brings them up ready.
-    _targets.LeftArm.x = -armSwing * sR * moveW - crouch * 0.9 + land * 0.5;
-    _targets.RightArm.x = -armSwing * sL * moveW - crouch * 0.9 + land * 0.5;
+    // Arms: counter-swing; crouch brings them forward ready (+x = forward).
+    _targets.LeftArm.x = -armSwing * sR * moveW + crouch * 0.55 + land * 0.5;
+    _targets.RightArm.x = -armSwing * sL * moveW + crouch * 0.55 + land * 0.5;
     _targets.LeftArm.z = 0.1 + speed01 * 0.06 + crouch * 0.12;
     _targets.RightArm.z = -0.1 - speed01 * 0.06 - crouch * 0.12;
     _targets.LeftForeArm.x = 0.18 + elbowBase * (0.4 + 0.6 * Math.max(0, -sR)) * moveW + crouch * 0.6 + land * 0.4;
@@ -131,49 +137,95 @@ export class CharacterAnimationController {
     _targets.Head.x = lean * 0.55 + crouch * 0.45 + breath * 0.008 - land * 0.1;
     _targets.Neck.x = -lean * 0.12 + crouch * 0.1;
 
-    // Idle life: weight shifts + micro head motion when still.
+    // Idle life: weight shifts + micro head motion when still. Arms sway
+    // ADDITIVELY so a crouch-ready pose is never stomped back to hanging.
     if (!moving && snap.grounded && prone < 0.02) {
       const sway = Math.sin(time * 0.55);
       _targets.Hips.z = sway * 0.012;
       _targets.Hips.x = Math.sin(time * 0.4) * 0.008;
       _targets.Head.y = Math.sin(time * 0.33) * 0.09;
       _targets.Head.x += Math.sin(time * 0.5) * 0.012;
-      _targets.LeftArm.x = sway * 0.02;
-      _targets.RightArm.x = -sway * 0.02;
+      _targets.LeftArm.x += sway * 0.02;
+      _targets.RightArm.x += -sway * 0.02;
     }
 
-    // ── Prone: real crawl pose (hips lay flat, limbs drive) ───────────
+    // ── Prone: staged kneel-down into a military high-crawl ──────────
+    // The reference has no prone, so this is built to its bar from field
+    // manuals instead: going down passes through a kneel with hands
+    // planting on the dirt (stage A), then the body stretches out flat
+    // (stage B). Down pose: chest ~0.3 m, up on the elbows with forearms
+    // flat forward, head craned to look ahead, legs trailed with toes
+    // pointed back. The crawl is diagonal — left elbow plants while the
+    // right knee drives — with body roll and counter-bobbed head.
     if (prone > 0.001) {
-      const w = prone;
-      const crawlAmp = moving ? Math.min(0.25 + speed * 0.3, 0.6) : 0;
-      const cL = Math.sin(phase);
-      const cR = Math.sin(phase + Math.PI);
-      this.hipsY = THREE.MathUtils.lerp(this.hipsY, 0.42, w);
-      this.hipsZ = THREE.MathUtils.lerp(this.hipsZ, 0.1, w);
-      _targets.Hips.x = THREE.MathUtils.lerp(_targets.Hips.x, -1.32, w);
-      _targets.Hips.y = THREE.MathUtils.lerp(_targets.Hips.y, 0.08 * cL * (moving ? 1 : 0), w);
-      // Legs trail back, knees pumping alternately.
-      _targets.LeftUpLeg.x = THREE.MathUtils.lerp(_targets.LeftUpLeg.x, 0.15 + crawlAmp * cL, w);
-      _targets.RightUpLeg.x = THREE.MathUtils.lerp(_targets.RightUpLeg.x, 0.15 + crawlAmp * cR, w);
-      _targets.LeftLeg.x = THREE.MathUtils.lerp(_targets.LeftLeg.x, -0.5 - crawlAmp * 1.1 * Math.max(0, cR), w);
-      _targets.RightLeg.x = THREE.MathUtils.lerp(_targets.RightLeg.x, -0.5 - crawlAmp * 1.1 * Math.max(0, cL), w);
-      _targets.LeftFoot.x = THREE.MathUtils.lerp(_targets.LeftFoot.x, 0.9, w);
-      _targets.RightFoot.x = THREE.MathUtils.lerp(_targets.RightFoot.x, 0.9, w);
-      _targets.LeftToeBase.x = THREE.MathUtils.lerp(_targets.LeftToeBase.x, 0, w);
-      _targets.RightToeBase.x = THREE.MathUtils.lerp(_targets.RightToeBase.x, 0, w);
-      // Spine arches slightly; chest leads.
-      _targets.Spine.x = THREE.MathUtils.lerp(_targets.Spine.x, 0.18, w);
-      _targets.Spine1.x = THREE.MathUtils.lerp(_targets.Spine1.x, 0.3, w);
-      // Arms pull alternately (combat crawl).
-      _targets.LeftArm.x = THREE.MathUtils.lerp(_targets.LeftArm.x, -1.1 + crawlAmp * 1.2 * cR, w);
-      _targets.RightArm.x = THREE.MathUtils.lerp(_targets.RightArm.x, -1.1 + crawlAmp * 1.2 * cL, w);
-      _targets.LeftArm.z = THREE.MathUtils.lerp(_targets.LeftArm.z, 0.35, w);
-      _targets.RightArm.z = THREE.MathUtils.lerp(_targets.RightArm.z, -0.35, w);
-      _targets.LeftForeArm.x = THREE.MathUtils.lerp(_targets.LeftForeArm.x, 0.9 + 0.5 * Math.max(0, cL), w);
-      _targets.RightForeArm.x = THREE.MathUtils.lerp(_targets.RightForeArm.x, 0.9 + 0.5 * Math.max(0, cR), w);
-      // Head cranes up to see forward.
-      _targets.Head.x = THREE.MathUtils.lerp(_targets.Head.x, 0.85, w);
-      _targets.Neck.x = THREE.MathUtils.lerp(_targets.Neck.x, 0.25, w);
+      const kneel = smooth01(prone / 0.42) * (1 - smooth01((prone - 0.38) / 0.5));
+      const flat = smooth01((prone - 0.35) / 0.6);
+      // Stage A: sink to the knees, hands planting forward-down.
+      if (kneel > 0.001) {
+        const k = kneel * (1 - flat * 0.85);
+        this.hipsY = THREE.MathUtils.lerp(this.hipsY, 0.55, k);
+        _targets.Hips.x = THREE.MathUtils.lerp(_targets.Hips.x, -0.5, k);
+        _targets.LeftUpLeg.x = THREE.MathUtils.lerp(_targets.LeftUpLeg.x, 0.35, k);
+        _targets.RightUpLeg.x = THREE.MathUtils.lerp(_targets.RightUpLeg.x, 0.35, k);
+        _targets.LeftLeg.x = THREE.MathUtils.lerp(_targets.LeftLeg.x, -2.0, k);
+        _targets.RightLeg.x = THREE.MathUtils.lerp(_targets.RightLeg.x, -2.0, k);
+        _targets.LeftFoot.x = THREE.MathUtils.lerp(_targets.LeftFoot.x, 1.1, k);
+        _targets.RightFoot.x = THREE.MathUtils.lerp(_targets.RightFoot.x, 1.1, k);
+        _targets.Spine.x = THREE.MathUtils.lerp(_targets.Spine.x, -0.35, k);
+        _targets.Spine1.x = THREE.MathUtils.lerp(_targets.Spine1.x, -0.3, k);
+        _targets.LeftArm.x = THREE.MathUtils.lerp(_targets.LeftArm.x, 0.7, k);
+        _targets.RightArm.x = THREE.MathUtils.lerp(_targets.RightArm.x, 0.7, k);
+        _targets.LeftForeArm.x = THREE.MathUtils.lerp(_targets.LeftForeArm.x, 0.25, k);
+        _targets.RightForeArm.x = THREE.MathUtils.lerp(_targets.RightForeArm.x, 0.25, k);
+        _targets.Head.x = THREE.MathUtils.lerp(_targets.Head.x, -0.25, k);
+      }
+      // Stage B: stretched flat — the high-crawl.
+      if (flat > 0.001) {
+        const w = flat;
+        const cL = Math.sin(phase);
+        const cR = Math.sin(phase + Math.PI);
+        const driveL = moving ? Math.max(0, cL) : 0; // left elbow plants…
+        const driveR = moving ? Math.max(0, cR) : 0; // …while right knee drives
+        const sway = moving ? Math.sin(phase) * 0.05 : 0;
+        const lift = moving ? Math.abs(Math.cos(phase)) * 0.02 : 0;
+        this.hipsY = THREE.MathUtils.lerp(this.hipsY, 0.34 + lift, w);
+        this.hipsZ = THREE.MathUtils.lerp(this.hipsZ, 0.06, w);
+        _targets.Hips.x = THREE.MathUtils.lerp(_targets.Hips.x, -1.45 + lift * 1.5, w);
+        _targets.Hips.y = THREE.MathUtils.lerp(_targets.Hips.y, sway, w);
+        _targets.Hips.z = THREE.MathUtils.lerp(_targets.Hips.z, sway * 0.8, w);
+        // Legs trail flat and slightly spread; knees drive up alternately.
+        _targets.LeftUpLeg.x = THREE.MathUtils.lerp(_targets.LeftUpLeg.x, 0.12 + driveR * 0.55, w);
+        _targets.RightUpLeg.x = THREE.MathUtils.lerp(_targets.RightUpLeg.x, 0.12 + driveL * 0.55, w);
+        _targets.LeftUpLeg.z = THREE.MathUtils.lerp(_targets.LeftUpLeg.z, 0.09, w);
+        _targets.RightUpLeg.z = THREE.MathUtils.lerp(_targets.RightUpLeg.z, -0.09, w);
+        _targets.LeftLeg.x = THREE.MathUtils.lerp(_targets.LeftLeg.x, -0.12 - driveR * 1.05, w);
+        _targets.RightLeg.x = THREE.MathUtils.lerp(_targets.RightLeg.x, -0.12 - driveL * 1.05, w);
+        _targets.LeftFoot.x = THREE.MathUtils.lerp(_targets.LeftFoot.x, 1.15 - driveR * 0.55, w);
+        _targets.RightFoot.x = THREE.MathUtils.lerp(_targets.RightFoot.x, 1.15 - driveL * 0.55, w);
+        _targets.LeftToeBase.x = THREE.MathUtils.lerp(_targets.LeftToeBase.x, 0.35, w);
+        _targets.RightToeBase.x = THREE.MathUtils.lerp(_targets.RightToeBase.x, 0.35, w);
+        // Back stays flat; chest twists into each reach.
+        _targets.Spine.x = THREE.MathUtils.lerp(_targets.Spine.x, 0.08, w);
+        _targets.Spine1.x = THREE.MathUtils.lerp(_targets.Spine1.x, 0.1, w);
+        _targets.Spine1.y = THREE.MathUtils.lerp(_targets.Spine1.y, moving ? cL * 0.07 : 0, w);
+        // Elbows plant beside the ribs, forearms flat forward, alternating.
+        _targets.LeftArm.x = THREE.MathUtils.lerp(_targets.LeftArm.x, 0.85 + driveL * 0.42, w);
+        _targets.RightArm.x = THREE.MathUtils.lerp(_targets.RightArm.x, 0.85 + driveR * 0.42, w);
+        _targets.LeftArm.z = THREE.MathUtils.lerp(_targets.LeftArm.z, 0.3, w);
+        _targets.RightArm.z = THREE.MathUtils.lerp(_targets.RightArm.z, -0.3, w);
+        _targets.LeftForeArm.x = THREE.MathUtils.lerp(_targets.LeftForeArm.x, 0.85 - driveL * 0.5, w);
+        _targets.RightForeArm.x = THREE.MathUtils.lerp(_targets.RightForeArm.x, 0.85 - driveR * 0.5, w);
+        _targets.LeftHand.x = THREE.MathUtils.lerp(_targets.LeftHand.x, 0.25, w);
+        _targets.RightHand.x = THREE.MathUtils.lerp(_targets.RightHand.x, 0.25, w);
+        // Head cranes up to look ahead (counter-bobs against the crawl).
+        _targets.Head.x = THREE.MathUtils.lerp(_targets.Head.x, 1.15 - lift * 4, w);
+        _targets.Neck.x = THREE.MathUtils.lerp(_targets.Neck.x, 0.3, w);
+        // Idle prone: a slow lookout scan, not a freeze.
+        if (!moving) {
+          _targets.Head.y = THREE.MathUtils.lerp(_targets.Head.y, Math.sin(time * 0.5) * 0.35, w);
+          _targets.Head.x = THREE.MathUtils.lerp(_targets.Head.x, 1.1 + breath * 0.02, w * 0.5);
+        }
+      }
     }
 
     // ── Airborne: additive over the move direction ────────────────────
@@ -186,8 +238,8 @@ export class CharacterAnimationController {
       _targets.RightLeg.x = THREE.MathUtils.lerp(_targets.RightLeg.x, -(0.35 + tuck * 0.7), air);
       _targets.LeftFoot.x = THREE.MathUtils.lerp(_targets.LeftFoot.x, 0.3 + falling * 0.15, air);
       _targets.RightFoot.x = THREE.MathUtils.lerp(_targets.RightFoot.x, 0.35 + falling * 0.15, air);
-      _targets.LeftArm.x = THREE.MathUtils.lerp(_targets.LeftArm.x, -0.55 * tuck - falling * 0.5, air);
-      _targets.RightArm.x = THREE.MathUtils.lerp(_targets.RightArm.x, -0.55 * tuck - falling * 0.5, air);
+      _targets.LeftArm.x = THREE.MathUtils.lerp(_targets.LeftArm.x, 0.9 * tuck - falling * 0.25, air);
+      _targets.RightArm.x = THREE.MathUtils.lerp(_targets.RightArm.x, 0.9 * tuck - falling * 0.25, air);
       _targets.LeftArm.z = THREE.MathUtils.lerp(_targets.LeftArm.z, 0.1 + 0.55 * tuck + falling * 0.35, air);
       _targets.RightArm.z = THREE.MathUtils.lerp(_targets.RightArm.z, -0.1 - 0.55 * tuck - falling * 0.35, air);
       _targets.LeftForeArm.x = THREE.MathUtils.lerp(_targets.LeftForeArm.x, 0.55, air);
@@ -204,8 +256,8 @@ export class CharacterAnimationController {
       // Braking brace: arms swing forward as the body sits back.
       if (snap.accel < -2.5) {
         const brace = Math.min((-snap.accel - 2.5) * 0.05, 0.3);
-        _targets.LeftArm.x -= brace;
-        _targets.RightArm.x -= brace;
+        _targets.LeftArm.x += brace;
+        _targets.RightArm.x += brace;
         _targets.LeftUpLeg.x += brace * 0.4;
         _targets.RightUpLeg.x += brace * 0.4;
       }
@@ -221,16 +273,18 @@ export class CharacterAnimationController {
     }
 
     // ── Look layer: head + chest follow the camera (aim-offset style) ─
-    const lookW = (1 - speed01 * 0.65) * (1 - prone * 0.7) * (1 - air * 0.5);
+    // Prone inverts the split: the chest stays glued to the dirt while the
+    // head scans freely with the camera (the crawler's lookout).
+    const lookW = (1 - speed01 * 0.65) * (1 - air * 0.5);
     this.lookYawSm += (snap.lookYawOffset - this.lookYawSm) * damp(7, dt);
     this.lookPitchSm += (snap.cameraPitch - this.lookPitchSm) * damp(7, dt);
     const ly = THREE.MathUtils.clamp(this.lookYawSm, -T.lookYawClamp, T.lookYawClamp) * lookW;
     const lp = THREE.MathUtils.clamp(this.lookPitchSm, -T.lookPitchClamp, T.lookPitchClamp) * lookW;
-    _targets.Head.y += ly;
-    _targets.Head.x += -lp * 0.75;
+    _targets.Head.y += ly * (1 + prone * 0.9);
+    _targets.Head.x += -lp * 0.75 * (1 + prone * 0.5);
     _targets.Neck.y += ly * 0.35;
     _targets.Neck.x += -lp * 0.2;
-    _targets.Spine1.y += ly * 0.3;
+    _targets.Spine1.y += ly * 0.3 * (1 - prone * 0.85);
 
     // ── Turn-in-place shuffle: small quick steps while pivoting ───────
     if (snap.turningInPlace) {
