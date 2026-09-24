@@ -48,6 +48,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { QualityBudget } from "./quality";
 import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
+import { insideBeachHouse } from "./beachHouseSite";
 import { GROUND_PALETTE } from "./palette";
 import { groundColorAt } from "./environment";
 
@@ -242,6 +243,7 @@ export function createHillGrassField(
   const acceptsClump = (x: number, z: number, y: number, ny: number): boolean => {
     if (insideRiver(x, z)) return false;
     if (insideWarehouse(x, z, 1.5)) return false;
+  if (insideBeachHouse(x, z, 1.5)) return false;
     if (Math.abs(x - RIVER_CENTER_X) < 7.4 && Math.random() < 0.6) return false;
     if (y < OCEAN_LEVEL + 0.45) return false; // drowned shelf / sea floor
     // The beach keeps its sand; the upper dune thins to scattered tufts.
@@ -317,7 +319,7 @@ export function createHillGrassField(
         const rad = radius * (0.7 + Math.random() * 0.75);
         const x = cx + Math.cos(a) * rad;
         const z = cz + Math.sin(a) * rad;
-        if (insideRiver(x, z) || insideWarehouse(x, z, 1.5)) continue;
+        if (insideRiver(x, z) || insideWarehouse(x, z, 1.5) || insideBeachHouse(x, z, 1.5)) continue;
         const y = terrainHeight(x, z);
         if (y < OCEAN_LEVEL + 0.45) continue;
         const t = Math.min(1, Math.max(0, (Math.hypot(x, z) - HILL_GRASS_IN) / span));
