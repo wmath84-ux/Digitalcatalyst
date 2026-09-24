@@ -546,6 +546,40 @@ export function dryCover(x: number, z: number, h: number, wet = 0): number {
   return dry < 0 ? 0 : dry > 0.78 ? 0.78 : dry;
 }
 
+/**
+ * THE HILL TURF MASK — how much a point on a hill is CLOTHED, 0 … 1.
+ *
+ * `dryCover`'s rise ramp is what gave the meadow its dry rises, and it is
+ * correct down in the clearing: 4 m of relief is a bank that sheds water.
+ * Carried up a 90 m pahad it said the opposite of what the world looks like:
+ * the whole sanctuary rim, the lesson hill and the western Highlands came out
+ * earth-and-scree tinted from top to bottom — the bare pahads the owner's
+ * reference file (`pahadon ke upar gras replace hill.blend`) exists to argue
+ * against. Its mound is green to its summit, with the mat growing on every
+ * part of it.
+ *
+ * So the hills get their own rule, and it is the same rule their 3-D cover
+ * uses (`hillGrass.ts`), expressed on the same two measurements:
+ *
+ *   1. ALTITUDE  a hill, not a bank — full past 14 m of height.
+ *   2. FOOTING   soil cannot cling past ~52° (`normalY` 0.62); turf holds to
+ *                0.8 and gives way below it, which keeps the mountain faces
+ *                and the cliff bands reading as ROCK, exactly as they do in
+ *                the reference file's shaly outcrops.
+ *   3. THE COAST keeps its bleached sand and sea-cliff albedo.
+ *
+ * The result is multiplied into `dry` inside `groundColorAt`, so the terrain
+ * colour, the grass, the tufts and the flowers all agree by construction —
+ * and because it is a pure function of the same height field everything else
+ * reads, it costs no extra samples.
+ */
+export function hillTurf(h: number, normalY: number, coastal: number): number {
+  const rise = smoothstep(2.5, 14, h);
+  const hold = smoothstep(0.55, 0.8, normalY);
+  const inland = 1 - Math.min(1, Math.max(0, coastal));
+  return rise * hold * inland;
+}
+
 
 /**
  * The albedo of the ground at a point, as a rule-based blend.
@@ -584,12 +618,22 @@ export function groundColorAt(
 ): THREE.Color {
   const wet = flowWetness(x, z);
   const worn = wornIn ?? pathWeight(x, z);
+  // The coast mask is read here (not further down) because the hill-turf rule
+  // has to know whether this slope is a sea cliff before the base colour is
+  // mixed — one call, one source of truth, no second ring test.
+  const coast = coastWeight(x, z);
 
   // ── Base: lush ↔ dry ──────────────────────────────────────────────
   // Dry ground follows drainage and the rises (dryCover), not a speckle.
   // The lerp is held back so a dry rise reads as earth and the flats stay
   // grass — green is the majority, desert shows through on the high ground.
-  const dry = dryCover(x, z, h, wet);
+  //
+  // HILLS ARE THE EXCEPTION (`hillTurf`): the rises' rule stays for the
+  // banks and the beach ridges it was written for, and is lifted on the
+  // pahads, whose turf the cover in `hillGrass.ts` grows on the same two
+  // measurements. Without this line the hills would be dressed in 3-D grass
+  // over bare-earth albedo, which is the one combination that reads as a bug.
+  const dry = dryCover(x, z, h, wet) * (1 - 0.74 * hillTurf(h, normalY, coast));
   out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.84));
 
   // ── Drainage: mossy darkening, not brown mud ──────────────────────
@@ -612,7 +656,6 @@ export function groundColorAt(
   // A touch of long-wave noise breaks the bands up so the shoreline never
   // reads as a contour line painted on the ground.
   const shoreUp = h - OCEAN_LEVEL;
-  const coast = coastWeight(x, z);
   if (shoreUp < 12 && coast > 0.02) {
     const swash = noise.noise2D(x * 0.045 + 9.3, z * 0.045 - 2.8) * 0.9;
     const drySand = (1 - smoothstep(2.2 + swash, 5.4 + swash, shoreUp)) * coast;

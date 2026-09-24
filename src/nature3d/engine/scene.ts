@@ -37,6 +37,7 @@ import { createHillGrassField, type HillGrassField } from "./hillGrass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
+import { createHillGrassField, type HillGrassField } from "./hillGrass";
 import { createMossBank, type MossBank } from "./moss";
 import { createTropicalField, type TropicalField } from "./tropicalFlora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
@@ -156,6 +157,12 @@ export class Sanctuary {
    */
   private hillGrass: HillGrassField;
   private flora: Flora;
+  /**
+   * THE HILL COVER — grass on every hill, slope and pahad past the meadow's
+   * own fields, in the recipe measured off the owner's reference file
+   * `pahadon ke upar gras replace hill.blend` — see `hillGrass.ts`.
+   */
+  private hillGrass: HillGrassField;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -459,7 +466,7 @@ export class Sanctuary {
 
     // THE GRASS TUFT FIELD — real 3D clumps (Grass Medium 02, all five
     // variants) decorating the meadow between the blades and the sorrel.
-    createGrassTuftField(this.budget, aniso).then((field) => {
+    createGrassTuftField(this.budget, aniso, this.rocks.grassPoints).then((field) => {
       if (this.disposed) {
         field.dispose();
         return;
@@ -1876,6 +1883,7 @@ export class Sanctuary {
     this.hillGrass.setShed(this.shedLevel);
     this.sorrel?.setShed(this.shedLevel);
     this.grassTufts?.setShed(this.shedLevel);
+    this.hillGrass.setShed(this.shedLevel);
     this.mossBank?.setShed(this.shedLevel);
     this.tropical?.setShed(this.shedLevel);
   }
@@ -2015,6 +2023,7 @@ export class Sanctuary {
       this.flora.update(time, this.wind);
       this.sorrel?.update(time, this.wind);
       this.grassTufts?.update(time, this.wind);
+      this.hillGrass.update(time, this.wind);
       this.mossBank?.update(time, this.wind);
       this.tropical?.update(time, this.wind);
       // The camera position lets the water cull its plunge-pool debris when
