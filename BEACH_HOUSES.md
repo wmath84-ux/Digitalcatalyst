@@ -7,6 +7,15 @@ problem nahin aani chahiye"*
 
 ---
 
+> ### ⚠ Colour fix, second pass
+>
+> The first pass shipped the house **WHITE/cream**, because the bake assigned
+> materials by MA-BLOCK ORDER instead of each mesh's own slot array, which put
+> 8 341 of the 22 410 faces on `light` — and `light` is the pack's LAMP, so
+> everything came out near-white. Both bugs are fixed and pinned by tests; the
+> house now wears the file's own colours, and a separate class of white (five
+> objects with **no material at all**) is handled explicitly. See §3b.
+
 ## 1. What the uploaded file actually contains (measured, not assumed)
 
 `Beach+House_Pack+JSGraphics_CGTrader.blend` is **Blender 3.0, uncompressed
@@ -32,10 +41,10 @@ Three findings decided the whole implementation:
 
    | slot | faces | what it is |
    |---|---|---|
-   | `light` | 8 341 | lime-washed plaster + the roof's rafters and finials |
-   | `Roof` | 547 | the shingle courses |
-   | `wall 1` | 580 | the dark oiled plank bands |
-   | `wall 2`, `wall 3` | **0** | unused slots (carried anyway, see §3) |
+   | `light` | 24 | **a lamp** — an Emission node, not plaster (see §3b) |
+   | `Roof` | 5 652 | the thatch / shingle courses |
+   | `wall 1` | 580 | dark oiled plank bands |
+   | `wall 2` / `wall 3` | 1 240 / 1 882 | timber bands (they DO carry faces — see §3b) |
 
 2. **Two leftovers.** The scene also holds `OBBeach House` (a 17 × 14 × 15 m
    block, 8 vertices) and `OBCube.367` (a 1.8 m roof shell at the origin) —
@@ -43,7 +52,16 @@ Three findings decided the whole implementation:
    *parented into* the house's tree, so a graph walk cannot separate them; a
    single-linkage cluster on object centres can (110 m apart, 40 m threshold).
 
-3. **The parent transforms are bookkeeping, not a transform stack.** Every
+3. **The colours are real, and they are NOT in the material names.** The five
+   materials' legacy viewport fields (`Material.r/g/b/a`) all sit at Blender's
+   default 0.8 grey, and `Object.col` is 1.0 white on every object — neither
+   is the author's palette. The real colours are the **node-tree socket
+   values**, and the real *shape* is: `light` is not plaster, it is a red-orange
+   **Emission lamp** (1.0, 0.0598, 0.0), and `Roof` — which owns 14 664 of the
+   22 210 exported triangles — is an **olive thatch** (0.248, 0.238, 0.108).
+   `wall 1/2/3` are three different browns. See §3b.
+
+4. **The parent transforms are bookkeeping, not a transform stack.** Every
    detail object carries its own world placement in `loc` and its mesh is
    authored around its origin; the parents' 5.4× scales are `OBBeach House`'s
    own odd scale and would blow the model up 5× if multiplied in. Verified by
@@ -68,7 +86,7 @@ model in the sanctuary:
 * writes the author's slot colours as `baseColorFactor` (metalness 0, so the
   roof cannot read as a mirror under this sun — the villa's rule).
 
-    file .......... 2 184 KB   (22 410 tris, 3 materials)
+    file .......... 2 217 KB   (22 210 tris, 5 materials — see §3b)
     bounds ........ 21.568 (x) × 18.920 (y) × 17.330 (z) m
     wall box ...... 14.190 × 14.040 m     ridge ......... 13.588 m
     depth centre .. 0.000                 floor ......... 0.000
@@ -84,6 +102,94 @@ the file "looked" broken — the sizes and triangle counts were right. It was
 found by loading the GLB and printing the bounding box.
 
 ---
+
+## 2b. §3b — THE COLOURS (and the two white bugs)
+
+The owner's second report: *"color sahi nahin hai unka actual color nahin hai
+unka white dikh rahe hain — keval actual color jo file mein mention hai sab
+exactly vahi color implement karo."* Two independent bugs were producing that
+white, and **both were in the bake, not the runtime**.
+
+### Bug 1 — materials were assigned by block order, not by slot
+
+`MPoly.mat_nr` indexes **the mesh's own `Material **mat` slot array**. The bake
+was indexing `find_blocks_from_code(b'MA')` instead — the order the material
+blocks happen to sit in the file, which is `light, Roof, wall 1, wall 2,
+wall 3`. The two orders disagree on most of the house:
+
+| | correct (`mesh.mat[mat_nr]`) | what the bake produced |
+|---|---|---|
+| `Roof` | 14 664 tris (5 652 faces) | 1 464 tris |
+| `wall 3` | 3 770 tris | **0** |
+| `wall 2` | 2 558 tris | **0** |
+| `wall 1` | 1 194 tris | 1 464 tris |
+| `light` | 24 tris | **22 110 tris** ← the entire house |
+
+And `light` is the pack's **lamp**: an Emission node with base colour
+`(1.0, 0.0598, 0.0)`. Every one of those 8 341 faces came out near-white. That
+is the white in the screenshots.
+
+`mat` is an array of **pointers**, so reading it takes two dereferences; the
+slot count lives in `Mesh.totcol`, which is a **short**, not an int.
+
+### Bug 2 — five objects have no material at all
+
+Separately, five of the house's objects carry **no material slot and no object
+material** (`Object.totcol = 0`, `Mesh.totcol = 0`), so Blender draws them with
+its own default grey. They are some of the biggest, most visible panels — a
+64-gon cupola cap, a long interior partition, three cross-beams.
+
+They are **not** instances of any materialed mesh (their vertex data is
+unique — verified by hashing every mesh), so there is no "correct" colour
+anywhere in the file; only the possibility of inventing one. Since the owner
+asked for *the file's* colours and not a nicer guess, the bake **drops them and
+prints exactly what it dropped**:
+
+```
+unassigned-material objects DROPPED (the file gives them no colour):
+   OBCircle.004  mesh=MECircle.005  polys=64
+   OBCube.376    mesh=MECube.205    polys=12
+   OBCube.377    mesh=MECube.206    polys=12
+   OBCube.378    mesh=MECube.207    polys=6
+   OBCube.379    mesh=MECube.208    polys=6
+   -> 5 objects, 100 faces (1.1% of the house).
+```
+
+`--keep-unassigned` restores them in Blender's own grey if that is ever wanted.
+
+### The colours that now ship — copied, not chosen
+
+Base colours are **linear** in Blender's sockets and **linear** in glTF's
+`baseColorFactor`, so they cross the boundary verbatim with no gamma conversion:
+
+| material | faces | linear (r, g, b) | sRGB | what it is |
+|---|---|---|---|---|
+| `Roof` | 5 652 | 0.248383, 0.238419, 0.108126 | `#89865c` | olive thatch |
+| `wall 3` | 1 882 | 0.098502, 0.029427, 0.011859 | `#58301c` | dark timber |
+| `wall 2` | 1 240 | 0.259796, 0.081814, 0.031642 | `#8b5132` | warm timber |
+| `wall 1` | 580 | 0.049547, 0.014357, 0.006436 | `#3f2013` | dark oiled plank |
+| `light` | 24 | 1.000000, 0.059756, 0.000000 | `#ff4500` | **the lamp** — carried as `emissiveFactor`, so it survives the low tier's Lambert swap |
+
+Two details the bake has to get right and the tests now pin:
+
+* **A linked socket ignores its own default.** `Roof`'s Base Color arrives
+  through a Hue/Saturation node, so `constant_rgba()` follows the link upstream
+  to the constant behind it. Reading the socket blindly would have taken the
+  HSV node's `(0.8, 0.8, 0.8)` instead — grey again.
+* **`bNodeSocket.type` is not the RNA enum.** It is `eNodeSocketDatatype`:
+  FLOAT=0, VECTOR=1, RGBA=2, SHADER=3, BOOLEAN=4, INT=5. Guessing the order
+  reads every colour as a float and every float as a colour.
+
+Nothing in the runtime re-tints: `beachHouses.ts` takes `material.color` and
+`material.emissive` straight off the loaded glTF. The contract test asserts
+that no hand-picked colour literal can come back, in the bake **or** in the
+runtime, and that the bake's "no colour for this material" path is a hard
+failure rather than a silent grey.
+
+### What it looks like now
+
+`docs/beach-houses/house_only.png` — brown timber, olive thatch, and the lamp
+showing as warm orange through the window frames.
 
 ## 3. Where the six stand — solved, not typed
 
@@ -181,11 +287,11 @@ it for free.
 | Gate | Command | Result |
 |---|---|---|
 | TypeScript strict | `npx tsc --noEmit -p tsconfig.json` | **CLEAN** |
-| Contract suite | `node --test tests/nature3dBeachHousesContract.test.mjs` | **10 / 10 pass** |
+| Contract suite | `node --test tests/nature3dBeachHousesContract.test.mjs` | **11 / 11 pass** |
 | World harness (real engine, real height field) | `bash scripts/verify-nature3d.sh` | **10 new house checks pass** (6 pads level, sites deterministic, spread, cut-down pads, no beach/river/villa collisions, walls clear) |
 | Whole repo suite | `bash run_tests.sh` | 2 539 pass / 39 fail — **byte-identical failure set to the pre-change baseline** (diffed line by line: 0 regressions, +10 new passes) |
-| Production build | `npm run build` | **built in 16.5 s** |
-| GLB load | three's real `GLTFLoader` in Node | **LOAD OK** — 3 meshes, 22 410 tris, floor at y = 0 |
+| Production build | `npm run build` | **built in 15.6 s** |
+| GLB load | three's real `GLTFLoader` in Node | **LOAD OK** — 5 meshes, 22 210 tris, floor at y = 0, the file's own colours |
 
 Two pre-existing failures the run surfaced and did **not** introduce
 (confirmed by running the suite on a stashed tree): the shader harness's

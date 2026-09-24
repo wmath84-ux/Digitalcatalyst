@@ -11,9 +11,19 @@ way the runtime places them.
 
 Usage:  python3 scripts/blend/render-soup.py <soup.bin> <out.png> <w> <h> <az> <el> <span>
 """
-import struct, sys, math, pathlib
-sys.path.insert(0, "/home/user/blendtool")
-from render import write_png
+import struct, sys, math, pathlib, zlib
+
+def write_png(path, w, h, pix):
+    """Minimal RGB8 PNG writer — keeps this file self-contained."""
+    raw = b"".join(b"\x00" + bytes(pix[y * w * 3:(y + 1) * w * 3]) for y in range(h))
+    def chunk(tag, data):
+        return (struct.pack(">I", len(data)) + tag + data
+                + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+    out = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(raw, 6))
+           + chunk(b"IEND", b""))
+    pathlib.Path(path).write_bytes(out)
 
 SZ = 12
 
@@ -111,13 +121,15 @@ def render(tris, path, w, h, az, el, zoom, target=None, span=None, bg=(150, 190,
     return lo, hi
 
 if __name__ == "__main__":
-    tris = load("/tmp/dc/world_soup.bin")
-    out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "/home/user/blendtool/out")
+    # render-soup.py <soup.bin> <out.png> <w> <h> <az> <el> <zoom> [span] [tx,ty,tz]
+    soup, dest = sys.argv[1], sys.argv[2]
+    w, h = int(sys.argv[3]), int(sys.argv[4])
+    az, el, zoom = float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])
+    span = float(sys.argv[8]) if len(sys.argv) > 8 and sys.argv[8] != "-" else None
+    target = None
+    if len(sys.argv) > 9 and sys.argv[9] != "-":
+        target = [float(v) for v in sys.argv[9].split(",")]
+    tris = load(soup)
     print("triangles:", len(tris))
-    views = {
-        "world_top": dict(w=880, h=880, az=250, el=52, zoom=1.12, target=[0, 0, 0], span=1500),
-        "world_wide": dict(w=1000, h=560, az=250, el=16, zoom=1.05, target=[0, 8, 0], span=1500),
-    }
-    for name, kw in views.items():
-        lo, hi = render(tris, str(out / (name + ".png")), **kw)
-        print(" ", name, "ok")
+    lo, hi = render(tris, dest, w, h, az, el, zoom, target=target, span=span)
+    print("bounds", [round(v, 1) for v in lo], [round(v, 1) for v in hi])

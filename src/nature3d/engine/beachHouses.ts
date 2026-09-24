@@ -9,14 +9,32 @@
 // ── The asset ───────────────────────────────────────────────────────────
 //
 // `Beach+House_Pack+JSGraphics_CGTrader.blend` (Blender 3.0) is ONE assembled
-// tropical beach bungalow: 172 mesh objects, 22 410 triangles, five flat
-// placeholder materials and — measured, not assumed — NOT ONE image texture
-// (the only image datablock in the file is Blender's own "Render Result").
-// The three material slots that actually carry faces are the artist's paint
-// primer: `light` (the lime-washed plaster and the roof's rafters), `Roof`
-// (the shingles) and `wall 1` (the dark oiled plank). `wall 2` / `wall 3`
-// hold no faces; they are carried in the export anyway so a re-export that
-// uses them cannot land on a missing-material white.
+// tropical beach bungalow: 172 mesh objects, 22 410 triangles and — measured,
+// not assumed — NOT ONE image texture (the only image datablock in the file is
+// Blender's own "Render Result").
+//
+// The colours are REAL and they are the FILE's. They are not in the material
+// names, and not in the legacy `Material.r/g/b/a` viewport fields (all five
+// sit at Blender's 0.8 grey default): they are in the author's NODE TREES,
+// and the bake reads them out socket by socket —
+//
+//   Roof     (5 652 faces)  (0.248383, 0.238419, 0.108126)  - olive thatch
+//   wall 3   (1 882 faces)  (0.098502, 0.029427, 0.011859)  - mid brown
+//   wall 2   (1 240 faces)  (0.259796, 0.081814, 0.031642)  - warm brown
+//   wall 1     (580 faces)  (0.049547, 0.014357, 0.006436)  - dark oiled
+//   light        (8 faces)  (1.000000, 0.059756, 0.000000)  - the LAMP, an
+//                                                            Emission node
+//
+// Two traps live in that list, both of which this district has already fallen
+// into once and neither of which is guessable:
+//
+//   * `MPoly.mat_nr` indexes the MESH's OWN `Material **mat` slot array, not
+//     the order the material blocks sit in the file. Reading the wrong list
+//     put 8 341 of the 22 410 faces on the wrong material, and because the
+//     first block in the file is `light`, the whole house rendered WHITE.
+//   * A socket whose input is LINKED ignores its own default — `Roof`'s Base
+//     Color comes through a Hue/Saturation node, so the bake follows the link
+//     to the constant behind it.
 //
 // It ships as `public/sanctuary/models/beach_house.glb`, baked by
 // `scripts/blend/extract-beach-house.py` (offline, one-off, provenance in
@@ -382,13 +400,23 @@ export function createBeachHouses(
 
     for (const src of sources) {
       const geometry = src.geometry;
+      // The colours are the FILE's, baked into the glTF by
+      // `scripts/blend/extract-beach-house.py` — the author's own node values,
+      // copied across linearly. Nothing here renames, re-tints or falls back
+      // to a "missing material" white: if a slot ever arrives without a
+      // colour, that is a bake bug and the 0.8 grey only makes it obvious.
       const gltfMat = src.material as THREE.MeshStandardMaterial | undefined;
       const color = gltfMat?.color ?? new THREE.Color(0.8, 0.8, 0.8);
+      // One slot in the pack is a LAMP: the author's `light` material is an
+      // Emission node (1.0, 0.0598, 0.0) — a warm glow. glTF carries it as
+      // `emissiveFactor`, so it survives the Lambert swap too.
+      const emissive = gltfMat?.emissive ?? null;
       let material: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial;
       if (budget.cheapPlants || !gltfMat) {
         // The diet tier: Lambert, no PBR channels to pay for. The pack ships
         // no textures at all, so this swaps the BRDF and nothing else.
         material = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+        if (emissive) material.emissive = emissive.clone();
       } else {
         material = gltfMat;
         // Flat, untextured slots: metalness 0 keeps the roof from reading as
@@ -398,6 +426,7 @@ export function createBeachHouses(
       }
       material.name = material.name || "beach-house";
       material.vertexColors = false;
+      material.needsUpdate = true;
       if (geometry.attributes.uv) geometry.deleteAttribute("uv");
       if (geometry.attributes.uv1) geometry.deleteAttribute("uv1");
       geometry.computeBoundingSphere();

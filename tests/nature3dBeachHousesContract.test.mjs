@@ -66,6 +66,34 @@ test("houses: the model ships offline, with provenance", () => {
   assert.match(extract, /floor = mn\[2\]/, "the floor comes off Blender's Z");
 });
 
+test("houses: the COLOURS are the file's, read not invented", () => {
+  // The owner's report was "colour sahi nahin hai ... white dikh rahe hain".
+  // The cause was two different bugs stacked, and both are now pinned:
+  //
+  //   1. the bake assigned materials by MA-BLOCK ORDER instead of the mesh's
+  //      own slot array, so 8 341 faces landed on `light` (the first block);
+  //   2. `light` is the pack's LAMP, so every one of those faces came out
+  //      near-white.
+  const extract = read("scripts/blend/extract-beach-house.py");
+  assert.ok(!/COLORS\s*=|ROUGHNESS\s*=/.test(extract),
+    "no invented colour table may come back — the file is the source of truth");
+  assert.match(extract, /def mesh_slots\(/, "the mesh's OWN slot array is read");
+  assert.match(extract, /struct\.unpack_from\(bl\.pfmt, raw, i \* bl\.psize\)/,
+    "and it is an array of POINTERS, so it takes two dereferences");
+  assert.match(extract, /def material_appearance\(/, "colours come from the node trees");
+  assert.match(extract, /def constant_rgba\(/, "following links upstream");
+  assert.match(extract, /ShaderNodeBsdfPrincipled/);
+  assert.match(extract, /ShaderNodeEmission/);
+  assert.match(extract, /raise SystemExit\("no colour for material/,
+    "a slot with no colour must FAIL the bake, never silently invent one");
+
+  // …and the runtime must not re-tint on top of the bake either.
+  assert.ok(!/0xf3efdf|0xad8669|0xa68169/i.test(HOUSE_CODE), "no hand-picked hex colours");
+  assert.match(HOUSE_CODE, /const color = gltfMat\?\.color/);
+  assert.match(HOUSE_CODE, /const emissive = gltfMat\?\.emissive/,
+    "the lamp slot's emissiveFactor survives the Lambert swap");
+});
+
 test("houses: six placements, solved — never hand-typed", () => {
   assert.match(HOUSE_CODE, /export const BEACH_HOUSE_COUNT = 6;/);
   assert.match(HOUSE_CODE, /function pickSites\(\)/);

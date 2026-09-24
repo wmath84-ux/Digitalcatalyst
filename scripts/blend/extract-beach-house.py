@@ -4,11 +4,18 @@ WHY THIS EXISTS
 ---------------
 `Beach+House_Pack+JSGraphics_CGTrader.blend` (Blender 3.0, uncompressed v301)
 holds ONE assembled beach house: 174 mesh objects, five flat-shaded
-placeholder materials (`MAbeachhouse | light/Roof*/wall 1/wall 2/wall 3`) and
-no image textures at all — the only image datablock in the file is Blender's
-own "Render Result". So the export carries geometry + UVs + per-material
-primitives, and the game-side colours are assigned by MATERIAL NAME in
-`src/nature3d/engine/beachHouses.ts`.
+placeholder VIEWPORT fields (`MAbeachhouse | light/Roof*/wall 1/wall 2/wall 3`)
+and no image textures at all — the only image datablock in the file is
+Blender's own "Render Result". The COLOURS are real, though: the author put
+them in the material node trees, and this script READS THEM OUT (see the
+"author's materials" section below) instead of guessing from the slot names.
+So the export carries geometry + UVs + the author's exact materials.
+
+COLOUR NOTE: five of the house's objects carry NO material slot at all (Blender
+draws those with its own 0.8 grey), and they are some of the biggest, most
+visible panels. They are not instances of any materialed mesh, so the file
+holds no "correct" colour for them; rather than invent one, the bake drops them
+and prints what it dropped. `--keep-unassigned` keeps them in Blender's grey.
 
 The scene also holds two objects that do NOT belong to the house (a 15 m
 box and a 1.8 m roof-only shell, both parked at the origin). They are noise
@@ -42,25 +49,195 @@ from blender_asset_tracer import blendfile  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 BLEND = REPO / "Beach+House_Pack+JSGraphics_CGTrader.blend"
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+FLAGS = {a for a in sys.argv[1:] if a.startswith("--")}
 OUT = pathlib.Path(
-    sys.argv[1] if len(sys.argv) > 1 else REPO / "public/sanctuary/models/beach_house.glb"
+    ARGS[0] if ARGS else REPO / "public/sanctuary/models/beach_house.glb"
 )
+# Six objects in this file have NO material slot at all; Blender draws those
+# with its own default grey (0.8), which is the white the owner saw. See
+# `unassigned_objects()` below.
+KEEP_UNASSIGNED = "--keep-unassigned" in FLAGS
 
 CD_MLOOPUV = 16
 ME_SMOOTH = 1
 
-# Material slot -> game colour. The author named the slots; two of them
-# ("wall 2", "wall 3") carry no faces in the source file at all, but they are
-# kept here so a future re-export that DOES use them still lands on a sane
-# colour instead of a missing-material white.
-COLORS = {
-    "light": (0.90, 0.86, 0.74, 1.0),   # lime-washed plaster / light timber
-    "Roof": (0.42, 0.24, 0.14, 1.0),    # teak shingle
-    "wall 1": (0.38, 0.22, 0.14, 1.0),  # dark oiled plank
-    "wall 2": (0.62, 0.44, 0.27, 1.0),
-    "wall 3": (0.52, 0.35, 0.21, 1.0),
-}
-ROUGHNESS = {"light": 0.62, "Roof": 0.88, "wall 1": 0.78, "wall 2": 0.78, "wall 3": 0.78}
+# ── the author's materials, READ OUT OF THE FILE ─────────────────────────
+#
+# MEASURED, and the reason this script was rewritten once already:
+#
+#   * `Material.r/g/b/a` and `Object.col` are the LEGACY viewport fields. Both
+#     sit at Blender's defaults in this file (0.8 grey / 1.0 white) and are
+#     NOT the author's colours. Neither is the material NAME.
+#
+#   * The colours live in the node trees, as socket `default_value`s.
+#     `bNodeSocket.type` uses `eNodeSocketDatatype` — FLOAT=0, VECTOR=1,
+#     RGBA=2, SHADER=3, BOOLEAN=4, INT=5, STRING=6 — whose order is NOT the
+#     RNA enum's. `default_value` resolves to a real DNA block:
+#     `bNodeSocketValueRGBA` (4 floats at +0) or `bNodeSocketValueFloat`
+#     (`{ int subtype; float value; float min; float max; }` — value at +4).
+#
+#   * `MPoly.mat_nr` indexes the MESH's OWN `Material **mat` slot array, NOT
+#     the order the MA blocks happen to sit in the file. Reading the wrong
+#     list painted 8 341 of this house's 22 410 faces with the wrong
+#     material — and since the first MA block is `light`, the whole house
+#     came out white. `mat` is an array of POINTERS, so it takes two
+#     dereferences. THIS was the bug the owner saw.
+#
+# Blender's own default for a face that has no material at all.
+DEFAULT_MATERIAL = (0.8, 0.8, 0.8, 1.0)
+NO_MATERIAL = "(no material)"
+
+SOCK_FLOAT = 0
+SOCK_VECTOR = 1
+SOCK_RGBA = 2
+SOCK_INT = 5
+
+
+def strfield(bl, block, path, n=64):
+    """A fixed-size `char[n]` DNA field, read as a NUL-terminated string."""
+    off, _ = bl.resolve(block, path)
+    return bl.raw(block)[off:off + n].split(b"\x00")[0].decode(errors="replace")
+
+
+def list_blocks(bl, block, path, limit=500):
+    try:
+        return bl.list_all(block, path, limit=limit)
+    except Exception:
+        return []
+
+
+def nodes_of(bl, ma):
+    """(nodetree, [nodes]) — the author's real shader setup, or (None, [])."""
+    nt = bl.deref_safe(ma, "nodetree")
+    if nt is None:
+        return None, []
+    return nt, list_blocks(bl, nt, "nodes", 200)
+
+
+def input_named(bl, node, name):
+    for sock in list_blocks(bl, node, "inputs", 200):
+        if strfield(bl, sock, "name") == name:
+            return sock
+    return None
+
+
+def socket_value(bl, sock):
+    """(type, value) for a socket's stored default value."""
+    typ = struct.unpack_from("<h", bl.raw(sock), bl.resolve(sock, "type")[0])[0]
+    ptr, = struct.unpack_from(bl.pfmt, bl.raw(sock), bl.resolve(sock, "default_value")[0])
+    if not ptr:
+        return typ, None
+    blk = bl.bf.dereference_pointer(ptr)
+    if blk is None:
+        return typ, None
+    raw = bl.raw(blk)
+    if typ == SOCK_RGBA and len(raw) >= 16:
+        return typ, struct.unpack_from("<4f", raw, 0)
+    if typ == SOCK_VECTOR and len(raw) >= 12:
+        return typ, struct.unpack_from("<3f", raw, 0)
+    if typ in (SOCK_FLOAT, SOCK_INT) and len(raw) >= 8:
+        if typ == SOCK_FLOAT:
+            return typ, struct.unpack_from("<f", raw, 4)[0]
+        return typ, struct.unpack_from("<i", raw, 4)[0]
+    return typ, None
+
+
+def incoming_link(bl, nt, node, sock):
+    """(from_node, from_sock) of the link feeding `sock`, else (None, None)."""
+    want_node = getattr(node, "addr_old", None)
+    want_sock = getattr(sock, "addr_old", None)
+    for lk in list_blocks(bl, nt, "links", 500):
+        tn = bl.deref_safe(lk, "tonode")
+        ts = bl.deref_safe(lk, "tosock")
+        if tn is None or ts is None:
+            continue
+        if (getattr(tn, "addr_old", None) == want_node
+                and getattr(ts, "addr_old", None) == want_sock):
+            return bl.deref_safe(lk, "fromnode"), bl.deref_safe(lk, "fromsock")
+    return None, None
+
+
+def constant_rgba(bl, nt, node, name, depth=0):
+    """The constant colour a socket settles on, following links upstream.
+
+    `Roof` drives Base Color through a Hue/Saturation node whose `Value` comes
+    from Object Info's per-object Random. That part is procedural; what is
+    read here is the chain's CONSTANT colour — the HSV node's own `Color`
+    input, exactly as the file stores it. Nothing is invented either way.
+    """
+    sock = input_named(bl, node, name)
+    if sock is None or depth > 6:
+        return None
+    from_node, from_sock = incoming_link(bl, nt, node, sock)
+    if from_node is None:
+        _typ, val = socket_value(bl, sock)
+        return val if isinstance(val, tuple) and len(val) >= 3 else None
+    return constant_rgba(bl, nt, from_node, strfield(bl, from_sock, "name"), depth + 1)
+
+
+def material_appearance(bl, ma):
+    """Exactly what this file says the material looks like.
+
+    `base` / `emissive` come out as LINEAR floats — the same space glTF's
+    `baseColorFactor` / `emissiveFactor` are defined in — so they are copied
+    across verbatim, with no gamma conversion anywhere.
+    """
+    nt, nodes = nodes_of(bl, ma)
+    principled = None
+    emission = None
+    for nd in nodes:
+        idname = strfield(bl, nd, "idname")
+        if idname == "ShaderNodeBsdfPrincipled" and principled is None:
+            principled = nd
+        elif idname == "ShaderNodeEmission" and emission is None:
+            emission = nd
+
+    look = {"base": None, "metallic": 0.0, "roughness": 0.5, "emissive": None}
+    if principled is not None:
+        rgba = constant_rgba(bl, nt, principled, "Base Color")
+        if rgba:
+            look["base"] = (rgba[0], rgba[1], rgba[2], rgba[3] if len(rgba) > 3 else 1.0)
+        for key, sock_name in (("metallic", "Metallic"), ("roughness", "Roughness")):
+            sock = input_named(bl, principled, sock_name)
+            if sock is not None:
+                _t, v = socket_value(bl, sock)
+                if isinstance(v, float):
+                    look[key] = v
+        emit = constant_rgba(bl, nt, principled, "Emission")
+        if emit and max(emit[:3]) > 0.0:
+            look["emissive"] = (emit[0], emit[1], emit[2])
+    if emission is not None:
+        # A LAMP: the Emission node's colour IS the material's colour, and it
+        # glows. (The author drives its Strength from a Light Falloff node,
+        # which is a distance curve, not a colour.)
+        rgba = constant_rgba(bl, nt, emission, "Color")
+        if rgba:
+            look["base"] = (rgba[0], rgba[1], rgba[2], rgba[3] if len(rgba) > 3 else 1.0)
+            look["emissive"] = (rgba[0], rgba[1], rgba[2])
+            look["roughness"] = 1.0
+    return look
+
+
+def mesh_slots(bl, me):
+    """The mesh's OWN material slot array — what `mat_nr` really indexes.
+
+    `mat` is a `Material **`: Blender writes the pointer array itself as an
+    untyped block, so this is a pointer to the array, then the array's
+    entries. `totcol` is a SHORT.
+    """
+    totcol = bl.scalar(me, "totcol", "h")
+    if not totcol:
+        return []
+    arr = bl.deref_safe(me, "mat")
+    if arr is None:
+        return []
+    raw = bl.raw(arr)
+    out = []
+    for i in range(totcol):
+        ptr, = struct.unpack_from(bl.pfmt, raw, i * bl.psize)
+        out.append(bl.bf.dereference_pointer(ptr))
+    return out
 
 
 # ── matrix helpers (row-major 4x4, translation in the last row) ──────────
@@ -223,12 +400,66 @@ def house_objects(bl, bf):
     return [o for (o, _c) in best]
 
 
+def short_name(full):
+    """`MAbeachhouse | wall 1` -> `wall 1` (the author's own slot label)."""
+    return full.replace("MAbeachhouse |", "").strip()
+
+
 def build(bf):
     bl = BL(bf)
-    mats = [s(m.id_name) for m in bf.find_blocks_from_code(b'MA')]
-    short = [m.replace("MAbeachhouse |", "").strip() for m in mats]
 
+    # Every material, with the appearance the FILE actually stores. The order
+    # of `find_blocks_from_code` is deliberately NOT used to index anything —
+    # see the note at the top of this file.
+    looks = {}
+    for ma in bf.find_blocks_from_code(b'MA'):
+        looks[short_name(s(ma.id_name))] = material_appearance(bl, ma)
+    print("materials in file:")
+    for name in sorted(looks):
+        look = looks[name]
+        base = look["base"] or DEFAULT_MATERIAL
+        emit = look["emissive"]
+        print("   %-8s base(linear)=(%.6f, %.6f, %.6f)  rough=%.2f metal=%.2f%s"
+              % (name, base[0], base[1], base[2], look["roughness"], look["metallic"],
+                 "  EMISSIVE(%.3f, %.3f, %.3f)" % emit if emit else ""))
+
+    # Deterministic slot order: the file's own, then the no-material bucket.
+    names = [short_name(s(ma.id_name)) for ma in bf.find_blocks_from_code(b'MA')]
+    names.append(NO_MATERIAL)
+
+    # ── the author's unfinished objects ─────────────────────────────────
+    #
+    # Six of the house's objects carry NO material slot at all, so Blender
+    # renders them with its own default grey — and because they are the
+    # house's biggest wall panels, that grey is most of what the player sees.
+    # MEASURED: `Object.totcol = 0`, `Mesh.totcol = 0`, and they are not
+    # instances of any materialed mesh either (their vertex data is unique —
+    # verified by hashing), so there is no "correct" colour hiding anywhere in
+    # the file. Rather than invent one — the owner asked for the FILE's
+    # colours, not for a nicer guess — the bake DROPS them and says so.
+    # `--keep-unassigned` restores them in Blender's grey.
     objs = house_objects(bl, bf)
+    unassigned = [o for o in objs if not mesh_slots(bl, bl.deref_safe(o, 'data'))]
+    if unassigned and not KEEP_UNASSIGNED:
+        dropped_faces = 0
+        for o in unassigned:
+            dropped_faces += bl.scalar(bl.deref_safe(o, 'data'), 'totpoly', 'i') or 0
+        objs = [o for o in objs if o not in unassigned]
+        print("unassigned-material objects DROPPED (the file gives them no colour):")
+        for o in unassigned:
+            me = bl.deref_safe(o, 'data')
+            print("   %-18s mesh=%-14s polys=%-4d  in Blender this draws as its "
+                  "0.8 grey default" % (s(o.id_name), s(me.id_name),
+                                        bl.scalar(me, 'totpoly', 'i')))
+        print("   -> %d objects, %d faces (%.1f%% of the house). "
+              "Pass --keep-unassigned to keep them."
+              % (len(unassigned), dropped_faces,
+                 100.0 * dropped_faces / max(1, sum(
+                     bl.scalar(bl.deref_safe(x, 'data'), 'totpoly', 'i') or 0
+                     for x in house_objects(bl, bf)))))
+    elif unassigned:
+        print("unassigned-material objects KEPT (--keep-unassigned): %d"
+              % len(unassigned))
 
     def local_matrix(ob):
         """The object's OWN loc/rot/scale — deliberately NOT the parent chain.
@@ -248,7 +479,8 @@ def build(bf):
 
     buckets = collections.defaultdict(
         lambda: {"pos": [], "nor": [], "uv": [], "idx": [], "has_uv": False})
-    stats = {"objects": len(objs), "verts": 0, "polys": 0, "tris": 0, "smooth": 0, "flat": 0}
+    stats = {"objects": len(objs), "verts": 0, "polys": 0, "tris": 0, "smooth": 0,
+             "flat": 0, "no_material_faces": 0}
     mn = [1e30] * 3
     mx = [-1e30] * 3
 
@@ -256,6 +488,11 @@ def build(bf):
         me = bl.deref_safe(ob, 'data')
         m = local_matrix(ob)
         verts, loops, polys, uv = Mesh(bl, me).read()
+        # THIS mesh's own slots. Six objects in the file carry none at all
+        # (106 faces) — Blender draws those with its default material, which
+        # is what they get here too.
+        slots = [short_name(s(x.id_name)) if x is not None else None
+                 for x in mesh_slots(bl, me)]
         stats["verts"] += len(verts)
         stats["polys"] += len(polys)
         wverts = [apply(m, v) for v in verts]
@@ -297,7 +534,10 @@ def build(bf):
                 sn[2] /= ln
 
         for pi, (start, count, mat_nr, flag) in enumerate(polys):
-            name = short[mat_nr] if 0 <= mat_nr < len(short) else short[0]
+            name = slots[mat_nr] if 0 <= mat_nr < len(slots) else None
+            if name is None:
+                name = NO_MATERIAL
+                stats["no_material_faces"] += 1
             bucket = buckets[name]
             smooth = bool(flag & ME_SMOOTH)
             lv = [loops[(start + k) * 2] for k in range(count)]
@@ -342,10 +582,10 @@ def build(bf):
             uv_arr[i] = 1.0 - uv_arr[i]
 
     size = (mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])
-    return buckets, short, stats, size, (cx, cy, floor)
+    return buckets, names, stats, size, (cx, cy, floor), looks
 
 
-def write_glb(path, buckets, names):
+def write_glb(path, buckets, names, looks, no_material):
     bin_parts = []
     offset = 0
     views = []
@@ -400,15 +640,28 @@ def write_glb(path, buckets, names):
             "material": len(materials),
             "mode": 4,
         })
-        materials.append({
+        # The FILE's own numbers, verbatim. `baseColorFactor` and
+        # `emissiveFactor` are LINEAR in glTF and the socket values are
+        # LINEAR in Blender, so nothing is converted anywhere.
+        look = looks.get(name) or {}
+        base = look.get("base")
+        if base is None:
+            if name != no_material:
+                raise SystemExit("no colour for material %r - refusing to invent one" % name)
+            base = DEFAULT_MATERIAL  # Blender's own default for a faceless material
+        entry = {
             "name": name,
             "pbrMetallicRoughness": {
-                "baseColorFactor": list(COLORS.get(name, (0.8, 0.8, 0.8, 1.0))),
-                "metallicFactor": 0.0,
-                "roughnessFactor": ROUGHNESS.get(name, 0.75),
+                "baseColorFactor": [base[0], base[1], base[2], base[3] if len(base) > 3 else 1.0],
+                "metallicFactor": look.get("metallic", 0.0),
+                "roughnessFactor": look.get("roughness", 0.5),
             },
             "doubleSided": True,
-        })
+        }
+        emit = look.get("emissive")
+        if emit:
+            entry["emissiveFactor"] = [emit[0], emit[1], emit[2]]
+        materials.append(entry)
 
     bin_data = b"".join(bin_parts)
     gltf = {
@@ -437,9 +690,9 @@ def write_glb(path, buckets, names):
 
 def main():
     bf = blendfile.BlendFile(BLEND)
-    buckets, names, stats, size, centre = build(bf)
+    buckets, names, stats, size, centre, looks = build(bf)
     bf.close()
-    size_bytes, nmats = write_glb(OUT, buckets, names)
+    size_bytes, nmats = write_glb(OUT, buckets, names, looks, NO_MATERIAL)
     print("source:", stats)
     print("glTF size (x, y, z) = %s" % [round(v, 3) for v in (size[0], size[2], size[1])])
     print("materials:", [n for n in names if buckets.get(n, {}).get("pos")])
