@@ -3825,8 +3825,10 @@ body.is-desktop nav:has([data-site-footer]) {
   }
 }
 
-/* Course player active - allow landscape */
-html[data-course-player-active="true"] {
+/* Rotation-free screens active (course player / nature studio) - allow
+   landscape */
+html[data-course-player-active="true"],
+html[data-nature-studio-active="true"] {
   /* Remove any portrait restrictions */
   overflow: auto;
 }
@@ -3840,7 +3842,11 @@ html[data-course-player-active="true"] {
    in appOrientation.ts, which reads the device's smaller physical CSS
    dimension — still true in Android split-screen, false on any real tablet. */
 @media screen and (orientation: landscape) and (max-width: 767px) {
-  html[data-phone-device="true"]:not([data-course-player-active="true"]) body {
+  /* The freeze must NOT apply while a rotation-free screen (course player
+     or the 3D nature studio) is open — the learner has to be able to drag
+     and pinch the world in landscape, so the freeze keys off BOTH
+     `data-*` attributes that appOrientation sets. */
+  html[data-phone-device="true"]:not([data-course-player-active="true"]):not([data-nature-studio-active="true"]) body {
     /* Prevent content from being interactive in landscape - overlay handles it */
     touch-action: none;
   }

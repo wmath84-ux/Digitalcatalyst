@@ -30,6 +30,10 @@ import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
 import { hourForMode, type DaylightMode } from "./engine/daylight";
+import {
+  enterNatureStudioRotation,
+  exitNatureStudioRotation,
+} from "../utils/appOrientation";
 
 const WIND_STEPS = [
   { label: "Calm", mult: 0.45 },
@@ -135,6 +139,15 @@ export default function NatureStudioPage() {
     const sync = () => setImmersive(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  // The 3D world is a rotation-free screen (same rule as the course
+  // player): the learner must be able to hold the phone in landscape to
+  // look around the island — no portrait re-lock, no "Rotate your phone"
+  // overlay, while the studio is open. Back to the portrait lock on exit.
+  useEffect(() => {
+    enterNatureStudioRotation();
+    return () => exitNatureStudioRotation();
   }, []);
 
   // ── Boot the engine once ────────────────────────────────────────────

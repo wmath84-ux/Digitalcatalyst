@@ -12,11 +12,13 @@
 // is not stretched into a cube.
 //
 //   * Static. The group matrix is written once and frozen.
-//   * Past ~1 km a 12-triangle timber box stands in, so the 1.5 km boot
-//     shot does not draw the shell. Inside ~850 m the real mesh returns —
-//     the shell is what the learner sees at every distance they can
-//     actually orbit to (the old 260 m swap made the villa read as a bare
-//     box the moment they zoomed out).
+//   * The REAL shell is drawn at EVERY distance. It used to swap to a
+//     12-triangle timber box past 260 m — and then, even after the swap
+//     moved to 1 km, the owner zoomed out further and saw the box again.
+//     The orbit camera legitimately reaches ~1.3 km, so the swap is gone
+//     altogether: 14 k triangles for one house is a rounding error next
+//     to the ~300 k of the jungle field. The box survives only as the
+//     shadow hull's geometry.
 //   * The colour camera never draws the shadow hull. It lives on layer 1.
 //   * Metalness is forced to 0. A Tripo roughness map often carries a
 //     metal channel, and metal under this sun reads as a white box. The
@@ -31,26 +33,14 @@ import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_YAW, WAREHOUSE_Z } from "./war
 export interface Warehouse {
   group: THREE.Group;
   /**
-   * Squared-distance LOD. Allocation-free: a handful of compares and
-   * visibility flips, no vectors, no materials, no traversal.
+   * Frame hook, kept for the loop. The villa draws its real shell at
+   * every distance, so there is nothing to do per frame.
    */
   update(camPos: THREE.Vector3): void;
   dispose(): void;
 }
 
 const MODEL_URL = "/sanctuary/models/rusty_roof_house.glb";
-
-// The shell is the model all the way to a full kilometre. The orbit camera
-// legitimately reaches ~1.3 km out, and the owner's world is now worth
-// zooming out to see — at 260 m the villa used to swap to a 12-triangle
-// timber box, which is exactly the "zoom out and the villa is just a
-// square box, nothing else" report. 14 k triangles for one house is a
-// rounding error next to the ~300 k of the jungle field, so the impostor
-// survives only for the 1.5 km+ establishing boot shot.
-/** Impostor only, past this. */
-const FAR_OUT = 1000 * 1000;
-/** Shell returns inside this. */
-const FAR_IN = 850 * 850;
 
 /** How far the floor is buried so the wall meets the dirt, not a gap. */
 const BITE = 0.4;
@@ -258,31 +248,16 @@ export function createWarehouse(budget: QualityBudget, anisotropy: number): Prom
     group.matrixAutoUpdate = false;
     group.updateMatrixWorld(true);
 
-    // Boot on the impostor. The establishing shot is 1.5 km out; the first
-    // update() promotes the shell if the camera is already close.
-    far.visible = true;
-    for (let i = 0; i < shell.length; i += 1) shell[i].visible = false;
-
-    let lod = 2;
-    const apply = (next: number) => {
-      if (next === lod) return;
-      lod = next;
-      const showShell = next < 2;
-      for (let i = 0; i < shell.length; i += 1) shell[i].visible = showShell;
-      far.visible = next === 2;
-    };
+    // The shell is ALWAYS the villa — see the header. The timber box never
+    // draws on the colour camera; it only feeds the shadow hull's geometry.
+    far.visible = false;
+    for (let i = 0; i < shell.length; i += 1) shell[i].visible = true;
 
     return {
       group,
-      update(camPos) {
-        const dx = camPos.x - WAREHOUSE_X;
-        const dy = camPos.y - group.position.y;
-        const dz = camPos.z - WAREHOUSE_Z;
-        const d2 = dx * dx + dy * dy + dz * dz;
-        let next = lod;
-        if (next === 2 && d2 < FAR_IN) next = 0;
-        else if (next === 0 && d2 > FAR_OUT) next = 2;
-        apply(next);
+      update() {
+        // No LOD swap anymore: the textured shell draws at every distance.
+        // The method stays on the interface so the frame loop is unchanged.
       },
       dispose() {
         const mats = new Set<THREE.Material>();
