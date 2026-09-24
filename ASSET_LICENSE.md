@@ -9,6 +9,7 @@ extracted game files are used.
 | `public/sanctuary/models/grass_medium_02_*` | Poly Haven asset, CC0; retained in the project as glTF geometry and maps. |
 | `public/sanctuary/models/moss_01.*` | Poly Haven asset, CC0; used for the moss bank. |
 | `public/sanctuary/models/shrub_sorrel_01_1k.gltf` | Poly Haven asset, CC0; used for shrub scattering. |
+| `public/sanctuary/models/tropical/*.glb` | Owner-supplied "Lowpoly tropical plant set" (uploaded as `Lowpoly+plants+tropical+blend.rar`: Blender file + six RGBA cutout PNGs), converted to glTF in this repo. The six card textures are the set's own "Plant alpha 1–6" images. |
 | `public/sanctuary/models/rusty_roof_house.glb` | Existing project asset; credit is recorded in its adjacent `.CREDIT.txt` file. |
 | `public/sanctuary/ground_field.jpg` and water textures | Existing project assets; used as optional detail/fallback sources. |
 

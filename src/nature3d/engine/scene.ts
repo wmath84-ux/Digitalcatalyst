@@ -37,6 +37,7 @@ import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
 import { createMossBank, type MossBank } from "./moss";
+import { createTropicalField, type TropicalField } from "./tropicalFlora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createWeathering, type Weathering } from "./weathering";
 import { createWinter, winterDaylight, type WinterSystem } from "./winter";
@@ -159,6 +160,13 @@ export class Sanctuary {
   private grassTufts: GrassTuftField | null = null;
   /** The mossy edge lining both banks of the river — see `moss.ts`. */
   private mossBank: MossBank | null = null;
+  /**
+   * The tropical jungle — the owner's six-variant low-poly plant set
+   * (palms, banana, fern, three leaf species), 310–1130 instances of
+   * 7–20 m scattered over the WHOLE world (meadow, plains, trek, mountain
+   * ring) plus six hand-placed at the villa — see `tropicalFlora.ts`.
+   */
+  private tropical: TropicalField | null = null;
   /**
    * Air, weathering and the rock kit — the three systems that carry the
    * research pass (see `atmosphere.ts`, `weathering.ts`, `rocks.ts`). The
@@ -450,6 +458,31 @@ export class Sanctuary {
       // createMossBank already warns on a load failure; this catches
       // anything later in the wiring so a broken field is never silent.
       console.warn("[sanctuary] moss bank failed", err);
+    });
+
+    // THE TROPICAL JUNGLE — the owner's low-poly tropical set (six variants,
+    // all of them), passed 2: scattered over the WHOLE world — the study
+    // meadow, the plains, the trek district and the mountain ring — 310 to
+    // 1130 plants of 7–20 m per tier, plus a hand-placed cluster of six at
+    // the villa's foundation. The cards' transparent padding is measured
+    // and trimmed so every plant's base sits on the ground. Same async,
+    // fail-soft load as the other plant fields: a failed download degrades
+    // to the grass + sorrel meadow instead of breaking the scene.
+    createTropicalField(this.budget, aniso).then((field) => {
+      if (this.disposed) {
+        field.dispose();
+        return;
+      }
+      this.tropical = field;
+      this.scene.add(field.group);
+      field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
+      field.materials.forEach((m) => this.winter.register(m, "foliage"));
+      if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
+      // A shed that fired while the asset was still loading lands now.
+      field.setShed(this.shedLevel);
+      console.info(`[sanctuary] tropical jungle planted: ${field.count} plants (7–20 m)`);
+    }).catch((err) => {
+      console.warn("[sanctuary] tropical jungle failed", err);
     });
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
@@ -1793,6 +1826,7 @@ export class Sanctuary {
     this.sorrel?.setShed(this.shedLevel);
     this.grassTufts?.setShed(this.shedLevel);
     this.mossBank?.setShed(this.shedLevel);
+    this.tropical?.setShed(this.shedLevel);
   }
 
   private shedOneLevel() {
@@ -1930,6 +1964,7 @@ export class Sanctuary {
       this.sorrel?.update(time, this.wind);
       this.grassTufts?.update(time, this.wind);
       this.mossBank?.update(time, this.wind);
+      this.tropical?.update(time, this.wind);
       // The camera position lets the water cull its plunge-pool debris when
       // the learner is nowhere near it (interest management, see water.ts).
       this.water.update(adt, time, this.camera.position);
@@ -2047,6 +2082,7 @@ export class Sanctuary {
     this.sorrel?.dispose();
     this.grassTufts?.dispose();
     this.mossBank?.dispose();
+    this.tropical?.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();
