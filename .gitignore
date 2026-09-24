@@ -55,3 +55,4 @@ android/app/src/main/assets/capacitor.plugins.json
 
 # Scratch / temporary demo harnesses (never shipped)
 scratch/
+_shader_probe.mjs
