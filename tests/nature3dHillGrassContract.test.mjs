@@ -76,9 +76,19 @@ test("grass climbs every slope: clumps align to the surface normal", () => {
   assert.match(HILL, /OCEAN_LEVEL \+ 0\.45/);
 });
 
-test("stones wear grass too — every boulder gets a skirt", () => {
+test("stones wear grass too — every boulder gets a skirt AND a top crop", () => {
+  // Skirts: the world-wide sward rings every boulder's base.
   assert.match(HILL, /skirtPoints/);
   assert.match(SCENE, /createHillGrassField\(this\.budget, this\.rocks\.skirtPoints\)/);
+  // Tops: the rock kit probes each boulder's own geometry for up-facing
+  // facets and the real 3-D tuft field plants clumps on them ("stones pe
+  // bhi grass" done with real geometry where it is still worth triangles).
+  const ROCKS = read("src/nature3d/engine/rocks.ts");
+  const TUFTS = read("src/nature3d/engine/grassTufts.ts");
+  assert.match(ROCKS, /grassPoints: Float32Array/);
+  assert.match(TUFTS, /stonePoints\?: Float32Array/);
+  assert.match(TUFTS, /function plantOnStones\(/);
+  assert.match(SCENE, /createGrassTuftField\(this\.budget, aniso, this\.rocks\.grassPoints\)/);
 });
 
 test("the wind animation rides the vertex shader, like the meadow's", () => {

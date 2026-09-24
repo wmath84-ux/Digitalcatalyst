@@ -27,7 +27,7 @@ import {
   regionWeight, trekRelief,
 } from "./regions";
 import { noise } from "./simplex";
-import { groundColorAt, hillTurf, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
+import { groundColorAt, pathWeight, SUN_SIDE_X, SUN_SIDE_Z } from "./environment";
 import { levelWarehouseGround } from "./warehouseSite";
 import { GROUND_PALETTE, GROUND_TILE_METRES, clampAlbedo } from "./palette";
 import { injectWorldVaryings } from "./atmosphere";

@@ -32,6 +32,9 @@ the bay headlands:
   clumps above the old 18 m rock band.
 - **Every stone.** The rock kit's published boulder bases get a skirt of
   clumps, so stones grow into the hillside (principle 50, now world-wide).
+  On top of that the real 3-D tuft field plants clumps ON the boulders'
+  up-facing facets (`rocks.grassPoints` → `grassTufts.plantOnStones`), so a
+  stone wears a crop where it can hold soil, not just a ring at its base.
 - **Dense at distance.** Cards grow with radius (height ×5.2, width ×13 at
   the rim), the same LOD-by-size trick the meadow's far ring uses, so the
   hills stay solid green without millions of instances. Weak tiers grow
@@ -55,6 +58,9 @@ bare rock / snow to GRASS, per the directive:
 - the steep-slope rock blend in `groundColorAt` was pulled back from
   `steep * 0.92` to `steep * 0.38` — stone under the sward, never bare
   faces;
+- a `hillTurf` mask holds the dry-earth tint back on real hills (and keeps
+  it off sea cliffs), so the ground colour under the 3-D cover reads green
+  instead of bare earth;
 - the ground-photo macro fetch was also corrected to the contracted
   `vMapUv * 0.25` scale (existing test failure, fixed in passing).
 
