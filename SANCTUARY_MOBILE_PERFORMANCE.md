@@ -14,7 +14,7 @@ hai — ek hi jagah tuning ka contract:
 | `fpsCap` | low = 30 | Fixed cadence pacing (Swappy-style) |
 | `cheapPlants` | low | Plant fields: PBR → Lambert, sirf diffuse+alpha maps |
 | `plantTextureDetail` | low = 1k | glTF plant textures ka 1 K diet |
-| `maxAniso` | low = 1 | Anisotropy bandwidth cap |
+| `maxAniso` | low = 2 | Bounded anisotropy for sharper ground at grazing angles |
 
 Desktop tiers (medium/high/ultra) pehle jaisa hi render karte hain.
 
@@ -49,10 +49,10 @@ isliye iska **bandwidth goal** teen tareekon se achieve hua:
 1. **Low tier par normal/ARM/AO maps gayab** (sorrel/tufts/moss Lambert diet):
    3 texture units aur ~17 MB texture traffic per boot frame-set free.
 2. **Grass tuft diffuse 2 K → 1 K** (`grass_medium_02_diff_1k.jpg`, 457 KB →
-   59 KB): texels ¼, displayed resolution low tier ke 0.85× scale par
-   waise bhi unreachable thi.
-3. **Anisotropy cap 8 → 1** (low) / 4 (medium): aniso bilinear se zyada
-   samples = seedha bandwidth multiplier.
+   59 KB): texels ¼; mobile plant cards par 2 K source detail visible benefit
+   nahi deta, lekin bandwidth har frame leta hai.
+3. **Anisotropy cap 8 → 2** (low) / 4 (medium): 2× ground/path ko desk ke
+   grazing angle par crisp rakhta hai; cap ab bhi sampler cost ko bounded rakhta hai.
    Normal-map channel packing (XY + Z reconstruct) tabhi meaningful hai jab
    normal maps load ho rahi hon — low tier unhe skip hi kar deta hai (best-
    case packing: zero fetch).
@@ -134,8 +134,8 @@ per-object draw call add nahi kiya.
 (iPhone 15 Pro bhi!). Ab flagship silicon (Adreno 640+, Mali-G77+, Apple
 A14+, Tensor G3+, Dimensity 8/9xxx) medium pa sakta hai — sasti low tier ka
 matlab sirf genuinely low-end parts. Low tier ka content budget bhi neeche
-aaya hai (trees 130→105, grass 36k→26k, rocks 120→95), kyunki wahi tier har
-mid/low Android ko milta hai.
+bounded hai (trees 112, near/far grass 30.5k, rocks 105); clarity pass ne
+sirf instanced density ko modest lift diya, naya draw/material pass nahi.
 
 ---
 
@@ -207,7 +207,8 @@ fully implemented:
 - **Mipmap bias:** WebGL can't select a base mip from JS, so the honest
   equivalent runs at boot on the low tier — `halveTextureSet()` repaints
   every procedural canvas at half size (512²→256² etc.): **¼ the VRAM and
-  ¼ the live texture bandwidth**, detail the 0.85× render scale never shows.
+  ¼ the live texture bandwidth**. The important grazing-angle sharpness now
+  comes from bounded 2× anisotropy rather than oversized source canvases.
 - **Streaming/eviction:** single-scene app — textures live for the session
   and are disposed on unmount (`dispose()` walks every set + material). The
   "behind-view eviction" equivalent is the shed ladder + frustum culling:
@@ -231,6 +232,6 @@ pnpm build                       # ✅ built (NatureStudioPage chunk ~816 kB)
 | Plant texture boot traffic | ~18.5 MB (2 K×3 + 1 K×…) | ~0.6 MB (1 K diff + alpha) |
 | Plant fragment lighting | PBR + transmission | Lambert, transmission off |
 | Fragment ALU width | fp32 (highp) | fp16 (mediump) — ~2× rate |
-| Pixel budget | 1.0× DPR | 0.85× start, DRS ⇒ 0.5× floor |
+| Pixel budget | 1.0× DPR | 1.05× clarity start, wall-clock DRS ⇒ 0.65× floor |
 | Cadence | uncapped (jagged under load) | 30 Hz paced + wall-clock DRS + shed |
 | Shadow pass foliage | casters on | foliage casters off (all tiers) |

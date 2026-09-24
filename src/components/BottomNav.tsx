@@ -1,16 +1,34 @@
 import { Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
 import SiteFooterNav from "./SiteFooterNav";
-import { type GlassDockItem } from "./glass-dock/GlassDock";
+import { type GlassDockIcon, type GlassDockItem } from "./glass-dock/GlassDock";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library" | "sanctuary";
 
 type BottomNavProps = {
   active: TabKey | null;
   onChange: (tab: TabKey) => void;
   storeBadge?: number;
   purchasesBadge?: number;
+  /** Home-only mobile shortcut placed immediately after FlowPath. */
+  showSanctuary?: boolean;
 };
+
+/**
+ * The sanctuary artwork is deliberately a PNG-backed icon rather than a
+ * generic tree glyph: it preserves the friendly dinosaur supplied for this
+ * destination while still participating in GlassDock's sizing and spring.
+ */
+const SanctuaryDinosaurIcon: GlassDockIcon = ({ className, style, size = 22 }) => (
+  <img
+    aria-hidden="true"
+    alt=""
+    draggable={false}
+    src="/icons/sanctuary-dinosaur.png"
+    className={className}
+    style={{ ...style, width: size, height: size, objectFit: "contain" }}
+  />
+);
 
 const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: string }[] = [
   { key: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
@@ -44,8 +62,26 @@ const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: st
  * The previous white-pill markup is stored at
  * src/components/glass-dock/stored/BottomNav.original.txt.
  */
-export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
-  const items: GlassDockItem[] = TABS.map(({ key, label, icon, color }) => {
+export default function BottomNav({
+  active,
+  onChange,
+  storeBadge,
+  purchasesBadge,
+  showSanctuary = false,
+}: BottomNavProps) {
+  const tabs = showSanctuary
+    ? [
+        ...TABS,
+        {
+          key: "sanctuary" as const,
+          label: "3D Sanctuary",
+          icon: SanctuaryDinosaurIcon,
+          color: "#34D399",
+        },
+      ]
+    : TABS;
+
+  const items: GlassDockItem[] = tabs.map(({ key, label, icon, color }) => {
     // P3-15: BottomNav badge — purchases uses same emerald ring as profile, keep 99+ cap
     const badge = key === "store" ? storeBadge : key === "purchases" ? purchasesBadge : undefined;
     return {
@@ -67,6 +103,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
         if (key === "study-library") window.location.hash = "#/study-library";
         else if (key === "flowpath") window.location.hash = "#/flowpath";
         else if (key === "revision") window.location.hash = "#/revision";
+        else if (key === "sanctuary") window.location.hash = "#/nature-studio";
         else onChange(key);
       }}
     />

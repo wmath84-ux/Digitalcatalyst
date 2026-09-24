@@ -120,7 +120,10 @@ export default function NatureStudioPage() {
   // Which study board the camera is fitted to — null once the learner jumps
   // to a scenery view instead, so "no board enabled" is a real state (the eye
   // button only fit-zooms when a board IS in focus).
-  const [activeBoard, setActiveBoard] = useState<ViewPreset | null>("student");
+  // The engine opens on the whole-world establishing shot, so no study fit is
+  // selected until the learner actually chooses one (showing Desk as active
+  // here used to advertise a zoom the camera had never applied).
+  const [activeBoard, setActiveBoard] = useState<ViewPreset | null>(null);
   // The bottom tray (4 board buttons + the ⋮ menu) is ON by default; it hides
   // from inside the ⋮ menu and comes back with the bottom-right eye button.
   const [trayVisible, setTrayVisible] = useState(true);
@@ -266,16 +269,22 @@ export default function NatureStudioPage() {
       eng.setHudInsets({ top: 10, bottom: 10, left: 10, right: 10 });
       return;
     }
+    const hostRect = hostRef.current?.getBoundingClientRect() ?? {
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+      left: 0,
+    };
     const top = hudTopRef.current
-      ? hudTopRef.current.getBoundingClientRect().bottom + 14
+      ? hudTopRef.current.getBoundingClientRect().bottom - hostRect.top + 14
       : 76;
     let bottom = 24;
     const tray = hudTrayRef.current;
     if (trayVisible && tray) {
-      // The tray is centred at the bottom; its top edge is the floor a
-      // framed board must not slide under (viewport coords — the canvas is
-      // a fixed full-viewport surface).
-      bottom = Math.max(bottom, window.innerHeight - tray.getBoundingClientRect().top + 12);
+      // Measure in the CANVAS' coordinates, not window.innerHeight. On mobile
+      // the visual viewport moves as browser chrome collapses; mixing those
+      // coordinate spaces was the source of stale/identical fit zooms.
+      bottom = Math.max(bottom, hostRect.bottom - tray.getBoundingClientRect().top + 12);
     }
     eng.setHudInsets({ top, bottom, left: 16, right: 16 });
   }, [hudHidden, trayVisible]);
@@ -285,7 +294,16 @@ export default function NatureStudioPage() {
     refreshInsets();
     const onResize = () => refreshInsets();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // iOS/Android can resize or offset only the visual viewport while the
+    // layout viewport stays unchanged (URL bar, fullscreen, soft keyboard).
+    // Listen to both so the fit camera always sees the live free rectangle.
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
+    };
   }, [refreshInsets]);
 
   // Hiding the HUD frees the whole screen: if a board is framed, re-frame it
@@ -300,6 +318,15 @@ export default function NatureStudioPage() {
       engineRef.current?.focus(activeBoard);
     }
   }, [activeBoard]);
+
+  const focusStudyView = useCallback((preset: ViewPreset) => {
+    // Measure first: a phone may have just rotated or collapsed its browser
+    // chrome without a layout-viewport resize. The engine then computes this
+    // specific camera's fit from fresh insets and its content profile.
+    refreshInsets();
+    engineRef.current?.focus(preset);
+    setActiveBoard(preset);
+  }, [refreshInsets]);
 
   // The bottom-right eye: one tap hides EVERY button (tray + stats chip) —
   // only the eye remains. If a study board is in focus it re-frames
@@ -395,10 +422,7 @@ export default function NatureStudioPage() {
                 aria-pressed={activeBoard === key}
                 aria-label={label}
                 title={label}
-                onClick={() => {
-                  engineRef.current?.focus(key);
-                  setActiveBoard(key);
-                }}
+                onClick={() => focusStudyView(key)}
                 className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
                   activeBoard === key
                     ? "bg-emerald-400/25 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)]"
@@ -468,8 +492,7 @@ export default function NatureStudioPage() {
                             label={label}
                             active={activeBoard === key}
                             onClick={() => {
-                              engineRef.current?.focus(key);
-                              setActiveBoard(key);
+                              focusStudyView(key);
                               setMenuOpen(false);
                             }}
                           />

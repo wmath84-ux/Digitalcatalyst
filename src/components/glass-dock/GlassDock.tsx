@@ -29,8 +29,10 @@ import GlassMaterial, {
 } from './GlassMaterial'
 
 export const ICON_SIZE = 44
-/** Compact plate (course player dock): seven tabs still fit a 360px phone. */
+/** Compact plate: seven/eight tabs still fit an ordinary phone. */
 export const COMPACT_ICON_SIZE = 38
+/** Eight home destinations on a 320 px phone, without horizontal clipping. */
+export const DENSE_ICON_SIZE = 34
 export const MAG_RANGE = 120
 export const MAG_SCALE = 1.55
 
@@ -241,6 +243,7 @@ export default function GlassDock({
   siteFooter = false,
   leading,
   compact = false,
+  dense = false,
   pointerX,
 }: {
   items: GlassDockItem[]
@@ -254,6 +257,8 @@ export default function GlassDock({
    * tooltips are otherwise identical.
    */
   compact?: boolean
+  /** 34px plates used only for the eight-tab Home dock on very narrow phones. */
+  dense?: boolean
   /**
    * Optional EXTERNAL pointer X the magnification wave follows. The dock
    * normally tracks the pointer itself; when a parent drives the same
@@ -292,7 +297,9 @@ export default function GlassDock({
         onSelect(id)
       }}
       onPointerCancel={resetPointer}
-      className={`relative isolate mx-auto flex w-max max-w-full shrink-0 items-end rounded-3xl ${compact ? 'gap-1.5 px-3 pb-2.5 pt-2.5' : 'gap-2 px-4 pb-3 pt-3'}`}
+      className={`relative isolate mx-auto flex w-max max-w-full shrink-0 items-end rounded-3xl ${
+        dense ? 'gap-0.5 px-1 pb-2 pt-2' : compact ? 'gap-1.5 px-3 pb-2.5 pt-2.5' : 'gap-2 px-4 pb-3 pt-3'
+      }`}
       style={{
         touchAction: 'none',
         background: DOCK_PANEL_BG,
@@ -315,7 +322,7 @@ export default function GlassDock({
           mouseX={mouseX}
           index={i}
           skipClickRef={skipClickRef}
-          plateSize={compact ? COMPACT_ICON_SIZE : ICON_SIZE}
+          plateSize={dense ? DENSE_ICON_SIZE : compact ? COMPACT_ICON_SIZE : ICON_SIZE}
           onSelect={() => onSelect(item.id)}
         />
       ))}
