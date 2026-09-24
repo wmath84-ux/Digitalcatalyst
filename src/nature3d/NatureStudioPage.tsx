@@ -21,11 +21,13 @@ import {
   Maximize2, Minimize2, PawPrint, RotateCw, Trees,
   LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
   BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
-  MoreVertical,
+  MoreVertical, Footprints, Zap, ChevronsUp, ArrowDownToLine, PersonStanding,
 } from "lucide-react";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
+import { formatDebugLine } from "./engine/character";
+import Joystick from "./components/Joystick";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
@@ -89,6 +91,7 @@ export default function NatureStudioPage() {
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Sanctuary | null>(null);
   const statsRef = useRef<HTMLSpanElement>(null);
+  const exploreDebugRef = useRef<HTMLSpanElement>(null);
   // Measured chrome so the engine can frame boards clear of it: the slim top
   // row (stats chip only — the menu moved into the tray) and the bottom tray.
   const hudTopRef = useRef<HTMLElement | null>(null);
@@ -130,6 +133,16 @@ export default function NatureStudioPage() {
   // True when the learner has hidden every HUD button (bottom-right toggle).
   // Only the toggle itself stays on screen.
   const [hudHidden, setHudHidden] = useState(false);
+  // Explore mode: the third-person character + follow camera own the lens.
+  const [exploreMode, setExploreMode] = useState(false);
+  const [exploreSprint, setExploreSprint] = useState(false);
+  // Dev-only locomotion telemetry (?explore-debug=1). Never in production.
+  const [showExploreDebug] = useState(
+    () =>
+      import.meta.env.DEV &&
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("explore-debug"),
+  );
 
   const { user } = useAuth();
   // Ownership is resolved from ALL five sources the app recognises —
@@ -171,6 +184,11 @@ export default function NatureStudioPage() {
           // Direct DOM write — no setState, so the loop never triggers React.
           const el = statsRef.current;
           if (el) el.textContent = `${Math.round(s.fps)} fps · ${s.tier} · ${s.draws} draws`;
+        },
+        onExploreDebug: (d) => {
+          // Same rule: the locomotion telemetry paints straight into the DOM.
+          const el = exploreDebugRef.current;
+          if (el) el.textContent = formatDebugLine(d);
         },
       });
       // The tier is fixed for the session, so this fires once (not per frame).
@@ -326,7 +344,33 @@ export default function NatureStudioPage() {
     refreshInsets();
     engineRef.current?.focus(preset);
     setActiveBoard(preset);
+    // A framed board parks the explorer (the engine exits too — belt and braces).
+    setExploreMode(false);
+    setExploreSprint(false);
   }, [refreshInsets]);
+
+  const toggleExplore = useCallback(() => {
+    const next = !exploreMode;
+    engineRef.current?.setExploreMode(next);
+    setExploreMode(next);
+    setExploreSprint(false);
+    setMenuOpen(false);
+    if (next) {
+      setActiveBoard(null);
+      if (showExploreDebug) engineRef.current?.setExploreDebug(true);
+    }
+  }, [exploreMode, showExploreDebug]);
+
+  const onExploreStick = useCallback((v: { x: number; y: number; active: boolean }) => {
+    engineRef.current?.setExploreMove(v.x, v.y, v.active);
+  }, []);
+
+  const toggleExploreSprint = useCallback(() => {
+    setExploreSprint((was) => {
+      engineRef.current?.setExploreSprint(!was);
+      return !was;
+    });
+  }, []);
 
   // The bottom-right eye: one tap hides EVERY button (tray + stats chip) —
   // only the eye remains. If a study board is in focus it re-frames
@@ -405,7 +449,7 @@ export default function NatureStudioPage() {
             on the bottom-right eye brings every button back. ── */}
         {!hudHidden && trayVisible ? (
         <p className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md">
-          Two fingers fly · double-tap to go
+          {exploreMode ? "Stick moves · drag to look · WASD + Space on desktop" : "Two fingers fly · double-tap to go"}
         </p>
         ) : null}
         {!hudHidden && trayVisible ? (
@@ -509,6 +553,8 @@ export default function NatureStudioPage() {
                             onClick={() => {
                               engineRef.current?.focus(key);
                               setActiveBoard(null);
+                              setExploreMode(false);
+                              setExploreSprint(false);
                               setMenuOpen(false);
                             }}
                           />
@@ -552,6 +598,13 @@ export default function NatureStudioPage() {
 
                       {/* ── Scene toggles (the old top-bar cluster) ── */}
                       <MenuSection label="Scene">
+                        <MenuItem
+                          Icon={Footprints}
+                          label={exploreMode ? "Exit explore mode" : "Explore on foot"}
+                          active={exploreMode}
+                          right={exploreMode ? "On" : "Off"}
+                          onClick={toggleExplore}
+                        />
                         <MenuItem
                           Icon={Snowflake}
                           label="Ice Age"
@@ -635,6 +688,80 @@ export default function NatureStudioPage() {
           loading={coursesLoading}
           uid={user?.id ?? null}
         />
+
+        {/* ── Explore-mode HUD: left stick, right buttons, exit chip ──────
+            Mounted only while exploring. The stick reports through a ref
+            callback (no 60 Hz re-renders); the buttons are momentary except
+            sprint, which latches. ── */}
+        {exploreMode && !hudHidden ? (
+          <>
+            <div className="pointer-events-auto absolute bottom-24 left-3 z-30">
+              <Joystick onMove={onExploreStick} label="Move the explorer" />
+            </div>
+            <div className="pointer-events-auto absolute bottom-24 right-3 z-30 flex flex-col items-end gap-2">
+              <button
+                type="button"
+                aria-pressed={exploreSprint}
+                onClick={toggleExploreSprint}
+                title="Sprint (Shift on desktop)"
+                className={`grid h-14 w-14 place-items-center rounded-full border backdrop-blur-xl transition ${
+                  exploreSprint
+                    ? "border-amber-300/60 bg-amber-500/30 text-white shadow-[0_0_24px_rgba(251,191,36,0.45)]"
+                    : "border-white/20 bg-slate-950/55 text-white/85 hover:bg-white/15"
+                }`}
+              >
+                <Zap className="h-5 w-5" />
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => engineRef.current?.toggleExploreProne()}
+                  title="Prone (Z on desktop)"
+                  className="grid h-12 w-12 place-items-center rounded-full border border-white/20 bg-slate-950/55 text-white/85 backdrop-blur-xl transition hover:bg-white/15"
+                >
+                  <PersonStanding className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => engineRef.current?.toggleExploreCrouch()}
+                  title="Crouch (C on desktop)"
+                  className="grid h-12 w-12 place-items-center rounded-full border border-white/20 bg-slate-950/55 text-white/85 backdrop-blur-xl transition hover:bg-white/15"
+                >
+                  <ArrowDownToLine className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => engineRef.current?.queueExploreJump()}
+                  title="Jump (Space on desktop)"
+                  className="grid h-14 w-14 place-items-center rounded-full border border-emerald-300/40 bg-emerald-500/25 text-white backdrop-blur-xl transition hover:bg-emerald-500/40"
+                >
+                  <ChevronsUp className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="pointer-events-auto absolute left-3 top-3 z-30">
+              <button
+                type="button"
+                onClick={toggleExplore}
+                title="Back to the flying camera"
+                className="flex items-center gap-2 rounded-xl border border-white/20 bg-slate-950/55 px-3 py-2 text-[11px] font-bold text-white/85 backdrop-blur-xl transition hover:bg-white/15"
+              >
+                <Footprints className="h-4 w-4" />
+                Exploring · tap to exit
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {/* ── Dev-only locomotion telemetry (see showExploreDebug) ── */}
+        {exploreMode && showExploreDebug ? (
+          <span
+            ref={exploreDebugRef}
+            className="pointer-events-none absolute left-3 top-14 z-30 rounded-lg border border-cyan-300/30 bg-slate-950/60 px-2 py-1 font-mono text-[10px] font-bold text-cyan-200 backdrop-blur-md"
+          >
+            — locomotion
+          </span>
+        ) : null}
 
         {/* ── HUD hide toggle — bottom-right corner. One tap hides EVERY
             button (bottom tray + stats chip) so only this button and the
@@ -748,6 +875,7 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] font-bold transition ${
         danger
           ? "text-rose-200 hover:bg-rose-500/20"

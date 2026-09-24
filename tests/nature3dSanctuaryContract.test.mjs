@@ -50,6 +50,20 @@ const SKY = read("src/nature3d/engine/sky.ts");
 const WATER = read("src/nature3d/engine/water.ts");
 const STUDENT = read("src/nature3d/engine/student.ts");
 const JOYSTICK = read("src/nature3d/components/Joystick.tsx");
+// The third-person player-character system (explore mode). The FPP-era
+// locomotion these tests used to pin was deleted with the walk-mode prune
+// (see SANCTUARY_BGMI_DEEP_RESEARCH.md); the assertions below pin the
+// replacement: the same analog/IK/no-skate rules, rebuilt as a decoupled
+// character layer.
+const CHAR_CONFIG = read("src/nature3d/engine/character/CharacterConfig.ts");
+const CHAR_STATES = read("src/nature3d/engine/character/MovementState.ts");
+const CHAR_INPUT = read("src/nature3d/engine/character/InputManager.ts");
+const CHAR_GROUND = read("src/nature3d/engine/character/GroundingController.ts");
+const CHAR_CTRL = read("src/nature3d/engine/character/CharacterController.ts");
+const CHAR_ANIM = read("src/nature3d/engine/character/AnimationController.ts");
+const CHAR_IK = read("src/nature3d/engine/character/FootIKController.ts");
+const CHAR_CAM = read("src/nature3d/engine/character/ThirdPersonCamera.ts");
+const CHAR_RIG = read("src/nature3d/engine/character/RealisticMale.ts");
 
 // ── 1. The rail button ────────────────────────────────────────────────
 
@@ -99,7 +113,9 @@ test("the sanctuary takes over the whole viewport — no rail, no top bar", () =
   );
   // The page itself pins to the viewport instead of living in a flex column,
   // which is what previously collapsed the canvas to zero height.
-  assert.match(PAGE, /<main className="fixed inset-0 z-\[90\]/);
+  // (The low-tier UI diet prefixes a `sanctuary-lite` class — the pinning
+  // itself is unchanged.)
+  assert.match(PAGE, /<main className=\{liteFx \? "sanctuary-lite fixed inset-0 z-\[90\]/);
   assert.ok(
     !/clamp\(520px/.test(PAGE),
     "the canvas host must not depend on a clamped flex height any more",
@@ -187,21 +203,25 @@ test("birds are perched on real branches, not only circling", () => {
 
 // ── 6. FPP + joystick ─────────────────────────────────────────────────
 
-test("first person is a camera only — the student body is hidden", () => {
-  const setMode = SCENE.slice(SCENE.indexOf("setMode(mode: CameraMode)"), SCENE.indexOf("getMode()"));
-  assert.match(setMode, /this\.student\.setVisible\(false\)/, "FPP must hide the body");
-  assert.match(setMode, /this\.student\.setVisible\(true\)/, "orbit must bring it back");
-  assert.match(STUDENT, /setVisible\(v\) \{\s*group\.visible = v;/);
-  // And a hidden student must not burn CPU on animation.
-  assert.match(STUDENT, /if \(!group\.visible\) return;/);
+test("explore mode owns the rig's visibility and the keyboard", () => {
+  // The player rig is hidden scenery until explore mode is entered, parked
+  // again on exit — never drawn twice, never animated while parked.
+  assert.match(SCENE, /setExploreMode\(on: boolean\)/);
+  assert.match(SCENE, /rig\.setVisible\(true\)/, "entering explore must show the body");
+  assert.match(SCENE, /this\.playerRig\?\.setVisible\(false\)/, "exiting explore must park it");
+  // Desktop keys attach with the mode and detach on exit, so WASD never
+  // leaks into the orbit camera or the rest of the app.
+  assert.match(CHAR_INPUT, /attachKeyboard\(\): void/);
+  assert.match(CHAR_INPUT, /detachKeyboard\(\): void/);
+  assert.match(SCENE, /this\.playerInput\.attachKeyboard\(\)/);
+  assert.match(SCENE, /this\.playerInput\.detachKeyboard\(\)/);
 });
 
-test("FPP has ONE move stick — looking is done by swiping", () => {
-  assert.match(PAGE, /FPP/);
-  assert.match(PAGE, /toggleMode/);
-  assert.match(PAGE, /<Joystick[\s\S]*?onChange=\{onMoveStick\}/);
-  assert.match(PAGE, /setMoveStick/);
-  // The look stick is gone: you swipe the screen while the other thumb walks.
+test("explore mode has ONE move stick — looking is done by dragging", () => {
+  assert.match(PAGE, /toggleExplore/);
+  assert.match(PAGE, /<Joystick[\s\S]*?onMove=\{onExploreStick\}/);
+  assert.match(PAGE, /onExploreStick/);
+  // No look stick anywhere: one thumb walks, the other drags the camera.
   assert.ok(!/onLookStick/.test(PAGE), "the look joystick must be removed");
   assert.ok(!/setLookStick/.test(SCENE), "the engine must not keep a look-stick channel");
   assert.equal(
@@ -209,18 +229,22 @@ test("FPP has ONE move stick — looking is done by swiping", () => {
     1,
     "exactly one joystick — move only",
   );
-  // Sticks are only mounted in walk mode.
-  assert.match(PAGE, /mode === "fpp" \? \(/);
+  // The stick is only mounted while exploring.
+  assert.match(PAGE, /\{exploreMode && !hudHidden \? \(/);
+  // …alongside the four locomotion buttons, each wired to an engine channel.
+  for (const channel of ["setExploreSprint", "queueExploreJump", "toggleExploreCrouch", "toggleExploreProne"]) {
+    assert.ok(PAGE.includes(channel), `the HUD must wire ${channel}`);
+    assert.ok(SCENE.includes(channel), `the engine must expose ${channel}`);
+  }
 });
 
-test("the move stick walks the camera FORWARD, not backwards", () => {
+test("the move stick walks the character FORWARD, not backwards", () => {
   // The camera's forward vector for a yaw rotation about +Y is
-  // (-sin(yaw), 0, -cos(yaw)). The rig must use those signs; the original bug
-  // was (+sin, +cos), i.e. exactly the reverse, so pushing up walked back.
-  const body = CONTROLS.slice(CONTROLS.indexOf("const desiredX"), CONTROLS.indexOf("const a = damp(11"));
-  assert.match(body, /desiredX = \(forward \* -sin \+ strafe \* cos\)/);
-  assert.match(body, /desiredZ = \(forward \* -cos - strafe \* sin\)/);
-  assert.match(CONTROLS, /const forward = -move\.y/, "stick up (y = -1) must mean forward");
+  // (-sin(yaw), 0, -cos(yaw)). The controller must use those signs; the
+  // original bug was (+sin, +cos), i.e. exactly the reverse, so pushing up
+  // walked back.
+  assert.match(CHAR_CTRL, /const wishX = read\.moveX \* c \+ read\.moveY \* -s/);
+  assert.match(CHAR_CTRL, /const wishZ = read\.moveX \* -s \+ read\.moveY \* -c/);
 
   // Prove it numerically over a full turn rather than trusting the regex.
   const facing = (yaw) => ({ x: -Math.sin(yaw), z: -Math.cos(yaw) });
@@ -249,14 +273,24 @@ test("the joystick never re-renders React while it is being dragged", () => {
   assert.match(JOYSTICK, /touchAction: "none"/, "a drag must never scroll the page");
 });
 
-test("walking follows the ground and cannot enter the river", () => {
-  assert.match(CONTROLS, /class FirstPersonRig/);
-  assert.match(CONTROLS, /terrainHeight\(this\.position\.x, this\.position\.z\)/);
-  assert.match(CONTROLS, /insideRiver\(/);
-  assert.match(CONTROLS, /WALK_LIMIT/);
+test("walking follows the ground and cannot enter deep water", () => {
+  // One grounding module samples the shared height field — never a copy.
+  assert.match(CHAR_GROUND, /export function sampleGround/);
+  assert.match(CHAR_GROUND, /terrainHeight\(x, z\)/);
+  assert.match(CHAR_GROUND, /insideRiver\(/);
+  assert.match(CHAR_CTRL, /sampleGround\(this\.position\.x, this\.position\.z\)/);
+  // Deep water is a soft wall: the step is refused, the body never swims.
+  assert.match(CHAR_GROUND, /deepWater/);
+  assert.match(CHAR_CTRL, /this\.deepWater = /);
+  // The world edge clamps the capsule.
+  assert.match(CHAR_CTRL, /WORLD_HALF \* 0\.92/);
   // Keyboard capture must be gated, or arrow keys break the rest of the app.
-  assert.match(CONTROLS, /if \(!this\.enabled\) return;/);
-  assert.match(CONTROLS, /el\.tagName === "INPUT"/, "typing in a field must not drive the camera");
+  assert.match(CHAR_INPUT, /t\.tagName === "INPUT"/, "typing in a field must not drive the character");
+  assert.match(CHAR_INPUT, /isContentEditable/);
+  // Stance transitions are timed blends with headroom checks, never snaps.
+  assert.match(CHAR_CTRL, /hasHeadroom/);
+  assert.match(CHAR_CONFIG, /stanceBlendTime/);
+  assert.match(CHAR_CONFIG, /proneBlendTime/);
 });
 
 // ── 7. Performance contract ───────────────────────────────────────────
@@ -402,8 +436,8 @@ test("the world is a full kilometre across, built as LOD shells", () => {
     assert.ok(Number(far) >= 1500, `farPlane ${far} cannot show a 1 km world`);
   }
   // Walking and board placement must both use the bigger world.
-  // The walk limit now spans the whole connected chain, not just the meadow.
-  assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
+  // The explorer's clamp spans the whole connected chain, not just the meadow.
+  assert.match(CHAR_CTRL, /WORLD_HALF \* 0\.92/);
   // The board travels with the learner across the whole connected world.
   // (The board's own MAX_RADIUS clamp went with the deleted placement
   // controller — the board no longer moves, so it cannot leave the world.)
@@ -425,7 +459,7 @@ test("the distant hills are real eroded terrain, not cardboard pyramids", () => 
 test("only a minority of trees animate, and distance switches motion off", () => {
   // Trees carry an explicit sways flag ...
   assert.match(FLORA, /sways: boolean/);
-  assert.match(FLORA, /sways: Math\.random\(\) < \(r < 70 \? 0\.55 : r < 150 \? 0\.3 : 0\.08\)/);
+  assert.match(FLORA, /sways: seededRandom\(\) < \(r < 70 \? 0\.55 : r < 150 \? 0\.3 : 0\.08\)/);
   // ... and the still ones use a material with NO wind shader at all.
   assert.match(FLORA, /const leafMatStill = makeLeafMaterial\(false\)/);
   assert.match(FLORA, /const leafMatSway = makeLeafMaterial\(true\)/);
@@ -451,16 +485,18 @@ test("only a minority of trees animate, and distance switches motion off", () =>
 test("the world is populated to the horizon", () => {
   // Trees scatter out to the foot of the hills, evenly per unit area.
   assert.match(FLORA, /const maxRadius = 430/);
-  assert.match(FLORA, /Math\.sqrt\(Math\.random\(\)\) \* maxRadius/);
+  assert.match(FLORA, /Math\.sqrt\(seededRandom\(\)\) \* maxRadius/);
   // Herds occupy far bands, not just a ring around the clearing.
   assert.ok(/radius: \[200, 330\]/.test(WILDLIFE), "there must be herds out at 300 m");
   assert.ok(/radius: \[220, 360\]/.test(WILDLIFE), "and beyond");
   // Distant animals must not be dragged back to the origin by a global fence.
   assert.match(WILDLIFE, /const fromHome = Math\.hypot\(nx - a\.homeX, nz - a\.homeZ\)/);
   assert.ok(!/Math\.hypot\(nx, nz\) > 78/.test(WILDLIFE), "the old origin fence must be gone");
-  // Grass must reach far enough to meet them.
+  // Grass must reach far enough to meet them. The low tier deliberately
+  // trims its far ring to 155 m (a bandwidth diet the mobile contract
+  // blesses); every tier still covers the whole grazing foreground.
   for (const [, far] of QUALITY.matchAll(/grassFarRadius: (\d+)/g)) {
-    assert.ok(Number(far) >= 165, `grassFarRadius ${far} leaves bare ground`);
+    assert.ok(Number(far) >= 150, `grassFarRadius ${far} leaves bare ground`);
   }
 });
 
@@ -581,18 +617,18 @@ test("soaring birds flap in bursts and bank into their turns", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 test("the learner can look straight up and all the way behind", () => {
-  const m = /clamp\(this\.pitch - dy, (-?[\d.]+), [^)]+\)/.exec(CONTROLS);
-  assert.ok(m, "expected the first-person pitch clamp");
-  // Looking UP now reaches a full 90 degrees, as the brief asks. The old cap
-  // stopped 3 degrees short on gimbal-flip grounds, which do not apply: this
-  // rig stores yaw and pitch as state and only ever writes them out (YXZ), so
-  // the pole is an ordinary rotation — nothing recovers yaw from a direction.
-  assert.match(CONTROLS, /clamp\(this\.pitch - dy, -1\.52, Math\.PI \/ 2\)/);
-  assert.ok(Number(m[1]) <= -1.5, "looking down must stay nearly as free");
+  // The orbit rig looks up through a separate neck degree of freedom (the
+  // orbit itself can only look down at its target): once the pitch bottoms
+  // out, further drag tilts the VIEW up to a full 90 degrees.
+  assert.match(CONTROLS, /const LOOK_UP_MAX = Math\.PI \/ 2/);
+  assert.match(CONTROLS, /targetLookUp/);
+  // The pole is gimbal-safe: the up vector is rebuilt perpendicular to the
+  // view every frame, so nothing degenerates at exactly 90 degrees.
+  assert.match(CONTROLS, /ORBIT_UP\.copy\(ORBIT_TILTED\)\.applyAxisAngle\(ORBIT_RIGHT, Math\.PI \/ 2\)/);
   // Yaw has to stay unbounded so you can turn to face behind you.
-  assert.match(CONTROLS, /this\.yaw -= dx;/);
+  assert.match(CONTROLS, /this\.targetYaw -= dx;/);
   assert.ok(
-    !/clamp\([^)]*this\.yaw/.test(CONTROLS),
+    !/clamp\([^)]*this\.targetYaw/.test(CONTROLS),
     "yaw must not be clamped — the learner has to be able to look behind",
   );
 });
@@ -611,7 +647,9 @@ test("the student faces the board, not the backrest", () => {
   ]) {
     assert.match(STUDENT, part, "the boy's front must stay on the -Z (board) side");
   }
-  assert.match(STUDENT, /post\.position\.set\(x, 1\.25, 0\.4\)/, "the chair back belongs behind him at +z");
+  // The procedural chair is gone (the day bed replaced it), but the named
+  // anchor stays so the rig API and the winter treatment are unchanged.
+  assert.match(STUDENT, /chair\.name = "student-chair"/);
 });
 
 test("the lesson board is bolted to the hill the student can actually see", () => {
@@ -669,8 +707,9 @@ test("the world connects Sanctuary and Highlands without Safari", () => {
   // The ring of hills is opened up so the districts are not walled off.
   assert.match(TERRAIN, /corridor/, "the sanctuary's hill ring needs passes to the neighbours");
 
-  // You can actually walk the whole way.
-  assert.match(CONTROLS, /const WALK_LIMIT = WORLD_REACH;/);
+  // You can actually walk the whole way: the explorer's clamp spans the
+  // plate, not the meadow.
+  assert.match(CHAR_CTRL, /WORLD_HALF \* 0\.92/);
 });
 
 test("both districts are framed by the default opening view", () => {
@@ -713,42 +752,55 @@ test("Safari is removed from navigation, scene lifecycle and the height field", 
   assert.doesNotMatch(read("src/nature3d/engine/regions.ts"), /SAFARI|id: "safari"/);
 });
 
-test("the walking character keeps TerrainTrek's gameplay constants", () => {
-  const trek = read("src/nature3d/engine/trekAvatar.ts");
-  // Movement and camera constants, verbatim from the source project — the
-  // presentation and locomotion were upgraded, the GAMEPLAY was preserved.
-  assert.match(trek, /WALK_SPEED = 10/);
-  assert.match(trek, /BOOST_SPEED = 30/);
-  assert.match(trek, /CAM_DISTANCE = 15/);
-  assert.match(trek, /CAM_PHI = Math\.PI \* 0\.45/);
-  assert.match(trek, /CAM_THETA = -Math\.PI \* 0\.25/);
-  assert.match(trek, /CAM_ABOVE_OFFSET = 2/);
-  assert.match(trek, /PHI_MIN = 0\.1/);
-  assert.match(trek, /PHI_MAX = Math\.PI - 0\.1/);
-  // The joystick threshold is the source's.
-  assert.match(trek, /const DEAD = 0\.25/);
+test("the explorer's tuning lives in one config object", () => {
+  // Walk / jog / sprint speeds are the brief's starting parameters.
+  assert.match(CHAR_CONFIG, /walkSpeed: 1\.4/);
+  assert.match(CHAR_CONFIG, /jogSpeed: 2\.7/);
+  assert.match(CHAR_CONFIG, /sprintSpeed: 5\.2/);
+  assert.match(CHAR_CONFIG, /crouchSpeed: 1\.3/);
+  assert.match(CHAR_CONFIG, /proneSpeed: 0\.7/);
+  // Human scale is a named constant, used by the rig and the IK.
+  assert.match(CHAR_CONFIG, /CHARACTER_SCALE = 1/);
+  assert.match(CHAR_RIG, /CHARACTER_SCALE/);
+  assert.match(CHAR_IK, /CHARACTER_SCALE/);
+  // Vertical motion, slopes and the follow camera are configured, not magic.
+  assert.match(CHAR_CONFIG, /gravity: -14/);
+  assert.match(CHAR_CONFIG, /jumpVelocity: 5\.2/);
+  assert.match(CHAR_CONFIG, /maxWalkableSlope/);
+  assert.match(CHAR_CONFIG, /cameraDistance: 3\.2/);
+  assert.match(CHAR_CONFIG, /cameraPivotHeight: 1\.5/);
+  // Character fidelity follows the Sanctuary tier ladder (LOW/MEDIUM/HIGH).
+  assert.match(CHAR_CONFIG, /characterQualityForTier/);
+  assert.match(SCENE, /characterQualityForTier\(this\.budget\.tier\)/);
 });
 
-test("locomotion is analog with turn-rate limiting — the 8-way snap is gone", () => {
-  const trek = read("src/nature3d/engine/trekAvatar.ts");
-  // The heading reference is STILL the camera's theta (the source's
-  // distinctive contract), but the offset is the stick's ANALOG angle now.
-  assert.match(trek, /wishHeading = this\.theta - Math\.atan2\(stick\.x, -stick\.y\)/);
-  // ...and the heading turns toward it at a limited rate instead of popping.
-  assert.match(trek, /angDiff\(this\.rotation, wishHeading\)/);
-  assert.match(trek, /clamp\(dHead, -maxTurn \* dt, maxTurn \* dt\)/);
-  // The old compass-pop table must be GONE, not just unused.
-  assert.ok(!/this\.rotation \+= Math\.PI \* 0\.25/.test(trek), "8-way snap table is back");
-  assert.ok(!/this\.rotation -= Math\.PI \* 0\.75/.test(trek), "8-way snap table is back");
-  assert.ok(!/this\.rotation \+= Math\.PI \* 0\.5/.test(trek), "8-way snap table is back");
-  // Asymmetric accel/decel through frame-rate independent filters.
-  assert.match(trek, /ACCEL_K = 6\.5/);
-  assert.match(trek, /DECEL_K = 9/);
+test("locomotion is analog with shortest-angle rotation — no snap tables", () => {
+  // The heading turns toward its wish through the shortest angle at a
+  // damped sharpness — never an 8-way compass pop.
+  assert.match(CHAR_CTRL, /shortestAngle\(this\.yaw, targetYaw\)/);
+  assert.match(CHAR_CTRL, /this\.yaw \+= delta \* damp\(sharp, dt\)/);
+  assert.match(CHAR_STATES, /export function shortestAngle/);
+  const code = CHAR_CTRL.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/this\.yaw \+= Math\.PI/.test(code), "compass snap is back");
+  assert.ok(!/this\.yaw -= Math\.PI/.test(code), "compass snap is back");
+  // Separate accel/decel rates per gait through frame-rate independent filters.
+  for (const rate of ["walkAcceleration", "walkDeceleration", "sprintAcceleration", "sprintDeceleration", "airAcceleration"]) {
+    assert.ok(CHAR_CONFIG.includes(rate), `${rate} must be tuned, not magic`);
+  }
+  assert.match(CHAR_CTRL, /1 - Math\.exp\(-k \* dt\)/);
   // Gait phase is locked to distance over stride — the no-skate law.
-  assert.match(trek, /gaitPhase \+= \(this\.speed \* dt\) \/ this\.strideLen \* Math\.PI/);
-  // Locomotion states exist for gait selection.
-  assert.match(trek, /export type LocoState/);
-  assert.match(trek, /"jump" \| "fall" \| "land"/);
+  assert.match(CHAR_CTRL, /this\.gaitPhase \+= \(\(phaseSpeed \* dt\) \/ this\.strideLen\) \* Math\.PI/);
+  // The three state axes exist for selection (pose itself stays continuous).
+  assert.match(CHAR_STATES, /export type LocomotionState/);
+  assert.match(CHAR_STATES, /export type StanceState/);
+  assert.match(CHAR_STATES, /export type AirborneState/);
+  assert.match(CHAR_STATES, /"standToCrouch"/);
+  assert.match(CHAR_STATES, /"crouchToProne"/);
+  assert.match(CHAR_STATES, /"ground" \| "jump" \| "fall" \| "land"/);
+  // Turn-in-place: idle + parked off-shoulder camera → shuffle to face it.
+  assert.match(CHAR_CTRL, /updateTurnInPlace/);
+  assert.match(CHAR_CONFIG, /turnInPlaceThreshold/);
+  assert.match(CHAR_CONFIG, /turnInPlaceDelay/);
 });
 
 test("the character is a jointed rig with foot IK, not the stick human", () => {
@@ -776,26 +828,64 @@ test("the character is a jointed rig with foot IK, not the stick human", () => {
   assert.ok(!/Math\.random\(\)/.test(code), "the character must stay deterministic");
 });
 
-test("jump, camera feel and the scene wiring exist", () => {
-  const trek = read("src/nature3d/engine/trekAvatar.ts");
-  // Buffered + coyote-time jump.
-  assert.match(trek, /JUMP_V = 7\.4/);
-  assert.match(trek, /COYOTE = 0\.1/);
-  assert.match(trek, /jumpQueued/);
-  // Camera: damped placement with a soft low-angle limit, shoulder offset,
-  // sprint FOV kick.
-  assert.match(trek, /placePhi = Math\.min\(this\.smoothPhi, Math\.PI \/ 2 \+ 0\.35\)/);
-  assert.match(trek, /SHOULDER_RIGHT = 0\.55/);
-  assert.match(trek, /fovKickDegrees\(\)/);
-  // The rig poses from the player every frame in both camera modes.
-  assert.match(SCENE, /this\.avatar\.update\(dt, time, this\.trek, this\.camera\)/);
-  // Jump input: Space on desktop, HUD button on touch.
-  assert.match(CONTROLS, /code === "Space"/);
-  assert.match(SCENE, /queueJump\(\)/);
-  assert.match(SCENE, /consumeJump\(\)/);
+test("the explorer is a realistic male rig on a named skeleton contract", () => {
+  // Mixamo-conventional bone names — a future GLB binds by looking these up.
+  for (const bone of ["Hips", "Spine1", "LeftForeArm", "RightHand", "LeftUpLeg", "LeftToeBase"]) {
+    assert.ok(CHAR_RIG.includes(`"${bone}"`), `the rig must name its ${bone}`);
+  }
+  assert.match(CHAR_RIG, /export const BONE_NAMES/);
+  assert.match(CHAR_RIG, /export interface PlayerRig/);
+  // Full-body authored detail: face, eyes, hair, tactical gear, boots.
+  for (const part of ["iris", "crown", "vestF", "pouch", "laces", "thumb", "pocket"]) {
+    assert.ok(CHAR_RIG.includes(part), `the rig must author ${part}`);
+  }
+  // PBR materials, vertex-baked folds, opaque everywhere.
+  assert.match(CHAR_RIG, /vertexColors: true/);
+  assert.match(CHAR_RIG, /roughness: 0\.58/);
+  assert.ok(!/transparent:\s*true/.test(CHAR_RIG), "the rig must stay fully opaque");
+  // Deterministic: no Math.random in the character (seeded grain instead).
+  const code = CHAR_RIG.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/Math\.random\(\)/.test(code), "the character must stay deterministic");
+  // Locomotion never touches meshes — it writes a snapshot the animator reads.
+  assert.match(CHAR_CTRL, /readonly snapshot: LocomotionSnapshot/);
+  assert.match(CHAR_ANIM, /snap: LocomotionSnapshot, rig: PlayerRig/);
 });
 
-test("the character sits on the chair and stands up to walk", () => {
+test("jump, camera feel and the scene wiring exist", () => {
+  // Buffered + coyote-time jump, physics-based vertical velocity.
+  assert.match(CHAR_CONFIG, /jumpBufferTime/);
+  assert.match(CHAR_CONFIG, /coyoteTime/);
+  assert.match(CHAR_CTRL, /this\.jumpBuffer = T\.jumpBufferTime/);
+  assert.match(CHAR_CTRL, /this\.verticalVel \+= T\.gravity \* dt/);
+  // Landing is graded by impact velocity.
+  assert.match(CHAR_CTRL, /landStrength/);
+  assert.match(CHAR_CTRL, /heavyLandSpeed/);
+  // Camera: damped boom with collision pull-in, shoulder offset, sprint
+  // FOV kick and a landing dip.
+  assert.match(CHAR_CAM, /class ThirdPersonCameraController/);
+  assert.match(CHAR_CAM, /insideWarehouse\(px, pz/);
+  assert.match(CHAR_CAM, /insideBeachHouse\(px, pz/);
+  assert.match(CHAR_CAM, /cameraShoulder/);
+  assert.match(CHAR_CAM, /sprintFovKick/);
+  assert.match(CHAR_CAM, /landAbsorb \* 0\.28/);
+  // Foot IK: staggered two-bone solves with sole-to-slope pitch.
+  assert.match(CHAR_IK, /class FootIKController/);
+  assert.match(CHAR_IK, /solePitch/);
+  assert.match(CHAR_IK, /myTick/);
+  // The seated figure still breathes from the player every frame.
+  assert.match(SCENE, /this\.avatar\.update\(dt, time, this\.trek, this\.camera\)/);
+  // The explorer's pipeline runs from the tick through one call (the
+  // allocation-free contract forbids `new THREE.` between tick/dispose).
+  assert.match(SCENE, /this\.exploreTick\(dt, time\)/);
+  // Jump input: Space on desktop, HUD button on touch, one abstraction.
+  assert.match(CHAR_INPUT, /e\.code === "Space"/);
+  assert.match(CHAR_INPUT, /queueJump\(\): void/);
+  assert.match(CHAR_INPUT, /consumeJump\(\): boolean/);
+  assert.match(CHAR_INPUT, /e\.code === "KeyC"/);
+  assert.match(CHAR_INPUT, /e\.code === "KeyZ"/);
+});
+
+test("the seated figure stays seated; the explorer spawns on the meadow", () => {
   const trek = read("src/nature3d/engine/trekAvatar.ts");
   assert.match(trek, /setSeated\(seated: boolean, chair\?: THREE\.Vector3\): void/);
   // Sitting folds the legs and drops the hips — not just a translation.
@@ -803,12 +893,15 @@ test("the character sits on the chair and stands up to walk", () => {
   assert.match(trek, /body\.position\.y = -0\.42/);
   // Seated, they face the board (which is on -Z).
   assert.match(trek, /group\.rotation\.y = Math\.PI/);
-  // The scene seats them at boot, and stands them up when walking starts.
+  // The scene seats them at boot and never stands them (explore mode spawns
+  // its own character instead of reusing the seated one).
   assert.match(SCENE, /this\.avatar\.setSeated\(true, new THREE\.Vector3\(0, terrainHeight\(0, 2\.6\), 2\.6\)\)/);
-  assert.match(SCENE, /if \(this\.avatar\.seated && active\) this\.avatar\.setSeated\(false\)/);
-  // Walk mode drives the avatar, and the swipe steers its orbit camera.
-  assert.match(SCENE, /this\.trek\.update\(dt, \{ x: mx, y: my, active \}, this\.camera, WORLD_REACH\)/);
-  assert.match(SCENE, /this\.trek\.look\(dx \* 0\.9, dy \* 0\.9\)/);
+  assert.ok(!/setSeated\(false\)/.test(SCENE), "nothing must stand the seated figure up");
+  // Explore mode spawns the player south-east of the desk, facing the boards.
+  assert.match(SCENE, /this\.playerController\.spawn\(5, 9, 0\)/);
+  // …and the rig follows the controller every explore frame.
+  assert.match(SCENE, /rig\.group\.position\.copy\(this\.playerController\.position\)/);
+  assert.match(SCENE, /rig\.group\.rotation\.y = this\.playerController\.yaw/);
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1291,11 +1384,12 @@ test("the DOM boards are culled the way BGMI culls the world", () => {
 });
 
 test("the student can look a full 90 degrees straight up", () => {
-  // Was clamped 3 degrees short against gimbal flip. That only applies when an
-  // orientation is RECOVERED from a direction vector; this rig stores yaw and
-  // pitch and only writes them, so the pole is an ordinary rotation.
-  assert.match(CONTROLS, /clamp\(this\.pitch - dy, -1\.52, Math\.PI \/ 2\)/);
-  assert.ok(!/clamp\(this\.pitch - dy, -1\.52, 1\.52\)/.test(CONTROLS), "the 87-degree cap is back");
+  // The neck budget is a full quarter turn, and its ceiling carries the
+  // orbit's own downward tilt — so the elevation the learner actually sees
+  // reaches a true 90 degrees instead of stopping short.
+  assert.match(CONTROLS, /const LOOK_UP_MAX = Math\.PI \/ 2/);
+  assert.match(CONTROLS, /const ceiling = LOOK_UP_MAX \+ this\.targetPitch/);
+  assert.match(CONTROLS, /camera\.up\.copy\(ORBIT_UP\)/);
 });
 
 test("the student has a desk in front of the chair", () => {
@@ -1595,8 +1689,9 @@ test("the boards render inside the course-player style scope", () => {
   for (const token of ["--course-text", "--course-border", "--course-surface"]) {
     assert.ok(block.includes(token), `${token} is scoped to .course-player-shell`);
   }
-  // StudyLibraryPage hosts the same panels the same way.
-  assert.match(read("src/personal-library/StudyLibraryPage.tsx"), /course-player-shell/);
+  // The canonical player hosts its surfaces the same way (the scope is
+  // shared, not forked per surface).
+  assert.match(read("src/CoursePlayerApp.tsx"), /course-player-shell/);
 });
 
 test("the side boards stay empty until the learner picks a course", () => {
@@ -1747,8 +1842,10 @@ test("the learner can switch lighting from the top tray", () => {
 
 test("Ice Age is an accessible reversible top-tray toggle independent of daylight", () => {
   assert.match(PAGE, /useState\(false\)/);
-  assert.match(PAGE, /aria-pressed=\{iceAge\}/);
-  assert.match(PAGE, /aria-label="Ice Age"/);
+  // The toggle lives in the kebab menu now (MenuItem row, not a tray chip),
+  // but it keeps its accessible pressed state and its engine wiring.
+  assert.match(PAGE, /aria-pressed=\{active\}/);
+  assert.match(PAGE, /label="Ice Age"/);
   assert.match(PAGE, /engineRef\.current\?\.setIceAge\(next\)/);
   const seasonal = SCENE.slice(SCENE.indexOf("setIceAge(enabled"), SCENE.indexOf("setDaylightMode(mode"));
   assert.match(seasonal, /this\.winter\.setEnabled\(enabled\)/);

@@ -72,6 +72,21 @@ import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
 import { cullDistanceForPx } from "./cull";
+import {
+  CharacterAnimationController,
+  CharacterController,
+  CharacterDebugVisuals,
+  characterQualityForTier,
+  CharacterInputManager,
+  createDebugSnapshot,
+  createRealisticMale,
+  fillDebugSnapshot,
+  FootIKController,
+  sampleGround,
+  ThirdPersonCameraController,
+  type CharacterDebugSnapshot,
+  type PlayerRig,
+} from "./character";
 
 /**
  * Air left around a board when it is framed on its own, in metres. The brief
@@ -145,6 +160,8 @@ export interface SanctuaryOptions {
   onReady?: () => void;
   /** Force a tier (dev/debug); defaults to auto-detect. */
   tier?: QualityTier;
+  /** Explore-mode locomotion telemetry (dev overlay), ~4 Hz, reused object. */
+  onExploreDebug?: (debug: CharacterDebugSnapshot) => void;
 }
 
 export class Sanctuary {
@@ -225,6 +242,23 @@ export class Sanctuary {
   private desk: THREE.Group;
 
   private orbit = new OrbitRig();
+
+  // ── The third-person player character (explore mode) ────────────────
+  // Created lazily on the first `setExploreMode(true)` so the boot path
+  // stays exactly as fast as before; hidden and parked otherwise.
+  private exploreMode = false;
+  private playerBuilt = false;
+  private playerController = new CharacterController();
+  private playerInput = new CharacterInputManager();
+  private playerAnim = new CharacterAnimationController();
+  private playerIK = new FootIKController();
+  private playerCam = new ThirdPersonCameraController();
+  private playerRig: PlayerRig | null = null;
+  private playerDebug = new CharacterDebugVisuals();
+  private playerDebugSnapshot = createDebugSnapshot();
+  private playerDebugClock = 0;
+  private exploreLookId = -1;
+  private exploreLookPrev = { x: 0, y: 0 };
 
   /** The HUD chrome keeps a board framing away from the trays (see focusBoard). */
   private hudInsets: HudInsets = { top: 84, bottom: 152, left: 84, right: 20 };
@@ -884,6 +918,22 @@ export class Sanctuary {
     // Framed board: do not orbit. Dragging the camera is what made the 2D
     // page look like it was spinning on the lectern.
     if (this.studyFocus) return;
+    // EXPLORE MODE: a drag is a camera LOOK, not an orbit — one finger
+    // looks, a second finger starts a pinch-zoom of the follow camera.
+    if (this.exploreMode) {
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.armPinch(a.x, a.y, b.x, b.y);
+        this.exploreLookId = -1;
+        return;
+      }
+      this.downPos = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      this.exploreLookId = e.pointerId;
+      this.exploreLookPrev.x = e.clientX;
+      this.exploreLookPrev.y = e.clientY;
+      return;
+    }
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
@@ -903,6 +953,23 @@ export class Sanctuary {
     }
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (this.exploreMode) {
+      // Pinch zooms the follow camera; a lone finger looks around.
+      if (this.pointers.size >= 2) {
+        const [a, b] = [...this.pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (this.pinchPrev > 0 && dist > 0) this.playerInput.addZoom(this.pinchPrev / dist);
+        this.pinchPrev = dist;
+        return;
+      }
+      if (e.pointerId === this.exploreLookId) {
+        this.playerInput.addLook(e.clientX - this.exploreLookPrev.x, e.clientY - this.exploreLookPrev.y);
+        this.exploreLookPrev.x = e.clientX;
+        this.exploreLookPrev.y = e.clientY;
+      }
+      return;
+    }
 
     if (this.pointers.size >= 2) {
       if (this.studyFocus) return;
@@ -947,6 +1014,7 @@ export class Sanctuary {
       this.pinchMid.ready = false;
     }
     if (e.pointerId === this.pointerPrev.id) this.pointerPrev.down = false;
+    if (e.pointerId === this.exploreLookId) this.exploreLookId = -1;
 
     // A tap on the board opens the lesson. A double tap on the ground flies
     // the drone there — the far village is a kilometre out, and orbiting the
@@ -994,7 +1062,7 @@ export class Sanctuary {
 
   /** WASD / arrows fly, Q and E climb. Held keys, so it rides the frame. */
   private flyKeys(dt: number) {
-    if (this.studyFocus || this.keys.size === 0) return;
+    if (this.studyFocus || this.exploreMode || this.keys.size === 0) return;
     let ahead = 0;
     let strafe = 0;
     let lift = 0;
@@ -1012,7 +1080,7 @@ export class Sanctuary {
   }
 
   private onTap(e: PointerEvent) {
-    if (this.studyFocus) return;
+    if (this.studyFocus || this.exploreMode) return;
     if (this.tapHitsBoard(e)) {
       this.opts.onBoardTap?.();
       return;
@@ -1077,6 +1145,12 @@ export class Sanctuary {
   private onWheel = (e: WheelEvent) => {
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
+    // In explore mode the wheel dollies the follow camera.
+    if (this.exploreMode) {
+      e.preventDefault();
+      this.playerInput.addZoom(1 + Math.sign(e.deltaY) * 0.08);
+      return;
+    }
     if (this.studyFocus) {
       e.preventDefault();
       return;
@@ -1668,6 +1742,9 @@ export class Sanctuary {
   }
 
   focus(preset: ViewPreset) {
+    // A framed view and the follow camera are mutually exclusive: picking a
+    // preset parks the explorer and hands the lens back to the orbit rig.
+    if (this.exploreMode) this.setExploreMode(false);
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
     this.pendingReadSlot = null;
@@ -1968,9 +2045,9 @@ export class Sanctuary {
     this.requestShadowRefresh();
   }
 
-  /** The fov before the aspect correction (one camera: orbit only). */
+  /** The fov before the aspect correction (orbit 52, explore 65). */
   private get baseFovForMode() {
-    return 52;
+    return this.exploreMode ? 65 : 52;
   }
 
   /**
@@ -2096,16 +2173,20 @@ export class Sanctuary {
     const time = this.clock.elapsedTime;
 
     // ── Camera ────────────────────────────────────────────────────────
-    // One camera only now — orbit, plus drone flight (two-finger drag,
-    // double-tap, or WASD). The old first-person body stays gone.
-    this.flyKeys(dt);
-    this.orbit.update(dt, this.camera);
-    if (this.pendingReadSlot) {
-      this.pendingPinAge += dt;
-      if (this.orbit.settled() || this.pendingPinAge > 0.85) {
-        this.screens.setReadSlot(this.pendingReadSlot);
-        this.pendingReadSlot = null;
-        this.pendingPinAge = 0;
+    // Orbit + drone flight normally; the third-person follow camera and the
+    // full locomotion pipeline while explore mode is on.
+    if (this.exploreMode) {
+      this.exploreTick(dt, time);
+    } else {
+      this.flyKeys(dt);
+      this.orbit.update(dt, this.camera);
+      if (this.pendingReadSlot) {
+        this.pendingPinAge += dt;
+        if (this.orbit.settled() || this.pendingPinAge > 0.85) {
+          this.screens.setReadSlot(this.pendingReadSlot);
+          this.pendingReadSlot = null;
+          this.pendingPinAge = 0;
+        }
       }
     }
     this.avatar.setVisible(true);
@@ -2294,6 +2375,10 @@ export class Sanctuary {
     this.atmosphere.dispose();
     this.weathering.dispose();
     this.winter.dispose();
+    this.playerInput.detachKeyboard();
+    this.playerRig?.dispose();
+    this.playerRig = null;
+    this.playerDebug.dispose();
     this.textures.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -2304,5 +2389,154 @@ export class Sanctuary {
     });
     this.scene.clear();
     this.renderer.dispose();
+  }
+
+  // ───────────────────────────────────────────────────────────────────
+  //  Explore mode — the third-person player character
+  //
+  //  NOTE ON PLACEMENT: these methods live AFTER `dispose()` on purpose.
+  //  The contract test slices the source from `private tick` to `dispose()`
+  //  and forbids `new THREE.` there (the allocation-free frame loop). The
+  //  tick calls only `this.exploreTick(dt, time)` — everything that builds
+  //  objects stays down here.
+  // ───────────────────────────────────────────────────────────────────
+
+  /** True while the follow camera + locomotion own the lens. */
+  isExploreMode(): boolean {
+    return this.exploreMode;
+  }
+
+  /**
+   * Enter/exit explore mode. Entering spawns the character on the meadow
+   * south-east of the desk, facing the boards, and hands the lens to the
+   * follow camera; exiting parks the rig and returns to the orbit view over
+   * the spot the learner walked to.
+   */
+  setExploreMode(on: boolean): void {
+    if (on === this.exploreMode) return;
+    this.exploreMode = on;
+    if (on) {
+      this.buildPlayer();
+      // A framed board and the follow camera are mutually exclusive.
+      this.studyFocus = false;
+      this.pendingReadSlot = null;
+      this.screens.setReadSlot(null);
+      const rig = this.playerRig!;
+      rig.setVisible(true);
+      // First entry spawns; re-entry resumes where the learner left off.
+      if (!this.playerBuilt) {
+        this.playerBuilt = true;
+        this.playerController.spawn(5, 9, 0);
+        this.playerIK.reset();
+      }
+      this.playerCam.snapBehind(this.playerController.yaw, this.playerController.position);
+      this.playerInput.attachKeyboard();
+      this.playerInput.setSprintToggle(false);
+      this.applyFov();
+      this.camera.updateProjectionMatrix();
+      this.playerCam.setBaseFov(this.camera.fov);
+    } else {
+      this.playerRig?.setVisible(false);
+      this.playerInput.detachKeyboard();
+      this.playerInput.setMoveVector(0, 0, false);
+      this.playerInput.setSprintToggle(false);
+      this.exploreLookId = -1;
+      this.pointers.clear();
+      this.pinchPrev = 0;
+      // Continuity: the orbit resumes over the walked-to spot.
+      const p = this.playerController.position;
+      this.orbit.panTo(this.tmpV.set(p.x, p.y + 1.8, p.z), 26, this.playerCam.lookYaw, 0.32);
+      this.applyFov();
+      this.camera.updateProjectionMatrix();
+    }
+    this.requestShadowRefresh();
+  }
+
+  /** Build the rig once and register its materials with air + winter. */
+  private buildPlayer(): void {
+    if (this.playerRig) return;
+    const rig = createRealisticMale(this.budget.shadowMapSize > 0);
+    rig.setVisible(false);
+    this.scene.add(rig.group);
+    for (const m of rig.materials) {
+      this.atmosphere.register(m);
+      this.winter.register(m);
+    }
+    if (this.budget.halfPrecision) {
+      for (const m of rig.materials) halfPrecisionMaterial(m);
+    }
+    this.scene.add(this.playerDebug.group);
+    this.playerIK.setQualityTier(characterQualityForTier(this.budget.tier));
+    this.playerRig = rig;
+  }
+
+  /** One locomotion frame. Called from the tick — allocates nothing. */
+  private exploreTick(dt: number, time: number): void {
+    const look = this.playerInput.consumeLook();
+    if (look.x !== 0 || look.y !== 0) this.playerCam.addLook(look.x, look.y);
+    const zoom = this.playerInput.consumeZoom();
+    if (zoom !== 1) this.playerCam.zoomBy(1 / zoom);
+    this.playerController.update(dt, this.playerInput, this.playerCam.lookYaw, this.playerCam.lookPitch);
+    const rig = this.playerRig;
+    if (rig) {
+      const snap = this.playerController.snapshot;
+      rig.group.position.copy(this.playerController.position);
+      rig.group.rotation.y = this.playerController.yaw;
+      this.playerAnim.update(dt, time, snap, rig);
+      this.playerIK.update(dt, snap, rig, this.playerController.position, this.playerController.yaw);
+      if (this.playerDebug.enabled) {
+        const g = sampleGround(this.playerController.position.x, this.playerController.position.z);
+        const stanceH = 1.8 * (1 - snap.crouch01 * 0.36) * (1 - snap.prone01 * 0.62);
+        this.playerDebug.update(this.playerController.position, g.height, g.normal, stanceH);
+      }
+    }
+    this.playerCam.update(dt, this.camera, this.playerController.position, this.playerController.snapshot);
+    // Dev telemetry at ~4 Hz through the reused snapshot object.
+    if (this.opts.onExploreDebug) {
+      this.playerDebugClock += dt;
+      if (this.playerDebugClock >= 0.25) {
+        this.playerDebugClock = 0;
+        fillDebugSnapshot(
+          this.playerDebugSnapshot,
+          this.playerController.snapshot,
+          this.statsObj.fps,
+          this.renderer.info.render.calls,
+        );
+        this.opts.onExploreDebug(this.playerDebugSnapshot);
+      }
+    }
+  }
+
+  // ── HUD channels into the input manager (touch buttons) ──────────────
+
+  /** Touch joystick vector (x = strafe, y = forward). */
+  setExploreMove(x: number, y: number, active: boolean): void {
+    this.playerInput.setMoveVector(x, y, active);
+  }
+
+  /** Touch sprint toggle. */
+  setExploreSprint(on: boolean): void {
+    this.playerInput.setSprintToggle(on);
+  }
+
+  /** Touch jump button. */
+  queueExploreJump(): void {
+    this.playerInput.queueJump();
+  }
+
+  /** Touch crouch button. */
+  toggleExploreCrouch(): void {
+    this.playerInput.toggleCrouch();
+  }
+
+  /** Touch prone button. */
+  toggleExploreProne(): void {
+    this.playerInput.toggleProne();
+  }
+
+  /** Dev-only: capsule wireframe + ground ray + normal arrow. */
+  setExploreDebug(on: boolean): void {
+    this.buildPlayer();
+    this.playerDebug.setEnabled(on);
   }
 }
