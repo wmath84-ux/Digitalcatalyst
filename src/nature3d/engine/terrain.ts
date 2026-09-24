@@ -456,13 +456,19 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   // rock kit refuses to place above the bleached crest line, the grass uses
   // the same heights), so they belong to the terrain. The base blend itself
   // comes from the environmental field, so the mesh, the grass and the trees
-  // all describe the same ground (research §8, §12). TROPICAL KEY: the rock
-  // band is warm coral limestone, the old "snow" line is the sun-bleached
-  // crest (pale, warm — weathered rock, not snow), and the deep floor under
-  // the ocean is teal-shifted so the transparent water reads blue-green over
-  // it instead of grey.
-  const rock = new THREE.Color(0x8d8770);
-  const snow = new THREE.Color(0xf4efe0);
+  // all describe the same ground (research §8, §12).
+  //
+  // OWNER DIRECTIVE — GRASS ON EVERY HILL ("pahadon ke upar gras replace
+  // hill", reference blend in the repo root): the mountains of this
+  // sanctuary wear GRASS from base to crest, exactly like the uploaded
+  // design — no bare rock band, no snow cap, every side of every hill the
+  // same dense sward as the meadow. The two altitude bands below still
+  // exist (the mesh, the props and the contract tests read them), but they
+  // now grade the sward itself: `rock` is the dry, sun-cured upland pasture
+  // the grass turns into on the high slopes, and `snow` is the pale
+  // bleached-grass crest — GRASS colours, never bare stone or snow.
+  const rock = new THREE.Color(0x8a9a4b);
+  const snow = new THREE.Color(0xc9d68a);
   // The island edge floor under the sea: deep blue bed so the dropped-off
   // corners read as water in the haze, never as a bright square patch.
   const deep = new THREE.Color(0x163a58);
@@ -557,7 +563,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         // soil, wet mud and exposed rock while the scan contributes grit and
         // macro breakup only.
         vec3 dcTexel = diffuseColor.rgb;
-        vec3 dcMacro = texture2D( map, vMapUv * 0.18 ).rgb;
+        vec3 dcMacro = texture2D( map, vMapUv * 0.25 ).rgb;
         float dcMacroL = dot( dcMacro, vec3( 0.3333 ) );
         float dcMicro = 0.92 + dcMacroL * 0.16;
         vec3 dcGround = vColor * dcMicro;
@@ -657,21 +663,21 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       const normalY = n[i * 3 + 1];
       groundColorAt(x, z, h, tmp, GROUND_PALETTE, normalY, worn);
 
-      // Altitude banding: grass gives way to bare rock, then snow on the
-      // highest crests. This is what makes the distant ranges read as real
-      // mountains instead of green cones.
+      // Altitude banding — GRASS MOUNTAINS (owner directive: "jitne bhi
+      // hills aur stones aur pahadiya hai sabhi per ghas"). The two bands
+      // still grade the surface, but towards the upland pasture and the
+      // pale bleached-grass crest — the blends are CAPPED so the green sward
+      // always stays the majority colour, at every altitude, on every slope.
       // (The two thresholds are spelled out as literals on purpose: the
       // sanctuary's contract test pins them, because props across the whole
-      // engine read the same 18 m rock band and 52 m snowline.)
-      if (h > 18) tmp.lerp(rock, Math.min(1, (h - 18) / 30));
-      // SNOW NEEDS A SHELF TO SIT ON. The height mask says where snow is
-      // possible; the slope mask says whether it STAYS — above ~52° a face
-      // sheds it all winter and stays bare rock. Without this multiply every
-      // peak came out evenly frosted, which is the single clearest "this was
-      // height-banded, not observed" tell in a stylised mountain range
-      // (research §8, §11; principle 20).
+      // engine read the same 18 m upland band and 52 m crest line.)
+      if (h > 18) tmp.lerp(rock, Math.min(0.52, (h - 18) / 30));
+      // THE CREST SHELF. The height mask says where the pale crest grass is
+      // possible; the slope mask says where it STAYS — above ~52° a face
+      // keeps the hardier, darker sward. The same shelf rule the snowline
+      // used, now serving grass (research §8, §11; principle 20).
       const shelf = h > 52 ? THREE.MathUtils.smoothstep(normalY, 0.62, 0.94) : 1;
-      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf);
+      if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf * 0.5);
       // Below the waterline-ish floor (the island edge) the ground goes dark.
       if (h < -6) tmp.lerp(deep, Math.min(1, (-6 - h) / 14));
 

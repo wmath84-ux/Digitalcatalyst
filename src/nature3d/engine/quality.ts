@@ -32,6 +32,13 @@ export interface QualityBudget {
   grassNearRadius: number;
   /** Radius of the far grass field. */
   grassFarRadius: number;
+  /**
+   * Clumps in the WORLD-WIDE hill sward — the dense grass that covers every
+   * hill, stone and mountain across the full 360° circle (`hillGrass.ts`).
+   * Every tier keeps the sward complete; weak devices grow bigger far cards
+   * instead of more instances.
+   */
+  hillGrass: number;
   /** Trees around the clearing. */
   treeCount: number;
   /** Leaf cards per tree canopy. */
@@ -124,6 +131,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     tier: "low",
     grassNear: 11000,
     grassFar: 15000,
+    hillGrass: 30000,
     grassNearRadius: 28,
     grassFarRadius: 145,
     treeCount: 105,
@@ -154,6 +162,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     tier: "medium",
     grassNear: 36000,
     grassFar: 46000,
+    hillGrass: 95000,
     grassNearRadius: 38,
     grassFarRadius: 240,
     treeCount: 240,
@@ -184,6 +193,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     tier: "high",
     grassNear: 72000,
     grassFar: 88000,
+    hillGrass: 150000,
     grassNearRadius: 46,
     grassFarRadius: 330,
     treeCount: 380,
@@ -214,6 +224,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     tier: "ultra",
     grassNear: 115000,
     grassFar: 130000,
+    hillGrass: 210000,
     grassNearRadius: 54,
     grassFarRadius: 420,
     treeCount: 520,
