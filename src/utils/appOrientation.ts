@@ -1,8 +1,12 @@
 // src/utils/appOrientation.ts
 //
 // HARD RULE - Mobile Portrait Lock:
-// - Mobile phones are LOCKED to portrait EVERYWHERE except Course Player.
-// - Course Player is the ONLY screen where rotation is allowed.
+// - Mobile phones are LOCKED to portrait EVERYWHERE except the Course
+//   Player and the Nature Studio 3D world.
+// - Those two screens are the ONLY places where rotation is allowed: the
+//   course player is a video/lesson reader, and the 3D world is a whole
+//   island to look around — both are properly wider in landscape, and the
+//   learner must be able to rotate freely while on them.
 // - This is a HARD rule that applies whether the user has system auto-rotate
 //   ON or OFF, and whether the phone is currently held in landscape or portrait:
 //   outside the course player the app NEVER rotates (Screen Orientation API +
@@ -29,8 +33,16 @@ type OrientationLockable = ScreenOrientation & {
 
 const rotationListeners = new Set<RotationListener>();
 
-/** True while the Course Player is mounted — the only rotation-unlocked state. */
+/** True while the Course Player is mounted — rotation unlocked. */
 let coursePlayerActive = false;
+/**
+ * True while the Nature Studio 3D world is mounted — rotation unlocked
+ * (second rotation-free screen, same rule as the course player).
+ */
+let natureStudioActive = false;
+
+/** Rotation is free while EITHER rotation-free screen is open. */
+const rotationUnlocked = (): boolean => coursePlayerActive || natureStudioActive;
 
 /**
  * Is this a phone-sized device, independent of the current orientation?
@@ -96,9 +108,15 @@ const setHtmlOrientationAttributes = (): void => {
     }
     if (coursePlayerActive) {
       html.setAttribute("data-course-player-active", "true");
+      html.removeAttribute("data-nature-studio-active");
+      html.removeAttribute("data-orientation-locked");
+    } else if (natureStudioActive) {
+      html.removeAttribute("data-course-player-active");
+      html.setAttribute("data-nature-studio-active", "true");
       html.removeAttribute("data-orientation-locked");
     } else {
       html.removeAttribute("data-course-player-active");
+      html.removeAttribute("data-nature-studio-active");
       if (shouldLockForCurrentViewport()) {
         html.setAttribute("data-orientation-locked", "portrait");
       } else {
@@ -184,8 +202,9 @@ export const lockAppToPortrait = (): void => {
     setHtmlOrientationAttributes();
     return;
   }
-  // Don't lock if course player is active - it needs rotation
-  if (coursePlayerActive) {
+  // Don't lock while a rotation-free screen (course player / nature
+  // studio) is open - it needs rotation
+  if (rotationUnlocked()) {
     setHtmlOrientationAttributes();
     return;
   }
@@ -227,6 +246,46 @@ export const unlockAppRotation = (): void => {
 };
 
 export const isCoursePlayerRotationActive = (): boolean => coursePlayerActive;
+
+/** True while the Nature Studio 3D world is mounted — rotation unlocked. */
+export const isNatureStudioRotationActive = (): boolean => natureStudioActive;
+
+/** True while EITHER rotation-free screen is open (course player, nature studio). */
+export const isRotationUnlockedActive = (): boolean => rotationUnlocked();
+
+/**
+ * Called by the Nature Studio on mount: unlock rotation (same contract as
+ * the course player) and let the global portrait guard keep its overlay
+ * away.
+ */
+export const enterNatureStudioRotation = (): void => {
+  natureStudioActive = true;
+  unlockAppRotation();
+  notifyRotationChange();
+  // Extra safety: retry unlock after delays for native platforms (the
+  // Capacitor plugin may need time to bind after the switch to fullSensor).
+  setTimeout(() => {
+    if (natureStudioActive) unlockAppRotation();
+  }, 300);
+  setTimeout(() => {
+    if (natureStudioActive) unlockAppRotation();
+  }, 800);
+};
+
+/**
+ * Called by the Nature Studio on unmount: lock straight back to portrait
+ * (unless the course player is open) so no other screen can appear in
+ * landscape.
+ */
+export const exitNatureStudioRotation = (): void => {
+  natureStudioActive = false;
+  if (!coursePlayerActive) lockAppToPortrait();
+  notifyRotationChange();
+  // Extra safety: ensure the portrait lock sticks.
+  setTimeout(() => {
+    if (!natureStudioActive && !coursePlayerActive) lockAppToPortrait();
+  }, 300);
+};
 
 /**
  * Called by the Course Player on mount: unlock rotation and let the global
@@ -281,16 +340,18 @@ export const initOrientationLock = (): void => {
 
   // Re-lock on visibility change (app coming from background)
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && !coursePlayerActive) {
+    if (document.visibilityState === "visible" && !rotationUnlocked()) {
       lockAppToPortrait();
     }
   });
 
-  // Re-lock on hash change (navigation) if not entering course player
+  // Re-lock on hash change (navigation) if not entering a rotation-free
+  // screen (course player or the nature studio world)
   window.addEventListener("hashchange", () => {
     const hash = window.location.hash || "";
     const isCourse = hash.startsWith("#/course/");
-    if (!isCourse && !coursePlayerActive) {
+    const isNature = hash.startsWith("#/nature-studio");
+    if ((!isCourse && !isNature) && !rotationUnlocked()) {
       // Small delay to let route render
       setTimeout(() => lockAppToPortrait(), 100);
     } else {
@@ -301,9 +362,10 @@ export const initOrientationLock = (): void => {
   // Re-evaluate on resize (orientation change)
   window.addEventListener("resize", () => {
     setHtmlOrientationAttributes();
-    if (!coursePlayerActive && shouldLockForCurrentViewport() && window.innerWidth > window.innerHeight) {
-      // User rotated to landscape outside course player with auto-rotate ON
-      // Lock will fail in browser tabs, but overlay will show
+    if (!rotationUnlocked() && shouldLockForCurrentViewport() && window.innerWidth > window.innerHeight) {
+      // User rotated to landscape outside a rotation-free screen with
+      // auto-rotate ON. Lock will fail in browser tabs, but overlay will
+      // show.
       lockAppToPortrait();
     }
   });

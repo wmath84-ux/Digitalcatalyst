@@ -37,6 +37,7 @@ import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
 import { createMossBank, type MossBank } from "./moss";
+import { createTropicalField, type TropicalField } from "./tropicalFlora";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createWeathering, type Weathering } from "./weathering";
 import { createWinter, winterDaylight, type WinterSystem } from "./winter";
@@ -160,6 +161,13 @@ export class Sanctuary {
   /** The mossy edge lining both banks of the river — see `moss.ts`. */
   private mossBank: MossBank | null = null;
   /**
+   * The tropical jungle — the owner's six-variant low-poly plant set
+   * (palms, banana, fern, three leaf species), 310–1130 instances of
+   * 7–20 m scattered over the WHOLE world (meadow, plains, trek, mountain
+   * ring) plus six hand-placed at the villa — see `tropicalFlora.ts`.
+   */
+  private tropical: TropicalField | null = null;
+  /**
    * Air, weathering and the rock kit — the three systems that carry the
    * research pass (see `atmosphere.ts`, `weathering.ts`, `rocks.ts`). The
    * atmosphere owns no geometry: it is a set of shared uniforms and a shader
@@ -253,6 +261,23 @@ export class Sanctuary {
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
   private pinchPrev = 0;
   private pinchMid = { x: 0, y: 0, ready: false };
+  /**
+   * Where each finger went DOWN. Tap detection must measure movement
+   * against this, not against the last move event: `pointers` tracks the
+   * live position, so a finger that paused before lifting measured
+   * ~0 px of movement and EVERY drag that ended in a stillness fired a
+   * phantom tap.
+   */
+  private downPos: { x: number; y: number; id: number } | null = null;
+  /**
+   * The pointers that took part in a two-finger pinch. A pinch is NEVER a
+   * tap: lifting the two fingers of a pinch-out lands inside the 340 ms
+   * double-tap window, and the ground-double-tap used to fire — the drone
+   * "flew" to the spot under the fingers at a fixed 42 m the instant the
+   * user let go. That is the reported "pinch out, lift, zoom snaps back"
+   * bug.
+   */
+  private pinchTainted = new Set<number>();
   private pointers = new Map<number, { x: number; y: number }>();
   private keys = new Set<string>();
   private lastGroundTap = 0;
@@ -450,6 +475,31 @@ export class Sanctuary {
       // createMossBank already warns on a load failure; this catches
       // anything later in the wiring so a broken field is never silent.
       console.warn("[sanctuary] moss bank failed", err);
+    });
+
+    // THE TROPICAL JUNGLE — the owner's low-poly tropical set (six variants,
+    // all of them), passed 2: scattered over the WHOLE world — the study
+    // meadow, the plains, the trek district and the mountain ring — 310 to
+    // 1130 plants of 7–20 m per tier, plus a hand-placed cluster of six at
+    // the villa's foundation. The cards' transparent padding is measured
+    // and trimmed so every plant's base sits on the ground. Same async,
+    // fail-soft load as the other plant fields: a failed download degrades
+    // to the grass + sorrel meadow instead of breaking the scene.
+    createTropicalField(this.budget, aniso).then((field) => {
+      if (this.disposed) {
+        field.dispose();
+        return;
+      }
+      this.tropical = field;
+      this.scene.add(field.group);
+      field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
+      field.materials.forEach((m) => this.winter.register(m, "foliage"));
+      if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
+      // A shed that fired while the asset was still loading lands now.
+      field.setShed(this.shedLevel);
+      console.info(`[sanctuary] tropical jungle planted: ${field.count} plants (7–20 m)`);
+    }).catch((err) => {
+      console.warn("[sanctuary] tropical jungle failed", err);
     });
 
     this.birds = createBirds(this.flora.perches, this.textures, this.budget);
@@ -765,6 +815,7 @@ export class Sanctuary {
       this.armPinch(a.x, a.y, b.x, b.y);
       return;
     }
+    this.downPos = { x: e.clientX, y: e.clientY, id: e.pointerId };
     this.pointerPrev = { x: e.clientX, y: e.clientY, id: e.pointerId, down: true };
   };
 
@@ -824,16 +875,30 @@ export class Sanctuary {
     // A tap on the board opens the lesson. A double tap on the ground flies
     // the drone there — the far village is a kilometre out, and orbiting the
     // study can never reach it.
-    if (start) {
-      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-      if (moved < 8) this.onTap(e);
+    //
+    // Two guards before a lifted finger may count as a tap:
+    //   * a PINCH finger is never a tap — lifting the two fingers of a
+    //     pinch-out inside the 340 ms double-tap window used to fire the
+    //     ground fly, and the drone flew back to 42 m the moment the user
+    //     let go (the "zoom snaps back" bug);
+    //   * "moved" is measured against POINTER DOWN (downPos), not the last
+    //     move event, so a drag that ends in a pause is not a tap either.
+    if (start && !this.pinchTainted.delete(e.pointerId)) {
+      const down = this.downPos;
+      if (down && down.id === e.pointerId) {
+        const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+        if (moved < 8) this.onTap(e);
+      }
     }
+    if (this.downPos && this.downPos.id === e.pointerId) this.downPos = null;
   };
 
   private tapRay = new THREE.Raycaster();
   private tapVec = new THREE.Vector2();
 
   private armPinch(ax: number, ay: number, bx: number, by: number) {
+    // Both fingers are now camera-pinch, never taps (see pinchTainted).
+    for (const id of this.pointers.keys()) this.pinchTainted.add(id);
     this.pinchPrev = Math.hypot(ax - bx, ay - by);
     this.pinchMid.x = (ax + bx) * 0.5;
     this.pinchMid.y = (ay + by) * 0.5;
@@ -1793,6 +1858,7 @@ export class Sanctuary {
     this.sorrel?.setShed(this.shedLevel);
     this.grassTufts?.setShed(this.shedLevel);
     this.mossBank?.setShed(this.shedLevel);
+    this.tropical?.setShed(this.shedLevel);
   }
 
   private shedOneLevel() {
@@ -1930,6 +1996,7 @@ export class Sanctuary {
       this.sorrel?.update(time, this.wind);
       this.grassTufts?.update(time, this.wind);
       this.mossBank?.update(time, this.wind);
+      this.tropical?.update(time, this.wind);
       // The camera position lets the water cull its plunge-pool debris when
       // the learner is nowhere near it (interest management, see water.ts).
       this.water.update(adt, time, this.camera.position);
@@ -2047,6 +2114,7 @@ export class Sanctuary {
     this.sorrel?.dispose();
     this.grassTufts?.dispose();
     this.mossBank?.dispose();
+    this.tropical?.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
     this.water.dispose();
