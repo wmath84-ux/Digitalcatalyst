@@ -44,6 +44,7 @@ import { createWeathering, type Weathering } from "./weathering";
 import { createWinter, winterDaylight, type WinterSystem } from "./winter";
 import { createRockField, type RockField } from "./rocks";
 import { createWildlife, type Wildlife } from "./wildlife";
+import { createMountainForest, type MountainForest } from "./mountainForest";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
@@ -162,6 +163,14 @@ export class Sanctuary {
    */
   private hillGrass: HillGrassField;
   private flora: Flora;
+  /**
+   * The 360° mountain-forest ring — the owner's uploaded "landscape is a
+   * forest in the mountains" diorama instanced around the world's edge
+   * (see `mountainForest.ts`). Like the sorrel field it loads
+   * asynchronously: null until the glTF resolves, and a failed load simply
+   * leaves the terrain's own 150 m hills on skyline duty.
+   */
+  private mountainForest: MountainForest | null = null;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -405,6 +414,12 @@ export class Sanctuary {
 
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
+    // OWNER DIRECTIVE — the anime sky is the sanctuary's DEFAULT sky. The
+    // engine issues the enable ITSELF (not via the page's boot effect), so
+    // every boot path opens under the panorama no matter what order the
+    // page finishes in. The Scene-menu toggle still switches it off.
+    // Idempotent with the page's own enable: the texture promise is cached.
+    this.setAnimeSky(true);
     // The sky dome fills the whole screen every frame — one of the best
     // fp16 candidates on the diet tier.
     if (this.budget.halfPrecision) halfPrecisionTree(this.sky.group);
@@ -448,6 +463,29 @@ export class Sanctuary {
     this.hillGrass.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
     this.hillGrass.materials.forEach((m) => this.winter.register(m, "foliage"));
     if (this.budget.halfPrecision) this.hillGrass.materials.forEach(halfPrecisionMaterial);
+
+    // THE REAL MOUNTAIN RING — the owner's uploaded forest-in-the-mountains
+    // diorama ("maine upload kar diya hai ... isko exactly implement karo
+    // charon taraf, purane hills ko replace karo"), instanced around
+    // the world's edge on the 150 m arc. Async like the other model fields:
+    // it lands a beat after boot, and a failed load leaves the terrain's
+    // own hills carrying the skyline.
+    void createMountainForest(this.budget).then((forest) => {
+      if (this.disposed) {
+        forest.dispose();
+        return;
+      }
+      this.mountainForest = forest;
+      this.scene.add(forest.group);
+      forest.foliageMaterials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
+      forest.solidMaterials.forEach((m) => this.atmosphere.register(m));
+      forest.foliageMaterials.forEach((m) => this.winter.register(m, "foliage"));
+      forest.solidMaterials.forEach((m) => this.winter.register(m));
+      if (this.budget.halfPrecision) {
+        forest.foliageMaterials.forEach(halfPrecisionMaterial);
+        forest.solidMaterials.forEach(halfPrecisionMaterial);
+      }
+    }).catch(() => { /* createMountainForest already degraded to an empty group */ });
 
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
@@ -2281,6 +2319,7 @@ export class Sanctuary {
     this.tropical?.dispose();
     this.birds.dispose();
     this.wildlife.dispose();
+    this.mountainForest?.dispose();
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();

@@ -95,6 +95,7 @@ test("daylight keeps grading the baked panorama", () => {
 test("the scene loads the panorama lazily, once, and survives a failure", () => {
   const code = SCENE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.match(code, /setAnimeSky\(enabled: boolean\)/, "public toggle exists");
+  assert.match(code, /this\.setAnimeSky\(true\)/, "the ENGINE boots on the anime sky by default (not dependent on the page)");
   assert.match(code, /animeSkyTexture/, "the texture promise is cached on the scene");
   assert.match(code, /loadAsync\(ANIME_SKY_URL\)/, "one lazy fetch from the public URL");
   assert.match(code, /return null/, "a failed load resolves to null instead of throwing");
@@ -106,7 +107,11 @@ test("the scene loads the panorama lazily, once, and survives a failure", () => 
 // ── 4. The page toggle ────────────────────────────────────────────────
 
 test("the Studio page exposes an Anime sky toggle wired to the engine", () => {
-  assert.match(PAGE, /const \[animeSky, setAnimeSky\] = useState\(false\)/, "UI state exists");
+  // OWNER DIRECTIVE: the anime sky is the DEFAULT sky. The state starts
+  // true and the boot effect issues the first enable, so the world opens
+  // under the panorama; the menu item only ever toggles it off/on.
+  assert.match(PAGE, /const \[animeSky, setAnimeSky\] = useState\(true\)/, "the anime sky is the default sky");
+  assert.match(PAGE, /engine\.setAnimeSky\(true\)/, "the boot enables it on the engine");
   assert.match(PAGE, /label="Anime sky"/, "the Scene menu carries the item");
   assert.match(PAGE, /engineRef\.current\?\.setAnimeSky\(next\)/, "the toggle reaches the engine");
   assert.match(PAGE, /Icon=\{Sparkles\}/, "the item has an icon");

@@ -15,10 +15,11 @@
 //   300–900 m  foothills — the outer arc ramps up gradually, so mountains
 //              DECREASE steadily as you walk toward the centre
 //   900–1150 m the mountain band — up to 100 m, with a full arc of eroded,
-//              snow-capped ridges and a lot of crest-to-valley variance
+//              grass-capped ridges and a lot of crest-to-valley variance,
+//              crowned by the 3D forest panorama (mountainForest.ts)
 //   1150+ m    the island edge — the world is a CIRCLE, not a square plate:
-//              outside the arc the ground falls away into the haze, which is
-//              what rounds the silhouette and hides the mesh's square corners
+//              outside the arc the ground falls away into the sea, and the
+//              ground mesh itself is a round disc, so no square edge exists
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
@@ -81,13 +82,15 @@ const SANCTUARY_HILL_RIM = 460;
  * makes the area read as a closed circle instead of a square. Its two
  * properties come straight from the brief:
  *
- *   • the peaks top out at EXACTLY 100 m (MOUNTAIN_MAX_HEIGHT);
+ *   • the peaks top out at EXACTLY 100 m (MOUNTAIN_MAX_HEIGHT) — the OLD
+ *     hills' size, restored at the owner's word ("iska height vaise hi karo
+ *     jaise purana pathar hills ka size tha utna hi");
  *   • the height grows gradually with radius, so the mountains decrease
  *     steadily from the 100 m band down to foothills and then rolling ground
  *     as you walk toward the centre — no cliff of terrain, just a long rise.
  */
 const RIM_INNER = 300; // foothills begin
-const RIM_FULL = 900;  // full 100 m band starts
+const RIM_FULL = 900;  // full-height band starts
 export const MOUNTAIN_MAX_HEIGHT = 100;
 
 /**
@@ -101,8 +104,11 @@ export const MOUNTAIN_MAX_HEIGHT = 100;
  * never as a bite taken out of a ring by a formula. The bay is where the
  * beach district, the village and the jetty all live, and from the high
  * meadow the gap frames the ocean and the distant islands behind it.
+ *
+ * EXPORTED: the 3D mountain-forest ring (`mountainForest.ts`) reads it so
+ * its own panorama OPENS over the bay instead of walling off the sea.
  */
-const BAY_AZIMUTH = 0.92;
+export const BAY_AZIMUTH = 0.92;
 const BAY_HALF_WIDTH = 0.34;
 
 function bayGap(ang: number): number {
@@ -118,6 +124,29 @@ function bayGap(ang: number): number {
 const ISLAND_EDGE_IN = 1120;
 const ISLAND_EDGE_OUT = 1440;
 const ISLAND_FLOOR = -18;
+
+/**
+ * How far out the ground DISC itself reaches.
+ *
+ * The ground is built as round radial shells ending at this radius — past
+ * ISLAND_EDGE_OUT (1440), so the island's fall into the sea always
+ * COMPLETES on drawn ground. The old outermost shell was a SQUARE plate
+ * that stopped at its own edge mid-side: through the clear shallows the
+ * bed's straight cutoff read as the "square boundary" the owner flagged.
+ * A disc has no such line — the world is round to the last vertex.
+ */
+export const TERRAIN_DISC_RADIUS = 1500;
+
+/**
+ * How far the free camera (drone / fly mode) may travel from the centre.
+ *
+ * The clamp is RADIAL, not a square: "iska kinare ko is tarah fit karo taki
+ * camera bahar na jaaye". The limit sits just inside the island edge, so
+ * from any reachable spot the view is always land, surf and haze — never
+ * the outside of the world. (`controls.ts` clamps the fly target to this
+ * circle; the orbit rig's own plate maths is unchanged.)
+ */
+export const FLY_LIMIT_RADIUS = 1050;
 
 /**
  * Where the COAST's influence becomes trustworthy, in metres from the centre.
@@ -173,19 +202,25 @@ function distantRelief(x: number, z: number): number {
 }
 
 function distantReliefRaw(x: number, z: number, rise: number): number {
-  // The inner ring is FOOTHILLS: the 100 m peaks live on the outer arc
-  // (see `outerRim`), so this band is the layer beneath them — 44 m of
-  // lower, softer ranges that hand off to the arc for depth.
-  // Three octaves of ridged noise gives crests and saddles rather than cones.
-  const a = Math.sin(x * 0.0115) * Math.cos(z * 0.0102);
-  const b = Math.sin(x * 0.0231 + z * 0.0187 + 1.7);
-  const c = Math.sin(x * 0.0476 - z * 0.0413 + 4.2);
+  // The inner ring is FOOTHILLS: the 150 m peaks live on the outer arc
+  // (see `outerRim`), so this band is the layer beneath them — lower, softer
+  // forested ranges that hand off to the arc (and to the 3D mountain-forest
+  // ring planted on it) for depth. Three octaves of REAL simplex, ridged,
+  // give crests and saddles rather than cones; a separable sin/cos field
+  // was tried here first and is wrong — it repeats on a visible lattice.
+  const a = noise.noise2D(x * 0.0032 + 71.3, z * 0.0032 - 17.9); // ~310 m masses
+  const b = noise.noise2D(x * 0.0071 - 45.2, z * 0.0071 + 63.8); // ~140 m ridges
+  const c = noise.noise2D(x * 0.0153 + 9.4, z * 0.0153 - 27.1);  // ~65 m crests
   // `1 - |n|` is the classic ridged transform: it turns rounded humps into
   // sharp-crested ridges with eroded flanks, which is what reads as a mountain.
-  const ridged = (1 - Math.abs(a)) * 0.62 + (1 - Math.abs(b)) * 0.26 + (1 - Math.abs(c)) * 0.12;
+  const ridged = (1 - Math.abs(a)) * 0.6 + (1 - Math.abs(b)) * 0.28 + (1 - Math.abs(c)) * 0.12;
   // Large-scale mass so some sectors are high ranges and others stay open.
-  const mass = 0.45 + 0.55 * (Math.sin(Math.atan2(z, x) * 2.3) * 0.5 + 0.5);
-  return ridged * ridged * rise * mass * 44;
+  const ang = Math.atan2(z, x);
+  const mass = 0.45 + 0.55 * (0.5 + 0.5 * noise.noise2D(Math.cos(ang) * 2.1 + 31.7, Math.sin(ang) * 2.1 + 5.9));
+  // Same gentle sharpen the outer arc wears, so the two ranges read as one
+  // mountain system at two distances, never as two different worlds.
+  const h = Math.min(1, Math.max(Math.pow(ridged * mass, 1.15), 0.05) * 1.24);
+  return h * 44 * rise;
 }
 
 /**
@@ -440,18 +475,79 @@ export function terrainNormal(x: number, z: number, out = new THREE.Vector3()): 
 }
 
 /**
+ * One round shell of the ground: a disc (inner = 0) or an annulus, built as
+ * concentric vertex rings around the origin. `pinch` > 1 packs rings toward
+ * the INNER edge (detail where the eye still resolves it); positions stay
+ * in world XZ — the caller lifts them with `terrainHeight` and fills the
+ * UVs from world metres, so every shell wears the texture at one texel
+ * density and the seams between shells line up exactly.
+ */
+function buildRadialShell(
+  inner: number,
+  outer: number,
+  segs: number,
+  ringStep: number,
+  pinch: number,
+): THREE.BufferGeometry {
+  const rings = Math.max(2, Math.ceil((outer - inner) / ringStep));
+  const disc = inner <= 0;
+  const ringVerts = segs + 1; // duplicated seam vertex, like the ocean disc
+  const vertCount = (disc ? 1 : 0) + rings * ringVerts;
+  const pos = new Float32Array(vertCount * 3);
+  const uv = new Float32Array(vertCount * 2);
+
+  let v = 0;
+  if (disc) {
+    pos[0] = 0; pos[1] = 0; pos[2] = 0;
+    uv[0] = 0; uv[1] = 0;
+    v = 1;
+  }
+  for (let r = 1; r <= rings; r += 1) {
+    const radius = inner + (outer - inner) * Math.pow(r / rings, pinch);
+    for (let s = 0; s <= segs; s += 1) {
+      const a = (s / segs) * Math.PI * 2;
+      const x = Math.cos(a) * radius;
+      const z = Math.sin(a) * radius;
+      pos[v * 3] = x;
+      pos[v * 3 + 2] = z;
+      uv[v * 2] = x;
+      uv[v * 2 + 1] = z;
+      v += 1;
+    }
+  }
+
+  const idx: number[] = [];
+  if (disc) for (let s = 0; s < segs; s += 1) idx.push(0, 1 + s + 1, 1 + s);
+  const firstRow = disc ? 1 : 0;
+  for (let r = 1; r < rings; r += 1) {
+    const a0 = firstRow + (r - 1) * ringVerts;
+    const a1 = a0 + ringVerts;
+    for (let s = 0; s < segs; s += 1) {
+      idx.push(a0 + s, a0 + s + 1, a1 + s);
+      idx.push(a0 + s + 1, a1 + s + 1, a1 + s);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  return geo;
+}
+
+/**
  * Build the ground.
  *
  * THE KILOMETRE PROBLEM: a single 1000 m plane dense enough to show the hills
  * would need ~4 M vertices. Instead the ground is built as CONCENTRIC LOD
- * SHELLS — the same trick BGMI-class mobile renderers use for open terrain.
- * Each shell covers 4× the area of the one inside it at the same vertex cost,
- * so detail is spent where the camera actually is:
+ * SHELLS — the same trick BGMI-class mobile renderers use for open terrain —
+ * and (owner directive, "ekdum round bnao") every shell is a ROUND disc or
+ * annulus of vertex rings, never a square plate:
  *
- *   shell 0   ±90 m    full density  — where you walk, where the grass is
- *   shell 1   ±260 m   1/3 density   — rolling mid-ground
- *   shell 2   ±1000 m  1/9 density   — the foothills and the mountain band
- *   shell 3   ±1380 m  the rest      — the arc's peaks and the circular edge
+ *   shell 0   0–90 m     full density — where you walk, where the grass is
+ *   shell 1   90–260 m   1/3 density  — rolling mid-ground
+ *   shell 2   260–620 m  1/9 density  — the foothills and the mountain band
+ *   shell 3   620–1500 m the rest     — the arc's peaks and the island edge
  *
  * Every shell samples the SAME `terrainHeight`, so the seams line up exactly
  * and a hill on the horizon is the same hill when you finally walk up it.
@@ -497,21 +593,30 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
 
   const density = budget.tier === "low" ? 0.62 : budget.tier === "medium" ? 0.82 : 1;
 
-  // Four shells, not three.
+  // Four ROUND shells, not four square plates.
   //
-  // With three, the outer shell had to cover the whole 2760 m world on 132
-  // segments — one vertex every 21 m. Mountains sampled that coarsely lose
-  // their crests and the far districts flatten into smooth swells. A fourth
-  // shell splits that span, so the sanctuary's ring of hills and the
-  // neighbouring districts are both carried at roughly 7 m, which is what
-  // the old single-kilometre world used.
-  const shells: Array<{ half: number; segs: number; shadow: boolean }> = [
-    { half: 90, segs: Math.round(150 * density), shadow: true },
-    { half: 260, segs: Math.round(120 * density), shadow: false },
+  // THE SQUARE-BOUNDARY BUG. The shells used to be square PlaneGeometry
+  // plates, and the outermost one stopped at its own edge mid-side: through
+  // the clear shallows of the drowned island edge, the bed's straight
+  // cutoff read as a square boundary laid over the world — exactly the
+  // "boundary ka land square hai" the owner flagged. The world is now round
+  // to the last vertex: every shell is a disc/annulus of concentric vertex
+  // rings (the same trick the ocean disc uses), and the outermost shell
+  // reaches TERRAIN_DISC_RADIUS — past ISLAND_EDGE_OUT — so the island's
+  // fall into the sea always COMPLETES on drawn ground and no straight
+  // line exists anywhere on the horizon.
+  //
+  // `half` is each shell's outer radius (shell N begins where shell N−1
+  // ends), `segs` the angular resolution, `ringStep` the ring spacing.
+  // Detail is still spent where the camera is: the near field keeps rings
+  // every ~6 m, the mountain band every ~12 m.
+  const shells: Array<{ half: number; outer?: number; segs: number; ringStep: number; shadow: boolean }> = [
+    { half: 90, segs: Math.round(150 * density), ringStep: 6, shadow: true },
+    { half: 260, segs: Math.round(120 * density), ringStep: 12, shadow: false },
     // Covers the sanctuary's foothills, the rolling ground and the inner passes.
-    { half: 620, segs: Math.round(190 * density), shadow: false },
+    { half: 620, segs: Math.round(190 * density), ringStep: 14, shadow: false },
     // Covers the 100 m mountain arc, both districts and the circular edge.
-    { half: WORLD_HALF, segs: Math.round(300 * density), shadow: false },
+    { half: WORLD_HALF, outer: TERRAIN_DISC_RADIUS, segs: Math.round(340 * density), ringStep: 10, shadow: false },
   ];
 
   const mat = new THREE.MeshStandardMaterial({
@@ -607,37 +712,32 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   };
 
   shells.forEach((shell, index) => {
-    const size = shell.half * 2;
-    const geo = new THREE.PlaneGeometry(size, size, shell.segs, shell.segs);
+    const inner = index === 0 ? 0 : shells[index - 1].half;
+    const outer = shell.outer ?? shell.half;
+    const geo = buildRadialShell(inner, outer, shell.segs, shell.ringStep, index >= 3 ? 1.12 : 1);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
-    // Shells 1+ are rings: the middle is punched out by pushing those
-    // vertices down out of sight, so they never z-fight the shell inside.
-    const innerHalf = index === 0 ? 0 : shells[index - 1].half;
 
-    // ── Texel density: the same texels per metre on every shell ─────
-    // The tile count is derived from THIS shell's size, so the 180 m shell
-    // and the 2760 m shell are authored at one density and the meadow never
-    // looks sharper than the hills (research §18). Hoisted: it is
-    // loop-invariant, so computing it per vertex was pure waste.
-    const tiles = size / TILE_METRES;
+    // ── Heights + texel density in one pass ──────────────────────────
+    // The shells already lie in world XZ, so each vertex is lifted by the
+    // ONE shared `terrainHeight` and its UV IS its world position over the
+    // tile size — every shell wears the ground photo at exactly the same
+    // texels per metre, and neighbouring shells' edge rings sample the same
+    // heights, so no seam can ever open between them.
     const uv = geo.attributes.uv as THREE.BufferAttribute;
     // Direct typed-array access in the hot loop (research §20): the getters
     // are a function call plus a bounds check per component, and this loop
-    // runs ~165 000 times. PlaneGeometry attributes are plain
-    // non-interleaved Float32Arrays, so reading/writing `.array` touches the
-    // exact same memory — identical heights, identical UVs, fewer calls.
+    // runs tens of thousands of times. The attributes are plain
+    // non-interleaved Float32Arrays, so reading/writing `.array` touches
+    // the exact same memory — identical heights, identical UVs, fewer calls.
     const p = pos.array as Float32Array;
     const u = uv.array as Float32Array;
     for (let i = 0; i < pos.count; i += 1) {
       const x = p[i * 3];
-      // PlaneGeometry lies in XY and is rotated -90° about X, so local +Y → world -Z.
-      const z = -p[i * 3 + 1];
-      const h = terrainHeight(x, z);
-      const inside = innerHalf > 0 && Math.abs(x) < innerHalf - 1 && Math.abs(z) < innerHalf - 1;
-      p[i * 3 + 2] = inside ? h - 240 : h;
-      u[i * 2] *= tiles;
-      u[i * 2 + 1] *= tiles;
+      const z = p[i * 3 + 2];
+      p[i * 3 + 1] = terrainHeight(x, z);
+      u[i * 2] = x / TILE_METRES;
+      u[i * 2 + 1] = z / TILE_METRES;
     }
     pos.needsUpdate = true;
     uv.needsUpdate = true;
@@ -646,24 +746,16 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // The colour pass runs AFTER the normals exist, because the normals ARE
     // the slope measurement: the mesh's own vertex normal is exactly what a
     // slope mask needs and reading it back costs nothing. Deriving the slope
-    // from `terrainHeight` instead would mean four more height samples on all
-    // ~150 000 vertices (research §8 — slope masks drive the layers).
+    // from `terrainHeight` instead would mean four more height samples on
+    // every vertex (research §8 — slope masks drive the layers).
     const normalAttr = geo.attributes.normal as THREE.BufferAttribute;
     // Same direct-array reads as the height pass (`computeVertexNormals`
     // reallocates nothing, so `p` is still the live position array).
     const n = normalAttr.array as Float32Array;
     for (let i = 0; i < pos.count; i += 1) {
       const x = p[i * 3];
-      const z = -p[i * 3 + 1];
-      const h = p[i * 3 + 2];
-      // The hidden ring-interior vertices (pushed 240 m down) are never seen,
-      // so they get no colour work at all.
-      if (h < -180) {
-        colors[i * 3] = deep.r;
-        colors[i * 3 + 1] = deep.g;
-        colors[i * 3 + 2] = deep.b;
-        continue;
-      }
+      const z = p[i * 3 + 2];
+      const h = p[i * 3 + 1];
 
       // Base: the same rule-based blend the grass clumps sample, so the field
       // and the ground it grows out of are one colour decision. The wear is
@@ -701,46 +793,16 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-    // ── Tight bounds over the VISIBLE surface only ─────────────────────
-    // Research §20 (cull volumes): three.js frustum-culls per mesh against
-    // the bounding sphere, but the auto-computed one includes the
-    // ring-interior verts sitting 240 m below the ground — which dragged
-    // every outer shell's culling volume ~100 m underground and inflated it,
-    // so a shell the camera was not looking at could never be rejected.
-    // Re-testing the same `inside` predicate from the height pass keeps
-    // exactly the verts the eye can see. (Heights alone cannot do this: pit
-    // verts under high ground sit ABOVE -180 m.)
-    // Local +Y maps to world -Z under the -90° X rotation, so |planeY| is |z|.
-    let minX = Infinity;
-    let minY = Infinity;
-    let minZ = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let maxZ = -Infinity;
-    for (let i = 0; i < pos.count; i += 1) {
-      const bx = p[i * 3];
-      const by = p[i * 3 + 1];
-      if (innerHalf > 0 && Math.abs(bx) < innerHalf - 1 && Math.abs(by) < innerHalf - 1) continue;
-      const bz = p[i * 3 + 2];
-      if (bx < minX) minX = bx;
-      if (by < minY) minY = by;
-      if (bz < minZ) minZ = bz;
-      if (bx > maxX) maxX = bx;
-      if (by > maxY) maxY = by;
-      if (bz > maxZ) maxZ = bz;
-    }
-    geo.boundingBox = new THREE.Box3(
-      new THREE.Vector3(minX, minY, minZ),
-      new THREE.Vector3(maxX, maxY, maxZ),
-    );
-    // 1 m of guard for rotation/float rounding on a 180–2760 m shell — the
-    // landscape shader displaces no vertices, so exact bounds are safe and
-    // this only covers numeric dust at the frustum edge.
-    geo.boundingBox.expandByScalar(1);
-    geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+    // ── Tight bounds ────────────────────────────────────────────────────
+    // Every vertex is visible ground now (the old square shells punched
+    // ring interiors 240 m down and needed a hand-rolled culling box);
+    // the computed box is already exact. 1 m of guard covers numeric dust
+    // at the frustum edge — the landscape shader displaces no vertices.
+    geo.computeBoundingBox();
+    geo.boundingBox!.expandByScalar(1);
+    geo.boundingSphere = geo.boundingBox!.getBoundingSphere(new THREE.Sphere());
 
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
     mesh.receiveShadow = shell.shadow && budget.shadowMapSize > 0;
     mesh.name = `ground-shell-${index}`;
     // The ground never moves: freeze the matrix so the renderer never

@@ -80,7 +80,8 @@ export function trekRelief(x: number, z: number): number {
   // for an infinite world with nothing man-made in it. Beside a 2.7 m study
   // board that is a 180 m wall, so the range is scaled to something a learner
   // can actually walk up while still reading as real mountains from the
-  // meadow 700 m away.
+  // meadow 700 m away. (Restored with the owner's "purane hills jaisa" —
+  // the arc cap is back at 100 m, so this is the original 110 again.)
   const AMPLITUDE = 110;
 
   // The source seeds its per-octave offsets from a seeded RNG. Fixed values
