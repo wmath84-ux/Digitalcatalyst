@@ -53,8 +53,8 @@ test("the sward wears the meadow's proven material recipe — never black", () =
   // sward must use the SAME recipe: the engine's blade texture as map,
   // alphaTest (no sorting/overdraw), DoubleSide, instance tints via
   // setColorAt — and NO vertexColors on a geometry with no colour attribute.
-  assert.match(HILL, /map: bladeTex/);
-  assert.match(HILL, /alphaTest: 0\.5/);
+  assert.match(HILL, /map: tex,/);
+  assert.match(HILL, /alphaTest: 0\.35/);
   assert.match(HILL, /side: THREE\.DoubleSide/);
   assert.match(HILL, /mesh\.setColorAt\(placed, color\)/);
   // (checked on the comment-stripped source — the file DOCUMENTS why the
@@ -120,9 +120,22 @@ test("the wind animation rides the vertex shader, like the meadow's", () => {
 
 test("distant hills stay solid green — cards grow with distance", () => {
   // Size LOD: the far rim grows the cards instead of multiplying instances.
-  assert.match(HILL, /grow \* 4\.2/); // height ramp
-  assert.match(HILL, /grow \* 12/); // width ramp
+  assert.match(HILL, /grow \* 5\.6/); // height ramp
+  assert.match(HILL, /grow \* 16/); // width ramp
   assert.match(HILL, /farBoost/, "weak devices grow bigger cards, not more instances");
+});
+
+test("the sward never vanishes with distance — no mip fade-out", () => {
+  // THE VANISHING-GRASS BUG the owner reported (grass only while the camera
+  // is close): a mipmapped alpha-tested map averages blade alpha below the
+  // test threshold at distance and the GPU discards the whole far sward.
+  // The hills wear a mipmap-FREE clone of the blade texture, so every card
+  // samples the full-res silhouette at any range — BGMI's rule: everything
+  // stays visible, the far stuff just reads softer.
+  assert.match(HILL, /const tex = bladeTex\.clone\(\)/);
+  assert.match(HILL, /tex\.generateMipmaps = false/);
+  assert.match(HILL, /tex\.minFilter = THREE\.LinearFilter/);
+  assert.match(HILL, /alphaTest: 0\.35/);
 });
 
 // ── 2. The budget, in every tier ──────────────────────────────────────

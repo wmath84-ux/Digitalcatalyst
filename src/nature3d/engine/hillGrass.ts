@@ -119,16 +119,37 @@ export function createHillGrassField(
   const group = new THREE.Group();
   group.name = "hill-grass-field";
 
+  // ── Distance-safe blade texture ────────────────────────────────────────
+  // THE VANISHING-GRASS BUG the owner hit: with a MIPMAPPED alpha-tested map,
+  // a clump that shrinks to a few pixels samples a low mip whose alpha is the
+  // AVERAGE of blade + empty space — below the test threshold — so the GPU
+  // discards it and the whole far sward simply disappears (grass only exists
+  // while the camera is close). BGMI's rule is the opposite: everything stays
+  // on screen at any distance; the far stuff just reads softer.
+  //
+  // So the hills wear their OWN clone of the meadow's blade texture with
+  // mipmaps OFF (`LinearFilter`, `generateMipmaps=false`): every card, near or
+  // 1 150 m out, samples the full-res silhouette, so alpha is 0-or-1 per texel
+  // and blades never average away. The mild shimmer that costs is exactly the
+  // "far = softer/blurrier" read the owner asked for, never invisibility.
+  const tex = bladeTex.clone();
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+
   const geo = hillBladeGeometry();
-  // The meadow's proven recipe, verbatim (see `grass.ts` buildRing): the
-  // blade texture supplies the silhouette, alphaTest trims the empty texels
-  // with no sorting/overdraw cost, and per-clump tint arrives via
-  // `setColorAt` (instanceColor). The geometry carries no per-vertex colour
-  // attribute, and `vertexColors: true` would multiply by an unbound
-  // attribute — so it stays OFF; instance colours alone drive the tint.
+  // The meadow's proven recipe (see `grass.ts` buildRing): the blade texture
+  // supplies the silhouette, alphaTest trims the empty texels with no
+  // sorting/overdraw cost, and per-clump tint arrives via `setColorAt`
+  // (instanceColor). The geometry carries no per-vertex colour attribute, and
+  // `vertexColors: true` would multiply by an unbound attribute — so it stays
+  // OFF; instance colours alone drive the tint. The cutoff is kept gentle
+  // (0.35, not 0.5) so thinned far texels still pass and the sward never
+  // pops out with distance.
   const material = new THREE.MeshLambertMaterial({
-    map: bladeTex,
-    alphaTest: 0.5,
+    map: tex,
+    alphaTest: 0.35,
     side: THREE.DoubleSide,
     transparent: false,
   });
@@ -249,8 +270,12 @@ export function createHillGrassField(
     dummy.quaternion.setFromUnitVectors(UP, NORMAL);
     dummy.rotateY(Math.random() * Math.PI * 2);
     dummy.rotateX((Math.random() - 0.5) * 0.14);
-    const hScale = (0.9 + Math.random() * 0.9) * (1 + grow * 4.2) * farBoost;
-    const wScale = (0.22 + Math.random() * 0.16) * (1 + grow * 12) * farBoost;
+    // Far cards grow BIG: a clump that holds 10+ pixels on screen keeps a
+    // high enough mip that its alpha survives the test — size is the second
+    // half of "always visible, far = softer" (the first half is the no-mip
+    // texture above).
+    const hScale = (0.9 + Math.random() * 0.9) * (1 + grow * 5.6) * farBoost;
+    const wScale = (0.22 + Math.random() * 0.16) * (1 + grow * 16) * farBoost;
     dummy.scale.set(wScale, hScale, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(placed, dummy.matrix);
@@ -349,6 +374,7 @@ export function createHillGrassField(
     },
     dispose() {
       geo.dispose();
+      tex.dispose();
       material.dispose();
       mesh.dispose();
       group.clear();
