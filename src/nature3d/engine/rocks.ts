@@ -61,6 +61,22 @@ export interface RockField {
    * something grows out of the join.
    */
   skirtPoints: Float32Array;
+  /**
+   * Grass ON the stones themselves — the brief's "stones pe bhi grass",
+   * and the one thing a skirt can never do.
+   *
+   * Packed as (x, y, z, size) quads: the world-space point of an UP-FACING
+   * facet on a boulder's top or shoulder (a facet whose world normal points
+   * skywards and whose vertex sits clear of the ground plane), and the
+   * boulder's own footprint, so a clump growing on a two-metre block is not
+   * planted at pebble scale.
+   *
+   * These are measured off the INSTANCED GEOMETRY, not guessed from the
+   * bounding box: the masters are sheared by their bedding planes and tilted
+   * on placement, so "the top of the rock" has no closed-form answer and a
+   * box-derived point would float beside the stone half the time.
+   */
+  grassPoints: Float32Array;
   dispose(): void;
 }
 
@@ -165,6 +181,80 @@ function sculptRock(rand: () => number, detail: number): THREE.BufferGeometry {
 /** The radius at which a boulder stops paying for the near-LOD triangles. */
 const NEAR_LOD_RADIUS = 150;
 
+/** Hoisted scratch for the stone-top probe — boot only, never in the loop. */
+const STONE_V = new THREE.Vector3();
+const STONE_N = new THREE.Vector3();
+const STONE_NM = new THREE.Matrix3();
+
+/**
+ * Find the spots on ONE boulder where grass could actually take root, and
+ * append them to `out` as (x, y, z, size) quads.
+ *
+ * A stone grows grass in its crevices and on its shoulders — the flat, dusty
+ * facets that catch seed and hold a little soil — never on its vertical flanks
+ * and never on the buried facets down at the contact line. So the probe walks
+ * the master's own vertices, transforms them by the instance matrix, and keeps
+ * the ones whose WORLD normal points up past ~63° and which sit clear of the
+ * ground plane. From those it picks the highest, flattest ones greedily, with a
+ * minimum spacing so two clumps never land on the same square centimetre.
+ */
+function pushStoneAnchors(
+  master: THREE.BufferGeometry,
+  matrix: THREE.Matrix4,
+  footprint: number,
+  ground: number,
+  out: number[],
+  rand: () => number,
+): void {
+  const pos = master.getAttribute("position") as THREE.BufferAttribute | undefined;
+  const nrm = master.getAttribute("normal") as THREE.BufferAttribute | undefined;
+  if (!pos || !nrm) return;
+
+  STONE_NM.getNormalMatrix(matrix);
+  const half = footprint * 0.5;
+  // Big stones carry more of them, and a 4 m block gets the full three.
+  const want = Math.max(1, Math.min(3, Math.round(1 + half)));
+  const minSep = Math.max(0.14, half * 0.62);
+  // The clump's own size: a tuft on a big block is a clump, on a pebble it is
+  // a pinch — but never so small it vanishes.
+  const size = Math.max(0.35, Math.min(1.6, half * 0.9));
+
+  const pickedStart = out.length;
+  for (let slot = 0; slot < want; slot += 1) {
+    let bestScore = -Infinity;
+    let bx = 0;
+    let by = 0;
+    let bz = 0;
+    for (let i = 0; i < pos.count; i += 1) {
+      STONE_V.fromBufferAttribute(pos, i).applyMatrix4(matrix);
+      STONE_N.fromBufferAttribute(nrm, i).applyMatrix3(STONE_NM).normalize();
+      if (STONE_N.y < 0.45) continue;
+      const lift = STONE_V.y - ground;
+      if (lift < 0.06) continue; // buried: nothing grows down there
+      let clash = false;
+      for (let a = pickedStart; a < out.length && !clash; a += 4) {
+        const dx = out[a] - STONE_V.x;
+        const dz = out[a + 2] - STONE_V.z;
+        if (dx * dx + dz * dz < minSep * minSep) clash = true;
+      }
+      if (clash) continue;
+      // Flat facets that stand proud win; the jitter keeps the three picks
+      // from landing on the same symmetric handful of vertices.
+      const score = STONE_N.y * 0.75 + Math.min(lift, footprint) * 0.25 + rand() * 0.05;
+      if (score > bestScore) {
+        bestScore = score;
+        bx = STONE_V.x;
+        by = STONE_V.y;
+        bz = STONE_V.z;
+      }
+    }
+    if (bestScore === -Infinity) break;
+    // Sunk a touch into the stone: a root that starts on the surface leaves a
+    // visible seam once the clump is scaled up.
+    out.push(bx, by - size * 0.12, bz, size);
+  }
+}
+
 export function createRockField(
   tex: TextureSet,
   budget: QualityBudget,
@@ -208,6 +298,20 @@ export function createRockField(
   const farColors: THREE.Color[][] = Array.from({ length: MASTER_COUNT }, () => []);
   const contacts: THREE.Matrix4[] = [];
   const skirts: number[] = [];
+  const stoneGrass: number[] = [];
+  // A separate RNG for the stone probe: the anchors are new data, and drawing
+  // them from the placement stream would have re-rolled every boulder in the
+  // world (same seed, different sequence). The kit's layout is unchanged.
+  const anchorRand = mulberry32(0x1c3a_77d1);
+
+  // ── The masters, sculpted ONCE ──────────────────────────────────────
+  // They used to be sculpted inside the bucket build, twice (near + far) —
+  // same seed, so the same shape. Now they are made up front and the far
+  // bucket gets a clone, which is byte-identical and lets the placement loop
+  // probe the real instanced geometry for its stone-top anchors.
+  const masters = Array.from({ length: MASTER_COUNT }, (_, m) =>
+    sculptRock(mulberry32(0x9e37_79b9 + m * 0x45d9_f3b), 2),
+  );
 
   let placed = 0;
   let guard = 0;
@@ -334,6 +438,15 @@ export function createRockField(
     contacts.push(dummy.matrix.clone());
     skirts.push(x, z, Math.max(sx, sz) * 0.75);
 
+    // ── Grass ON the stone ──────────────────────────────────────────────
+    // Probed while the instance matrix is still in hand: the world's ground
+    // height, the boulder's own footprint and its sculpted, tilted, sheared
+    // geometry are all that is needed to know where a clump could take root.
+    // EVERY boulder is probed, near or far: a dozen anchors costs a few
+    // hundred transforms at boot, and the brief asks for grass on the stones
+    // themselves, not only on the ones beside the camera.
+    pushStoneAnchors(masters[masterIndex], dummy.matrix, Math.max(sx, sz), s.height, stoneGrass, anchorRand);
+
     placed += 1;
   }
 
@@ -362,16 +475,16 @@ export function createRockField(
   };
 
   for (let m = 0; m < MASTER_COUNT; m += 1) {
-    // Same seed → same rock. USER DIRECTIVE (big-stone design pass): the far
-    // masters used to be sculpted at detail 1 (80 triangles), so every LARGE
-    // boulder read as a smooth featureless lump next to the crisp small ones.
-    // Both buckets now sculpt the SAME detail-2 master — big and small stones
-    // are literally the same design. (Two geometries, not one shared: the
-    // per-instance weather attribute lives ON the geometry, so a shared
-    // master would let the far bucket overwrite the near bucket's weather.)
-    const seed = 0x9e37_79b9 + m * 0x45d9_f3b;
-    buildBucket(sculptRock(mulberry32(seed), 2), nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
-    buildBucket(sculptRock(mulberry32(seed), 2), farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
+    // USER DIRECTIVE (big-stone design pass): the far masters used to be
+    // sculpted at detail 1 (80 triangles), so every LARGE boulder read as a
+    // smooth featureless lump next to the crisp small ones. Both buckets use
+    // the SAME detail-2 master — big and small stones are literally the same
+    // design. Two geometries, not one shared: the per-instance weather
+    // attribute lives ON the geometry, so a shared master would let the far
+    // bucket overwrite the near bucket's weather. The far one is a clone of
+    // the master the placement loop already probed for grass anchors.
+    buildBucket(masters[m], nearBuckets[m], nearWeather[m], nearColors[m], `rock-master-${m}`);
+    buildBucket(masters[m].clone(), farBuckets[m], farWeather[m], farColors[m], `rock-master-${m}-far`);
   }
 
   // ── Contact decals: one instanced mesh for the whole field ──────────
@@ -398,8 +511,10 @@ export function createRockField(
   return {
     group,
     skirtPoints: new Float32Array(skirts),
+    grassPoints: new Float32Array(stoneGrass),
     dispose() {
       material.dispose();
+      masters.forEach((m) => m.dispose());
       group.traverse((o) => {
         const mesh = o as THREE.Mesh;
         mesh.geometry?.dispose?.();
