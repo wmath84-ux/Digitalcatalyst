@@ -626,17 +626,21 @@ export function groundColorAt(
     }
   }
 
-  // ── Slope: soil cannot sit on a 45° face ───────────────────────────
-  // The research is specific (§8, principle 21): past ~45° nothing clings,
-  // so the ground switches to bare rock. `normalY` is cosine of the slope, so
-  // 45° is 0.707 — the ramp therefore runs 0.80 → 0.62, and the switch bites
-  // exactly where the brief says it should:
-  //     26° (0.90) → no rock     45° (0.71) → half rock     52° (0.62) → all
+  // ── Slope: a HINT of rock on the steepest faces ────────────────────
+  // OWNER DIRECTIVE — GRASS ON EVERY HILL: the uploaded reference blend
+  // (`pahadon ke upar gras replace hill.blend`) covers EVERY slope of the
+  // terrain with dense grass, so the mountains here wear their sward even
+  // on steep faces. The ramp still runs 0.80 → 0.62 (`normalY` is cosine
+  // of the slope: 26° (0.90) → no rock, 45° (0.71) → towards rock), but
+  // the blend is held back to a minority mix — the rock colour only
+  // suggests the stone UNDER the grass on the hardest faces, it never
+  // replaces the green. The world-wide hill sward (`hillGrass.ts`) plants
+  // its clumps on these same faces, flush to the surface normal.
   //
   // `normalY` is published by the terrain mesh itself, so this costs no
   // height samples at all inside the 150 k-vertex colour loop.
   const steep = clamp01((0.8 - normalY) / 0.18);
-  out.lerp(palette.rock, steep * 0.92);
+  out.lerp(palette.rock, steep * 0.38);
 
   // ── The worn strip ────────────────────────────────────────────────
   out.lerp(palette.gravel, clamp01(worn * 1.25));

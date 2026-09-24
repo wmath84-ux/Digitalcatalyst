@@ -33,6 +33,7 @@ import {
 import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GROUND_PHOTO_URL, type TextureSet } from "./textures";
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
+import { createHillGrassField, type HillGrassField } from "./hillGrass";
 import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
@@ -148,6 +149,12 @@ export class Sanctuary {
 
   private textures: TextureSet;
   private grass: GrassField;
+  /**
+   * GRASS ON EVERY HILL — the world-wide sward covering every hill, stone
+   * and mountain across the full 360° circle (see `hillGrass.ts` and the
+   * owner's reference blend, `pahadon ke upar gras replace hill.blend`).
+   */
+  private hillGrass: HillGrassField;
   private flora: Flora;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
@@ -399,6 +406,17 @@ export class Sanctuary {
     this.grass.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
     this.grass.materials.forEach((m) => this.winter.register(m, "foliage"));
     if (this.budget.halfPrecision) this.grass.materials.forEach(halfPrecisionMaterial);
+
+    // GRASS ON EVERY HILL — the owner's directive ("jitne bhi hills aur
+    // stones aur pahadiya hai sabhi per ghas ... 360 degree all around"):
+    // one dense sward over every mountain flank, ridge and boulder, built
+    // from the same shared height field and leaning with every slope. It
+    // glows backlit exactly like the meadow grass it continues.
+    this.hillGrass = createHillGrassField(this.budget, this.rocks.skirtPoints);
+    this.scene.add(this.hillGrass.group);
+    this.hillGrass.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
+    this.hillGrass.materials.forEach((m) => this.winter.register(m, "foliage"));
+    if (this.budget.halfPrecision) this.hillGrass.materials.forEach(halfPrecisionMaterial);
 
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
@@ -1855,6 +1873,7 @@ export class Sanctuary {
    */
   private applyShed() {
     this.grass.setDetail(this.shedLevel);
+    this.hillGrass.setShed(this.shedLevel);
     this.sorrel?.setShed(this.shedLevel);
     this.grassTufts?.setShed(this.shedLevel);
     this.mossBank?.setShed(this.shedLevel);
@@ -1992,6 +2011,7 @@ export class Sanctuary {
       const adt = this.ambientClock;
       this.ambientClock = 0;
       this.grass.update(time, this.wind);
+      this.hillGrass.update(time, this.wind);
       this.flora.update(time, this.wind);
       this.sorrel?.update(time, this.wind);
       this.grassTufts?.update(time, this.wind);
@@ -2109,6 +2129,7 @@ export class Sanctuary {
     disposeGroup(this.desk);
     this.avatar.dispose();
     this.grass.dispose();
+    this.hillGrass.dispose();
     this.rocks.dispose();
     this.flora.dispose();
     this.sorrel?.dispose();
