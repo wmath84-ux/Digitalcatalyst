@@ -29,7 +29,13 @@ import PersonalModulesPanel from "./course/PersonalModulesPanel";
 import { toast } from "./components/ui/glass-toast";
 import { trackFeatureEvent } from "./utils/featureAnalytics";
 import { usePersonalModules } from "./hooks/usePersonalModules";
-import type { PersonalCourseOfficialReference } from "./lib/personalCourseClient";
+// NEW My Study Library (2026-09-24): "Add to My Module" + "Save for later"
+// now write into the learner-owned course shelf (`users/{uid}/myCourses`),
+// not the old server-backed personal-modules tree.
+import { useMyCourses } from "./hooks/useMyCourses";
+import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from "./lib/myCourseClient";
+import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
+import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
@@ -564,9 +570,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // only reflects its answers.
   const [personalModulesOpen, setPersonalModulesOpen] = useState(false);
   const [addOfficialOpen, setAddOfficialOpen] = useState(false);
-  const [officialDialogTarget, setOfficialDialogTarget] = useState<{ reference: PersonalCourseOfficialReference; name: string; type: CourseFile["type"] } | null>(null);
+  const [officialDialogTarget, setOfficialDialogTarget] = useState<OfficialResourceDraft | null>(null);
   const [personalLibraryActionBusy, setPersonalLibraryActionBusy] = useState<"save" | null>(null);
   const personalActionRef = useRef(false);
+  // ── NEW My Study Library controller ────────────────────────────────────
+  // ONE live listener feeding the "Add to My Module" dialog and the
+  // "Save for later" action below. Both write a `myCourses` document
+  // (users/{uid}/myCourses/{courseId}) — the same surface the Study Library
+  // page and the self-authored Course Player read, so anything saved here is
+  // visible on the library shelf the moment Firestore confirms it.
+  const myLibrary = useMyCourses();
   // Course entry is lazy: ordinary lesson playback performs zero personal
   // library requests. The manager/add dialog calls ensureLoaded on demand.
   const personalModules = usePersonalModules(user?.id, product.id, {
@@ -584,6 +597,27 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     moduleId: String(selectedOfficialModule.id),
     resourceId: String(selectedFile.id),
   } : null;
+
+  // ── Official resource → My Study Library draft ──────────────────────────
+  // The active official file, flattened into the shape a `myCourses` resource
+  // needs. Both settings actions consume this, so an official resource and
+  // its library copy always carry the same name, type, link and Brain set.
+  const officialResourceDraft: OfficialResourceDraft | null = useMemo(() => {
+    if (!selectedFile || activeFileIsPersonal) return null;
+    const file = selectedFile;
+    return {
+      name: String(file.name || "Course resource"),
+      type: file.type,
+      url: String(file.url || file.embedUrl || file.youtubeUrl || ""),
+      description: String(file.description || ""),
+      ...(file.type === "brain" && Array.isArray(file.practiceQuestions)
+        ? {
+            practiceTitle: String(file.practiceTitle || ""),
+            practiceQuestions: file.practiceQuestions.map((question) => ({ ...question })),
+          }
+        : {}),
+    };
+  }, [selectedFile, activeFileIsPersonal]);
 
   // The modules-tab entry row subtitle follows the live server snapshot:
   // usage vs the plan's limits when entitled, a clear locked hint otherwise.
@@ -628,30 +662,191 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     setOfficialDialogTarget(null);
   }, []);
 
+  // ── Writing official resources into the NEW My Study Library ────────────
+  // Both settings rows land in `users/{uid}/myCourses/{courseId}` documents:
+  //
+  //   · "Save for later"  → the learner's reserved "Saved for later" shelf
+  //     course (stable id below) so the resource is one tap away on the
+  //     Study Library page.
+  //   · "Add to My Module" → whichever course + module the learner picks in
+  //     the dialog (or a brand-new course/module created on the spot).
+  //
+  // The write goes through `myLibrary.save()` — the same optimistic
+  // patch + Firestore setDoc the course builder uses — so the library page,
+  // any open dialog and the player stay in step from one live listener.
+
+  /** Stable id of the shelf course that backs "Save for later". */
+  const SAVED_FOR_LATER_COURSE_ID = "saved-for-later";
+  const SAVED_FOR_LATER_MODULE_TITLE = "Saved";
+
+  /** Deep-clone a course so drafts never mutate the live snapshot. */
+  const cloneCourse = (course: MyCourse): MyCourse =>
+    typeof structuredClone === "function"
+      ? structuredClone(course)
+      : JSON.parse(JSON.stringify(course)) as MyCourse;
+
+  const buildLibraryResource = (draft: OfficialResourceDraft): MyCourseResource => {
+    const resource = createMyResource(draft.type);
+    const mapped: MyCourseResource = {
+      ...resource,
+      name: draft.name,
+      url: draft.url,
+      description: draft.description,
+      source: "link",
+      ...(draft.type === "brain" && draft.practiceQuestions
+        ? {
+            practiceTitle: draft.practiceTitle || draft.name,
+            practiceQuestions: draft.practiceQuestions.map((question) => ({ ...question })),
+          }
+        : {}),
+    };
+    return mapped;
+  };
+
+  /**
+   * The same resource (by link, or name+type when it has no link) must never
+   * land twice in one course — mirrors the old server-side duplicate guard.
+   */
+  const findDuplicateResource = (
+    modules: MyCourseModule[],
+    draft: OfficialResourceDraft,
+  ): MyCourseResource | null => {
+    for (const module of modules) {
+      for (const resource of module.resources) {
+        const sameUrl = Boolean(draft.url) && String(resource.url || "") === draft.url;
+        const sameIdentity = !draft.url
+          && resource.type === draft.type
+          && String(resource.name || "") === draft.name;
+        if (sameUrl || sameIdentity) return resource;
+      }
+      const nested = findDuplicateResource(module.modules || [], draft);
+      if (nested) return nested;
+    }
+    return null;
+  };
+
+  const addLibraryResource = async (
+    course: MyCourse,
+    draft: OfficialResourceDraft,
+    destination: { moduleId: string | null; newModuleTitle: string },
+  ): Promise<{ ok: boolean; alreadyExists?: boolean; destinationTitle?: string; message?: string }> => {
+    const working = cloneCourse(course);
+    if (findDuplicateResource(working.modules, draft)) {
+      return { ok: true, alreadyExists: true, destinationTitle: working.title || "your library" };
+    }
+    const resource = buildLibraryResource(draft);
+    let destinationTitle = "";
+    if (destination.moduleId) {
+      const append = (modules: MyCourseModule[]): boolean => {
+        for (const module of modules) {
+          if (module.id === destination.moduleId) {
+            module.resources = [...(module.resources || []), resource];
+            module.updatedAt = Date.now();
+            destinationTitle = `${module.title || "Module"} · ${working.title || "My Study Library"}`;
+            return true;
+          }
+          if (append(module.modules || [])) return true;
+        }
+        return false;
+      };
+      if (!append(working.modules)) {
+        return { ok: false, message: "That module no longer exists. Please pick another destination." };
+      }
+    } else {
+      const module = createMyModule(destination.newModuleTitle || "New module");
+      module.resources = [resource];
+      working.modules = [...(working.modules || []), module];
+      destinationTitle = `${module.title} · ${working.title || "My Study Library"}`;
+    }
+    const result = await myLibrary.save(working);
+    if (!result.ok) return { ok: false, message: result.message };
+    return { ok: true, destinationTitle };
+  };
+
+  const addOfficialToLibrary = async (
+    input: AddOfficialSaveInput,
+  ): Promise<{ ok: boolean; alreadyExists?: boolean; destinationTitle?: string; message?: string }> => {
+    if (!officialResourceDraft) return { ok: false, message: "Open a lesson file first." };
+    if (!user?.id) return { ok: false, message: "Please sign in to save to your library." };
+    trackFeatureEvent("library_official_add", { surface: "course_player_settings" });
+    if (input.existingCourseId) {
+      const course = myLibrary.courses.find((entry) => entry.id === input.existingCourseId);
+      if (!course) return { ok: false, message: "That course no longer exists. Please pick another destination." };
+      return addLibraryResource(course, officialResourceDraft, {
+        moduleId: input.moduleId,
+        newModuleTitle: input.newModuleTitle,
+      });
+    }
+    const course = createMyCourse(user.id, input.newCourseTitle || "My course");
+    return addLibraryResource(course, officialResourceDraft, {
+      moduleId: null,
+      newModuleTitle: input.newModuleTitle || "Module 1",
+    });
+  };
+
   const saveSelectedOfficialForLater = async () => {
-    if (!selectedOfficialReference || personalActionRef.current) return;
+    if (!officialResourceDraft || personalActionRef.current) return;
+    if (!user?.id) {
+      toast({ title: "Sign in first", description: "Please sign in to save resources to your library.", variant: "info" });
+      return;
+    }
     personalActionRef.current = true;
     setPersonalLibraryActionBusy("save");
-    trackFeatureEvent("save_for_later_submitted", { type: selectedFile?.type || "unknown" });
-    const result = await personalModules.addOfficial(selectedOfficialReference, { destination: "saved" });
-    personalActionRef.current = false;
-    setPersonalLibraryActionBusy(null);
-    if (!result.ok) {
-      toast({ title: "Couldn't save resource", description: result.message, variant: "error" });
-      trackFeatureEvent("save_for_later_failed", { code: result.code || "unknown" });
-      return;
-    }
-    if (result.alreadyExists) {
+    try {
+      trackFeatureEvent("save_for_later_submitted", { type: officialResourceDraft.type || "unknown" });
+      // Never guess the shelf is empty: if the live snapshot hasn't resolved
+      // yet, read Firestore once — an overwrite of the real shelf document
+      // with a fresh single-module course would drop the learner's other
+      // saved resources.
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SAVED_FOR_LATER_COURSE_ID) || null;
+      let course: MyCourse;
+      if (existing) {
+        course = cloneCourse(existing);
+      } else {
+        course = {
+          ...createMyCourse(user.id, "Saved for later"),
+          id: SAVED_FOR_LATER_COURSE_ID,
+          description: "Resources you saved from your courses — find them here on the Study Library shelf.",
+        };
+      }
+      // The shelf course keeps ONE root module ("Saved") that holds every
+      // saved resource, in save order.
+      let savedModule = (course.modules || []).find((module) => module.title === SAVED_FOR_LATER_MODULE_TITLE) || null;
+      if (!savedModule) {
+        savedModule = createMyModule(SAVED_FOR_LATER_MODULE_TITLE);
+        course.modules = [...(course.modules || []), savedModule];
+      }
+      if (findDuplicateResource(course.modules, officialResourceDraft)) {
+        toast({
+          title: "Already saved",
+          description: "This resource is already in Saved for Later.",
+          variant: "info",
+        });
+        trackFeatureEvent("official_already_added", { destination: "saved" });
+        return;
+      }
+      const resource = buildLibraryResource(officialResourceDraft);
+      savedModule.resources = [...(savedModule.resources || []), resource];
+      savedModule.updatedAt = Date.now();
+      const result = await myLibrary.save(course);
+      if (!result.ok) {
+        toast({ title: "Couldn't save resource", description: result.message, variant: "error" });
+        trackFeatureEvent("save_for_later_failed", { code: "save-failed" });
+        return;
+      }
       toast({
-        title: result.data?.existingState === "module" ? "Already in My Modules" : "Already saved",
-        description: result.data?.existingState === "module" ? "This resource is already organised in your library." : "This resource is already in Saved for Later.",
-        variant: "info",
+        title: "Saved for later",
+        description: `${officialResourceDraft.name} is in My Study Library.`,
+        variant: "success",
       });
-      trackFeatureEvent("official_already_added", { destination: "saved" });
-      return;
+      trackFeatureEvent("saved_for_later", { type: officialResourceDraft.type || "unknown" });
+    } finally {
+      personalActionRef.current = false;
+      setPersonalLibraryActionBusy(null);
     }
-    toast({ title: "Saved for later", description: `${selectedFile?.name || "Resource"} is in My Study Library.`, variant: "success" });
-    trackFeatureEvent("saved_for_later", { type: selectedFile?.type || "unknown" });
   };
 
   // ── Per-module mind map ─────────────────────────────────────────────────
@@ -1280,13 +1475,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       isDone={isDone}
       activeFilePersonal={activeFileIsPersonal}
       fileActions={fileActions?.model ?? null}
-      showPersonalLibraryActions={Boolean(selectedOfficialReference) && !isMine}
+      showPersonalLibraryActions={Boolean(selectedOfficialReference) && Boolean(user) && !isMine}
       personalLibraryActionBusy={personalLibraryActionBusy}
       onAddToPersonalModule={() => {
-        if (!selectedOfficialReference || personalActionRef.current) return;
-        setOfficialDialogTarget({ reference: selectedOfficialReference, name: selectedFile?.name || "Course resource", type: selectedFile!.type });
+        if (!officialResourceDraft || personalActionRef.current) return;
+        setOfficialDialogTarget(officialResourceDraft);
         setAddOfficialOpen(true);
-        void personalModules.ensureLoaded();
       }}
       onSaveForLater={() => { void saveSelectedOfficialForLater(); }}
       snowMode={snowMode}
@@ -1617,10 +1811,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <AddOfficialResourceDialog
           open
           onClose={closeAddOfficialDialog}
-          personal={personalModules}
-          official={officialDialogTarget?.reference || null}
-          resourceName={officialDialogTarget?.name || "Course resource"}
-          resourceType={officialDialogTarget?.type}
+          courses={myLibrary.courses}
+          coursesState={myLibrary.state === "error" ? "ready" : myLibrary.state}
+          resource={officialDialogTarget}
+          onSave={addOfficialToLibrary}
         />
       </Suspense>
     ) : null}

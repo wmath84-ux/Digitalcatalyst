@@ -26,12 +26,14 @@ import {
   signOut,
   updateProfile,
   type User as FirebaseUser,
+  type UserCredential,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
 import { isCapacitorNative, isEmbeddedWebView, warmNativeGoogleAuth } from "../utils/nativeRuntime";
+import { promptGoogleOneTap, gsiWebClientId } from "../lib/googleIdentity";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -341,6 +343,47 @@ const signInWithGoogleNatively = async () => {
 };
 
 /**
+ * The WEB answer to "picker opens with the Chrome toolbar" (owner report,
+ * 2026-09-24).
+ *
+ * `signInWithPopup()` cannot show a real popup window on phones or inside an
+ * installed PWA — Android Chrome turns every `window.open` into a full
+ * browser tab, so the Google account chooser appeared wrapped in Chrome's
+ * toolbar and the learner was bounced out of the app. This helper instead
+ * asks Google Identity Services for its NATIVE account sheet (GIS One Tap
+ * with FedCM — drawn inside the page by the browser itself, no tab, no
+ * toolbar) and exchanges the returned ID token for the SAME web-SDK session:
+ *
+ *   google.accounts.id.prompt()  →  ID token  →  signInWithCredential()
+ *
+ * Outcomes:
+ *   · credential token → signed-in UserCredential (via `commitFirebaseUser`
+ *     at the call sites, so profile sync stays where it is today);
+ *   · "cancel"    — the learner closed the native sheet (same meaning as
+ *     closing the popup today);
+ *   · "fallback"  — the sheet could not be shown at all (GIS blocked, no
+ *     Google session in the browser, One Tap cooldown after a dismissal,
+ *     FedCM-unsupported browser, unauthorized client origin) — the caller
+ *     falls back to the existing popup flow, so this is never a dead end.
+ */
+const signInWithGoogleOneTap = async (): Promise<
+  { kind: "credential"; idToken: string } | { kind: "cancel" } | { kind: "fallback" }
+> => {
+  const outcome = await promptGoogleOneTap({ clientId: gsiWebClientId() });
+  if (outcome.kind === "credential") return { kind: "credential", idToken: outcome.idToken };
+  if (outcome.kind === "dismissed") return { kind: "cancel" };
+  // "skipped" and "unavailable" both mean "the native sheet never showed".
+  return { kind: "fallback" };
+};
+
+/** Exchange a GIS ID token for the normal web-SDK Firebase session. */
+const signInWithGoogleIdToken = async (idToken: string) => {
+  await setPersistence(auth, browserLocalPersistence);
+  const credential = GoogleAuthProvider.credential(idToken);
+  return signInWithCredential(auth, credential);
+};
+
+/**
  * Best-effort answer to "was this account created with Google and given no
  * password?".
  *
@@ -615,6 +658,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Shared tail of every admin Google sign-in: approved-email + role check. */
+  const finishAdminGoogleSignIn = useCallback(async (credential: UserCredential): Promise<AuthResult> => {
+    const signedInEmail = normalizeEmail(credential.user.email);
+    if (signedInEmail !== APPROVED_ADMIN_EMAIL) {
+      await signOut(auth);
+      setUser(null);
+      return { success: false, message: "This Google account is not the approved admin (wmath84@gmail.com)." };
+    }
+
+    const profileRef = doc(db, "users", credential.user.uid);
+    await setDoc(profileRef, {
+      email: signedInEmail,
+      role: "admin",
+      status: "active",
+      authProvider: "google",
+      providerIds: getProviderIds(credential.user),
+      emailVerified: credential.user.emailVerified,
+      lastLoginAt: serverTimestamp(),
+      ...(credential.user.displayName ? { name: credential.user.displayName } : {}),
+      ...(credential.user.photoURL ? { photoURL: credential.user.photoURL } : {}),
+    }, { merge: true });
+
+    const appUser = await readAppUser(credential.user);
+    setUser({ ...appUser, role: "admin" });
+    createAdminSession(appUser.id, signedInEmail);
+    return { success: true, message: "Admin login successful." };
+  }, []);
+
   const loginAdminWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
     try {
@@ -625,38 +696,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // popup is impossible at all (Google blocks embedded WebViews), so the
       // native Play Services picker is used there instead — both paths end in
       // the same web-SDK session, so the checks below are unchanged.
+      // On the web the browser-native One Tap sheet (FedCM) is tried FIRST —
+      // same UI fix as loginWithGoogle(): no Chrome-toolbar tab. If it cannot
+      // show, the popup below is unchanged; redirect is still never used.
+      if (!isCapacitorNative()) {
+        const oneTap = await signInWithGoogleOneTap();
+        if (oneTap.kind === "credential") {
+          clearGoogleRedirectMarker();
+          const credential = await signInWithGoogleIdToken(oneTap.idToken);
+          return await finishAdminGoogleSignIn(credential);
+        }
+        if (oneTap.kind === "cancel") {
+          clearGoogleRedirectMarker();
+          return { success: false, code: "auth/popup-closed-by-user", message: "Google sign-in cancel कर दिया गया।" };
+        }
+      }
       const credential = isCapacitorNative()
         ? await signInWithGoogleNatively()
         : await signInWithPopup(auth, googleProvider);
-      const signedInEmail = normalizeEmail(credential.user.email);
-      if (signedInEmail !== APPROVED_ADMIN_EMAIL) {
-        await signOut(auth);
-        setUser(null);
-        return { success: false, message: "This Google account is not the approved admin (wmath84@gmail.com)." };
-      }
-
-      const profileRef = doc(db, "users", credential.user.uid);
-      await setDoc(profileRef, {
-        email: signedInEmail,
-        role: "admin",
-        status: "active",
-        authProvider: "google",
-        providerIds: getProviderIds(credential.user),
-        emailVerified: credential.user.emailVerified,
-        lastLoginAt: serverTimestamp(),
-        ...(credential.user.displayName ? { name: credential.user.displayName } : {}),
-        ...(credential.user.photoURL ? { photoURL: credential.user.photoURL } : {}),
-      }, { merge: true });
-
-      const appUser = await readAppUser(credential.user);
-      setUser({ ...appUser, role: "admin" });
-      createAdminSession(appUser.id, signedInEmail);
-      return { success: true, message: "Admin login successful." };
+      return await finishAdminGoogleSignIn(credential);
     } catch (error) {
       clearAdminSession();
       return { success: false, message: authErrorMessage(error) };
     }
-  }, []);
+  }, [finishAdminGoogleSignIn]);
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
@@ -752,7 +815,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setPersistence(auth, browserLocalPersistence);
       setGoogleNotice(null);
 
-      // POPUP FIRST — on every device, phones and installed PWAs included.
+      // PATH 1 — Google's NATIVE account sheet (GIS One Tap + FedCM).
+      //
+      // The owner's 2026-09-24 report: "Google ID picker Chrome toolbar ke
+      // saath khulta hai". Root cause: mobile Chrome cannot open popup
+      // windows, so the popup path's chooser always appeared as a full
+      // browser tab (toolbar, address bar, app left behind) — on phones,
+      // installed PWAs and desktop Chrome alike after Chrome 59's popup
+      // policy. One Tap with FedCM is Google's replacement UI: the browser
+      // draws a "Choose an account" sheet INSIDE this page and hands back an
+      // ID token, which is exchanged through signInWithCredential for the
+      // exact session the popup used to produce (same onAuthStateChanged,
+      // same Firestore rules, same everything downstream).
+      //
+      // Any non-success here ("fallback" = the sheet never showed; Google
+      // suppresses One Tap after a dismissal, when the browser has no Google
+      // session, on FedCM-less browsers, or when this origin is not in the
+      // OAuth client's authorized list) quietly continues into the popup
+      // path below — this can never dead-end the button.
+      const oneTap = await signInWithGoogleOneTap();
+      if (oneTap.kind === "credential") {
+        clearGoogleRedirectMarker();
+        const credential = await signInWithGoogleIdToken(oneTap.idToken);
+        await commitFirebaseUser(credential.user);
+        return { success: true, message: "Google login successful." };
+      }
+      if (oneTap.kind === "cancel") {
+        clearGoogleRedirectMarker();
+        return { success: false, code: "auth/popup-closed-by-user", message: "Google sign-in cancel कर दिया गया।" };
+      }
+
+      // PATH 2 — POPUP (the pre-One-Tap default, kept as the fallback).
       //
       // This is Firebase's documented Option 2 for apps that are NOT hosted on
       // `<project>.firebaseapp.com` (redirect-best-practices): the popup hands

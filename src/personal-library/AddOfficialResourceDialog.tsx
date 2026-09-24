@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, FolderPlus, Library, LoaderCircle, Plus } from "lucide-react";
+import { BookPlus, CheckCircle2, FolderPlus, Library, LoaderCircle, Plus } from "lucide-react";
 import Modal from "../components/ui/Modal";
 import {
   GlassSelect,
@@ -8,135 +8,188 @@ import {
   GlassSelectTrigger,
 } from "../components/ui/glass-select";
 import { toast } from "../components/ui/glass-toast";
-import type { PersonalModulesController } from "../hooks/usePersonalModules";
-import type { PersonalCourseOfficialReference } from "../lib/personalCourseClient";
+import type { MyCourse, MyCourseModule } from "../types/myCourse";
+import { MY_COURSE_TITLE_MAX, MY_MODULE_TITLE_MAX } from "../types/myCourse";
 import type { CourseFileType } from "../types/course";
 import { trackFeatureEvent } from "../utils/featureAnalytics";
-import {
-  PERSONAL_MODULE_DESC_MAX,
-  PERSONAL_MODULE_TITLE_MAX,
-  usageAtModuleLimit,
-  usageAtPerModuleLimit,
-  usageAtResourceLimit,
-} from "../../utils/personalCourse";
+
+/**
+ * The official resource the Course Player hands to this dialog, already
+ * flattened from the active `CourseFile` by the player.
+ */
+export interface OfficialResourceDraft {
+  name: string;
+  type: CourseFileType;
+  url: string;
+  description: string;
+  /** Brain practice payload (type "brain" only) — copied verbatim. */
+  practiceTitle?: string;
+  practiceQuestions?: MyCourseModule["resources"][number]["practiceQuestions"];
+}
+
+export interface AddOfficialSaveInput {
+  /** `null` → create a brand-new course titled `newCourseTitle`. */
+  existingCourseId: string | null;
+  newCourseTitle: string;
+  /** `null` → append a new module titled `newModuleTitle`. */
+  moduleId: string | null;
+  newModuleTitle: string;
+}
+
+export type AddOfficialSaveResult = {
+  ok: boolean;
+  alreadyExists?: boolean;
+  destinationTitle?: string;
+  message?: string;
+};
 
 interface AddOfficialResourceDialogProps {
   open: boolean;
   onClose: () => void;
-  personal: PersonalModulesController;
-  official: PersonalCourseOfficialReference | null;
-  resourceName: string;
-  resourceType?: CourseFileType;
+  /** The learner's live My Study Library (useMyCourses().courses). */
+  courses: MyCourse[];
+  coursesState: "loading" | "ready" | "error";
+  resource: OfficialResourceDraft | null;
+  onSave: (input: AddOfficialSaveInput) => Promise<AddOfficialSaveResult>;
 }
 
+interface ModuleOption {
+  id: string;
+  title: string;
+  depth: number;
+  resourceCount: number;
+}
+
+/** Depth-first flatten of a course's module tree for the destination select. */
+const flattenModules = (modules: MyCourseModule[], depth = 0): ModuleOption[] =>
+  modules.flatMap((module) => [
+    {
+      id: module.id,
+      title: module.title || "Untitled module",
+      depth,
+      resourceCount: module.resources.length,
+    },
+    ...flattenModules(module.modules || [], depth + 1),
+  ]);
+
 /**
- * Course Player → personal module bridge. Source ids are only references; the
- * API re-resolves the official siteProducts snapshot and access server-side.
- * One in-flight guard prevents repeated taps, while authoritative transactions
- * and destination fingerprints reject stale targets and same-module duplicates.
+ * Course Player → My Study Library bridge ("Add to My Module").
+ *
+ * Owner brief (2026-09-24): the two settings rows ("Add to My Module" and
+ * "Save for later") must write into the NEW My Study Library — the
+ * learner-owned course shelf at `users/{uid}/myCourses/{courseId}
+ * (src/lib/myCourseClient.ts) — instead of the old server-backed
+ * personal-modules tree, so everything saved here shows up on the Study
+ * Library page and plays in the same Course Player.
+ *
+ * This dialog picks the destination course + module (or creates either) and
+ * hands the actual write back to the player through `onSave` — the player
+ * owns the resource mapping, the duplicate check and the live controller, so
+ * this dialog stays presentational exactly like the old one.
  */
 export default function AddOfficialResourceDialog({
   open,
   onClose,
-  personal,
-  official,
-  resourceName,
-  resourceType,
+  courses,
+  coursesState,
+  resource,
+  onSave,
 }: AddOfficialResourceDialogProps) {
-  const [destination, setDestination] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [creatingCourse, setCreatingCourse] = useState(false);
+  const [courseId, setCourseId] = useState("");
+  const [newCourseTitle, setNewCourseTitle] = useState("");
+  const [creatingModule, setCreatingModule] = useState(false);
+  const [moduleId, setModuleId] = useState("");
+  const [newModuleTitle, setNewModuleTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submittedRef = useRef(false);
   const modeChosenRef = useRef(false);
 
+  const course = useMemo(
+    () => courses.find((entry) => entry.id === courseId) || null,
+    [courses, courseId],
+  );
+  const moduleOptions = useMemo(() => flattenModules(course?.modules || []), [course]);
+
+  // Opening is the reset boundary: preselect the learner's most recently
+  // updated course and its first module.
   useEffect(() => {
     if (!open) return;
     submittedRef.current = false;
     modeChosenRef.current = false;
     setBusy(false);
     setError(null);
-    setCreating(personal.allModules.length === 0);
-    setDestination(personal.allModules[0]?.id || "");
-    setTitle("");
-    setDescription("");
-    void personal.ensureLoaded();
-    trackFeatureEvent("official_add_opened");
-  }, [open]); // Opening is the reset boundary; live module changes are handled below.
+    setCreatingCourse(courses.length === 0);
+    setCourseId(courses[0]?.id || "");
+    setNewCourseTitle("");
+    setCreatingModule(courses.length === 0);
+    setNewModuleTitle("");
+    const firstCourse = courses[0] || null;
+    const options = flattenModules(firstCourse?.modules || []);
+    setModuleId(options[0]?.id || "");
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- courses changes are reconciled below
+
+  // Live reconciliation: the selected course/module can disappear (another
+  // tab, a delete) while the dialog is open — never leave a stale id selected.
+  useEffect(() => {
+    if (!open) return;
+    if (!creatingCourse) {
+      if (!courses.some((entry) => entry.id === courseId)) {
+        setCourseId(courses[0]?.id || "");
+        if (!courses.length) setCreatingCourse(true);
+      }
+    }
+  }, [open, creatingCourse, courses, courseId]);
 
   useEffect(() => {
-    if (!open || modeChosenRef.current) return;
-    if (personal.allModules.length > 0) {
-      setCreating(false);
-      setDestination((current) => personal.allModules.some((module) => module.id === current)
-        ? current
-        : personal.allModules[0].id);
-    } else if (personal.loaded) {
-      setCreating(true);
-      setDestination("");
+    if (!open || creatingModule || !course) return;
+    if (!moduleOptions.some((option) => option.id === moduleId)) {
+      setModuleId(moduleOptions[0]?.id || "");
     }
-  }, [open, personal.allModules, personal.loaded]);
+  }, [open, creatingModule, course, moduleOptions, moduleId]);
 
-  // A module can disappear in another tab while this dialog is open. Select a
-  // live fallback instead of leaving a visually selected but stale id.
-  useEffect(() => {
-    if (!open || creating || personal.allModules.length === 0) return;
-    if (!personal.allModules.some((module) => module.id === destination)) {
-      setDestination(personal.allModules[0].id);
-    }
-  }, [creating, destination, open, personal.allModules]);
-
-  const selectedModule = useMemo(
-    () => personal.allModules.find((module) => module.id === destination) || null,
-    [destination, personal.allModules],
-  );
-  const limits = personal.access?.limits || null;
-  const moduleLimitReached = usageAtModuleLimit(personal.usage, limits);
-  const resourceLimitReached = usageAtResourceLimit(personal.usage, limits);
-  const typeNotAllowed = Boolean(resourceType && personal.access && !personal.access.allowedTypes.includes(resourceType));
-  const selectedModuleLimitReached = Boolean(selectedModule && usageAtPerModuleLimit(selectedModule.resources.length, limits));
-  const canAddResource = Boolean(personal.access?.entitled) && !resourceLimitReached && !typeNotAllowed;
-  const canCreateModule = Boolean(personal.access?.entitled) && !moduleLimitReached;
-  const canSubmit = Boolean(
-    official
-    && !busy
-    && canAddResource
-    && (creating ? canCreateModule && title.trim() : selectedModule && !selectedModuleLimitReached),
-  );
+  const selectedCourseValid = creatingCourse ? newCourseTitle.trim().length > 0 : Boolean(course);
+  const selectedModuleValid = creatingModule ? newModuleTitle.trim().length > 0 : Boolean(moduleId);
+  const canSubmit = Boolean(resource) && !busy && selectedCourseValid && selectedModuleValid;
 
   const submit = async () => {
-    if (!official || !canSubmit || submittedRef.current) return;
+    if (!resource || !canSubmit || submittedRef.current) return;
     submittedRef.current = true;
     setBusy(true);
     setError(null);
-    trackFeatureEvent("official_add_submitted", { destination: creating ? "new_module" : "existing_module" });
-    const result = await personal.addOfficial(official, creating
-      ? { destination: "module", newModuleTitle: title, newModuleDescription: description }
-      : { destination: "module", moduleId: selectedModule!.id });
+    trackFeatureEvent("official_add_submitted", {
+      destination: creatingCourse ? "new_course" : "existing_course",
+    });
+    const result = await onSave({
+      existingCourseId: creatingCourse ? null : courseId,
+      newCourseTitle: newCourseTitle.trim(),
+      moduleId: creatingModule ? null : moduleId,
+      newModuleTitle: newModuleTitle.trim(),
+    });
     setBusy(false);
     submittedRef.current = false;
     if (!result.ok) {
       setError(result.message || "The resource wasn't added. Please try again.");
-      trackFeatureEvent("official_add_failed", { code: result.code || "unknown" });
+      trackFeatureEvent("official_add_failed", { code: result.message ? "save-failed" : "unknown" });
       return;
     }
     if (result.alreadyExists) {
-      const existingModule = personal.allModules.find((module) => module.id === result.data?.existingModuleId);
       toast({
         title: "Already added",
-        description: existingModule ? `This resource is already in ${existingModule.title}.` : "This resource is already in that destination.",
+        description: `“${resource.name}” is already in ${result.destinationTitle || "that module"}.`,
         variant: "info",
       });
       trackFeatureEvent("official_already_added", { destination: "module" });
     } else {
       toast({
         title: "Added to My Module",
-        description: creating ? `Created “${title.trim()}” and added ${resourceName}.` : `Added to “${selectedModule?.title || "My Module"}”.`,
+        description: `“${resource.name}” is now in ${result.destinationTitle || "your library"} — open My Study Library to see it.`,
         variant: "success",
       });
-      trackFeatureEvent("official_add_succeeded", { destination: creating ? "new_module" : "existing_module" });
+      trackFeatureEvent("official_add_succeeded", {
+        destination: creatingCourse ? "new_course" : "existing_course",
+      });
     }
     onClose();
   };
@@ -146,114 +199,138 @@ export default function AddOfficialResourceDialog({
       <div className="space-y-5" data-add-official-resource-dialog>
         <div className="rounded-2xl border border-violet-400/25 bg-violet-500/10 p-4">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">Official resource</p>
-          <p className="mt-1 break-words text-sm font-black text-white">{resourceName || "Course resource"}</p>
-          <p className="mt-1 text-xs font-medium leading-5 text-white/55">A personal snapshot is added. The official course, order, authorship and completion stay unchanged.</p>
+          <p className="mt-1 break-words text-sm font-black text-white">{resource?.name || "Course resource"}</p>
+          <p className="mt-1 text-xs font-medium leading-5 text-white/55">
+            A personal copy is added to your My Study Library. The official course, order and completion stay unchanged.
+          </p>
         </div>
 
-        {personal.state === "loading" && !personal.loaded ? (
+        {coursesState === "loading" && courses.length === 0 ? (
           <div className="flex min-h-28 items-center justify-center gap-2 text-sm font-bold text-white/60" role="status">
-            <LoaderCircle className="h-5 w-5 animate-spin" /> Loading your modules…
+            <LoaderCircle className="h-5 w-5 animate-spin" /> Loading your library…
           </div>
         ) : (
           <>
-            {!personal.access?.entitled || resourceLimitReached || typeNotAllowed ? (
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-5 text-amber-100" role="status">
-                <p>{resourceLimitReached
-                  ? "Your current plan’s total resource limit has been reached. Existing library content remains available."
-                  : typeNotAllowed
-                    ? `This ${resourceType || "resource"} type is not included in your current plan. Existing library content remains available.`
-                    : "Your existing library remains available, but your current plan does not allow another personal copy."}</p>
-                <button
-                  type="button"
-                  onClick={() => { trackFeatureEvent("upgrade_clicked", { surface: "official_add_dialog", reason: resourceLimitReached ? "resource_limit" : typeNotAllowed ? "resource_type" : "ineligible" }); window.location.hash = "#/subscription"; }}
-                  className="mt-2 min-h-11 rounded-full bg-amber-400/15 px-4 font-black ring-1 ring-amber-400/30"
-                >
-                  View plans
-                </button>
-              </div>
-            ) : null}
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Destination type">
               <button
                 type="button"
-                className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${!creating ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65"}`}
-                onClick={() => { modeChosenRef.current = true; setCreating(false); }}
-                disabled={busy || personal.allModules.length === 0}
-                aria-pressed={!creating}
+                className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${!creatingCourse ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65"}`}
+                onClick={() => { modeChosenRef.current = true; setCreatingCourse(false); }}
+                disabled={busy || courses.length === 0}
+                aria-pressed={!creatingCourse}
               >
-                <Library className="mr-1.5 inline h-4 w-4" /> Existing
+                <Library className="mr-1.5 inline h-4 w-4" /> Existing course
               </button>
               <button
                 type="button"
-                className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${creating ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65"}`}
-                onClick={() => { modeChosenRef.current = true; setCreating(true); }}
-                disabled={busy || !canCreateModule}
-                aria-pressed={creating}
+                className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${creatingCourse ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65"}`}
+                onClick={() => { modeChosenRef.current = true; setCreatingCourse(true); }}
+                disabled={busy}
+                aria-pressed={creatingCourse}
               >
-                <FolderPlus className="mr-1.5 inline h-4 w-4" /> Create new
+                <BookPlus className="mr-1.5 inline h-4 w-4" /> New course
               </button>
             </div>
 
-            {creating ? (
+            {creatingCourse ? (
               <div className="space-y-4">
-                {personal.access?.entitled && moduleLimitReached && !resourceLimitReached && !typeNotAllowed ? (
-                  <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-5 text-amber-100">
-                    <p>This plan’s module limit has been reached. Choose an existing module or view plans.</p>
-                    <button type="button" onClick={() => { trackFeatureEvent("upgrade_clicked", { surface: "official_add_dialog", reason: "module_limit" }); window.location.hash = "#/subscription"; }} className="mt-2 min-h-11 rounded-full bg-amber-400/15 px-4 font-black ring-1 ring-amber-400/30">View plans</button>
-                  </div>
-                ) : null}
                 <div>
-                  <label htmlFor="official-new-module-title" className="mb-1.5 block text-xs font-black text-white/70">Module name</label>
+                  <label htmlFor="official-new-course-title" className="mb-1.5 block text-xs font-black text-white/70">Course name</label>
                   <input
-                    id="official-new-module-title"
+                    id="official-new-course-title"
                     autoFocus
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    maxLength={PERSONAL_MODULE_TITLE_MAX}
-                    disabled={busy || !canCreateModule}
+                    value={newCourseTitle}
+                    onChange={(event) => setNewCourseTitle(event.target.value)}
+                    maxLength={MY_COURSE_TITLE_MAX}
+                    disabled={busy}
                     placeholder="e.g. Exam revision"
                     className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-semibold text-white outline-none placeholder:text-white/30 focus:border-violet-400/60"
                   />
                 </div>
                 <div>
-                  <label htmlFor="official-new-module-description" className="mb-1.5 block text-xs font-black text-white/70">Description <span className="font-medium text-white/40">(optional)</span></label>
-                  <textarea
-                    id="official-new-module-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    maxLength={PERSONAL_MODULE_DESC_MAX}
-                    disabled={busy || !canCreateModule}
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-white/30 focus:border-violet-400/60"
+                  <label htmlFor="official-new-course-module" className="mb-1.5 block text-xs font-black text-white/70">Module name</label>
+                  <input
+                    id="official-new-course-module"
+                    value={newModuleTitle}
+                    onChange={(event) => setNewModuleTitle(event.target.value)}
+                    maxLength={MY_MODULE_TITLE_MAX}
+                    disabled={busy}
+                    placeholder="e.g. Chapter 1"
+                    className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-semibold text-white outline-none placeholder:text-white/30 focus:border-violet-400/60"
                   />
                 </div>
               </div>
-            ) : personal.allModules.length > 0 ? (
-              <div>
-                <label htmlFor="official-module-destination" className="mb-1.5 block text-xs font-black text-white/70">Choose a module</label>
-                <GlassSelect value={destination} onValueChange={setDestination}>
-                  <GlassSelectTrigger
-                    id="official-module-destination"
-                    autoFocus
-                    disabled={busy}
-                    aria-label="Choose a module"
-                    className="dc-glass-select min-h-12 h-auto w-full rounded-2xl px-4 text-sm font-semibold"
-                  />
-                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Module destinations">
-                    {personal.allModules.map((module) => (
-                      <GlassSelectItem key={module.id} value={module.id}>{`${module.title} · ${module.resources.length} resources`}</GlassSelectItem>
-                    ))}
-                  </GlassSelectContent>
-                </GlassSelect>
-                {personal.access?.entitled && selectedModuleLimitReached && !resourceLimitReached && !typeNotAllowed ? (
-                  <div className="mt-2 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs font-semibold leading-5 text-amber-100" role="status">
-                    <p>This module has reached your plan’s per-module resource limit. Choose another module or view plans.</p>
-                    <button type="button" onClick={() => { trackFeatureEvent("upgrade_clicked", { surface: "official_add_dialog", reason: "per_module_limit" }); window.location.hash = "#/subscription"; }} className="mt-2 min-h-11 rounded-full bg-amber-400/15 px-4 font-black ring-1 ring-amber-400/30">View plans</button>
+            ) : courses.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="official-course-destination" className="mb-1.5 block text-xs font-black text-white/70">Choose a course</label>
+                  <GlassSelect value={courseId} onValueChange={setCourseId}>
+                    <GlassSelectTrigger
+                      id="official-course-destination"
+                      disabled={busy}
+                      aria-label="Choose a course"
+                      className="dc-glass-select min-h-12 h-auto w-full rounded-2xl px-4 text-sm font-semibold"
+                    />
+                    <GlassSelectContent className="dc-glass-select-pop" aria-label="Course destinations">
+                      {courses.map((entry) => (
+                        <GlassSelectItem key={entry.id} value={entry.id}>{entry.title || "Untitled course"}</GlassSelectItem>
+                      ))}
+                    </GlassSelectContent>
+                  </GlassSelect>
+                </div>
+
+                {creatingModule ? (
+                  <div>
+                    <label htmlFor="official-new-module-title" className="mb-1.5 block text-xs font-black text-white/70">New module name</label>
+                    <input
+                      id="official-new-module-title"
+                      autoFocus
+                      value={newModuleTitle}
+                      onChange={(event) => setNewModuleTitle(event.target.value)}
+                      maxLength={MY_MODULE_TITLE_MAX}
+                      disabled={busy}
+                      placeholder="e.g. Chapter 1"
+                      className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-semibold text-white outline-none placeholder:text-white/30 focus:border-violet-400/60"
+                    />
                   </div>
-                ) : null}
+                ) : moduleOptions.length > 0 ? (
+                  <div>
+                    <label htmlFor="official-module-destination" className="mb-1.5 block text-xs font-black text-white/70">Choose a module</label>
+                    <GlassSelect value={moduleId} onValueChange={setModuleId}>
+                      <GlassSelectTrigger
+                        id="official-module-destination"
+                        disabled={busy}
+                        aria-label="Choose a module"
+                        className="dc-glass-select min-h-12 h-auto w-full rounded-2xl px-4 text-sm font-semibold"
+                      />
+                      <GlassSelectContent className="dc-glass-select-pop" aria-label="Module destinations">
+                        {moduleOptions.map((option) => (
+                          <GlassSelectItem key={option.id} value={option.id}>
+                            {`${"\u00A0\u00A0".repeat(option.depth)}${option.title} · ${option.resourceCount} resources`}
+                          </GlassSelectItem>
+                        ))}
+                      </GlassSelectContent>
+                    </GlassSelect>
+                  </div>
+                ) : (
+                  <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-semibold leading-5 text-white/60">
+                    This course has no modules yet — create one below.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  className={`min-h-10 w-full rounded-2xl border px-3 text-xs font-black transition ${creatingModule ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65"}`}
+                  onClick={() => { setCreatingModule((current) => !current); setNewModuleTitle(""); }}
+                  disabled={busy}
+                  aria-pressed={creatingModule}
+                >
+                  {creatingModule ? "Choose an existing module instead" : <><FolderPlus className="mr-1.5 inline h-4 w-4" /> Create a new module</>}
+                </button>
               </div>
             ) : (
               <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5 text-center text-sm font-semibold text-white/60">
-                You don't have a module yet. Create one above to add this resource.
+                You don't have a course yet — create one above to add this resource.
               </p>
             )}
           </>
@@ -269,8 +346,8 @@ export default function AddOfficialResourceDialog({
             disabled={!canSubmit}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-violet-600 px-5 text-sm font-black text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : creating ? <Plus className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-            {busy ? "Adding…" : creating ? "Create and add" : "Add resource"}
+            {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : creatingCourse ? <Plus className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            {busy ? "Adding…" : creatingCourse ? "Create and add" : "Add resource"}
           </button>
         </div>
       </div>

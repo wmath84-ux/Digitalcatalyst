@@ -77,6 +77,24 @@ test("the web Google flow tries the popup on EVERY device, phone included", () =
   assert.match(auth, /POPUP_FALLBACK_CODES/);
   assert.match(auth, /auth\/popup-blocked/);
   assert.match(auth, /auth\/operation-not-supported-in-this-environment/);
+  // Owner report 2026-09-24: "Google ID picker Chrome toolbar ke saath khulta
+  // hai". The FIRST attempt on the web is now Google's native (FedCM) One Tap
+  // sheet — drawn inside the page, no tab, no toolbar — and its ID token is
+  // exchanged with signInWithCredential; the popup survives only as that
+  // sheet's fallback.
+  assert.match(auth, /signInWithGoogleOneTap\(\)/);
+  assert.match(auth, /promptGoogleOneTap/);
+  const oneTapAt = loginFn.indexOf("signInWithGoogleOneTap()");
+  assert.ok(oneTapAt > 0 && oneTapAt < popupAt, "the FedCM One Tap sheet must be attempted before the popup");
+  assert.match(auth, /signInWithGoogleIdToken/);
+  assert.match(auth, /GoogleAuthProvider\.credential\(idToken\)/);
+  assert.match(auth, /signInWithCredential\(auth, credential\)/);
+  // The GIS loader itself opts into FedCM and degrades without it.
+  const gsi = fs.readFileSync("src/lib/googleIdentity.ts", "utf8");
+  assert.match(gsi, /use_fedcm_for_prompt: true/);
+  assert.match(gsi, /use_fedcm_for_button: true/);
+  assert.match(gsi, /accounts\.google\.com\/gsi\/client/);
+  assert.match(gsi, /kind: "skipped"/);
 });
 
 test("the redirect fallback leaves a marker so an empty return is explainable", () => {

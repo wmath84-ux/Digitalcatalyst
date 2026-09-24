@@ -21,6 +21,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -306,6 +307,22 @@ export async function saveMyCourse(uid: string, course: MyCourse): Promise<void>
     updatedAtServer: serverTimestamp(),
   };
   await setDoc(courseRef(uid, clean.id), payload, { merge: true });
+}
+
+/**
+ * One-shot read of the learner's courses (no live listener). Used by the
+ * Course Player's "Save for later": if the tap lands before the live
+ * snapshot has resolved, the action reads Firestore directly instead of
+ * guessing the shelf course is empty — a guess that would overwrite the
+ * existing shelf document's modules.
+ */
+export async function fetchMyCourses(uid: string): Promise<MyCourse[]> {
+  if (!uid) return [];
+  const snapshot = await getDocs(collection(db, "users", uid, MY_COURSES_COLLECTION));
+  return snapshot.docs
+    .map((entry) => parseMyCourse(entry.data(), uid))
+    .filter((course): course is MyCourse => Boolean(course))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function deleteMyCourse(uid: string, courseId: string): Promise<void> {
