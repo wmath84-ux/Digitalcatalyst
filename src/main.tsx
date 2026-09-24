@@ -61,6 +61,11 @@ const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
 const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
 const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
+// My Study Library's creation surfaces: the builder ("+" → new course / edit
+// course) and the Course Player host for a course the learner authored. Both
+// are lazy — nothing is downloaded until the learner actually opens one.
+const MyCourseEditorPage = lazyRoute(() => import("./personal-library/MyCourseEditorPage"));
+const MyCoursePlayerPage = lazyRoute(() => import("./personal-library/MyCoursePlayerPage"));
 const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage"));
 // The 3D sanctuary is a heavy chunk (three.js + the procedural world), so it
 // is lazy like every other route — nothing is downloaded until the learner
@@ -111,7 +116,7 @@ import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
-import { requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
+import { isMyCourseEditorRoute, isMyCoursePlayerRoute, readMyCourseId, requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
 import AppShell from "./components/AppShell";
@@ -181,6 +186,8 @@ const PROFILE_HASH = "#/profile";
 // Dedicated Settings / Preferences page (the desktop rail's Settings entry).
 const SETTINGS_HASH = "#/settings";
 const STUDY_LIBRARY_HASH = "#/study-library";
+/** Learner-authored courses: `#/my-course/new`, `#/my-course/<id>`, `#/my-course/<id>/edit`. */
+const MY_COURSE_HASH = "#/my-course/";
 const STUDY_PACK_HASH = "#/pack/";
 const NATURE_STUDIO_HASH = "#/nature-studio";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
@@ -562,6 +569,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
+  if (hash.startsWith(MY_COURSE_HASH)) return isMyCourseEditorRoute(hash) ? MyCourseEditorPage : MyCoursePlayerPage;
   if (hash.startsWith(NATURE_STUDIO_HASH)) return NatureStudioPage;
   if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
@@ -681,6 +689,10 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
+    // A course the learner authored opens the SAME immersive player, so the
+    // rail / top bar have to get out of its way too. The builder (…/new and
+    // …/edit) keeps the normal chrome.
+    || isMyCoursePlayerRoute(hash)
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
     || hash.startsWith(OPENING_PREVIEW_HASH)
@@ -1730,6 +1742,31 @@ function RootPage(): ReactNode {
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(NATURE_STUDIO_HASH)) return <NatureStudioPage />;
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
+  // Learner-authored courses (My Study Library): `#/my-course/new` and
+  // `#/my-course/<id>/edit` open the builder, `#/my-course/<id>` opens the
+  // SAME Course Player a purchased course opens — on the learner's own
+  // modules, resources and Brain practice sets.
+  if (hash.startsWith(MY_COURSE_HASH)) {
+    const myCourseId = readMyCourseId(hash);
+    return (
+      <StudyLibraryErrorBoundary>
+        <PageEnter pageKey={pageEnterAppKey(hash)}>
+          {isMyCourseEditorRoute(hash) ? (
+            <MyCourseEditorPage
+              courseId={myCourseId}
+              onBack={() => { window.location.hash = STUDY_LIBRARY_HASH; }}
+              onPlay={(courseId) => { window.location.hash = `#/my-course/${encodeURIComponent(courseId)}`; }}
+            />
+          ) : (
+            <MyCoursePlayerPage
+              courseId={myCourseId}
+              onBack={() => { window.location.hash = STUDY_LIBRARY_HASH; }}
+            />
+          )}
+        </PageEnter>
+      </StudyLibraryErrorBoundary>
+    );
+  }
   if (hash.startsWith(STUDY_LIBRARY_HASH)) {
     // The boundary keeps a Study Library render crash contained to this route:
     // instead of the whole app unmounting to a bare black canvas (with dead

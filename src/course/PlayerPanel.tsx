@@ -181,6 +181,15 @@ export interface PlayerPanelProps {
   gateFile?: { id?: string | null; url?: string | null; name?: string | null } | null;
   productId?: string | null;
   moduleId?: string | null;
+  /**
+   * True when this player is showing a course the LEARNER authored in My
+   * Study Library. The personal-library rows ("Add to My Module", "Save for
+   * later") and the "Gate personal access" form all exist to copy or unlock
+   * an OFFICIAL course resource — there is none here, so they are hidden.
+   * Every other setting (snowfall, desktop view, status bar, footer dock)
+   * is untouched.
+   */
+  mine?: boolean;
 }
 
 export default function PlayerPanel({
@@ -211,6 +220,7 @@ export default function PlayerPanel({
   gateFile = null,
   productId = null,
   moduleId = null,
+  mine = false,
 }: PlayerPanelProps) {
   // Holding the logo opens the main app (Home); a normal tap returns the
   // learner to Purchases — the exact contract the old player header had.
@@ -310,7 +320,7 @@ export default function PlayerPanel({
             ) : null}
           </div>
           <div className="space-y-1">
-            {showPersonalLibraryActions && onAddToPersonalModule ? (
+            {!mine && showPersonalLibraryActions && onAddToPersonalModule ? (
               <PanelActionRow
                 icon={FolderPlus}
                 color="#B388FF"
@@ -321,7 +331,7 @@ export default function PlayerPanel({
                 dataAttrs={{ "data-course-add-to-personal-module": "" }}
               />
             ) : null}
-            {showPersonalLibraryActions && onSaveForLater ? (
+            {!mine && showPersonalLibraryActions && onSaveForLater ? (
               <PanelActionRow
                 icon={BookmarkPlus}
                 color="#FFBE0B"
@@ -413,7 +423,7 @@ export default function PlayerPanel({
           Only shown for Google file types (Docs, Sheets, Slides, PDF/Drive)
           that the owner-side workflow can prepare and share. Other types
           (YouTube, embeds, direct files) have no Drive source for this gate. */}
-      {gateFile ? (
+      {!mine && gateFile ? (
         <>
           <SectionLabel>Gate personal access</SectionLabel>
           <div className="px-2 pb-2">

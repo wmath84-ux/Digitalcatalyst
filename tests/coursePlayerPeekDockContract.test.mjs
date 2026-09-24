@@ -42,7 +42,9 @@ test("the peek dock mounts the line, the panel and the home GlassDock", () => {
   assert.match(peek, /<GlassDock[^>]*compact[^>]*items=\{items\}[^>]*onSelect=\{handleSelect\}/);
   assert.match(peek, /<GlassMaterial radius=\{6\} \/>/);
   // The dock items are the study pane's own tabs, built by the shared helper.
-  assert.match(peek, /buildDockItems\(tab\)/);
+  // `hiddenTabs` removes tabs the player must not offer (a learner-authored
+  // course has no Paid tab) — the dock is built from the visible remainder.
+  assert.match(peek, /buildDockItems\(tab, hiddenTabs\)/);
   // It must NOT carry the site-footer attribute: that is what the desktop
   // rules hide, and the peek dock has to stay reachable on every device.
   assert.doesNotMatch(peek, /siteFooter/);
@@ -132,7 +134,7 @@ test("the player defaults to the always-visible dock and persists the preference
   // Persisted on change, like every other player preference.
   assert.match(coursePlayer, /localStorage\.setItem\(legacyFooterDockStorageKey, legacyFooterDock \? "1" : "0"\)/);
   // The peek dock renders ONLY while the legacy preference is off.
-  assert.match(coursePlayer, /!legacyFooterDock \? <CoursePeekDock tab=\{dockTab\} onTabChange=\{handleDockTabChange\} \/> : null/);
+  assert.match(coursePlayer, /!legacyFooterDock \? <CoursePeekDock tab=\{dockTab\} onTabChange=\{handleDockTabChange\} hiddenTabs=\{hiddenTabs\} \/> : null/);
   // The study pane is told to drop its own dock in the same mode.
   assert.match(coursePlayer, /peekDock=\{!legacyFooterDock\}/);
 });

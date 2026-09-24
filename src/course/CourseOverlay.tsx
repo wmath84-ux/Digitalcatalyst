@@ -416,6 +416,13 @@ interface CourseOverlayProps {
    * "coming soon" placeholder, so older call sites keep working.
    */
   brainPanel?: ReactNode;
+  /**
+   * Tabs this player must NOT show. A learner-authored course (My Study
+   * Library) passes `["paid"]`: there is nothing to purchase in a course the
+   * learner built, so the premium tab is gone from the dock (and from the
+   * ⌘/Ctrl+1… tab shortcuts, which the Course Player filters the same way).
+   */
+  hiddenTabs?: DockTab[];
 }
 
 /**
@@ -475,8 +482,8 @@ export const PLAYER_FALLBACK = (
  * TABS order, with the course data hooks the contract tests look for. Shared
  * by both variants so the dock is identical wherever it lives.
  */
-export const buildDockItems = (tab: DockTab): GlassDockItem[] =>
-  TABS.map(({ key, label, color, icon }) => ({
+export const buildDockItems = (tab: DockTab, hiddenTabs: DockTab[] = []): GlassDockItem[] =>
+  TABS.filter(({ key }) => !hiddenTabs.includes(key)).map(({ key, label, color, icon }) => ({
     id: key,
     label,
     color,
@@ -852,7 +859,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // (release the finger on a tab and it is selected). No slide-drag pill, no
   // live content swap while the finger moves. This element is the LAST CHILD
   // OF THE STUDY PANE, so the footer navigation lives inside the split.
-  const dockItems: GlassDockItem[] = buildDockItems(tab);
+  const dockItems: GlassDockItem[] = buildDockItems(tab, props.hiddenTabs);
 
   // ── The tab body ───────────────────────────────────────────────────────
   const studyBody = (

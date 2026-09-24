@@ -242,8 +242,11 @@ test("CoursePlayer persists notes to localStorage (per user + product)", () => {
   assert.match(notesStore, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
   assert.match(notesStore, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
   assert.match(notesStore, /notesStorageKey = \(uid: string, productId: string\) => `dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/);
-  assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
-  assert.match(coursePlayer, /loadLocalNotes\(user\.id, product\.id\)/);
+  // Notes are keyed on `storageProductId` (`mine-<courseId>` for a course the
+  // learner authored) so a learner-authored course never shares a note store
+  // with an official course.
+  assert.match(coursePlayer, /persistLocalNotes\(user\.id, storageProductId, next\)/);
+  assert.match(coursePlayer, /loadLocalNotes\(user\.id, storageProductId\)/);
 });
 
 test("CoursePlayerNote type has all the fields the NotesPanel reads", () => {

@@ -11,15 +11,47 @@ export const LANDING_HASH = "#/landing";
 /** Fallback destination for the auth Back button when nothing else exists. */
 export const AUTH_BACK_FALLBACK = "#/home";
 
+/** Learner-authored courses (My Study Library). */
+export const MY_COURSE_PREFIX = "#/my-course/";
+
 /** Routes that require a signed-in user before they may render. */
 export const AUTH_REQUIRED_PREFIXES = [
   "#/checkout",
   "#/my-day",
   "#/profile",
   "#/study-library",
+  MY_COURSE_PREFIX,
   "#/course/",
   "#/subscription",
 ] as const;
+
+/**
+ * The course id inside `#/my-course/<id>` (or `<id>/edit`). `"new"` — the
+ * builder's create route — returns null, which is exactly what the editor
+ * expects for a blank course.
+ */
+export const readMyCourseId = (hash: string): string | null => {
+  if (!hash.startsWith(MY_COURSE_PREFIX)) return null;
+  const rest = String(hash).slice(MY_COURSE_PREFIX.length).split("?")[0].replace(/\/+$/, "");
+  if (!rest || rest === "new") return null;
+  const [id, ...tail] = rest.split("/");
+  if (!id) return null;
+  // `#/my-course/<id>/edit` → the builder; anything else is the player route.
+  return tail[0] === "edit" ? id : id;
+};
+
+/** True for the builder routes (`#/my-course/new`, `#/my-course/<id>/edit`). */
+export const isMyCourseEditorRoute = (hash: string): boolean => {
+  if (!hash.startsWith(MY_COURSE_PREFIX)) return false;
+  const rest = String(hash).slice(MY_COURSE_PREFIX.length).split("?")[0].replace(/\/+$/, "");
+  if (!rest || rest === "new") return true;
+  return rest.split("/")[1] === "edit";
+};
+
+/** True for `#/my-course/<id>` — the Course Player on a learner's own course. */
+export const isMyCoursePlayerRoute = (hash: string): boolean =>
+  hash.startsWith(MY_COURSE_PREFIX) && !isMyCourseEditorRoute(hash);
+
 
 /** Auth / admin entry screens are never "pages to go back to". */
 export const AUTH_SCREEN_PREFIXES = ["#/auth", "#/admin-login", "#/admin"] as const;

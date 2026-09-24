@@ -125,6 +125,32 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
 
+      // ── Learner-authored courses (My Study Library → "+") ───────────────
+      // ONE document per course: cover image, title, nested modules, resources
+      // and Brain (MCQ) practice questions — the tree the Course Player opens
+      // at `#/my-course/<id>`.
+      //
+      // Ownership is re-derived from the PATH, so a browser can never read or
+      // write another learner's course. The learner owns the whole tree
+      // outright (no entitlement, no plan limit, nothing purchasable), so —
+      // exactly like `mindMaps` — direct owner writes are permitted: the
+      // offline queue then means a course built on a flaky connection is never
+      // lost. The caps below keep one document far away from Firestore's 1 MB
+      // limit (the client enforces the same numbers while editing).
+      match /myCourses/{courseId} {
+        allow read, delete: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 120
+          && (!('description' in request.resource.data) || request.resource.data.description.size() <= 600)
+          && (!('coverImage' in request.resource.data) || request.resource.data.coverImage is string)
+          && request.resource.data.modules is list
+          && request.resource.data.modules.size() <= 200
+          && request.resource.data.schemaVersion is int
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+      }
+
       match /courseProgress/{productId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

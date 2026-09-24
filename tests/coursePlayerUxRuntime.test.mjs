@@ -134,7 +134,7 @@ test("All note operations (add / edit / delete) write to localStorage", () => {
   assert.match(notesStore, /notesStorageKey/, "expected 'notesStorageKey' in source");
   assert.match(notesStore, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
   assert.match(notesStore, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
-  assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
+  assert.match(coursePlayer, /persistLocalNotes\(user\.id, storageProductId, next\)/);
 });
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ test("CoursePlayerNote is exported from src/types/course.ts", () => {
 // ---------------------------------------------------------------------------
 
 test("Last opened file is persisted on every select", () => {
-  assert.match(coursePlayer, /setDoc\(progressRef, \{ productId: product\.id, lastOpenedFileId: file\.id, lastOpenedAt: serverTimestamp\(\) \}, \{ merge: true \}\)/);
+  assert.match(coursePlayer, /setDoc\(progressRef, \{ productId: storageProductId, lastOpenedFileId: file\.id, lastOpenedAt: serverTimestamp\(\) \}, \{ merge: true \}\)/);
 });
 
 test("Completed files are persisted via arrayUnion and un-completed via arrayRemove", () => {
