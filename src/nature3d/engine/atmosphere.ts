@@ -5,14 +5,16 @@
 //
 // ── What this replaces (research §15, §16, §21, principles 17, 18, 23, 24)
 //
-// Before this file, distance haze was one line in `scene.ts`:
+// Distance smoke fog is authored in `scene.ts` as THREE.Fog (linear near/far)
+// per the three.js manual (https://threejs.org/manual/#en/fog):
 //
-//     this.scene.fog = new THREE.FogExp2(0xbcd9ef, budget.fogDensity)
+//     this.scene.fog = new THREE.Fog(color, fogNear, fogFar)
 //
-// That is three.js's stock exponential-squared fog: a uniform, colourless
-// grey that multiplies by distance. It hides the far hills (which is why it
-// was there) but it does nothing else, because real air does three things a
-// uniform fog cannot:
+// Stock Fog fades material → fogColor between near and far. This file
+// replaces the fog_fragment so the same near/far ramp also gets height
+// weighting and sun-side aerial tint — still one cheap ALU path, no
+// volumetric raymarch. Real air also does three things stock fog alone
+// cannot:
 //
 //   1. IT POOLS LOW. Haze is densest in the valleys and thins with altitude,
 //      which is what makes a mountain top look CLOSE and a valley floor look
@@ -204,62 +206,56 @@ function projectVertexChunk(withNormal: boolean): string {
 }
 
 /**
- * The fog chunk, replaced.
+ * SMOKE / DISTANCE FOG — three.js manual recipe.
  *
- * Distance-driven atmospheric fog:
- *   0–12 m   crystal clear (no fog)
- *  12–40 m   haze eases in
- *  40 m+     density ramps hard — distant land goes smoky
+ * Docs (https://threejs.org/manual/#en/fog):
+ *   THREE.Fog(color, near, far)
+ *   - distance < near  → no fog (clear)
+ *   - distance > far   → fully fog colour (smoke)
+ *   - between          → smoothstep fade material → fog
  *
- * The scene still carries FogExp2 for three.js bookkeeping, but the real
- * look is this distance curve so near ground stays readable and far ridges
- * melt into blue-grey air.
+ * three.js injects fogNear / fogFar / fogColor / vFogDepth automatically when
+ * scene.fog is a THREE.Fog. We replace the stock fog_fragment so we can:
+ *   1. use the FULL 0→1 mix (stock is fine; we keep it honest)
+ *   2. tint the fog with sun-side aerial perspective (slight warm limb)
+ *   3. height-weight the smoke so valleys are denser than ridgelines
+ *      (Unreal AtmosphericFog / height-fog idea — still one cheap ALU)
+ *
+ * NO volumetric raymarch, NO post-process — mobile-safe distance fog only.
  */
 const FOG_CHUNK = /* glsl */ `
   #ifdef USE_FOG
     #ifdef FOG_EXP2
-      // Height-weighted optical depth. Haze pools in the low ground and
-      // clears with altitude, so a summit reads near and a valley reads far.
-      float dcHazeAlt = max( vDcWorldPos.y, -12.0 );
-      float dcHazeFall = exp( - dcHazeAlt / uDcHazeHeight );
-      float dcHazeDensity = fogDensity * mix( 1.0, uDcHazeGround, dcHazeFall );
+      // Fallback if something re-enables Exp2 (underwater used to).
+      float dcFogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+      dcFogFactor = clamp( dcFogFactor, 0.0, 1.0 );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, dcFogFactor );
+    #else
+      // ── LINEAR DISTANCE SMOKE (THREE.Fog) ──────────────────────────
+      // Official three.js formula: smoothstep(near, far, depth).
+      // near ≈ 16 m  →  10–20 m stays sharp (user request)
+      // far  ≈ 420 m →  mid/far ground is fully in the smoke ramp
+      float dcFogFactor = smoothstep( fogNear, fogFar, vFogDepth );
 
-      float dcDepth = max( vFogDepth, 0.0 );
+      // Height fog: smoke pools low. Ridges stay a touch clearer so the
+      // silhouette still reads through the haze (UE AtmosphericFog idea).
+      float dcHazeAlt = max( vDcWorldPos.y, -8.0 );
+      float dcHeightW = mix( uDcHazeGround, 1.0, exp( - dcHazeAlt / uDcHazeHeight ) );
+      dcFogFactor = clamp( dcFogFactor * dcHeightW, 0.0, 1.0 );
+      // Cap below 1.0 so a full zoom-out never becomes a solid grey wall
+      // (StackOverflow / open-world practice: hazy distance, not a curtain).
+      dcFogFactor = min( dcFogFactor, 0.88 );
 
-      // ── DISTANCE FOG CURVE ──────────────────────────────────────────
-      // Near field stays clear so 10–20 m reads sharp; past that the air
-      // thickens smoothly into smoke. Two smoothsteps + a soft exp tail.
-      float dcNearClear = 1.0 - smoothstep( 12.0, 40.0, dcDepth );
-      float dcMidBuild  = smoothstep( 30.0, 120.0, dcDepth );
-      float dcFarSmoke  = smoothstep( 90.0, 380.0, dcDepth );
-      // Base exp2 fog still contributes a gentle global falloff.
-      float dcExpFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
-      // Composite: clear near → growing haze → dense smoky distance.
-      float dcFog = mix( dcExpFog, 1.0, dcMidBuild * 0.55 + dcFarSmoke * 0.45 );
-      dcFog *= ( 1.0 - dcNearClear * 0.92 );
-      // Extra far-field punch so ridges dissolve into air.
-      dcFog = clamp( dcFog + dcFarSmoke * 0.35, 0.0, 1.0 );
-
-      // AERIAL PERSPECTIVE — cool smoky blue air, not grey bleach.
+      // Aerial perspective: fog colour leans slightly sun-warm on the lit
+      // side of the sky and stays cool blue-grey otherwise — real air is lit.
       vec3 dcEye = normalize( vDcWorldPos - cameraPosition );
       float dcToward = max( dot( dcEye, uDcSunDir ), 0.0 );
-      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.22 );
-      // Smoky atmosphere: pale blue-grey that thickens with distance.
-      dcHaze = mix( dcHaze, vec3( 0.62, 0.74, 0.88 ), 0.28 + dcFarSmoke * 0.22 );
-
-      // Near stays almost untouched; far can go heavily atmospheric.
-      float dcWash = clamp( dcFog * uDcAerial * ( 0.55 + dcFarSmoke * 0.85 ), 0.0, 0.78 );
-      float dcLum = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
-      float dcHazeLum = max( dot( dcHaze, vec3( 0.2126, 0.7152, 0.0722 ) ), 0.001 );
-      // Allow haze to lift slightly so far land reads as lit air, not mud.
-      dcHaze *= min( 1.35, ( dcLum + 0.08 ) / dcHazeLum );
-      // Desaturate with distance — contrast drop into the smoke.
-      float dcGrey = dot( gl_FragColor.rgb, vec3( 0.3333 ) );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( dcGrey ), dcWash * 0.35 );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcWash );
-    #else
-      float dcLin = smoothstep( max( fogNear, 12.0 ), fogFar, vFogDepth );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, min( dcLin, 0.72 ) );
+      vec3 dcSmoke = mix( fogColor, uDcSunColor * fogColor, dcToward * uDcInScatter * 0.18 );
+      // Soft desat of the surface as it enters the smoke (contrast drop).
+      float dcGrey = dot( gl_FragColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
+      vec3 dcSurf = mix( gl_FragColor.rgb, vec3( dcGrey ), dcFogFactor * 0.32 );
+      // Mix to smoke — distance looks foggy/smoky, near stays clear.
+      gl_FragColor.rgb = mix( dcSurf, dcSmoke, dcFogFactor );
     #endif
   #endif
 `;

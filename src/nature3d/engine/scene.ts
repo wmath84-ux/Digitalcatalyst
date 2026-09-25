@@ -375,7 +375,16 @@ export class Sanctuary {
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
 
-    this.scene.fog = new THREE.FogExp2(0xaedcfa, this.budget.fogDensity);
+    // SMOKE FOG — three.js manual (https://threejs.org/manual/#en/fog):
+    // THREE.Fog(color, near, far) is the standard open-world distance fog.
+    // Closer than near = clear; further than far = full smoke colour;
+    // between = smooth fade. FogExp2 cannot express "clear for 20 m then
+    // thicken" — that is exactly what linear Fog is for.
+    this.scene.fog = new THREE.Fog(
+      0xb8d0e8,
+      this.budget.fogNear,
+      this.budget.fogFar,
+    );
 
     // Anisotropy is a bandwidth consumer on tile GPUs — the budget owns the
     // cap now (1 on low, 4 medium, 8 desktop), not a one-off low/else split.
@@ -1615,9 +1624,13 @@ export class Sanctuary {
     if (this.iceAge) winterDaylight(state);
     this.daylight = state;
     this.sky.applyDaylight(state);
-    const fog = this.scene.fog as THREE.FogExp2;
+    const fog = this.scene.fog as THREE.Fog;
+    // three.js rule: fog colour AND clear-colour must match or the horizon
+    // seams against the sky. Daylight fog colour drives both; the sky dome
+    // still paints the upper sky, the fog colour fills the distant air.
     fog.color.copy(state.fog);
-    fog.density = this.budget.fogDensity * (this.iceAge ? 1.18 : 1);
+    fog.near = this.budget.fogNear * (this.iceAge ? 0.75 : 1);
+    fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
     // The air is lit by the same sun as the ground: its colour, its in-scatter
     // and the strength of the foliage transmission term all follow the hour.
     // Reading `sunDir.y` gives the elevation directly — it is a unit vector
@@ -1635,9 +1648,11 @@ export class Sanctuary {
    * Fog density here is runtime-only — the quality-tier values stay pinned.
    */
   private applyUnderwater() {
-    const fog = this.scene.fog as THREE.FogExp2;
+    // Underwater: tight linear fog so the water column is immediate and blue.
+    const fog = this.scene.fog as THREE.Fog;
     fog.color.set(0x0a58b8);
-    fog.density = 0.06;
+    fog.near = 0.4;
+    fog.far = 8;
     this.scene.background = fog.color;
     this.renderer.toneMappingExposure = 0.78;
   }
