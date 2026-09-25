@@ -46,7 +46,7 @@ import { insideRiver, terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } 
 import { insideWarehouse } from "./warehouseSite";
 import { insideBeachHouse } from "./beachHouseSite";
 import { GROUND_PALETTE } from "./palette";
-import { dryCover, flowWetness, groundColorAt, pathWeight } from "./environment";
+import { dryCover, flowWetness, grassDensityAt, groundColorAt, pathWeight } from "./environment";
 
 export interface GrassField {
   group: THREE.Group;
@@ -221,7 +221,7 @@ function buildRing(
    * beach thins to scattered salt-tolerant tufts, which is exactly what a
    * real back-shore looks like and what keeps the sand reading as SAND.
    */
-  const acceptsBlade = (x: number, z: number, y: number, worn: number): boolean => {
+  const acceptsBlade = (x: number, z: number, y: number, worn: number, density: number): boolean => {
     if (insideRiver(x, z)) return false;
     // The warehouse pad. A blade through the wall is the pasted-asset tell.
     if (insideWarehouse(x, z, 0.6)) return false;
@@ -241,6 +241,11 @@ function buildRing(
     // ragged in life, and a hard cutoff would draw a line along the path.
     if (worn > 0.62) return false;
     if (worn > 0.18 && Math.random() < worn * 1.45) return false;
+    // NATURAL DENSITY FIELD: bare patches, sparse belts and dense clusters
+    // all come from grassDensityAt — never a uniform carpet of sticks.
+    if (density < 0.08) return false;
+    if (density < 0.35 && Math.random() > density * 1.6) return false;
+    if (density < 0.55 && Math.random() > 0.55 + density * 0.7) return false;
     // Dry rises keep a few blades. A full sward there hides the earth and
     // the land reads as green everywhere. Wet hollows are not touched.
     const dry = dryCover(x, z, y, flowWetness(x, z));
@@ -264,6 +269,7 @@ function buildRing(
     // measuring each one individually would triple the build cost to produce
     // the same answer.
     const worn = pathWeight(cx, cz);
+    const density = grassDensityAt(cx, cz, cy, worn);
     // The clump's colour is the GROUND's colour, greened. This is what makes
     // the field read as the terrain growing something rather than as a
     // separate object sitting on it (research §12, §27).
@@ -272,35 +278,39 @@ function buildRing(
     ground.getHSL(hsl);
     const patch = (Math.sin(cx * 0.21) * Math.cos(cz * 0.19) + 1) * 0.5;
 
+    // Grass CATEGORIES from density: short / medium / tall / dense / sparse.
+    // Height and blade count scale with the density field so bare patches stay
+    // bare and lush hollows stack taller tufts — never identical sticks.
+    const heightMul = 0.55 + density * 0.85; // short … tall
+    const widthMul = 0.75 + density * 0.45;
+
     for (let b = 0; b < blades; b += 1) {
       if (placed >= opts.count) return;
       const a = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * opts.clumpRadius;
+      const rad = Math.sqrt(Math.random()) * opts.clumpRadius * (0.7 + density * 0.6);
       const x = cx + Math.cos(a) * rad;
       const z = cz + Math.sin(a) * rad;
       const y = rad < 0.06 ? cy : terrainHeight(x, z);
-      if (!acceptsBlade(x, z, y, worn)) continue;
+      if (!acceptsBlade(x, z, y, worn, density)) continue;
 
-      const scale = (0.62 + Math.random() * 0.68) * fade * gain;
+      const scale = (0.55 + Math.random() * 0.75) * fade * gain * heightMul;
       dummy.position.set(x, y, z);
       dummy.rotation.set(
-        (Math.random() - 0.5) * 0.16,
+        (Math.random() - 0.5) * 0.18,
         Math.random() * Math.PI,
-        (Math.random() - 0.5) * 0.22,
+        (Math.random() - 0.5) * 0.24,
       );
-      dummy.scale.set((0.8 + Math.random() * 0.5) * gain, scale, 1);
+      dummy.scale.set((0.75 + Math.random() * 0.55) * gain * widthMul, scale, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(placed, dummy.matrix);
 
-      // Hue drifts with the ground's own hue and lightness. USER DIRECTIVE
-      // (natural green): base hue 0.30 is true grass (~108°), not the old
-      // yellow-green 0.232 that read as straw. Saturation floor 0.64 so the
-      // field stays vivid in afternoon sun; lightness is a touch higher so
-      // the blades catch the light instead of sitting as a dark carpet.
-      const hue = 0.30 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * opts.colorJitter;
-      const sat = 0.66 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
-      const lit = 0.48 + hsl.l * 0.28 + Math.random() * 0.12 - patch * 0.03;
-      color.setHSL(hue, sat, lit);
+      // Natural green: olive-cast meadow hue, not neon arcade grass.
+      // Saturation is restrained; dry ground leans yellower, wet hollows deeper.
+      const hue = 0.28 + hsl.l * 0.015 + patch * 0.018 + (Math.random() - 0.5) * opts.colorJitter
+        + (1 - density) * 0.02; // sparse/dry tips lean slightly yellower
+      const sat = 0.48 + hsl.s * 0.18 + patch * 0.06 + Math.random() * 0.08 + density * 0.08;
+      const lit = 0.42 + hsl.l * 0.26 + Math.random() * 0.1 - patch * 0.04 + (1 - density) * 0.04;
+      color.setHSL(hue, Math.min(0.72, sat), lit);
       mesh.setColorAt(placed, color);
       placed += 1;
     }
@@ -313,7 +323,7 @@ function buildRing(
     placed = plantSkirt(mesh, opts.skirt, placed, Math.round(opts.count * 0.08));
   }
 
-  while (placed < opts.count && guard < opts.count * 6) {
+  while (placed < opts.count && guard < opts.count * 10) {
     guard += 1;
     // sqrt() keeps the disc sampling uniform instead of clumping at the centre.
     const r = Math.sqrt(Math.random()) * span + opts.innerRadius;
@@ -324,16 +334,23 @@ function buildRing(
     // most of the ring is rejected for being in the water or off the edge.
     const wornHere = pathWeight(x, z);
     if (wornHere > 0.62) continue;
+    // Density-driven rejection: bare / sparse zones skip the height sample.
+    // This is what creates natural patches instead of a uniform carpet.
+    const densityProbe = grassDensityAt(x, z, undefined, wornHere);
+    if (densityProbe < 0.1) continue;
+    if (densityProbe < 0.4 && Math.random() > densityProbe * 1.8) continue;
     const y = terrainHeight(x, z);
-    if (!acceptsBlade(x, z, y, wornHere)) continue;
+    if (!acceptsBlade(x, z, y, wornHere, densityProbe)) continue;
 
     // Fade the blade height to zero across the last 12 % of the ring so the
     // LOD boundary is invisible.
     const fade = Math.min(1, Math.max(0.05, 1 - Math.max(0, (r - (opts.outerRadius - span * 0.12)) / (span * 0.12))));
     const gain = 1 + ((opts.distanceGain ?? 0) * (r - opts.innerRadius)) / Math.max(span, 1);
     const mix = span > 0 ? (r - opts.innerRadius) / span : 0;
-    const perClump = opts.clumpNear + (opts.clumpFar - opts.clumpNear) * mix;
-    const blades = Math.max(1, Math.round(perClump * (0.6 + Math.random() * 0.8)));
+    // Dense clusters get more blades; sparse zones get 1–2.
+    const perClump = (opts.clumpNear + (opts.clumpFar - opts.clumpNear) * mix)
+      * (0.45 + densityProbe * 0.9);
+    const blades = Math.max(1, Math.round(perClump * (0.55 + Math.random() * 0.85)));
     plantClump(x, z, y, blades, gain, fade);
   }
 

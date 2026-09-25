@@ -207,7 +207,10 @@ export const TERRAIN_DISC_RADIUS = 1500;
  * the outside of the world. (`controls.ts` clamps the fly target to this
  * circle; the orbit rig's own plate maths is unchanged.)
  */
-export const FLY_LIMIT_RADIUS = 1050;
+// Fly/drone radial clamp — stay over island + near shelf, well inside the
+// sky dome. Ocean continues far past this so zoom-out still shows sea, but
+// the camera itself never leaves the skybox.
+export const FLY_LIMIT_RADIUS = 1180;
 
 /**
  * Where the COAST's influence becomes trustworthy, in metres from the centre.
@@ -443,30 +446,45 @@ export function terrainHeight(x: number, z: number): number {
   // one falloff, so they are separated.
   const valley = Math.exp(-(((x - RIVER_CENTER_X) / 7.5) ** 2));
 
-  // Fine near-field texture (a few metres of undulation that breaks up the
-  // meadow floor close in), fading out past the clearing.
+  // Fine near-field texture — multi-scale so the floor is never a smooth
+  // disc: broad rolls + medium undulation + micro bumps the eye reads as
+  // natural ground underfoot.
   const hills =
     Math.sin(x * 0.06) * Math.cos(z * 0.06) * 2.2 +
     Math.sin(x * 0.14 + z * 0.1) * 0.85 +
-    Math.sin(x * 0.31 - z * 0.21) * 0.22;
+    Math.sin(x * 0.31 - z * 0.21) * 0.22 +
+    // Micro-terrain: small natural mounds and hollows (~3–8 m wavelength).
+    noise.noise2D(x * 0.18 + 8.4, z * 0.18 - 11.2) * 0.28 +
+    noise.noise2D(x * 0.42 - 3.7, z * 0.42 + 19.1) * 0.09;
   const dist = Math.hypot(x, z);
   // Smooth ramp instead of a hard clamp: the first metres around the chair
   // are truly flat, and the undulation eases in so nothing pokes through the
   // board fan (the outermost study board stands at r ≈ 45 m on 3 m posts).
   const flatten = smoothstep(10, 32, dist);
 
-  // ROLLING MID-GROUND — the "BGMI's ground is not flat" term. Three octaves
-  // of real simplex (not a separable sin/cos lattice) with an amplitude that
-  // GROWS with distance: ~2 m just past the clearing, ~12 m at the foot of
-  // the foothills. Wide, soft, walkable — the same undulation you see across
-  // an Erangel map, only scaled to a study meadow.
+  // ROLLING MID-GROUND — multi-scale layered noise (large hills + medium
+  // undulation + high-frequency micro-relief). Amplitude grows with distance:
+  // ~2 m just past the clearing, ~12 m at the foot of the foothills. The
+  // extra high-frequency octave and shallow depression term stop the ground
+  // reading as perfectly smooth procedural hills.
   const rolling =
-    noise.noise2D(x * 0.011 + 3.1, z * 0.011 - 7.7) * 0.6 +
-    noise.noise2D(x * 0.027 - 19.4, z * 0.027 + 26.8) * 0.27 +
-    noise.noise2D(x * 0.065 + 51.2, z * 0.065 - 33.5) * 0.13;
+    noise.noise2D(x * 0.011 + 3.1, z * 0.011 - 7.7) * 0.52 +
+    noise.noise2D(x * 0.027 - 19.4, z * 0.027 + 26.8) * 0.24 +
+    noise.noise2D(x * 0.065 + 51.2, z * 0.065 - 33.5) * 0.14 +
+    // High-frequency micro-relief — breaks the smooth silhouette.
+    noise.noise2D(x * 0.14 + 77.3, z * 0.14 - 44.1) * 0.07 +
+    // Occasional shallow depressions (negative bias on a sparse low-freq field).
+    Math.min(0, noise.noise2D(x * 0.008 + 101.2, z * 0.008 - 55.7)) * 0.18;
   const rollIn = smoothstep(42, 150, dist);
   const rollAmp = 2.4 + 9.8 * smoothstep(70, 470, dist);
-  const rollingGround = rolling * rollAmp * rollIn;
+  // Subtle erosion channels: long thin depressions following a noise ridge
+  // field. Amplitude is small so walkability is untouched, but the ground
+  // no longer reads as a continuous smooth roll.
+  const erosion =
+    Math.pow(Math.max(0, 1 - Math.abs(noise.noise2D(x * 0.019 + 22.1, z * 0.019 - 8.4)) * 2.4), 2.2) *
+    0.55 *
+    smoothstep(55, 180, dist);
+  const rollingGround = rolling * rollAmp * rollIn - erosion;
 
   // ── The connected districts ─────────────────────────────────────────────
   //
@@ -708,9 +726,9 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   // bleached-grass crest — GRASS colours, never bare stone or snow.
   const rock = new THREE.Color(0x8a9a4b);
   const snow = new THREE.Color(0xc9d68a);
-  // The island edge floor under the sea: deep blue bed so the dropped-off
-  // corners read as water in the haze, never as a bright square patch.
-  const deep = new THREE.Color(0x163a58);
+  // Underwater bed: clear blue-green (not black navy) so the river centre
+  // and the drowned shelf never read as a dark strip through the water.
+  const deep = new THREE.Color(0x2a6a88);
   const tmp = new THREE.Color();
 
   /**
@@ -819,17 +837,24 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
         // reintroducing its washed-out colour cast.
         dcGround = mix( dcGround, dcGround * (0.72 + dcTexel * 0.42), 0.18 );
 
-        // SHORELINE (per-pixel, Phase 4/5) — unchanged bands, now applied to
-        // the photo-dominant colour so the tide still reads on it.
+        // SHORELINE — soft irregular bands (wet sand → sparse shore → grass).
+        // Extra noise breaks the hard contour so the water edge never reads
+        // as a clean geometric boundary.
         float dcShore = vDcWorldPos.y - uDcOceanLevel;
-        float dcSwash = dcMacroL * 1.4;
-        if ( dcShore < 3.2 ) {
-          float dcWet = 1.0 - smoothstep( 0.1 + dcSwash, 2.2 + dcSwash, dcShore );
-          dcGround *= mix( 1.0, 0.66, dcWet * 0.85 );
-          float dcFoam = ( 1.0 - smoothstep( 0.02 + dcSwash * 0.4, 0.5 + dcSwash * 0.6, dcShore ) )
-                       * step( 0.0, dcShore )
-                       * smoothstep( 0.35, 0.75, dcMacroL + 0.25 * sin( vDcWorldPos.x * 0.7 + vDcWorldPos.z * 0.5 ) );
-          dcGround = mix( dcGround, vec3( 0.92, 0.97, 0.97 ), clamp( dcFoam, 0.0, 1.0 ) * 0.8 );
+        float dcSwash = dcMacroL * 1.6
+                      + 0.35 * sin( vDcWorldPos.x * 0.31 + vDcWorldPos.z * 0.27 )
+                      + 0.22 * sin( vDcWorldPos.x * 0.73 - vDcWorldPos.z * 0.61 );
+        if ( dcShore < 4.5 ) {
+          float dcWet = 1.0 - smoothstep( -0.15 + dcSwash, 2.8 + dcSwash, dcShore );
+          dcGround *= mix( 1.0, 0.64, dcWet * 0.88 );
+          // Wet-mud band just above the waterline.
+          float dcMud = ( 1.0 - smoothstep( 0.2 + dcSwash * 0.5, 2.6 + dcSwash * 0.5, dcShore ) )
+                      * smoothstep( -0.4, 0.6, dcShore );
+          dcGround = mix( dcGround, vec3( 0.28, 0.30, 0.18 ), clamp( dcMud, 0.0, 1.0 ) * 0.35 );
+          float dcFoam = ( 1.0 - smoothstep( 0.02 + dcSwash * 0.4, 0.55 + dcSwash * 0.6, dcShore ) )
+                       * step( -0.05, dcShore )
+                       * smoothstep( 0.3, 0.8, dcMacroL + 0.3 * sin( vDcWorldPos.x * 0.7 + vDcWorldPos.z * 0.5 ) );
+          dcGround = mix( dcGround, vec3( 0.90, 0.95, 0.95 ), clamp( dcFoam, 0.0, 1.0 ) * 0.72 );
           float dcBed = clamp( -dcShore / 10.0, 0.0, 1.0 );
           dcGround = mix( dcGround, vec3( 0.035, 0.10, 0.22 ), dcBed * 0.85 );
         }
@@ -916,10 +941,21 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       // Below the waterline-ish floor (the island edge) the ground goes dark.
       if (h < -6) tmp.lerp(deep, Math.min(1, (-6 - h) / 14));
 
-      // Art direction: no albedo leaves the physical range, and the worn
-      // trails read a little lighter and greyer than the ground around them.
+      // Art direction: no albedo leaves the physical range. Paths are packed
+      // dirt (warm brown), never chalk-white — the gravel lerp is softer and
+      // the centre is slightly darkened so the trail reads foot-worn.
       clampAlbedo(tmp, tmp);
-      if (worn > 0.02) tmp.lerp(GROUND_PALETTE.gravel, Math.min(0.45, worn * 0.5));
+      if (worn > 0.02) {
+        const pathAmt = Math.min(0.55, worn * 0.62);
+        tmp.lerp(GROUND_PALETTE.gravel, pathAmt);
+        // Darker centre of the path (foot/wheel wear).
+        if (worn > 0.4) {
+          const dark = Math.min(0.14, (worn - 0.4) * 0.28);
+          tmp.r *= 1 - dark;
+          tmp.g *= 1 - dark * 0.92;
+          tmp.b *= 1 - dark * 0.8;
+        }
+      }
 
       colors[i * 3] = tmp.r;
       colors[i * 3 + 1] = tmp.g;

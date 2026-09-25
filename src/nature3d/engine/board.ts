@@ -189,7 +189,7 @@ export function createBoard(budget: QualityBudget): BoardHandle {
   const geo = new THREE.BoxGeometry(BOARD_WIDTH, BOARD_HEIGHT, BOARD_THICKNESS);
 
   // Only the front face carries the lesson texture; the rim is dark glass.
-  const rim = new THREE.MeshStandardMaterial({ color: 0x14243c, roughness: 0.3, metalness: 0.5 });
+  const rim = new THREE.MeshStandardMaterial({ color: 0x14243c, roughness: 0.3, metalness: 0.5, fog: true });
   const face = budget.richBoardMaterial
     ? new THREE.MeshPhysicalMaterial({
         map: texture,
@@ -202,8 +202,9 @@ export function createBoard(budget: QualityBudget): BoardHandle {
         thickness: 0.2,
         transparent: true,
         opacity: 0.985,
+        fog: true,
       })
-    : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.28, metalness: 0.05 });
+    : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.28, metalness: 0.05, fog: true });
 
   // BoxGeometry face order: +x, -x, +y, -y, +z, -z → index 4 is the front.
   const panel = new THREE.Mesh(geo, [rim, rim, rim, rim, face, rim]);
@@ -222,7 +223,7 @@ export function createBoard(budget: QualityBudget): BoardHandle {
   // Eight small pucks on the edges and corners. They are pure affordance —
   // the hit-test is done against the panel UV, not against these — but
   // without them nobody discovers that the board can be stretched.
-  const gripMat = new THREE.MeshBasicMaterial({ color: 0xbfe4ff, transparent: true, opacity: 0.72 });
+  const gripMat = new THREE.MeshBasicMaterial({ color: 0xbfe4ff, transparent: true, opacity: 0.72, fog: true });
   const gripGeo = new THREE.SphereGeometry(0.075, 10, 8);
   const hw = BOARD_WIDTH * 0.5;
   const hh = BOARD_HEIGHT * 0.5;
@@ -319,7 +320,7 @@ export function createBoardStand(
   const groundY = terrainHeight(hill.position.x, hill.position.z);
   const legLength = hill.position.y - halfH - groundY + 3;
 
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2b3242, roughness: 0.72, metalness: 0.3 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2b3242, roughness: 0.72, metalness: 0.3, fog: true });
   const legGeo = new THREE.CylinderGeometry(0.62, 0.92, legLength, 10);
   for (const sx of [-1, 1]) {
     const leg = new THREE.Mesh(legGeo, mat);

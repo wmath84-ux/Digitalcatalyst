@@ -288,6 +288,13 @@ export interface BoardScreensHandle {
   setWinter(enabled: boolean): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
+  /**
+   * Distance smoke on the CSS3D board faces.
+   * CSS3D sits above the WebGL canvas and does not receive scene.fog, so the
+   * engine pushes the same near/far/colour the world uses and each face gets
+   * a translucent overlay that matches THREE.Fog's smoothstep ramp.
+   */
+  setFog(near: number, far: number, color: THREE.Color): void;
   render(camera: THREE.PerspectiveCamera, force?: boolean): void;
   dispose(): void;
 }
@@ -308,9 +315,12 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
 
   // One material set shared by all three boards — three boards then batch into
   // the same buckets instead of forcing a state change per board.
-  const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35 });
-  const backing = new THREE.MeshBasicMaterial({ color: 0x05070c });
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4 });
+  // fog: true (default on Standard/Lambert) so distance smoke hits the
+  // board shells the same way it hits trees and terrain. BasicMaterial
+  // also supports fog — keep it on so the black backing fades into haze.
+  const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35, fog: true });
+  const backing = new THREE.MeshBasicMaterial({ color: 0x05070c, fog: true });
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4, fog: true });
 
   const frameGeo = new THREE.BoxGeometry(W + BEZEL * 2, H + BEZEL * 2, DEPTH);
   const backGeo = new THREE.PlaneGeometry(W, H);
@@ -411,6 +421,22 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     element.style.top = "0px";
     host.appendChild(element);
 
+    // Fog veil — sits above the live DOM face, ignores pointer events so
+    // buttons/scroll still work. Opacity is driven each frame from camera
+    // distance using the same smoothstep(near, far) as THREE.Fog.
+    const fogVeil = document.createElement("div");
+    fogVeil.className = "nature3d-board-fog";
+    fogVeil.style.position = "absolute";
+    fogVeil.style.inset = "0";
+    fogVeil.style.pointerEvents = "none";
+    fogVeil.style.borderRadius = "6px";
+    fogVeil.style.opacity = "0";
+    fogVeil.style.background = "rgb(180, 204, 228)";
+    fogVeil.style.transition = "opacity 80ms linear";
+    fogVeil.style.zIndex = "20";
+    host.appendChild(fogVeil);
+    (host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil = fogVeil;
+
     // The engine's orbit/look handlers live on the shared host element, and
     // the board is a CHILD of it, so without this every click inside a panel
     // would also spin the camera and every text selection would drag the
@@ -441,6 +467,11 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   });
 
   const shells = createBoardShells(placements, shadows);
+
+  // Distance smoke parameters — mirrored from scene.fog each daylight tick.
+  let fogNear = 16;
+  let fogFar = 420;
+  let fogColorCss = "rgb(180, 204, 228)";
 
   // ── Culling scratch (hoisted — the render path allocates nothing) ─────
   const frustum = new THREE.Frustum();
@@ -646,6 +677,19 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       sphere.radius = LECTERN_BOARD_WIDTH * s * 0.62;
     },
 
+    setFog(near, far, color) {
+      fogNear = Math.max(0.5, near);
+      fogFar = Math.max(fogNear + 1, far);
+      const r = Math.round(color.r * 255);
+      const g = Math.round(color.g * 255);
+      const b = Math.round(color.b * 255);
+      fogColorCss = `rgb(${r}, ${g}, ${b})`;
+      for (const screen of screens) {
+        const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
+        if (veil) veil.style.background = fogColorCss;
+      }
+    },
+
     render(camera, force = false) {
       // Rule 1: an idle camera costs nothing. The CSS transforms are already
       // correct, so re-writing identical style strings would only burn style
@@ -765,6 +809,28 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           lastCamPos.copy(camera.position);
           lastCamQuat.copy(camera.quaternion);
         }
+      }
+
+      // Distance smoke on every live CSS3D face (WebGL shells get scene.fog
+      // for free; DOM faces need this overlay). Same smoothstep as THREE.Fog.
+      const span = Math.max(1e-3, fogFar - fogNear);
+      for (const screen of screens) {
+        if (screen.slot === liftedSlot) {
+          // Framed full-bleed board stays fully readable — no fog veil.
+          const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
+          if (veil) veil.style.opacity = "0";
+          continue;
+        }
+        const dist = camera.position.distanceTo(screen.placement.position);
+        let t = (dist - fogNear) / span;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+        // smoothstep
+        t = t * t * (3 - 2 * t);
+        // Cap so a far board never fully disappears into a grey slab.
+        t = Math.min(0.82, t);
+        const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
+        if (veil) veil.style.opacity = String(t);
       }
 
       if (!moved && !changed) return;

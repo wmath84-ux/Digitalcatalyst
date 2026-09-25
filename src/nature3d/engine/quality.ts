@@ -67,22 +67,25 @@ export interface QualityBudget {
   /** Volumetric sun shafts. */
   sunShafts: boolean;
   /**
-   * Far plane / fog density pair.
+   * Far plane / distance fog pair.
    *
-   * Both are sized against the ZOOMED-OUT view, not the walking view. With
-   * the orbit distance now capped so the camera stays over its own terrain
-   * (see `OrbitRig.maxDistance`), the furthest thing that can ever be on
-   * screen is the opposite corner of the plate — about 3310 m away — so every
-   * tier's far plane must clear that or the far hills get sliced off.
+   * Far plane is sized against the ZOOMED-OUT view so the opposite corner of
+   * the plate (~3310 m) is never sliced off.
    *
-   * Fog is exponential in the SQUARE of distance, which is why 0.0006 looked
-   * fine up close and turned the fully zoomed-out world into a grey-out: it
-   * obscured 49 % of the far rim. 0.00028 keeps the same haze near the meadow
-   * while leaving the rim ~9 % obscured, so pulling all the way back shows
-   * the world instead of fog.
+   * SMOKE FOG uses THREE.Fog (linear distance fog — three.js manual):
+   *   fogNear  anything closer is crystal clear
+   *   fogFar   anything further is fully the fog/smoke colour
+   * Between near→far the mix ramps 0→1. This is the standard open-world
+   * "near clear, far smoky" setup (threejs.org/manual fog page). fogDensity
+   * is kept as a residual Exp2-compat value for underwater / ice overrides.
    */
   farPlane: number;
+  /** Residual Exp2 density (underwater / ice). Distance smoke uses fogNear/Far. */
   fogDensity: number;
+  /** Metres from camera where smoke fog starts (THREE.Fog.near). */
+  fogNear: number;
+  /** Metres from camera where smoke is fully opaque (THREE.Fog.far). */
+  fogFar: number;
 
   // ── Mobile bandwidth diet (the mid-to-low Android fail-safe set) ──────
   //
@@ -136,7 +139,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 17500,
     hillGrass: 36000,
     grassNearRadius: 30,
-    grassFarRadius: 155,
+    grassFarRadius: 170,
     treeCount: 112,
     leavesPerTree: 10,
     animalCount: 54,
@@ -156,8 +159,12 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1.05,
     minPixelRatio: 0.65,
     sunShafts: false,
-    farPlane: 3500,
-    fogDensity: 0.00028,
+    // Far plane must clear the open-ocean disc (~5400 m) and leave headroom
+    // so a camera off-centre never clips sea or sky into a black hole.
+    farPlane: 6200,
+    fogDensity: 0.00034,
+    fogNear: 16,
+    fogFar: 420,
     halfPrecision: true,
     fpsCap: 30,
     cheapPlants: true,
@@ -189,8 +196,10 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1.35,
     minPixelRatio: 0.7,
     sunShafts: true,
-    farPlane: 3600,
-    fogDensity: 0.00028,
+    farPlane: 6400,
+    fogDensity: 0.00034,
+    fogNear: 16,
+    fogFar: 420,
     halfPrecision: false,
     fpsCap: 0,
     cheapPlants: false,
@@ -220,8 +229,10 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 1.75,
     minPixelRatio: 0.8,
     sunShafts: true,
-    farPlane: 4000,
-    fogDensity: 0.00028,
+    farPlane: 7000,
+    fogDensity: 0.00034,
+    fogNear: 16,
+    fogFar: 420,
     halfPrecision: false,
     fpsCap: 0,
     cheapPlants: false,
@@ -251,8 +262,10 @@ const BASE: Record<QualityTier, QualityBudget> = {
     maxPixelRatio: 2,
     minPixelRatio: 0.85,
     sunShafts: true,
-    farPlane: 4400,
-    fogDensity: 0.00028,
+    farPlane: 7800,
+    fogDensity: 0.00034,
+    fogNear: 16,
+    fogFar: 420,
     halfPrecision: false,
     fpsCap: 0,
     cheapPlants: false,

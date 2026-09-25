@@ -375,7 +375,20 @@ export class Sanctuary {
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
 
-    this.scene.fog = new THREE.FogExp2(0xaedcfa, this.budget.fogDensity);
+    // SMOKE FOG — three.js manual (https://threejs.org/manual/#en/fog):
+    // THREE.Fog(color, near, far) is the standard open-world distance fog.
+    // Closer than near = clear; further than far = full smoke colour;
+    // between = smooth fade. FogExp2 cannot express "clear for 20 m then
+    // thicken" — that is exactly what linear Fog is for.
+    this.scene.fog = new THREE.Fog(
+      0xb8d0e8,
+      this.budget.fogNear,
+      this.budget.fogFar,
+    );
+    // Clear colour = fog/horizon blue. Any pixel the sky dome misses (far
+    // clip, first frame before update) must NOT flash pure black — that was
+    // the rotating black circle on zoom-out.
+    this.renderer.setClearColor(0xb8d0e8, 1);
 
     // Anisotropy is a bandwidth consumer on tile GPUs — the budget owns the
     // cap now (1 on low, 4 medium, 8 desktop), not a one-off low/else split.
@@ -414,12 +427,10 @@ export class Sanctuary {
 
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
-    // OWNER DIRECTIVE — the anime sky is the sanctuary's DEFAULT sky. The
-    // engine issues the enable ITSELF (not via the page's boot effect), so
-    // every boot path opens under the panorama no matter what order the
-    // page finishes in. The Scene-menu toggle still switches it off.
-    // Idempotent with the page's own enable: the texture promise is cached.
-    this.setAnimeSky(true);
+    // Procedural gradient dome is the default sky. Anime panorama is opt-in
+    // via the Scene menu (`setAnimeSky(true)`). Boot never auto-loads the
+    // 2.5 MB equirect — keeps first paint light and the sky natural.
+    this.setAnimeSky(false);
     // The sky dome fills the whole screen every frame — one of the best
     // fp16 candidates on the diet tier.
     if (this.budget.halfPrecision) halfPrecisionTree(this.sky.group);
@@ -742,7 +753,18 @@ export class Sanctuary {
 
     this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
     this.scene.add(this.screens.shells);
+    // Board shells must take the same distance smoke as terrain/trees —
+    // without atmosphere registration the stock fog_fragment never runs
+    // on materials that only have the default chunk, and without fog:true
+    // they skip it entirely. Register so far boards haze into the air.
+    this.atmosphere.registerTree(this.screens.shells);
     this.winter.registerTree(this.screens.shells);
+    // Boot applied daylight before screens existed — push the current fog
+    // ramp onto the CSS3D faces now that the hosts are live.
+    {
+      const fog = this.scene.fog as THREE.Fog;
+      this.screens.setFog(fog.near, fog.far, fog.color);
+    }
     // The CSS3D layer is a sibling of the canvas, sharing its camera. It is
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
@@ -773,12 +795,15 @@ export class Sanctuary {
     this.board.group.rotation.y = BOARD_HILL.yaw;
     this.board.group.scale.setScalar(BOARD_HILL.scale);
     this.scene.add(this.board.group);
+    // Distance smoke on the lesson board + stand (same air as the hills).
+    this.atmosphere.registerTree(this.board.group);
     // The lesson face gets frost at its edges, not over the readable text.
     const boardMaterials = this.board.panel.material as THREE.Material[];
     this.winter.register(boardMaterials[4], "board");
     this.winter.registerTree(this.board.group);
     const boardStand = createBoardStand(BOARD_HILL, this.budget.shadowMapSize > 0);
     this.scene.add(boardStand);
+    this.atmosphere.registerTree(boardStand);
     this.winter.registerTree(boardStand);
 
 // The board is scenery now: no controller, no drag, no resize, no
@@ -1615,15 +1640,26 @@ export class Sanctuary {
     if (this.iceAge) winterDaylight(state);
     this.daylight = state;
     this.sky.applyDaylight(state);
-    const fog = this.scene.fog as THREE.FogExp2;
+    const fog = this.scene.fog as THREE.Fog;
+    // three.js rule: fog colour AND clear-colour must match or the horizon
+    // seams against the sky. Daylight fog colour drives both; the sky dome
+    // still paints the upper sky, the fog colour fills the distant air.
     fog.color.copy(state.fog);
-    fog.density = this.budget.fogDensity * (this.iceAge ? 1.18 : 1);
+    fog.near = this.budget.fogNear * (this.iceAge ? 0.75 : 1);
+    fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
+    // CSS3D board faces sit above the canvas — push the same smoke ramp so
+    // black boards haze into the air just like terrain and trees.
+    // Guard: applyDaylight runs once before createBoardScreens during boot.
+    this.screens?.setFog(fog.near, fog.far, fog.color);
     // The air is lit by the same sun as the ground: its colour, its in-scatter
     // and the strength of the foliage transmission term all follow the hour.
     // Reading `sunDir.y` gives the elevation directly — it is a unit vector
     // towards the sun, so its Y component IS the sine of the elevation.
     this.atmosphere.update(state.sunDir.y, state.sunDir, state.sunColor, state.fog);
     this.scene.background = null;
+    // Keep the GL clear colour locked to the live fog so a missed sky pixel
+    // is haze-blue, never black (zoom-out / rotate black-circle fix).
+    this.renderer.setClearColor(fog.color, 1);
     this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();
@@ -1635,9 +1671,12 @@ export class Sanctuary {
    * Fog density here is runtime-only — the quality-tier values stay pinned.
    */
   private applyUnderwater() {
-    const fog = this.scene.fog as THREE.FogExp2;
+    // Underwater: tight linear fog so the water column is immediate and blue.
+    const fog = this.scene.fog as THREE.Fog;
     fog.color.set(0x0a58b8);
-    fog.density = 0.06;
+    fog.near = 0.4;
+    fog.far = 8;
+    this.screens?.setFog(fog.near, fog.far, fog.color);
     this.scene.background = fog.color;
     this.renderer.toneMappingExposure = 0.78;
   }

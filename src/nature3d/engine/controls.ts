@@ -150,10 +150,14 @@ export class OrbitRig {
     // Looking straight down, ground reach stops constraining anything (cos
     // goes to zero and `usable / cp` runs away to 16 km, far outside the far
     // plane). What constrains a top-down view instead is ALTITUDE: climb high
-    // enough to see the whole plate and no higher. That is WORLD_HALF over
-    // tan(half-fov), and the widest sane half-fov here is ~50 degrees, so
-    // 2 * WORLD_HALF is a safe ceiling that still clears the far plane.
-    const ceiling = WORLD_HALF * 2;
+    // enough to see the whole plate and no higher.
+    //
+    // SKYBOX HARD CAP: the procedural/anime sky dome is ~farPlane * 0.92.
+    // Camera must NEVER leave that sphere — otherwise the user sees outside
+    // the skybox into empty black. Cap orbit distance well inside the dome
+    // (and inside the fly circle) so max zoom-out still shows sky + ocean.
+    const skyboxSafe = Math.min(FLY_LIMIT_RADIUS * 1.35, WORLD_HALF * 1.55);
+    const ceiling = skyboxSafe;
     if (cp < 0.05) return ceiling;
     return Math.min(usable / cp, ceiling);
   }
@@ -197,7 +201,9 @@ export class OrbitRig {
     // drone skims the surface instead of diving.
     const ground = sampled < OCEAN_LEVEL ? OCEAN_LEVEL : sampled;
     if (lift !== 0) {
-      this.target.y = THREE.MathUtils.clamp(this.target.y + lift, ground + 0.6, ground + 900);
+      // Altitude ceiling stays well inside the sky dome so max climb never
+      // punches through the skybox into empty black.
+      this.target.y = THREE.MathUtils.clamp(this.target.y + lift, ground + 0.6, ground + 520);
     } else {
       this.target.y = ground + 1.8;
     }
@@ -268,6 +274,13 @@ export class OrbitRig {
     const sz = THREE.MathUtils.clamp(camera.position.z, -WORLD_HALF, WORLD_HALF);
     const floor = terrainHeight(sx, sz) + 0.9;
     if (camera.position.y < floor) camera.position.y = floor;
+
+    // Hard skybox guard: never let the eye leave the sky sphere, even if a
+    // panTo preset or a pitch change briefly overshoots maxDistance.
+    // Dome radius is farPlane * 0.92 (≥ 3220 on low tier); keep a margin.
+    const skySafe = Math.min(FLY_LIMIT_RADIUS * 2.4, WORLD_HALF * 2.2);
+    const camR = camera.position.length();
+    if (camR > skySafe) camera.position.multiplyScalar(skySafe / camR);
 
     this.lookUp += (this.targetLookUp - this.lookUp) * k;
 

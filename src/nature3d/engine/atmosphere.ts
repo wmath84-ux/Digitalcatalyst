@@ -5,14 +5,16 @@
 //
 // ── What this replaces (research §15, §16, §21, principles 17, 18, 23, 24)
 //
-// Before this file, distance haze was one line in `scene.ts`:
+// Distance smoke fog is authored in `scene.ts` as THREE.Fog (linear near/far)
+// per the three.js manual (https://threejs.org/manual/#en/fog):
 //
-//     this.scene.fog = new THREE.FogExp2(0xbcd9ef, budget.fogDensity)
+//     this.scene.fog = new THREE.Fog(color, fogNear, fogFar)
 //
-// That is three.js's stock exponential-squared fog: a uniform, colourless
-// grey that multiplies by distance. It hides the far hills (which is why it
-// was there) but it does nothing else, because real air does three things a
-// uniform fog cannot:
+// Stock Fog fades material → fogColor between near and far. This file
+// replaces the fog_fragment so the same near/far ramp also gets height
+// weighting and sun-side aerial tint — still one cheap ALU path, no
+// volumetric raymarch. Real air also does three things stock fog alone
+// cannot:
 //
 //   1. IT POOLS LOW. Haze is densest in the valleys and thins with altitude,
 //      which is what makes a mountain top look CLOSE and a valley floor look
@@ -204,44 +206,56 @@ function projectVertexChunk(withNormal: boolean): string {
 }
 
 /**
- * The fog chunk, replaced.
+ * SMOKE / DISTANCE FOG — three.js manual recipe.
  *
- * `FOG_EXP2` is the scene's FogExp2 and the only path used at runtime; the
- * linear fallback is there so the chunk is never a silent no-op if the scene
- * is switched to a linear fog.
+ * Docs (https://threejs.org/manual/#en/fog):
+ *   THREE.Fog(color, near, far)
+ *   - distance < near  → no fog (clear)
+ *   - distance > far   → fully fog colour (smoke)
+ *   - between          → smoothstep fade material → fog
+ *
+ * three.js injects fogNear / fogFar / fogColor / vFogDepth automatically when
+ * scene.fog is a THREE.Fog. We replace the stock fog_fragment so we can:
+ *   1. use the FULL 0→1 mix (stock is fine; we keep it honest)
+ *   2. tint the fog with sun-side aerial perspective (slight warm limb)
+ *   3. height-weight the smoke so valleys are denser than ridgelines
+ *      (Unreal AtmosphericFog / height-fog idea — still one cheap ALU)
+ *
+ * NO volumetric raymarch, NO post-process — mobile-safe distance fog only.
  */
 const FOG_CHUNK = /* glsl */ `
   #ifdef USE_FOG
     #ifdef FOG_EXP2
-      // Height-weighted optical depth. Haze pools in the low ground and
-      // clears with altitude, so a summit reads near and a valley reads far.
-      float dcHazeAlt = max( vDcWorldPos.y, -12.0 );
-      float dcHazeFall = exp( - dcHazeAlt / uDcHazeHeight );
-      float dcHazeDensity = fogDensity * mix( 1.0, uDcHazeGround, dcHazeFall );
+      // Fallback if something re-enables Exp2 (underwater used to).
+      float dcFogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+      dcFogFactor = clamp( dcFogFactor, 0.0, 1.0 );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, dcFogFactor );
+    #else
+      // ── LINEAR DISTANCE SMOKE (THREE.Fog) ──────────────────────────
+      // Official three.js formula: smoothstep(near, far, depth).
+      // near ≈ 16 m  →  10–20 m stays sharp (user request)
+      // far  ≈ 420 m →  mid/far ground is fully in the smoke ramp
+      float dcFogFactor = smoothstep( fogNear, fogFar, vFogDepth );
 
-      // Two-distance integral of an exponential-squared medium: the plain
-      // exp(-d^2) form, weighted so the low ground thickens first.
-      float dcDepth = max( vFogDepth, 0.0 );
-      float dcFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
-      dcFog = clamp( dcFog, 0.0, 1.0 );
+      // Height fog: smoke pools low. Ridges stay a touch clearer so the
+      // silhouette still reads through the haze (UE AtmosphericFog idea).
+      float dcHazeAlt = max( vDcWorldPos.y, -8.0 );
+      float dcHeightW = mix( uDcHazeGround, 1.0, exp( - dcHazeAlt / uDcHazeHeight ) );
+      dcFogFactor = clamp( dcFogFactor * dcHeightW, 0.0, 1.0 );
+      // Cap below 1.0 so a full zoom-out never becomes a solid grey wall
+      // (StackOverflow / open-world practice: hazy distance, not a curtain).
+      dcFogFactor = min( dcFogFactor, 0.88 );
 
-      // AERIAL PERSPECTIVE. A little sky tint at range, never a replacement.
-      // The old mix used a near-white haze as the destination, so a long
-      // view bleached every surface to white and the colour was gone.
-      // Distance may cool a colour toward the sky. It must not lift it, and
-      // it must leave the surface's own colour the majority at any range.
+      // Aerial perspective: fog colour leans slightly sun-warm on the lit
+      // side of the sky and stays cool blue-grey otherwise — real air is lit.
       vec3 dcEye = normalize( vDcWorldPos - cameraPosition );
       float dcToward = max( dot( dcEye, uDcSunDir ), 0.0 );
-      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.22 );
-
-      float dcWash = min( dcFog * uDcAerial, 0.22 );
-      float dcLum = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
-      float dcHazeLum = max( dot( dcHaze, vec3( 0.2126, 0.7152, 0.0722 ) ), 0.001 );
-      dcHaze *= min( 1.0, ( dcLum + 0.02 ) / dcHazeLum );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcWash );
-    #else
-      float dcLin = smoothstep( fogNear, fogFar, vFogDepth );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, min( dcLin, 0.22 ) );
+      vec3 dcSmoke = mix( fogColor, uDcSunColor * fogColor, dcToward * uDcInScatter * 0.18 );
+      // Soft desat of the surface as it enters the smoke (contrast drop).
+      float dcGrey = dot( gl_FragColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
+      vec3 dcSurf = mix( gl_FragColor.rgb, vec3( dcGrey ), dcFogFactor * 0.32 );
+      // Mix to smoke — distance looks foggy/smoky, near stays clear.
+      gl_FragColor.rgb = mix( dcSurf, dcSmoke, dcFogFactor );
     #endif
   #endif
 `;
@@ -259,17 +273,19 @@ const TRANSMIT_APPLY = /* glsl */ `
 `;
 
 export function createAtmosphere(budget: QualityBudget): Atmosphere {
+  // Budget still gates far-plane-related aerial strength for low tiers.
+  const aerialBase = budget.fogDensity > 0.0004 ? 1.2 : 1.15;
   const uniforms: AtmosphereUniforms = {
     uDcSunDir: { value: new THREE.Vector3(0.62, 0.34, -0.7).normalize() },
     uDcSunColor: { value: new THREE.Color(0xfff0cf) },
-    uDcHazeColor: { value: new THREE.Color(0xaedcfa) },
-    uDcInScatter: { value: 0.4 },
-    // 46 m of scale height: the meadow's own relief is ~12 m, so the haze
-    // thins noticeably as the learner walks up the lesson-board hill but
-    // still blankets the whole valley floor evenly.
-    uDcHazeHeight: { value: 46 },
-    uDcHazeGround: { value: 1.22 },
-    uDcAerial: { value: budget.fogDensity > 0.0004 ? 0.85 : 1 },
+    uDcHazeColor: { value: new THREE.Color(0xb8d8f0) },
+    uDcInScatter: { value: 0.48 },
+    // 52 m of scale height: haze pools in valleys; hilltops stay clearer.
+    uDcHazeHeight: { value: 52 },
+    uDcHazeGround: { value: 1.35 },
+    // Stronger aerial mix so distant ground goes smoky (near stays clear
+    // via the distance curve in FOG_CHUNK).
+    uDcAerial: { value: aerialBase },
     uDcTransmit: { value: 0.40 },
     uDcTransmitColor: { value: new THREE.Color(0x7ee038) },
     uDcPhase: { value: 2.6 },
@@ -364,9 +380,9 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
         // more forward-scattered light through the leaves, which is what
         // makes a backlit canopy at 6 pm glow.
         const low = 1 - Math.min(1, Math.max(0, elevation / 0.55));
-        // Kept low on purpose. The fog chunk also caps the mix, so a long
-        // view cannot bleach a surface to white even if this drifts up.
-        uniforms.uDcAerial.value = 0.4 + low * 0.15;
+        // Aerial strength stays high so far ridges dissolve into smoky air;
+        // the distance curve already protects the near 10–20 m band.
+        uniforms.uDcAerial.value = 1.05 + low * 0.2;
         uniforms.uDcTransmit.value = 0.32 + low * 0.28;
         uniforms.uDcPhase.value = 2.6 + low * 1.4;
       }

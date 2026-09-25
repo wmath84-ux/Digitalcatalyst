@@ -186,7 +186,10 @@ export function daylightAt(hour: number): DaylightState {
     horizon: lerpColor(0xc8eeff, 0xffc79a, warm),
     ground: lerpColor(0xdceec0, 0x7d8a55, warm),
     sunTint: lerpColor(0xfff8e0, 0xffb07a, warm),
-    fog: lerpColor(0xaedcfa, 0xf7d5ac, warm),
+    // Smoke fog colour — cool blue-grey haze by day, warm dust at dusk.
+    // Must stay close to the sky horizon so distant land melts into air
+    // (three.js rule: fog colour ≈ background / horizon colour).
+    fog: lerpColor(0xb4cce4, 0xe8d0b0, warm),
     exposure: THREE.MathUtils.lerp(1.02, 1.16, dayFactor),
     dayFactor,
     hour: h,

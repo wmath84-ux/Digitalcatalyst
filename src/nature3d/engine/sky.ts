@@ -134,8 +134,17 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(budget.farPlane * 0.46, 32, 20), domeMat);
+  // Dome is re-centred on the camera every frame (see update). Radius must
+  // stay WELL under the far plane so the sphere never gets clipped into a
+  // black disc — that is the "black circle in the sky when I zoom out /
+  // rotate" bug. With the eye at the centre of the sphere, farPlane * 0.48
+  // fills the view and every sky pixel stays inside the depth range.
+  const domeRadius = budget.farPlane * 0.48;
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(domeRadius, 64, 32), domeMat);
   dome.renderOrder = -1000;
+  // Camera is always inside this mesh — default frustum tests can drop it
+  // the moment the eye sits near the bounding-sphere edge.
+  dome.frustumCulled = false;
   group.add(dome);
 
   // ── Anime panorama dome (optional) ───────────────────────────────────
@@ -411,6 +420,8 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
         // Same sphere as the shader dome (shared geometry, one sphere of
         // VRAM), same draw slot — it REPLACES the dome, never stacks on it.
         animeDome = new THREE.Mesh(dome.geometry, animeMat);
+        animeDome.frustumCulled = false;
+        animeDome.position.copy(dome.position);
         animeDome.renderOrder = -1000;
         animeDome.frustumCulled = false;
         group.add(animeDome);
@@ -439,6 +450,12 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       gradeAnime(state);
     },
     update(dt, time, wind, camera) {
+      // Keep the sky sphere locked to the eye. A world-fixed dome is clipped
+      // by the far plane into a rotating black circle the moment the camera
+      // leaves the origin — follow the camera and the whole sky stays lit.
+      dome.position.copy(camera.position);
+      if (animeDome) animeDome.position.copy(camera.position);
+
       // Cloud banks drift
       for (let i = 0; i < cloudCount; i += 1) {
         const s = cloudSeeds[i];

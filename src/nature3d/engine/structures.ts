@@ -26,6 +26,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { QualityBudget } from "./quality";
 import { terrainHeight, OCEAN_LEVEL } from "./terrain";
 import { pathWeight } from "./environment";
+import { beachHouseSites } from "./beachHouseSite";
 import { noise } from "./simplex";
 
 export interface Structures {
@@ -262,6 +263,88 @@ export function createStructures(budget: QualityBudget): Structures {
       if (i < 7) {
         add(woodMat, box(1.4, 0.07, 0.05), x + 0.67, g + 0.82, z, HAMLET_YAW, false);
         add(woodMat, box(1.4, 0.07, 0.05), x + 0.67, g + 0.42, z, HAMLET_YAW, false);
+      }
+    }
+  }
+
+  // ── HOMESTEAD DETAILS at each beach house ────────────────────────────
+  // Low-cost environmental storytelling: a short fence run, a wood pile,
+  // a bench and a couple of storage crates. Sparse — open yard space stays.
+  // All merged into the wood bucket (zero extra draw calls).
+  {
+    const houses = beachHouseSites();
+    for (let hi = 0; hi < houses.length; hi += 1) {
+      const h = houses[hi];
+      const cos = h.cos;
+      const sin = h.sin;
+      /** Local offset → world XZ. */
+      const wx = (lx: number, lz: number) => h.x + cos * lx - sin * lz;
+      const wz = (lx: number, lz: number) => h.z + sin * lx + cos * lz;
+      // Short fence run on the side yard (not a full enclosure — open space).
+      const fenceSide = hi % 2 === 0 ? 1 : -1;
+      for (let i = 0; i < 5; i += 1) {
+        const lx = fenceSide * (h.halfX + 1.8);
+        const lz = -h.halfZ * 0.4 + i * 1.4;
+        const x = wx(lx, lz);
+        const z = wz(lx, lz);
+        const g = groundAt(x, z);
+        add(woodMat, box(0.07, 0.95, 0.07), x, g + 0.48, z, h.yaw, false);
+        if (i < 4) {
+          const mx = wx(lx, lz + 0.7);
+          const mz = wz(lx, lz + 0.7);
+          add(woodMat, box(0.06, 0.06, 1.35), mx, g + 0.78, mz, h.yaw, false);
+          add(woodMat, box(0.06, 0.06, 1.35), mx, g + 0.4, mz, h.yaw, false);
+        }
+      }
+      // Wood pile beside the house (firewood stack).
+      {
+        const lx = -fenceSide * (h.halfX + 2.4);
+        const lz = h.halfZ * 0.15;
+        const x = wx(lx, lz);
+        const z = wz(lx, lz);
+        const g = groundAt(x, z);
+        for (let row = 0; row < 3; row += 1) {
+          for (let col = 0; col < 3 - row; col += 1) {
+            const ox = (col - 1) * 0.38 + row * 0.08;
+            const oy = row * 0.28 + 0.12;
+            add(
+              woodMat,
+              new THREE.CylinderGeometry(0.1, 0.11, 0.85, 5),
+              x + cos * ox, g + oy, z + sin * ox,
+              h.yaw + Math.PI / 2 + (rand() - 0.5) * 0.15,
+              false,
+            );
+          }
+        }
+      }
+      // Bench facing the meadow entrance.
+      {
+        const lx = 0;
+        const lz = h.halfZ + 3.2;
+        const x = wx(lx, lz);
+        const z = wz(lx, lz);
+        const g = groundAt(x, z);
+        add(woodMat, box(1.4, 0.08, 0.42), x, g + 0.42, z, h.yaw, false);
+        add(woodMat, box(0.08, 0.42, 0.08), x - 0.55 * cos, g + 0.21, z - 0.55 * sin, 0, false);
+        add(woodMat, box(0.08, 0.42, 0.08), x + 0.55 * cos, g + 0.21, z + 0.55 * sin, 0, false);
+        // Backrest.
+        add(woodMat, box(1.4, 0.45, 0.06), x - sin * 0.18, g + 0.7, z + cos * 0.18, h.yaw, false);
+      }
+      // Small storage crate + farming patch marker (low box rows).
+      if (budget.tier !== "low") {
+        const lx = fenceSide * (h.halfX + 3.6);
+        const lz = -h.halfZ * 0.2;
+        const x = wx(lx, lz);
+        const z = wz(lx, lz);
+        const g = groundAt(x, z);
+        add(woodMat, box(0.7, 0.55, 0.55), x, g + 0.28, z, h.yaw + 0.2, false);
+        // Tiny garden rows — three low planks as bed edges.
+        for (let r = 0; r < 3; r += 1) {
+          const gx = wx(lx + 1.8, lz - 1.2 + r * 0.85);
+          const gz = wz(lx + 1.8, lz - 1.2 + r * 0.85);
+          const gg = groundAt(gx, gz);
+          add(woodMat, box(2.2, 0.08, 0.12), gx, gg + 0.06, gz, h.yaw, false);
+        }
       }
     }
   }

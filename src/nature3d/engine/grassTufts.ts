@@ -132,9 +132,13 @@ function acceptsTuft(
  * thick the turf can be open, and vice versa. That overlap-of-two-patterns
  * is what stops the field reading as one stamped carpet.
  */
+/** Prefer denser tuft clusters in natural vegetation zones. */
 function patchDensity(x: number, z: number): number {
-  return noise.noise2D(x * 0.038 - 91.3, z * 0.038 + 55.9) * 0.62
-    + noise.noise2D(x * 0.14 + 8.1, z * 0.14 - 66.4) * 0.38;
+  // Natural density fields: dense → medium → sparse → bare patches.
+  const field = noise.noise2D(x * 0.022 + 11.3, z * 0.022 - 4.7) * 0.5 + 0.5;
+  const clump = noise.noise2D(x * 0.038 - 91.3, z * 0.038 + 55.9) * 0.55
+    + noise.noise2D(x * 0.14 + 8.1, z * 0.14 - 66.4) * 0.45;
+  return clump * 0.65 + (field - 0.4) * 0.5;
 }
 
 /** Load one variant, re-based to unit height with its base at the origin. */
