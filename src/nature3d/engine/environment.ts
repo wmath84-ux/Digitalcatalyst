@@ -316,8 +316,8 @@ export function pathWeight(x: number, z: number): number {
   // that could not be on a trail AND are far outside the trodden circle.
   const b = TRAIL_BOUNDS;
   if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) {
-    const dc = Math.hypot(x, z - 2.0);
-    const clearing = Math.max(0, 0.82 * (1 - smoothstep(1.2, 2.5, dc)));
+    const dc = Math.hypot(x, z);
+    const clearing = Math.max(0, 0.82 * (1 - smoothstep(1.8, 2.6, dc)));
     const yard = 0.62 * beachHouseYardWeight(x, z);
     return yard > clearing ? yard : clearing;
   }
@@ -342,8 +342,8 @@ export function pathWeight(x: number, z: number): number {
     w = Math.max(w, core * Math.max(0, endFade) * wobble);
   }
   // The clearing: the trodden disc under the chair and desk.
-  const d = Math.hypot(x, z - 2.0);
-  w = Math.max(w, 0.82 * (1 - smoothstep(1.2, 2.5, d)));
+  const d = Math.hypot(x, z);
+  w = Math.max(w, 0.82 * (1 - smoothstep(1.8, 2.6, d)));
   // THE HOMESTEADS: the ground each beach house stands on reads as a lived-in
   // yard — bare, swept, compacted — which is what makes a house look occupied
   // instead of dropped. It is fed through THIS function (rather than each
