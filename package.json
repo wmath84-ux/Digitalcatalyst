@@ -31,6 +31,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:static": "node scripts/preview.mjs 5174",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
     "ensure:google-services": "node scripts/ensure-google-services.mjs",
     "android:sync": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android",
