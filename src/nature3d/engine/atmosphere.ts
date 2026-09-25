@@ -206,9 +206,14 @@ function projectVertexChunk(withNormal: boolean): string {
 /**
  * The fog chunk, replaced.
  *
- * `FOG_EXP2` is the scene's FogExp2 and the only path used at runtime; the
- * linear fallback is there so the chunk is never a silent no-op if the scene
- * is switched to a linear fog.
+ * Distance-driven atmospheric fog:
+ *   0–12 m   crystal clear (no fog)
+ *  12–40 m   haze eases in
+ *  40 m+     density ramps hard — distant land goes smoky
+ *
+ * The scene still carries FogExp2 for three.js bookkeeping, but the real
+ * look is this distance curve so near ground stays readable and far ridges
+ * melt into blue-grey air.
  */
 const FOG_CHUNK = /* glsl */ `
   #ifdef USE_FOG
@@ -219,33 +224,42 @@ const FOG_CHUNK = /* glsl */ `
       float dcHazeFall = exp( - dcHazeAlt / uDcHazeHeight );
       float dcHazeDensity = fogDensity * mix( 1.0, uDcHazeGround, dcHazeFall );
 
-      // Two-distance integral of an exponential-squared medium: the plain
-      // exp(-d^2) form, weighted so the low ground thickens first.
       float dcDepth = max( vFogDepth, 0.0 );
-      float dcFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
-      dcFog = clamp( dcFog, 0.0, 1.0 );
 
-      // AERIAL PERSPECTIVE — depth without bleaching.
-      // As distance increases: contrast drops, saturation drops slightly,
-      // atmospheric blue increases subtly. Surfaces keep their identity;
-      // the world simply feels larger.
+      // ── DISTANCE FOG CURVE ──────────────────────────────────────────
+      // Near field stays clear so 10–20 m reads sharp; past that the air
+      // thickens smoothly into smoke. Two smoothsteps + a soft exp tail.
+      float dcNearClear = 1.0 - smoothstep( 12.0, 40.0, dcDepth );
+      float dcMidBuild  = smoothstep( 30.0, 120.0, dcDepth );
+      float dcFarSmoke  = smoothstep( 90.0, 380.0, dcDepth );
+      // Base exp2 fog still contributes a gentle global falloff.
+      float dcExpFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
+      // Composite: clear near → growing haze → dense smoky distance.
+      float dcFog = mix( dcExpFog, 1.0, dcMidBuild * 0.55 + dcFarSmoke * 0.45 );
+      dcFog *= ( 1.0 - dcNearClear * 0.92 );
+      // Extra far-field punch so ridges dissolve into air.
+      dcFog = clamp( dcFog + dcFarSmoke * 0.35, 0.0, 1.0 );
+
+      // AERIAL PERSPECTIVE — cool smoky blue air, not grey bleach.
       vec3 dcEye = normalize( vDcWorldPos - cameraPosition );
       float dcToward = max( dot( dcEye, uDcSunDir ), 0.0 );
-      // Cool blue bias in the haze (not grey, not white).
-      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.18 );
-      dcHaze = mix( dcHaze, vec3( 0.55, 0.72, 0.92 ), 0.18 );
+      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.22 );
+      // Smoky atmosphere: pale blue-grey that thickens with distance.
+      dcHaze = mix( dcHaze, vec3( 0.62, 0.74, 0.88 ), 0.28 + dcFarSmoke * 0.22 );
 
-      float dcWash = min( dcFog * uDcAerial, 0.28 );
+      // Near stays almost untouched; far can go heavily atmospheric.
+      float dcWash = clamp( dcFog * uDcAerial * ( 0.55 + dcFarSmoke * 0.85 ), 0.0, 0.78 );
       float dcLum = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
       float dcHazeLum = max( dot( dcHaze, vec3( 0.2126, 0.7152, 0.0722 ) ), 0.001 );
-      dcHaze *= min( 1.0, ( dcLum + 0.02 ) / dcHazeLum );
-      // Desaturate slightly with distance before the haze mix — contrast drop.
+      // Allow haze to lift slightly so far land reads as lit air, not mud.
+      dcHaze *= min( 1.35, ( dcLum + 0.08 ) / dcHazeLum );
+      // Desaturate with distance — contrast drop into the smoke.
       float dcGrey = dot( gl_FragColor.rgb, vec3( 0.3333 ) );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( dcGrey ), dcWash * 0.22 );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( dcGrey ), dcWash * 0.35 );
       gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcWash );
     #else
-      float dcLin = smoothstep( fogNear, fogFar, vFogDepth );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, min( dcLin, 0.22 ) );
+      float dcLin = smoothstep( max( fogNear, 12.0 ), fogFar, vFogDepth );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, min( dcLin, 0.72 ) );
     #endif
   #endif
 `;
@@ -263,17 +277,19 @@ const TRANSMIT_APPLY = /* glsl */ `
 `;
 
 export function createAtmosphere(budget: QualityBudget): Atmosphere {
+  // Budget still gates far-plane-related aerial strength for low tiers.
+  const aerialBase = budget.fogDensity > 0.0004 ? 1.2 : 1.15;
   const uniforms: AtmosphereUniforms = {
     uDcSunDir: { value: new THREE.Vector3(0.62, 0.34, -0.7).normalize() },
     uDcSunColor: { value: new THREE.Color(0xfff0cf) },
-    uDcHazeColor: { value: new THREE.Color(0xaedcfa) },
-    uDcInScatter: { value: 0.4 },
-    // 46 m of scale height: the meadow's own relief is ~12 m, so the haze
-    // thins noticeably as the learner walks up the lesson-board hill but
-    // still blankets the whole valley floor evenly.
-    uDcHazeHeight: { value: 46 },
-    uDcHazeGround: { value: 1.22 },
-    uDcAerial: { value: budget.fogDensity > 0.0004 ? 0.85 : 1 },
+    uDcHazeColor: { value: new THREE.Color(0xb8d8f0) },
+    uDcInScatter: { value: 0.48 },
+    // 52 m of scale height: haze pools in valleys; hilltops stay clearer.
+    uDcHazeHeight: { value: 52 },
+    uDcHazeGround: { value: 1.35 },
+    // Stronger aerial mix so distant ground goes smoky (near stays clear
+    // via the distance curve in FOG_CHUNK).
+    uDcAerial: { value: aerialBase },
     uDcTransmit: { value: 0.40 },
     uDcTransmitColor: { value: new THREE.Color(0x7ee038) },
     uDcPhase: { value: 2.6 },
@@ -368,9 +384,9 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
         // more forward-scattered light through the leaves, which is what
         // makes a backlit canopy at 6 pm glow.
         const low = 1 - Math.min(1, Math.max(0, elevation / 0.55));
-        // Kept low on purpose. The fog chunk also caps the mix, so a long
-        // view cannot bleach a surface to white even if this drifts up.
-        uniforms.uDcAerial.value = 0.4 + low * 0.15;
+        // Aerial strength stays high so far ridges dissolve into smoky air;
+        // the distance curve already protects the near 10–20 m band.
+        uniforms.uDcAerial.value = 1.05 + low * 0.2;
         uniforms.uDcTransmit.value = 0.32 + low * 0.28;
         uniforms.uDcPhase.value = 2.6 + low * 1.4;
       }

@@ -129,22 +129,15 @@ export function createWater(
   normTex.wrapT = THREE.RepeatWrapping;
 
   const riverMat = new THREE.MeshStandardMaterial({
-    // METALNESS IS 0, NOT 0.42 (research §9: a metalness map is 0 or 1 in
-    // practice; values in between are a look, not a material). The reflection
-    // here is dielectric Fresnel — which is what water actually is — and the
-    // injection below supplies it in full; parking metalness at 0.42 on top
-    // would double-count the same highlight and kill the diffuse body.
-    // USER DIRECTIVE (the "small flat cube of water" GLB): the water IS the
-    // GLB's bright turquoise — baseColorFactor (0.35, 0.86, 0.88) ≈ #59dce1.
-    // The albedo map is kept for flow, but the body colour in the shader owns
-    // the look. DoubleSide so a camera under the surface still sees water.
-    color: 0x59dce1,
-    roughness: 0.18,
+    // Clear water blue base — the shader body colour owns the look, but the
+    // material albedo must not start dark or the river centre reads black.
+    color: 0x3eb8e0,
+    roughness: 0.22,
     metalness: 0.0,
     transparent: true,
-    opacity: 0.94,
+    opacity: 0.92,
     map: flowTex,
-    envMapIntensity: 0.55,
+    envMapIntensity: 0.4,
     side: THREE.DoubleSide,
   });
   // USER DIRECTIVE (the "small flat cube of water" GLB): the baked caustics
@@ -231,26 +224,21 @@ export function createWater(
         float dcCos = clamp(dot(dcView, dcNormal), 0.0, 1.0);
         float dcFres = 0.02 + 0.98 * pow(1.0 - dcCos, 5.0);
 
-        // ── Depth tint (Beer-Lambert): shallow edge, deep channel ───────
-        // The channel is deepest along its centre line, so the distance from
-        // that line is a stand-in for the water column that costs no extra
-        // geometry or depth pass (principle 39: fake the part nobody checks).
-        // USER DIRECTIVE (the GLB cube): the whole channel lives in the GLB's
-        // turquoise — bright #7fe7ea over the shelf, saturated #0aa0c4 in the
-        // deep current. The caustic noise then carves bright wave threads
-        // through it, strongly (0.45 → 1.35), so the texture is unmistakable.
+        // ── Depth tint: REAL WATER BLUE (not black/navy) ────────────────
+        // The centre line was reading black-blue because the deep body was
+        // too dark and caustics multiplied it down further. The whole channel
+        // now stays a clear, readable water blue — deeper in the middle,
+        // brighter turquoise near the banks — never black.
         float dcBank = abs(vDcWorld.x - ${RIVER_CENTER_X.toFixed(1)});
         float dcDepth = smoothstep(0.0, 5.4, dcBank);
-        vec3 dcDeep = vec3(0.007, 0.330, 0.500);       // sRGB #0aa0c4
-        vec3 dcShallow = vec3(0.210, 0.790, 0.820);    // sRGB #7fe7ea — the GLB base
-        vec3 dcBody = mix(dcDeep, dcShallow, dcDepth);
+        // Linear water blues — mid channel is saturated blue, banks are
+        // bright turquoise. No near-black deep value.
+        vec3 dcDeep = vec3(0.045, 0.42, 0.72);         // sRGB ~#2aa8d8 clear blue
+        vec3 dcShallow = vec3(0.18, 0.72, 0.82);       // sRGB ~#7ad4e6 turquoise
+        vec3 dcBody = mix(dcDeep, dcShallow, dcDepth * 0.85 + 0.15);
 
         // ── THE GLB WATER TEXTURE (small_flat_cube_of_water.glb) ────────
-        // The baked caustic-wave noise, dual-phase scrolled like the normal:
-        // two samples drift against each other and cross-fade, so the
-        // pattern is ALWAYS moving and never visibly slides. It multiplies
-        // the body into bright caustic threads and dark troughs — wave
-        // animation straight in the shader, zero CPU.
+        // Caustics modulate brightness gently so troughs never go black.
         #ifdef DC_WATER_LOW
         float dcCau = texture2D(uCaustics, dcUv * 1.7 + dcFlow * (dcPhase0 - 0.5) * 1.3).r;
         #else
@@ -259,47 +247,43 @@ export function createWater(
           texture2D(uCaustics, dcUv * 2.3 + 0.41 - dcFlow * (dcPhase1 - 0.5) * 1.3).r,
           dcMix);
         #endif
-        dcBody *= 0.45 + dcCau * 0.90;
+        // Floor at 0.72 so the centre never collapses to black water.
+        dcBody *= 0.72 + dcCau * 0.48;
 
-        // Sky reflection is kept QUIET so the body stays water-coloured
-        // instead of bleaching to white-blue along the centre line.
-        vec3 dcSky = uWsky * 0.55 + uWsun * 0.06;
+        // Sky reflection is quiet; body colour owns the look.
+        vec3 dcSky = uWsky * 0.45 + uWsun * 0.05 + vec3(0.08, 0.28, 0.48) * 0.25;
         vec3 dcH = normalize(dcView + uSunDir);
-        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 1.1;
-        float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 36.0) * 0.07;
-        // The GLB's roughness map decides where the sun really BITES: the
-        // smooth patches (low roughness) catch a hard glint, the choppy
-        // ones stay matte — that variation is most of what reads as SHINE.
+        float dcSpec = pow(max(dot(dcNormal, dcH), 0.0), 220.0) * 0.85;
+        float dcSheen = pow(max(dot(dcNormal, dcH), 0.0), 36.0) * 0.06;
         #ifndef DC_WATER_LOW
         float dcRgh = texture2D(uRoughTex, dcUv * 1.3 + vec2(dcPhase1 * 0.2, 0.0)).g;
-        float dcGlint = mix(1.75, 0.4, dcRgh);
+        float dcGlint = mix(1.55, 0.45, dcRgh);
         dcSpec *= dcGlint;
         dcSheen *= dcGlint * 0.8;
         #endif
 
-        vec3 dcCol = mix(dcBody, dcSky, dcFres * 0.28) + uWsun * (dcSpec + dcSheen);
+        vec3 dcCol = mix(dcBody, dcSky, dcFres * 0.22) + uWsun * (dcSpec + dcSheen);
 
-        // The GLB's own photographic surface, drifting slower than the
-        // caustics — a mid-depth photo layer the body sits ON. Sun/sky tint
-        // keeps it honest at every hour (never glowing at midnight).
         #ifndef DC_WATER_LOW
         vec3 dcPhoto = texture2D(uEmis, dcUv * 0.6 + vec2(uTime * 0.008, 0.0)).rgb;
-        dcCol = mix(dcCol, dcPhoto * (uWsun * 0.85 + uWsky * 0.45) * 1.35, 0.12);
+        // Photo layer is tinted blue so it cannot pull the centre toward black.
+        dcCol = mix(dcCol, dcPhoto * vec3(0.35, 0.75, 0.95) * (uWsun * 0.5 + uWsky * 0.55) * 1.1, 0.08);
         #endif
 
-        // Shoreline foam — a thin bank only, never a white stripe down the
-        // middle of the channel.
+        // Shoreline foam — thin bank only.
         float dcEdge = smoothstep(5.15, 6.25, dcBank);
         float dcFoam = dcEdge * 0.35 * smoothstep(0.45, 0.9, dcRipple);
 
-        // Caustic-driven sparkles: the sun's hot spot rides the SAME moving
-        // caustic pattern — shine that dances with the waves.
-        dcCol += uWsun * pow(max(dot(dcNormal, dcH), 0.0), 60.0) * dcCau * 0.22;
+        dcCol += uWsun * pow(max(dot(dcNormal, dcH), 0.0), 60.0) * dcCau * 0.18;
+        dcCol = mix(dcCol, vec3(0.55, 0.78, 0.88), clamp(dcFoam, 0.0, 0.4));
 
-        dcCol = mix(dcCol, vec3(0.42, 0.62, 0.78), clamp(dcFoam, 0.0, 0.4));
+        // Lift any residual darkness — water must read as water, not tar.
+        float dcColLum = dot(dcCol, vec3(0.2126, 0.7152, 0.0722));
+        if (dcColLum < 0.18) dcCol += vec3(0.04, 0.18, 0.32) * (0.18 - dcColLum) * 2.5;
 
-        gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.15, 0.35, 0.85), dcCol, 0.94);
-        gl_FragColor.a = clamp(mix(0.88, 0.98, dcFres * 0.4) + dcFoam * 0.06, 0.0, 1.0);
+        // Final mix: keep the water blue dominant (not the dark base albedo).
+        gl_FragColor.rgb = mix(vec3(0.12, 0.48, 0.72), dcCol, 0.96);
+        gl_FragColor.a = clamp(mix(0.90, 0.98, dcFres * 0.4) + dcFoam * 0.06, 0.0, 1.0);
         `,
       );
     riverMat.userData.shader = shader;
@@ -310,11 +294,11 @@ export function createWater(
   river.renderOrder = 1;
   group.add(river);
 
-  // Wet sandy riverbed under the translucent surface — a tropical stream
-  // runs over pale grit, not dark slate.
+  // Wet sandy riverbed under the translucent surface — pale blue-green grit
+  // so the centre never reads as a black strip when the surface is thin.
   const bed = new THREE.Mesh(
     new THREE.PlaneGeometry(13.5, RIVER_LENGTH + 2),
-    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x3d6e88 }),
+    new THREE.MeshLambertMaterial({ map: tex.rock, color: 0x5a9ab8 }),
   );
   bed.rotation.x = -Math.PI / 2;
   bed.position.set(RIVER_CENTER_X, WATER_LEVEL - 0.75, 0);
@@ -656,8 +640,8 @@ export function createWater(
           // USER DIRECTIVE (the GLB cube): turquoise sea — bright shelf,
           // saturated mid, teal deep. No navy anywhere.
           vec3 dcShallowC = vec3( 0.130, 0.750, 0.790 );  // sRGB #66e0e6
-          vec3 dcMidC     = vec3( 0.026, 0.480, 0.550 );  // sRGB #2cb8c4
-          vec3 dcDeepC    = vec3( 0.004, 0.210, 0.350 );  // sRGB #0e7c9e
+          vec3 dcMidC     = vec3( 0.045, 0.48, 0.68 );    // clear water blue
+          vec3 dcDeepC    = vec3( 0.030, 0.32, 0.55 );    // deep blue — not black
           vec3 dcBody = mix( dcShallowC, dcMidC, smoothstep( 0.6, 6.0, dcD ) );
           dcBody = mix( dcBody, dcDeepC, smoothstep( 6.0, 13.0, dcD ) );
 

@@ -723,9 +723,9 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
   // bleached-grass crest — GRASS colours, never bare stone or snow.
   const rock = new THREE.Color(0x8a9a4b);
   const snow = new THREE.Color(0xc9d68a);
-  // The island edge floor under the sea: deep blue bed so the dropped-off
-  // corners read as water in the haze, never as a bright square patch.
-  const deep = new THREE.Color(0x163a58);
+  // Underwater bed: clear blue-green (not black navy) so the river centre
+  // and the drowned shelf never read as a dark strip through the water.
+  const deep = new THREE.Color(0x2a6a88);
   const tmp = new THREE.Color();
 
   /**
