@@ -755,6 +755,12 @@ export class Sanctuary {
     // they skip it entirely. Register so far boards haze into the air.
     this.atmosphere.registerTree(this.screens.shells);
     this.winter.registerTree(this.screens.shells);
+    // Boot applied daylight before screens existed — push the current fog
+    // ramp onto the CSS3D faces now that the hosts are live.
+    {
+      const fog = this.scene.fog as THREE.Fog;
+      this.screens.setFog(fog.near, fog.far, fog.color);
+    }
     // The CSS3D layer is a sibling of the canvas, sharing its camera. It is
     // inserted BEFORE the HUD so the glass controls stay on top of it.
     opts.dom.appendChild(this.screens.domElement);
@@ -1639,7 +1645,8 @@ export class Sanctuary {
     fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
     // CSS3D board faces sit above the canvas — push the same smoke ramp so
     // black boards haze into the air just like terrain and trees.
-    this.screens.setFog(fog.near, fog.far, fog.color);
+    // Guard: applyDaylight runs once before createBoardScreens during boot.
+    this.screens?.setFog(fog.near, fog.far, fog.color);
     // The air is lit by the same sun as the ground: its colour, its in-scatter
     // and the strength of the foliage transmission term all follow the hour.
     // Reading `sunDir.y` gives the elevation directly — it is a unit vector
@@ -1662,7 +1669,7 @@ export class Sanctuary {
     fog.color.set(0x0a58b8);
     fog.near = 0.4;
     fog.far = 8;
-    this.screens.setFog(fog.near, fog.far, fog.color);
+    this.screens?.setFog(fog.near, fog.far, fog.color);
     this.scene.background = fog.color;
     this.renderer.toneMappingExposure = 0.78;
   }
