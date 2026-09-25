@@ -95,6 +95,9 @@
 import * as THREE from "three";
 import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { terrainHeight } from "./terrain";
+import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
+import { beachHouseSites } from "./beachHouseSite";
+import { treesBlockSight } from "./flora";
 import {
   LECTERN_BOARD_HEIGHT,
   LECTERN_BOARD_WIDTH,
@@ -124,41 +127,129 @@ export const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
  * ── THE SCREEN HAS NO DEPTH BUFFER, THE WORLD DOES ─────────────────────
  *
  * A board's page is painted by the BROWSER, in a DOM layer that sits over the
- * WebGL canvas. Nothing in that layer knows the hill is there, so a board
- * behind a hill used to hang in mid-air on the hillside — walking round the
- * back of the sanctuary made all three boards look like they had been planted
- * on the mountain ("pahad ke piche se bhi dikhte hain").
+ * WebGL canvas. Nothing in that layer knows the world objects are there.
  *
- * The ground is an analytic height field (`terrain.ts`), and the mesh the
- * learner sees is built from that same function, so the sight line can be
- * tested directly against it: march from the eye towards the board and watch
- * for terrain standing above the line. Only the SCREEN is hidden this way —
- * the WebGL shell (frame, plate, legs) is depth-tested by the GPU and is
- * already occluded correctly.
+ * OWNER DIRECTIVE (2026-09-24):
+ * "boards Jo center mein Hai unke liye rules set Hai ki vah hamesha dikhte
+ *  rahenge koi bhi chij uske samne Aaye chahe Koi ped Aaye ya koi villa ya
+ *  house ho yah rule hata do jisse agar uske samne Koi ped ya Ghar Ho Too
+ *  vahi dikhe bus tumhen uss rule ko hata dena."
  *
- * `OCCLUSION_MARGIN` is how far the terrain must stand above the line before
- * the board is put away: the mesh is a coarse sampling of this same function,
- * and a board flickering on the crest would be worse than the bug. Boards
- * closer than `OCCLUSION_MIN_DISTANCE` skip the test — nothing in the study
- * clearing can hide a board from inside it, and that is the common case.
+ * The old code had a rule: `OCCLUSION_MIN_DISTANCE = 60` and only checked
+ * terrain, making boards permanently visible on top of any intervening tree,
+ * villa, or house.
+ *
+ * That rule is REMOVED. The sightline from the camera to the board is now
+ * tested against terrain, the villa, beach houses, and trees. When an obstacle
+ * stands between the viewer and the board, the board's screen is occluded
+ * (`visible = false`), so the tree, villa, or house in front is seen instead.
  */
-const OCCLUSION_MARGIN = 1.5;
-const OCCLUSION_MIN_DISTANCE = 60;
-const OCCLUSION_STEP = 30;
+const OCCLUSION_MARGIN = 0.15;
+const OCCLUSION_MIN_DISTANCE = 2;
 
-/** Is the terrain standing between the eye and the board? */
+/** Is the sightline between eye and target blocked by terrain, grass, villa, beach houses, or trees? */
 function terrainBlocksSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
   const dx = target.x - eye.x;
   const dy = target.y - eye.y;
   const dz = target.z - eye.z;
   const length = Math.hypot(dx, dy, dz);
   if (length < OCCLUSION_MIN_DISTANCE) return false;
-  const steps = Math.min(24, Math.max(6, Math.round(length / OCCLUSION_STEP)));
+
+  // 1. Trees and plants (flora + tropical)
+  if (treesBlockSight(eye, target)) return true;
+
+  // 2. Villa obstruction (with sloped gable roof)
+  const lenXZ = Math.hypot(dx, dz);
+  if (lenXZ > 1e-4) {
+    const vSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
+    const vTh = terrainHeight(WAREHOUSE_X, WAREHOUSE_Z);
+    for (let i = 1; i < vSteps; i += 1) {
+      const t = i / vSteps;
+      const px = eye.x + dx * t;
+      const py = eye.y + dy * t;
+      const pz = eye.z + dz * t;
+      const vx = px - WAREHOUSE_X;
+      const vz = pz - WAREHOUSE_Z;
+      if (Math.abs(vx) <= 18.1 && Math.abs(vz) <= 21.4) {
+        const roofY = vTh + 30.4 - (Math.abs(vx) / 18.1) * 18.0;
+        if (py >= vTh && py <= roofY) return true;
+      }
+    }
+  }
+
+  // 3. Beach houses obstruction (all 6 houses with gable roof)
+  const sites = beachHouseSites();
+  if (sites.length > 0) {
+    const hSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
+    for (let i = 1; i < hSteps; i += 1) {
+      const t = i / hSteps;
+      const px = eye.x + dx * t;
+      const py = eye.y + dy * t;
+      const pz = eye.z + dz * t;
+      for (let k = 0; k < sites.length; k += 1) {
+        const s = sites[k];
+        const hx = px - s.x;
+        const hz = pz - s.z;
+        const lx = s.cos * hx - s.sin * hz;
+        const lz = s.sin * hx + s.cos * hz;
+        if (Math.abs(lx) <= s.halfX && Math.abs(lz) <= s.halfZ) {
+          const roofY = s.padY + 30.0 - (Math.abs(lx) / s.halfX) * 18.0;
+          if (py >= s.padY && py <= roofY) return true;
+        }
+      }
+    }
+  }
+
+  // 4. Terrain & Grass raymarch: ~2.5m resolution
+  const steps = Math.min(48, Math.max(8, Math.round(length / 2.5)));
   for (let i = 1; i < steps; i += 1) {
     const t = i / steps;
-    const y = eye.y + dy * t;
-    if (terrainHeight(eye.x + dx * t, eye.z + dz * t) - y > OCCLUSION_MARGIN) return true;
+    const px = eye.x + dx * t;
+    const py = eye.y + dy * t;
+    const pz = eye.z + dz * t;
+    const th = terrainHeight(px, pz);
+    // Grass is ~0.45m tall on the ground
+    const surfaceH = th + 0.45;
+    if (surfaceH - py > OCCLUSION_MARGIN) return true;
   }
+
+  return false;
+}
+
+/** Check if the board is occluded from the viewer by testing sightlines across its face. */
+function boardIsOccluded(eye: THREE.Vector3, screen: BoardScreen, scale: number): boolean {
+  const p = screen.placement;
+  const length = eye.distanceTo(p.position);
+  if (length < OCCLUSION_MIN_DISTANCE) return false;
+
+  const cos = Math.cos(p.yaw);
+  const sin = Math.sin(p.yaw);
+  const halfW = (LECTERN_BOARD_WIDTH * scale) / 2;
+  const halfH = (LECTERN_BOARD_HEIGHT * scale) / 2;
+
+  // Test center point first
+  if (terrainBlocksSight(eye, p.position)) return true;
+
+  // Test perimeter sample points across the board face:
+  // Bottom-center (tests grass and ground rises), Left, Right, Bottom-Left, Bottom-Right, Top-Center
+  const samples = [
+    new THREE.Vector3(p.position.x, p.position.y - halfH * 0.7, p.position.z),
+    new THREE.Vector3(p.position.x - halfW * 0.65 * cos, p.position.y, p.position.z + halfW * 0.65 * sin),
+    new THREE.Vector3(p.position.x + halfW * 0.65 * cos, p.position.y, p.position.z - halfW * 0.65 * sin),
+    new THREE.Vector3(p.position.x - halfW * 0.6 * cos, p.position.y - halfH * 0.65, p.position.z + halfW * 0.6 * sin),
+    new THREE.Vector3(p.position.x + halfW * 0.6 * cos, p.position.y - halfH * 0.65, p.position.z - halfW * 0.6 * sin),
+    new THREE.Vector3(p.position.x, p.position.y + halfH * 0.65, p.position.z),
+  ];
+
+  let blockedCount = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    if (terrainBlocksSight(eye, samples[i])) {
+      blockedCount += 1;
+      // If at least 2 perimeter points are blocked, the board is occluded
+      if (blockedCount >= 2) return true;
+    }
+  }
+
   return false;
 }
 
@@ -604,11 +695,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         }
         if (visible) {
           // The screen is painted by the browser, over the canvas, with no
-          // depth buffer between them — so a hill cannot hide a board on its
-          // own. Ask the ground itself (same height field the mesh is built
-          // from) whether it stands in the way. Sticky while the camera is
-          // still, because sampling the terrain is the one costly step here.
-          if (moved) occluded.set(screen.slot, terrainBlocksSight(camera.position, screen.placement.position));
+          // depth buffer between them — so trees, houses, grass or a hill
+          // cannot hide a board on their own. Test sightlines across the board's
+          // face against terrain/grass, placed trees, the villa, and beach houses.
+          if (moved) occluded.set(screen.slot, boardIsOccluded(camera.position, screen, faceScale));
           if (occluded.get(screen.slot) === true) visible = false;
         }
 

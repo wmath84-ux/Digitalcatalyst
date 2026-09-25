@@ -47,8 +47,15 @@ const HORIZON_SWING = THREE.MathUtils.degToRad(70);
  * shadow frustum degenerates (light parallel to the ground plane) and every
  * shadow stretches to infinity, which reads as a black screen rather than a
  * sunset.
+ *
+ * 10° rather than the old 4° — OWNER DIRECTIVE ("raat ke samay aur shaam ke
+ * samay colour ekdam black dikhta hai … dark green dikhna chahiye, na ki
+ * black"). At 4° the sun's dot(N,L) on the ground is 0.07, i.e. the whole
+ * world is lit by ambient alone AND the shadow map is raking the meadow at a
+ * grazing angle (self-shadowing + acne on top of an already tiny sun term).
+ * 10° keeps a real, warm, raking sun on the ground at both ends of the day.
  */
-const MIN_ELEVATION = THREE.MathUtils.degToRad(4);
+const MIN_ELEVATION = THREE.MathUtils.degToRad(10);
 
 export type DaylightMode = "auto" | "morning" | "midday" | "evening";
 
@@ -140,25 +147,47 @@ export function daylightAt(hour: number): DaylightState {
   // Evenings read warmer and hazier than mornings at the same elevation.
   const evening = t > 0.5 ? THREE.MathUtils.smoothstep(t, 0.52, 0.98) : 0;
 
+  // ── THE DUSK FLOOR ───────────────────────────────────────────────────
+  //
+  // OWNER DIRECTIVE (2026-09-24): "raat ke samay aur shaam ke samay colour
+  // ekdam black dikhta hai … dark green dikhna chahiye, na ki black."
+  //
+  // Measured, not guessed. The low-sun end of every curve below used to fall
+  // to values that put a grass pixel at roughly RGB(15, 91, 10) after the
+  // ACES fit — a green so deep a phone screen at night renders it as black.
+  // The four `1.xx`/`0.xx` endpoints of the intensity and exposure curves are
+  // therefore LIFTED (a camera's night adaptation: the eye opens up when the
+  // sun goes down), the dusk sky/ground-bounce colours are pulled back
+  // towards green instead of olive-brown, and the sun keeps 10° of elevation
+  // so the ground is still lit by something other than ambient.
+  //
+  // THE MIDDAY END OF EVERY CURVE IS UNTOUCHED — `dayFactor = 1` and
+  // `warm = 0` still resolve to exactly the values the sunny-afternoon
+  // directive pinned (sun 3.15, hemi 1.85, fill 1.05, exposure 1.16,
+  // hemiSky #d8f4ff, hemiGround #62b032). Only the ends of the day moved.
   return {
     sunDir,
     sunColor: lerpColor(0xfff8ea, 0xff9450, warm).lerp(new THREE.Color(0xff7a40), evening * 0.35),
-    sunIntensity: THREE.MathUtils.lerp(0.95, 3.15, dayFactor),
+    sunIntensity: THREE.MathUtils.lerp(1.28, 3.15, dayFactor),
     // USER DIRECTIVE (sunny afternoon): a hard, clean, saturated sky — the
     // zenith is a real afternoon blue, the horizon is bright pale, the ground
     // bounce is sunlit grass (so shadows stay green, not mud), and the fog
-    // is clear blue air rather than dust. Colour literals are free; the
-    // intensity / exposure formulas stay pinned.
-    hemiSky: lerpColor(0xd8f4ff, 0xffcf9e, warm),
-    hemiGround: lerpColor(0x62b032, 0x6a5a32, warm),
-    hemiIntensity: THREE.MathUtils.lerp(1.05, 1.85, dayFactor),
-    fillIntensity: THREE.MathUtils.lerp(0.52, 1.05, dayFactor),
-    zenith: lerpColor(0x1f7eef, 0x35508f, warm),
-    horizon: lerpColor(0xc8eeff, 0xffbd8c, warm),
-    ground: lerpColor(0xdceec0, 0x9a7a5c, warm),
-    sunTint: lerpColor(0xfff8e0, 0xffa468, warm),
-    fog: lerpColor(0xaedcfa, 0xf2c49a, warm),
-    exposure: THREE.MathUtils.lerp(0.92, 1.16, dayFactor),
+    // is clear blue air rather than dust.
+    //
+    // DUSK FLOOR: the sky stays warm (it IS a sunset) but lighter and less
+    // orange, and the ground bounce stays GREEN — the old #6a5a32 olive was
+    // the single biggest reason a dusk shadow read as mud-black. Night is
+    // deliberately a deep green dusk, never a black screen.
+    hemiSky: lerpColor(0xd8f4ff, 0xffe3c4, warm),
+    hemiGround: lerpColor(0x62b032, 0x3d8f2e, warm),
+    hemiIntensity: THREE.MathUtils.lerp(1.95, 1.85, dayFactor),
+    fillIntensity: THREE.MathUtils.lerp(0.8, 1.05, dayFactor),
+    zenith: lerpColor(0x1f7eef, 0x3f5f9e, warm),
+    horizon: lerpColor(0xc8eeff, 0xffc79a, warm),
+    ground: lerpColor(0xdceec0, 0x7d8a55, warm),
+    sunTint: lerpColor(0xfff8e0, 0xffb07a, warm),
+    fog: lerpColor(0xaedcfa, 0xf7d5ac, warm),
+    exposure: THREE.MathUtils.lerp(1.02, 1.16, dayFactor),
     dayFactor,
     hour: h,
   };

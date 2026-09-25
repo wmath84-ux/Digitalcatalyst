@@ -260,9 +260,13 @@ export interface AtmosphereKey {
 }
 
 const KEYS: ReadonlyArray<{ maxElevation: number; key: AtmosphereKey }> = [
-  // Low sun: warm air, but not a cream sheet. A pale haze tint multiplied
-  // into the fog colour was what turned a long view white.
-  { maxElevation: 0.25, key: { haze: new THREE.Color(0xc49262), sun: new THREE.Color(0xffdca8), inScatter: 0.28 } },
+  // Low sun: warm air, but not a cream sheet — and NOT the dark ochre it used
+  // to be. This tint is MULTIPLIED into the fog colour, so the old 0xc49262
+  // pulled the whole dusk haze down to (0.73, 0.45, 0.28): every distant
+  // surface faded towards a brown that read as black on a phone screen
+  // (owner: "shaam ko sab black dikhta hai"). A pale, still-warm haze keeps
+  // the aerial perspective without eating the world's brightness.
+  { maxElevation: 0.25, key: { haze: new THREE.Color(0xe0b489), sun: new THREE.Color(0xffdca8), inScatter: 0.28 } },
   // Mid-morning / late afternoon: still warm, still a colour.
   { maxElevation: 0.55, key: { haze: new THREE.Color(0xa8b48a), sun: new THREE.Color(0xffeecb), inScatter: 0.16 } },
   // High sun: a real sky blue. The old 0xdcefef was near-white, and that is

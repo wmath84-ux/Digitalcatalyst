@@ -109,9 +109,9 @@ import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
 import type { QualityBudget } from "./quality";
 import { RIVER_CENTER_X, RIVER_HALF_WIDTH, terrainHeight } from "./terrain";
 import { pathWeight } from "./environment";
-import { insideWarehouse } from "./warehouseSite";
+import { insideWarehouse, WAREHOUSE_HEIGHT } from "./warehouseSite";
 import {
-  HOUSE_RIDGE,
+  HOUSE_TOTAL_HEIGHT,
   beachHouseSites,
   beachHousesInstalled,
   installBeachHouseSites,
@@ -134,10 +134,23 @@ export interface BeachHouses {
 
 const MODEL_URL = "sanctuary/models/beach_house.glb";
 
-/** The ridge height the whole district is designed around, in metres. */
-const RIDGE_TARGET = 10.5;
-/** 10.5 m of ridge ÷ the authored 13.588 m ridge. */
-const BASE_SCALE = RIDGE_TARGET / HOUSE_RIDGE;
+/**
+ * OWNER DIRECTIVE (2026-09-24):
+ * "jo other houses hai villa ko chodkar unka size hight length sab exactly
+ * utna hi karo jitna villa ka hai , matlab jitna hight size villa ka hai
+ * utna Hi sabhi aur dusre sabhi houses ka size set kar utna hi"
+ *
+ * The villa's authored height is 30 m (`WAREHOUSE_HEIGHT`).
+ * The beach house's authored total height is 18.92 m (`HOUSE_TOTAL_HEIGHT`).
+ * Setting `BASE_SCALE = WAREHOUSE_HEIGHT / HOUSE_TOTAL_HEIGHT` makes the
+ * house stand 30 m tall, exactly matching the villa's height, with roof
+ * dimensions of 34.2 × 27.5 m matching the villa's 36.2 × 42.8 m footprint.
+ * Every house in the district is set to this EXACT same size — uniform
+ * across all six houses, matching the villa.
+ */
+export const HOUSE_HEIGHT_TARGET = WAREHOUSE_HEIGHT;
+export const BASE_SCALE = HOUSE_HEIGHT_TARGET / HOUSE_TOTAL_HEIGHT;
+export const RIDGE_TARGET = HOUSE_HEIGHT_TARGET;
 /** How far the floor is buried, so the wall meets the dirt, not a gap. */
 const BITE = 0.32;
 
@@ -254,8 +267,8 @@ function pickSites(): BeachHousePlacement[] {
   // The flat pad's own half extents at the base scale — the ground a house's
   // levelling actually rewrites, so the relief the gate measures is exactly
   // the cut the pad would have to make.
-  const probeHalfX = 14.19 * 0.5 * BASE_SCALE + 5.4;
-  const probeHalfZ = 14.04 * 0.5 * BASE_SCALE + 4.6;
+  const probeHalfX = 14.19 * 0.5 * BASE_SCALE + 9.0;
+  const probeHalfZ = 14.04 * 0.5 * BASE_SCALE + 8.5;
   const halfSpan = Math.ceil(R_MAX / GRID_STEP) * GRID_STEP;
 
   const candidates: Candidate[] = [];
@@ -325,19 +338,24 @@ function pickSites(): BeachHousePlacement[] {
   const rng = mulberry32(0x5ea51de);
   const sites: BeachHousePlacement[] = [];
   for (const c of chosen) {
-    const scale = BASE_SCALE * (0.86 + 0.28 * rng());
+    // All other houses are set to the exact same size matching the villa.
+    const scale = BASE_SCALE;
     // Face the meadow: the model's local +Z is aimed at the sanctuary centre,
     // with a small jitter so the row never reads as a parade ground.
     const yaw = Math.atan2(-c.x, -c.z) + (rng() - 0.5) * 0.55;
     const halfX = 14.19 * 0.5 * scale;
     const halfZ = 14.04 * 0.5 * scale;
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
     // The pad level is the LOWEST natural sample under the walls (walls plus
     // 2.5 m of apron), so the floor is cut in — the villa's rule, and the
     // reason a house on a 3 m swell still reads as built, not dropped.
     let padY = Infinity;
     for (let ix = -2; ix <= 2; ix += 1) {
       for (let iz = -2; iz <= 2; iz += 1) {
-        const h = terrainHeight(c.x + (ix / 2) * (halfX + 2.5), c.z + (iz / 2) * (halfZ + 2.5));
+        const lx = (ix / 2) * (halfX + 2.5);
+        const lz = (iz / 2) * (halfZ + 2.5);
+        const h = terrainHeight(c.x + cos * lx - sin * lz, c.z + sin * lx + cos * lz);
         if (h < padY) padY = h;
       }
     }
