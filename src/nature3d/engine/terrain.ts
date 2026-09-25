@@ -94,6 +94,67 @@ const RIM_FULL = 900;  // full-height band starts
 export const MOUNTAIN_MAX_HEIGHT = 100;
 
 /**
+ * WHERE THE 3D MOUNTAIN FOREST STANDS — and the ground it stands ON.
+ *
+ * `mountainForest.ts` plants the owner's forested-mountain diorama 360°
+ * around the world's edge, one card every ~30° at this radius. The radius is
+ * published HERE, not there, because the ground has to know it too: the ring
+ * only reads as a mountain range if the terrain it is dropped on is itself
+ * high ground. OWNER DIRECTIVE (2026-09-24):
+ *
+ *   "pahad hawa mein tairte hue dikh rahe hain … pahad ko upar niche thoda
+ *    karo aur jo jameen hai usko upar shift karke jameen se connect kar do,
+ *    isase aur bhi natural feel aaega."
+ *
+ * The floating was two bugs meeting. The cards were seated on the HIGHEST of
+ * five ground samples spread over ±140 m, so wherever the arc dipped in front
+ * of a card the card hung over the dip — measured gaps of 20…57 m of empty air
+ * under a "mountain". Seating them on the LOWEST sample under their own
+ * footprint buries the card's base instead (no gap is possible), and this
+ * apron lifts the ground under the whole band so the burial is a few metres of
+ * skirt rather than half the mountain: the cards sink a little, the ground
+ * rises to meet them, and the two are one range.
+ */
+export const MOUNTAIN_RING_RADIUS = 950;
+
+/**
+ * The apron's radial profile, in metres from the centre.
+ *
+ * A card's own footprint runs from ~255 m INSIDE its placement point to ~30 m
+ * outside it, and ~208 m either side (measured from the model's bounding box
+ * at the ring's scale), so its inner CORNERS reach in to r ≈ 668. The
+ * fully-lifted band therefore has to be up by 660 or the card is seated on a
+ * ramp and hangs over the low ground behind it:
+ *
+ *   520 → 660   rise in   (a long ramp, so the meadow side is a foothill
+ *                          approach you can walk up, never a terrace wall;
+ *                          it also hands on from the inner foothill ring,
+ *                          which is fully up at 460 m)
+ *   660 → 1000  held      (the ground the cards are seated on)
+ *   1000 → 1120 release   (hands back to the island edge's own fall at 1120)
+ */
+const APRON_IN = 520;
+const APRON_FULL = 660;
+const APRON_FADE = 1000;
+const APRON_OUT = 1120;
+
+/**
+ * How high the apron lifts the ground, in metres — a FLOOR, not an addition
+ * (`terrainHeight` takes the max of this and the natural relief), so a sector
+ * the arc already pushed to 100 m keeps its peak and only the valleys between
+ * the peaks are filled. 46 m is deliberate:
+ *
+ *   • above the tree line (flora rejects ground over 34 m), so the band stays
+ *     open hill turf for the cards' own forest to stand on;
+ *   • high enough that a card seated on the band's LOWEST point still shows
+ *     ~50–100 m of mountain above the surrounding ground (the card is ~108 m
+ *     tall and its base is buried);
+ *   • below the 100 m cap, so the apron can never become the tallest thing in
+ *     the world and trim the real peaks.
+ */
+const APRON_LEVEL = 46;
+
+/**
  * THE BAY — the one sector of the mountain arc that opens to the sea.
  *
  * A tropical island is read by its coastline, so the rim must have a place
@@ -170,6 +231,49 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * The mountain passes, shared by every ring-shaped term in the height field.
+ *
+ * The rings that close the map (the inner foothills, the outer arc and the
+ * apron the 3D forest stands on) would each cut the sanctuary off from the
+ * Highlands, so each of them is opened along the straight line that joins the
+ * two districts. `inner`/`outer` are the pass's half-width ramp in metres:
+ * the inner ring keeps a tight 90…260 m pass, the outer arc and the apron a
+ * wider 120…420 m one, so the walk out is a valley rather than a slot.
+ *
+ * ONE implementation on purpose: three copies of this loop is how a pass ends
+ * up open in one ring and walled in the next, which reads from the meadow as a
+ * mountain with a doorway punched through it.
+ */
+function corridorWeight(x: number, z: number, inner: number, outer: number): number {
+  let corridor = 1;
+  for (const r of REGIONS) {
+    if (r.id === "sanctuary") continue;
+    // Distance from the straight line joining the sanctuary to this district.
+    const t = Math.max(0, Math.min(1, x / r.centerX));
+    const lineZ = r.centerZ * t;
+    const off = Math.hypot(z - lineZ, 0);
+    const onCorridor = (x > 0) === (r.centerX > 0);
+    if (onCorridor) corridor = Math.min(corridor, smoothstep(inner, outer, off));
+  }
+  return corridor;
+}
+
+/**
+ * The mountain-pass factor the OUTER ring terms share, published so the 3D
+ * mountain forest can stay out of the passes too (`mountainForest.ts`).
+ *
+ * 1 on high ground, 0 in the middle of the pass that leads to the Highlands.
+ * A card planted across a pass would be seated on the plain at its mouth and
+ * hang over it — the same floating mountain the apron exists to prevent — so
+ * the ring skips any chunk whose footprint touches one, exactly as it skips
+ * the bay. The terrain's arc and the planted forest then agree on where the
+ * openings are: the bay to the sea, the pass to the west.
+ */
+export function mountainPassWeight(x: number, z: number): number {
+  return corridorWeight(x, z, 120, 420);
+}
+
 function distantRelief(x: number, z: number): number {
   const d = Math.hypot(x, z);
   // Nothing until well past the clearing, then a long smooth ramp that is
@@ -181,16 +285,7 @@ function distantRelief(x: number, z: number): number {
   // meadow off from its neighbours, so it is opened up along the corridors
   // that lead to the other two districts. The result is a natural mountain
   // pass at each end rather than a wall.
-  let corridor = 1;
-  for (const r of REGIONS) {
-    if (r.id === "sanctuary") continue;
-    // Distance from the straight line joining the sanctuary to this district.
-    const t = Math.max(0, Math.min(1, x / r.centerX));
-    const lineZ = r.centerZ * t;
-    const off = Math.hypot(z - lineZ, 0);
-    const onCorridor = (x > 0) === (r.centerX > 0);
-    if (onCorridor) corridor = Math.min(corridor, smoothstep(90, 260, off));
-  }
+  const corridor = corridorWeight(x, z, 90, 260);
   if (corridor <= 0) return 0;
   // The inner ring HANDS OFF to the outer arc instead of stacking on top of
   // it — stacked, the two together could push the ground past the 100 m
@@ -249,15 +344,7 @@ function outerRim(x: number, z: number): number {
   const rise = smoothstep(RIM_INNER, RIM_FULL, d);
   if (rise <= 0) return 0;
 
-  let corridor = 1;
-  for (const r of REGIONS) {
-    if (r.id === "sanctuary") continue;
-    const t = Math.max(0, Math.min(1, x / r.centerX));
-    const lineZ = r.centerZ * t;
-    const off = Math.hypot(z - lineZ, 0);
-    const onCorridor = (x > 0) === (r.centerX > 0);
-    if (onCorridor) corridor = Math.min(corridor, smoothstep(120, 420, off));
-  }
+  const corridor = corridorWeight(x, z, 120, 420);
   if (corridor <= 0) return 0;
 
   // The octave scales are the whole game for the silhouette: too fine and
@@ -290,6 +377,45 @@ function outerRim(x: number, z: number): number {
   // the bay factor is applied AFTER it (see `bayGap`).
   const h = Math.min(1, Math.max(Math.pow(ridged * mass, 1.15), 0.05) * 1.28);
   return h * MOUNTAIN_MAX_HEIGHT * rise * corridor * bayGap(Math.atan2(z, x));
+}
+
+/**
+ * The ground floor under the 3D mountain ring — see `MOUNTAIN_RING_RADIUS`.
+ *
+ * Returns a HEIGHT (not an offset): `terrainHeight` takes `max(natural, this)`,
+ * so the apron fills the arc's valleys up to a walkable plateau and leaves
+ * every real peak exactly where it was. Three gates keep it honest:
+ *
+ *   corridor — the pass to the Highlands stays a pass. Without this the
+ *              apron would be a 46 m wall across the one route out of the
+ *              meadow (the arc above already respects it).
+ *   bayGap   — the bay is the map's coastline: beach, surf, jetty, sea view.
+ *              The gap is remapped so the apron is EXACTLY zero in the bay's
+ *              core and only reaches full strength outside it, which leaves
+ *              the measured shoreline (and the jetty built on it) untouched.
+ *   mass     — the arc's own slow angular noise, reused, so the plateau
+ *              undulates sector to sector with the mountains above it instead
+ *              of being one flat 46 m terrace all the way round.
+ *
+ * Cheap by construction: the radial weights are two `smoothstep`s on the
+ * `dist` the caller already computed, and the two noise calls only run inside
+ * the band (which the ground mesh samples at its COARSEST shell density).
+ */
+function ringApron(x: number, z: number, dist: number): number {
+  const w =
+    smoothstep(APRON_IN, APRON_FULL, dist) * (1 - smoothstep(APRON_FADE, APRON_OUT, dist));
+  if (w <= 0.001) return 0;
+
+  const ang = Math.atan2(z, x);
+  // The bay opens here: 0.1 is the gap's floor, so subtract it and renormalise.
+  const open = Math.max(0, bayGap(ang) - 0.1) / 0.9;
+  if (open <= 0.001) return 0;
+  const corridor = corridorWeight(x, z, 120, 420);
+  if (corridor <= 0.001) return 0;
+  const mass =
+    0.72 + 0.28 * (0.5 + 0.5 * noise.noise2D(Math.cos(ang) * 2.3 + 5.2, Math.sin(ang) * 2.3 - 8.1));
+
+  return APRON_LEVEL * w * open * corridor * mass;
 }
 
 /**
@@ -406,13 +532,21 @@ export function terrainHeight(x: number, z: number): number {
   // shallow, which is what gives the ocean something to turn turquoise over
   // and the beach somewhere flat to be.
   const shelf = Math.pow(edge, 1.45);
+  // THE RING APRON — the ground the 3D mountain forest is seated on. It is a
+  // FLOOR under the natural relief, applied before the shelf so the seaward
+  // fall still owns the island's edge: filling the arc's valleys up to the
+  // plateau is what connects the planted mountains to the ground instead of
+  // leaving them hanging in the air (see `ringApron`).
+  const natural = districtBlend + lessonBump;
+  const apron = ringApron(x, z, dist);
+  const lifted = apron > natural ? apron : natural;
   // The 100 m cap: the brief says the mountains are 100 m high, so nothing
   // in the whole world — arc, trek highlands, the lesson crest — is allowed
-  // to exceed it. (The lesson crest targets 37.5 m, so the cap only ever
-  // trims real mountain peaks.)
+  // to exceed it. (The lesson crest targets 37.5 m and the apron 46 m, so the
+  // cap only ever trims real mountain peaks.)
   const base = Math.min(
     MOUNTAIN_MAX_HEIGHT,
-    (districtBlend + lessonBump) * shelf + ISLAND_FLOOR * (1 - shelf),
+    lifted * shelf + ISLAND_FLOOR * (1 - shelf),
   );
 
   // ── THE RIVER CARVES ────────────────────────────────────────────────

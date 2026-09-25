@@ -16,10 +16,17 @@
 // THE RING. One diorama is a single mountain; the world needs hills on
 // every side of the compass. So the diorama is instanced around a circle of
 // RING_RADIUS, each instance rotated to face the centre with a
-// deterministic wiggle. Height: ~60 m (the owner's revised size). The cards overlap by several tens of metres, which
+// deterministic wiggle. Height: ~100 m of mountain above its seat. The cards
+// overlap by several tens of metres, which
 // hides the seams: from anywhere in the meadow the ring reads as one
 // continuous forested mountain range standing on the world's own hills.
 // The bay sector is skipped so the beach keeps its view of the sea.
+//
+// SEATED, NOT DROPPED. Each card is sunk into the LOWEST ground anywhere
+// under its own 417 × 284 m footprint, and `terrain.ts` lifts an apron of
+// high ground under the whole band, so the range grows out of the world
+// instead of hanging over it. Both halves are measured and logged at build
+// time; see `SINK`, `FOOTPRINT_SAMPLES` and `ringApron`.
 //
 // TWO BUGS THAT MADE THE FIRST RING INVISIBLE — both fixed here, and both
 // worth writing down because they are glTF-loader universals, not typos:
@@ -46,7 +53,7 @@ import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { QualityBudget } from "./quality";
-import { BAY_AZIMUTH, terrainHeight } from "./terrain";
+import { BAY_AZIMUTH, MOUNTAIN_RING_RADIUS, mountainPassWeight, terrainHeight } from "./terrain";
 
 const MODEL_URL = "sanctuary/models/mountain_forest.glb";
 
@@ -56,9 +63,14 @@ const MODEL_URL = "sanctuary/models/mountain_forest.glb";
  * The world's mountain band runs from RIM_INNER (300 m) to past the full
  * band at 900 m (terrain.ts); the island's coast begins ~920 m out. 950 m
  * plants every card right on the crest line, with the card body (which
- * extends ~240 m inward at the ring's scale) filling the band behind it.
+ * extends ~255 m inward at the ring's scale) filling the band behind it.
+ *
+ * The radius is PUBLISHED BY `terrain.ts` (`MOUNTAIN_RING_RADIUS`) because
+ * the ground has to know where the ring stands: it lifts an apron under this
+ * exact band so the cards are seated on high ground instead of hanging over
+ * the arc's valleys. Two constants that must agree live in one place.
  */
-const RING_RADIUS = 950;
+const RING_RADIUS = MOUNTAIN_RING_RADIUS;
 
 /**
  * Model units → metres. Sizes are applied EXACTLY ONCE — baked into the
@@ -74,8 +86,79 @@ const RING_RADIUS = 950;
 const SCALE_XZ = 12;
 const SCALE_Y = 8;
 
-/** How deep each card is sunk into the ground, in metres. */
-const SINK = 2.4;
+/**
+ * MEASURED bounds of the diorama in MODEL units — read off the GLB's own
+ * bounding box, not eyeballed, because the seating below depends on them:
+ *
+ *   X  -17.809 … 16.909   (×12 = 417 m across the ring)
+ *   Y   -1.017 … 12.449   (×8  = the base dips 8.1 m BELOW the origin, the
+ *                               crest stands 99.6 m above it)
+ *   Z   -2.440 … 21.216   (×12 = 29 m outward, 255 m inward — local +Z is
+ *                               rotated to point at the world centre)
+ *
+ * The negative Y is the useful half: the card already carries ~8 m of buried
+ * skirt, so seating it a few metres into the ground hides the base plane
+ * completely and the mountain appears to grow out of the world's own hill.
+ */
+const MODEL_MIN_X = -17.809;
+const MODEL_MAX_X = 16.909;
+const MODEL_MIN_Y = -1.017;
+const MODEL_MAX_Y = 12.449;
+const MODEL_MIN_Z = -2.44;
+const MODEL_MAX_Z = 21.216;
+/** The card's own buried skirt, in metres below its placement point. */
+const SKIRT_BELOW_ORIGIN = -MODEL_MIN_Y * SCALE_Y;
+/** How far the crest stands above the placement point, in metres. */
+const CREST_ABOVE_ORIGIN = MODEL_MAX_Y * SCALE_Y;
+
+/**
+ * How deep each card is sunk into the ground, in metres — ON TOP of its own
+ * 8.1 m skirt.
+ *
+ * The seat is (nearly) the LOWEST ground anywhere under the card's footprint
+ * (see below), and the footprint is sampled on a ~90 m grid, so this is the
+ * margin that covers a dip BETWEEN two samples: 6 m of sink + 8.1 m of skirt
+ * = 14 m of burial at the lowest point, against relief whose finest octave in
+ * the arc is ~65 m at a few metres of amplitude. Nothing can poke a gap under
+ * the card, which is exactly the "pahad hawa mein tairte hue dikh rahe hain"
+ * report this replaces.
+ */
+const SINK = 6;
+
+/**
+ * The most a single deep feature under a card may pull its seat down, in
+ * metres below the footprint's MEDIAN ground.
+ *
+ * Seating on the strict lowest sample is right for ordinary relief — every
+ * dip is buried — but three features in this world are holes, not dips, and
+ * they would swallow a card whole:
+ *
+ *   • the RIVER, a 12 m-wide gorge cut to −5 m that runs the full length of
+ *     the world and crosses the band at x ≈ 18 (measured: it dragged one
+ *     card's seat 41 m down, burying the whole mountain in its own hills);
+ *   • the BAY mouth, where the ground is deliberately at sea level so the
+ *     beach keeps its view of the sea;
+ *   • the MOUNTAIN PASS west, likewise kept open as the walk to the
+ *     Highlands.
+ *
+ * A card may give way by this much and no more, so it stays planted on the
+ * ground that actually surrounds it and floats, at worst, a few metres over
+ * a narrow gorge that its own body hides — instead of disappearing into it.
+ * The bay and the pass are handled by SKIPPING those chunks (below), so this
+ * bound only ever has to absorb the river.
+ */
+const MAX_DIP = 35;
+
+/**
+ * Skip a chunk when the pass owns its centre. The card is 417 m across, so
+ * one planted in the middle of the pass would wall off the walk to the
+ * Highlands that `terrain.ts` deliberately keeps open; the terrain's own arc
+ * is gated by the same corridor weight, so ring and range agree on where the
+ * opening is. Chunks merely EDGING the pass stay — the bound above seats them
+ * on the high ground beside it, and a mountain at a pass mouth is what a pass
+ * mouth looks like.
+ */
+const PASS_CLEAR = 0.5;
 
 /**
  * Chunks this close to the BAY's azimuth are SKIPPED. The bay (terrain.ts)
@@ -215,13 +298,28 @@ export async function createMountainForest(budget: QualityBudget): Promise<Mount
   const foliageMaterials: THREE.MeshStandardMaterial[] = [];
   const solidMaterials: THREE.MeshStandardMaterial[] = [];
 
-  // How many chunks the ring actually keeps (the bay opens the south-east).
-  const angles: number[] = [];
+  // Which chunks the ring actually keeps. TWO openings stay clear, and both
+  // are the terrain's own: the BAY to the south-east (the beach keeps its view
+  // of the sea) and the mountain PASS west (the walk out to the Highlands).
+  // `terrain.ts` gates its arc with the same two weights, so the planted range
+  // and the ground it stands on agree about where the gaps are — and no card
+  // is ever seated over ground that was deliberately dropped to sea level.
+  const kept: Array<{ angle: number; chunk: number }> = [];
+  let baySkips = 0;
+  let passSkips = 0;
   for (let i = 0; i < ring.chunks; i += 1) {
     const a = (i / ring.chunks) * Math.PI * 2;
     let d = Math.abs(a - BAY_AZIMUTH);
     if (d > Math.PI) d = Math.PI * 2 - d;
-    if (d > BAY_SKIP) angles.push(a);
+    if (d <= BAY_SKIP) {
+      baySkips += 1;
+      continue;
+    }
+    if (mountainPassWeight(Math.cos(a) * RING_RADIUS, Math.sin(a) * RING_RADIUS) < PASS_CLEAR) {
+      passSkips += 1;
+      continue;
+    }
+    kept.push({ angle: a, chunk: i });
   }
 
   const tmpMat = new THREE.Matrix4();
@@ -229,9 +327,88 @@ export async function createMountainForest(budget: QualityBudget): Promise<Mount
   const tmpQuat = new THREE.Quaternion();
   const tmpScale = new THREE.Vector3();
   const yAxis = new THREE.Vector3(0, 1, 0);
-  const SAMPLES: ReadonlyArray<readonly [number, number]> = [
-    [0, 0], [140, 0], [-140, 0], [0, 115], [0, -230],
-  ];
+
+  /**
+   * The card's footprint, sampled on a 5 × 5 grid in the card's OWN frame
+   * (local metres, +Z inward). Derived from the measured model bounds and the
+   * ring's scale, inset 6 % so the empty extreme corners of the diorama do not
+   * drag the seat down on a slope they do not actually cover.
+   */
+  const FOOTPRINT_SAMPLES: ReadonlyArray<readonly [number, number]> = (() => {
+    const x0 = MODEL_MIN_X * SCALE_XZ;
+    const x1 = MODEL_MAX_X * SCALE_XZ;
+    const z0 = MODEL_MIN_Z * SCALE_XZ;
+    const z1 = MODEL_MAX_Z * SCALE_XZ;
+    const ix = (x1 - x0) * 0.06;
+    const iz = (z1 - z0) * 0.06;
+    const out: Array<[number, number]> = [];
+    for (let i = 0; i <= 4; i += 1) {
+      for (let j = 0; j <= 4; j += 1) {
+        out.push([
+          x0 + ix + ((x1 - x0 - 2 * ix) * i) / 4,
+          z0 + iz + ((z1 - z0 - 2 * iz) * j) / 4,
+        ]);
+      }
+    }
+    return out;
+  })();
+
+  // ── Seat the ring on the ground, ONCE ───────────────────────────────────
+  //
+  // Every material draws the same instances, so the seat is solved here and
+  // reused instead of being re-sampled per material (20 chunks × 25 height
+  // samples, not × 10 materials).
+  //
+  // THE SEAT IS THE LOWEST GROUND UNDER THE CARD, not the highest. Seating a
+  // card on the highest of a few samples is what left it hanging over any dip
+  // in front of it — the owner's "pahad hawa mein tairte hue dikh rahe hain",
+  // measured at 20…57 m of open air under a card, because the terrain at this
+  // radius swings from valley floor to 100 m crest inside one card's 417 m
+  // width. Sinking to the LOWEST point makes a gap geometrically impossible:
+  // the base plane and its own 8.1 m of skirt are underground everywhere on
+  // the footprint, so all that is left above the surface is the mountain —
+  // standing on the apron `terrain.ts` lifts under this same band, which is
+  // the "jameen ko upar shift karke connect kar do" half of the fix.
+  //
+  // One bound on that: MAX_DIP. The river gorge is 12 m wide and 45 m deep
+  // and it crosses this band, so a strict minimum would let one narrow slot
+  // drag a whole mountain 41 m underground. See MAX_DIP for the rule.
+  const seats: Array<{ x: number; y: number; z: number; yaw: number }> = [];
+  let deepestBurial = 0;
+  let worstFloat = 0;
+  let leastClearance = Infinity;
+  for (const { angle: a, chunk } of kept) {
+    const px = Math.cos(a) * RING_RADIUS;
+    const pz = Math.sin(a) * RING_RADIUS;
+    // Face the centre: local +Z (where the diorama's mass sits) points at the
+    // origin, with a deterministic wiggle so the ring never reads as stamped.
+    // The wiggle is keyed to the ABSOLUTE chunk index, so one compass angle
+    // keeps the same tilt at every quality tier. NO mirroring — a mirrored
+    // instance flips winding and FrontSide faces get culled into invisibility
+    // (see header, bug #2).
+    const yaw = Math.atan2(-Math.cos(a), -Math.sin(a)) + chunkJitter(chunk);
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const ground: number[] = [];
+    for (const [fx, fz] of FOOTPRINT_SAMPLES) {
+      // three's Y rotation: (cos·x + sin·z, ·, −sin·x + cos·z).
+      ground.push(terrainHeight(px + cy * fx + sy * fz, pz - sy * fx + cy * fz));
+    }
+    if (ground.length === 0) continue;
+    ground.sort((p, q) => p - q);
+    const lowest = ground[0];
+    const highest = ground[ground.length - 1];
+    const median = ground[ground.length >> 1];
+    const seat = Math.max(lowest, median - MAX_DIP) - SINK;
+    // Diagnostics for the log below, and the three numbers that say whether
+    // the ring reads as planted: how much ground swallows the card, how much
+    // air is left under it (must stay gorge-width nothing), and how much of
+    // the mountain still stands proud of the tallest ground beside it.
+    deepestBurial = Math.max(deepestBurial, median - seat);
+    worstFloat = Math.max(worstFloat, seat - lowest);
+    leastClearance = Math.min(leastClearance, seat + CREST_ABOVE_ORIGIN - highest);
+    seats.push({ x: px, y: seat, z: pz, yaw });
+  }
 
   for (const [mat, geos] of byMaterial) {
     const merged = mergeGeometries(geos, false);
@@ -249,26 +426,11 @@ export async function createMountainForest(budget: QualityBudget): Promise<Mount
     (cutout ? foliageMaterials : solidMaterials).push(mat);
     disposables.push(mat);
 
-    const inst = new THREE.InstancedMesh(merged, mat, angles.length);
+    const inst = new THREE.InstancedMesh(merged, mat, seats.length);
     inst.name = `mountain-forest/${mat.name || "material"}`;
-    angles.forEach((a, k) => {
-      const px = Math.cos(a) * RING_RADIUS;
-      const pz = Math.sin(a) * RING_RADIUS;
-      // Snap onto the real ground: the highest of five samples under the
-      // card, minus a small sink, so no slope ever pokes through the card
-      // and no card ever floats above its hill.
-      let ground = -Infinity;
-      for (const [sx, sz] of SAMPLES) {
-        const h = terrainHeight(px + sx, pz + sz);
-        if (h > ground) ground = h;
-      }
-      // Face the centre: local +Z (where the diorama's mass sits) points at
-      // the origin, with a deterministic wiggle so the ring never reads as
-      // stamped. NO mirroring — a mirrored instance flips winding and
-      // FrontSide faces get culled into invisibility (see header, bug #2).
-      const yaw = Math.atan2(-Math.cos(a), -Math.sin(a)) + chunkJitter(k);
-      tmpPos.set(px, ground - SINK, pz);
-      tmpQuat.setFromAxisAngle(yAxis, yaw);
+    seats.forEach((seat, k) => {
+      tmpPos.set(seat.x, seat.y, seat.z);
+      tmpQuat.setFromAxisAngle(yAxis, seat.yaw);
       // Unit scale — THE SIZE IS ALREADY BAKED INTO THE GEOMETRY above.
       // (The first ring shipped with the scale in BOTH places: the two
       // matrices multiplied into x144 horizontally — 4.4 km cards that
@@ -286,9 +448,14 @@ export async function createMountainForest(budget: QualityBudget): Promise<Mount
   }
 
   // One diagnosable line: if the ring is ever missing again, this says
-  // whether it LOADED (and how much is in it) or never arrived.
+  // whether it LOADED (and how much is in it) or never arrived. The three
+  // seat figures are the anti-float check — `float` is open air left under a
+  // card (must stay a few metres, over the river gorge only), `buried` is how
+  // much the ground swallows (must stay well under the card's ~100 m), and
+  // `clear` is how much mountain still stands above the tallest ground beside
+  // it (must stay positive, or the range is being swallowed by its own hills).
   console.info(
-    `[sanctuary] mountain forest ring: ${angles.length} chunks · ${byMaterial.size} materials · ${Math.round(tris / 1000)}k tris · tier ${budget.tier}`,
+    `[sanctuary] mountain forest ring: ${seats.length} chunks (${baySkips} bay, ${passSkips} pass skipped) · ${byMaterial.size} materials · ${Math.round(tris / 1000)}k tris · tier ${budget.tier} · seat float ≤${worstFloat.toFixed(1)} m, buried ≤${deepestBurial.toFixed(0)} m, crest clear ≥${leastClearance.toFixed(0)} m · skirt ${SKIRT_BELOW_ORIGIN.toFixed(1)} m + sink ${SINK} m`,
   );
 
   return {

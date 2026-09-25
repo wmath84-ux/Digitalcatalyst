@@ -399,7 +399,7 @@ let houseBad = "";
 for (const s of houseSites) {
   const r = Math.hypot(s.x, s.z);
   if (r < 130 || r > 520) houseBad += ` r=${r.toFixed(0)}`;
-  else if (!(s.scale > 0.7 && s.scale < 1.1)) houseBad += ` scale=${s.scale}`;
+  else if (!(s.scale > 1.4 && s.scale < 2.5)) houseBad += ` scale=${s.scale}`;
   else if (!Number.isFinite(s.yaw)) houseBad += " yaw";
   else if (Math.abs(s.x - RIVER_CENTER_X) < 18) houseBad += " river";
   else if (Math.hypot(s.x - WAREHOUSE_X, s.z - WAREHOUSE_Z) < 60) houseBad += " villa";

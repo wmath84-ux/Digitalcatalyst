@@ -72,13 +72,15 @@ export const HOUSE_WALL_HALF_X = 14.19 / 2;
 export const HOUSE_WALL_HALF_Z = 14.04 / 2;
 /** The authored ridge height, in metres — the handle designs are scaled by. */
 export const HOUSE_RIDGE = 13.588;
+/** The authored total height, in metres (from floor y = 0 to roof flare tip). */
+export const HOUSE_TOTAL_HEIGHT = 18.92;
 
 /** Half-extents of the level pad around the walls, in metres. */
-const PAD_FLAT_X = 5.4;
-const PAD_FLAT_Z = 4.6;
+const PAD_FLAT_X = 9.0;
+const PAD_FLAT_Z = 8.5;
 /** How far the pad feathers back into natural ground. */
-const PAD_BLEND_X = 7.5;
-const PAD_BLEND_Z = 6.5;
+const PAD_BLEND_X = 8.5;
+const PAD_BLEND_Z = 7.5;
 
 let sites: BeachHouseSite[] = [];
 let installed = false;
@@ -173,7 +175,7 @@ export function insideBeachHouse(x: number, z: number, margin = 0): boolean {
     const s = sites[i];
     const dx = x - s.x;
     const dz = z - s.z;
-    const limit = s.halfX + margin + 1;
+    const limit = Math.max(s.halfX, s.halfZ) + margin + 1;
     if (dx > limit || dx < -limit) continue;
     if (dz > limit || dz < -limit) continue;
     const lx = s.cos * dx - s.sin * dz;

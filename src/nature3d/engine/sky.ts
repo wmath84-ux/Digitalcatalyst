@@ -156,16 +156,23 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   // graded on arrival, not lit like noon for a frame.
   let lastDaylight: DaylightState | null = null;
   const ANIME_DAY = new THREE.Color(0xffffff);
-  const ANIME_NIGHT = new THREE.Color(0x2a3550);
+  // OWNER DIRECTIVE ("raat aur shaam me sab black dikhta hai"): the night
+  // grade used to multiply the panorama by roughly (0.50, 0.25, 0.17) — a
+  // deep orange-brown that, on the sanctuary's DEFAULT sky, read as a black
+  // ceiling over an already dark world. The dusk blue is lighter and the mix
+  // is held to 42 %, so the panorama dims into a readable twilight instead of
+  // sinking out. It must never glow like noon (that is what the day factor is
+  // for), but it must never go black either.
+  const ANIME_NIGHT = new THREE.Color(0x46597e);
   const gradeAnime = (state: DaylightState) => {
     if (!animeMat) return;
     // The panorama is baked at noon: stay true to its art in daylight, lean
     // on the sun's tint near the edges of the day. At night it dips toward
-    // a deep blue multiply but never more than 55 % — the owner studies at
+    // a deep blue multiply but never more than 42 % — the owner studies at
     // night and the panorama must stay READABLE ("sky to dikh hi nahin
     // raha hai"), not sink into a black dome.
-    animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.1);
-    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.55);
+    animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.18);
+    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.42);
   };
 
   // ── No mountain ring ─────────────────────────────────────────────────

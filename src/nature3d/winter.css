@@ -18,15 +18,15 @@
 }
 
 /* ── Low-tier HUD diet (the research's UI-overdraw rule) ───────────────
-   `backdrop-filter: blur()` repaints a fullscreen sample + gaussian blur
+   Full-screen background blur repaints a fullscreen sample + gaussian blur
    per chrome element, per frame — on a Mali/Adreno tile GPU that is one of
    the most expensive things CSS can ask for, and the sanctuary's glass
    chips were using it liberally (menu button, dropdown, stats chip, eye
    toggle, lesson modal, sticks). On the low tier (`sanctuary-lite` on the
    page root) the blur radius is dropped to 2 px: the glass read survives,
-   the per-frame fullscreen blurs do not. Tailwind v4 composes the filter
+   the per-frame fullscreen blurs do not. Tailwind v4 composes the blur
    from the --tw-backdrop-blur variable, so overriding the variable keeps
-   every other backdrop-filter term (brightness etc.) intact. */
+   every other backdrop term (brightness etc.) intact. */
 .sanctuary-lite .backdrop-blur-xl,
 .sanctuary-lite .backdrop-blur-md {
   --tw-backdrop-blur: blur(2px);
