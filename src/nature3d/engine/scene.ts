@@ -423,12 +423,10 @@ export class Sanctuary {
 
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
-    // OWNER DIRECTIVE — the anime sky is the sanctuary's DEFAULT sky. The
-    // engine issues the enable ITSELF (not via the page's boot effect), so
-    // every boot path opens under the panorama no matter what order the
-    // page finishes in. The Scene-menu toggle still switches it off.
-    // Idempotent with the page's own enable: the texture promise is cached.
-    this.setAnimeSky(true);
+    // Procedural gradient dome is the default sky. Anime panorama is opt-in
+    // via the Scene menu (`setAnimeSky(true)`). Boot never auto-loads the
+    // 2.5 MB equirect — keeps first paint light and the sky natural.
+    this.setAnimeSky(false);
     // The sky dome fills the whole screen every frame — one of the best
     // fp16 candidates on the diet tier.
     if (this.budget.halfPrecision) halfPrecisionTree(this.sky.group);
@@ -751,6 +749,11 @@ export class Sanctuary {
 
     this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
     this.scene.add(this.screens.shells);
+    // Board shells must take the same distance smoke as terrain/trees —
+    // without atmosphere registration the stock fog_fragment never runs
+    // on materials that only have the default chunk, and without fog:true
+    // they skip it entirely. Register so far boards haze into the air.
+    this.atmosphere.registerTree(this.screens.shells);
     this.winter.registerTree(this.screens.shells);
     // The CSS3D layer is a sibling of the canvas, sharing its camera. It is
     // inserted BEFORE the HUD so the glass controls stay on top of it.
@@ -782,12 +785,15 @@ export class Sanctuary {
     this.board.group.rotation.y = BOARD_HILL.yaw;
     this.board.group.scale.setScalar(BOARD_HILL.scale);
     this.scene.add(this.board.group);
+    // Distance smoke on the lesson board + stand (same air as the hills).
+    this.atmosphere.registerTree(this.board.group);
     // The lesson face gets frost at its edges, not over the readable text.
     const boardMaterials = this.board.panel.material as THREE.Material[];
     this.winter.register(boardMaterials[4], "board");
     this.winter.registerTree(this.board.group);
     const boardStand = createBoardStand(BOARD_HILL, this.budget.shadowMapSize > 0);
     this.scene.add(boardStand);
+    this.atmosphere.registerTree(boardStand);
     this.winter.registerTree(boardStand);
 
 // The board is scenery now: no controller, no drag, no resize, no
@@ -1631,6 +1637,9 @@ export class Sanctuary {
     fog.color.copy(state.fog);
     fog.near = this.budget.fogNear * (this.iceAge ? 0.75 : 1);
     fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
+    // CSS3D board faces sit above the canvas — push the same smoke ramp so
+    // black boards haze into the air just like terrain and trees.
+    this.screens.setFog(fog.near, fog.far, fog.color);
     // The air is lit by the same sun as the ground: its colour, its in-scatter
     // and the strength of the foliage transmission term all follow the hour.
     // Reading `sunDir.y` gives the elevation directly — it is a unit vector
@@ -1653,6 +1662,7 @@ export class Sanctuary {
     fog.color.set(0x0a58b8);
     fog.near = 0.4;
     fog.far = 8;
+    this.screens.setFog(fog.near, fog.far, fog.color);
     this.scene.background = fog.color;
     this.renderer.toneMappingExposure = 0.78;
   }

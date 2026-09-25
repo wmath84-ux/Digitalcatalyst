@@ -484,9 +484,15 @@ export function createWater(
   //     Schlick Fresnel against the LIVE sky colours, a GGX-ish sun glint on
   //     the shared sun vector, and depth grades. All analytic, all linear
   //     pre-tone-map, ~30 ALU + 2 fetches per fragment.
+  // Ocean disc extends ~500 m past the previous outer rim (3450 → 3950+)
+  // and well past the sky dome edge the camera can never leave, so max
+  // zoom-out always shows real sea under the sky, not a cut-off water plate.
   const OCEAN_RING_RADII = [
     0, 160, 340, 540, 740, 900, 970, 1020, 1060, 1095, 1125, 1155, 1185, 1215,
     1245, 1275, 1310, 1350, 1400, 1470, 1580, 1760, 2050, 2450, 2950, 3450,
+    // +500 m expansion, 360° — denser rings near the old rim, then long
+    // sparse rings out past the skybox so the sea never ends before the sky.
+    3600, 3750, 3900, 4100, 4350, 4650, 5000, 5400,
   ];
   const OCEAN_SEGMENTS = 256;
   const oceanGeo = new THREE.BufferGeometry();

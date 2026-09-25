@@ -207,7 +207,10 @@ export const TERRAIN_DISC_RADIUS = 1500;
  * the outside of the world. (`controls.ts` clamps the fly target to this
  * circle; the orbit rig's own plate maths is unchanged.)
  */
-export const FLY_LIMIT_RADIUS = 1050;
+// Fly/drone radial clamp — stay over island + near shelf, well inside the
+// sky dome. Ocean continues far past this so zoom-out still shows sea, but
+// the camera itself never leaves the skybox.
+export const FLY_LIMIT_RADIUS = 1180;
 
 /**
  * Where the COAST's influence becomes trustworthy, in metres from the centre.

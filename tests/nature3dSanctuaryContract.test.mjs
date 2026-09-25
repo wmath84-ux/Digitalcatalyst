@@ -1344,7 +1344,10 @@ test("the camera can never orbit off its own terrain plate", () => {
   const WORLD_REACH = Number(/WORLD_REACH = (\d+)/.exec(read("src/nature3d/engine/regions.ts"))[1]);
   const WORLD_HALF = WORLD_REACH + 200;
   const usable = WORLD_HALF * 0.93;
-  const ceiling = WORLD_HALF * 2;
+  // Skybox hard cap: camera stays inside the sky dome (never leaves the skybox).
+  const flyMatch = /FLY_LIMIT_RADIUS\s*=\s*(\d+)/.exec(read("src/nature3d/engine/terrain.ts"));
+  const FLY_LIMIT_RADIUS = flyMatch ? Number(flyMatch[1]) : 1180;
+  const ceiling = Math.min(FLY_LIMIT_RADIUS * 1.35, WORLD_HALF * 1.55);
   const maxDistance = (pitch) => {
     const cp = Math.cos(pitch);
     return cp < 0.05 ? ceiling : Math.min(usable / cp, ceiling);
@@ -1361,9 +1364,14 @@ test("the camera can never orbit off its own terrain plate", () => {
   }
 
   // Looking straight down, cos goes to zero and `usable / cp` runs away to
-  // 16 km — outside every tier's far plane. The altitude ceiling catches it.
-  assert.match(CONTROLS, /const ceiling = WORLD_HALF \* 2;/);
+  // 16 km — outside every tier's far plane. The skybox-safe ceiling catches it.
+  assert.match(CONTROLS, /skyboxSafe/);
+  assert.match(CONTROLS, /FLY_LIMIT_RADIUS/);
   assert.ok(maxDistance(Math.PI / 2 - 0.001) <= ceiling, "a top-down view must be bounded by altitude");
+  // Camera orbit distance must stay inside the sky dome (~farPlane * 0.92).
+  const minFar = 3500;
+  const skyRadius = minFar * 0.92;
+  assert.ok(ceiling < skyRadius, `orbit ceiling ${ceiling} must be inside sky radius ${skyRadius}`);
 });
 
 test("the ground floor is sampled on the plate, so it cannot fake a hill", () => {

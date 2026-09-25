@@ -134,7 +134,11 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(budget.farPlane * 0.46, 32, 20), domeMat);
+  // Sky dome radius must CLEARLY exceed every reachable camera position
+  // (orbit maxDistance + fly radius + ocean rim). farPlane * 0.92 leaves the
+  // camera always inside the skybox; the old 0.46 factor let max zoom poke
+  // through the dome into empty black.
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(budget.farPlane * 0.92, 48, 24), domeMat);
   dome.renderOrder = -1000;
   group.add(dome);
 
