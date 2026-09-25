@@ -27,7 +27,10 @@ import {
   detectTier,
   halfPrecisionMaterial,
   halfPrecisionTree,
+  QUALITY_PROFILES,
+  profileForTier,
   type QualityBudget,
+  type QualityProfile,
   type QualityTier,
 } from "./quality";
 import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GROUND_PHOTO_URL, type TextureSet } from "./textures";
@@ -81,9 +84,6 @@ import { cullDistanceForPx } from "./cull";
  * fullscreen page that has lost its place in the world.
  */
 const BOARD_VIEW_MARGIN = 0.5;
-
-/** The anime skybox panorama (equirect JPEG extracted from the Sketchfab GLB). */
-const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
@@ -199,13 +199,6 @@ export class Sanctuary {
   private weathering: Weathering;
   private winter: WinterSystem;
   private iceAge = false;
-  /**
-   * The anime skybox (see `sky.ts`): the wanted state, and the lazily-loaded
-   * panorama shared for the life of the scene so toggling never re-downloads.
-   * A failed load resolves to null and the procedural dome simply stays.
-   */
-  private animeSkyWanted = false;
-  private animeSkyTexture: Promise<THREE.Texture | null> | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private rocks: RockField;
   private birds: BirdColony;
@@ -292,6 +285,10 @@ export class Sanctuary {
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
   /** The sunny-afternoon brightness push applied on top of the per-hour curve. */
   private gradeExposure = 1.52;
+  /** Live settings-panel state (defaults = the boot grade). */
+  private qualityProfile: QualityProfile = "balanced";
+  private frameCap = 0;
+  private shadowsOn = true;
   /** True while the camera (or the walker) is under the water line. */
   private submerged = false;
   private pointerPrev = { x: 0, y: 0, id: -1, down: false };
@@ -371,6 +368,10 @@ export class Sanctuary {
 
     this.adaptive = new AdaptiveResolution(this.budget, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.adaptive.pixelRatio);
+    // The settings panel opens on what the device was actually given, so its
+    // selected style is never a lie about the running scene.
+    this.qualityProfile = profileForTier(this.budget.tier);
+    this.shadowsOn = this.budget.shadowMapSize > 0;
 
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
@@ -427,10 +428,10 @@ export class Sanctuary {
 
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
-    // Procedural gradient dome is the default sky. Anime panorama is opt-in
-    // via the Scene menu (`setAnimeSky(true)`). Boot never auto-loads the
-    // 2.5 MB equirect — keeps first paint light and the sky natural.
-    this.setAnimeSky(false);
+    // The procedural sky dome IS the sky. The baked anime panorama was
+    // removed at the owner's request (2026-09-25): it cost a 2.5 MB download
+    // for a look that fought the sanctuary's own daylight grading, and its
+    // toggle lived in the old Scene menu. Nothing to load, nothing to swap.
     // The sky dome fills the whole screen every frame — one of the best
     // fp16 candidates on the diet tier.
     if (this.budget.halfPrecision) halfPrecisionTree(this.sky.group);
@@ -1210,7 +1211,7 @@ export class Sanctuary {
     let best: { screen: BoardScreen; x: number; y: number; t: number } | null = null;
     this.screens.screens.forEach((screen, i) => {
       if (restrict && screen !== restrict) return;
-      if (!screen.object.visible) return; // culled boards cannot be touched
+      if (!screen.touchable) return; // culled boards cannot be touched
       const plane = this.boardPlanes[i];
       if (plane.distanceToPoint(this.camera.position) < 0) return; // camera behind the face
       if (!ray.intersectPlane(plane, this.bridgeHit)) return;
@@ -1290,12 +1291,12 @@ export class Sanctuary {
    * restore the 3D matrix before the next frame paints.
    */
   private elementAtBoardFlat(screen: BoardScreen, clientX: number, clientY: number): Element | null {
-    // The HOST is the element CSS3DRenderer gives the 3D matrix to — the
+    // The LAYER is the element the engine gives the 3D matrix to — the
     // board's box in the world. Flattening it (rather than the panel surface
-    // inside it) keeps this query measuring exactly what it measured before
-    // the pin started lifting a separate surface: the host is the node whose
-    // transform is the projection, and the panel that fills it rides along.
-    const root = screen.host;
+    // inside it) keeps this query measuring the board's own rectangle: the
+    // layer is the node whose transform is the projection, and the panel that
+    // fills it rides along.
+    const root = screen.layer;
     const visual = root.getBoundingClientRect();
     if (visual.width < 2 || visual.height < 2) return null;
     const prevTransform = root.style.transform;
@@ -1629,6 +1630,97 @@ export class Sanctuary {
     return this.orbit.autoRotate;
   }
 
+  // ───────────────────────────────────────────────────────────────────
+  //  Runtime settings (the full-screen SETTINGS panel)
+  // ───────────────────────────────────────────────────────────────────
+  //
+  // Everything the settings panel offers has to take effect on the live
+  // scene — a control that only changes React state is a lie. These four
+  // knobs are the ones the engine can honour without rebuilding the world:
+  // the render ceiling, the frame cap, the shadow pass and the grade.
+
+  /**
+   * Graphics style. The tier itself (grass counts, tree counts, material
+   * quality) is fixed at boot — re-allocating a world mid-flight is a
+   * multi-second stall — so a style change moves the RESOLUTION CEILING the
+   * dynamic scaler may climb to, which is the half of "graphics quality" the
+   * viewer actually feels. Smooth trades pixels for frames, HDR spends them.
+   */
+  setQualityProfile(profile: QualityProfile) {
+    const ceiling = QUALITY_PROFILES[profile].ceiling;
+    this.qualityProfile = profile;
+    const ratio = this.adaptive.setCeiling(ceiling);
+    if (ratio !== null) {
+      this.renderer.setPixelRatio(ratio);
+      this.requestShadowRefresh();
+    }
+  }
+
+  getQualityProfile(): QualityProfile {
+    return this.qualityProfile;
+  }
+
+  /** The style the device was given at boot — what RESET DEFAULTS returns to. */
+  getDefaultProfile(): QualityProfile {
+    return profileForTier(this.budget.tier);
+  }
+
+  /** 30 / 60, or 0 to follow the tier's own pacing. */
+  setFrameCap(fps: number) {
+    this.frameCap = fps;
+    this.paceNext = 0;
+  }
+
+  getFrameCap(): number {
+    return this.frameCap;
+  }
+
+  /**
+   * Shadows on/off. three.js needs every program recompiled when the shadow
+   * map is enabled or disabled (the shader's lighting branch changes), so
+   * the traverse is unavoidable — it is why this is a setting and not a
+   * per-frame toggle.
+   */
+  setShadows(on: boolean) {
+    if (this.shadowsOn === on) return;
+    this.shadowsOn = on;
+    const canShadow = this.budget.shadowMapSize > 0;
+    this.renderer.shadowMap.enabled = on && canShadow;
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const m = mesh.material;
+      if (!m) return;
+      for (const one of Array.isArray(m) ? m : [m]) one.needsUpdate = true;
+    });
+    if (this.renderer.shadowMap.enabled) this.requestShadowRefresh();
+  }
+
+  getShadows(): boolean {
+    return this.shadowsOn && this.budget.shadowMapSize > 0;
+  }
+
+  /** True when the device's tier cannot draw shadows at all. */
+  get shadowsAvailable(): boolean {
+    return this.budget.shadowMapSize > 0;
+  }
+
+  /**
+   * Final brightness push on top of the contract-fixed daylight curve
+   * (`gradeExposure`, the +52 % daylight directive). 1 is that grade; the
+   * panel's slider scales it 0.75×–1.25× so a bright room can be toned down
+   * without touching the per-hour art.
+   */
+  setBrightness(multiplier: number) {
+    this.gradeExposure = 1.52 * multiplier;
+    this.renderer.toneMappingExposure = this.submerged
+      ? 0.78
+      : this.daylight.exposure * this.gradeExposure;
+  }
+
+  getBrightness(): number {
+    return this.gradeExposure / 1.52;
+  }
+
 /**
    * Push the current daylight state into the sky, the fog and the exposure.
    *
@@ -1690,42 +1782,6 @@ export class Sanctuary {
     this.sky.setWinter(enabled);
     this.screens.setWinter(enabled);
     this.applyDaylight();
-  }
-
-  /**
-   * Swap the procedural sky dome for the baked anime panorama
-   * (`sanctuary/skybox_anime_sky.jpg`, extracted from the Sketchfab
-   * "free - skybox anime sky" GLB). Daylight keeps grading it, so this is
-   * safe with any hour and with the Ice Age. The first enable starts one
-   * 2.5 MB download; every later toggle is instant.
-   */
-  setAnimeSky(enabled: boolean) {
-    this.animeSkyWanted = enabled;
-    if (enabled && !this.animeSkyTexture) {
-      this.animeSkyTexture = new THREE.TextureLoader()
-        .loadAsync(ANIME_SKY_URL)
-        .then((t) => {
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.mapping = THREE.EquirectangularReflectionMapping;
-          t.wrapS = THREE.RepeatWrapping;
-          t.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
-          return t;
-        })
-        .catch((err) => {
-          // A missing skybox is cosmetic — the procedural dome carries on.
-          console.warn("[sanctuary] anime skybox failed to load:", err);
-          return null;
-        });
-    }
-    if (!this.animeSkyTexture) {
-      this.sky.setAnimeSkybox(null);
-      return;
-    }
-    void this.animeSkyTexture.then((t) => {
-      // Honour the LAST wish, not the wish at call time (fast toggles while
-      // the texture is still in flight).
-      this.sky.setAnimeSkybox(this.animeSkyWanted ? t : null);
-    });
   }
 
   /** Morning / midday / evening, or "auto" to follow the real clock. */
@@ -2156,9 +2212,10 @@ export class Sanctuary {
     // than a jagged 38–50 fps oscillation (this is why the consoles and
     // Swappy pace instead of free-running), and it halves the thermal load
     // that triggers Android's sustained-performance throttle.
-    if (this.budget.fpsCap > 0) {
+    const cap = this.frameCap > 0 ? this.frameCap : this.budget.fpsCap;
+    if (cap > 0) {
       if (frameStart < this.paceNext) return;
-      this.paceNext = Math.max(frameStart, this.paceNext) + 1000 / this.budget.fpsCap;
+      this.paceNext = Math.max(frameStart, this.paceNext) + 1000 / cap;
     }
 
     // The DRS signal is the WALL-CLOCK span since the last rendered frame,
@@ -2362,8 +2419,6 @@ export class Sanctuary {
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();
-    // The anime panorama is scene-owned (cached for instant re-toggles).
-    void this.animeSkyTexture?.then((t) => t?.dispose());
     this.board.dispose();
     this.student.dispose();
     this.dayBed?.dispose();

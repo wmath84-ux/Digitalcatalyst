@@ -18,12 +18,6 @@ export interface SkySystem {
   hemi: THREE.HemisphereLight;
   /** Current sun direction, shared (not copied) with everything that reads it. */
   sunDir: THREE.Vector3;
-  /**
-   * Swap the procedural gradient dome for a baked equirect panorama (or back
-   * with `null`). The texture is owned by the caller (cached across toggles);
-   * the dome mesh and its material are owned here.
-   */
-  setAnimeSkybox(map: THREE.Texture | null): void;
   /** Re-light the whole sky for a moment of the day. */
   applyDaylight(state: DaylightState): void;
   setWinter(enabled: boolean): void;
@@ -146,43 +140,6 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   // the moment the eye sits near the bounding-sphere edge.
   dome.frustumCulled = false;
   group.add(dome);
-
-  // ── Anime panorama dome (optional) ───────────────────────────────────
-  //
-  // `sanctuary/skybox_anime_sky.jpg` — the equirect texture pulled out of the
-  // Sketchfab "free - skybox anime sky" GLB. The GLB itself is not loaded at
-  // runtime: its only content of value is this baked JPEG (the mesh is a
-  // bare sphere), and modern three dropped the KHR_materials_pbrSpecular-
-  // Glossiness extension the file is authored with, so GLTFLoader would hand
-  // back an untextured ball. Drawn instead on OUR sphere with a basic
-  // material, which keeps one draw call and lets daylight keep grading it.
-  //
-  // Nudge this fraction to spin the panorama around the compass (0.25 = 90°).
-  const ANIME_SKY_OFFSET_U = 0.0;
-  let animeMat: THREE.MeshBasicMaterial | null = null;
-  let animeDome: THREE.Mesh | null = null;
-  // Kept from the last applyDaylight so a texture arriving mid-session is
-  // graded on arrival, not lit like noon for a frame.
-  let lastDaylight: DaylightState | null = null;
-  const ANIME_DAY = new THREE.Color(0xffffff);
-  // OWNER DIRECTIVE ("raat aur shaam me sab black dikhta hai"): the night
-  // grade used to multiply the panorama by roughly (0.50, 0.25, 0.17) — a
-  // deep orange-brown that, on the sanctuary's DEFAULT sky, read as a black
-  // ceiling over an already dark world. The dusk blue is lighter and the mix
-  // is held to 42 %, so the panorama dims into a readable twilight instead of
-  // sinking out. It must never glow like noon (that is what the day factor is
-  // for), but it must never go black either.
-  const ANIME_NIGHT = new THREE.Color(0x46597e);
-  const gradeAnime = (state: DaylightState) => {
-    if (!animeMat) return;
-    // The panorama is baked at noon: stay true to its art in daylight, lean
-    // on the sun's tint near the edges of the day. At night it dips toward
-    // a deep blue multiply but never more than 42 % — the owner studies at
-    // night and the panorama must stay READABLE ("sky to dikh hi nahin
-    // raha hai"), not sink into a black dome.
-    animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.18);
-    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.42);
-  };
 
   // ── No mountain ring ─────────────────────────────────────────────────
   //
@@ -392,45 +349,7 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     setWinter(enabled) {
       motes.visible = !enabled;
     },
-    setAnimeSkybox(map) {
-      if (!map) {
-        // Back to the procedural dome. The texture stays cached upstream —
-        // toggling off must not cost a re-download on the next on.
-        if (animeDome) {
-          group.remove(animeDome);
-          animeMat?.dispose();
-          animeMat = null;
-          animeDome = null;
-        }
-        dome.visible = true;
-        return;
-      }
-      if (animeDome) {
-        animeMat!.map = map;
-        animeMat!.needsUpdate = true;
-      } else {
-        animeMat = new THREE.MeshBasicMaterial({
-          map,
-          side: THREE.BackSide,
-          depthWrite: false,
-          fog: false,
-        });
-        map.offset.x = ANIME_SKY_OFFSET_U;
-        map.wrapS = THREE.RepeatWrapping;
-        // Same sphere as the shader dome (shared geometry, one sphere of
-        // VRAM), same draw slot — it REPLACES the dome, never stacks on it.
-        animeDome = new THREE.Mesh(dome.geometry, animeMat);
-        animeDome.frustumCulled = false;
-        animeDome.position.copy(dome.position);
-        animeDome.renderOrder = -1000;
-        animeDome.frustumCulled = false;
-        group.add(animeDome);
-        dome.visible = false;
-      }
-      if (lastDaylight) gradeAnime(lastDaylight);
-    },
     applyDaylight(state) {
-      lastDaylight = state;
       sunDir.copy(state.sunDir);
       domeMat.uniforms.uSunDir.value.copy(state.sunDir);
       (domeMat.uniforms.uSunColor.value as THREE.Color).copy(state.sunTint);
@@ -446,15 +365,12 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       fill.intensity = state.fillIntensity;
       // Clouds pick up the sun's warmth — pure white at sunset is a dead give-away.
       cloudMat.color.copy(state.sunTint).lerp(CLOUD_WHITE, 0.72);
-      // The anime panorama (when enabled) rides the same hour.
-      gradeAnime(state);
     },
     update(dt, time, wind, camera) {
       // Keep the sky sphere locked to the eye. A world-fixed dome is clipped
       // by the far plane into a rotating black circle the moment the camera
       // leaves the origin — follow the camera and the whole sky stays lit.
       dome.position.copy(camera.position);
-      if (animeDome) animeDome.position.copy(camera.position);
 
       // Cloud banks drift
       for (let i = 0; i < cloudCount; i += 1) {

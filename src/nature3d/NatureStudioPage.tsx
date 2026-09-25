@@ -18,14 +18,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff,
-  Maximize2, Minimize2, PawPrint, RotateCw, Trees,
-  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
-  BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
-  MoreVertical,
+  Settings,
+  Rows3, Sparkles, X, Globe2, Mountain, Home,
+  PawPrint, Trees, Waves,
+  Sunrise, Sun, Sunset, Clock,
+  BookOpen, PenLine, Network, Users,
 } from "lucide-react";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
+import SanctuarySettings, { WIND_STEPS } from "./SanctuarySettings";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
@@ -34,12 +36,6 @@ import {
   enterNatureStudioRotation,
   exitNatureStudioRotation,
 } from "../utils/appOrientation";
-
-const WIND_STEPS = [
-  { label: "Calm", mult: 0.45 },
-  { label: "Breeze", mult: 1 },
-  { label: "Gusty", mult: 2.2 },
-];
 
 const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
   // The whole connected world first, then the two districts, then the
@@ -59,7 +55,8 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
  * square onto that board so it fills the view (with the half-metre of world
  * still showing at the edges), which is what makes a 30 m board usable — you
  * read ONE board at a time. "Desk" pulls back to the seat so all three are in
- * frame together. The fifth tray button is the ⋮ menu itself.
+ * frame together. The fifth tray button is the gear that opens the
+ * full-screen settings sheet.
  */
 /**
  * Lighting modes for the top tray.
@@ -95,8 +92,14 @@ export default function NatureStudioPage() {
   const hudTrayRef = useRef<HTMLElement | null>(null);
 
   const [supported] = useState(() => webglSupported());
+  const [stats, setStats] = useState<{ fps: number; tier: string; pixelRatio: number; draws: number } | null>(null);
+  const statsLatest = useRef<{ fps: number; tier: string; pixelRatio: number; draws: number } | null>(null);
   const [booting, setBooting] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The gear in the tray opens the full-screen SETTINGS sheet (PUBG-style
+  // layout: tab strip, grouped rows, pinned action bar) — see
+  // `SanctuarySettings.tsx`. It replaced the old ⋮ dropdown, which could
+  // only show a fifth of the controls at a time.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Low-tier UI diet: the engine's budget decides once at boot. When true,
   // the root gets `sanctuary-lite` and the wallpaper-grade backdrop blurs
   // are downgraded (see winter.css) — backdrop-filter is a fullscreen
@@ -104,10 +107,9 @@ export default function NatureStudioPage() {
   // tile GPU (the research's UI-overdraw rule applied to the HUD itself).
   const [liteFx, setLiteFx] = useState(false);
   const [windIdx, setWindIdx] = useState(1);
+  // Board size, mirrored from the engine so the settings panel can show it.
+  const [boardScale, setBoardScale] = useState(1);
   const [iceAge, setIceAge] = useState(false);
-  // Anime sky is OFF by default — procedural dome is the opening sky.
-  // Toggle still lives in the Scene menu for turning the panorama on.
-  const [animeSky, setAnimeSky] = useState(false);
   const [daylight, setDaylight] = useState<DaylightMode>("auto");
   // Shown next to the buttons so "Auto" is legible — otherwise the learner
   // cannot tell which hour the scene decided on. Ticks once a minute.
@@ -173,6 +175,15 @@ export default function NatureStudioPage() {
           // Direct DOM write — no setState, so the loop never triggers React.
           const el = statsRef.current;
           if (el) el.textContent = `${Math.round(s.fps)} fps · ${s.tier} · ${s.draws} draws`;
+          // The settings sheet reads the same numbers through a ref; it only
+          // copies them into React state while it is actually open (see the
+          // mirror effect below), so a closed panel costs nothing.
+          statsLatest.current = {
+            fps: s.fps,
+            tier: s.tier,
+            pixelRatio: s.pixelRatio,
+            draws: s.draws,
+          };
         },
       });
       // The tier is fixed for the session, so this fires once (not per frame).
@@ -190,8 +201,6 @@ export default function NatureStudioPage() {
     };
     resize();
     engine.start();
-    // Procedural sky is the default. Anime panorama stays opt-in via menu.
-    engine.setAnimeSky(false);
     // Two frames in, the first render has landed — drop the boot veil.
     const revealTimer = window.setTimeout(() => setBooting(false), 240);
 
@@ -217,6 +226,16 @@ export default function NatureStudioPage() {
     };
   }, [supported]);
 
+  // ── Settings sheet: mirror the live engine numbers ─────────────────
+  // Once a second, and ONLY while the sheet is open — the HUD badge is
+  // written straight to the DOM, so React must stay out of the frame loop.
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    const id = window.setInterval(() => setStats(statsLatest.current), 1000);
+    setStats(statsLatest.current);
+    return () => window.clearInterval(id);
+  }, [settingsOpen]);
+
   // ── HUD actions ─────────────────────────────────────────────────────
   useEffect(() => {
     if (daylight !== "auto") return undefined;
@@ -225,19 +244,21 @@ export default function NatureStudioPage() {
     return () => window.clearInterval(id);
   }, [daylight]);
 
-  const cycleWind = useCallback(() => {
-    setWindIdx((i) => {
-      const next = (i + 1) % WIND_STEPS.length;
-      engineRef.current?.setWind(WIND_STEPS[next].mult);
-      return next;
-    });
+  const pickWind = useCallback((idx: number) => {
+    const step = WIND_STEPS[idx];
+    if (!step) return;
+    engineRef.current?.setWind(step.mult);
+    setWindIdx(idx);
   }, []);
 
-  const toggleOrbit = useCallback(() => {
-    setAutoOrbit((v) => {
-      engineRef.current?.setAutoOrbit(!v);
-      return !v;
-    });
+  const pickBoardScale = useCallback((scale: number) => {
+    engineRef.current?.setBoardScale(scale);
+    setBoardScale(scale);
+  }, []);
+
+  const toggleOrbit = useCallback((on: boolean) => {
+    engineRef.current?.setAutoOrbit(on);
+    setAutoOrbit(on);
   }, []);
 
   // The shell (rail + top bar) is gone on this route, so the HUD owns the
@@ -337,9 +358,8 @@ export default function NatureStudioPage() {
   // full-bleed at the freed rect (the effect below reframes); if no board is
   // enabled, the camera simply stays where it is, as before. Tapping again
   // brings every button back — including the tray if it was hidden from the
-  // ⋮ menu.
+  // settings sheet.
   const toggleHud = useCallback(() => {
-    setMenuOpen(false);
     if (hudHidden) setTrayVisible(true);
     setHudHidden((v) => !v);
   }, [hudHidden]);
@@ -384,9 +404,9 @@ export default function NatureStudioPage() {
           </div>
         ) : null}
 
-        {/* ── Top stats chip — the only chrome left up here. The ⋮ menu
-            and the board buttons have moved DOWN into the bottom tray, so
-            the top-left corner belongs to the world again. ── */}
+        {/* ── Top stats chip — the only chrome left up here. The gear and
+            the board buttons live DOWN in the bottom tray, so the top-left
+            corner belongs to the world again. ── */}
         {!hudHidden ? (
         <header
           ref={hudTopRef}
@@ -403,10 +423,10 @@ export default function NatureStudioPage() {
         ) : null}
 
         {/* ── Bottom tray — ON by default. Exactly five controls: the four
-            study boards (Mind / Reading / Notes / Desk) plus the ⋮ menu as
-            the fifth button; every other control lives inside that menu.
-            The tray can be hidden from inside the menu itself, and one tap
-            on the bottom-right eye brings every button back. ── */}
+            study boards (Mind / Reading / Notes / Desk) plus the GEAR as the
+            fifth button, which opens the full-screen settings sheet.
+            The tray can be hidden from inside that sheet, and one tap on the
+            bottom-right eye brings every button back. ── */}
         {!hudHidden && trayVisible ? (
         <p className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md">
           Two fingers fly · double-tap to go
@@ -440,191 +460,25 @@ export default function NatureStudioPage() {
 
             <div aria-hidden className="mx-0.5 h-8 w-px bg-white/15" />
 
-            {/* Fifth tray button: the ⋮ menu itself (moved down from the
-                top-left corner). The dropdown opens UPWARDS from the tray. */}
+            {/* Fifth tray button: the GEAR. It opens the full-screen
+                SETTINGS sheet (PUBG-style tab strip + grouped rows), which
+                replaced the old ⋮ dropdown that could only show a handful of
+                controls at a time. */}
             <div className="relative">
               <button
                 type="button"
-                aria-expanded={menuOpen}
-                aria-label={menuOpen ? "Close the controls menu" : "Open all controls"}
-                onClick={() => setMenuOpen((v) => !v)}
-                title={menuOpen ? "Close the menu" : "All controls — boards, views, light, camera"}
+                aria-expanded={settingsOpen}
+                aria-label={settingsOpen ? "Close settings" : "Open settings"}
+                onClick={() => setSettingsOpen((v) => !v)}
+                title="Settings — graphics, light, boards, views"
                 className={`grid h-12 w-12 place-items-center rounded-xl border transition ${
-                  menuOpen
-                    ? "border-emerald-300/60 bg-emerald-500/30 text-white shadow-[0_0_24px_rgba(16,185,129,0.45)]"
+                  settingsOpen
+                    ? "border-[#ff8a1f]/70 bg-[#ff8a1f]/25 text-white shadow-[0_0_24px_rgba(255,138,31,0.45)]"
                     : "border-white/22 bg-slate-950/55 text-white/85 hover:bg-white/15"
                 }`}
               >
-                <MoreVertical className="h-5 w-5" />
+                <Settings className="h-5 w-5" />
               </button>
-
-              {menuOpen ? (
-                <>
-                  {/* Tap-anywhere-else closes the menu. */}
-                  <div
-                    className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                  <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/22 bg-slate-950/85 shadow-2xl backdrop-blur-xl">
-                    {/* The title card that used to sit loose in the top bar. */}
-                    <div className="flex items-center gap-3 border-b border-white/10 px-3.5 py-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-orange-400 to-emerald-500 text-white shadow-lg shadow-amber-500/25">
-                        <Sparkles className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <h1 className="flex flex-wrap items-center gap-2 text-[13px] font-black tracking-tight text-white">
-                          Morning Nature Sanctuary
-                          <span className="rounded-full border border-emerald-400/40 bg-emerald-500/25 px-2 py-0.5 text-[9px] font-bold text-emerald-200">
-                            {iceAge ? "Ice Age" : "Living biome"}
-                          </span>
-                        </h1>
-                        <p className="truncate text-[11px] text-white/55">
-                          {iceAge
-                            ? "Frozen world · Drifting snow · Frosted study space"
-                            : "Highlands · Waterfall · Living forest"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="max-h-[calc(100vh-11rem)] overflow-y-auto p-1.5">
-                      {/* ── Study boards (mirrors the tray's first four) ── */}
-                      <MenuSection label="Study boards">
-                        {BOARD_VIEWS.map(({ key, label, Icon }) => (
-                          <MenuItem
-                            key={key}
-                            Icon={Icon}
-                            label={label}
-                            active={activeBoard === key}
-                            onClick={() => {
-                              focusStudyView(key);
-                              setMenuOpen(false);
-                            }}
-                          />
-                        ))}
-                      </MenuSection>
-
-                      {/* ── Viewpoints (the old presets row) ── */}
-                      <MenuSection label="Views">
-                        {PRESETS.map(({ key, label, Icon }) => (
-                          <MenuItem
-                            key={key}
-                            Icon={Icon}
-                            label={label}
-                            onClick={() => {
-                              engineRef.current?.focus(key);
-                              setActiveBoard(null);
-                              setMenuOpen(false);
-                            }}
-                          />
-                        ))}
-                      </MenuSection>
-
-                      {/* ── Light (the old segmented daylight switch) ── */}
-                      <MenuSection label="Light">
-                        <div className="flex items-center gap-1 rounded-xl bg-white/[0.06] p-1">
-                          {DAYLIGHT_MODES.map(({ key, label, Icon }) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => {
-                                engineRef.current?.setDaylightMode(key);
-                                setDaylight(key);
-                              }}
-                              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5 text-[9px] font-bold transition ${
-                                daylight === key
-                                  ? "bg-amber-400/25 text-white shadow-[0_0_16px_rgba(251,191,36,0.35)]"
-                                  : "text-white/70 hover:bg-white/12"
-                              }`}
-                              title={
-                                key === "auto"
-                                  ? "Follow the real time of day"
-                                  : `Light the sanctuary as ${label.toLowerCase()}`
-                              }
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                        {daylight === "auto" ? (
-                          <p className="px-3 pt-1 font-mono text-[10px] font-bold text-amber-200/80">
-                            {String(Math.floor(clockHour)).padStart(2, "0")}:
-                            {String(Math.floor((clockHour % 1) * 60)).padStart(2, "0")} · following your clock
-                          </p>
-                        ) : null}
-                      </MenuSection>
-
-                      {/* ── Scene toggles (the old top-bar cluster) ── */}
-                      <MenuSection label="Scene">
-                        <MenuItem
-                          Icon={Snowflake}
-                          label="Ice Age"
-                          active={iceAge}
-                          right={iceAge ? "On" : "Off"}
-                          onClick={() => {
-                            const next = !iceAge;
-                            engineRef.current?.setIceAge(next);
-                            setIceAge(next);
-                          }}
-                        />
-                        <MenuItem
-                          Icon={Sparkles}
-                          label="Anime sky"
-                          active={animeSky}
-                          right={animeSky ? "On" : "Off"}
-                          onClick={() => {
-                            const next = !animeSky;
-                            engineRef.current?.setAnimeSky(next);
-                            setAnimeSky(next);
-                          }}
-                        />
-                        <MenuItem
-                          Icon={Wind}
-                          label="Wind strength"
-                          right={WIND_STEPS[windIdx].label}
-                          onClick={cycleWind}
-                        />
-                        <MenuItem
-                          Icon={RotateCw}
-                          label="Auto 360° orbit"
-                          active={autoOrbit}
-                          right={autoOrbit ? "On" : "Off"}
-                          onClick={toggleOrbit}
-                        />
-                        <MenuItem
-                          Icon={immersive ? Minimize2 : Maximize2}
-                          label={immersive ? "Exit fullscreen" : "Fullscreen"}
-                          active={immersive}
-                          onClick={() => {
-                            toggleFullscreen();
-                            setMenuOpen(false);
-                          }}
-                        />
-                        {/* Hides this tray; the bottom-right eye button is
-                            what brings every button back. */}
-                        <MenuItem
-                          Icon={Rows3}
-                          label="Bottom tray"
-                          right="Hide"
-                          onClick={() => {
-                            setTrayVisible(false);
-                            setMenuOpen(false);
-                          }}
-                        />
-                      </MenuSection>
-
-                      <div className="mt-1 border-t border-white/10 p-1.5">
-                        <MenuItem
-                          Icon={LogOut}
-                          label="Back to Digital Catalyst"
-                          onClick={exitSanctuary}
-                          danger
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </nav>
@@ -659,6 +513,44 @@ export default function NatureStudioPage() {
             {hudHidden ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
           </button>
         </div>
+
+        {/* ── SETTINGS sheet — full-screen, PUBG-style ── */}
+        <SanctuarySettings
+          open={settingsOpen}
+          boardViews={BOARD_VIEWS}
+          presets={PRESETS}
+          daylightModes={DAYLIGHT_MODES}
+          onClose={() => setSettingsOpen(false)}
+          engine={engineRef.current}
+          stats={stats}
+          daylight={daylight}
+          onDaylight={(mode) => {
+            engineRef.current?.setDaylightMode(mode);
+            setDaylight(mode);
+          }}
+          clockHour={clockHour}
+          iceAge={iceAge}
+          onIceAge={(on) => {
+            engineRef.current?.setIceAge(on);
+            setIceAge(on);
+          }}
+          windIdx={windIdx}
+          onWindStep={pickWind}
+          autoOrbit={autoOrbit}
+          onAutoOrbit={toggleOrbit}
+          activeBoard={activeBoard}
+          onBoard={focusStudyView}
+          onView={(preset) => {
+            engineRef.current?.focus(preset);
+            setActiveBoard(null);
+          }}
+          boardScale={boardScale}
+          onBoardScale={pickBoardScale}
+          immersive={immersive}
+          onFullscreen={toggleFullscreen}
+          onHideTray={() => setTrayVisible(false)}
+          onExit={exitSanctuary}
+        />
 
         {/* ── Lesson modal ── */}
         {showLesson ? (
@@ -707,63 +599,6 @@ export default function NatureStudioPage() {
           fixed full-screen surface, so there is no "below" — the same hints
           are surfaced in the HUD and the board panel instead. */}
     </main>
-  );
-}
-
-/** One labelled group inside the kebab dropdown. */
-function MenuSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="px-0.5 pb-1 pt-2 first:pt-0.5">
-      <p className="px-2.5 pb-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-/**
- * One row in the kebab dropdown: icon + label + optional right-side state
- * readout (e.g. "On", "Breeze"). Rows that navigate close the menu; toggles
- * stay open (their handler decides).
- */
-function MenuItem({
-  Icon,
-  label,
-  right,
-  active,
-  danger,
-  onClick,
-}: {
-  Icon: typeof Compass;
-  label: string;
-  right?: string;
-  active?: boolean;
-  danger?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] font-bold transition ${
-        danger
-          ? "text-rose-200 hover:bg-rose-500/20"
-          : active
-            ? "bg-emerald-400/25 text-white shadow-[0_0_16px_rgba(16,185,129,0.25)]"
-            : "text-white/85 hover:bg-white/12"
-      }`}
-    >
-      <Icon className={`h-4 w-4 shrink-0 ${danger ? "text-rose-300" : "text-white/70"}`} />
-      <span className="flex-1 truncate">{label}</span>
-      {right ? <span className="text-[10px] font-bold text-white/50">{right}</span> : null}
-    </button>
   );
 }
 

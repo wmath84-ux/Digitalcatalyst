@@ -34,6 +34,10 @@ const exists = (p) => existsSync(new URL(p, ROOT));
 const DESKTOP_SHELL = read("src/components/DesktopShell.tsx");
 const MAIN = read("src/main.tsx");
 const PAGE = read("src/nature3d/NatureStudioPage.tsx");
+// The full-screen settings sheet: the gear in the bottom tray opens it, and it
+// now owns the controls that used to live in the old ⋮ dropdown (light, views,
+// scene toggles, exit). Assertions about those controls read BOTH files.
+const SETTINGS = read("src/nature3d/SanctuarySettings.tsx");
 const SCENE = read("src/nature3d/engine/scene.ts");
 const BOARD = read("src/nature3d/engine/board.ts");
 // Comment-stripped view: several assertions below check that a mechanism is
@@ -1052,9 +1056,29 @@ test("the desk view fits all three boards without cutting any off", () => {
 test("the boards are live DOM surfaces, not textures, so every file type works", () => {
   // A canvas texture cannot host an iframe, which rules out YouTube and PDF
   // outright, and no render-target resolution keeps body text legible on a
-  // 30 m board. CSS3D is the only approach that satisfies the brief.
-  assert.match(SCREENS, /CSS3DRenderer/);
-  assert.match(SCREENS, /CSS3DObject/);
+  // 30 m board. A real DOM layer per board is the only approach that
+  // satisfies the brief — and, since the layer is created ONCE and never
+  // re-parented, the only one that does it without reloading a playing video.
+  assert.match(SCREENS, /layer\.appendChild\(element\);/);
+  assert.match(SCREENS, /domElement\.appendChild\(layer\);/);
+  // The reset bug (2026-09-25): moving a face in and out of a host re-creates
+  // the iframe subtree, so every camera change restarted the video. The layer
+  // is therefore written, never moved. Exactly one appendChild per face and
+  // one per layer exist in the whole engine, and nothing removes them.
+  assert.equal(
+    SCREENS.split("layer.appendChild(element);").length - 1,
+    1,
+    "the face element is attached exactly once",
+  );
+  assert.equal(
+    SCREENS.split("domElement.appendChild(layer);").length - 1,
+    1,
+    "the layer is attached to the host exactly once",
+  );
+  assert.ok(
+    !/removeChild|replaceChild|insertBefore|innerHTML/.test(SCREENS),
+    "the DOM board must never be moved — a moved iframe restarts its video",
+  );
   assert.ok(!/WebGLRenderTarget/.test(SCREENS), "the boards must not be render targets");
 
   // The real player viewer is reused, so every CourseFileType is covered by
@@ -1096,7 +1120,11 @@ test("the tray switches boards and the camera turns to the one picked", () => {
     );
   }
   assert.match(PAGE, /key: "student", label: "Desk"/);
-  assert.match(PAGE, /engineRef\.current\?\.focus\(key\)/);
+  // Tray → focusStudyView → engine.focus. The settings sheet reaches the same
+  // camera through its own prop, so the wiring is asserted on both surfaces.
+  assert.match(PAGE, /onClick=\{\(\) => focusStudyView\(key\)\}/);
+  assert.match(PAGE, /engineRef\.current\?\.focus\(preset\)/);
+  assert.match(SETTINGS, /onView\(key\)/);
   // And the engine knows those presets.
   assert.match(SCENE, /\| "reading" \| "notes" \| "mindmap"/);
 });
@@ -1271,7 +1299,7 @@ test("board panels keep native vertical scroll on touch", () => {
 
 test("the DOM boards are culled the way BGMI culls the world", () => {
   // 1. An idle camera writes no styles at all.
-  assert.match(SCREENS, /if \(!moved && !changed\) return;/);
+  assert.match(SCREENS, /if \(!moved\) return;/);
   // 2. Frustum + back-face culled per board.
   assert.match(SCREENS, /frustum\.intersectsSphere\(sphere\)/);
   assert.match(SCREENS, /boardNormal\.dot\(toCamera\) > 0/);
@@ -1703,9 +1731,11 @@ test("the dusk floor keeps evening and night a readable DARK GREEN", () => {
   assert.match(DAYLIGHT, /fillIntensity: THREE\.MathUtils\.lerp\(0\.8, 1\.05, dayFactor\)/);
   assert.match(DAYLIGHT, /hemiGround: lerpColor\(0x62b032, 0x3d8f2e, warm\)/);
   assert.ok(!/0x6a5a32/.test(DAYLIGHT), "the olive dusk bounce is what read as mud-black");
-  // The baked panorama's night grade must dim, not black out (sky.ts).
-  assert.match(SKY, /ANIME_NIGHT = new THREE\.Color\(0x46597e\)/);
-  assert.match(SKY, /\(1 - state\.dayFactor\) \* 0\.42/);
+  // The procedural dome's night grade must dim, not black out. At night the
+  // zenith dips to a deep blue and the ground bounce stays green — the owner
+  // reads at 23:00 and the world must stay readable, never a black screen.
+  assert.match(DAYLIGHT, /zenith: lerpColor\(0x1f7eef, 0x3f5f9e, warm\)/);
+  assert.ok(!/lerpColor\(0x000000/.test(DAYLIGHT), "no curve may bottom out at black");
   // And the dusk haze tint is multiplied INTO the fog, so it must stay pale.
   // Comment-stripped: palette.ts documents the old value it replaced.
   const PALETTE = read("src/nature3d/engine/palette.ts")
@@ -1772,7 +1802,8 @@ test("the learner can switch lighting from the top tray", () => {
   }
   // Auto is the default, so the sanctuary matches the real world unprompted.
   assert.match(PAGE, /useState<DaylightMode>\("auto"\)/);
-  assert.match(PAGE, /engineRef\.current\?\.setDaylightMode\(key\)/);
+  assert.match(PAGE, /engineRef\.current\?\.setDaylightMode\(mode\)/);
+  assert.match(SETTINGS, /onChange=\{onDaylight\}/);
   assert.match(SCENE, /setDaylightMode\(mode: DaylightMode\)/);
   // Auto re-reads the clock while the page is open — otherwise a long session
   // started in the morning would still be lit as morning at dusk.

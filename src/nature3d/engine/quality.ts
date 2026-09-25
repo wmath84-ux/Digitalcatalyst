@@ -347,6 +347,34 @@ export function budgetFor(tier: QualityTier): QualityBudget {
 }
 
 /**
+ * The SETTINGS panel's graphics styles, in PUBG's vocabulary (Smooth /
+ * Balanced / HD / HDR).
+ *
+ * A style is a RESOLUTION CEILING, expressed as a fraction of what the
+ * device's own pixel ratio allows: the dynamic scaler keeps every right the
+ * research doc gives it (trim under load, recover when fast), it simply may
+ * never climb past the style's ceiling. The tier's world budget (grass, trees,
+ * shadow map) is allocation-time and stays put — rebuilding it mid-session is
+ * a multi-second stall, which is worse than any style.
+ */
+export type QualityProfile = "smooth" | "balanced" | "hd" | "hdr";
+
+export const QUALITY_PROFILES: Record<QualityProfile, { label: string; ceiling: number; blurb: string }> = {
+  smooth: { label: "Smooth", ceiling: 0.75, blurb: "Fewest pixels, most frames" },
+  balanced: { label: "Balanced", ceiling: 1, blurb: "The device's own resolution" },
+  hd: { label: "HD", ceiling: 1.3, blurb: "Sharper image, heavier GPU" },
+  hdr: { label: "HDR", ceiling: 1.6, blurb: "Maximum clarity, battery beware" },
+};
+
+/** The style a freshly detected tier opens on. */
+export function profileForTier(tier: QualityTier): QualityProfile {
+  if (tier === "low") return "smooth";
+  if (tier === "medium") return "balanced";
+  if (tier === "high") return "hd";
+  return "hdr";
+}
+
+/**
  * Dynamic resolution scaler — the DRS half of `ACTIVATE_THERMAL_DRS_PACING`.
  *
  * It watches the WALL-CLOCK interval between rendered frames, not the JS CPU
@@ -370,17 +398,37 @@ export class AdaptiveResolution {
   private scale: number;
   private lastChange = 0;
   private readonly min: number;
-  private readonly max: number;
+  private max: number;
   /** Frame budget in ms (30 fps tier → 33.3). */
   private readonly targetMs: number;
   /** Consecutive trims that bottomed out at the floor. */
   private floorTrims = 0;
 
+  /** The device's own ceiling, before the scaler ever touched it. */
+  private readonly deviceMax: number;
+
   constructor(budget: QualityBudget, deviceRatio: number) {
-    this.max = Math.min(deviceRatio || 1, budget.maxPixelRatio);
+    this.deviceMax = Math.min(deviceRatio || 1, budget.maxPixelRatio);
+    this.max = this.deviceMax;
     this.min = Math.min(this.max, budget.minPixelRatio);
     this.scale = this.max;
     this.targetMs = budget.fpsCap > 0 ? 1000 / budget.fpsCap : 1000 / 60;
+  }
+
+  /**
+   * Re-set the ceiling the scaler may climb to (the SETTINGS panel's
+   * graphics style). Returns the new pixel ratio when it changed so the
+   * renderer can be re-sized once. The scaler still trims under load — a
+   * user ceiling is a ceiling, not a floor.
+   */
+  setCeiling(ratio: number): number | null {
+    this.max = Math.min(this.deviceMax, Math.max(this.min, ratio));
+    if (this.scale > this.max) {
+      this.scale = this.max;
+      this.lastChange = performance.now();
+      return this.scale;
+    }
+    return null;
   }
 
   get pixelRatio(): number {
