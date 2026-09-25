@@ -385,6 +385,10 @@ export class Sanctuary {
       this.budget.fogNear,
       this.budget.fogFar,
     );
+    // Clear colour = fog/horizon blue. Any pixel the sky dome misses (far
+    // clip, first frame before update) must NOT flash pure black — that was
+    // the rotating black circle on zoom-out.
+    this.renderer.setClearColor(0xb8d0e8, 1);
 
     // Anisotropy is a bandwidth consumer on tile GPUs — the budget owns the
     // cap now (1 on low, 4 medium, 8 desktop), not a one-off low/else split.
@@ -1653,6 +1657,9 @@ export class Sanctuary {
     // towards the sun, so its Y component IS the sine of the elevation.
     this.atmosphere.update(state.sunDir.y, state.sunDir, state.sunColor, state.fog);
     this.scene.background = null;
+    // Keep the GL clear colour locked to the live fog so a missed sky pixel
+    // is haze-blue, never black (zoom-out / rotate black-circle fix).
+    this.renderer.setClearColor(fog.color, 1);
     this.renderer.toneMappingExposure = state.exposure * this.gradeExposure;
     // The sun moved, so every shadow in the world is now wrong.
     this.requestShadowRefresh();

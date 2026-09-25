@@ -38,7 +38,14 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
-import { RIVER_CENTER_X, WATER_LEVEL, OCEAN_LEVEL, coastWeight, terrainHeight } from "./terrain";
+import {
+  RIVER_CENTER_X,
+  WATER_LEVEL,
+  OCEAN_LEVEL,
+  TERRAIN_DISC_RADIUS,
+  coastWeight,
+  terrainHeight,
+} from "./terrain";
 import type { TextureSet, WaterPhotoSet } from "./textures";
 
 export interface WaterSystem {
@@ -484,14 +491,13 @@ export function createWater(
   //     Schlick Fresnel against the LIVE sky colours, a GGX-ish sun glint on
   //     the shared sun vector, and depth grades. All analytic, all linear
   //     pre-tone-map, ~30 ALU + 2 fetches per fragment.
-  // Ocean disc extends ~500 m past the previous outer rim (3450 → 3950+)
-  // and well past the sky dome edge the camera can never leave, so max
-  // zoom-out always shows real sea under the sky, not a cut-off water plate.
+  // Ocean disc: dense shelf near the island, then long open-sea rings out to
+  // ~5400 m (well past the old 3450 rim and past the terrain disc). farPlane
+  // on every tier clears this radius so the sea is never far-clipped.
   const OCEAN_RING_RADII = [
     0, 160, 340, 540, 740, 900, 970, 1020, 1060, 1095, 1125, 1155, 1185, 1215,
     1245, 1275, 1310, 1350, 1400, 1470, 1580, 1760, 2050, 2450, 2950, 3450,
-    // +500 m expansion, 360° — denser rings near the old rim, then long
-    // sparse rings out past the skybox so the sea never ends before the sky.
+    // +500 m+ expansion past the old rim — continuous open water to the horizon.
     3600, 3750, 3900, 4100, 4350, 4650, 5000, 5400,
   ];
   const OCEAN_SEGMENTS = 256;
@@ -517,8 +523,14 @@ export function createWater(
         pos[v * 3 + 2] = z;
         // The flood mask + water column in one number: −1 = dry (collapsed
         // under the terrain), 0… = metres of water over the bed.
-        depth[v] = coastWeight(x, z) > 0.42
-          ? Math.max(0, OCEAN_LEVEL - terrainHeight(x, z))
+        // Past the terrain disc the ground mesh ends — force a deep open-sea
+        // column so the expanded outer rings actually draw as water (not a
+        // collapsed dry plate that made the +500 m expansion invisible).
+        const radial = Math.hypot(x, z);
+        const openSea = radial > TERRAIN_DISC_RADIUS - 40;
+        const wet = openSea || coastWeight(x, z) > 0.42;
+        depth[v] = wet
+          ? Math.max(openSea ? 12 : 0, OCEAN_LEVEL - terrainHeight(x, z))
           : -1;
         v += 1;
       }

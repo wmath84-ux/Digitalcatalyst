@@ -1368,10 +1368,12 @@ test("the camera can never orbit off its own terrain plate", () => {
   assert.match(CONTROLS, /skyboxSafe/);
   assert.match(CONTROLS, /FLY_LIMIT_RADIUS/);
   assert.ok(maxDistance(Math.PI / 2 - 0.001) <= ceiling, "a top-down view must be bounded by altitude");
-  // Camera orbit distance must stay inside the sky dome (~farPlane * 0.92).
-  const minFar = 3500;
-  const skyRadius = minFar * 0.92;
+  // Sky dome is camera-locked at ~farPlane * 0.48 — orbit must stay well
+  // inside that radius so the eye never sits outside the sphere.
+  const minFar = 6200;
+  const skyRadius = minFar * 0.48;
   assert.ok(ceiling < skyRadius, `orbit ceiling ${ceiling} must be inside sky radius ${skyRadius}`);
+  assert.match(read("src/nature3d/engine/sky.ts"), /dome\.position\.copy\(camera\.position\)/, "sky follows the camera");
 });
 
 test("the ground floor is sampled on the plate, so it cannot fake a hill", () => {
