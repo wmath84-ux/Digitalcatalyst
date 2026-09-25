@@ -44,6 +44,7 @@
 import * as THREE from "three";
 import { terrainHeight, RIVER_CENTER_X, OCEAN_LEVEL, coastWeight } from "./terrain";
 import { beachHouseYardWeight } from "./beachHouseSite";
+import { beachHouseSites } from "./beachHouseSite";
 import { noise } from "./simplex";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -69,9 +70,9 @@ export const SUN_SIDE_X = 0;
 export const SUN_SIDE_Z = -1;
 
 /** How far a worn trail's core reaches, in metres. */
-const PATH_CORE = 0.85;
+const PATH_CORE = 0.72;
 /** The shoulder of a trail, where grass thins but still grows. */
-const PATH_SHOULDER = 2.4;
+const PATH_SHOULDER = 2.85;
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Drainage — the flow map (research §8)
@@ -223,21 +224,28 @@ export function flowMaxAccumulation(): number {
  * strip, the missing grass and the cleared stones always line up.
  */
 const TRAILS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // Chair → river bank: the water run.
-  [[0, 2.6], [7.5, -1.5], [14.5, -6.5]],
-  // Chair → the lesson-board hill: the climb.
-  [[0, 0], [-26, -24], [-58, -58], [-96, -98]],
+  // Chair → river bank: the water run (meandering, not a straight ruler).
+  [[0, 2.6], [4.2, 1.1], [8.8, -2.4], [12.6, -5.1], [14.5, -6.5]],
+  // Chair → the lesson-board hill: the climb, with natural bends.
+  [[0, 0], [-14, -12], [-28, -26], [-48, -46], [-72, -70], [-96, -98]],
   // East, towards the open meadow: the long trail out of the meadow.
-  [[1.5, 1.5], [34, 6], [120, 10], [240, 6], [360, -4]],
+  [[1.5, 1.5], [18, 4], [42, 9], [78, 7], [140, 12], [210, 4], [280, 9], [360, -4]],
   // West, towards the highlands.
-  [[-1.5, 1.5], [-30, 7], [-110, 14], [-215, 8], [-330, -6]],
+  [[-1.5, 1.5], [-16, 5], [-42, 11], [-80, 8], [-150, 16], [-220, 6], [-280, 2], [-330, -6]],
+  // Secondary spur: meadow clearing → north open fields (connecting path).
+  [[2, 3], [12, 28], [28, 55], [48, 82], [70, 110]],
+  // Secondary spur: west trail → river crossing approach.
+  [[-30, 7], [-18, 2], [-6, -3], [4, -5], [12, -6]],
   // SOUTH-EAST: meadow → the bay. The one trail that reaches the open sea —
   // it follows the coastal gap between the hill sectors, threads the village,
   // and ends at the jetty on the beach. The worn ground is what guides the
   // learner's eye (and feet) from the chair to the water. The last waypoints
   // are pinned to the MEASURED bay shoreline (the terrain crosses sea level
   // at r ≈ 1215 on the bay's azimuth, and the dry beach runs to ~1075).
-  [[2, 5], [60, 34], [150, 96], [300, 250], [470, 450], [620, 650], [688, 790], [706, 880], [700, 940], [686, 1000]],
+  // Extra waypoints break the geometric arc into natural dirt meanders.
+  [[2, 5], [28, 18], [60, 34], [100, 62], [150, 96], [220, 160], [300, 250],
+   [380, 340], [470, 450], [540, 540], [620, 650], [660, 720], [688, 790],
+   [706, 880], [700, 940], [686, 1000]],
 ];
 
 /**
@@ -323,10 +331,18 @@ export function pathWeight(x: number, z: number): number {
   }
 
   let w = 0;
-  // A meandering edge — a perfectly parallel-sided path reads as a decal. One
-  // noise call per query rather than one per trail: this function is called
-  // ~60 000 times while the grass and the terrain are built.
-  const wobble = 0.82 + 0.18 * noise.noise2D(x * 0.21 + 3.1, z * 0.21 - 7.7);
+  // Irregular path edges + varying width: a perfectly parallel-sided path
+  // reads as a decal. Two noise fields — one for edge wobble, one for width
+  // breathing — so the dirt ribbon thickens and thins naturally. One pair of
+  // noise calls per query (not per trail): this function is called ~60 000
+  // times while the grass and the terrain are built.
+  const wobble = 0.78 + 0.22 * noise.noise2D(x * 0.19 + 3.1, z * 0.19 - 7.7);
+  // Width variation: 0.7× … 1.35× of the authored core/shoulder.
+  const widthBreath =
+    0.78 + 0.42 * (0.5 + 0.5 * noise.noise2D(x * 0.055 + 41.2, z * 0.055 - 17.6));
+  // Grass intrusion: sparse noise that punches holes in the path edge so
+  // turf creeps back in irregularly instead of stopping at a hard line.
+  const grassBite = noise.noise2D(x * 0.38 + 9.7, z * 0.38 - 14.3);
   for (const s of TRAIL_SEGS) {
     let t = s.lenSq > 0 ? ((x - s.ax) * s.vx + (z - s.az) * s.vz) / s.lenSq : 0;
     t = Math.min(1, Math.max(0, t));
@@ -338,7 +354,13 @@ export function pathWeight(x: number, z: number): number {
     const along = t * s.len;
     const total = s.len;
     const endFade = Math.min(1, along / 14, (total - along) / 14);
-    const core = 1 - smoothstep(PATH_CORE, PATH_SHOULDER, d);
+    const coreR = PATH_CORE * widthBreath;
+    const shoulderR = PATH_SHOULDER * widthBreath;
+    let core = 1 - smoothstep(coreR, shoulderR, d);
+    // Darker centre: the core is more worn than the shoulders (foot-packed).
+    if (d < coreR * 0.55) core = Math.min(1, core * 1.18);
+    // Grass intrusion on the outer shoulder — irregular, never a circle.
+    if (d > coreR && grassBite > 0.35) core *= 0.55 + 0.45 * (1 - grassBite);
     w = Math.max(w, core * Math.max(0, endFade) * wobble);
   }
   // The clearing: the trodden disc under the chair and desk.
@@ -351,6 +373,36 @@ export function pathWeight(x: number, z: number): number {
   // thinned plants and the packed dirt tint all come from one number.
   // Until `beachHouses.ts` installs its sites this is a single length check.
   w = Math.max(w, 0.62 * beachHouseYardWeight(x, z));
+
+  // ENTRANCE SPURS: a short dirt path from each house door toward the meadow
+  // centre, so yards connect logically to the trail network instead of sitting
+  // as isolated props on green carpet. Cheap: sites are few (≤6) and the test
+  // is a point-to-segment distance with a soft shoulder.
+  const houses = beachHouseSites();
+  for (let i = 0; i < houses.length; i += 1) {
+    const h = houses[i];
+    // Door sits on the meadow-facing side of the wall box (local +Z).
+    const doorX = h.x + h.sin * h.halfZ * 0.92;
+    const doorZ = h.z + h.cos * h.halfZ * 0.92;
+    // Spur runs ~18 m from the door toward the origin (meadow).
+    const toOriginX = -doorX;
+    const toOriginZ = -doorZ;
+    const toLen = Math.hypot(toOriginX, toOriginZ) || 1;
+    const spurLen = Math.min(18, toLen * 0.35);
+    const ex = doorX + (toOriginX / toLen) * spurLen;
+    const ez = doorZ + (toOriginZ / toLen) * spurLen;
+    const vx = ex - doorX;
+    const vz = ez - doorZ;
+    const lenSq = vx * vx + vz * vz;
+    let t = lenSq > 0 ? ((x - doorX) * vx + (z - doorZ) * vz) / lenSq : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const px = doorX + vx * t;
+    const pz = doorZ + vz * t;
+    const d = Math.hypot(x - px, z - pz);
+    const spur = 1 - smoothstep(0.55, 2.1, d);
+    if (spur > w) w = spur * 0.88;
+  }
+
   return Math.min(1, w);
 }
 
@@ -609,6 +661,58 @@ export function hillTurf(h: number, normalY: number, coastal: number): number {
  * principle 11), then given the subtle warm/cool hue drift that stops a large
  * surface reading as one flat colour.
  */
+/**
+ * Procedural grass DENSITY field, 0 (bare) … 1 (dense sward).
+ *
+ * This is the single source of truth for "how much grass belongs here". The
+ * grass scatter, tufts and tropical undergrowth all read it so bare patches,
+ * dense clusters and path shoulders agree by construction — never a uniform
+ * carpet of identical sticks.
+ *
+ * Driven by multi-scale noise + moisture + path wear + slope + coast, so the
+ * field naturally forms dense → medium → sparse → bare → dense patches.
+ */
+export function grassDensityAt(x: number, z: number, h?: number, wornIn?: number): number {
+  const height = h ?? terrainHeight(x, z);
+  const wet = flowWetness(x, z);
+  const worn = wornIn ?? pathWeight(x, z);
+  const coast = coastWeight(x, z);
+
+  // Multi-scale density noise: broad ~40 m fields + ~12 m clumps + ~4 m tufts.
+  const broad = noise.noise2D(x * 0.025 + 2.7, z * 0.025 - 5.1) * 0.5 + 0.5;
+  const clump = noise.noise2D(x * 0.08 + 17.3, z * 0.08 - 9.4) * 0.5 + 0.5;
+  const tuft = noise.noise2D(x * 0.22 + 41.6, z * 0.22 + 3.8) * 0.5 + 0.5;
+  let d = broad * 0.48 + clump * 0.34 + tuft * 0.18;
+
+  // Moist hollows grow denser; dry rises thin out.
+  d *= 0.72 + wet * 0.45;
+  const dry = dryCover(x, z, height, wet);
+  d *= 1 - dry * 0.55;
+
+  // Paths: gradual thin-out across the shoulder, bare on the core.
+  d *= 1 - clamp01(worn * 1.55);
+
+  // Beach: sand owns the shore; only sparse dune grass remains.
+  const shoreUp = height - OCEAN_LEVEL;
+  if (coast > 0.05) {
+    d *= 1 - clamp01(coast * (1 - smoothstep(1.5, 5.5, shoreUp)) * 0.92);
+  }
+
+  // Village yards and the study clearing are worn, not lawn.
+  const r = Math.hypot(x, z);
+  if (r < 8) d *= smoothstep(2.2, 7.5, r);
+
+  // Bare-patch punch: occasional open soil islands inside otherwise dense turf.
+  const bare = noise.noise2D(x * 0.045 - 28.1, z * 0.045 + 14.7);
+  if (bare > 0.62) d *= 0.15 + (1 - bare) * 0.5;
+
+  // River edges denser (moist bank vegetation), channel itself is bare water.
+  const fromRiver = Math.abs(x - RIVER_CENTER_X);
+  if (fromRiver < 22 && fromRiver > 7) d = Math.min(1, d * 1.25);
+
+  return clamp01(d);
+}
+
 export function groundColorAt(
   x: number,
   z: number,
@@ -633,45 +737,44 @@ export function groundColorAt(
   // mixed — one call, one source of truth, no second ring test.
   const coast = coastWeight(x, z);
 
-  // ── Base: lush ↔ dry ──────────────────────────────────────────────
-  // Dry ground follows drainage and the rises (dryCover), not a speckle.
-  // The lerp is held back so a dry rise reads as earth and the flats stay
-  // grass — green is the majority, desert shows through on the high ground.
-  //
-  // HILLS ARE THE EXCEPTION (`hillTurf`): the rises' rule stays for the
-  // banks and the beach ridges it was written for, and is lifted on the
-  // pahads, whose turf the cover in `hillGrass.ts` grows on the same two
-  // measurements. Without this line the hills would be dressed in 3-D grass
-  // over bare-earth albedo, which is the one combination that reads as a bug.
+  // ── Base: lush ↔ dry grass ────────────────────────────────────────
+  // Soft multi-material blend. Dry rises lean yellow-olive (not neon green
+  // carpet); moist hollows stay deeper green. Soft irregular noise breaks
+  // any circular boundary the eye could latch onto.
   const dry = dryCover(x, z, h, wet) * (1 - 0.74 * hillTurf(h, normalY, coast));
-  out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.84));
+  // Irregular mottling so material zones never form obvious circles.
+  const mottling = noise.noise2D(x * 0.031 + 6.2, z * 0.029 - 4.8) * 0.12;
+  out.copy(palette.lush).lerp(palette.dry, clamp01(dry * 0.78 + mottling));
 
-  // ── Drainage: mossy darkening, not brown mud ──────────────────────
-  out.lerp(palette.mud, clamp01(wet * 0.55 - 0.18));
+  // ── Exposed soil around paths / yards (disturbed ground) ──────────
+  // Soft soil halo just outside the packed dirt core — grass intrusion
+  // zone that reads as earth rather than chalk-white gravel.
+  const soilHalo = clamp01(worn * 0.9 - 0.08) * (1 - clamp01(worn * 1.4));
+  if (soilHalo > 0.01) {
+    // Warm brown soil, slightly darker than the path centre.
+    out.r = out.r * (1 - soilHalo * 0.35) + 0.42 * soilHalo;
+    out.g = out.g * (1 - soilHalo * 0.35) + 0.32 * soilHalo;
+    out.b = out.b * (1 - soilHalo * 0.35) + 0.18 * soilHalo;
+  }
 
-  // ── THE BEACH GRADIENT (Phase 4) ──────────────────────────────────
-  //
-  // The sea owns every metre it can reach — but only near the sea (the
-  // `coast` ring mask protects the inland basins). The band is measured
-  // straight off the height above OCEAN_LEVEL, so the ground rule, the ocean
-  // mesh and the shoreline foam all agree on where "the beach" is, by
-  // construction:
-  //
-  //   +11 m  coastal influence fades in
-  //    +4 m  dry sand → full pale sand at +2 m
-  //   +0.9 m wet sand begins (the tide's reach)
-  //    0     OCEAN_LEVEL — the waterline
-  //   below  the sand goes teal-green as the water column takes over
-  //
-  // A touch of long-wave noise breaks the bands up so the shoreline never
-  // reads as a contour line painted on the ground.
+  // ── Drainage: mossy darkening / wet ground near water ─────────────
+  out.lerp(palette.mud, clamp01(wet * 0.62 - 0.14));
+
+  // ── THE BEACH GRADIENT ────────────────────────────────────────────
+  // Soft irregular transitions: water → wet sand/mud → sparse shore → grass.
+  // Long-wave noise breaks contour-line banding.
   const shoreUp = h - OCEAN_LEVEL;
-  if (shoreUp < 12 && coast > 0.02) {
-    const swash = noise.noise2D(x * 0.045 + 9.3, z * 0.045 - 2.8) * 0.9;
-    const drySand = (1 - smoothstep(2.2 + swash, 5.4 + swash, shoreUp)) * coast;
+  if (shoreUp < 14 && coast > 0.02) {
+    const swash = noise.noise2D(x * 0.045 + 9.3, z * 0.045 - 2.8) * 1.15
+      + noise.noise2D(x * 0.11 - 2.1, z * 0.11 + 7.4) * 0.35;
+    const drySand = (1 - smoothstep(2.0 + swash, 6.2 + swash, shoreUp)) * coast;
     out.lerp(palette.sand, clamp01(drySand));
-    const wetSand = (1 - smoothstep(-0.2 + swash * 0.4, 1.0 + swash * 0.4, shoreUp)) * coast;
+    const wetSand = (1 - smoothstep(-0.35 + swash * 0.45, 1.15 + swash * 0.45, shoreUp)) * coast;
     out.lerp(palette.sandWet, clamp01(wetSand));
+    // Wet mud band just above the waterline — soft transition, not a hard edge.
+    const wetMud = (1 - smoothstep(0.4 + swash * 0.3, 2.4 + swash * 0.3, shoreUp))
+      * coast * 0.35;
+    out.lerp(palette.mud, clamp01(wetMud));
     if (shoreUp < 0.2) {
       const under = clamp01((0.2 - shoreUp) / 5.5) * coast;
       out.lerp(palette.sandUnder, under * 0.8);
@@ -679,30 +782,43 @@ export function groundColorAt(
     }
   }
 
-  // ── Slope: a HINT of rock on the steepest faces ────────────────────
-  // OWNER DIRECTIVE — GRASS ON EVERY HILL: the uploaded reference blend
-  // (`pahadon ke upar gras replace hill.blend`) covers EVERY slope of the
-  // terrain with dense grass, so the mountains here wear their sward even
-  // on steep faces. The ramp still runs 0.80 → 0.62 (`normalY` is cosine
-  // of the slope: 26° (0.90) → no rock, 45° (0.71) → towards rock), but
-  // the blend is held back to a minority mix — the rock colour only
-  // suggests the stone UNDER the grass on the hardest faces, it never
-  // replaces the green. The world-wide hill sward (`hillGrass.ts`) plants
-  // its clumps on these same faces, flush to the surface normal.
-  //
-  // `normalY` is published by the terrain mesh itself, so this costs no
-  // height samples at all inside the 150 k-vertex colour loop.
+  // ── Slope: rock on steep faces + rocky outcrop noise ──────────────
+  // Steep faces show stone; a secondary noise field creates occasional
+  // rocky patches on moderate slopes (exposed rock formations).
   const steep = clamp01((0.8 - normalY) / 0.18);
+  // Minority rock mix — stone UNDER the sward (contract: steep * 0.38).
+  // A secondary noise field adds occasional rocky patches on moderate slopes
+  // without replacing the green majority on steep faces.
   out.lerp(palette.rock, steep * 0.38);
+  const rockPatch = noise.noise2D(x * 0.04 + 55.1, z * 0.04 - 22.3);
+  if (rockPatch > 0.58) {
+    out.lerp(palette.rock, clamp01(rockPatch - 0.58) * 0.22 * clamp01((0.92 - normalY) / 0.2));
+  }
 
-  // ── The worn strip ────────────────────────────────────────────────
-  out.lerp(palette.gravel, clamp01(worn * 1.25));
+  // ── The worn dirt path ────────────────────────────────────────────
+  // Packed earth centre (darker), lighter shoulder — never pure white.
+  // Soft irregular edges come from pathWeight's own noise already.
+  if (worn > 0.02) {
+    const pathAmt = clamp01(worn * 1.15);
+    // Darker centre: multiply slightly before the dirt lerp so the middle
+    // of a trail reads foot-worn rather than painted beige.
+    const centreDark = clamp01(worn - 0.35) * 0.18;
+    out.r *= 1 - centreDark;
+    out.g *= 1 - centreDark * 0.95;
+    out.b *= 1 - centreDark * 0.85;
+    out.lerp(palette.gravel, pathAmt * 0.85);
+    // Occasional small stone flecks on the path (subtle value noise).
+    const grit = noise.noise2D(x * 0.55 + 3.1, z * 0.55 - 7.2);
+    if (grit > 0.55 && worn > 0.25) {
+      out.lerp(palette.rock, (grit - 0.55) * 0.35 * worn);
+    }
+  }
 
-  // ── Hue drift: sunlit flats go BRIGHTER and MORE SATURATED ────────
-  // USER DIRECTIVE (saturation): the old −2 % sat on flats washed the meadow
-  // out. Afternoon grass in hard sun is the opposite — chroma up, value up.
+  // ── Hue drift: subtle, not neon ───────────────────────────────────
+  // Soft saturation lift on sunlit flats — restrained so the meadow stays
+  // natural green rather than glowing arcade grass.
   const flatFace = clamp01((normalY - 0.83) / 0.17);
-  out.offsetHSL(0, 0.07 * flatFace, 0.02 * flatFace * (1 - wet));
+  out.offsetHSL(0, 0.035 * flatFace, 0.012 * flatFace * (1 - wet));
 
   return out;
 }

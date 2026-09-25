@@ -292,8 +292,13 @@ function acceptsPlant(
  * the first pass left are the complaint, not the feature.
  */
 function patchDensity(x: number, z: number): number {
-  return noise.noise2D(x * 0.033, z * 0.033) * 0.55
-    + noise.noise2D(x * 0.11 + 31.7, z * 0.11 - 13.9) * 0.45;
+  // Ecological undergrowth: dense around tree-scale clusters and river banks,
+  // sparse in open clearings — the intermediate layer between grass and canopy.
+  const grove = noise.noise2D(x * 0.018 + 4.1, z * 0.018 - 9.3) * 0.5 + 0.5;
+  const clump = noise.noise2D(x * 0.055, z * 0.055) * 0.55
+    + noise.noise2D(x * 0.13 + 31.7, z * 0.13 - 13.9) * 0.45;
+  // Bias toward grove edges and moist ground so bushes fill the grass→tree gap.
+  return (clump * 0.65 + (grove - 0.5) * 0.7) * 0.9 + 0.05;
 }
 
 /** One loaded variant: the merged card geometry + its glTF material. */

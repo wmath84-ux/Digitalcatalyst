@@ -50,6 +50,7 @@ import { bakeCurvature, type Weathering } from "./weathering";
 import { insideRiver, terrainHeight } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
 import { insideBeachHouse } from "./beachHouseSite";
+import { noise } from "./simplex";
 import type { TextureSet } from "./textures";
 
 export interface RockField {
@@ -326,26 +327,32 @@ export function createRockField(
 
     if (clusterLeft <= 0) {
       // ── Choose the next outcrop ─────────────────────────────────────
-      // Clusters, not a uniform scatter: real boulders come out of the ground
-      // in families where the bedrock is close to the surface (research §49:
-      // nature follows density gradients, never a grid).
+      // Rock FORMATIONS, not decorative singles: clusters form where slope,
+      // elevation and a rocky noise mask agree. Small stones surround larger
+      // anchors (set below). Flat deep-soiled meadow keeps its grass.
       const a = rand() * Math.PI * 2;
       const r = 14 + Math.sqrt(rand()) * 430;
       clusterX = Math.cos(a) * r;
       clusterZ = Math.sin(a) * r;
       const s = siteAt(clusterX, clusterZ, site);
+      // Rocky mask: occasional exposed formations even on moderate ground.
+      const rockMask = noise.noise2D(clusterX * 0.022 + 13.1, clusterZ * 0.022 - 7.4);
       // Steep ground and drainage lines are where rock shows through. Flat,
       // deep-soiled meadow keeps its grass, so most flat draws are rejected —
       // EXCEPT on the beach, where scattered coral boulders are part of the
-      // shoreline's composition (Phase 10: rocks at the coast, deliberately).
-      if (s.slopeDeg < 5 && rand() < (s.coastal > 0.35 ? 0.22 : 0.62)) continue;
+      // shoreline's composition, and on rocky noise peaks (formations).
+      const flatReject = s.coastal > 0.35 ? 0.18 : rockMask > 0.45 ? 0.28 : 0.68;
+      if (s.slopeDeg < 5 && rand() < flatReject) continue;
+      if (s.slopeDeg < 12 && rockMask < 0.15 && s.coastal < 0.3 && rand() < 0.55) continue;
       if (pathWeight(clusterX, clusterZ) > 0.35) continue;
       if (Math.hypot(clusterX, clusterZ) < 14) continue;
       // Don't start an outcrop on the warehouse pad — the per-rock test
       // below still catches a cluster that grew in from outside.
       if (insideWarehouse(clusterX, clusterZ, 12)) continue;
       if (insideBeachHouse(clusterX, clusterZ, 12)) continue;
-      clusterLeft = 3 + ((rand() * 7) | 0);
+      // Larger formations on steep/high ground; small pebble groups elsewhere.
+      const formation = s.slopeDeg > 18 || s.height > 16 || rockMask > 0.55;
+      clusterLeft = formation ? 5 + ((rand() * 9) | 0) : 2 + ((rand() * 5) | 0);
       clusterWet = Math.max(s.nearWater, s.wetness) * (s.slopeDeg < 26 ? 1 : 0.4);
     }
 
@@ -375,8 +382,11 @@ export function createRockField(
     // field on the far flank is what gives the distance its scale
     // (research §7). This is the kit-bash scale rule (principle 8) — the
     // whole reusability cheat in one line.
+    // Size mix inside a cluster: one larger anchor + smaller companion stones.
     const distGain = isNear ? 1 + Math.min(distOrigin / 140, 1.1) : 1 + Math.min(distOrigin / 120, 4.2);
-    const sc = (0.55 + rand() * 1.05) * distGain;
+    const role = rand(); // 0..1 — small stones around larger rocks
+    const sizeMul = role < 0.18 ? 1.55 : role < 0.55 ? 1.0 : 0.48;
+    const sc = (0.55 + rand() * 1.05) * distGain * sizeMul;
     const sx = sc * (0.85 + rand() * 0.35);
     const sy = sc * (0.62 + rand() * 0.42);
     const sz = sc * (0.85 + rand() * 0.35);

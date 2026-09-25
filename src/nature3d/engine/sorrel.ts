@@ -166,8 +166,12 @@ function acceptsPlant(
  * GAPS, not just thinning (the brief asked for visible gaps).
  */
 function patchDensity(x: number, z: number): number {
-  return noise.noise2D(x * 0.042, z * 0.042) * 0.62
-    + noise.noise2D(x * 0.15 + 40.7, z * 0.15 - 17.3) * 0.38;
+  // Ecological shrub layer: dense around rocks/depressions/river edges,
+  // sparse in open clearings — the grass → bush → tree intermediate.
+  const belt = noise.noise2D(x * 0.016 + 2.4, z * 0.016 - 8.1) * 0.5 + 0.5;
+  const clump = noise.noise2D(x * 0.042, z * 0.042) * 0.55
+    + noise.noise2D(x * 0.15 + 40.7, z * 0.15 - 17.3) * 0.45;
+  return clump * 0.7 + (belt - 0.42) * 0.55;
 }
 
 export function createSorrelField(budget: QualityBudget, anisotropy: number): Promise<SorrelField> {

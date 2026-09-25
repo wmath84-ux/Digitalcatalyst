@@ -166,19 +166,21 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  // Lush hollows stay true grass. Dry rises are dusty earth — the same
-  // ochre a fallow field has — so a dry belt reads as desert, not as a
-  // lighter green. The ground grit is neutral; this vertex colour is what
-  // decides which one you see.
-  lush: new THREE.Color(0x3cc428),
-  dry: new THREE.Color(0xc4a06a),
-  mud: new THREE.Color(0x4e6a32),
-  rock: new THREE.Color(0x8d8770),
-  gravel: new THREE.Color(0xd2c5a0),
-  sand: new THREE.Color(0xe8d8ae),
-  sandWet: new THREE.Color(0xbfa274),
+  // NATURAL GROUND KEY — not a neon lawn, not a pale farm tile.
+  // Lush hollows are a real meadow green (olive-cast, not RGB-primary).
+  // Dry rises lean dusty yellow-olive so fallow belts read as earth, not
+  // as a lighter green. Paths are packed dirt, never chalk-white gravel.
+  lush: new THREE.Color(0x3d8f28),
+  dry: new THREE.Color(0xa8944e),
+  mud: new THREE.Color(0x455a2e),
+  rock: new THREE.Color(0x7a7566),
+  // Packed dirt path — light brown / beige earth with a warm undertone.
+  // The old #d2c5a0 read as pure white chalk under midday sun.
+  gravel: new THREE.Color(0x9a7a52),
+  sand: new THREE.Color(0xe0d0a4),
+  sandWet: new THREE.Color(0xb89868),
   sandUnder: new THREE.Color(0x5a9ab0),
-  snow: new THREE.Color(0xf4efe0),
+  snow: new THREE.Color(0xe8e4d0),
   deep: new THREE.Color(0x163a58),
 };
 
@@ -194,14 +196,14 @@ export const FOLIAGE_PALETTE = {
   /** Grass blades, root … tip. The tip is where new growth and sunlight meet.
    *  USER DIRECTIVE (sunny afternoon): true green throughout — the tip is a
    *  sunlit lime, not straw-yellow, so the field stays grass. */
-  bladeRoot: new THREE.Color(0x1e6e12),
-  bladeMid: new THREE.Color(0x32b01c),
-  bladeTip: new THREE.Color(0x6edc32),
+  bladeRoot: new THREE.Color(0x1a5a14),
+  bladeMid: new THREE.Color(0x2e8e1e),
+  bladeTip: new THREE.Color(0x5ab830),
   /** Leaf cards, inner canopy … outer. */
-  leafDeep: new THREE.Color(0x1c6e16),
-  leafLit: new THREE.Color(0x4cc428),
+  leafDeep: new THREE.Color(0x1a5e16),
+  leafLit: new THREE.Color(0x3ea028),
   /** Transmitted light through a leaf (the cheap subsurface term). */
-  transmittance: new THREE.Color(0x8ee048),
+  transmittance: new THREE.Color(0x72c838),
   /** Bark, young … old (older bark is paler, greyer and more fissured). */
   barkYoung: new THREE.Color(0x6d5941),
   barkOld: new THREE.Color(0x9b8a70),

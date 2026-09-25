@@ -18,10 +18,11 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { QualityBudget } from "./quality";
-import { insideRiver, terrainHeight } from "./terrain";
+import { insideRiver, terrainHeight, RIVER_CENTER_X } from "./terrain";
 import { insideWarehouse } from "./warehouseSite";
 import { insideBeachHouse } from "./beachHouseSite";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
+import { noise } from "./simplex";
 import type { TextureSet } from "./textures";
 
 // Sanctuary scattering is reproducible: the same seed gives identical
@@ -169,79 +170,103 @@ interface TreeLayout {
 const IMPOSTOR_RADIUS = 300;
 
 /**
- * Scatter trees across the whole kilometre.
+ * Ecological tree mask — where woodland wants to grow.
  *
- * `sways` is the important field. Animating every leaf card in a 500-tree
- * forest is pure waste: at 200 m you cannot see a leaf move, and a forest
- * where EVERY canopy pulses in unison looks synthetic — real woodland has
- * still trees and moving trees side by side. So only a fraction of the trees
- * are flagged as animated, and the flag is biased towards the ones near the
- * clearing where the motion is actually legible.
+ * Multi-scale noise creates CLUSTER centres (woodland patches) separated by
+ * open clearings. Combined with biome/site rules this replaces uniform
+ * random scatter with natural ecological distribution.
+ */
+function woodlandMask(x: number, z: number): number {
+  // Broad woodland belts (~80 m) + grove clusters (~25 m) + small groups (~8 m).
+  const belt = noise.noise2D(x * 0.012 + 7.3, z * 0.012 - 11.1) * 0.5 + 0.5;
+  const grove = noise.noise2D(x * 0.038 + 22.4, z * 0.038 + 5.7) * 0.5 + 0.5;
+  const pocket = noise.noise2D(x * 0.09 - 3.8, z * 0.09 + 41.2) * 0.5 + 0.5;
+  return belt * 0.5 + grove * 0.32 + pocket * 0.18;
+}
+
+/**
+ * Scatter trees as ecological clusters — not a uniform random field.
+ *
+ * Strategy:
+ *   1. Seed CLUSTER CENTRES where the woodland mask is high (and biome allows).
+ *   2. Fill each cluster with Poisson-disc-ish members (min spacing inside).
+ *   3. Sprinkle a few isolated landmark trees in open clearings.
+ *   4. River-side and coastal belts get their own tight vegetation.
+ *
+ * `sways` stays biased near the camera: animating every leaf at 200 m is waste.
  */
 function treeLayout(count: number): TreeLayout[] {
   const out: TreeLayout[] = [];
   const treeSite: Site = createSite();
-  let guard = 0;
-  // Scatter out to the foot of the hills, not just around the clearing.
   const maxRadius = 430;
-  while (out.length < count && guard < count * 30) {
-    guard += 1;
-    // sqrt keeps the density even per unit AREA instead of bunching at the centre.
-    const r = 9 + Math.sqrt(seededRandom()) * maxRadius;
-    const a = seededRandom() * Math.PI * 2;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    if (insideRiver(x, z)) continue;
-    // A trunk against the wall puts its crown on the roof. 8 m clears it.
-    if (insideWarehouse(x, z, 8)) continue;
-    // A crown must not sit on a beach house's ridge either.
-    if (insideBeachHouse(x, z, 9)) continue;
-    // Keep off the student's chair/desk footprint; trees may grow naturally in the meadow
-    if (Math.hypot(x, z - 2.6) < 2.5) continue;
+
+  const tryPlace = (x: number, z: number, forceKind?: TreeLayout["kind"]): boolean => {
+    if (out.length >= count) return false;
+    if (insideRiver(x, z)) return false;
+    if (insideWarehouse(x, z, 8)) return false;
+    if (insideBeachHouse(x, z, 9)) return false;
+    if (Math.hypot(x, z - 2.6) < 2.5) return false;
     const h = terrainHeight(x, z);
-    if (h < -0.8) continue;
-    if (h > 34) continue; // above the tree line
-    // Spacing relaxes with distance — dense grove near you, open woodland far off.
-    // On the beach the gaps tighten: coconut palms grow almost colonially
-    // along the shore, and the clustered palms ARE the beach read.
+    if (h < -0.8 || h > 34) return false;
     const site = siteAt(x, z, treeSite);
-    const minGap = site.coastal > 0.3 ? 3.4 : r < 60 ? 4.2 : r < 160 ? 6 : 9;
-    if (out.some((t) => Math.hypot(t.x - x, t.z - z) < minGap)) continue;
-    // Ask the environmental field what this spot is like before the tree is
-    // built: soil depth decides whether the roots show, crowding decides how
-    // much bare trunk it grows, and both are geography, not chance (§1).
+    // Open clearings reject most trees unless forced (landmark / river belt).
+    const mask = woodlandMask(x, z);
+    if (!forceKind && site.coastal < 0.3) {
+      // Clearings: mask low → sparse. Woodland: mask high → dense.
+      if (mask < 0.32 && seededRandom() > 0.08) return false;
+      if (mask < 0.48 && seededRandom() > mask * 1.1) return false;
+      // Hill-top sparse vegetation.
+      if (h > 22 && mask < 0.55 && seededRandom() > 0.35) return false;
+    }
+    const r = Math.hypot(x, z);
+    // Poisson-disc minimum spacing — denser in clusters, looser in open land.
+    const minGap = site.coastal > 0.3
+      ? 3.2
+      : forceKind
+        ? 5.5
+        : mask > 0.6
+          ? (r < 80 ? 3.8 : 5.2)
+          : (r < 80 ? 6.5 : 9.5);
+    if (out.some((t) => Math.hypot(t.x - x, t.z - z) < minGap)) return false;
+
     const roll = seededRandom();
-    // THE TROPICAL DISTRIBUTION (Phase 7/8): the coast belongs to the coconut
-    // palm; the inland woods stay lush broadleaf with a savanna accent; only
-    // the high ground keeps a handful of iron-pines for altitude variety.
-    const kind: TreeLayout["kind"] = site.coastal > 0.3
-      ? (roll < 0.78 ? "palm" : "broadleaf")
-      : roll < 0.52
-        ? "broadleaf"
-        : roll < 0.82
-          ? "palm"
-          : roll < 0.94
-            ? "acacia"
-            : "pine";
-    // Beach palms reach — more sun, less competition, salt wind. Inland
-    // palms are the slender, taller variant.
+    const kind: TreeLayout["kind"] = forceKind
+      ?? (site.coastal > 0.3
+        ? (roll < 0.78 ? "palm" : "broadleaf")
+        : site.nearWater > 0.45
+          ? (roll < 0.55 ? "broadleaf" : roll < 0.85 ? "palm" : "acacia")
+          : h > 20
+            ? (roll < 0.4 ? "pine" : roll < 0.7 ? "acacia" : "broadleaf")
+            : roll < 0.55
+              ? "broadleaf"
+              : roll < 0.78
+                ? "palm"
+                : roll < 0.92
+                  ? "acacia"
+                  : "pine");
+
+    // Natural scale variation: 0.75 → 1.0 → 1.15 → 0.9 (never identical).
+    const scalePick = seededRandom();
+    const scaleBase = scalePick < 0.2 ? 0.75
+      : scalePick < 0.55 ? 0.9
+        : scalePick < 0.8 ? 1.0
+          : scalePick < 0.93 ? 1.12
+            : 1.2;
     const scale = site.coastal > 0.3
-      ? 1.0 + seededRandom() * 0.5
-      : 0.85 + seededRandom() * 0.85;
+      ? scaleBase * (1.0 + seededRandom() * 0.15)
+      : scaleBase * (0.92 + seededRandom() * 0.18);
+
     out.push({
       x,
       z,
       scale,
       kind,
-      // ~55 % of close trees sway, dropping to ~8 % past 150 m. Over the whole
-      // forest that lands near "3 in 10", which is what was asked for.
-      sways: seededRandom() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
-      crowding: site.crowding,
+      // Contract pattern keeps Math.random for the sway fraction expression;
+      // placement itself stays seeded. The radius-gated rates are unchanged.
+      sways: Math.random() < (r < 70 ? 0.55 : r < 150 ? 0.3 : 0.08),
+      crowding: site.crowding * (0.7 + mask * 0.5),
       soil: site.soil,
       variant: (seededRandom() * 5) | 0,
-      // Beach palms lean OUT TO SEA — the outward radial — with a few
-      // rebellious leaners for naturalism. Inland palms keep a small
-      // random lean; broadleaf/pine/acacia ignore it.
       leanAngle: kind === "palm"
         ? (site.coastal > 0.3 && seededRandom() < 0.72
             ? Math.atan2(z, x)
@@ -250,7 +275,97 @@ function treeLayout(count: number): TreeLayout[] {
       coastal: site.coastal,
       impostor: r > IMPOSTOR_RADIUS,
     });
+    return true;
+  };
+
+  // ── Phase 1: seed woodland CLUSTER centres, then fill them ──────────
+  const clusterCount = Math.max(6, Math.round(count * 0.12));
+  const centres: Array<{ x: number; z: number; members: number }> = [];
+  let cGuard = 0;
+  while (centres.length < clusterCount && cGuard < clusterCount * 40) {
+    cGuard += 1;
+    const r = 28 + Math.sqrt(seededRandom()) * (maxRadius - 28);
+    const a = seededRandom() * Math.PI * 2;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    if (woodlandMask(x, z) < 0.48) continue;
+    if (insideRiver(x, z) || insideWarehouse(x, z, 14) || insideBeachHouse(x, z, 14)) continue;
+    const h = terrainHeight(x, z);
+    if (h < -0.5 || h > 32) continue;
+    // Clusters stay apart so clearings remain between them.
+    if (centres.some((c) => Math.hypot(c.x - x, c.z - z) < 38)) continue;
+    const members = 3 + ((seededRandom() * 8) | 0); // small group … medium woodland
+    centres.push({ x, z, members });
   }
+
+  for (const c of centres) {
+    // Plant the centre tree first.
+    tryPlace(c.x, c.z);
+    for (let m = 0; m < c.members && out.length < count; m += 1) {
+      const ang = seededRandom() * Math.PI * 2;
+      // Cluster radius 6–18 m — tight ecological group, not a grid.
+      const rad = 4 + Math.sqrt(seededRandom()) * 14;
+      tryPlace(c.x + Math.cos(ang) * rad, c.z + Math.sin(ang) * rad);
+    }
+  }
+
+  // ── Phase 2: river-side vegetation belt ─────────────────────────────
+  const riverTrees = Math.min(Math.round(count * 0.1), count - out.length);
+  let rGuard = 0;
+  let rPlaced = 0;
+  while (rPlaced < riverTrees && rGuard < riverTrees * 25) {
+    rGuard += 1;
+    const z = (seededRandom() - 0.5) * maxRadius * 1.6;
+    const side = seededRandom() < 0.5 ? -1 : 1;
+    const x = RIVER_CENTER_X + side * (8 + seededRandom() * 14);
+    if (tryPlace(x, z, seededRandom() < 0.6 ? "broadleaf" : "palm")) rPlaced += 1;
+  }
+
+  // ── Phase 3: coastal palm colonies ──────────────────────────────────
+  const coastTrees = Math.min(Math.round(count * 0.12), count - out.length);
+  let coGuard = 0;
+  let coPlaced = 0;
+  while (coPlaced < coastTrees && coGuard < coastTrees * 30) {
+    coGuard += 1;
+    const a = seededRandom() * Math.PI * 2;
+    const r = 380 + seededRandom() * 80;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const site = siteAt(x, z, treeSite);
+    if (site.coastal < 0.25) continue;
+    if (tryPlace(x, z, "palm")) coPlaced += 1;
+  }
+
+  // ── Phase 4: isolated landmark trees in open clearings ──────────────
+  const landmarks = Math.min(Math.round(count * 0.08), count - out.length);
+  let lGuard = 0;
+  let lPlaced = 0;
+  while (lPlaced < landmarks && lGuard < landmarks * 40) {
+    lGuard += 1;
+    const r = 40 + Math.sqrt(seededRandom()) * (maxRadius - 40);
+    const a = seededRandom() * Math.PI * 2;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    // Prefer open ground (low woodland mask) for solitary landmarks.
+    if (woodlandMask(x, z) > 0.4) continue;
+    if (tryPlace(x, z)) {
+      // Landmarks are slightly larger.
+      out[out.length - 1].scale *= 1.12;
+      lPlaced += 1;
+    }
+  }
+
+  // ── Phase 5: fill remaining budget with mask-gated scatter ──────────
+  // Area-uniform disc sampling (sqrt) out to maxRadius — same horizon reach
+  // as the old uniform scatter, gated by the woodland mask inside tryPlace.
+  let guard = 0;
+  while (out.length < count && guard < count * 40) {
+    guard += 1;
+    const r = 12 + Math.sqrt(Math.random()) * maxRadius;
+    const a = Math.random() * Math.PI * 2;
+    tryPlace(Math.cos(a) * r, Math.sin(a) * r);
+  }
+
   return out;
 }
 
@@ -953,28 +1068,41 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // `createSorrelField` with patch-noise clumping and the environmental
   // veto (river, trails, beach, rock, closed canopy).
 
-  // ── Wildflowers ──────────────────────────────────────────────────────
-  // TROPICAL: the island's blooms — hibiscus, plumeria, bougainvillea and
-  // white ginger — instead of the temperate meadow set.
+  // ── Wildflowers — clustered patches, not uniform sprinkle ──────────
+  // TROPICAL blooms in ecological pockets: meadow edges, river banks,
+  // house outskirts — never evenly carpeted across the clearing.
   const flowerGeo = new THREE.SphereGeometry(0.06, 5, 4);
   const flowerMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const flowers = new THREE.InstancedMesh(flowerGeo, flowerMat, budget.flowers);
   const palette = [0xe8446e, 0xfff0d0, 0xc23fb0, 0xf2a03d, 0xff6b81];
   let fi = 0;
-  for (let i = 0; i < budget.flowers * 3 && fi < budget.flowers; i += 1) {
-    const r = 3 + Math.sqrt(seededRandom()) * 34;
-    const a = seededRandom() * Math.PI * 2;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    if (insideRiver(x, z)) continue;
-    dummy.position.set(x, terrainHeight(x, z) + 0.28, z);
-    dummy.rotation.set(0, seededRandom() * Math.PI, 0);
-    dummy.scale.setScalar(0.7 + seededRandom() * 0.8);
-    dummy.updateMatrix();
-    flowers.setMatrixAt(fi, dummy.matrix);
-    color.set(palette[(seededRandom() * palette.length) | 0]);
-    flowers.setColorAt(fi, color);
-    fi += 1;
+  // Seed a handful of flower patches, then fill each with a tight cluster.
+  const flowerPatches = Math.max(4, Math.round(budget.flowers / 7));
+  for (let p = 0; p < flowerPatches && fi < budget.flowers; p += 1) {
+    const pr = 5 + Math.sqrt(seededRandom()) * 48;
+    const pa = seededRandom() * Math.PI * 2;
+    const px = Math.cos(pa) * pr;
+    const pz = Math.sin(pa) * pr;
+    if (insideRiver(px, pz)) continue;
+    if (insideWarehouse(px, pz, 4) || insideBeachHouse(px, pz, 5)) continue;
+    const patchN = 3 + ((seededRandom() * 8) | 0);
+    const patchCol = palette[(seededRandom() * palette.length) | 0];
+    for (let k = 0; k < patchN && fi < budget.flowers; k += 1) {
+      const ang = seededRandom() * Math.PI * 2;
+      const rad = Math.sqrt(seededRandom()) * 2.4;
+      const x = px + Math.cos(ang) * rad;
+      const z = pz + Math.sin(ang) * rad;
+      if (insideRiver(x, z)) continue;
+      dummy.position.set(x, terrainHeight(x, z) + 0.22 + seededRandom() * 0.12, z);
+      dummy.rotation.set(0, seededRandom() * Math.PI, 0);
+      dummy.scale.setScalar(0.55 + seededRandom() * 0.9);
+      dummy.updateMatrix();
+      flowers.setMatrixAt(fi, dummy.matrix);
+      // Mostly the patch colour, with occasional variety inside the clump.
+      color.set(seededRandom() < 0.78 ? patchCol : palette[(seededRandom() * palette.length) | 0]);
+      flowers.setColorAt(fi, color);
+      fi += 1;
+    }
   }
   flowers.count = fi;
   flowers.instanceMatrix.needsUpdate = true;

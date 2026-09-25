@@ -225,19 +225,23 @@ const FOG_CHUNK = /* glsl */ `
       float dcFog = 1.0 - exp( - dcHazeDensity * dcHazeDensity * dcDepth * dcDepth );
       dcFog = clamp( dcFog, 0.0, 1.0 );
 
-      // AERIAL PERSPECTIVE. A little sky tint at range, never a replacement.
-      // The old mix used a near-white haze as the destination, so a long
-      // view bleached every surface to white and the colour was gone.
-      // Distance may cool a colour toward the sky. It must not lift it, and
-      // it must leave the surface's own colour the majority at any range.
+      // AERIAL PERSPECTIVE — depth without bleaching.
+      // As distance increases: contrast drops, saturation drops slightly,
+      // atmospheric blue increases subtly. Surfaces keep their identity;
+      // the world simply feels larger.
       vec3 dcEye = normalize( vDcWorldPos - cameraPosition );
       float dcToward = max( dot( dcEye, uDcSunDir ), 0.0 );
-      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.22 );
+      // Cool blue bias in the haze (not grey, not white).
+      vec3 dcHaze = mix( uDcHazeColor, uDcSunColor * uDcHazeColor, dcToward * uDcInScatter * 0.18 );
+      dcHaze = mix( dcHaze, vec3( 0.55, 0.72, 0.92 ), 0.18 );
 
-      float dcWash = min( dcFog * uDcAerial, 0.22 );
+      float dcWash = min( dcFog * uDcAerial, 0.28 );
       float dcLum = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
       float dcHazeLum = max( dot( dcHaze, vec3( 0.2126, 0.7152, 0.0722 ) ), 0.001 );
       dcHaze *= min( 1.0, ( dcLum + 0.02 ) / dcHazeLum );
+      // Desaturate slightly with distance before the haze mix — contrast drop.
+      float dcGrey = dot( gl_FragColor.rgb, vec3( 0.3333 ) );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( dcGrey ), dcWash * 0.22 );
       gl_FragColor.rgb = mix( gl_FragColor.rgb, dcHaze, dcWash );
     #else
       float dcLin = smoothstep( fogNear, fogFar, vFogDepth );

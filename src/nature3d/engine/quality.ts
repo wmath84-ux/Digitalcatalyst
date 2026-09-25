@@ -136,7 +136,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     grassFar: 17500,
     hillGrass: 36000,
     grassNearRadius: 30,
-    grassFarRadius: 155,
+    grassFarRadius: 170,
     treeCount: 112,
     leavesPerTree: 10,
     animalCount: 54,
