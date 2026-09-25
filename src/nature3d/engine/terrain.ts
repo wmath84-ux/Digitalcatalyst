@@ -799,6 +799,25 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     // Sea level, for the per-pixel shoreline treatment below.
     shader.uniforms.uDcOceanLevel = { value: OCEAN_LEVEL };
 
+    // THE TRAIL WEIGHT, published per vertex.
+    //
+    // The path's summer look is baked into the vertex colours, which the
+    // winter layer cannot read as a mask (a colour is not a decision). So the
+    // same `pathWeight` that tints the ground also rides an attribute, and
+    // `winter.ts` uses it to give the trail COMPACTED snow instead of the
+    // drifts either side of it. Without this, winter flattens the paths into
+    // the field and the aerial view loses its roads — the owner's "paths must
+    // remain visible" requirement.
+    //
+    // Declared here, not in winter.ts: the attribute belongs to this geometry,
+    // and the injection in `winter.ts` probes for the varying rather than
+    // assuming it, so the two files stay independent.
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>\nattribute float aWorn;\nvarying float vDcWorn;`)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>\nvDcWorn = aWorn;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nvarying float vDcWorn;`);
+
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
@@ -876,6 +895,10 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
     const geo = buildRadialShell(inner, outer, shell.segs, shell.ringStep, index >= 3 ? 1.12 : 1);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
+    // One float per vertex: how trodden this spot is. Consumed by the winter
+    // layer (see the varying above); unused in summer, and free — it rides the
+    // same buffer update the colour pass already does.
+    const worn = new Float32Array(pos.count);
 
     // ── Heights + texel density in one pass ──────────────────────────
     // The shells already lie in world XZ, so each vertex is lifted by the
@@ -918,10 +941,11 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
 
       // Base: the same rule-based blend the grass clumps sample, so the field
       // and the ground it grows out of are one colour decision. The wear is
-      // measured once here and reused by the gravel tint below.
-      const worn = pathWeight(x, z);
+      // measured once here and reused by the gravel tint and the attribute.
+      const wear = pathWeight(x, z);
+      worn[i] = wear;
       const normalY = n[i * 3 + 1];
-      groundColorAt(x, z, h, tmp, GROUND_PALETTE, normalY, worn);
+      groundColorAt(x, z, h, tmp, GROUND_PALETTE, normalY, wear);
 
       // Altitude banding — GRASS MOUNTAINS (owner directive: "jitne bhi
       // hills aur stones aur pahadiya hai sabhi per ghas"). The two bands
@@ -945,12 +969,12 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       // dirt (warm brown), never chalk-white — the gravel lerp is softer and
       // the centre is slightly darkened so the trail reads foot-worn.
       clampAlbedo(tmp, tmp);
-      if (worn > 0.02) {
-        const pathAmt = Math.min(0.55, worn * 0.62);
+      if (wear > 0.02) {
+        const pathAmt = Math.min(0.55, wear * 0.62);
         tmp.lerp(GROUND_PALETTE.gravel, pathAmt);
         // Darker centre of the path (foot/wheel wear).
-        if (worn > 0.4) {
-          const dark = Math.min(0.14, (worn - 0.4) * 0.28);
+        if (wear > 0.4) {
+          const dark = Math.min(0.14, (wear - 0.4) * 0.28);
           tmp.r *= 1 - dark;
           tmp.g *= 1 - dark * 0.92;
           tmp.b *= 1 - dark * 0.8;
@@ -962,6 +986,7 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       colors[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute("aWorn", new THREE.BufferAttribute(worn, 1));
 
     // ── Tight bounds ────────────────────────────────────────────────────
     // Every vertex is visible ground now (the old square shells punched

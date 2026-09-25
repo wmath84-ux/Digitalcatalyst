@@ -278,6 +278,10 @@ export class Sanctuary {
   private pendingPinAge = 0;
   /** Face-size multiplier vs the pinned 30 m board. 1 / 1.5 / 2 / 3. */
   private boardScale = 1;
+  /** Live season progress, mirrored from the winter system each frame. */
+  private season = 0;
+  /** Throttle for the mid-transition daylight re-grade. */
+  private seasonClock = 0;
   private disposed = false;
 
   // Hoisted scratch — the loop never allocates.
@@ -451,7 +455,8 @@ export class Sanctuary {
     this.rocks = createRockField(this.textures, this.budget, this.weathering);
     this.scene.add(this.rocks.group);
     this.atmosphere.registerTree(this.rocks.group);
-    this.winter.registerTree(this.rocks.group);
+    // Stones take snow CAPS; the up-facing gate is what keeps them readable.
+    this.winter.registerTree(this.rocks.group, "rock");
     if (this.budget.halfPrecision) halfPrecisionTree(this.rocks.group);
 
     this.grass = createGrassField(this.textures.grassBlade, this.budget, this.rocks.skirtPoints);
@@ -491,8 +496,8 @@ export class Sanctuary {
       this.scene.add(forest.group);
       forest.foliageMaterials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
       forest.solidMaterials.forEach((m) => this.atmosphere.register(m));
-      forest.foliageMaterials.forEach((m) => this.winter.register(m, "foliage"));
-      forest.solidMaterials.forEach((m) => this.winter.register(m));
+      forest.foliageMaterials.forEach((m) => this.winter.register(m, "canopy"));
+      forest.solidMaterials.forEach((m) => this.winter.register(m, "trunk"));
       if (this.budget.halfPrecision) {
         forest.foliageMaterials.forEach(halfPrecisionMaterial);
         forest.solidMaterials.forEach(halfPrecisionMaterial);
@@ -506,8 +511,10 @@ export class Sanctuary {
     // guess which material is which.
     this.flora.foliageMaterials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
     this.flora.solidMaterials.forEach((m) => this.atmosphere.register(m));
-    this.flora.foliageMaterials.forEach((m) => this.winter.register(m, "foliage"));
-    this.flora.solidMaterials.forEach((m) => this.winter.register(m));
+    this.flora.foliageMaterials.forEach((m) => this.winter.register(m, "canopy"));
+    // Trunk / pine / flower names decide per material; "trunk" is the
+    // fallback so nothing in this list can ever read as a white silhouette.
+    this.flora.solidMaterials.forEach((m) => this.winter.register(m, "trunk"));
     if (this.budget.halfPrecision) {
       this.flora.foliageMaterials.forEach(halfPrecisionMaterial);
       this.flora.solidMaterials.forEach(halfPrecisionMaterial);
@@ -651,7 +658,9 @@ export class Sanctuary {
     this.structures = createStructures(this.budget);
     this.scene.add(this.structures.group);
     this.atmosphere.registerTree(this.structures.group);
-    this.winter.registerTree(this.structures.group);
+    // Roofs and walls: the same gravity gate separates them, so one class
+    // gives snowy tops and bare walls without splitting the meshes.
+    this.winter.registerTree(this.structures.group, "roof");
     if (this.budget.halfPrecision) halfPrecisionTree(this.structures.group);
 
     // Light the world for the current moment before the first frame, so the
@@ -707,7 +716,8 @@ export class Sanctuary {
         this.scene.add(building.group);
         building.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(building.group);
-        this.winter.registerTree(building.group);
+        // The villa is a building: snowy roof, readable walls.
+        this.winter.registerTree(building.group, "roof");
         if (this.budget.halfPrecision) halfPrecisionTree(building.group);
         building.update(this.camera.position);
       })
@@ -728,7 +738,8 @@ export class Sanctuary {
         this.scene.add(district.group);
         district.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(district.group);
-        this.winter.registerTree(district.group);
+        // Six beach houses: same roof/wall gravity gate.
+        this.winter.registerTree(district.group, "roof");
         if (this.budget.halfPrecision) halfPrecisionTree(district.group);
         console.info(
           `[sanctuary] beach houses placed: ${district.count} sites (` +
@@ -1728,8 +1739,11 @@ export class Sanctuary {
    * writes, so the glint has already moved by the time this returns.
    */
   private applyDaylight() {
-    const state = daylightAt(hourForMode(this.daylightMode));
-    if (this.iceAge) winterDaylight(state);
+    let state = daylightAt(hourForMode(this.daylightMode));
+    // Winter is a BLEND of the season, not a switch: a half-open season is a
+    // real halfway state, which is what makes the transition gradual instead
+    // of a snap from one palette to another.
+    if (this.season > 0) state = winterDaylight(state, this.season);
     this.daylight = state;
     this.sky.applyDaylight(state);
     const fog = this.scene.fog as THREE.Fog;
@@ -1737,8 +1751,13 @@ export class Sanctuary {
     // seams against the sky. Daylight fog colour drives both; the sky dome
     // still paints the upper sky, the fog colour fills the distant air.
     fog.color.copy(state.fog);
-    fog.near = this.budget.fogNear * (this.iceAge ? 0.75 : 1);
-    fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
+    // The old winter fog pulled the ramp in to 0.75/0.72 of its summer reach
+    // AND pushed its colour 80 % towards white, which is why the far hills
+    // vanished into a flat sheet. Winter now keeps almost the full reach: the
+    // distance should read as cooler and lower-contrast, not erased.
+    const fogReach = this.season > 0 ? 1 - 0.08 * this.season : 1;
+    fog.near = this.budget.fogNear * fogReach;
+    fog.far = this.budget.fogFar * fogReach;
     // CSS3D board faces sit above the canvas — push the same smoke ramp so
     // black boards haze into the air just like terrain and trees.
     // Guard: applyDaylight runs once before createBoardScreens during boot.
@@ -1773,15 +1792,28 @@ export class Sanctuary {
     this.renderer.toneMappingExposure = 0.78;
   }
 
-  /** Season and daylight are independent: keep the selected hour when toggling. */
+  /**
+   * Season and daylight are independent: keep the selected hour when toggling.
+   *
+   * The season itself BLENDS over ~1.1 s. Materials, particles, fog, sky and
+   * exposure all read the same progress value, so the world crosses from
+   * summer to winter instead of swapping palettes — and the reverse is just as
+   * gradual. Summer stays byte-identical at progress 0 (requirement 21).
+   */
   setIceAge(enabled: boolean) {
     if (this.iceAge === enabled) return;
     this.iceAge = enabled;
-    this.winter.setEnabled(enabled);
+    this.winter.setEnabled(enabled, true);
+    this.season = this.winter.season;
     this.water.setFrozen(enabled);
     this.sky.setWinter(enabled);
     this.screens.setWinter(enabled);
     this.applyDaylight();
+  }
+
+  /** The season's current position: 0 = summer, 1 = full winter. */
+  getSeason(): number {
+    return this.season;
   }
 
   /** Morning / midday / evening, or "auto" to follow the real clock. */
@@ -2362,7 +2394,27 @@ export class Sanctuary {
     }
 
 
+    // Mirror the season's progress BEFORE the update advances it, then keep
+    // re-applying daylight while the blend is still running — otherwise the
+    // light, fog and sky would snap on the first frame of the transition and
+    // only the materials would animate.
+    const seasonBefore = this.winter.season;
     this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
+    this.season = this.winter.season;
+    if (this.iceAge && Math.abs(this.season - seasonBefore) > 1e-4) {
+      // Mid-blend: re-grade the daylight so light, fog, sky and exposure cross
+      // with the materials. Throttled to ~12 Hz — a colour lerp is invisible at
+      // that rate, and re-applying every frame would re-render the static
+      // shadow map 66 times for nothing.
+      this.seasonClock += dt;
+      if (this.seasonClock >= 0.08) {
+        this.seasonClock = 0;
+        this.daylightClock = 0;
+        this.applyDaylight();
+      }
+    } else {
+      this.seasonClock = 0;
+    }
     this.renderer.render(this.scene, this.camera);
     // The DOM boards share this camera. The call is a no-op unless the camera
     // actually moved or a board crossed a cull boundary, so a still frame

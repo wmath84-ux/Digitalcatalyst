@@ -382,9 +382,16 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // The palm gets its OWN material + merged mesh: its ringed, sun-bleached
   // trunk is one of the strongest tropical reads in the whole scene, and
   // temperate bark would undo it.
+  // The NAMES are load-bearing: `winter.ts` reads them to decide how much snow
+  // a surface takes. Bark is a trunk (a dusting, never a white silhouette) and
+  // pine is a canopy (snow on the up-facing needles, the green stays the
+  // majority). Without them every tree would snow as one flat solid.
   const trunkMat = new THREE.MeshLambertMaterial({ map: tex.bark, vertexColors: true });
+  trunkMat.name = "tree-trunk";
   const palmTrunkMat = new THREE.MeshLambertMaterial({ map: tex.palmBark, vertexColors: true });
+  palmTrunkMat.name = "tree-trunk";
   const pineMat = new THREE.MeshLambertMaterial({ color: 0x2a8a28, vertexColors: true });
+  pineMat.name = "tree-canopy";
 
   // STATIC GEOMETRY IS MERGED, NOT ADDED.
   //
@@ -434,6 +441,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       side: THREE.DoubleSide,
       vertexColors: true,
     });
+    // Named for `winter.ts`: leaf cards are a canopy, so snow flecks the
+    // up-facing side of the cluster and the foliage stays the majority colour.
+    mat.name = animated ? "tree-leaf-sway" : "tree-leaf";
     if (!animated) return mat;
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = { value: 0 };
@@ -1073,6 +1083,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // house outskirts — never evenly carpeted across the clearing.
   const flowerGeo = new THREE.SphereGeometry(0.06, 5, 4);
   const flowerMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // Flowers are low foliage: they take a light flecking and a dormant tint,
+  // they do not vanish (requirement 8 — keep the vegetation).
+  flowerMat.name = "flower";
   const flowers = new THREE.InstancedMesh(flowerGeo, flowerMat, budget.flowers);
   const palette = [0xe8446e, 0xfff0d0, 0xc23fb0, 0xf2a03d, 0xff6b81];
   let fi = 0;

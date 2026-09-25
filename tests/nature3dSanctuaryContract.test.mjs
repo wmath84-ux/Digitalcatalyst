@@ -1816,12 +1816,14 @@ test("the learner can switch lighting from the top tray", () => {
 
 
 test("Ice Age is an accessible reversible top-tray toggle independent of daylight", () => {
-  assert.match(PAGE, /useState\(false\)/);
-  assert.match(PAGE, /aria-pressed=\{iceAge\}/);
-  assert.match(PAGE, /aria-label="Ice Age"/);
-  assert.match(PAGE, /engineRef\.current\?\.setIceAge\(next\)/);
+  assert.match(PAGE, /const \[iceAge, setIceAge\] = useState\(false\)/, "winter starts off");
+  assert.match(PAGE, /engineRef\.current\?\.setIceAge\(on\)/);
+  assert.match(PAGE, /iceAge=\{iceAge\}[\s\S]{0,200}onIceAge=\{\(on\) =>/);
+  // The toggle itself lives in the settings sheet, as an accessible switch.
+  assert.match(SETTINGS, /<Toggle on=\{iceAge\} onChange=\{onIceAge\} label="Ice Age" \/>/);
+  assert.match(SETTINGS, /role="switch"[\s\S]{0,120}aria-checked=\{on\}[\s\S]{0,120}aria-label=\{label\}/);
   const seasonal = SCENE.slice(SCENE.indexOf("setIceAge(enabled"), SCENE.indexOf("setDaylightMode(mode"));
-  assert.match(seasonal, /this\.winter\.setEnabled\(enabled\)/);
+  assert.match(seasonal, /this\.winter\.setEnabled\(enabled, true\)/, "the season eases in");
   assert.match(seasonal, /this\.water\.setFrozen\(enabled\)/);
   assert.match(seasonal, /this\.applyDaylight\(\)/);
   assert.doesNotMatch(seasonal, /this\.daylightMode =/);

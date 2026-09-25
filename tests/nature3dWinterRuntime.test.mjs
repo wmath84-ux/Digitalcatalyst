@@ -118,7 +118,9 @@ test("icy river/ocean/waterfall stop flowing and restore on thaw", () => {
 });
 
 test("snowfall uses tier budgets, follows the viewer, respects reduced motion and disposes", () => {
-  for (const [tier, count] of [["low", 450], ["medium", 900], ["high", 1600], ["ultra", 1600]]) {
+  // The old version ran a full blizzard (450/900/1600/1600). Snow now has to
+  // read as weather, not as a wall of white, and it must fit the budget.
+  for (const [tier, count] of [["low", 260], ["medium", 520], ["high", 900], ["ultra", 900]]) {
     const winter = createWinter(tier);
     const camera = new THREE.PerspectiveCamera();
     const points = winter.group.children[0];
@@ -165,10 +167,14 @@ test("chair and desk freeze independently from the student and restore without m
   for (const root of [student.chair, desk]) root.traverse((mesh) => {
     if (!mesh.isMesh) return;
     const shader = compile(mesh.material);
-    assert.match(shader.fragmentShader, /mix\(0.62, 1.0, snowUp\)/, "vertical furniture is frosted too");
+    // Furniture is gravity-driven with a LOW ceiling: a vertical chair leg takes
+    // almost nothing, which is what stops props reading as white props.
+    assert.match(shader.fragmentShader, /mix\(0\.10, 1\.0, snowUp\)/, "prop surfaces get the low furniture ceiling");
+    assert.doesNotMatch(shader.fragmentShader, /mix\(0\.62, 1\.0, snowUp\)/);
+    assert.doesNotMatch(shader.fragmentShader, /vec2 frostEdge/, "props use gravity, not the board's UV-edge mask");
     shaders.push(shader);
   });
-  assert.ok(shaders.length > 10);
+  assert.ok(shaders.length >= 4, "both the chair and the desk are props");
   student.group.traverse((mesh) => {
     if (!mesh.isMesh || mesh.parent === student.chair) return;
     assert.equal(compile(mesh.material).uniforms.uIceAge, undefined, "the learner is not frozen");
@@ -178,6 +184,11 @@ test("chair and desk freeze independently from the student and restore without m
   winter.setEnabled(false);
   assert.ok(shaders.every((s) => s.uniforms.uIceAge.value === 0));
   student.dispose(); winter.dispose();
+  // Disposal must undo the hook, not leave a dangling uniform behind.
+  desk.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    assert.equal(compile(mesh.material).uniforms.uIceAge, undefined, "dispose removes the winter hook");
+  });
   desk.traverse((mesh) => { mesh.geometry?.dispose(); mesh.material?.dispose(); });
 });
 
@@ -193,7 +204,7 @@ test("lesson frost is UV-edge-only, including physical-material boards", () => {
   assert.match(shader.fragmentShader, /vec2 frostEdge = min\(vMapUv, 1.0 - vMapUv\)/);
   assert.match(shader.fragmentShader, /snowCover \*= 1.0 - smoothstep/);
   assert.doesNotMatch(compile(frame).fragmentShader, /vec2 frostEdge/);
-  assert.match(compile(frame).fragmentShader, /mix\(0.62, 1.0, snowUp\)/);
+  assert.match(compile(frame).fragmentShader, /mix\(0\.10, 1\.0, snowUp\)/);
   winter.dispose(); face.map.dispose(); face.dispose(); frame.dispose();
   group.children[0].geometry.dispose();
 });
@@ -206,7 +217,7 @@ test("blowing snow dust follows hills, responds to wind, pauses and releases res
   winter.setEnabled(true);
   winter.update(0.1, camera, 0.45);
   const attr = dust.geometry.attributes.position;
-  assert.equal(attr.count, 192);
+  assert.equal(attr.count, 128);
   function aboveGround() {
     for (let i = 0; i < attr.count; i++) {
       const gap = attr.getY(i) - terrainHeight(attr.getX(i), attr.getZ(i));
