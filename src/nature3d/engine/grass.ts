@@ -230,7 +230,6 @@ function buildRing(
     // eaves read as planted rather than pasted on a lawn.
     if (insideBeachHouse(x, z, 1.2)) return false;
     if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.72) return false;
-    if (Math.hypot(x, z + 1.35) < 1.9) return false;
     if (y < -1.1) return false;
     // THE BEACH: no grass below the tide line + 1 m; the dry sand above it
     // keeps only ~1 blade in 4, and that inherits the sand colour from the

@@ -66,6 +66,11 @@ export function registerTreeObstacles(trees: readonly TreeObstacle[]): void {
   activeTreeObstacles = [...trees];
 }
 
+/** Append more tree obstacles to the registry (e.g. tropical flora). */
+export function addTreeObstacles(trees: readonly TreeObstacle[]): void {
+  activeTreeObstacles.push(...trees);
+}
+
 /** Check if any placed tree stands directly between the eye and a target. */
 export function treesBlockSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
   if (activeTreeObstacles.length === 0) return false;
@@ -80,14 +85,14 @@ export function treesBlockSight(eye: THREE.Vector3, target: THREE.Vector3): bool
     // Projection of tree center onto 2D segment
     const u = ((t.x - eye.x) * dx + (t.z - eye.z) * dz) / segLen2;
     // We only care about obstacles strictly between eye and target (with margin)
-    if (u <= 0.03 || u >= 0.97) continue;
+    if (u <= 0.01 || u >= 0.99) continue;
     const px = eye.x + u * dx;
     const pz = eye.z + u * dz;
     const d2 = (px - t.x) * (px - t.x) + (pz - t.z) * (pz - t.z);
     if (d2 > t.radius * t.radius) continue;
-    // Check vertical overlap
+    // Check vertical overlap (with crown height allowance)
     const py = eye.y + u * dy;
-    if (py >= t.baseY && py <= t.baseY + t.height) return true;
+    if (py >= t.baseY - 0.5 && py <= t.baseY + t.height + 1.5) return true;
   }
   return false;
 }
@@ -191,7 +196,8 @@ function treeLayout(count: number): TreeLayout[] {
     if (insideWarehouse(x, z, 8)) continue;
     // A crown must not sit on a beach house's ridge either.
     if (insideBeachHouse(x, z, 9)) continue;
-    if (Math.hypot(x, z) < 8) continue;
+    // Keep off the student's chair/desk footprint; trees may grow naturally in the meadow
+    if (Math.hypot(x, z - 2.6) < 2.5) continue;
     const h = terrainHeight(x, z);
     if (h < -0.8) continue;
     if (h > 34) continue; // above the tree line

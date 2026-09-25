@@ -112,6 +112,7 @@ import {
   type Site,
 } from "./environment";
 import { noise } from "./simplex";
+import { addTreeObstacles, type TreeObstacle } from "./flora";
 
 export interface TropicalField {
   group: THREE.Group;
@@ -237,12 +238,6 @@ const RING_CFG: Record<Ring, {
   far: { patchT: -0.05, baseP: 0.68, fall: 0.25, slopeDeg: 52, soil: 0.08, crowd: 0.6, sizeGain: 1.12 },
 };
 
-/** The lesson board's hillside spot (see `board.ts`) — keep it clear. */
-const BOARD_HILL_X = -268.7;
-const BOARD_HILL_Z = -266.1;
-/** Board + posts + the approach, at the board's 8× scale. */
-const BOARD_HILL_CLEAR = 42;
-
 /**
  * Does a jungle plant belong at (x, z, y)?
  *
@@ -259,16 +254,11 @@ function acceptsPlant(
   if (insideWarehouse(x, z, 9)) return false;
   // 7–20 m plants: anything inside the wall box would swallow the roof.
   if (insideBeachHouse(x, z, 9)) return false;
-  // The STUDY ZONE: the three 30 m boards stand on a 26 m arc around the
-  // chair (lectern.ts, LECTERN_RADIUS/PIVOT). This field's plants grow to
-  // 20 m — twice a board's height — so a plant inside the arc would sit
-  // between the seated learner and a board face. 34 m clears the 1× arc,
-  // the board depth and a margin (the other fields keep out only 4.5 m
-  // because their plants are under 8 m).
-  if (Math.hypot(x, z - 2.6) < 34) return false;
-  // The lesson board on the hill: the learner reads it from the chair,
-  // so nothing may stand between the seat and the face.
-  if (Math.hypot(x - BOARD_HILL_X, z - BOARD_HILL_Z) < BOARD_HILL_CLEAR) return false;
+  // USER DIRECTIVE (2026-09-24 / 2026-09-25): Remove the rule that boards
+  // always stay visible and that vegetation is forced away from them.
+  // Plants and trees may grow naturally in the meadow, including in front of
+  // the study boards (only keeping clear of the student's chair/desk footprint).
+  if (Math.hypot(x, z - 2.6) < 2.5) return false;
   // The river scours a shingle band along its edge — thin it out, keep a
   // few stragglers so the bank is ragged, not drawn (mirrors sorrel).
   if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.7) return false;
@@ -515,6 +505,24 @@ export function createTropicalField(budget: QualityBudget, anisotropy: number): 
           tint,
         });
       }
+
+      // Register all placed tropical plants and trees as obstacles for sightline occlusion
+      const tropicalObstacles: TreeObstacle[] = [];
+      for (let vi = 0; vi < VARIANTS.length; vi += 1) {
+        const v = VARIANTS[vi];
+        for (const ringList of [nearBucket[vi], midBucket[vi], farBucket[vi]]) {
+          for (const p of ringList) {
+            tropicalObstacles.push({
+              x: p.x,
+              z: p.z,
+              baseY: p.y,
+              height: v.artH * p.sy,
+              radius: Math.max(2.0, v.artH * p.sx * 0.35),
+            });
+          }
+        }
+      }
+      addTreeObstacles(tropicalObstacles);
 
       // ── One InstancedMesh per (variant, ring) ─────────────────────────
       const meshes: THREE.InstancedMesh[] = [];
