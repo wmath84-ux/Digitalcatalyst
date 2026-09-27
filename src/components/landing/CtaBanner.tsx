@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import ApkDownloadButton from "./ApkDownloadButton";
 
 export default function CtaBanner() {
   return (
@@ -37,6 +38,7 @@ export default function CtaBanner() {
           >
             🚀 Open App
           </motion.button>
+          <ApkDownloadButton large />
           <GlassButton
             variant="capsule"
             type="button"

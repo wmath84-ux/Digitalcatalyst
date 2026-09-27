@@ -7,7 +7,9 @@ android {
         applicationId "app.eduvora.shop"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // CI publishes a new signed APK on every main build. A higher code
+        // lets Android install it as an update over the previous APK.
+        versionCode (System.getenv('ANDROID_VERSION_CODE') ?: '1').toInteger()
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

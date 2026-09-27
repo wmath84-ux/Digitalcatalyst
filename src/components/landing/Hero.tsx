@@ -5,6 +5,7 @@ import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 import { useBranding } from "@/context/BrandingContext";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import ApkDownloadButton from "./ApkDownloadButton";
 
 export default function Hero() {
   const { appName, tagline } = useBranding();
@@ -46,6 +47,8 @@ export default function Hero() {
               🚀 Open App
             </motion.button>
 
+            <ApkDownloadButton />
+
             <GlassButton
               variant="capsule"
               type="button"
@@ -55,6 +58,9 @@ export default function Hero() {
               ⬇️ Install the PWA
             </GlassButton>
           </div>
+          <p className="mt-3 text-xs text-white/55">
+            APK for Android only. Your browser may ask you to allow installs from this source.
+          </p>
 
           <div className="mt-10 flex flex-wrap gap-6 text-sm text-white/55">
             <div className="flex items-center gap-2">
