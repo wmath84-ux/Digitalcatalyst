@@ -184,8 +184,14 @@ jobs:
             -PEDUVORA_KEYSTORE_ALIAS=${{ secrets.KEY_ALIAS }} \
             -PEDUVORA_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
 
+      # Block scalar, NOT a double-quoted scalar. A single `run: "..."` line
+      # ends at its second quote, so any trailing words turn this whole file
+      # into invalid YAML: GitHub then refuses to parse the workflow, the run
+      # fails with 0 jobs created, and no APK is ever built or published.
       - name: Verify APK is signed
-        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload Release AAB
         uses: actions/upload-artifact@v4
