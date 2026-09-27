@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 import { useBranding } from "@/context/BrandingContext";
+import LandingGlassCard from "./LandingGlassCard";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
 import ApkDownloadButton from "./ApkDownloadButton";
@@ -81,7 +82,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.3 }}
           className="hidden w-full min-w-0 lg:block"
         >
-          <GlassSurface radius={32} className="w-full text-white" contentClassName="p-8 xl:p-10">
+          <LandingGlassCard radius={32} className="w-full text-white" contentClassName="p-8 xl:p-10">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">
               All your learning, in one place
             </span>
@@ -94,7 +95,7 @@ export default function Hero() {
                 { icon: "🎬", title: "Watch", text: "Expert-led video lectures" },
                 { icon: "🗓️", title: "Plan", text: "Keep your day on track" },
               ].map((item) => (
-                <div key={item.title} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div key={item.title} className="flex items-center gap-4 border-b border-white/15 px-1 py-4 last:border-b-0">
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-400/15 text-xl" aria-hidden="true">{item.icon}</span>
                   <div>
                     <p className="font-bold text-white">{item.title}</p>
@@ -103,7 +104,7 @@ export default function Hero() {
                 </div>
               ))}
             </div>
-          </GlassSurface>
+          </LandingGlassCard>
         </motion.div>
       </div>
 

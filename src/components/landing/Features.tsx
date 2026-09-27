@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useBranding } from "@/context/BrandingContext";
-import { GlassSurface } from "@/components/ui/glass";
+import LandingGlassCard from "./LandingGlassCard";
 
 const buildFeatures = (appName: string) => [
   {
@@ -74,7 +74,7 @@ export default function Features() {
               style={{ transformStyle: "preserve-3d", perspective: 900 }}
               className={`group h-full ${i < 3 ? "lg:col-span-2" : "lg:col-span-3"} ${i === features.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}
             >
-              <GlassSurface radius={24} className="h-full text-white" contentClassName="p-7">
+              <LandingGlassCard radius={24} className="h-full text-white" contentClassName="p-7">
               <div
                 className={`float-anim grid h-14 w-14 place-items-center rounded-2xl text-2xl ${f.tint}`}
               >
@@ -82,7 +82,7 @@ export default function Features() {
               </div>
               <h3 className="mt-5 text-xl font-bold text-white">{f.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-white/55">{f.desc}</p>
-              </GlassSurface>
+              </LandingGlassCard>
             </motion.div>
           ))}
         </div>

@@ -9,7 +9,7 @@ import {
   promptInstall,
 } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
-import { GlassSurface } from "@/components/ui/glass";
+import LandingGlassCard from "./LandingGlassCard";
 import { GlassButton } from "@/components/ui/glass-button";
 import { useBranding } from "@/context/BrandingContext";
 
@@ -69,7 +69,7 @@ export default function LandingOverlays() {
           transition={{ type: "spring", stiffness: 320, damping: 30 }}
           className="fixed inset-x-3 top-3 z-[100] mx-auto max-w-md"
         >
-          <GlassSurface radius={24} className="text-white ring-1 ring-emerald-300/20" contentClassName="p-5">
+          <LandingGlassCard radius={24} className="text-white ring-1 ring-emerald-300/20" contentClassName="p-5">
             <div>
               <div className="flex items-start gap-3">
                 <BrandMark className="h-12 w-12 shrink-0 rounded-2xl" fallbackLetter />
@@ -107,7 +107,7 @@ export default function LandingOverlays() {
                 </button>
               </div>
             </div>
-          </GlassSurface>
+          </LandingGlassCard>
         </motion.div>
       )}
     </AnimatePresence>
