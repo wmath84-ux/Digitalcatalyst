@@ -82,6 +82,8 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build Debug APK
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: cd android && ./gradlew assembleDebug --no-daemon
 
       - name: Upload Debug APK
