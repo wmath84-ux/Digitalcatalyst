@@ -64,14 +64,29 @@ export default function Features() {
 
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
           {features.map((f, i) => (
+            /* NO 3D TRANSFORM ON THIS WRAPPER. These five cards are the only
+               landing cards that were wrapped in `transform-style:
+               preserve-3d`, and that silently destroys the glass: an ancestor
+               in a 3D rendering context breaks `backdrop-filter`, so the
+               18.4px frost never lands and the page behind shows through
+               unblurred — Firefox renders no filter at all, Chrome/Edge apply
+               the filter but let the raw background through on top
+               (Firefox #1952612, Chromium #323735424). The Hero and CTA cards
+               have no 3D context, which is why THEY looked right and these
+               five did not.
+
+               So: no preserve-3d, no perspective, no rotateX/rotateY anywhere
+               on this element — the tilt was the only thing forcing a 3D
+               context. The lift is now a plain 2D translate + scale, which
+               still reads as a lift but keeps every card on exactly the same
+               material as the first one. */
             <motion.div
               key={f.title}
-              initial={{ opacity: 0, y: 40, rotateX: -10 }}
-              whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.55, delay: (i % 3) * 0.12 }}
-              whileHover={{ y: -8, rotateX: 4, rotateY: -4 }}
-              style={{ transformStyle: "preserve-3d", perspective: 900 }}
+              whileHover={{ y: -8, scale: 1.015 }}
               className={`group h-full ${i < 3 ? "lg:col-span-2" : "lg:col-span-3"} ${i === features.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}
             >
               <LandingGlassCard radius={24} className="h-full text-white" contentClassName="p-7">

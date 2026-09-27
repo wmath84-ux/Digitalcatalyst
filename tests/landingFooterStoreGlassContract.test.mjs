@@ -26,6 +26,33 @@ test("landing feature, hero, CTA and install cards reuse the Store product mater
   assert.match(glassCss, /--dc-store-glass-tint: rgba\(173, 216, 255, 0\.26\)/);
 });
 
+test("no landing card is wrapped in a 3D context, which would kill the glass", () => {
+  // An ancestor in a 3D rendering context breaks `backdrop-filter`, so the
+  // 18.4px frost silently stops rendering and the page behind shows through
+  // unblurred — Firefox drops the filter entirely, Chrome/Edge apply it but
+  // let the raw background show on top (Firefox #1952612, Chromium #323735424).
+  // Features.tsx used to carry `transform-style: preserve-3d` + `perspective` +
+  // rotateX/rotateY purely for its hover tilt, which made those five cards the
+  // only ones on the landing page that did NOT look like the first card.
+  for (const name of ["Hero", "Features", "CtaBanner", "LandingOverlays", "Footer", "Header"]) {
+    const source = read(`src/components/landing/${name}.tsx`);
+    const offenders = source
+      .split("\n")
+      .map((line, i) => [i + 1, line])
+      .filter(([, line]) => /preserve-3d|perspective\s*:|rotateX|rotateY|rotateZ/.test(line))
+      // Comments explaining the ban are fine; live 3D declarations are not.
+      .filter(([, line]) => !/^\s*(\*|\/\*|\/\/)/.test(line) && !/preserve-3d`,|no preserve-3d/.test(line));
+    assert.deepEqual(
+      offenders.map(([n, l]) => `${name}.tsx:${n} ${l.trim()}`),
+      [],
+      `${name}.tsx puts a glass card in a 3D context`,
+    );
+  }
+
+  // The lift that replaced the tilt must stay 2D.
+  assert.match(read("src/components/landing/Features.tsx"), /whileHover=\{\{ y: -8, scale: [\d.]+ \}\}/);
+});
+
 test("footer has readable text and links to the website's real legal pages and security section", () => {
   assert.doesNotMatch(footer, /text-white\/(?:40|45)/);
   assert.match(footer, /text-lg font-extrabold/);
