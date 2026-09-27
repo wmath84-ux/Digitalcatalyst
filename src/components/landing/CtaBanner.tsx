@@ -2,20 +2,21 @@
 
 import { motion } from "framer-motion";
 import { openApp, openInstallPanel } from "@/utils/pwaInstall";
-import { GlassSurface } from "@/components/ui/glass";
+import LandingGlassCard from "./LandingGlassCard";
 import { GlassButton } from "@/components/ui/glass-button";
+import ApkDownloadButton from "./ApkDownloadButton";
 
 export default function CtaBanner() {
   return (
-    <section className="relative px-6 pb-28 sm:px-8">
+    <section className="landing-container relative pb-24">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, amount: 0.4 }}
         transition={{ duration: 0.6 }}
-        className="mx-auto max-w-6xl"
+        className="w-full"
       >
-        <GlassSurface radius={40} className="text-white" contentClassName="px-8 py-16 text-center sm:px-16">
+        <LandingGlassCard radius={40} className="text-white" contentClassName="px-8 py-16 text-center sm:px-16">
 
         <span className="text-xs font-bold uppercase tracking-[0.3em] text-cyan-300">
           Ready when you are
@@ -37,6 +38,7 @@ export default function CtaBanner() {
           >
             🚀 Open App
           </motion.button>
+          <ApkDownloadButton large />
           <GlassButton
             variant="capsule"
             type="button"
@@ -46,7 +48,7 @@ export default function CtaBanner() {
             ⬇️ Install the PWA
           </GlassButton>
         </div>
-        </GlassSurface>
+        </LandingGlassCard>
       </motion.div>
     </section>
   );

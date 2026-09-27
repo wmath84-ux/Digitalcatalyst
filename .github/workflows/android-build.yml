@@ -7,6 +7,12 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# Only the newest main build should publish the public APK. PR builds keep
+# their own concurrency groups and never get permission to publish a release.
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
 jobs:
   build-apk:
     name: Build Debug APK
@@ -86,10 +92,15 @@ jobs:
           retention-days: 7
 
   build-release:
-    name: Build Release AAB
+    name: Build signed Release APK and AAB
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: build-apk
+    permissions:
+      contents: write # gh release create/upload; PR jobs never run this job
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -164,13 +175,17 @@ jobs:
             echo "Warning: KEYSTORE_BASE64 secret nahi mila!"
           fi
 
-      - name: Build Release AAB
+      - name: Build signed Release APK and AAB
         run: |
-          cd android && ./gradlew bundleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+          test -s android/app/release.jks || { echo 'Release keystore missing'; exit 1; }
+          cd android && ./gradlew bundleRelease assembleRelease --no-daemon \
+            -PEDUVORA_KEYSTORE_FILE=${{ github.workspace }}/android/app/release.jks \
+            -PEDUVORA_KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
+            -PEDUVORA_KEYSTORE_ALIAS=${{ secrets.KEY_ALIAS }} \
+            -PEDUVORA_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
+
+      - name: Verify APK is signed
+        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload Release AAB
         uses: actions/upload-artifact@v4
@@ -178,4 +193,19 @@ jobs:
           name: app-release-aab-${{ github.run_number }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
-        
+
+      # Actions artifacts are ZIPs behind a GitHub login and expire. A public
+      # Release asset is a real APK with a stable, unauthenticated download URL.
+      # Never publish from PRs; only successful signed main builds reach here.
+      - name: Publish latest APK for the landing page
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          title="Android APK (build #${GITHUB_RUN_NUMBER})"
+          notes="Signed Android APK from main, build #${GITHUB_RUN_NUMBER} (${GITHUB_SHA})."
+          if gh release view android-apk >/dev/null 2>&1; then
+            gh release upload android-apk "$apk" --clobber
+            gh release edit android-apk --title "$title" --notes "$notes"
+          else
+            gh release create android-apk "$apk" --target "$GITHUB_SHA" \
+              --title "$title" --notes "$notes" --latest=false
+          fi
