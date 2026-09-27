@@ -7,9 +7,9 @@
 // the fixed header stretched edge-to-edge and the footer vanished — the whole
 // page looked "faila hua / stretched" on every size except the smallest.
 //
-// Contract: the landing renders full-bleed at every shell-eligible size, its
-// header content rides the shared content column, and the footer shows on
-// desktop again.
+// Contract: the landing renders full-bleed at every shell-eligible size. The
+// header and sections use fluid gutters, the hero fills both columns, and
+// the footer shows on desktop again.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -21,6 +21,7 @@ const footer = fs.readFileSync("src/components/landing/Footer.tsx", "utf8");
 const hero = fs.readFileSync("src/components/landing/Hero.tsx", "utf8");
 const features = fs.readFileSync("src/components/landing/Features.tsx", "utf8");
 const cta = fs.readFileSync("src/components/landing/CtaBanner.tsx", "utf8");
+const landingCss = fs.readFileSync("src/landing.css", "utf8");
 
 test("DesktopAppHost passes the landing routes through without the app shell", () => {
   const host = main.slice(main.indexOf("function DesktopAppHost"), main.indexOf("function RootPage"));
@@ -33,21 +34,27 @@ test("non-landing desktop routes still get the AppShell", () => {
   assert.match(host, /<AppShell[\s\S]*active=\{resolveActiveFromHash\(hash\)\}/);
 });
 
-test("landing header content is centred on the shared content column, not stretched edge-to-edge", () => {
-  // Wave 12: the strip is the pack GlassSurface inside a full-width clip.
-  assert.match(header, /<div className="w-full overflow-hidden rounded-b-2xl">\s*<GlassSurface radius=\{0\} className="w-full text-white"/, "glass strip keeps its full-bleed background");
-  assert.match(header, /mx-auto flex w-full max-w-7xl items-center justify-between/, "inner content capped at the content width");
+test("landing header paint and content connect across the full viewport", () => {
+  assert.match(header, /className="fixed inset-x-0 top-0 z-50 w-full"/);
+  assert.match(header, /<GlassSurface\s+radius=\{0\}\s+className="w-full border-b/);
+  assert.match(header, /contentClassName="landing-container flex items-center justify-between/);
+  assert.doesNotMatch(header, /rounded-b-2xl|max-w-7xl/);
 });
 
 test("landing footer renders on desktop too (privacy / terms links)", () => {
   assert.doesNotMatch(footer, /lg:hidden/);
 });
 
-test("landing sections keep their content-width containers (no wide-screen stretch)", () => {
-  assert.match(hero, /max-w-7xl/);
-  assert.match(features, /max-w-7xl/);
-  assert.match(cta, /max-w-6xl/);
-  assert.match(footer, /max-w-7xl/);
+test("landing uses fluid gutters and fills unused desktop space", () => {
+  assert.match(landingCss, /\.landing-container\s*\{[\s\S]*padding-inline: clamp\(1rem, 3vw, 3\.5rem\)/);
+  for (const section of [header, hero, features, cta, footer]) {
+    assert.match(section, /landing-container/);
+    assert.doesNotMatch(section, /max-w-(?:6xl|7xl)/);
+  }
+  assert.match(hero, /lg:grid-cols-2/);
+  assert.match(hero, /All your learning, in one place/);
+  assert.match(features, /lg:grid-cols-6/);
+  assert.match(features, /lg:col-span-3/);
 });
 
 test("smallest viewport design stays untouched (hero fills the screen, same tokens)", () => {

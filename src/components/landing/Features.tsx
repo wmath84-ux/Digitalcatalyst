@@ -41,8 +41,8 @@ export default function Features() {
   const { appName } = useBranding();
   const features = buildFeatures(appName);
   return (
-    <section id="features" className="relative px-6 py-28 sm:px-8">
-      <div className="relative mx-auto max-w-7xl">
+    <section id="features" className="relative py-24">
+      <div className="landing-container relative">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -62,7 +62,7 @@ export default function Features() {
           </p>
         </motion.div>
 
-        <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
           {features.map((f, i) => (
             <motion.div
               key={f.title}
@@ -72,7 +72,7 @@ export default function Features() {
               transition={{ duration: 0.55, delay: (i % 3) * 0.12 }}
               whileHover={{ y: -8, rotateX: 4, rotateY: -4 }}
               style={{ transformStyle: "preserve-3d", perspective: 900 }}
-              className="group h-full"
+              className={`group h-full ${i < 3 ? "lg:col-span-2" : "lg:col-span-3"} ${i === features.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}
             >
               <GlassSurface radius={24} className="h-full text-white" contentClassName="p-7">
               <div

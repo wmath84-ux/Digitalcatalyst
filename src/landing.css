@@ -1,6 +1,12 @@
-/* Wave 14: `.glass-panel` / `.pulse-glow` / `.bg-grid` removed — every landing
-   surface is a pack component now. Only the Hero word-mark gradient text and
-   the float keyframe remain. */
+/* Fluid gutters make the landing use the whole viewport without pinning
+   content directly against the edges on phones or ultra-wide screens. */
+.landing-container {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3vw, 3.5rem);
+}
+
+/* The landing surfaces use the shared glass components. */
 .gradient-text {
   background: linear-gradient(90deg, #a78bfa, #22d3ee, #f472b6);
   background-size: 200% auto;

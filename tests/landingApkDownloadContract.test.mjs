@@ -16,6 +16,9 @@ test("both landing CTAs link directly to the stable public APK asset, not a logi
   assert.match(hero, /<ApkDownloadButton\s*\/>/);
   assert.match(cta, /<ApkDownloadButton large\s*\/>/);
   assert.doesNotMatch(button, /\/actions\/runs\//);
+  assert.match(button, /fetch\(RELEASE_API_URL, \{ cache: "no-store" \}\)/);
+  assert.match(button, /response\.status === 404/);
+  assert.match(button, /APK is not published yet/);
 });
 
 test("main builds verify and publish a signed APK to that exact release asset", () => {

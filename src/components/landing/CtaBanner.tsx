@@ -8,13 +8,13 @@ import ApkDownloadButton from "./ApkDownloadButton";
 
 export default function CtaBanner() {
   return (
-    <section className="relative px-6 pb-28 sm:px-8">
+    <section className="landing-container relative pb-24">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, amount: 0.4 }}
         transition={{ duration: 0.6 }}
-        className="mx-auto max-w-6xl"
+        className="w-full"
       >
         <GlassSurface radius={40} className="text-white" contentClassName="px-8 py-16 text-center sm:px-16">
 
