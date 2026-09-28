@@ -371,7 +371,7 @@ export default function NatureStudioPage() {
       >
         {/* ── WebGL host. `touch-action:none` so a drag never scrolls the page ── */}
         <div ref={hostRef} className="absolute inset-0" style={{ touchAction: "none", cursor: "grab" }}>
-          <canvas ref={canvasRef} className="block h-full w-full outline-none" />
+          <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-[1] block h-full w-full outline-none" />
         </div>
 
         {/* ── Boot veil ── */}

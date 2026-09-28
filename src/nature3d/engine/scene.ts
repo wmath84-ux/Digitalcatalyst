@@ -350,7 +350,7 @@ export class Sanctuary {
     this.renderer = new THREE.WebGLRenderer({
       canvas: opts.canvas,
       antialias: this.budget.antialias,
-      alpha: false,
+      alpha: true,
       powerPreference: "high-performance",
       stencil: false,
       depth: true,
@@ -2306,11 +2306,10 @@ export class Sanctuary {
 
 
     this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
-    this.renderer.render(this.scene, this.camera);
-    // The DOM boards share this camera. The call is a no-op unless the camera
-    // actually moved or a board crossed a cull boundary, so a still frame
-    // costs nothing here.
+    // Update DOM projection + aperture visibility before WebGL to avoid a
+    // one-frame black flash. Idle camera/projection updates are cached.
     this.screens.render(this.camera);
+    this.renderer.render(this.scene, this.camera);
 
     // ── Adaptive resolution + thermal fail-safe + stats ───────────────
     const frameMs = performance.now() - frameStart;
