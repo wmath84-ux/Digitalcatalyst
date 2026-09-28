@@ -159,12 +159,12 @@ export default function QuickNotes({
 
     return (
       <GlassCard
-        className="overflow-hidden"
-        contentClassName="flex flex-col p-0"
+        className="flex max-h-[min(72dvh,680px)] flex-col overflow-hidden sm:max-h-[min(75dvh,720px)]"
+        contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
         data-myday-notes-editor
         data-myday-notes-mode={editing ? "edit" : "compose"}
       >
-        <div className="flex min-h-[340px] flex-col p-3" data-myday-notes-composer>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3" data-myday-notes-composer>
           <RichTextEditor
             value={value}
             onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
@@ -172,7 +172,7 @@ export default function QuickNotes({
             onHeadingChange={editing ? (html) => setEditTitle(html) : (html) => setDraftTitle(html)}
             headingAutoFocus={!editing}
             autoFocus={editing}
-            surfaceClassName="min-h-0"
+            surfaceClassName="min-h-0 flex-1"
             ariaLabel={editing ? "Edit note" : "New note"}
             dataAttribute={editing ? "data-myday-note-edit-input" : "data-myday-notes-input"}
           />
@@ -257,18 +257,19 @@ export default function QuickNotes({
         )}
       </div>
 
-      {/* The single "+" — a small circular button floating at the grid's
-          bottom-right.  Opens the same rich-text composer the course player
-          uses. */}
+      {/* The single "+" — bottom-right FAB, always visible above the
+          bottom nav (same placement as Study Library's FAB). Previously it
+          was absolute inside the grid and appeared centered when the grid
+          was short. */}
       <button
         type="button"
         onClick={openComposer}
-        className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95"
+        className="fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_12px_30px_-10px_rgba(124,92,255,0.9)] transition hover:brightness-110 active:scale-95 sm:bottom-28 sm:right-6 lg:bottom-8"
         aria-label="Add note"
         title="Add note"
         data-myday-notes-add
       >
-        <Plus size={18} strokeWidth={2.8} />
+        <Plus size={26} strokeWidth={2.8} />
       </button>
 
       {/* Two-step delete confirmation (same as course player). */}

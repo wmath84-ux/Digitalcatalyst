@@ -118,11 +118,19 @@ import { Ribbon } from "./Ribbon";
 import { ActivityNode } from "./ActivityNode";
 import { ActivityCard } from "./ActivityCard";
 import { PlusNode } from "./PlusNode";
-import { RadialMenu, type RadialItem } from "./RadialMenu";
 import { CreateModal } from "./CreateModal";
+import { CreateMenuPanel, type CreateMenuSection } from "./CreateMenuPanel";
+import FlowPathImportModal from "./FlowPathImportModal";
 import { EmptyState } from "./EmptyState";
 import { BottomDock } from "./BottomDock";
-import { ACTIVITY_ICONS } from "./icons";
+import {
+  BellRing,
+  CalendarClock,
+  CalendarPlus,
+  CheckSquare,
+  FileUp,
+  StickyNote,
+} from "lucide-react";
 
 const SCROLL_BUFFER = 2000;
 const CHUNK_SIZE = 8;
@@ -159,27 +167,28 @@ function saveCurveOverride(value: CurveOverride) {
   }
 }
 
-const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (() => {
-  const items: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map((t) => ({
-    id: t,
-    label: ACTIVITY_TYPE_META[t].label,
-    icon: ACTIVITY_ICONS[t],
-    color: ACTIVITY_TYPE_META[t].color,
-  }));
-  // Append the "Lecture" entry that drives the 3-step picker
-  // (course + module + schedule). Same radial menu surface so
-  // the user can reach it from the same + button they use for
-  // every other kind.
-  items.push({
-    id: "lecture",
-    label: "Lecture",
-    icon: BookOpen,
-    color: "#22d3ee",
-  });
-  return items;
-})();
+// Upgraded per user request: My Day 4 options (Today Task, Daily Reminder, Schedule, Quick Notes)
+// Revision only 2 options (Schedule Test, Import Test) — Create Test removed, direct creation on flow
+const FLOW_CREATE_SECTIONS: CreateMenuSection[] = [
+  {
+    title: "My Day",
+    items: [
+      { id: "today-task", label: "Today Task", icon: CheckSquare, color: "#8b7bff" },
+      { id: "daily-reminder", label: "Daily Reminder", icon: BellRing, color: "#f5b969" },
+      { id: "schedule", label: "Schedule", icon: CalendarClock, color: "#5eead4" },
+      { id: "quick-notes", label: "Quick Notes", icon: StickyNote, color: "#c084fc" },
+    ],
+  },
+  {
+    title: "Revision",
+    items: [
+      { id: "schedule-test", label: "Schedule Test", icon: CalendarPlus, color: "#34d399" },
+      { id: "import-test", label: "Import Test", icon: FileUp, color: "#f5b969" },
+    ],
+  },
+];
 
-interface PendingMenu {
+interface CreatePanelMenu {
   afterId: string | null;
   rect: DOMRect;
 }
@@ -269,10 +278,13 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [visible, setVisible] = useState({ top: -10000, bottom: 10000 });
-  const [menu, setMenu] = useState<PendingMenu | null>(null);
+  // Radial menu removed per user request — only CreateMenuPanel on plus icons
+  const [createPanelMenu, setCreatePanelMenu] = useState<CreatePanelMenu | null>(null);
   const [createType, setCreateType] = useState<{ type: ActivityType; afterId: string | null } | null>(
     null
   );
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importAfterId, setImportAfterId] = useState<string | null>(null);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [pulseSegment, setPulseSegment] = useState<{ key: number; d: string } | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -464,24 +476,42 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pulseToken]);
 
+  // Plus icon on stairs opens upgraded CreateMenuPanel — radial menu removed per user request
   const handleOpenMenu = useCallback((afterId: string | null, rect: DOMRect) => {
-    setMenu({ afterId, rect });
+    setCreatePanelMenu({ afterId, rect });
   }, []);
 
-  const handleSelectType = useCallback(
+  const handleCreatePanelSelect = useCallback(
     (id: string) => {
-      const afterId = menu?.afterId ?? null;
-      setMenu(null);
-      // Lecture: open the 3-step picker instead of the regular
-      // CreateModal. The picker drives a separate flow that picks
-      // the course + module + schedule, then submits a bulk create.
-      if (id === "lecture") {
-        setLecturePickerOpen(true);
+      const afterId = createPanelMenu?.afterId ?? null;
+      setCreatePanelMenu(null);
+      if (id === "today-task") {
+        setCreateType({ type: "task", afterId });
         return;
       }
-      setCreateType({ type: id as ActivityType, afterId });
+      if (id === "daily-reminder") {
+        setCreateType({ type: "reminder", afterId });
+        return;
+      }
+      if (id === "schedule") {
+        setCreateType({ type: "schedule", afterId });
+        return;
+      }
+      if (id === "quick-notes") {
+        setCreateType({ type: "note", afterId });
+        return;
+      }
+      if (id === "schedule-test") {
+        setCreateType({ type: "mcq", afterId });
+        return;
+      }
+      if (id === "import-test") {
+        setImportAfterId(afterId);
+        setImportModalOpen(true);
+        return;
+      }
     },
-    [menu]
+    [createPanelMenu]
   );
 
   const handleCreate = useCallback(
@@ -589,7 +619,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
             <PlusRowItem
               key={row.id}
               row={row}
-              active={menu?.afterId === row.afterId}
+              active={createPanelMenu?.afterId === row.afterId}
               onOpen={(rect) => handleOpenMenu(row.afterId, rect)}
             />
           ) : (
@@ -620,18 +650,44 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
         />
       )}
 
-      <RadialMenu
-        anchor={menu?.rect ?? null}
-        items={ACTIVITY_RADIAL_ITEMS}
-        onClose={() => setMenu(null)}
-        onSelect={handleSelectType}
-      />
+      {/* CreateMenuPanel on stair plus icons — radial menu removed per user request */}
+      {createPanelMenu && (
+        <CreateMenuPanel
+          anchor={createPanelMenu.rect}
+          sections={FLOW_CREATE_SECTIONS}
+          onClose={() => setCreatePanelMenu(null)}
+          onSelect={handleCreatePanelSelect}
+        />
+      )}
 
       <CreateModal
         type={createType?.type ?? null}
         onClose={closeCreateModal}
         onCreate={handleCreate}
         editing={editingActivity}
+      />
+
+      <FlowPathImportModal
+        open={importModalOpen}
+        uid={lecturePickerUid()}
+        onClose={() => {
+          setImportModalOpen(false);
+          setImportAfterId(null);
+        }}
+        onCreated={(testId, title, count) => {
+          // After import, also create a flow activity on the stair
+          const afterId = importAfterId;
+          createActivity({
+            type: "mcq",
+            title: title || `Imported Test (${count} Qs)`,
+            description: `Test ID ${testId} with ${count} questions imported directly from FlowPath`,
+            datetime: new Date().toISOString(),
+            extra: { totalQuestions: count, completedQuestions: 0, testId },
+            afterId,
+          });
+          setImportModalOpen(false);
+          setImportAfterId(null);
+        }}
       />
 
       <LecturePicker

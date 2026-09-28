@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import Hero from "./Hero";
@@ -8,8 +8,6 @@ import ProductCard from "./ProductCard";
 import TiltedCoverflow from "./TiltedCoverflow";
 import { EmptyState } from "./ui/EmptyState";
 import { GlassCard } from "./ui/GlassCard";
-import { GlassSurface } from "./ui/glass";
-import { GlassButton } from "./ui/glass-button";
 import Skeleton from "./ui/Skeleton";
 import { BookOpenIcon } from "./icons";
 import { useStoreFilters } from "../hooks/useStoreFilters";
@@ -31,54 +29,7 @@ type StorePageProps = {
   onView: (product: Product) => void;
 };
 
-/* ── View-mode icons (inline SVGs for the dropdown) ──────────────────── */
 
-function GridIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={2} stroke="currentColor">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
-
-function ListIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={2} stroke="currentColor">
-      <rect x="3" y="3" width="18" height="6" rx="1.5" />
-      <rect x="3" y="15" width="18" height="6" rx="1.5" />
-    </svg>
-  );
-}
-
-function MixedIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={2} stroke="currentColor">
-      <rect x="3" y="3" width="7" height="10" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="5" rx="1.5" />
-      <rect x="3" y="17" width="7" height="4" rx="1.5" />
-    </svg>
-  );
-}
-
-function LayoutIcon({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={1.8} stroke="currentColor">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="18" height="7" rx="1.5" />
-    </svg>
-  );
-}
-
-const VIEW_OPTIONS: { mode: ViewMode; label: string; Icon: typeof GridIcon }[] = [
-  { mode: "grid", label: "Grid", Icon: GridIcon },
-  { mode: "list", label: "Cards", Icon: ListIcon },
-  { mode: "mixed", label: "Mixed", Icon: MixedIcon },
-];
 
 /* ── ProductCard variant for list / rectangular view ──────────────────── */
 
@@ -196,24 +147,14 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
-  /* Default = the Home-ratio glass GRID (4:3 art + copy, auto-fill tracks).
-     "Cards" (rectangular rows) and "Mixed" stay one tap away in the layout
-     dropdown. */
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!viewDropdownOpen) return;
-    const close = (e: Event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setViewDropdownOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [viewDropdownOpen]);
+  // Advanced filters — new per user request, moved to top row left of Recommended
+  const [advancedFilters, setAdvancedFilters] = useState<import("./StoreAdvancedFilters").AdvancedFilters>({
+    priceRange: "all",
+    rating: "all",
+    category: "all",
+    availability: "all",
+  });
 
   /**
    * The chip row. Filters created in the admin panel (Products → Store
@@ -231,7 +172,6 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     [chips, activeFilterId],
   );
 
-  // A chip the admin deleted or hid must not keep filtering the store.
   useEffect(() => {
     if (activeFilterId !== ALL_STORE_FILTER.id && !chips.some((filter) => filter.id === activeFilterId)) {
       setActiveFilterId(ALL_STORE_FILTER.id);
@@ -250,7 +190,34 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       const matchesChip = productMatchesStoreFilter(p, activeFilter);
 
-      return matchesSearch && matchesChip;
+      // Advanced filters
+      let matchesAdvanced = true;
+      // Price range
+      if (advancedFilters.priceRange !== "all") {
+        if (advancedFilters.priceRange === "free") matchesAdvanced = matchesAdvanced && (p.isFree || p.price === 0);
+        else if (advancedFilters.priceRange === "under500") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 500;
+        else if (advancedFilters.priceRange === "under1000") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 1000;
+        else if (advancedFilters.priceRange === "under2000") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 2000;
+        else if (advancedFilters.priceRange === "premium") matchesAdvanced = matchesAdvanced && p.price >= 2000;
+      }
+      // Rating
+      if (advancedFilters.rating !== "all") {
+        const minRating = parseFloat(advancedFilters.rating);
+        if (!isNaN(minRating)) matchesAdvanced = matchesAdvanced && p.rating >= minRating;
+      }
+      // Category
+      if (advancedFilters.category !== "all") {
+        matchesAdvanced = matchesAdvanced && p.category === advancedFilters.category;
+      }
+      // Availability
+      if (advancedFilters.availability !== "all") {
+        if (advancedFilters.availability === "free") matchesAdvanced = matchesAdvanced && (p.isFree || p.price === 0);
+        else if (advancedFilters.availability === "paid") matchesAdvanced = matchesAdvanced && !p.isFree && p.price > 0;
+        else if (advancedFilters.availability === "purchased") matchesAdvanced = matchesAdvanced && purchased.has(p.id);
+        else if (advancedFilters.availability === "not-purchased") matchesAdvanced = matchesAdvanced && !purchased.has(p.id);
+      }
+
+      return matchesSearch && matchesChip && matchesAdvanced;
     });
 
     list = [...list];
@@ -260,7 +227,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     if (sort === "Newest") list.reverse();
 
     return list;
-  }, [products, search, activeFilter, sort]);
+  }, [products, search, activeFilter, sort, advancedFilters, purchased]);
 
   return (
     /* No `overflow-hidden` here on purpose: an `overflow` ancestor other
@@ -292,7 +259,17 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       </section>
 
       <div className="space-y-4">
-        <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          sort={sort}
+          onSortChange={setSort}
+          advancedFilters={advancedFilters}
+          onAdvancedFiltersChange={setAdvancedFilters}
+          resultCount={filtered.length}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
       </div>
 
       {/* The bar is a SIBLING of the search wrapper, not a child: a sticky
@@ -312,57 +289,11 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           by a shell-scoped rule in index.css — the class list stays `top-0`
           for the mobile scroller.) */}
       {/* P2-8: HOLD — store blur/color only to revision+PDP. Store filter bar stays flat chrome (no glass blur), cards keep blur={0}. Revision/PDP retain chrome blur. */}
+      {/* Filter chips bar — now only sliding toggle, Filters button moved to top row left of Recommended per user request, layout toggle moved to top row right of Recommended */}
       <div data-store-filter-bar className="sticky top-0 z-20 mt-4 border-b border-slate-200/60 bg-white/85 py-2.5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
-          {/* Mobile overlap fix: the view-mode toggle is a normal flex
-              sibling (shrink-0) instead of an absolutely-positioned overlay,
-              so the scrolling chip row and the button can never paint on top
-              of each other at any viewport width. */}
           <div className="flex items-center gap-1 pr-3">
             <div className="min-w-0 flex-1 overflow-hidden">
-              <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />
-            </div>
-
-            {/* View mode toggle — anchored at the right edge of the bar */}
-            <div ref={dropdownRef} className="relative z-10 shrink-0">
-              <GlassButton
-                type="button"
-                aria-label="Change view layout"
-                aria-expanded={viewDropdownOpen}
-                onClick={() => setViewDropdownOpen((o) => !o)}
-                className={`[&_.size-12]:size-9 ${viewDropdownOpen ? "text-indigo-200" : ""}`}
-              >
-                <LayoutIcon className="h-[18px] w-[18px]" />
-              </GlassButton>
-
-              {/* Same plate as everything else that floats over the scene —
-                  and being a pack surface it also loses its live blur, which
-                  matters here because the popover hangs over scrolling cards.
-                  The anchor geometry below is the shape
-                  storeViewDropdownResponsiveContract pins, untouched. */}
-              {viewDropdownOpen && (
-                <GlassSurface
-                  data-store-view-options
-                  className="dc-scene-plate absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
-                  radius={16}
-                  contentClassName="flex w-max gap-1 p-1.5"
-                >
-                  {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
-                    <GlassButton
-                      key={mode}
-                      type="button"
-                      onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
-                      title={label}
-                      aria-label={`${label} view`}
-                      aria-pressed={viewMode === mode}
-                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition [&_.size-12]:size-9 ${
-                        viewMode === mode ? "[&_svg]:text-violet-300" : "[&_svg]:text-white/70"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </GlassButton>
-                  ))}
-                </GlassSurface>
-              )}
+              <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} hideFilterButton />
             </div>
           </div>
       </div>

@@ -16,6 +16,9 @@ import {
   sanctuaryModuleType,
   type SanctuaryModuleType,
 } from "./sanctuaryModules";
+import MyCourseBrainEditor from "../../personal-library/MyCourseBrainEditor";
+import { createMyQuestion } from "../../lib/myCourseClient";
+import type { MyCourseQuestion } from "../../types/myCourse";
 
 interface SanctuaryModuleMenuProps {
   uid: string | null;
@@ -29,10 +32,12 @@ interface SanctuaryModuleMenuProps {
   /** Open the dedicated Course Player for this module. */
   onPlay: (course: MyCourse) => void;
   onCreated: (course: MyCourse) => void;
+  /** When true, hide the trigger button — used when the trigger lives inside GlassDock */
+  hideTrigger?: boolean;
 }
 
 export default function SanctuaryModuleMenu({
-  uid, courses, loading, open, onToggle, onClose, onOpenOnBoard, onPlay, onCreated,
+  uid, courses, loading, open, onToggle, onClose, onOpenOnBoard, onPlay, onCreated, hideTrigger = false,
 }: SanctuaryModuleMenuProps) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<SanctuaryModuleType>("youtube");
@@ -42,6 +47,19 @@ export default function SanctuaryModuleMenu({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const option = sanctuaryModuleType(type);
+
+  const MAX_BYTES = 80 * 1024 * 1024;
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  // Brain — full editor parity with My Study Library (MyCourseBrainEditor)
+  const [brainTitle, setBrainTitle] = useState("");
+  const [brainQuestions, setBrainQuestions] = useState<MyCourseQuestion[]>(() => [
+    { ...createMyQuestion(), prompt: "Question 1", options: ["Option A", "Option B", "Option C", "Option D"], correctIndex: 0 },
+  ]);
 
   const sorted = useMemo(
     () => [...courses].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -54,6 +72,10 @@ export default function SanctuaryModuleMenu({
     setFile(null);
     setError(null);
     if (fileRef.current) fileRef.current.value = "";
+    setBrainTitle("");
+    setBrainQuestions([
+      { ...createMyQuestion(), prompt: "Question 1", options: ["Option A", "Option B", "Option C", "Option D"], correctIndex: 0 },
+    ]);
   };
 
   const submit = async () => {
@@ -66,10 +88,13 @@ export default function SanctuaryModuleMenu({
     try {
       const course = await createSanctuaryModule({
         uid,
-        title: title.trim() || file?.name?.replace(/\.[^.]+$/, "") || "Untitled module",
+        title: title.trim() || file?.name?.replace(/\.[^.]+$/, "") || brainTitle.trim() || "Untitled module",
         type,
         url,
         file,
+        ...(type === "brain"
+          ? { practiceTitle: brainTitle.trim() || title.trim() || "Practice set", practiceQuestions: brainQuestions }
+          : {}),
       });
       resetForm();
       onCreated(course);
@@ -82,6 +107,7 @@ export default function SanctuaryModuleMenu({
 
   return (
     <div className="relative" data-sanctuary-module-menu>
+      {!hideTrigger ? (
       <button
         type="button"
         aria-expanded={open}
@@ -97,13 +123,16 @@ export default function SanctuaryModuleMenu({
         <Layers3 className="h-4 w-4" />
         <span className="text-[8px] font-bold leading-none tracking-wide">Module</span>
       </button>
+      ) : null}
 
       {open ? (
         <>
           <div className="fixed inset-0 z-40 cursor-default" onClick={onClose} />
           <div
             data-sanctuary-module-panel
-            className="absolute bottom-full right-0 z-50 mb-2 w-[min(22.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/20 bg-slate-950/90 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+            className={`absolute bottom-full right-0 z-50 mb-2 overflow-hidden rounded-2xl border border-white/20 bg-slate-950/90 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl ${
+              type === "brain" ? "w-[min(36rem,calc(100vw-1rem))]" : "w-[min(22.5rem,calc(100vw-1.5rem))]"
+            }`}
           >
             <header className="flex items-center gap-3 border-b border-white/10 px-3.5 py-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-tr from-violet-500 via-indigo-500 to-emerald-400 text-white shadow-lg shadow-violet-500/30">
@@ -112,7 +141,7 @@ export default function SanctuaryModuleMenu({
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-black tracking-tight text-white">My modules</p>
                 <p className="truncate text-[11px] text-white/55">
-                  URL or any file type · opens in its own Course Player
+                  URL, file or Brain MCQ · plays on the board (3D)
                 </p>
               </div>
               <button
@@ -210,7 +239,7 @@ export default function SanctuaryModuleMenu({
                         />
                       </div>
                       {option.upload ? (
-                        <div className="flex items-center gap-2">
+                        <div className="space-y-2">
                           <input
                             ref={fileRef}
                             type="file"
@@ -218,43 +247,63 @@ export default function SanctuaryModuleMenu({
                             className="hidden"
                             onChange={(event) => {
                               const next = event.target.files?.[0] || null;
+                              event.currentTarget.value = "";
+                              if (!next) return;
+                              if (next.size > MAX_BYTES) {
+                                setError(`File too large — ${formatSize(next.size)}. Max ${formatSize(MAX_BYTES)}.`);
+                                return;
+                              }
+                              setError(null);
                               setFile(next);
-                              if (next) {
-                                setType(inferSanctuaryModuleType(url, next));
-                                if (!title.trim()) {
-                                  setTitle(next.name.replace(/\.[^.]+$/, "").slice(0, 120));
-                                }
+                              setType(inferSanctuaryModuleType(url, next));
+                              if (!title.trim()) {
+                                setTitle(next.name.replace(/\.[^.]+$/, "").slice(0, 120));
                               }
                             }}
                           />
                           <button
                             type="button"
                             onClick={() => fileRef.current?.click()}
-                            className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-3 text-[11px] font-bold text-white/75 hover:border-violet-400/50 hover:bg-violet-500/10"
+                            className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-3 text-[11px] font-bold text-white/75 hover:border-violet-400/50 hover:bg-violet-500/10"
                           >
                             <Upload className="h-3.5 w-3.5" />
-                            {file ? file.name : "Upload a file"}
+                            {file ? `Change file — ${file.name}` : `Upload a file${option.accept?.includes("pdf") ? " (PDF, up to 80MB)" : ""}`}
                           </button>
                           {file ? (
-                            <button
-                              type="button"
-                              aria-label="Clear file"
-                              onClick={() => {
-                                setFile(null);
-                                if (fileRef.current) fileRef.current.value = "";
-                              }}
-                              className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-white/70 hover:bg-white/15"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-500/10 px-3 py-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[11px] font-black text-white">{file.name}</p>
+                                <p className="text-[10px] font-medium text-white/50">{formatSize(file.size)} · {file.type || "file"} · will be saved with name & size like My Study Library</p>
+                              </div>
+                              <button
+                                type="button"
+                                aria-label="Clear file"
+                                onClick={() => {
+                                  setFile(null);
+                                  if (fileRef.current) fileRef.current.value = "";
+                                }}
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-white/70 hover:bg-white/15"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                       ) : null}
                     </div>
                   ) : (
-                    <p className="rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] font-medium leading-5 text-violet-100/80">
-                      A Brain practice set is created with a starter question. Open it in the Course Player to add more MCQs.
-                    </p>
+                    <div className="space-y-2 rounded-xl border border-violet-400/20 bg-violet-500/[0.06] p-2">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-violet-200">Brain · practice set — same as My Study Library</p>
+                      <MyCourseBrainEditor
+                        questions={brainQuestions}
+                        title={brainTitle}
+                        onChange={({ questions, title: nextTitle }) => {
+                          setBrainQuestions(questions);
+                          setBrainTitle(nextTitle);
+                          if (!title.trim() && nextTitle.trim()) setTitle(nextTitle.trim());
+                        }}
+                      />
+                    </div>
                   )}
 
                   {error ? (
@@ -308,8 +357,8 @@ export default function SanctuaryModuleMenu({
                           </button>
                           <button
                             type="button"
-                            aria-label={`Play ${course.title || "module"}`}
-                            title="Open in Course Player"
+                            aria-label={`Play ${course.title || "module"} on board`}
+                            title="Play on Board (3D)"
                             onClick={() => onPlay(course)}
                             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-violet-500/25 text-violet-100 ring-1 ring-violet-300/40 hover:bg-violet-500/40"
                           >

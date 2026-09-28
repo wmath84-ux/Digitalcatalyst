@@ -524,14 +524,18 @@ export class Sanctuary {
         return;
       }
       this.sorrel = field;
+      // FIX: prevent initial overload pop-in near board — start hidden, apply final shed, then show only final state
+      field.group.visible = false;
       this.scene.add(field.group);
       // Thin leaves glow when the sun is behind them, like the grass —
       // except on the plant-diet tier (see foliageOpts).
       field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
       if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
-      // A shed that fired while the asset was still loading lands now.
+      // A shed that fired while the asset was still loading lands now — apply final state before showing
       field.setShed(this.shedLevel);
+      // Show only after final count is applied, no overload flash
+      requestAnimationFrame(() => { field.group.visible = true; });
     }).catch((err) => {
       // createSorrelField already warns on a load failure; this catches
       // anything later in the wiring so a broken field is never silent.
@@ -546,11 +550,13 @@ export class Sanctuary {
         return;
       }
       this.grassTufts = field;
+      field.group.visible = false;
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
       if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
       field.setShed(this.shedLevel);
+      requestAnimationFrame(() => { field.group.visible = true; });
     }).catch((err) => {
       // createGrassTuftField already warns per failed variant; this catches
       // anything later in the wiring so a broken field is never silent.
@@ -565,11 +571,13 @@ export class Sanctuary {
         return;
       }
       this.mossBank = field;
+      field.group.visible = false;
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
       if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
       field.setShed(this.shedLevel);
+      requestAnimationFrame(() => { field.group.visible = true; });
     }).catch((err) => {
       // createMossBank already warns on a load failure; this catches
       // anything later in the wiring so a broken field is never silent.
@@ -590,12 +598,14 @@ export class Sanctuary {
         return;
       }
       this.tropical = field;
+      field.group.visible = false;
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
       field.materials.forEach((m) => this.winter.register(m, "foliage"));
       if (this.budget.halfPrecision) field.materials.forEach(halfPrecisionMaterial);
-      // A shed that fired while the asset was still loading lands now.
+      // A shed that fired while the asset was still loading lands now — apply final state before showing
       field.setShed(this.shedLevel);
+      requestAnimationFrame(() => { field.group.visible = true; });
       console.info(`[sanctuary] tropical jungle planted: ${field.count} plants (7–20 m)`);
     }).catch((err) => {
       console.warn("[sanctuary] tropical jungle failed", err);

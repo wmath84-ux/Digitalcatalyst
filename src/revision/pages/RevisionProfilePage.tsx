@@ -1,9 +1,16 @@
 // Revision profile — optimized for desktop/tablet, compact, no empty space
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
-import { PrimaryButton, SecondaryButton } from "../components/ui";
+import { PrimaryButton } from "../components/ui";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { GlassButton } from "../../components/ui/glass-button";
+import {
+  GlassDropdownMenu,
+  GlassDropdownTrigger,
+  GlassDropdownContent,
+  GlassDropdownItem,
+} from "../../components/ui/glass-dropdown-menu";
 import {
   BookOpenIcon,
   ChevronRightIcon,
@@ -13,6 +20,7 @@ import {
   SparklesIcon,
   TrophyIcon,
 } from "../components/icons";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getRevisionOverview } from "../engine/statsService";
 import AiQuotaCard from "../../components/AiQuotaCard";
@@ -20,6 +28,7 @@ import AiQuotaCard from "../../components/AiQuotaCard";
 export default function RevisionProfilePage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
   const { navigate } = useExitGuard();
   const dashboard = useMemo(() => getRevisionOverview(uid), [uid]);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <PageShell route={route} title="Profile" mergeIntoMainHeader>
@@ -36,9 +45,23 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
                 Build focused revision plans, connect AI and track how you are improving.
               </p>
             </div>
-            <SecondaryButton onClick={() => navigate("#/revision/ai-generate")} className="mt-4 lg:mt-0 lg:w-auto">
-              <SparklesIcon className="h-5 w-5 lg:h-4 lg:w-4" /> Generate Questions with AI
-            </SecondaryButton>
+            <GlassDropdownMenu open={addOpen} onOpenChange={setAddOpen}>
+              <GlassDropdownTrigger className="mt-4 lg:mt-0 lg:w-auto w-full">
+                <GlassButton variant="capsule" className="w-full lg:w-auto [&>span>div]:gap-2">
+                  <span className="inline-flex items-center gap-2 font-bold">
+                    <Sparkles className="h-4 w-4" /> Add Questions <ChevronDown className={`h-4 w-4 transition-transform ${addOpen ? "rotate-180" : ""}`} />
+                  </span>
+                </GlassButton>
+              </GlassDropdownTrigger>
+              <GlassDropdownContent align="end" sideOffset={10} className="min-w-[220px]">
+                <GlassDropdownItem onClick={() => navigate("#/revision/ai-generate")}>
+                  <SparklesIcon className="h-4 w-4 text-violet-300" /> Generate with AI
+                </GlassDropdownItem>
+                <GlassDropdownItem onClick={() => navigate("#/revision/bulk-import")}>
+                  <BookOpenIcon className="h-4 w-4 text-indigo-300" /> Import directly
+                </GlassDropdownItem>
+              </GlassDropdownContent>
+            </GlassDropdownMenu>
           </div>
         </GlassSurface>
 

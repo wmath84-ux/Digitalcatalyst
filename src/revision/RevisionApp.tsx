@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { GlassSurface } from "../components/ui/glass";
-import PageSkeleton from "../components/PageSkeleton";
+import Skeleton from "../components/ui/Skeleton";
 import StoreHeader from "../components/Header";
 import PageTabs, { type PageTabItem } from "../components/ui/PageTabs";
 import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
@@ -186,6 +186,90 @@ export function RevisionPageTabs({ path }: { path: string }) {
   );
 }
 
+
+function RevisionLoadingSkeleton({ label }: { label?: string }) {
+  return (
+    <div
+      data-revision-loading-skeleton
+      aria-busy="true"
+      aria-label={label || "Loading revision"}
+      className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto"
+    >
+      {/* Primary: hero + stats */}
+      <div data-rev-panel="primary" className="flex flex-col gap-4 lg:col-span-7 lg:gap-3">
+        {/* Hero card skeleton - mirrors FirstRevisionCard / RevisionPlanCard */}
+        <GlassSurface tint={0.62} tintColor="173,216,255" className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-rev-glass dc-scene-plate text-white lg:min-h-[220px]" contentClassName="flex min-h-0 flex-1 flex-col p-5 lg:p-4">
+          <div className="relative flex min-h-0 flex-1 flex-col gap-4">
+            <Skeleton width={48} height={48} radius={16} />
+            <div className="space-y-2">
+              <Skeleton width="42%" height={12} radius={6} />
+              <Skeleton width="78%" height={24} radius={8} />
+              <Skeleton width="100%" height={14} radius={6} />
+              <Skeleton width="92%" height={14} radius={6} />
+            </div>
+            <div className="mt-auto">
+              <Skeleton width="100%" height={50} radius={999} />
+            </div>
+          </div>
+        </GlassSurface>
+
+        {/* Stat grid skeleton */}
+        <div data-rev-stat-grid className="grid shrink-0 grid-cols-3 gap-3 lg:gap-2">
+          {[0,1,2].map((i) => (
+            <GlassSurface key={i} tint={0.62} tintColor="173,216,255" radius={20} className="dc-rev-glass dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-2 py-3 lg:py-2">
+              <Skeleton width={20} height={20} radius={6} />
+              <Skeleton width="54%" height={16} radius={6} />
+              <Skeleton width="42%" height={10} radius={4} />
+            </GlassSurface>
+          ))}
+        </div>
+      </div>
+
+      {/* Secondary: weak topics + revision bank */}
+      <div data-rev-panel="secondary" className="space-y-4 lg:col-span-5 lg:space-y-3">
+        <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className="rev-card dc-rev-glass p-4 text-white dc-scene-plate">
+          <div className="mb-3 flex items-center justify-between">
+            <Skeleton width="32%" height={14} radius={6} />
+            <Skeleton width="18%" height={12} radius={999} />
+          </div>
+          <div className="space-y-3">
+            {[0,1,2].map((j) => (
+              <div key={j} className="flex items-center gap-3">
+                <Skeleton width={36} height={36} radius={12} />
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Skeleton width="62%" height={12} radius={6} />
+                    <Skeleton width="18%" height={10} radius={4} />
+                  </div>
+                  <Skeleton width="100%" height={8} radius={999} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassSurface>
+
+        <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className="rev-card dc-rev-glass p-4 text-white dc-scene-plate">
+          <div className="mb-3 flex items-center justify-between">
+            <Skeleton width="36%" height={14} radius={6} />
+            <Skeleton width="16%" height={12} radius={999} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[0,1,2].map((k) => (
+              <div key={k} className="rounded-2xl border border-white/10 py-2.5">
+                <Skeleton width="40%" height={18} radius={6} className="mx-auto" />
+                <Skeleton width="56%" height={10} radius={4} className="mx-auto mt-1.5" />
+              </div>
+            ))}
+          </div>
+          <Skeleton width="100%" height={44} radius={999} className="mt-3" />
+        </GlassSurface>
+      </div>
+
+      <p className="sr-only" role="status">{label}</p>
+    </div>
+  );
+}
+
 export default function RevisionApp() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
@@ -342,27 +426,8 @@ export default function RevisionApp() {
             <RevisionPageTabs path={path} />
 
             {revisionAccessLoading || revisionDataLoading ? (
-              <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
-                <GlassSurface radius={24} className="dc-scene-plate text-white/55" contentClassName="flex w-full max-w-sm flex-col gap-3 px-8 py-7">
-                  {/* The page's own dummy layout while membership / test-bank
-                      data streams in — a page swap shows the structure, never
-                      a bare spinner. The real panels replace it when the data
-                      lands. */}
-                  <PageSkeleton
-                    label="Loading revision"
-                    header={false}
-                    footer={false}
-                    blocks={[
-                      { width: "72%", height: 18 },
-                      { width: "100%", height: 64 },
-                      { width: "100%", height: 64 },
-                      { width: "88%", height: 64 },
-                    ]}
-                  />
-                  <p className="sr-only" role="status">
-                    {revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}
-                  </p>
-                </GlassSurface>
+              <div data-revision-access-loading data-revision-content className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <RevisionLoadingSkeleton label={revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"} />
               </div>
             ) : (
               <div data-revision-content className="flex min-h-0 flex-1 flex-col overflow-hidden">

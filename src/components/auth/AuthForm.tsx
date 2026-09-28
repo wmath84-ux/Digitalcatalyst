@@ -193,9 +193,22 @@ export default function AuthForm() {
       transition={{ duration: 0.5 }}
       className="mx-auto w-full max-w-md"
     >
-      {/* Wave 12: the auth card is the pack GlassSurface (no landing.css
-          `.glass-panel` paint, no drop shadow). */}
-      <GlassSurface radius={24} className="text-white" contentClassName="p-6 sm:p-8">
+      {/* Auth card wears the HOME social card's exact material:
+          store lens (src/store-glass.css) — blur 46% → 18.4px,
+          light-blue rgb(173,216,255) @ 26%, quiet sheen + white rim.
+          Same invocation as SocialProfileCard (src/home/components/
+          SocialProfileCard.tsx): tint 0.62 over the light blue, blur 0
+          because store-glass.css owns the 46% frost via
+          --dc-store-glass-blur. Radius stays 24 (layout/shape untouched,
+          only the look is synced). */}
+      <GlassSurface
+        radius={24}
+        tint={0.62}
+        tintColor="173,216,255"
+        blur={0}
+        className="dc-store-glass dc-scene-ink text-white"
+        contentClassName="p-6 sm:p-8"
+      >
       <div className="mb-6 flex items-center gap-3">
         <BrandMark className="h-10 w-10 rounded-xl" fallbackLetter />
         <div>

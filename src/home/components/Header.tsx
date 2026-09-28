@@ -29,6 +29,11 @@ interface HeaderProps {
    * gear opens; no duplicate settings page is created here.
    */
   onOpenSettings?: () => void;
+  /**
+   * Header variant — when 'flow', only profile, notifications and gear icons
+   * are rendered to prevent greeting shrinkage from too many icons. Default 'default' shows all actions.
+   */
+  headerVariant?: 'default' | 'flow';
 }
 
 const typeLabel: Record<string, string> = {
@@ -60,7 +65,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings, headerVariant = 'default' },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -189,10 +194,10 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
-              Good to see you 👋
+              {headerVariant === 'flow' ? 'Organize your day' : 'Good to see you 👋'}
             </p>
             <h1 data-home-greeting className="mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight">
-              Hello, {userName}
+              {headerVariant === 'flow' ? 'Plan Today' : `Hello, ${userName}`}
             </h1>
           </div>
         </div>
@@ -216,33 +221,40 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               else if (id === "notifications") onOpenNotifications?.();
               else if (id === "favorites") onOpenFavorites?.();
             }}
-            items={[
-              { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
-              { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
-              {
-                id: "notifications",
-                label: "Alerts",
-                ariaLabel: "Notifications",
-                icon: <Bell size={17} strokeWidth={2.4} />,
-                badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
-                badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
-                badgeTone: "rose",
-              },
-              {
-                id: "favorites",
-                label: "Favorites",
-                ariaLabel: "Favorites",
-                icon: <Heart size={17} strokeWidth={2.4} fill="currentColor" />,
-                badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
-                badgeTone: "rose",
-              },
-              // Flow-page-only gear (same icon system / size as the other
-              // header actions): rendered just when the page passes the
-              // callback, so no other header ever shows it.
-              ...(onOpenSettings
-                ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={17} strokeWidth={2.4} /> }]
-                : []),
-            ]}
+            items={(() => {
+              const all = [
+                { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
+                { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
+                {
+                  id: "notifications",
+                  label: "Alerts",
+                  ariaLabel: "Notifications",
+                  icon: <Bell size={17} strokeWidth={2.4} />,
+                  badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
+                  badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
+                  badgeTone: "rose" as const,
+                },
+                {
+                  id: "favorites",
+                  label: "Favorites",
+                  ariaLabel: "Favorites",
+                  icon: <Heart size={17} strokeWidth={2.4} fill="currentColor" />,
+                  badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
+                  badgeTone: "rose" as const,
+                },
+                // Flow-page-only gear (same icon system / size as the other
+                // header actions): rendered just when the page passes the
+                // callback, so no other header ever shows it.
+                ...(onOpenSettings
+                  ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={17} strokeWidth={2.4} /> }]
+                  : []),
+              ];
+              // Flow variant: only profile, notifications, gear to prevent greeting shrink
+              if (headerVariant === 'flow') {
+                return all.filter((it) => it.id === 'profile' || it.id === 'notifications' || it.id === 'settings');
+              }
+              return all;
+            })()}
           />
           {/* The "Dark mode" GlassSwitch moved off the header — appearance now
               lives with the rest of the account preferences (Profile →

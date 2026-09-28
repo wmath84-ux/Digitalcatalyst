@@ -48,7 +48,54 @@ export type FcmPayload = {
   url?: string;
   icon?: string;
   badge?: string;
+  category?: string;
+  section?: string;
+  targetType?: string;
 };
+
+const NOTIF_ICON_BASE = (() => {
+  const envUrl = (process.env.SITE_URL || process.env.VERCEL_URL || "").trim();
+  if (envUrl) {
+    const withProto = envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+    try { return new URL(withProto).origin; } catch {}
+  }
+  return "https://digitalcatalyst-five.vercel.app";
+})();
+
+function absIcon(path: string): string {
+  try { return new URL(path, NOTIF_ICON_BASE).toString(); } catch { return `${NOTIF_ICON_BASE}${path}`; }
+}
+
+function getContextualLargeIcon(tag: string, category?: string, section?: string, targetType?: string): string {
+  const t = (tag || "").toLowerCase();
+  const c = (category || "").toLowerCase();
+  const s = (section || "").toLowerCase();
+  const tt = (targetType || "").toLowerCase();
+  let p = "/notif-icons/default.png";
+  if (s.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (s.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (s.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("reminder") || c.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (t.includes("task") || c.includes("task") || tt.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("schedule") || c.includes("schedule") || tt.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (t.includes("course") || c === "course" || tt === "course" || t.includes("lecture") || t.includes("revision") || t.includes("exam")) p = "/notif-icons/course.png";
+  else if (t.includes("store") || c === "store" || tt === "product") p = "/notif-icons/store.png";
+  else if (t.includes("unlock") || c === "unlock") p = "/notif-icons/unlock.png";
+  else if (t.includes("community") || c === "community") p = "/notif-icons/community.png";
+  else if (t.includes("announcement") || c === "announcement" || c === "reading") p = "/notif-icons/announcement.png";
+  else if (t.includes("subscription") || c === "subscription") p = "/notif-icons/subscription.png";
+  else if (t.includes("mayday") || c === "mayday") {
+    if (t.includes("schedule") || s === "schedule") p = "/notif-icons/schedule.png";
+    else if (t.includes("reminder") || s === "reminders") p = "/notif-icons/reminder.png";
+    else p = "/notif-icons/task.png";
+  } else if (t.includes("flowpath")) {
+    if (t.includes("reminder")) p = "/notif-icons/reminder.png";
+    else if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (t.includes("task")) p = "/notif-icons/task.png";
+    else p = "/notif-icons/course.png";
+  }
+  return absIcon(p);
+}
 
 let cachedMessaging: Messaging | null = null;
 
@@ -108,7 +155,10 @@ async function sendToTokenDoc(item: FcmTokenDoc, data: Record<string, string>): 
           // launcher icon (or drop the icon entirely). The real logo URL
           // stays in the `data.icon` field above, which the TWA's
           // foreground handler uses for the largeIcon.
+          // Left small icon always app logo, right contextual via imageUrl + data.largeIcon
           icon: "ic_stat_eduvora",
+          // imageUrl is the contextual icon shown on right side when app is killed and system renders directly
+          imageUrl: data.largeIcon || undefined,
           tag: data.tag,
           clickAction: "OPEN_TARGET_URL",
         },
@@ -136,6 +186,7 @@ export async function fcmPushToUser(db: Firestore, uid: string, payload: FcmPayl
   const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
   if (snap.empty) return 0;
   const brand = await getNotificationBrandChrome();
+  const largeIcon = getContextualLargeIcon(payload.tag || "", payload.category, payload.section, payload.targetType);
   const data: Record<string, string> = {
     title: payload.title,
     body: payload.body,
@@ -143,6 +194,10 @@ export async function fcmPushToUser(db: Firestore, uid: string, payload: FcmPayl
     url: payload.url || "/",
     icon: payload.icon || brand.icon,
     badge: payload.badge || brand.badge,
+    largeIcon,
+    category: payload.category || "",
+    section: payload.section || "",
+    targetType: payload.targetType || "",
   };
   let sent = 0;
   for (const item of snap.docs as unknown as QueryDocumentSnapshot[]) {
@@ -160,6 +215,7 @@ export async function fcmPushToAllDevices(db: Firestore, payload: FcmPayload): P
   const snap = await db.collectionGroup("fcmTokens").get();
   if (snap.empty) return { sent: 0, devices: 0 };
   const brand = await getNotificationBrandChrome();
+  const largeIcon = getContextualLargeIcon(payload.tag || "", payload.category, payload.section, payload.targetType);
   const data: Record<string, string> = {
     title: payload.title,
     body: payload.body,
@@ -167,6 +223,10 @@ export async function fcmPushToAllDevices(db: Firestore, payload: FcmPayload): P
     url: payload.url || "/",
     icon: payload.icon || brand.icon,
     badge: payload.badge || brand.badge,
+    largeIcon,
+    category: payload.category || "",
+    section: payload.section || "",
+    targetType: payload.targetType || "",
   };
   let sent = 0;
   for (const item of snap.docs as unknown as QueryDocumentSnapshot[]) {

@@ -61,6 +61,7 @@ export default function FlowPathApp({
           onOpenFavorites={onOpenFavorites}
           onOpenNotifications={onOpenNotifications}
           onOpenSettings={() => openCurveRef.current?.()}
+          headerVariant="flow"
         />
       </div>
 

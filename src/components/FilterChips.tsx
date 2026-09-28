@@ -15,6 +15,8 @@ type FilterChipsProps = {
   filters: StoreFilter[];
   activeId: string;
   onSelect: (id: string) => void;
+  /** When true, hide the Filters button (advanced filters moved to top row per user request) */
+  hideFilterButton?: boolean;
 };
 
 /**
@@ -28,7 +30,7 @@ type FilterChipsProps = {
  * frosted pills with per-tag colour accents, staggered spring entrance, and
  * a colour dot that swaps for a spring-drawn check mark on selection.
  */
-export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
+export default function FilterChips({ filters, activeId, onSelect, hideFilterButton = false }: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const closeTimer = useRef<number | null>(null);
   // Mouse parity: the chip row is a touch scroller with its scrollbar hidden,
@@ -211,16 +213,18 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
         onPointerDown={chipRow.onPointerDown}
         className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:[scrollbar-width:thin] lg:[scrollbar-color:rgba(255,255,255,0.16)_transparent] lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-white/15"
       >
-        <GlassButton
-          variant="capsule"
-          type="button"
-          onClick={() => setShowFilters((prev) => !prev)}
-          aria-expanded={showFilters}
-          className={`shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
-        >
-          <SlidersIcon className="h-4 w-4" />
-          <span>Filters</span>
-        </GlassButton>
+        {!hideFilterButton && (
+          <GlassButton
+            variant="capsule"
+            type="button"
+            onClick={() => setShowFilters((prev) => !prev)}
+            aria-expanded={showFilters}
+            className={`shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
+          >
+            <SlidersIcon className="h-4 w-4" />
+            <span>Filters</span>
+          </GlassButton>
+        )}
 
         <GlassToggleGroup
           className="dc-segment dc-scene-plate shrink-0"

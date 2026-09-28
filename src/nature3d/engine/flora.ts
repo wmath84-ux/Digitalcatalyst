@@ -24,6 +24,20 @@ import { insideBeachHouse } from "./beachHouseSite";
 import { createSite, siteAt, SUN_SIDE_X, SUN_SIDE_Z, type Site } from "./environment";
 import { noise } from "./simplex";
 import type { TextureSet } from "./textures";
+import { lecternPlacements } from "./lectern";
+
+// FIX: prevent initial overload near study boards — cache board positions and exclude trees within radius.
+// Keeps only final state (no pop-in where many trees/vegetables render then disappear).
+const LECTERN_BOARD_XZ_FLORA = (() => {
+  try { return lecternPlacements().map((p) => ({ x: p.position.x, z: p.position.z })); } catch { return [] as Array<{ x: number; z: number }>; }
+})();
+function nearLecternBoardFlora(x: number, z: number, r = 14): boolean {
+  for (let i = 0; i < LECTERN_BOARD_XZ_FLORA.length; i += 1) {
+    const b = LECTERN_BOARD_XZ_FLORA[i];
+    if (Math.hypot(b.x - x, b.z - z) < r) return true;
+  }
+  return false;
+}
 
 // Sanctuary scattering is reproducible: the same seed gives identical
 // placement, silhouettes and ground contact on every load. Keeping one tiny
@@ -206,6 +220,7 @@ function treeLayout(count: number): TreeLayout[] {
     if (insideWarehouse(x, z, 8)) return false;
     if (insideBeachHouse(x, z, 9)) return false;
     if (Math.hypot(x, z - 2.6) < 2.5) return false;
+    if (nearLecternBoardFlora(x, z, 14)) return false;
     const h = terrainHeight(x, z);
     if (h < -0.8 || h > 34) return false;
     const site = siteAt(x, z, treeSite);

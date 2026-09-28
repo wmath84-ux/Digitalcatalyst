@@ -20,8 +20,10 @@
 // it is. See `engine/boardScreens.ts` for why that decision was forced.
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, FileText, Film, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Film, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play, Sparkles, Brain } from "lucide-react";
 import ResourceViewer from "../../course/ResourceViewer";
+import CourseBrainPanel from "../../course/CourseBrainPanel";
+import { collectBrainPracticeSets } from "../../../utils/practiceSet.js";
 import type { CourseFile, CourseFileType, CourseModule } from "../../types/course";
 import type { Product } from "../../data/products";
 
@@ -63,7 +65,7 @@ const TYPE_ICON: Partial<Record<CourseFileType, typeof FileText>> = {
   ebook: BookOpen,
   image: ImageIcon,
   mindmap: Layers,
-  brain: Layers,
+  brain: Brain,
   embed: Play,
   google_form: FileText,
 };
@@ -87,7 +89,51 @@ export default function ReadingBoard({
   const isMine = Boolean(course && myCourses.some((c) => c.id === course.id));
 
   // ── Level 3: a resource is open ──────────────────────────────────────
+  // Brain resources are NOT played via ResourceViewer — they are practice sets
+  // that need the Course Player's Brain panel (same as My Study Library's player).
+  // Inside Sanctuary they must play ON THE BOARD, not via the external Course Player.
+  const brainSets = useMemo(() => {
+    if (!course) return [];
+    const mods = course.courseContent ?? [];
+    // Collect all module ids as unlocked (learner owns their own course)
+    const allIds = new Set<string>();
+    const collectIds = (nodes: any[]) => {
+      for (const m of nodes || []) {
+        allIds.add(String(m.id));
+        if (Array.isArray(m.modules)) collectIds(m.modules);
+      }
+    };
+    collectIds(mods as any);
+    return collectBrainPracticeSets(mods as any, allIds);
+  }, [course]);
+
+  const activeBrainSet = useMemo(() => {
+    if (!file || file.type !== "brain") return null;
+    return brainSets.find((s: any) => s.id === file.id) || null;
+  }, [file, brainSets]);
+
   if (course && file) {
+    if (file.type === "brain" && activeBrainSet) {
+      return (
+        <BoardFrame
+          title={file.name}
+          subtitle={`${course.title} · Brain practice on board`}
+          onBack={() => setFile(null)}
+          backLabel="Modules"
+        >
+          <div className="h-full w-full overflow-auto p-2">
+            <CourseBrainPanel
+              productId={course.id}
+              sets={brainSets as any}
+              activeModuleId={moduleId}
+              openSetId={file.id}
+              onOpenedSet={() => {}}
+              onComplete={() => {}}
+            />
+          </div>
+        </BoardFrame>
+      );
+    }
     return (
       <BoardFrame
         title={file.name}
@@ -124,7 +170,7 @@ export default function ReadingBoard({
               onClick={() => onPlayMyCourse(course.id)}
               className="inline-flex items-center gap-2 rounded-xl bg-violet-500/25 px-4 py-2 text-[14px] font-black text-violet-100 ring-1 ring-violet-300/40 transition hover:bg-violet-500/40"
             >
-              <Play className="h-4 w-4" /> Open Course Player
+              <Play className="h-4 w-4" /> Play on Board
             </button>
           </div>
         ) : null}
@@ -206,7 +252,7 @@ export default function ReadingBoard({
                           onClick={() => onPlayMyCourse(c.id)}
                           className="inline-flex items-center gap-2 text-[13px] font-black text-violet-100"
                         >
-                          <Play className="h-3.5 w-3.5" /> Open Course Player
+                          <Play className="h-3.5 w-3.5" /> Play on Board
                         </button>
                       </div>
                     ) : null}

@@ -48,6 +48,18 @@ import { insideBeachHouse } from "./beachHouseSite";
 import { createSite, dryCover, siteAt, pathWeight, groundColorAt, type Site } from "./environment";
 import { GROUND_PALETTE } from "./palette";
 import { noise } from "./simplex";
+import { lecternPlacements } from "./lectern";
+
+const LECTERN_BOARD_XZ_TUFT = (() => {
+  try { return lecternPlacements().map((p) => ({ x: p.position.x, z: p.position.z })); } catch { return [] as Array<{ x: number; z: number }>; }
+})();
+function nearLecternBoardTuft(x: number, z: number, r = 11): boolean {
+  for (let i = 0; i < LECTERN_BOARD_XZ_TUFT.length; i += 1) {
+    const b = LECTERN_BOARD_XZ_TUFT[i];
+    if (Math.hypot(b.x - x, b.z - z) < r) return true;
+  }
+  return false;
+}
 
 export interface GrassTuftField {
   group: THREE.Group;
@@ -116,6 +128,8 @@ function acceptsTuft(
   if (worn > 0.3) return false;
   if (worn > 0.12 && Math.random() < worn * 1.5) return false;
   if (Math.hypot(x, z + 1.35) < 4.5) return false;
+  // FIX: prevent initial overload near boards — keep only final state, no pop-in
+  if (nearLecternBoardTuft(x, z, 11)) return false;
   if (site.slopeDeg > 30) return false;
   if (site.soil < 0.2) return false;
   if (site.wetness > 0.85 && Math.random() < 0.7) return false;
