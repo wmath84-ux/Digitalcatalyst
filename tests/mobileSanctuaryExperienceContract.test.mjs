@@ -6,7 +6,7 @@
 //   • Desk / Reading / Notes / Mind map fit zooms must respond to mobile
 //     viewport/HUD changes (including the bottom-right eye toggle);
 //   • low-tier environment clarity improves without removing the existing
-//     30 fps pacing, adaptive resolution or thermal shedding safeguards.
+//     40 fps target, adaptive resolution or thermal shedding safeguards.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -62,10 +62,10 @@ test("each mobile study camera owns a projection-aware fit", () => {
 
 test("low-tier clarity rises while smoothness safeguards remain active", () => {
   const low = quality.slice(quality.indexOf("low: {"), quality.indexOf("medium: {"));
-  assert.match(low, /maxPixelRatio: 1\.05/);
-  assert.match(low, /minPixelRatio: 0\.65/);
+  assert.match(low, /maxPixelRatio: 0\.85/);
+  assert.match(low, /minPixelRatio: 0\.5/);
   assert.match(low, /maxAniso: 2/);
-  assert.match(low, /fpsCap: 30/);
+  assert.match(low, /fpsCap: 40/);
   assert.match(low, /shadowMapSize: 0/);
   assert.match(low, /antialias: false/);
   assert.match(quality, /class AdaptiveResolution/);

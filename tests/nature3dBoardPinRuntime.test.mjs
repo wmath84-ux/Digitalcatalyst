@@ -16,7 +16,8 @@ const FIXTURE = `
 import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
 import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
-export { terrainHeight };
+import { AdaptiveResolution, budgetFor } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/quality.ts"))};
+export { terrainHeight, AdaptiveResolution, budgetFor };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -87,6 +88,24 @@ const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
 const CAMERA_SOURCE = fs.readFileSync(path.join(ROOT, "src/nature3d/engine/controls.ts"), "utf8");
 const SCENE_SOURCE = fs.readFileSync(path.join(ROOT, "src/nature3d/engine/scene.ts"), "utf8");
+
+test("low tier targets 40 FPS and DRS quickly reaches its render-scale floor under 21 FPS", () => {
+  const { AdaptiveResolution, budgetFor } = fixture;
+  const low = budgetFor("low");
+  assert.equal(low.fpsCap, 40);
+  assert.equal(low.maxPixelRatio, 0.85);
+  assert.equal(low.minPixelRatio, 0.5);
+
+  const drs = new AdaptiveResolution(low, 1);
+  assert.equal(drs.pixelRatio, 0.85);
+  let now = 0;
+  for (let frame = 0; frame < 120; frame++) {
+    now += 1000 / 21;
+    drs.sample(1000 / 21, now);
+  }
+  assert.ok(drs.pixelRatio <= 0.500001, `DRS should trim quickly, got ${drs.pixelRatio}`);
+  assert.equal(drs.atFloor, true);
+});
 
 test("camera movement settings match the main-branch reference", () => {
   assert.match(SCENE_SOURCE, /\(e\.clientX - this\.pointerPrev\.x\) \* 0\.005/);

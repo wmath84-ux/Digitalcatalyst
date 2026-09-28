@@ -102,9 +102,8 @@ export interface QualityBudget {
   halfPrecision: boolean;
   /**
    * `ACTIVATE_THERMAL_DRS_PACING` (pacing half): cap the render loop at this
-   * many fps. 0 = uncapped (desktop). A 30 fps cap on tile GPUs beats a
-   * stuttering 45: the browser vsync-throttles a slow GPU anyway, and a
-   * fixed cadence kills the micro-stutter Swappy exists to remove.
+   * many fps. 0 = uncapped (desktop). Low-tier targets 40 fps with adaptive
+   * resolution; the fixed cadence avoids missed-frame jitter on tile GPUs.
    */
   fpsCap: number;
   /**
@@ -129,12 +128,12 @@ const BASE: Record<QualityTier, QualityBudget> = {
   // silicon), so this tier IS the product for most learners. It used to be a
   // lightly-trimmed desktop budget and it lagged; it is now tuned the way
   // the owner's research prescribes: content that fits a Mali-class tile
-  // GPU, a 30 fps cadence, fp16 fragments and adaptive native-ish clarity.
+  // GPU, a 40 fps target, fp16 fragments and adaptive scene resolution.
   low: {
     tier: "low",
-    // Clarity pass: a modest density lift fills the closest meadow without
-    // enabling any new draw calls/material passes. Every field stays instanced
-    // and the existing thermal ladder can still trim it allocation-free.
+    // Low-tier prioritizes the requested 40 fps target: retain instanced
+    // geometry, but start at a GPU-friendly pixel ratio and leave DRS room to
+    // trim further before any content is shed.
     grassNear: 13000,
     grassFar: 17500,
     hillGrass: 36000,
@@ -153,11 +152,11 @@ const BASE: Record<QualityTier, QualityBudget> = {
     shadowMapSize: 0,
     richBoardMaterial: false,
     antialias: false,
-    // 0.85 DPR made texturing and foliage visibly soft even when the GPU had
-    // headroom. Start at a native-ish 1.05 and let wall-clock DRS step down to
-    // 0.65 only when the phone actually misses its locked 30 fps budget.
-    maxPixelRatio: 1.05,
-    minPixelRatio: 0.65,
+    // A 40 fps camera target takes precedence over pixel-perfect distant
+    // scenery. The DOM study boards remain independently rasterized and crisp.
+    // DRS can step down quickly to 0.5 when the world still misses budget.
+    maxPixelRatio: 0.85,
+    minPixelRatio: 0.5,
     sunShafts: false,
     // Far plane must clear the open-ocean disc (~5400 m) and leave headroom
     // so a camera off-centre never clips sea or sky into a black hole.
@@ -166,7 +165,7 @@ const BASE: Record<QualityTier, QualityBudget> = {
     fogNear: 16,
     fogFar: 420,
     halfPrecision: true,
-    fpsCap: 30,
+    fpsCap: 40,
     cheapPlants: true,
     plantTextureDetail: "1k",
     // 2× is a small, bounded sampler cost and dramatically improves the
@@ -320,8 +319,8 @@ export function detectTier(): QualityTier {
   const mobileGpu = /adreno|mali|powervr|apple a\d/.test(gpu);
   // Flagship phone silicon (Adreno 640+, Mali-G77+, Apple A14+) CAN carry the
   // medium tier — the blanket mobile penalty used to pin even these to low,
-  // and low is tuned for genuinely low-end parts (1.05× clarity start with a
-  // DRS floor, rather than permanently blurring every phone at 0.85×).
+  // and low is tuned for genuinely low-end parts (0.85 render-scale start
+  // with an adaptive floor, rather than using desktop budgets on every phone).
   const fastMobileGpu = /adreno (6[4-9]\d|7\d\d|8\d\d)|mali-g(7[7-9]|[89]\d|\d\d\d)|apple a1[4-9]|apple a\d pro|apple m[1-9]|tensor g[3-9]|dimensity (8|9)\d\d\d|xclipse/.test(gpu);
 
   if (software || weakIntel || cores <= 2 || memory <= 2) return "low";
@@ -354,11 +353,10 @@ export function budgetFor(tier: QualityTier): QualityBudget {
  * while the GPU is drowning, and the only place that back-pressure shows up
  * is the browser vsync-throttling the rAF — i.e. the inter-frame interval.
  *
- * Thresholds are derived from the tier's frame budget (`targetMs`): a 30 fps
- * cap tier trims when it cannot hold 30, a 60 fps tier trims above ~45 fps.
- * When frames get long it drops the render scale; once the scene has been
- * comfortably fast for a while it gives some back. Steps are rate limited so
- * the viewer never notices a resolution "pump".
+ * Thresholds are derived from the tier's frame budget (`targetMs`). When
+ * frames get long it drops the render scale; once the scene has been
+ * comfortably fast for a while it gives some back. Low-tier feedback uses a
+ * short window to chase the 40 fps target without content popping.
  *
  * The scaler also reports THERMAL HOT (`consumeThermalHot`): three trims in a
  * row that all landed on the floor mean resolution alone cannot save the
@@ -371,7 +369,7 @@ export class AdaptiveResolution {
   private lastChange = 0;
   private readonly min: number;
   private readonly max: number;
-  /** Frame budget in ms (30 fps tier → 33.3). */
+  /** Frame budget in ms (40 fps low tier → 25). */
   private readonly targetMs: number;
   /** Consecutive trims that bottomed out at the floor. */
   private floorTrims = 0;
@@ -409,19 +407,19 @@ export class AdaptiveResolution {
   sample(frameMs: number, now: number): number | null {
     // Ignore absurd deltas (tab restore, debugger pause, first frames).
     if (frameMs > 0 && frameMs < 500) this.samples.push(frameMs);
-    if (this.samples.length < 36) return null;
+    // A shorter rolling window lets a struggling mobile GPU react within
+    // about 0.6–1.0 seconds instead of spending several seconds below target.
+    if (this.samples.length < 24) return null;
 
     const avg = this.samples.reduce((a, b) => a + b, 0) / this.samples.length;
     this.samples.length = 0;
-    if (now - this.lastChange < 900) return null;
+    if (now - this.lastChange < 600) return null;
 
-    // Frame overruns: a sustained ~60 % overrun gets a hard chop (−15 %), a
-    // ~25 % overrun the classic −8 % trim. Recovery gives back 5 % at a time
-    // once we are beating ~80 % of the budget — the hysteresis keeps the
-    // scale from oscillating around the threshold.
-    const hard = this.targetMs * 1.6;
-    const soft = this.targetMs * 1.22;
-    const restore = this.targetMs * 0.8;
+    // Protect the 40 fps low-tier target with quicker trims: cut 15 % above
+    // 1.35× budget, 8 % above 1.08×, and recover only below 0.75× budget.
+    const hard = this.targetMs * 1.35;
+    const soft = this.targetMs * 1.08;
+    const restore = this.targetMs * 0.75;
 
     if (avg > soft && this.scale > this.min) {
       const cut = avg > hard ? 0.85 : 0.92;

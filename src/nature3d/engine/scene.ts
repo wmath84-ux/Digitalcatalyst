@@ -2147,7 +2147,7 @@ export class Sanctuary {
 
     // ── Frame pacing (ACTIVATE_THERMAL_DRS_PACING, pacing half) ───────
     //
-    // On capped tiers (30 fps on low) a rAF that arrives EARLIER than the
+    // On capped tiers (40 fps on low) a rAF that arrives EARLIER than the
     // frame budget is skipped wholesale — the browser keeps scheduling ticks
     // at the panel's refresh rate, we simply render every other one. The
     // simulation loses nothing: THREE.Clock accumulates the skipped span, so
@@ -2223,7 +2223,9 @@ export class Sanctuary {
     // sways, just on fewer ticks — and the frame budget goes to the board.
     const study = this.studyFocus;
     this.ambientClock += dt;
-    const ambientStep = study ? 1 / 15 : 0;
+    // Keep camera frames at the tier target; low-tier flora/structure updates
+    // are independent and can run at 20 Hz rather than consuming every frame.
+    const ambientStep = study ? 1 / 15 : this.budget.tier === "low" ? 1 / 20 : 0;
     const runAmbient = this.ambientClock >= ambientStep;
     if (runAmbient) {
       const adt = this.ambientClock;
