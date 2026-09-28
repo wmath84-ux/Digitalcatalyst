@@ -21,11 +21,27 @@
 //     breakdown, per-question review with explanations).
 //
 // One difference: this page lives INSIDE the player's study pane, so it fills
-// the pane instead of a page, and its type + cards scale with the viewport via
-// `--brain-scale` (1 on a phone — the revision page's own pixel sizes — up to
-// 1.24 on a wide pane). Every scaled metric is written as
-// `calc(<the revision px> * var(--brain-scale))`, so the design is the
-// revision design at 1× and simply grows with the screen.
+// the pane instead of a page, and its type + cards scale with `--brain-scale`
+// (1 on a phone — the revision page's own pixel sizes — up to 1.24). Every
+// scaled metric is written as `calc(<the revision px> * var(--brain-scale))`,
+// so the design is the revision design at 1× and simply grows with the box.
+//
+// ── THE SCALE FOLLOWS THE PANE, NOT THE SCREEN (owner brief, 2026-09-28) ───
+//   "Course player ke andar jo Brain page ka design hai, itna flexible banao
+//    ki vah screen size / jaise area ke according question, option aur jo bhi
+//    button hai sab kuchh properly visible ho jaaye … jaise split mode mein
+//    ham donon hisson ko jitna man kahe utna khinchkar upar niche kar sakte
+//    hain, to uske according yah Brain page utna hi flexible ho."
+//
+// The Study pane's size is not the screen's: the learner drags the Split Deck
+// divider and the pane becomes any height and width, on any device. So the
+// panel MEASURES ITSELF (`useFitTarget` + `brainFitScale`, src/course/
+// panelFit.ts) and publishes `--brain-scale` on whichever screen is mounted:
+// a wide pane grows the design to 1.24, a short pane shrinks it (floor 0.8,
+// where the answer tiles still clear a 44 px touch target) so the question,
+// its options and the docked Previous / Next bar stay visible instead of being
+// cut. The `@media` ladder in src/index.css is only the pre-measure fallback —
+// the measured value is written inline and always wins.
 //
 // What the learner sees comes straight off the course tree: a `brain` file
 // carries `practiceQuestions` (see utils/practiceSet.js). Nothing is fetched
@@ -39,6 +55,7 @@ import { GlassTile } from "../components/ui/glass-tile";
 import { Badge, Card, PrimaryButton, ProgressBar, SecondaryButton } from "../revision/components/ui";
 import { CheckIcon, ChevronRightIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
+import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 const SWIPE_THRESHOLD = 60;
@@ -167,6 +184,22 @@ export default function CourseBrainPanel({
   const [moduleOverride, setModuleOverride] = useState<string | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const scoredRef = useRef<string | null>(null);
+
+  /**
+   * The Brain page measures ITS OWN box (see `useFitTarget` / `brainFitScale`)
+   * and publishes `--brain-scale` on the mounted screen's root. This is what
+   * makes the page follow the Split Deck divider: the study pane's size IS the
+   * panel root's size, so dragging the divider re-solves the scale and the
+   * question, its options and the Previous / Next bar re-fit instead of being
+   * cut. It is written straight to the DOM (no state, no re-render per frame)
+   * and synchronously on attach, so the first paint is already the right size;
+   * the `@media` ladder in src/index.css only covers the frames before that.
+   */
+  const publishBrainFit = useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    publishVar(node, "--brain-scale", String(brainFitScale(node.clientWidth, node.clientHeight)));
+  }, []);
+  const fitRef = useFitTarget(publishBrainFit);
 
   useEffect(() => {
     setScores(loadScores(productId));
@@ -339,6 +372,7 @@ export default function CourseBrainPanel({
   if (!activeSet) {
     return (
       <div
+        ref={fitRef}
         className="flex h-full min-h-0 flex-col px-3 py-3"
         data-course-brain-panel=""
         data-brain-screen="library"
@@ -458,7 +492,7 @@ export default function CourseBrainPanel({
 
   if (mode === "review") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="review" style={{ fontSize: S(16) }}>
+      <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="review" style={{ fontSize: S(16) }}>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           <Card className="brain-card" style={{ padding: S(16) } as CSSProperties}>
             <p className="text-white/75" style={{ fontSize: S(14), marginBottom: S(16) }}>
@@ -495,13 +529,13 @@ export default function CourseBrainPanel({
           </Card>
         </div>
         <div
-          className="dc-scene-plate dc-scene-plate--bar flex border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
+          className="dc-scene-plate dc-scene-plate--bar flex shrink-0 border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
           style={{ gap: S(12), padding: `${S(12)} ${S(16)} calc(env(safe-area-inset-bottom) + ${S(12)})` }}
         >
-          <SecondaryButton onClick={() => setMode("question")} className="flex-1">
+          <SecondaryButton onClick={() => setMode("question")} className="flex-1 min-w-0">
             Back
           </SecondaryButton>
-          <PrimaryButton onClick={() => setShowSubmitConfirm(true)} className="flex-1">
+          <PrimaryButton onClick={() => setShowSubmitConfirm(true)} className="flex-1 min-w-0">
             Submit Practice
           </PrimaryButton>
         </div>
@@ -524,7 +558,7 @@ export default function CourseBrainPanel({
     const message =
       stats.score >= 90 ? "Outstanding work! 🎉" : stats.score >= 70 ? "Great job today! 👏" : stats.score >= 50 ? "Good effort, keep going! 💪" : "Every practice makes you sharper. Let's revise! 📘";
     return (
-      <div className="h-full overflow-y-auto px-3 py-3" data-course-brain-panel="" data-brain-screen="result" style={{ fontSize: S(16) }}>
+      <div ref={fitRef} className="h-full overflow-y-auto px-3 py-3" data-course-brain-panel="" data-brain-screen="result" style={{ fontSize: S(16) }}>
         <div className="space-y-4">
           <Card className="brain-card bg-indigo-600 text-center text-white" data-brain-score-card style={{ padding: S(16) } as CSSProperties}>
             <p className="font-semibold text-indigo-100" style={{ fontSize: S(12) }}>
@@ -607,7 +641,7 @@ export default function CourseBrainPanel({
 
   if (mode === "answers") {
     return (
-      <div className="h-full overflow-y-auto px-3 py-3" data-course-brain-panel="" data-brain-screen="answers" style={{ fontSize: S(16) }}>
+      <div ref={fitRef} className="h-full overflow-y-auto px-3 py-3" data-course-brain-panel="" data-brain-screen="answers" style={{ fontSize: S(16) }}>
         <div className="space-y-4">
           {questions.map((item, index) => {
             const picked = selections[index];
@@ -683,8 +717,8 @@ export default function CourseBrainPanel({
   /* ── question — the revision test-taking page, exactly ───────────────── */
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="question" style={{ fontSize: S(16) }}>
-      <div className="flex items-center" style={{ padding: `${S(12)} ${S(16)} 0`, gap: S(8) }}>
+    <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="question" style={{ fontSize: S(16) }}>
+      <div className="flex shrink-0 items-center" style={{ padding: `${S(12)} ${S(16)} 0`, gap: S(8) }}>
         <button
           type="button"
           onClick={backToLibrary}
@@ -698,7 +732,7 @@ export default function CourseBrainPanel({
           {activeSet.title}
         </p>
       </div>
-      <div style={{ padding: `${S(12)} ${S(16)} 0` }}>
+      <div className="shrink-0" style={{ padding: `${S(12)} ${S(16)} 0` }}>
         <ProgressBar value={total ? ((currentIndex + 1) / total) * 100 : 0} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: `${S(20)} ${S(16)}` }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -751,14 +785,17 @@ export default function CourseBrainPanel({
         ) : null}
       </div>
 
+      {/* The bar is DOCKED: `shrink-0` (plus the scroller above owning the
+          only `flex-1`) is what guarantees Previous / Next are on screen at
+          every pane height — the question scrolls, the buttons never do. */}
       <div
-        className="dc-scene-plate dc-scene-plate--bar flex border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
+        className="dc-scene-plate dc-scene-plate--bar flex shrink-0 border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
         style={{ gap: S(12), padding: `${S(12)} ${S(16)} calc(env(safe-area-inset-bottom) + ${S(12)})` }}
       >
-        <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
+        <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="min-w-0 flex-[1]">
           Previous
         </SecondaryButton>
-        <PrimaryButton onClick={goNext} className="flex-[1.4]">
+        <PrimaryButton onClick={goNext} className="min-w-0 flex-[1.4]">
           {currentIndex === total - 1 ? "Review & Submit" : "Next"}
           <ChevronRightIcon style={{ height: S(16), width: S(16) }} />
         </PrimaryButton>

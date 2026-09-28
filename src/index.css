@@ -2017,19 +2017,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    The Brain tab renders the revision test-taking page exactly
    (src/revision/pages/TestPlayerPage.tsx) inside the player's study pane
    (src/course/CourseBrainPanel.tsx). Every metric that page fixes in px is
-   written here as `calc(<that px> * var(--brain-scale))`, and this is the one
-   place the scale is decided:
+   written as `calc(<that px> * var(--brain-scale))`, so the design is the
+   revision design at 1× and stays proportional at every other size.
 
-     · on a phone (the design's own home, 360–560 px) the scale is 1, so the
-       Brain page IS the revision page, pixel for pixel;
-     · as the pane gets wider the type, the answer tiles, the letter circles,
-       the review grid and the card padding all grow with it (up to 1.24),
-       so the design reads at tablet / desktop / landscape-rail sizes instead
-       of staying phone-sized in a wide pane.
-
-   Scaling the whole design (not just the prompt) is what keeps the
-   proportions identical: the 19 px question and the 56 px answer tile keep
-   their ratio at every width. */
+   The ladder below is only the PRE-MEASURE fallback. The scale is really
+   decided by the panel itself, which measures the box it has been given and
+   writes `--brain-scale` inline (src/course/panelFit.ts → `brainFitScale`),
+   because the study pane is NOT the screen: the learner drags the Split Deck
+   divider, and the same pane is 520 px wide on one drag and 240 px on the
+   next. A viewport-based ladder cannot see that; the measured value wins over
+   these rules the moment the panel mounts (inline custom properties outrank
+   any stylesheet), and it also shrinks the design on a SHORT pane — floor
+   0.8, where the 56 px answer tile is still above a 44 px touch target — so
+   the question, its options and the docked Previous / Next bar stay visible
+   instead of being cut. What these rules cover is the frame before that
+   measurement and any engine that never runs it. */
 [data-course-brain-panel] {
   --brain-scale: 1;
 }
@@ -2057,8 +2059,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
-   landscape stages. The player measures its stage and switches layout; these
-   rules keep every control inside the visible box on phone / tablet / desktop. */
+   landscape stages. The player measures its stage and fits the card to it
+   (src/course/panelFit.ts → `--audio-scale`; the scaled frame around the card
+   is what keeps every control inside the visible box on phone / tablet /
+   desktop), and these rules are the backstop for the one frame before that
+   measurement and for any engine that does not run it. */
 [data-course-viewer-audio],
 [data-course-audio-player] {
   max-width: 100%;
@@ -7050,26 +7055,54 @@ html[data-nature-studio-active="true"] {
 /* Home has one extra, mobile-only destination: the dinosaur Sanctuary button
    immediately after FlowPath. Eight destinations still stay in ONE capsule;
    the wrapper selects 38 px plates through 479 px and 34 px through 349 px,
-   while these rules only solve the remaining gap/padding arithmetic. */
+   while these rules only solve the remaining gap/padding arithmetic.
+
+   Since 2026-09-28 these bands are also the RESTING RHYTHM the Home dock's
+   width fill grows from ("footer navigation ka size thoda bada karo … side
+   mein jitna area khali hai vah sab cover ho jaaye, ekadam edge se sat na
+   jaaye"): SiteFooterNav reads `--dc-home-dock-gap/pad/pad-block` off the nav
+   (getComputedStyle) as the base, solves the biggest plate + gap that still
+   keeps a margin from the edge, and renders the dock with those numbers. The
+   values below are therefore the single source of truth for both paths — the
+   CSS-only rendering (what these rules produce on their own) and the measured
+   fill — which is why the dock's gap/padding are stated ONCE, as variables,
+   and consumed by one rule instead of being re-declared per band. */
+[data-site-footer-nav][data-dock-count="8"] {
+  --dc-home-dock-gap: 8px;
+  --dc-home-dock-pad: 16px;
+  --dc-home-dock-pad-block: 12px;
+}
+
+[data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
+  gap: var(--dc-home-dock-gap, 8px);
+  padding-inline: var(--dc-home-dock-pad, 16px);
+}
+
 @media (max-width: 479px) {
-  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
-    gap: 4px;
-    padding-inline: 8px;
+  [data-site-footer-nav][data-dock-count="8"] {
+    --dc-home-dock-gap: 4px;
+    --dc-home-dock-pad: 8px;
+    --dc-home-dock-pad-block: 10px;
   }
 }
 @media (max-width: 379px) {
   [data-site-footer-nav][data-dock-count="8"] {
-    padding-inline: 8px;
+    --dc-home-dock-gap: 2px;
+    --dc-home-dock-pad: 6px;
+    --dc-home-dock-pad-block: 10px;
   }
-  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
-    gap: 2px;
-    padding-inline: 6px;
+
+  /* The nav's own gutter, i.e. what the filled capsule keeps clear of the edge
+     (on top of the fill's 4 px reserve). */
+  [data-site-footer-nav][data-dock-count="8"] {
+    padding-inline: 8px;
   }
 }
 @media (max-width: 349px) {
-  [data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
-    gap: 2px;
-    padding-inline: 4px;
+  [data-site-footer-nav][data-dock-count="8"] {
+    --dc-home-dock-gap: 2px;
+    --dc-home-dock-pad: 4px;
+    --dc-home-dock-pad-block: 8px;
   }
 }
 @media (max-width: 319px) {

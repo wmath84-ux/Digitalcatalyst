@@ -84,6 +84,21 @@
  * `whileTap={{scale:0.82}}` became a press spring multiplied into the wave's
  * scale, because a `whileTap` scale would fight the magnification scale for
  * the same transform slot. Same 0.82, same feel, no conflict.
+ *
+ * ── THE HOME DOCK'S FILL (owner brief, later the same day) ────────────────
+ *   "Home screen per footer navigation ka size thoda bada karo — matlab side
+ *    mein jitna area khali hai vah sab cover ho jaaye … ekadam pura hi na ho
+ *    jaaye ki sat jaaye ekadam edge se, lekin aur bada ho jaaye icon vagaira
+ *    jisse."
+ *
+ * The fill is the ONLY thing that changes a dock's resting size, and it is
+ * opt-in: `SiteFooterNav` measures the width the nav leaves the capsule,
+ * solves for the biggest plate that still keeps a margin from the screen edge
+ * (capped at 60px, with the leftover handed to the gaps), and passes the four
+ * numbers down as `fill`. Because the plate size is part of the wave's
+ * geometry, the magnification, the lift, the neighbour push, the tooltip and
+ * the glyph all grow with it — one size, no separate length/width edits, and
+ * nothing is frozen by a CSS `width` (which is what the old bar did).
  */
 
 import {
@@ -170,6 +185,41 @@ export type GlassDockItem = {
    * every existing dock is untouched.
    */
   wide?: boolean
+}
+
+/**
+ * The FILL metrics of a dock whose owner asked for a bigger, width-covering
+ * footer — today that is Home's eight-tab dock and nothing else.
+ *
+ * Owner brief, 2026-09-28:
+ *
+ *   "Home screen per footer navigation ka size thoda bada karo — matlab side
+ *    mein jitna area khali hai vah sab cover ho jaaye … ekadam pura hi na ho
+ *    jaaye ki sat jaaye ekadam edge se, lekin aur bada ho jaaye icon vagaira
+ *    jisse."
+ *
+ * Home is the only footer with an eighth destination (the Sanctuary slot), so
+ * it was the only one wearing the 38 px `compact` plates on an ordinary phone
+ * — narrower plates, a smaller glyph, and 20–70 px of empty screen either side
+ * of the capsule. `SiteFooterNav` measures the width the nav actually leaves
+ * the capsule and hands the answer down here as ONE set of numbers, so the
+ * dock stays a single size: bigger plates (up to 60 px), the glyph half of
+ * them, wider rhythm, and the magnification wave — which is measured against
+ * `plateSize` — grows with them instead of being frozen by CSS.
+ *
+ * Everything is optional: with no `fill` the dock is byte-for-byte the dock
+ * every other screen (My Day, Revision, Cart, Store, the course player) has
+ * always worn.
+ */
+export type GlassDockFill = {
+  /** Resting plate (tap target + the wave's geometry), in px. */
+  plateSize: number
+  /** Resting gap between plates. */
+  gap: number
+  /** Resting capsule padding — left and right, each. */
+  padInline: number
+  /** Resting capsule padding — top and bottom, each. */
+  padBlock: number
 }
 
 /**
@@ -413,9 +463,13 @@ function DockItem({
   )
 }
 
-/** The glyph stays proportional to its plate (22 on 44, 20 on 38/34). */
+/**
+ * The glyph stays proportional to its plate: 22 on 44, 20 on 38/34 — and, on
+ * the Home dock's fill plate, whatever half of that plate is (30 on 60), with
+ * the 20 px floor the compact/dense plates already sit on.
+ */
 function glyphFor(plateSize: number) {
-  return plateSize >= ICON_SIZE ? 22 : 20
+  return Math.max(20, Math.round(plateSize / 2))
 }
 
 function idFromPoint(clientX: number, clientY: number): string | null {
@@ -437,6 +491,7 @@ export default function GlassDock({
   compact = false,
   dense = false,
   pointerX,
+  fill = null,
 }: {
   items: GlassDockItem[]
   onSelect: (id: string) => void
@@ -459,13 +514,23 @@ export default function GlassDock({
    * motion value here so the wave follows the finger during that drag too.
    */
   pointerX?: MotionValue<number>
+  /**
+   * Explicit resting geometry for a dock that must COVER the width it is
+   * given (Home's eight-tab footer — see `GlassDockFill`). When present it
+   * replaces the plate size the compact/dense flags would pick AND the
+   * cascade's gap/padding, so the capsule and its icons are one size that
+   * `SiteFooterNav` can compute per viewport; the springs, stagger,
+   * magnification and tooltips are untouched. Absent everywhere else, which
+   * is why every other dock keeps its authored rhythm.
+   */
+  fill?: GlassDockFill | null
 }) {
   const internalMouseX = useMotionValue(-200)
   const mouseX = pointerX ?? internalMouseX
   const skipClickRef = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const nodesRef = useRef(new Map<string, HTMLDivElement>())
-  const plateSize = dense ? DENSE_ICON_SIZE : compact ? COMPACT_ICON_SIZE : ICON_SIZE
+  const plateSize = fill?.plateSize ?? (dense ? DENSE_ICON_SIZE : compact ? COMPACT_ICON_SIZE : ICON_SIZE)
 
   // Read during render so the (deliberately stable) callbacks below never go
   // stale and never need `items` in a dependency array.
@@ -474,8 +539,13 @@ export default function GlassDock({
   const plateSizeRef = useRef(plateSize)
   plateSizeRef.current = plateSize
 
-  const fallbackPadTop = dense ? 8 : compact ? 10 : 12
-  const fallbackPadInline = dense ? 4 : compact ? 12 : 16
+  // The capsule's resting padding. With a fill the numbers are AUTHORITATIVE
+  // (they are what this dock writes inline), so `measureNow` must never take
+  // the cascade's value for them — it would read back a stale base when the
+  // fill changes on a resize. Without one, the cascade decides exactly as
+  // before: media rules win, the flags are the fallback.
+  const fallbackPadTop = fill?.padBlock ?? (dense ? 8 : compact ? 10 : 12)
+  const fallbackPadInline = fill?.padInline ?? (dense ? 4 : compact ? 12 : 16)
   const layoutRef = useRef<DockLayout>({
     centres: {},
     ids: [],
@@ -483,6 +553,27 @@ export default function GlassDock({
     padInline: fallbackPadInline,
     spread: false,
   })
+  /**
+   * The resting padding as a MOTION VALUE, not a constant: the derived
+   * `padInline` / `padTop` below only recompute when one of their sources
+   * changes, and a fill that is re-solved on a resize is exactly that.
+   * Publishing the new base here is what makes the capsule wear the new box in
+   * the same commit — without it the dock would keep rendering the previous
+   * viewport's padding until the next magnification gesture moved the spring.
+   *
+   * A fill's numbers are AUTHORITATIVE (they are the props this dock renders
+   * with), so they are published during render — the same thing framer does for
+   * its own derived values, and the only way the value is already correct when
+   * the derived padding is read in that commit. Without a fill the measurement
+   * in `measureNow` owns the base, exactly as before; publishing the flag
+   * fallback here would overwrite what the media rules said.
+   */
+  const padTopBase = useMotionValue(fallbackPadTop)
+  const padInlineBase = useMotionValue(fallbackPadInline)
+  if (fill) {
+    if (padTopBase.get() !== fill.padBlock) padTopBase.set(fill.padBlock)
+    if (padInlineBase.get() !== fill.padInline) padInlineBase.set(fill.padInline)
+  }
 
   const registerItem = useCallback((id: string, node: HTMLDivElement | null) => {
     if (node) nodesRef.current.set(id, node)
@@ -519,10 +610,10 @@ export default function GlassDock({
   const growX = useSpring(rawGrowX, WAVE_SPRING)
   const growY = useSpring(rawGrowY, WAVE_SPRING)
   const padInline = useTransform(
-    growX,
-    (growth: number) => layoutRef.current.padInline + (layoutRef.current.spread ? 0 : growth / 2),
+    [growX, padInlineBase],
+    ([growth, base]: number[]) => base + (layoutRef.current.spread ? 0 : growth / 2),
   )
-  const padTop = useTransform(growY, (growth: number) => layoutRef.current.padTop + growth)
+  const padTop = useTransform([growY, padTopBase], ([growth, base]: number[]) => base + growth)
 
   /** The wave is settled: the capsule is wearing its resting box. */
   const atRest = () => Math.abs(growX.get()) < 0.5 && Math.abs(growY.get()) < 0.5
@@ -549,20 +640,31 @@ export default function GlassDock({
       const rect = node.getBoundingClientRect()
       if (rect.width > 0) centres[id] = rect.left + rect.width / 2
     }
-    let padTopBase = fallbackPadTop
-    let padInlineBase = fallbackPadInline
+    let padTopValue = fallbackPadTop
+    let padInlineValue = fallbackPadInline
     let spread = false
     if (root && typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
       const style = window.getComputedStyle(root)
-      const top = parseFloat(style.paddingTop)
-      const inline = parseFloat(style.paddingLeft)
-      if (Number.isFinite(top) && top > 0) padTopBase = top
-      if (Number.isFinite(inline) && inline > 0) padInlineBase = inline
+      // A filled dock OWNS its padding, so there is nothing to read back: the
+      // numbers it is already rendering with ARE the base. (Reading the
+      // computed value would freeze the previous viewport's padding into the
+      // dock, because the inline style this read returns is the one the dock
+      // itself wrote.) The row's spread mode is still the cascade's business.
+      if (!fill) {
+        const top = parseFloat(style.paddingTop)
+        const inline = parseFloat(style.paddingLeft)
+        if (Number.isFinite(top) && top > 0) padTopValue = top
+        if (Number.isFinite(inline) && inline > 0) padInlineValue = inline
+      }
       spread = style.justifyContent === 'space-between'
     }
     const ids = itemsRef.current.map((item) => item.id).filter((id) => centres[id] !== undefined)
-    layoutRef.current = { centres, ids, padTop: padTopBase, padInline: padInlineBase, spread }
-  }, [fallbackPadInline, fallbackPadTop])
+    layoutRef.current = { centres, ids, padTop: padTopValue, padInline: padInlineValue, spread }
+    // Publish the resting padding so the capsule wears it on this frame (see
+    // `padTopBase` / `padInlineBase`).
+    padTopBase.set(padTopValue)
+    padInlineBase.set(padInlineValue)
+  }, [fill, fallbackPadInline, fallbackPadTop, padInlineBase, padTopBase])
 
   const measure = useCallback(() => {
     if (atRest()) {
@@ -724,8 +826,14 @@ export default function GlassDock({
       }`}
       style={{
         touchAction: 'none',
+        // A filled dock's rhythm comes from the numbers `SiteFooterNav`
+        // measured for this viewport — inline, so it also outranks the fit
+        // bands that tighten the eight-tab rhythm on a narrow phone. Without a
+        // fill these are `undefined` and the authored classes stand.
+        gap: fill ? fill.gap : undefined,
         paddingTop: padTop,
         paddingInline: padInline,
+        paddingBottom: fill ? fill.padBlock : undefined,
         // The capsule's own box is the only thing that re-lays out during a
         // gesture; keep that work inside the dock and off the page.
         contain: 'layout style',
