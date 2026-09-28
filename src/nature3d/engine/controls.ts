@@ -19,6 +19,11 @@
 import * as THREE from "three";
 import { FLY_LIMIT_RADIUS, OCEAN_LEVEL, terrainHeight, WORLD_HALF } from "./terrain";
 
+/** Two-times touch sensitivity requested for direct camera orbit drags. */
+export const ORBIT_DRAG_SENSITIVITY = 0.01;
+/** Two-times touch sensitivity for two-finger camera panning. */
+export const PAN_DRAG_SENSITIVITY = 0.0064;
+
 /** Frame-rate independent smoothing factor. */
 export function damp(k: number, dt: number): number {
   return 1 - Math.exp(-k * dt);
@@ -231,7 +236,7 @@ export class OrbitRig {
    * distance, so one swipe crosses the island and a close swipe is precise.
    */
   flyByDrag(sx: number, sy: number) {
-    const speed = Math.max(this.distance, 6) * 0.0032;
+    const speed = Math.max(this.distance, 6) * PAN_DRAG_SENSITIVITY;
     this.fly(-sx * speed, sy * speed, 0);
   }
 

@@ -16,10 +16,10 @@ const FIXTURE = `
 import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
 import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
-import { OrbitRig } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/controls.ts"))};
+import { ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY, OrbitRig } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/controls.ts"))};
 import { FramePacing } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/framePacing.ts"))};
 
-export { terrainHeight, OrbitRig, FramePacing };
+export { terrainHeight, OrbitRig, FramePacing, ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -89,6 +89,31 @@ for (const key of ["HTMLElement", "Element", "Node", "Event", "MouseEvent", "get
 const fixture = require(bundle);
 const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
+
+test("orbit and two-finger pan response are exactly twice the previous sensitivity", () => {
+  const { THREE, OrbitRig, ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY } = fixture;
+  assert.equal(ORBIT_DRAG_SENSITIVITY, 0.01);
+  assert.equal(PAN_DRAG_SENSITIVITY, 0.0064);
+
+  const cameraA = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
+  const cameraB = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
+  const previousOrbit = new OrbitRig();
+  const updatedOrbit = new OrbitRig();
+  previousOrbit.rotate(100 * 0.005, 0);
+  updatedOrbit.rotate(100 * ORBIT_DRAG_SENSITIVITY, 0);
+  previousOrbit.update(1, cameraA);
+  updatedOrbit.update(1, cameraB);
+  const previousTurn = Math.abs(previousOrbit.yaw + 0.35);
+  const updatedTurn = Math.abs(updatedOrbit.yaw + 0.35);
+  assert.ok(Math.abs(updatedTurn / previousTurn - 2) < 1e-9);
+
+  const updatedPan = new OrbitRig();
+  const start = updatedPan.target.clone();
+  updatedPan.flyByDrag(100, 0);
+  const moved = Math.hypot(updatedPan.target.x - start.x, updatedPan.target.z - start.z);
+  const previousSensitivityDistance = Math.max(updatedPan.distance, 6) * 0.0032 * 100;
+  assert.ok(Math.abs(moved / previousSensitivityDistance - 2) < 1e-9);
+});
 
 test("button-driven camera presets are recognized as motion and bypass the low-tier cap", () => {
   const { THREE, OrbitRig, FramePacing } = fixture;

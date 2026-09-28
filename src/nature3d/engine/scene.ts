@@ -59,7 +59,7 @@ import {
 } from "./beachHouses";
 import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
-import { OrbitRig } from "./controls";
+import { ORBIT_DRAG_SENSITIVITY, OrbitRig } from "./controls";
 import { FramePacing } from "./framePacing";
 import { StudyWorldPacer } from "./studyWorldPacer";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
@@ -1006,8 +1006,8 @@ export class Sanctuary {
     }
 
     if (!this.pointerPrev.down || e.pointerId !== this.pointerPrev.id) return;
-    const dx = (e.clientX - this.pointerPrev.x) * 0.005;
-    const dy = (e.clientY - this.pointerPrev.y) * 0.005;
+    const dx = (e.clientX - this.pointerPrev.x) * ORBIT_DRAG_SENSITIVITY;
+    const dy = (e.clientY - this.pointerPrev.y) * ORBIT_DRAG_SENSITIVITY;
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
     if (this.studyFocus) return;

@@ -46,12 +46,15 @@
   button-driven camera transitions (fit, zoom, rotate), so movement renders on
   each available animation frame. The cap resumes when motion settles; wheel
   zoom gets a short responsive window.
+- Camera orbit drag sensitivity is doubled from 0.005 to 0.01 radians per CSS
+  pixel; two-finger pan sensitivity is doubled from 0.0032 to 0.0064. Pinch
+  zoom scaling is unchanged.
 
 ## Verification
 
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed.
-- `node --test tests/nature3dBoardPinRuntime.test.mjs`: fourteen tests passed.
+- `node --test tests/nature3dBoardPinRuntime.test.mjs`: fifteen tests passed.
 - `tests/nature3dBoardBrowser.test.mjs`: passed in real headless Chromium with
   software WebGL. Checks actual framebuffer alpha under a foreground box,
   uncovered board pixels, iframe window/document identity and load count across
@@ -66,8 +69,10 @@
   work before, versus 0 raster tasks after the fog shader/compositor changes.
   Added browser regression fails if a 90-frame zoom produces 90 or more raster
   tasks (timings are deliberately not asserted across variable CI GPUs).
-- Board runtime/browser tests: 16 passed together, including active-gesture frame-cap bypass and release-stop regression checks. Broad Sanctuary source
-  contracts retain the same unrelated legacy failures; the winter runtime suite
+- Board runtime/browser tests: 18 passed together, including active-gesture
+  frame-cap bypass, release-stop, and exactly doubled drag-sensitivity checks.
+  Broad Sanctuary source contracts retain the same unrelated legacy failures;
+  the winter runtime suite
   has one pre-existing furniture mesh-count assertion (`shaders.length > 10`)
   against unchanged modules.
 
