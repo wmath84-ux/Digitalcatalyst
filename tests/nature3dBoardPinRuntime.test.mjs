@@ -17,8 +17,9 @@ import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
 import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
 import { OrbitRig } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/controls.ts"))};
+import { FramePacing } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/framePacing.ts"))};
 
-export { terrainHeight, OrbitRig };
+export { terrainHeight, OrbitRig, FramePacing };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -88,6 +89,18 @@ for (const key of ["HTMLElement", "Element", "Node", "Event", "MouseEvent", "get
 const fixture = require(bundle);
 const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
+
+test("low-tier frame cap is bypassed during camera input and resumes on release", () => {
+  const { FramePacing } = fixture;
+  const pacer = new FramePacing();
+  assert.equal(pacer.shouldSkip(0, 30, false), false);
+  assert.equal(pacer.shouldSkip(16, 30, false), true);
+  for (const t of [32, 48, 64, 80, 96, 112]) {
+    assert.equal(pacer.shouldSkip(t, 30, true), false, "do not skip an active camera gesture frame");
+  }
+  assert.equal(pacer.shouldSkip(128, 30, false), false, "release gets an immediate frame");
+  assert.equal(pacer.shouldSkip(144, 30, false), true, "thermal cap resumes after the gesture");
+});
 
 test("camera drag stops at the current pose when the final finger lifts", () => {
   const { THREE, OrbitRig } = fixture;

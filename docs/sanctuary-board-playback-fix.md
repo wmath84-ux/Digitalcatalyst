@@ -42,12 +42,15 @@
   the current camera pose. This prevents residual movement coasting after the
   learner lifts their finger; smoothing still applies during the drag. Plain
   taps and board interactions do not cancel a preset pan.
+- Low-tier 30 Hz thermal pacing is bypassed while a camera gesture is actively
+  moving, so fast swipes render on each available animation frame. The cap
+  resumes immediately after release; wheel zoom gets a short responsive window.
 
 ## Verification
 
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed.
-- `node --test tests/nature3dBoardPinRuntime.test.mjs`: eleven tests passed.
+- `node --test tests/nature3dBoardPinRuntime.test.mjs`: thirteen tests passed.
 - `tests/nature3dBoardBrowser.test.mjs`: passed in real headless Chromium with
   software WebGL. Checks actual framebuffer alpha under a foreground box,
   uncovered board pixels, iframe window/document identity and load count across
@@ -62,7 +65,7 @@
   work before, versus 0 raster tasks after the fog shader/compositor changes.
   Added browser regression fails if a 90-frame zoom produces 90 or more raster
   tasks (timings are deliberately not asserted across variable CI GPUs).
-- Board runtime/browser tests: 14 passed together. Broad Sanctuary source
+- Board runtime/browser tests: 16 passed together, including active-gesture frame-cap bypass and release-stop regression checks. Broad Sanctuary source
   contracts retain the same unrelated legacy failures; the winter runtime suite
   has one pre-existing furniture mesh-count assertion (`shaders.length > 10`)
   against unchanged modules.

@@ -60,6 +60,7 @@ import {
 import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
 import { OrbitRig } from "./controls";
+import { FramePacing } from "./framePacing";
 import { StudyWorldPacer } from "./studyWorldPacer";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
@@ -333,8 +334,12 @@ export class Sanctuary {
    * See SANCTUARY_MOBILE_PERFORMANCE.md (ACTIVATE_THERMAL_DRS_PACING).
    */
   private shedLevel = 0;
-  /** Wall-clock gate for the tier's fps cap (the Swappy-style pacer). */
-  private paceNext = 0;
+  /** Thermal frame cap, bypassed only during active camera input. */
+  private readonly framePacing = new FramePacing();
+  /** True only while a camera gesture is actively changing the rig. */
+  private cameraGestureActive = false;
+  /** Short high-cadence tail for wheel/trackpad zoom events. */
+  private cameraInputBoostUntil = 0;
   /** Previous rendered frame's start time — the DRS's wall-clock signal. */
   private lastTickStart = 0;
 
@@ -949,6 +954,7 @@ export class Sanctuary {
     // Framed board: do not orbit. Dragging the camera is what made the 2D
     // page look like it was spinning on the lectern.
     if (this.studyFocus) return;
+    if (this.pointers.size === 0) this.cameraGestureActive = false;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // A second finger turns the gesture into a pinch-zoom of the camera.
     if (this.pointers.size === 2) {
@@ -979,10 +985,18 @@ export class Sanctuary {
         const ratio = this.pinchPrev / Math.max(dist, 1);
         // A pure slide barely changes the finger gap. Ignore that noise so
         // flying does not also zoom.
-        if (ratio > 1.012 || ratio < 0.988) this.orbit.zoom(ratio);
+        if (ratio > 1.012 || ratio < 0.988) {
+          this.orbit.zoom(ratio);
+          this.cameraGestureActive = true;
+        }
       }
       if (this.pinchMid.ready) {
-        this.orbit.flyByDrag(midX - this.pinchMid.x, midY - this.pinchMid.y);
+        const dx = midX - this.pinchMid.x;
+        const dy = midY - this.pinchMid.y;
+        if (Math.abs(dx) + Math.abs(dy) > 0.01) {
+          this.orbit.flyByDrag(dx, dy);
+          this.cameraGestureActive = true;
+        }
       }
       this.pinchPrev = dist;
       this.pinchMid.x = midX;
@@ -997,6 +1011,7 @@ export class Sanctuary {
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
     if (this.studyFocus) return;
+    this.cameraGestureActive = true;
     this.orbit.rotate(dx, dy);
   };
 
@@ -1006,18 +1021,14 @@ export class Sanctuary {
       return;
     }
     const start = this.pointers.get(e.pointerId);
-    const down = this.downPos;
-    const dragDistance = down?.id === e.pointerId
-      ? Math.hypot(e.clientX - down.x, e.clientY - down.y)
-      : 0;
-    const cameraGesture = this.pinchTainted.has(e.pointerId) || dragDistance >= 8;
     this.pointers.delete(e.pointerId);
     // A released camera gesture is the end of input, not the start of a long
     // inertial coast. Keep smoothing while the finger is down; discard only
     // the unconsumed target when the final orbit/pinch pointer lifts. Plain
     // taps and board interactions must not cancel a preset camera pan.
-    if (start && cameraGesture && this.pointers.size === 0 && !this.studyFocus) {
-      this.orbit.stopInertia();
+    if (start && this.pointers.size === 0) {
+      if (this.cameraGestureActive && !this.studyFocus) this.orbit.stopInertia();
+      this.cameraGestureActive = false;
     }
     if (this.pointers.size < 2) {
       this.pinchPrev = 0;
@@ -1159,6 +1170,7 @@ export class Sanctuary {
       return;
     }
     e.preventDefault();
+    this.cameraInputBoostUntil = performance.now() + 180;
     this.orbit.zoom(1 + Math.sign(e.deltaY) * 0.1);
   };
 
@@ -2161,20 +2173,11 @@ export class Sanctuary {
     const frameStart = performance.now();
 
     // ── Frame pacing (ACTIVATE_THERMAL_DRS_PACING, pacing half) ───────
-    //
-    // On capped tiers (30 fps on low) a rAF that arrives EARLIER than the
-    // frame budget is skipped wholesale — the browser keeps scheduling ticks
-    // at the panel's refresh rate, we simply render every other one. The
-    // simulation loses nothing: THREE.Clock accumulates the skipped span, so
-    // the next rendered frame receives the full ~33 ms of dt and the world
-    // moves at true speed. A fixed 30 Hz cadence on a tile GPU is smoother
-    // than a jagged 38–50 fps oscillation (this is why the consoles and
-    // Swappy pace instead of free-running), and it halves the thermal load
-    // that triggers Android's sustained-performance throttle.
-    if (this.budget.fpsCap > 0) {
-      if (frameStart < this.paceNext) return;
-      this.paceNext = Math.max(frameStart, this.paceNext) + 1000 / this.budget.fpsCap;
-    }
+    // Keep the thermal cap for ordinary world idling, but never throw away
+    // RAF ticks while a camera gesture is changing the rig. That avoids
+    // 30 Hz judder on fast touch swipes without permanently doubling GPU load.
+    const responsiveCameraInput = this.cameraGestureActive || frameStart < this.cameraInputBoostUntil;
+    if (this.framePacing.shouldSkip(frameStart, this.budget.fpsCap, responsiveCameraInput)) return;
 
     // The DRS signal is the WALL-CLOCK span since the last rendered frame,
     // never the tick's CPU time: on a GPU-bound phone the CPU work below is
