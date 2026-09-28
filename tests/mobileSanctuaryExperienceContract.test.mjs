@@ -32,7 +32,9 @@ test("Home alone opts into the dinosaur Sanctuary footer destination", () => {
     bottomNav.indexOf('key: "sanctuary"') > bottomNav.indexOf('key: "flowpath"'),
     "Sanctuary must be immediately appended beside the right-most FlowPath tab",
   );
-  assert.match(bottomNav, /key === "sanctuary"\) window\.location\.hash = "#\/nature-studio"/);
+  assert.match(bottomNav, /key === "sanctuary"/);
+  assert.match(bottomNav, /lockAppToLandscape\(\)/);
+  assert.match(bottomNav, /window\.location\.hash = "#\/nature-studio"/);
 });
 
 test("the eight-tab mobile dock fits without clipping its last destination", () => {

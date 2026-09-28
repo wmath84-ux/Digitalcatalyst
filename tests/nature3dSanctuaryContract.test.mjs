@@ -1072,13 +1072,15 @@ test("the boards are live DOM surfaces, not textures, so every file type works",
   assert.match(STUDY_BOARDS, /loadLocalNotes|persistLocalNotes/);
 });
 
-test("the reading board lists only purchased courses", () => {
+test("the reading board lists purchased courses and sanctuary-created modules", () => {
   // Ownership now comes from the full entitlement resolver (Group 15), not
   // from the legacy purchases subcollection alone.
   assert.match(PAGE, /useOwnedCourses\(\)/);
   assert.match(PAGE, /<BoardPortals/);
   // Drilling down: course -> module -> resource, chosen by the learner.
   assert.match(READING_BOARD, /courses\.map\(/);
+  assert.match(READING_BOARD, /myCourses\.map\(/);
+  assert.match(READING_BOARD, /Created by you/);
   assert.match(READING_BOARD, /course\.courseContent/);
   // Opening a resource also records which module it came from, so the notes
   // and mind-map boards scope to it (Group 15).
@@ -1096,7 +1098,7 @@ test("the tray switches boards and the camera turns to the one picked", () => {
     );
   }
   assert.match(PAGE, /key: "student", label: "Desk"/);
-  assert.match(PAGE, /engineRef\.current\?\.focus\(key\)/);
+  assert.match(PAGE, /engineRef\.current\?\.focus\(preset\)/);
   // And the engine knows those presets.
   assert.match(SCENE, /\| "reading" \| "notes" \| "mindmap"/);
 });
@@ -1785,9 +1787,10 @@ test("the learner can switch lighting from the top tray", () => {
 
 
 test("Ice Age is an accessible reversible top-tray toggle independent of daylight", () => {
+  const SETTINGS = read("src/nature3d/SanctuarySettings.tsx");
   assert.match(PAGE, /useState\(false\)/);
-  assert.match(PAGE, /aria-pressed=\{iceAge\}/);
-  assert.match(PAGE, /aria-label="Ice Age"/);
+  assert.match(SETTINGS, /pressed=\{iceAge\}/);
+  assert.match(SETTINGS, /ariaLabel="Ice Age"/);
   assert.match(PAGE, /engineRef\.current\?\.setIceAge\(next\)/);
   const seasonal = SCENE.slice(SCENE.indexOf("setIceAge(enabled"), SCENE.indexOf("setDaylightMode(mode"));
   assert.match(seasonal, /this\.winter\.setEnabled\(enabled\)/);

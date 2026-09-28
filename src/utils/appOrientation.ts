@@ -3,16 +3,16 @@
 // HARD RULE - Mobile Portrait Lock:
 // - Mobile phones are LOCKED to portrait EVERYWHERE except the Course
 //   Player and the Nature Studio 3D world.
-// - Those two screens are the ONLY places where rotation is allowed: the
-//   course player is a video/lesson reader, and the 3D world is a whole
-//   island to look around — both are properly wider in landscape, and the
-//   learner must be able to rotate freely while on them.
+// - Course player: rotation is UNLOCKED (FULL_SENSOR) so a lesson can be
+//   watched in either orientation, even if auto-rotate is OFF (YouTube).
+// - Nature Studio: HARD LANDSCAPE LOCK (SENSOR_LANDSCAPE), PUBG / BGMI
+//   style. Tapping Sanctuary rotates the phone into landscape and OPENS
+//   already rotated — auto-rotate ON or OFF does not matter. Leaving the
+//   world locks straight back to portrait.
 // - This is a HARD rule that applies whether the user has system auto-rotate
 //   ON or OFF, and whether the phone is currently held in landscape or portrait:
-//   outside the course player the app NEVER rotates (Screen Orientation API +
-//   Capacitor plugin lock + full-screen overlay fallback on web). Inside the
-//   course player, rotation is allowed and uses FULL_SENSOR on native so it can
-//   rotate even if auto-rotate OFF (like YouTube).
+//   outside those two screens the app NEVER rotates (Screen Orientation API +
+//   Capacitor plugin lock + full-screen overlay fallback on web).
 // - Tablet/desktop are NEVER locked - their layouts work in any orientation.
 //
 // Four layers for enforcement:
@@ -36,12 +36,12 @@ const rotationListeners = new Set<RotationListener>();
 /** True while the Course Player is mounted — rotation unlocked. */
 let coursePlayerActive = false;
 /**
- * True while the Nature Studio 3D world is mounted — rotation unlocked
- * (second rotation-free screen, same rule as the course player).
+ * True while the Nature Studio 3D world is mounted — HARD landscape lock
+ * (PUBG / BGMI: the world opens already rotated, auto-rotate ignored).
  */
 let natureStudioActive = false;
 
-/** Rotation is free while EITHER rotation-free screen is open. */
+/** Portrait lock / rotate-overlay stay off while either special screen is open. */
 const rotationUnlocked = (): boolean => coursePlayerActive || natureStudioActive;
 
 /**
@@ -161,6 +161,39 @@ const tryCapacitorLockPortrait = async (): Promise<void> => {
   } catch {}
 };
 
+/** Try Capacitor HARD landscape lock (Sanctuary / PUBG-style). */
+const tryCapacitorLockLandscape = async (): Promise<void> => {
+  try {
+    const mod = await import("@capacitor/screen-orientation").catch(() => null);
+    if (mod?.ScreenOrientation?.lock) {
+      await mod.ScreenOrientation.lock({ orientation: "landscape" }).catch(() => {});
+    }
+  } catch {}
+  try {
+    // @ts-ignore - custom plugin may not have types
+    const { Capacitor } = await import("@capacitor/core").catch(() => ({ Capacitor: null } as any));
+    if (Capacitor?.isNativePlatform?.()) {
+      const plugins: any = (Capacitor as any).Plugins || {};
+      if (plugins.AppOrientation?.lockLandscape) {
+        await plugins.AppOrientation.lockLandscape().catch(() => {});
+        return;
+      }
+      if (plugins.AppOrientation?.lock) {
+        await plugins.AppOrientation.lock({ orientation: "landscape" }).catch(() => {});
+        return;
+      }
+      const custom = (window as any).Capacitor?.Plugins?.AppOrientation;
+      if (custom?.lockLandscape) {
+        await custom.lockLandscape().catch(() => {});
+        return;
+      }
+      if (custom?.lock) {
+        await custom.lock({ orientation: "landscape" }).catch(() => {});
+      }
+    }
+  } catch {}
+};
+
 /** Try Capacitor unlock for course player */
 const tryCapacitorUnlock = async (): Promise<void> => {
   try {
@@ -230,6 +263,40 @@ export const lockAppToPortrait = (): void => {
   void tryCapacitorLockPortrait();
 };
 
+/**
+ * HARD LANDSCAPE LOCK for the 3D Sanctuary.
+ *
+ * PUBG / BGMI contract: the world OPENS already rotated to landscape,
+ * whether the phone's auto-rotate is ON or OFF and whether the user is
+ * currently holding it in portrait. Phones only — tablets/desktops are
+ * left alone.
+ */
+export const lockAppToLandscape = (): void => {
+  if (typeof window === "undefined") return;
+  if (!isPhoneDevice()) {
+    setHtmlOrientationAttributes();
+    return;
+  }
+
+  setHtmlOrientationAttributes();
+
+  try {
+    const orientation = screen.orientation as OrientationLockable | undefined;
+    if (orientation?.lock) {
+      const result = orientation.lock("landscape");
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        (result as Promise<void>).catch(() => {
+          /* rejected — CSS fallback on [data-sanctuary-root] handles it */
+        });
+      }
+    }
+  } catch {
+    /* unsupported */
+  }
+
+  void tryCapacitorLockLandscape();
+};
+
 /** Let the device rotate freely again (Course Player only) */
 export const unlockAppRotation = (): void => {
   setHtmlOrientationAttributes();
@@ -247,28 +314,28 @@ export const unlockAppRotation = (): void => {
 
 export const isCoursePlayerRotationActive = (): boolean => coursePlayerActive;
 
-/** True while the Nature Studio 3D world is mounted — rotation unlocked. */
+/** True while the Nature Studio 3D world is mounted — hard landscape lock. */
 export const isNatureStudioRotationActive = (): boolean => natureStudioActive;
 
-/** True while EITHER rotation-free screen is open (course player, nature studio). */
+/** True while EITHER special screen is open (course player, nature studio). */
 export const isRotationUnlockedActive = (): boolean => rotationUnlocked();
 
 /**
- * Called by the Nature Studio on mount: unlock rotation (same contract as
- * the course player) and let the global portrait guard keep its overlay
- * away.
+ * Called by the Nature Studio on mount — AND from the Sanctuary button
+ * click (user gesture, so the Web Orientation API is allowed to lock).
+ *
+ * HARD landscape: the world opens already rotated, auto-rotate ignored.
  */
 export const enterNatureStudioRotation = (): void => {
   natureStudioActive = true;
-  unlockAppRotation();
+  lockAppToLandscape();
   notifyRotationChange();
-  // Extra safety: retry unlock after delays for native platforms (the
-  // Capacitor plugin may need time to bind after the switch to fullSensor).
+  // Native lock can lag a tick after the activity switch; re-assert.
   setTimeout(() => {
-    if (natureStudioActive) unlockAppRotation();
+    if (natureStudioActive) lockAppToLandscape();
   }, 300);
   setTimeout(() => {
-    if (natureStudioActive) unlockAppRotation();
+    if (natureStudioActive) lockAppToLandscape();
   }, 800);
 };
 
@@ -340,9 +407,9 @@ export const initOrientationLock = (): void => {
 
   // Re-lock on visibility change (app coming from background)
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && !rotationUnlocked()) {
-      lockAppToPortrait();
-    }
+    if (document.visibilityState !== "visible") return;
+    if (natureStudioActive) lockAppToLandscape();
+    else if (!rotationUnlocked()) lockAppToPortrait();
   });
 
   // Re-lock on hash change (navigation) if not entering a rotation-free

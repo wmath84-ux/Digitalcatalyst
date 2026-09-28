@@ -9,8 +9,10 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
  * Hard-rule orientation plugin:
- * - lockPortrait: Forces portrait everywhere except course player (hard lock).
- * - unlock: Allows FULL_SENSOR rotation ONLY inside course player.
+ * - lockPortrait: Forces portrait everywhere except course player / sanctuary.
+ * - lockLandscape: Forces landscape for the 3D Sanctuary even if auto-rotate
+ *   is OFF (PUBG / BGMI style — SENSOR_LANDSCAPE).
+ * - unlock: Allows FULL_SENSOR rotation ONLY inside the course player.
  *
  * This is used together with @capacitor/screen-orientation plugin.
  * The screen-orientation plugin's unlock() maps to UNSPECIFIED which respects
@@ -25,6 +27,19 @@ public class AppOrientationPlugin extends Plugin {
         try {
             if (getActivity() != null) {
                 getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
+        } catch (Exception ignored) {}
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void lockLandscape(PluginCall call) {
+        try {
+            if (getActivity() != null) {
+                // SENSOR_LANDSCAPE: the activity OPENS already rotated, even
+                // when the user has system auto-rotate OFF — same contract as
+                // PUBG / BGMI. Either landscape direction is allowed.
+                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
         } catch (Exception ignored) {}
         call.resolve();
@@ -49,7 +64,7 @@ public class AppOrientationPlugin extends Plugin {
                 if ("portrait".equals(orientation)) {
                     getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                 } else if ("landscape".equals(orientation)) {
-                    getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                 } else {
                     getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
                 }

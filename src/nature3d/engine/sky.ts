@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import type { QualityBudget } from "./quality";
-import type { DaylightState } from "./daylight";
+import { DAY_END, DAY_START, type DaylightState } from "./daylight";
 import type { TextureSet } from "./textures";
 
 export interface SkySystem {
@@ -157,10 +157,20 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   // back an untextured ball. Drawn instead on OUR sphere with a basic
   // material, which keeps one draw call and lets daylight keep grading it.
   //
-  // Nudge this fraction to spin the panorama around the compass (0.25 = 90°).
-  const ANIME_SKY_OFFSET_U = 0.0;
+  // ORIENTATION. The JPEG is authored in glTF UV space (v=0 at the IMAGE
+  // top) and that top half is the painted islands — the nadir. TextureLoader
+  // defaults to flipY=true, which put that top on SphereGeometry's +Y, so
+  // looking up showed ground and the sky sat under the earth. We keep
+  // flipY=false so the zenith (sky + sun, the IMAGE bottom) sits on +Y.
+  //
+  // TIME-LAPSE. Rather than a frozen compass offset, the dome yaws around
+  // its centre (local +Y, through the camera) as the hour moves: one full
+  // turn sunrise → sunset, so a morning→evening switch is a visible spin
+  // and Auto mode creeps with the real clock.
   let animeMat: THREE.MeshBasicMaterial | null = null;
   let animeDome: THREE.Mesh | null = null;
+  let animeYaw = 0;
+  let animeYawTarget = 0;
   // Kept from the last applyDaylight so a texture arriving mid-session is
   // graded on arrival, not lit like noon for a frame.
   let lastDaylight: DaylightState | null = null;
@@ -182,6 +192,25 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     // raha hai"), not sink into a black dome.
     animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.18);
     animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.42);
+  };
+
+  /** Centre-axis yaw for this hour: 0 at sunrise, −2π at sunset. */
+  const yawForHour = (state: DaylightState): number => {
+    const t = THREE.MathUtils.clamp((state.hour - DAY_START) / (DAY_END - DAY_START), 0, 1);
+    return -t * Math.PI * 2;
+  };
+
+  const spinAnimeSky = (state: DaylightState, snap: boolean) => {
+    animeYawTarget = yawForHour(state);
+    if (snap) animeYaw = animeYawTarget;
+    if (animeDome) animeDome.rotation.y = animeYaw;
+  };
+
+  const orientAnimeMap = (map: THREE.Texture) => {
+    // glTF V (see block comment): zenith = +Y, nadir = −Y.
+    map.flipY = false;
+    map.wrapS = THREE.RepeatWrapping;
+    map.needsUpdate = true;
   };
 
   // ── No mountain ring ─────────────────────────────────────────────────
@@ -405,6 +434,7 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
         dome.visible = true;
         return;
       }
+      orientAnimeMap(map);
       if (animeDome) {
         animeMat!.map = map;
         animeMat!.needsUpdate = true;
@@ -415,8 +445,6 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
           depthWrite: false,
           fog: false,
         });
-        map.offset.x = ANIME_SKY_OFFSET_U;
-        map.wrapS = THREE.RepeatWrapping;
         // Same sphere as the shader dome (shared geometry, one sphere of
         // VRAM), same draw slot — it REPLACES the dome, never stacks on it.
         animeDome = new THREE.Mesh(dome.geometry, animeMat);
@@ -427,7 +455,12 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
         group.add(animeDome);
         dome.visible = false;
       }
-      if (lastDaylight) gradeAnime(lastDaylight);
+      if (lastDaylight) {
+        gradeAnime(lastDaylight);
+        // First appearance (or a re-toggle) snaps to the current hour so
+        // the dome does not whirl from yaw 0 on enable.
+        spinAnimeSky(lastDaylight, true);
+      }
     },
     applyDaylight(state) {
       lastDaylight = state;
@@ -446,15 +479,26 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       fill.intensity = state.fillIntensity;
       // Clouds pick up the sun's warmth — pure white at sunset is a dead give-away.
       cloudMat.color.copy(state.sunTint).lerp(CLOUD_WHITE, 0.72);
-      // The anime panorama (when enabled) rides the same hour.
+      // The anime panorama (when enabled) rides the same hour: grade AND
+      // a centre-axis yaw, lerped in update() so a mode switch time-lapses.
       gradeAnime(state);
+      spinAnimeSky(state, false);
     },
     update(dt, time, wind, camera) {
       // Keep the sky sphere locked to the eye. A world-fixed dome is clipped
       // by the far plane into a rotating black circle the moment the camera
       // leaves the origin — follow the camera and the whole sky stays lit.
       dome.position.copy(camera.position);
-      if (animeDome) animeDome.position.copy(camera.position);
+      if (animeDome) {
+        // Centre follows the eye so the far plane never clips the sphere
+        // into a black disc; yaw is independent — the time-lapse spin
+        // around the local +Y (the dome's centre axis).
+        animeDome.position.copy(camera.position);
+        const delta = Math.atan2(Math.sin(animeYawTarget - animeYaw), Math.cos(animeYawTarget - animeYaw));
+        // ~2 s on a morning↔evening jump; Auto's 20 s ticks are tiny.
+        animeYaw += delta * Math.min(1, dt * 1.15);
+        animeDome.rotation.y = animeYaw;
+      }
 
       // Cloud banks drift
       for (let i = 0; i < cloudCount; i += 1) {

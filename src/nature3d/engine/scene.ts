@@ -1707,6 +1707,10 @@ export class Sanctuary {
         .then((t) => {
           t.colorSpace = THREE.SRGBColorSpace;
           t.mapping = THREE.EquirectangularReflectionMapping;
+          // GLB-extracted equirect (glTF V). flipY=true put the painted
+          // islands on the zenith — sky.ts also pins this when the dome
+          // is built, but set it here so the first upload is already right.
+          t.flipY = false;
           t.wrapS = THREE.RepeatWrapping;
           t.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
           return t;

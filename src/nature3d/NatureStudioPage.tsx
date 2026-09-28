@@ -15,20 +15,24 @@
 // updates through a direct DOM write, and the joysticks talk to the engine
 // through a ref. That is what keeps the panel at a locked frame rate.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff,
-  Maximize2, Minimize2, PawPrint, RotateCw, Trees,
-  LogOut, Rows3, Sparkles, Waves, Wind, X, Globe2, Mountain, Snowflake, Home,
-  BookOpen, PenLine, Network, Users, Sunrise, Sun, Sunset, Clock,
-  MoreVertical,
+  PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
+  BookOpen, PenLine, Network, Users, Rows3, Settings,
 } from "lucide-react";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
+import SanctuaryModuleMenu from "./boards/SanctuaryModuleMenu";
+import SanctuarySettings, { type SettingsPage } from "./SanctuarySettings";
+import { sanctuaryModulePlayHash } from "./boards/sanctuaryModules";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
+import { useMyCourses } from "../hooks/useMyCourses";
+import { myCourseToProduct } from "../lib/myCourseAdapter";
+import { myCourseStorageId, type MyCourse } from "../types/myCourse";
 import { hourForMode, type DaylightMode } from "./engine/daylight";
 import {
   enterNatureStudioRotation,
@@ -41,17 +45,17 @@ const WIND_STEPS = [
   { label: "Gusty", mult: 2.2 },
 ];
 
-const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> = [
-  // The whole connected world first, then the two districts, then the
-  // points of interest inside the home district.
-  { key: "world", label: "World", Icon: Globe2 },
-  { key: "trek", label: "Highlands", Icon: Mountain },
-  { key: "sanctuary", label: "Sanctuary", Icon: Compass },
-  { key: "warehouse", label: "Villa", Icon: Home },
-  { key: "houses", label: "Beach Houses", Icon: Trees },
-  { key: "board", label: "Board", Icon: Rows3 },
-  { key: "waterfall", label: "Waterfall", Icon: Waves },
-  { key: "wildlife", label: "Wildlife", Icon: PawPrint },
+const PRESETS: Array<{ key: ViewPreset; label: string; short: string; Icon: typeof Compass }> = [
+  // Live on the bottom tray (no longer buried in the ⋮ menu). Short labels
+  // keep the row compact; the full name is the button title.
+  { key: "world", label: "World", short: "World", Icon: Globe2 },
+  { key: "trek", label: "Highlands", short: "Hills", Icon: Mountain },
+  { key: "sanctuary", label: "Sanctuary", short: "Isle", Icon: Compass },
+  { key: "warehouse", label: "Villa", short: "Villa", Icon: Home },
+  { key: "houses", label: "Beach Houses", short: "Beach", Icon: Trees },
+  { key: "board", label: "Board", short: "Board", Icon: Rows3 },
+  { key: "waterfall", label: "Waterfall", short: "Fall", Icon: Waves },
+  { key: "wildlife", label: "Wildlife", short: "Wild", Icon: PawPrint },
 ];
 
 /**
@@ -61,28 +65,15 @@ const PRESETS: Array<{ key: ViewPreset; label: string; Icon: typeof Compass }> =
  * read ONE board at a time. "Desk" pulls back to the seat so all three are in
  * frame together. The fifth tray button is the ⋮ menu itself.
  */
-/**
- * Lighting modes for the top tray.
- *
- * "Auto" leads because it is the default: the sanctuary follows the device
- * clock, so a learner opening it at 5 pm gets evening light without touching
- * anything. The other three pin the sun to a representative hour. Night is
- * deliberately absent — after sunset the scene holds the evening look, since
- * a dark study space would make the boards unreadable.
- */
-const DAYLIGHT_MODES: { key: DaylightMode; label: string; Icon: typeof Sun }[] = [
-  { key: "auto", label: "Auto", Icon: Clock },
-  { key: "morning", label: "Morning", Icon: Sunrise },
-  { key: "midday", label: "Midday", Icon: Sun },
-  { key: "evening", label: "Evening", Icon: Sunset },
-];
-
 const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; short: string; Icon: typeof Compass }> = [
   { key: "mindmap", label: "Mind map", short: "Mind", Icon: Network },
   { key: "reading", label: "Reading", short: "Read", Icon: BookOpen },
   { key: "notes", label: "Note taking", short: "Notes", Icon: PenLine },
   { key: "student", label: "Desk", short: "Desk", Icon: Users },
 ];
+
+/** The tray instruction is visible on open, then must leave within this cap. */
+const TRAY_INSTRUCTION_MS = 3000;
 
 export default function NatureStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,6 +88,7 @@ export default function NatureStudioPage() {
   const [supported] = useState(() => webglSupported());
   const [booting, setBooting] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("light");
   // Low-tier UI diet: the engine's budget decides once at boot. When true,
   // the root gets `sanctuary-lite` and the wallpaper-grade backdrop blurs
   // are downgraded (see winter.css) — backdrop-filter is a fullscreen
@@ -132,6 +124,14 @@ export default function NatureStudioPage() {
   // True when the learner has hidden every HUD button (bottom-right toggle).
   // Only the toggle itself stays on screen.
   const [hudHidden, setHudHidden] = useState(false);
+  // The written tray instruction ("Two fingers fly…") is ON when the
+  // sanctuary world opens, then hideTrayInstruction() takes it off — at
+  // the latest 3 s after the meadow is up. It does not come back.
+  const [trayInstructionVisible, setTrayInstructionVisible] = useState(true);
+  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
+  const [activeView, setActiveView] = useState<ViewPreset | null>(null);
+  const [openCourseId, setOpenCourseId] = useState<string | null>(null);
+  const [focusMine, setFocusMine] = useState(false);
 
   const { user } = useAuth();
   // Ownership is resolved from ALL five sources the app recognises —
@@ -139,6 +139,11 @@ export default function NatureStudioPage() {
   // both legacy purchase records — not just `purchasedIds`, which is only
   // the legacy subcollection and left subscribers with an empty library.
   const { courses: ownedCourses, loading: coursesLoading } = useOwnedCourses();
+  const myCourses = useMyCourses();
+  const myProducts = useMemo(
+    () => myCourses.courses.map(myCourseToProduct),
+    [myCourses.courses],
+  );
 
   // Keep the fullscreen flag honest when the user leaves via Esc / F11.
   useEffect(() => {
@@ -147,10 +152,9 @@ export default function NatureStudioPage() {
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
-  // The 3D world is a rotation-free screen (same rule as the course
-  // player): the learner must be able to hold the phone in landscape to
-  // look around the island — no portrait re-lock, no "Rotate your phone"
-  // overlay, while the studio is open. Back to the portrait lock on exit.
+  // HARD LANDSCAPE (PUBG / BGMI): phones open the world already rotated,
+  // whether auto-rotate is ON or OFF. Tablets/desktops are left alone.
+  // Back to the portrait lock on exit.
   useEffect(() => {
     enterNatureStudioRotation();
     return () => exitNatureStudioRotation();
@@ -185,8 +189,11 @@ export default function NatureStudioPage() {
     setBoardHosts(engine.boardHosts());
 
     const resize = () => {
-      const r = host.getBoundingClientRect();
-      engine?.resize(r.width, r.height);
+      // clientWidth/Height are the laid-out box. After the CSS landscape
+      // fallback rotates [data-sanctuary-root], that box is already the
+      // landscape size — getBoundingClientRect would return the AABB of
+      // the rotated element (portrait), which would squash the world.
+      engine?.resize(host.clientWidth, host.clientHeight);
     };
     resize();
     engine.start();
@@ -224,6 +231,19 @@ export default function NatureStudioPage() {
     setClockHour(hourForMode("auto"));
     return () => window.clearInterval(id);
   }, [daylight]);
+
+  /** Hide the bottom-tray instruction. Called by the 3 s open-world timer. */
+  const hideTrayInstruction = useCallback(() => {
+    setTrayInstructionVisible(false);
+  }, []);
+
+  useEffect(() => {
+    // Wait for the boot veil to drop so the learner actually sees the world
+    // (and the hint) before the clock starts. Cap is 3 s from that moment.
+    if (booting || !trayInstructionVisible) return undefined;
+    const id = window.setTimeout(hideTrayInstruction, TRAY_INSTRUCTION_MS);
+    return () => window.clearTimeout(id);
+  }, [booting, trayInstructionVisible, hideTrayInstruction]);
 
   const cycleWind = useCallback(() => {
     setWindIdx((i) => {
@@ -330,7 +350,41 @@ export default function NatureStudioPage() {
     refreshInsets();
     engineRef.current?.focus(preset);
     setActiveBoard(preset);
+    setActiveView(null);
   }, [refreshInsets]);
+
+  const focusSceneryView = useCallback((preset: ViewPreset) => {
+    engineRef.current?.focus(preset);
+    setActiveBoard(null);
+    setActiveView(preset);
+    setModuleMenuOpen(false);
+    setMenuOpen(false);
+  }, []);
+
+  const playMyCourse = useCallback((course: MyCourse) => {
+    window.location.hash = sanctuaryModulePlayHash(course.id);
+  }, []);
+
+  const playMyCourseByProductId = useCallback((productId: string) => {
+    const raw = productId.startsWith("mine-") ? productId.slice("mine-".length) : productId;
+    window.location.hash = sanctuaryModulePlayHash(raw);
+  }, []);
+
+  const openMyCourseOnBoard = useCallback((course: MyCourse) => {
+    setFocusMine(true);
+    setOpenCourseId(myCourseStorageId(course.id));
+    setModuleMenuOpen(false);
+    focusStudyView("reading");
+  }, [focusStudyView]);
+
+  const onSanctuaryModuleCreated = useCallback((course: MyCourse) => {
+    void myCourses.save(course);
+    setFocusMine(true);
+    setOpenCourseId(myCourseStorageId(course.id));
+    focusStudyView("reading");
+  }, [focusStudyView, myCourses.save]);
+
+  const consumeOpenCourse = useCallback(() => setOpenCourseId(null), []);
 
   // The bottom-right eye: one tap hides EVERY button (tray + stats chip) —
   // only the eye remains. If a study board is in focus it re-frames
@@ -340,6 +394,7 @@ export default function NatureStudioPage() {
   // ⋮ menu.
   const toggleHud = useCallback(() => {
     setMenuOpen(false);
+    setModuleMenuOpen(false);
     if (hudHidden) setTrayVisible(true);
     setHudHidden((v) => !v);
   }, [hudHidden]);
@@ -364,7 +419,10 @@ export default function NatureStudioPage() {
   }
 
   return (
-    <main className={liteFx ? "sanctuary-lite fixed inset-0 z-[90] bg-[#0b1620]" : "fixed inset-0 z-[90] bg-[#0b1620]"}>
+    <main
+      data-sanctuary-root
+      className={liteFx ? "sanctuary-lite fixed inset-0 z-[90] bg-[#0b1620]" : "fixed inset-0 z-[90] bg-[#0b1620]"}
+    >
       <div
         className="absolute overflow-hidden bg-[#0b1620]"
         style={{ inset: 0 }}
@@ -402,23 +460,30 @@ export default function NatureStudioPage() {
         </header>
         ) : null}
 
-        {/* ── Bottom tray — ON by default. Exactly five controls: the four
-            study boards (Mind / Reading / Notes / Desk) plus the ⋮ menu as
-            the fifth button; every other control lives inside that menu.
-            The tray can be hidden from inside the menu itself, and one tap
-            on the bottom-right eye brings every button back. ── */}
-        {!hudHidden && trayVisible ? (
-        <p className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md">
+        {/* ── Bottom tray — study boards, scenery views, Module, ⋮ menu.
+            Views used to live in the settings dropdown; they sit on the
+            tray now. Module opens the create/library panel. The ⋮ keeps
+            light / scene / exit. One tap on the eye hides every button. ── */}
+        {!hudHidden && trayVisible && trayInstructionVisible ? (
+        <p
+          data-tray-instruction
+          className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md"
+        >
           Two fingers fly · double-tap to go
         </p>
         ) : null}
         {!hudHidden && trayVisible ? (
         <nav
           ref={hudTrayRef}
-          aria-label="Study boards and all controls"
-          className="pointer-events-auto absolute bottom-3 left-1/2 z-40 -translate-x-1/2"
+          aria-label="Study boards, views and modules"
+          className="pointer-events-auto absolute bottom-3 left-3 right-16 z-40"
         >
-          <div className="flex items-center gap-1 rounded-2xl border border-white/22 bg-slate-950/55 p-1.5 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-end gap-1.5">
+          <div
+            data-sanctuary-tray-scroll
+            className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-white/22 bg-slate-950/55 p-1.5 shadow-2xl backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div className="flex w-max items-center gap-1">
             {BOARD_VIEWS.map(({ key, label, short, Icon }) => (
               <button
                 key={key}
@@ -440,192 +505,69 @@ export default function NatureStudioPage() {
 
             <div aria-hidden className="mx-0.5 h-8 w-px bg-white/15" />
 
-            {/* Fifth tray button: the ⋮ menu itself (moved down from the
-                top-left corner). The dropdown opens UPWARDS from the tray. */}
-            <div className="relative">
+            {PRESETS.map(({ key, label, short, Icon }) => (
               <button
+                key={key}
                 type="button"
-                aria-expanded={menuOpen}
-                aria-label={menuOpen ? "Close the controls menu" : "Open all controls"}
-                onClick={() => setMenuOpen((v) => !v)}
-                title={menuOpen ? "Close the menu" : "All controls — boards, views, light, camera"}
-                className={`grid h-12 w-12 place-items-center rounded-xl border transition ${
-                  menuOpen
-                    ? "border-emerald-300/60 bg-emerald-500/30 text-white shadow-[0_0_24px_rgba(16,185,129,0.45)]"
-                    : "border-white/22 bg-slate-950/55 text-white/85 hover:bg-white/15"
+                aria-pressed={activeView === key}
+                aria-label={label}
+                title={label}
+                onClick={() => focusSceneryView(key)}
+                className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
+                  activeView === key
+                    ? "bg-sky-400/25 text-white shadow-[0_0_16px_rgba(56,189,248,0.35)]"
+                    : "text-white/85 hover:bg-white/15"
                 }`}
               >
-                <MoreVertical className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
+                <span className="text-[8px] font-bold leading-none tracking-wide">{short}</span>
               </button>
-
-              {menuOpen ? (
-                <>
-                  {/* Tap-anywhere-else closes the menu. */}
-                  <div
-                    className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                  <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/22 bg-slate-950/85 shadow-2xl backdrop-blur-xl">
-                    {/* The title card that used to sit loose in the top bar. */}
-                    <div className="flex items-center gap-3 border-b border-white/10 px-3.5 py-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-tr from-amber-400 via-orange-400 to-emerald-500 text-white shadow-lg shadow-amber-500/25">
-                        <Sparkles className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <h1 className="flex flex-wrap items-center gap-2 text-[13px] font-black tracking-tight text-white">
-                          Morning Nature Sanctuary
-                          <span className="rounded-full border border-emerald-400/40 bg-emerald-500/25 px-2 py-0.5 text-[9px] font-bold text-emerald-200">
-                            {iceAge ? "Ice Age" : "Living biome"}
-                          </span>
-                        </h1>
-                        <p className="truncate text-[11px] text-white/55">
-                          {iceAge
-                            ? "Frozen world · Drifting snow · Frosted study space"
-                            : "Highlands · Waterfall · Living forest"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="max-h-[calc(100vh-11rem)] overflow-y-auto p-1.5">
-                      {/* ── Study boards (mirrors the tray's first four) ── */}
-                      <MenuSection label="Study boards">
-                        {BOARD_VIEWS.map(({ key, label, Icon }) => (
-                          <MenuItem
-                            key={key}
-                            Icon={Icon}
-                            label={label}
-                            active={activeBoard === key}
-                            onClick={() => {
-                              focusStudyView(key);
-                              setMenuOpen(false);
-                            }}
-                          />
-                        ))}
-                      </MenuSection>
-
-                      {/* ── Viewpoints (the old presets row) ── */}
-                      <MenuSection label="Views">
-                        {PRESETS.map(({ key, label, Icon }) => (
-                          <MenuItem
-                            key={key}
-                            Icon={Icon}
-                            label={label}
-                            onClick={() => {
-                              engineRef.current?.focus(key);
-                              setActiveBoard(null);
-                              setMenuOpen(false);
-                            }}
-                          />
-                        ))}
-                      </MenuSection>
-
-                      {/* ── Light (the old segmented daylight switch) ── */}
-                      <MenuSection label="Light">
-                        <div className="flex items-center gap-1 rounded-xl bg-white/[0.06] p-1">
-                          {DAYLIGHT_MODES.map(({ key, label, Icon }) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => {
-                                engineRef.current?.setDaylightMode(key);
-                                setDaylight(key);
-                              }}
-                              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5 text-[9px] font-bold transition ${
-                                daylight === key
-                                  ? "bg-amber-400/25 text-white shadow-[0_0_16px_rgba(251,191,36,0.35)]"
-                                  : "text-white/70 hover:bg-white/12"
-                              }`}
-                              title={
-                                key === "auto"
-                                  ? "Follow the real time of day"
-                                  : `Light the sanctuary as ${label.toLowerCase()}`
-                              }
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                        {daylight === "auto" ? (
-                          <p className="px-3 pt-1 font-mono text-[10px] font-bold text-amber-200/80">
-                            {String(Math.floor(clockHour)).padStart(2, "0")}:
-                            {String(Math.floor((clockHour % 1) * 60)).padStart(2, "0")} · following your clock
-                          </p>
-                        ) : null}
-                      </MenuSection>
-
-                      {/* ── Scene toggles (the old top-bar cluster) ── */}
-                      <MenuSection label="Scene">
-                        <MenuItem
-                          Icon={Snowflake}
-                          label="Ice Age"
-                          active={iceAge}
-                          right={iceAge ? "On" : "Off"}
-                          onClick={() => {
-                            const next = !iceAge;
-                            engineRef.current?.setIceAge(next);
-                            setIceAge(next);
-                          }}
-                        />
-                        <MenuItem
-                          Icon={Sparkles}
-                          label="Anime sky"
-                          active={animeSky}
-                          right={animeSky ? "On" : "Off"}
-                          onClick={() => {
-                            const next = !animeSky;
-                            engineRef.current?.setAnimeSky(next);
-                            setAnimeSky(next);
-                          }}
-                        />
-                        <MenuItem
-                          Icon={Wind}
-                          label="Wind strength"
-                          right={WIND_STEPS[windIdx].label}
-                          onClick={cycleWind}
-                        />
-                        <MenuItem
-                          Icon={RotateCw}
-                          label="Auto 360° orbit"
-                          active={autoOrbit}
-                          right={autoOrbit ? "On" : "Off"}
-                          onClick={toggleOrbit}
-                        />
-                        <MenuItem
-                          Icon={immersive ? Minimize2 : Maximize2}
-                          label={immersive ? "Exit fullscreen" : "Fullscreen"}
-                          active={immersive}
-                          onClick={() => {
-                            toggleFullscreen();
-                            setMenuOpen(false);
-                          }}
-                        />
-                        {/* Hides this tray; the bottom-right eye button is
-                            what brings every button back. */}
-                        <MenuItem
-                          Icon={Rows3}
-                          label="Bottom tray"
-                          right="Hide"
-                          onClick={() => {
-                            setTrayVisible(false);
-                            setMenuOpen(false);
-                          }}
-                        />
-                      </MenuSection>
-
-                      <div className="mt-1 border-t border-white/10 p-1.5">
-                        <MenuItem
-                          Icon={LogOut}
-                          label="Back to Digital Catalyst"
-                          onClick={exitSanctuary}
-                          danger
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : null}
+            ))}
             </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/22 bg-slate-950/55 p-1.5 shadow-2xl backdrop-blur-xl">
+            <SanctuaryModuleMenu
+              uid={user?.id ?? null}
+              courses={myCourses.courses}
+              loading={myCourses.state === "loading"}
+              open={moduleMenuOpen}
+              onToggle={() => {
+                setMenuOpen(false);
+                setModuleMenuOpen((v) => {
+                  const next = !v;
+                  if (next) {
+                    setFocusMine(true);
+                    focusStudyView("reading");
+                  }
+                  return next;
+                });
+              }}
+              onClose={() => setModuleMenuOpen(false)}
+              onOpenOnBoard={openMyCourseOnBoard}
+              onPlay={playMyCourse}
+              onCreated={onSanctuaryModuleCreated}
+            />
+
+            {/* Gear — opens the full-page Light / Scene settings. */}
+            <button
+              type="button"
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Close settings" : "Open settings"}
+              onClick={() => {
+                setModuleMenuOpen(false);
+                setMenuOpen((v) => !v);
+              }}
+              title={menuOpen ? "Close settings" : "Settings — light and scene"}
+              className={`grid h-12 w-12 place-items-center rounded-xl border transition ${
+                menuOpen
+                  ? "border-amber-300/70 bg-amber-400/25 text-white shadow-[0_0_24px_rgba(251,191,36,0.4)]"
+                  : "border-white/22 bg-slate-950/55 text-white/85 hover:bg-white/15"
+              }`}
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
           </div>
         </nav>
         ) : null}
@@ -636,6 +578,11 @@ export default function NatureStudioPage() {
         <BoardPortals
           hosts={boardHosts}
           courses={ownedCourses}
+          myCourses={myProducts}
+          onPlayMyCourse={playMyCourseByProductId}
+          openCourseId={openCourseId}
+          onOpenCourseConsumed={consumeOpenCourse}
+          focusMine={focusMine}
           loading={coursesLoading}
           uid={user?.id ?? null}
         />
@@ -645,6 +592,45 @@ export default function NatureStudioPage() {
             world remain; if a study board is in focus it re-frames
             full-bleed, otherwise the camera simply stays. Tapping again
             brings every button back (including a menu-hidden tray). ── */}
+        <SanctuarySettings
+          open={menuOpen}
+          page={settingsPage}
+          onPage={setSettingsPage}
+          onClose={() => setMenuOpen(false)}
+          daylight={daylight}
+          clockHour={clockHour}
+          onDaylight={(mode) => {
+            engineRef.current?.setDaylightMode(mode);
+            setDaylight(mode);
+          }}
+          iceAge={iceAge}
+          onIceAge={() => {
+            const next = !iceAge;
+            engineRef.current?.setIceAge(next);
+            setIceAge(next);
+          }}
+          animeSky={animeSky}
+          onAnimeSky={() => {
+            const next = !animeSky;
+            engineRef.current?.setAnimeSky(next);
+            setAnimeSky(next);
+          }}
+          windLabel={WIND_STEPS[windIdx].label}
+          onWind={cycleWind}
+          autoOrbit={autoOrbit}
+          onOrbit={toggleOrbit}
+          immersive={immersive}
+          onFullscreen={() => {
+            toggleFullscreen();
+            setMenuOpen(false);
+          }}
+          onHideTray={() => {
+            setTrayVisible(false);
+            setMenuOpen(false);
+          }}
+          onExit={exitSanctuary}
+        />
+
         <div className="pointer-events-auto absolute bottom-3 right-3 z-30">
           <button
             type="button"
@@ -707,63 +693,6 @@ export default function NatureStudioPage() {
           fixed full-screen surface, so there is no "below" — the same hints
           are surfaced in the HUD and the board panel instead. */}
     </main>
-  );
-}
-
-/** One labelled group inside the kebab dropdown. */
-function MenuSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="px-0.5 pb-1 pt-2 first:pt-0.5">
-      <p className="px-2.5 pb-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-/**
- * One row in the kebab dropdown: icon + label + optional right-side state
- * readout (e.g. "On", "Breeze"). Rows that navigate close the menu; toggles
- * stay open (their handler decides).
- */
-function MenuItem({
-  Icon,
-  label,
-  right,
-  active,
-  danger,
-  onClick,
-}: {
-  Icon: typeof Compass;
-  label: string;
-  right?: string;
-  active?: boolean;
-  danger?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] font-bold transition ${
-        danger
-          ? "text-rose-200 hover:bg-rose-500/20"
-          : active
-            ? "bg-emerald-400/25 text-white shadow-[0_0_16px_rgba(16,185,129,0.25)]"
-            : "text-white/85 hover:bg-white/12"
-      }`}
-    >
-      <Icon className={`h-4 w-4 shrink-0 ${danger ? "text-rose-300" : "text-white/70"}`} />
-      <span className="flex-1 truncate">{label}</span>
-      {right ? <span className="text-[10px] font-bold text-white/50">{right}</span> : null}
-    </button>
   );
 }
 

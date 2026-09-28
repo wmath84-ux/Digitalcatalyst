@@ -3833,6 +3833,31 @@ html[data-nature-studio-active="true"] {
   overflow: auto;
 }
 
+/* ── Sanctuary HARD landscape fallback (PUBG / BGMI) ───────────────────
+   Native Android (SENSOR_LANDSCAPE) physically rotates the activity, even
+   with auto-rotate OFF. Mobile browsers often reject orientation.lock
+   outside fullscreen, so if the phone is STILL in portrait while the
+   studio is open we CSS-rotate the stage 90° — the world opens already
+   "landscape" instead of waiting for the user to turn the phone.
+   Tablets never match (gated on data-phone-device). When the native lock
+   succeeds, orientation is landscape and this block does not apply. */
+@media screen and (orientation: portrait) {
+  html[data-phone-device="true"][data-nature-studio-active="true"] [data-sanctuary-root] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 100vw !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100dvh !important;
+    height: 100dvw !important;
+    max-width: none !important;
+    max-height: none !important;
+    transform: rotate(90deg) !important;
+    transform-origin: top left !important;
+    inset: auto !important;
+  }
+}
+
 /* Extra safety: Hide any landscape-specific UI outside course player on mobile.
    The freeze is gated on `data-phone-device`, NOT on the orientation-lock
    attribute: `touch-action` intersects down the ancestor chain, so an ungated
