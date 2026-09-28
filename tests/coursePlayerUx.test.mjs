@@ -459,7 +459,10 @@ test("The active file's media fullscreen toggle lives in the Player tab", () => 
   // The viewer still performs the fullscreen switch (it owns the stage
   // element), but the button itself is a Player panel row.
   assert.match(playerPanel, /data-course-viewer-fullscreen/);
-  assert.match(resourceViewer, /requestFullscreen/);
+  // The viewer hands its stage element to the shared fullscreen controller
+  // (web Fullscreen API → native immersive bars → in-page layer), so the
+  // toggle works in the APK as well as in a browser.
+  assert.match(resourceViewer, /toggleAppFullscreen\(\{ element: root \}\)/);
   assert.match(resourceViewer, /onToggleFullscreen/);
 });
 

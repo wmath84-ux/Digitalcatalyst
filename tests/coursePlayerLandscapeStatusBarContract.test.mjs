@@ -22,6 +22,10 @@ import fs from "node:fs";
 const player = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const statusBar = fs.readFileSync("src/utils/courseStatusBar.ts", "utf8");
+// The platform decision (native immersive bridge / web Fullscreen API /
+// in-page fallback) now lives in ONE shared controller that every fullscreen
+// button in the app uses — the Sanctuary's Fullscreen row included.
+const fullscreen = fs.readFileSync("src/utils/fullscreen.ts", "utf8");
 
 test("status bar hiding is an explicit Player-tab row because auto-hide cannot be gesture-less", () => {
   // Android-only switch: iOS can never hide the bar and desktop browsers
@@ -76,15 +80,19 @@ test("the landscape shell reports the live bar state for QA/integration", () => 
 });
 
 test("status bar hiding combines fullscreen with a blended theme-color", () => {
-  assert.match(statusBar, /requestFullscreen/);
-  assert.match(statusBar, /exitFullscreen/);
+  // The player delegates the request to the shared controller…
+  assert.match(statusBar, /enterFullscreen\(\{ allowAppFallback: false \}\)/);
+  assert.match(statusBar, /void exitFullscreen\(\)/);
+  // …which owns the web layer (navigationUI: "hide" makes Android's fullscreen
+  // immersive, gesture navigation bar included) AND the native layer that
+  // finally makes this work inside the APK.
+  assert.match(fullscreen, /requestFullscreen\(\{ navigationUI: "hide" \}\)/);
+  assert.match(fullscreen, /exitFullscreen/);
+  assert.match(fullscreen, /AppFullscreen/);
   assert.match(statusBar, /black-translucent/);
   assert.match(statusBar, /setThemeColor/);
   assert.match(statusBar, /\(pointer: coarse\)/);
   assert.match(statusBar, /navigator\.maxTouchPoints/);
-  // navigationUI: "hide" makes Android's fullscreen immersive — the gesture
-  // navigation bar goes too.
-  assert.match(statusBar, /navigationUI: "hide"/);
 });
 
 test("the bar is restored when leaving landscape or unmounting the player", () => {

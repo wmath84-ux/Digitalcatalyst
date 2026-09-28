@@ -3,6 +3,14 @@
 // CSS-only contract for the Home social card's proportional internal ramp.
 // The values are read from the shipped stylesheet so this test can prove the
 // ladder and its arithmetic without a browser.
+//
+// 2026-09-28 — the card became the STORE'S GLASS CARD (owner direction): the
+// teal fill / 4px teal frame are gone and the material is `.dc-store-glass`
+// (src/store-glass.css). The ROUNDING did not move (10 / 12 / 14 px) and NO
+// metric of the ramp changed — so this contract still measures the same
+// ladder, minus the card's own frame (a lens has a rim, not a border; the
+// logo's ring keeps its 4 / 5 / 6 px steps). `!important` is tolerated on the
+// radius steps because GlassSurface writes the pack radius inline.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -56,7 +64,9 @@ function mediaBlock(width) {
 function declaration(body, property) {
   const match = body.match(new RegExp(`(?:^|;)\\s*${escaped(property)}\\s*:\\s*([^;]+);`));
   assert.ok(match, `${property} declaration exists`);
-  return match[1].trim();
+  // GlassSurface hands the pack radius down inline, so the card's own radius
+  // steps have to out-rank it with `!important` — the number is what matters.
+  return match[1].replace(/\s*!important\s*$/i, "").trim();
 }
 
 function length(value) {
@@ -113,7 +123,8 @@ function metricSet(source, { base = false } = {}) {
     : boxValues(card, "padding");
   const tooltipPadding = expandBox(declaration(tooltip, "padding"));
 
-  const border = number(declaration(card, base ? "border" : "border-width"));
+  // The card itself has no border (the store lens paints a rim, not a frame);
+  // the LOGO's ring keeps its stepped width.
   const logoBorder = number(declaration(pic, base ? "border" : "border-width"));
   const dividerMargin = expandBox(declaration(divider, "margin"));
   const arrowWidths = expandBox(declaration(arrow, "border-width"));
@@ -127,7 +138,6 @@ function metricSet(source, { base = false } = {}) {
     paddingBottom: padding[2],
     paddingLeft: padding[3],
     radius: length(declaration(card, "border-radius")),
-    border,
     hoverLift: Math.abs(number(declaration(hover, "transform"))),
     logo: length(declaration(pic, "width")),
     logoBorder,
@@ -161,7 +171,7 @@ const steps = [base, at640, at768];
 const boxes = [520, 640, 740];
 
 const metricKeys = [
-  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "radius", "border", "hoverLift",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "radius", "hoverLift",
   "logo", "logoBorder", "name", "bio", "nameMarginTop", "divider", "dividerMarginTop",
   "dividerMarginBottom", "icon", "iconGap", "iconRowGap", "tooltip", "tooltipPaddingTop",
   "tooltipPaddingRight", "tooltipPaddingBottom", "tooltipPaddingLeft", "tooltipArrowTop",
@@ -183,7 +193,6 @@ test("the 520px phone step pins the enlarged brand metrics", () => {
   assert.equal(base.paddingRight, 20);
   assert.equal(base.paddingBottom, 25);
   assert.equal(base.paddingLeft, 20);
-  assert.equal(base.border, 4);
   assert.equal(base.radius, 10);
   assert.equal(base.hoverLift, 10);
   assert.equal(base.logo, 288);
@@ -206,12 +215,14 @@ test("the 520px phone step pins the enlarged brand metrics", () => {
     [base.tooltipArrowTop, base.tooltipArrowRight, base.tooltipArrowBottom, base.tooltipArrowLeft],
     [12, 12, 0, 12],
   );
-  assert.match(baseCss, /background: #2cb5a0;/);
-  assert.match(baseCss, /border: 4px solid #7cdacc;/);
-  assert.match(baseCss, /box-shadow: 0 6px 10px rgba\(207, 212, 222, 1\);/);
+  // The store's lens: no fill of its own (the four GlassSurface layers are
+  // painted by src/store-glass.css), a translucent white logo rim, a
+  // translucent white divider — same rounding, same ramp.
+  assert.match(baseCss, /background: transparent;/);
+  assert.match(baseCss, /border: 4px solid rgba\(255, 255, 255, 0\.42\);/);
   assert.match(baseCss, /font-weight: 600;/);
   assert.match(baseCss, /\.dc-social-name span[\s\S]*?font-weight: 200;/);
-  assert.match(baseCss, /\.dc-social-media::before[\s\S]*?background: #7cdacc;/);
+  assert.match(baseCss, /\.dc-social-media::before[\s\S]*?background: rgba\(255, 255, 255, 0\.28\);/);
   assert.match(baseCss, /fill: currentColor;/);
   assert.match(baseCss, /filter: brightness\(0\) invert\(1\);/);
   assert.match(baseCss, /transform: translate\(-50%, -130%\);/);
@@ -255,20 +266,18 @@ function contentStack(metric, nameLines = 1, bioLines = 1) {
   const iconRowHeight = metric.iconRowGap + metric.icon;
 
   return metric.paddingTop
-    + metric.border
     + logoWithRing
     + metric.nameMarginTop
     + nameHeight
     + bioHeight
     + dividerHeight
     + iconRowHeight
-    + metric.paddingBottom
-    + metric.border;
+    + metric.paddingBottom;
 }
 
 test("the content stack stays proportional and a typical name + bio still fit", () => {
   const normalStacks = steps.map((metric) => contentStack(metric));
-  const ratios = normalStacks.map((stack, index) => stack / (boxes[index] - (2 * steps[index].border)));
+  const ratios = normalStacks.map((stack, index) => stack / boxes[index]);
   const baselineRatio = ratios[0];
 
   for (const [index, ratio] of ratios.entries()) {

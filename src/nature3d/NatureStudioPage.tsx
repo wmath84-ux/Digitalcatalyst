@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Compass, Eye, EyeOff,
+  Compass, Eye, EyeOff, Minimize2,
   PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
   BookOpen, PenLine, Network, Users, Rows3, Settings,
 } from "lucide-react";
@@ -38,6 +38,14 @@ import {
   enterNatureStudioRotation,
   exitNatureStudioRotation,
 } from "../utils/appOrientation";
+import {
+  exitFullscreen as exitAppFullscreen,
+  getFullscreenSnapshot,
+  isFullscreenActive,
+  subscribeFullscreen,
+  toggleFullscreen as toggleAppFullscreen,
+  type FullscreenSnapshot,
+} from "../utils/fullscreen";
 
 const WIND_STEPS = [
   { label: "Calm", mult: 0.45 },
@@ -106,7 +114,19 @@ export default function NatureStudioPage() {
   const [clockHour, setClockHour] = useState(() => hourForMode("auto"));
   const [autoOrbit, setAutoOrbit] = useState(false);
   const [showLesson, setShowLesson] = useState(false);
-  const [immersive, setImmersive] = useState(false);
+  // Live fullscreen state for the Scene → Fullscreen row. It tracks EVERY
+  // layer the shared controller can use: the native Android immersive bridge
+  // (the layer that makes the button work inside the APK), the browser's own
+  // Fullscreen API, and the in-page fallback for platforms that expose
+  // neither (iOS Safari). See src/utils/fullscreen.ts.
+  const [fullscreen, setFullscreen] = useState<FullscreenSnapshot>(() => getFullscreenSnapshot());
+  const immersive = fullscreen.active;
+  /**
+   * The page-level fallback is on when the platform cannot hide the OS chrome
+   * at all. The HUD chrome then steps aside (CSS keys off
+   * `html[data-app-fullscreen="true"]`) so the world keeps the whole viewport.
+   */
+  const appImmersive = fullscreen.mode === "app";
   const [error, setError] = useState<string | null>(null);
   // The board faces are DOM elements the engine creates. They only exist once
   // the engine has booted, so React portals into them on a second pass.
@@ -145,11 +165,13 @@ export default function NatureStudioPage() {
     [myCourses.courses],
   );
 
-  // Keep the fullscreen flag honest when the user leaves via Esc / F11.
+  // Keep the Fullscreen row honest — whoever leaves fullscreen (our button,
+  // Esc / F11, the Android swipe-down, the system bars coming back) the label
+  // flips back to "Fullscreen". The controller already listens to the browser
+  // events; this only mirrors its snapshot into React.
   useEffect(() => {
-    const sync = () => setImmersive(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", sync);
-    return () => document.removeEventListener("fullscreenchange", sync);
+    setFullscreen(getFullscreenSnapshot());
+    return subscribeFullscreen(() => setFullscreen(getFullscreenSnapshot()));
   }, []);
 
   // HARD LANDSCAPE (PUBG / BGMI): phones open the world already rotated,
@@ -263,16 +285,30 @@ export default function NatureStudioPage() {
   // The shell (rail + top bar) is gone on this route, so the HUD owns the
   // only way back out.
   const exitSanctuary = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    // Leaving the world must never strand the learner in immersive fullscreen
+    // (the APK hides the system bars natively), so release every layer first.
+    if (isFullscreenActive()) void exitAppFullscreen();
     window.location.hash = "#/home";
   }, []);
 
-  // The page already fills the viewport, so this button escalates to real
-  // browser fullscreen (hides the OS/browser chrome too).
+  // Unmounting the world releases its fullscreen as well — the system bars
+  // come straight back for whatever screen opens next.
+  useEffect(() => () => {
+    if (isFullscreenActive()) void exitAppFullscreen();
+  }, []);
+
+  /**
+   * Scene → Fullscreen.
+   *
+   * Called straight from the tap (never after an `await` we control) so the
+   * browser layers still ride the real user gesture. The shared controller
+   * picks the layer: the NATIVE Android immersive bridge inside the APK — the
+   * only thing that can hide the system bars from a WebView, which is why this
+   * button used to do nothing there — then the real Fullscreen API, then the
+   * in-page fallback (iOS Safari).
+   */
   const toggleFullscreen = useCallback(() => {
-    const root = document.documentElement;
-    if (document.fullscreenElement) void document.exitFullscreen?.();
-    else void root.requestFullscreen?.().catch(() => {});
+    void toggleAppFullscreen();
   }, []);
 
   // ── Board click safety ──────────────────────────────────────────────
@@ -290,7 +326,9 @@ export default function NatureStudioPage() {
     const eng = engineRef.current;
     const host = hostRef.current;
     if (!eng || !host) return;
-    if (hudHidden) {
+    // `appImmersive` = the platform gave us no OS fullscreen, so the page hid
+    // its own chrome (CSS): the free rect is the whole viewport again.
+    if (hudHidden || appImmersive) {
       eng.setHudInsets({ top: 8, bottom: 8, left: 8, right: 8 });
       return;
     }
@@ -308,7 +346,7 @@ export default function NatureStudioPage() {
       bottom = Math.max(bottom, frameH - trayTop + 8);
     }
     eng.setHudInsets({ top, bottom, left: 10, right: 10 });
-  }, [hudHidden, trayVisible]);
+  }, [appImmersive, hudHidden, trayVisible]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
   useEffect(() => {
@@ -392,16 +430,25 @@ export default function NatureStudioPage() {
   // brings every button back — including the tray if it was hidden from the
   // ⋮ menu.
   const toggleHud = useCallback(() => {
+    // In the in-page fallback the tray (and the gear inside it) is off-screen
+    // — this corner button is then the ONE way back out of fullscreen, so it
+    // becomes the exit control instead of the HUD toggle.
+    if (appImmersive) {
+      setMenuOpen(false);
+      setModuleMenuOpen(false);
+      void exitAppFullscreen();
+      return;
+    }
     setMenuOpen(false);
     setModuleMenuOpen(false);
     if (hudHidden) setTrayVisible(true);
     setHudHidden((v) => !v);
-  }, [hudHidden]);
+  }, [appImmersive, hudHidden]);
 
   useEffect(() => {
     refreshInsets();
     reframeActiveBoard();
-  }, [hudHidden, trayVisible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appImmersive, hudHidden, trayVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!supported || error) {
     return (
@@ -447,6 +494,7 @@ export default function NatureStudioPage() {
         {!hudHidden ? (
         <header
           ref={hudTopRef}
+          data-sanctuary-chrome
           className="pointer-events-none absolute inset-x-3 top-3 z-40 flex items-start justify-end gap-2"
         >
 
@@ -466,6 +514,7 @@ export default function NatureStudioPage() {
         {!hudHidden && trayVisible && trayInstructionVisible ? (
         <p
           data-tray-instruction
+          data-sanctuary-chrome
           className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md"
         >
           Two fingers fly · double-tap to go
@@ -474,6 +523,7 @@ export default function NatureStudioPage() {
         {!hudHidden && trayVisible ? (
         <nav
           ref={hudTrayRef}
+          data-sanctuary-chrome
           aria-label="Study boards, views and modules"
           className="pointer-events-auto absolute bottom-3 left-3 right-16 z-40"
         >
@@ -634,14 +684,25 @@ export default function NatureStudioPage() {
           <button
             type="button"
             onClick={toggleHud}
+            aria-label={appImmersive ? "Exit fullscreen" : undefined}
             className={`grid h-12 w-12 place-items-center rounded-full border backdrop-blur-xl transition ${
-              hudHidden
+              appImmersive || hudHidden
                 ? "border-emerald-300/60 bg-emerald-500/30 text-white shadow-[0_0_24px_rgba(16,185,129,0.45)]"
                 : "border-white/20 bg-slate-950/55 text-white/85 hover:bg-white/15"
             }`}
-            title={hudHidden ? "Show all buttons" : "Hide all buttons"}
+            title={
+              appImmersive
+                ? "Exit fullscreen"
+                : hudHidden
+                  ? "Show all buttons"
+                  : "Hide all buttons"
+            }
           >
-            {hudHidden ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+            {appImmersive
+              ? <Minimize2 className="h-5 w-5" />
+              : hudHidden
+                ? <Eye className="h-5 w-5" />
+                : <EyeOff className="h-5 w-5" />}
           </button>
         </div>
 
