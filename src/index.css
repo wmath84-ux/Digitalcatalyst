@@ -1182,10 +1182,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
    exactly at the top bar's bottom edge. The variable is 64 px on desktop
    and 56 px in the 960–1023 tablet band, where the top bar row is pinned
    to 56 px. */
-.dc-desktop-shell:has([data-store-page]) [data-desktop-content] {
+.dc-desktop-shell:has([data-store-page]) [data-desktop-content],
+.dc-desktop-shell:has([data-leaderboard-page]) [data-desktop-content] {
   padding-top: 0 !important;
 }
-.dc-desktop-shell [data-store-page] {
+.dc-desktop-shell [data-store-page],
+.dc-desktop-shell [data-leaderboard-page] {
   padding-top: calc(var(--desktop-topbar-height, 64px) + 1.5rem);
 }
 .dc-desktop-shell [data-store-filter-bar] {
