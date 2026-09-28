@@ -16,10 +16,7 @@ const FIXTURE = `
 import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
 import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
-import { ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY, OrbitRig } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/controls.ts"))};
-import { FramePacing } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/framePacing.ts"))};
-
-export { terrainHeight, OrbitRig, FramePacing, ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY };
+export { terrainHeight };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -39,7 +36,6 @@ export function frame(screens: any, camera: any, slot: string, distance = 60) {
 }
 
 export { THREE };
-export { StudyWorldPacer } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/studyWorldPacer.ts"))};
 `;
 
 const CACHE = path.join(ROOT, "node_modules", ".cache", "nature3d-board-pin");
@@ -89,92 +85,16 @@ for (const key of ["HTMLElement", "Element", "Node", "Event", "MouseEvent", "get
 const fixture = require(bundle);
 const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
+const CAMERA_SOURCE = fs.readFileSync(path.join(ROOT, "src/nature3d/engine/controls.ts"), "utf8");
+const SCENE_SOURCE = fs.readFileSync(path.join(ROOT, "src/nature3d/engine/scene.ts"), "utf8");
 
-test("orbit and two-finger pan response are exactly twice the previous sensitivity", () => {
-  const { THREE, OrbitRig, ORBIT_DRAG_SENSITIVITY, PAN_DRAG_SENSITIVITY } = fixture;
-  assert.equal(ORBIT_DRAG_SENSITIVITY, 0.01);
-  assert.equal(PAN_DRAG_SENSITIVITY, 0.0064);
-
-  const cameraA = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
-  const cameraB = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
-  const previousOrbit = new OrbitRig();
-  const updatedOrbit = new OrbitRig();
-  previousOrbit.rotate(100 * 0.005, 0);
-  updatedOrbit.rotate(100 * ORBIT_DRAG_SENSITIVITY, 0);
-  previousOrbit.update(1, cameraA);
-  updatedOrbit.update(1, cameraB);
-  const previousTurn = Math.abs(previousOrbit.yaw + 0.35);
-  const updatedTurn = Math.abs(updatedOrbit.yaw + 0.35);
-  assert.ok(Math.abs(updatedTurn / previousTurn - 2) < 1e-9);
-
-  const updatedPan = new OrbitRig();
-  const start = updatedPan.target.clone();
-  updatedPan.flyByDrag(100, 0);
-  const moved = Math.hypot(updatedPan.target.x - start.x, updatedPan.target.z - start.z);
-  const previousSensitivityDistance = Math.max(updatedPan.distance, 6) * 0.0032 * 100;
-  assert.ok(Math.abs(moved / previousSensitivityDistance - 2) < 1e-9);
-});
-
-test("button-driven camera presets are recognized as motion and bypass the low-tier cap", () => {
-  const { THREE, OrbitRig, FramePacing } = fixture;
-  const camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
-  const rig = new OrbitRig();
-  rig.update(1 / 60, camera);
-  rig.panTo(new THREE.Vector3(3, 8, -5), 40, 0.7, 0.25);
-  const pacer = new FramePacing();
-  for (let i = 0; i < 30; i++) {
-    assert.equal(rig.isMoving(), true);
-    assert.equal(pacer.shouldSkip(i * 1000 / 60, 30, rig.isMoving()), false,
-      "preset camera motion must not be quantized to the idle frame cap");
-    rig.update(1 / 60, camera);
-  }
-  for (let i = 0; i < 240 && rig.isMoving(); i++) rig.update(1 / 60, camera);
-  assert.equal(rig.isMoving(), false, "motion detection must stop once the preset settles");
-  assert.equal(pacer.shouldSkip(6000, 30, rig.isMoving()), false);
-  assert.equal(pacer.shouldSkip(6016, 30, rig.isMoving()), true, "idle thermal pacing resumes");
-
-  rig.fly(0, 1, 0);
-  assert.equal(rig.isMoving(), true, "directed camera translation gets an immediate frame");
-  rig.update(1 / 60, camera);
-  assert.equal(rig.isMoving(), false, "directed translation clears after that camera pose is applied");
-});
-
-test("low-tier frame cap is bypassed during camera input and resumes on release", () => {
-  const { FramePacing } = fixture;
-  const pacer = new FramePacing();
-  assert.equal(pacer.shouldSkip(0, 30, false), false);
-  assert.equal(pacer.shouldSkip(16, 30, false), true);
-  for (const t of [32, 48, 64, 80, 96, 112]) {
-    assert.equal(pacer.shouldSkip(t, 30, true), false, "do not skip an active camera gesture frame");
-  }
-  assert.equal(pacer.shouldSkip(128, 30, false), false, "release gets an immediate frame");
-  assert.equal(pacer.shouldSkip(144, 30, false), true, "thermal cap resumes after the gesture");
-});
-
-test("camera drag stops at the current pose when the final finger lifts", () => {
-  const { THREE, OrbitRig } = fixture;
-  const camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
-  const rig = new OrbitRig();
-  rig.update(1 / 60, camera);
-  rig.rotate(0.9, 0.35);
-  rig.update(1 / 60, camera);
-  const movingYaw = rig.yaw;
-  const movingPitch = rig.pitch;
-  assert.notEqual(movingYaw, -0.35, "camera responds while the drag is active");
-
-  rig.stopInertia();
-  for (let i = 0; i < 180; i++) rig.update(1 / 60, camera);
-  assert.ok(Math.abs(rig.yaw - movingYaw) < 1e-12, "yaw must not coast after release");
-  assert.ok(Math.abs(rig.pitch - movingPitch) < 1e-12, "pitch must not coast after release");
-
-  // Pinch zoom also uses a damped distance target; release must not leave a
-  // stale zoom target slowly pulling the camera for seconds.
-  rig.zoom(0.65);
-  rig.update(1 / 60, camera);
-  const releasedDistance = rig.distance;
-  rig.stopInertia();
-  for (let i = 0; i < 180; i++) rig.update(1 / 60, camera);
-  assert.ok(Math.abs(rig.distance - releasedDistance) < 1e-12);
+test("camera movement settings match the main-branch reference", () => {
+  assert.match(SCENE_SOURCE, /\(e\.clientX - this\.pointerPrev\.x\) \* 0\.005/);
+  assert.match(SCENE_SOURCE, /\(e\.clientY - this\.pointerPrev\.y\) \* 0\.005/);
+  assert.match(CAMERA_SOURCE, /this\.distance, 6\) \* 0\.0032/);
+  assert.match(CAMERA_SOURCE, /const k = damp\(9, dt\)/);
+  assert.match(SCENE_SOURCE, /this\.paceNext = Math\.max\(frameStart, this\.paceNext\) \+ 1000 \/ this\.budget\.fpsCap/);
+  assert.doesNotMatch(SCENE_SOURCE, /FramePacing|StudyWorldPacer|cameraGestureActive|cameraInputBoostUntil/);
 });
 
 test("camera navigation never disconnects or reparents a live iframe", () => {
@@ -327,23 +247,6 @@ test("FOV, resize, scale and read slot changes bypass the idle cache", () => {
   screens.setScale(1.5); assert.equal(screens.render(camera), true);
   screens.setReadSlot("notes"); assert.equal(screens.render(camera), true);
   assert.equal(screens.render(camera), false);
-});
-
-test("parked study world keeps 30 Hz minimum and never paces camera movement or Desk", () => {
-  for (const hz of [30, 60, 120]) {
-    const pacer = new fixture.StudyWorldPacer();
-    let draws = 0;
-    for (let frame = 0; frame < hz; frame++) {
-      if (pacer.shouldRender(frame * 1000 / hz, true, false)) draws++;
-    }
-    assert.equal(draws, 30);
-    for (let frame = hz; frame < hz * 2; frame++) {
-      assert.equal(pacer.shouldRender(frame * 1000 / hz, true, true), true);
-    }
-    assert.equal(pacer.shouldRender(2001, false, false), true, "Desk restores full cadence immediately");
-    pacer.invalidate();
-    assert.equal(pacer.shouldRender(2002, true, false), true, "resize/DRS clears must repaint immediately");
-  }
 });
 
 test("disposal removes the permanent hosts", () => {

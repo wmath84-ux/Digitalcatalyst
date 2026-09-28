@@ -34,27 +34,16 @@
   promotion; off-screen hosts release the compositor hint. Camera motion uses a
   last-painted-pose threshold to avoid style writes from tiny orbit damping
   tails, while accumulated slow movement remains responsive.
-- While a board is parked in Study view, the ambient world canvas is drawn at
-  30 Hz (matching the low-tier render budget), instead of 15 Hz. The DOM/iframe
-  and input continue at browser cadence. Any camera/projection movement draws
-  immediately; Desk and navigation are never paced.
-- On final orbit/pinch pointer release, yaw/pitch/zoom damping targets reset to
-  the current camera pose. This prevents residual movement coasting after the
-  learner lifts their finger; smoothing still applies during the drag. Plain
-  taps and board interactions do not cancel a preset pan.
-- Low-tier 30 Hz thermal pacing is bypassed during direct camera gestures and
-  button-driven camera transitions (fit, zoom, rotate), so movement renders on
-  each available animation frame. The cap resumes when motion settles; wheel
-  zoom gets a short responsive window.
-- Camera orbit drag sensitivity is doubled from 0.005 to 0.01 radians per CSS
-  pixel; two-finger pan sensitivity is doubled from 0.0032 to 0.0064. Pinch
-  zoom scaling is unchanged.
+- The camera rig and renderer pacing are restored to the `main` reference:
+  0.005 rad/CSS-pixel orbit drag, 0.0032 two-finger pan scale, damping 9, and the
+  tier's original FPS cap. No extra post-release inertia reset or study-only
+  renderer cap is applied. Board projection changes do not alter camera input.
 
 ## Verification
 
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed.
-- `node --test tests/nature3dBoardPinRuntime.test.mjs`: fifteen tests passed.
+- `node --test tests/nature3dBoardPinRuntime.test.mjs`: eleven tests passed.
 - `tests/nature3dBoardBrowser.test.mjs`: passed in real headless Chromium with
   software WebGL. Checks actual framebuffer alpha under a foreground box,
   uncovered board pixels, iframe window/document identity and load count across
@@ -69,10 +58,9 @@
   work before, versus 0 raster tasks after the fog shader/compositor changes.
   Added browser regression fails if a 90-frame zoom produces 90 or more raster
   tasks (timings are deliberately not asserted across variable CI GPUs).
-- Board runtime/browser tests: 18 passed together, including active-gesture
-  frame-cap bypass, release-stop, and exactly doubled drag-sensitivity checks.
-  Broad Sanctuary source contracts retain the same unrelated legacy failures;
-  the winter runtime suite
+- Board runtime/browser tests: 14 passed together, including a regression that checks
+  camera movement settings against the main-branch values. Broad Sanctuary source
+  contracts retain the same unrelated legacy failures; the winter runtime suite
   has one pre-existing furniture mesh-count assertion (`shaders.length > 10`)
   against unchanged modules.
 
