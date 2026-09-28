@@ -2017,19 +2017,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    The Brain tab renders the revision test-taking page exactly
    (src/revision/pages/TestPlayerPage.tsx) inside the player's study pane
    (src/course/CourseBrainPanel.tsx). Every metric that page fixes in px is
-   written here as `calc(<that px> * var(--brain-scale))`, and this is the one
-   place the scale is decided:
+   written as `calc(<that px> * var(--brain-scale))`, so the design is the
+   revision design at 1× and stays proportional at every other size.
 
-     · on a phone (the design's own home, 360–560 px) the scale is 1, so the
-       Brain page IS the revision page, pixel for pixel;
-     · as the pane gets wider the type, the answer tiles, the letter circles,
-       the review grid and the card padding all grow with it (up to 1.24),
-       so the design reads at tablet / desktop / landscape-rail sizes instead
-       of staying phone-sized in a wide pane.
-
-   Scaling the whole design (not just the prompt) is what keeps the
-   proportions identical: the 19 px question and the 56 px answer tile keep
-   their ratio at every width. */
+   The ladder below is only the PRE-MEASURE fallback. The scale is really
+   decided by the panel itself, which measures the box it has been given and
+   writes `--brain-scale` inline (src/course/panelFit.ts → `brainFitScale`),
+   because the study pane is NOT the screen: the learner drags the Split Deck
+   divider, and the same pane is 520 px wide on one drag and 240 px on the
+   next. A viewport-based ladder cannot see that; the measured value wins over
+   these rules the moment the panel mounts (inline custom properties outrank
+   any stylesheet), and it also shrinks the design on a SHORT pane — floor
+   0.8, where the 56 px answer tile is still above a 44 px touch target — so
+   the question, its options and the docked Previous / Next bar stay visible
+   instead of being cut. What these rules cover is the frame before that
+   measurement and any engine that never runs it. */
 [data-course-brain-panel] {
   --brain-scale: 1;
 }
@@ -2057,8 +2059,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
-   landscape stages. The player measures its stage and switches layout; these
-   rules keep every control inside the visible box on phone / tablet / desktop. */
+   landscape stages. The player measures its stage and fits the card to it
+   (src/course/panelFit.ts → `--audio-scale`; the scaled frame around the card
+   is what keeps every control inside the visible box on phone / tablet /
+   desktop), and these rules are the backstop for the one frame before that
+   measurement and for any engine that does not run it. */
 [data-course-viewer-audio],
 [data-course-audio-player] {
   max-width: 100%;

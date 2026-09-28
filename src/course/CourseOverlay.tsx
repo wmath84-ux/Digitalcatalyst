@@ -120,8 +120,10 @@ interface SheetRowSpec {
   /** Selected file / module holding it — violet plate + glow, like the dock's active tab. */
   selected?: boolean;
   extra?: ReactNode;
-  /** When set the row is a real button: tap clicks it AND lifting a scroll
-   *  over it fires the same action (scroll-snap selection). */
+  /**
+   * When set the row is a real button: a TAP opens it, scrolling never does
+   * (see `SnapList`).
+   */
   press?: () => void;
   dataAttrs?: Record<string, string | number | undefined>;
 }
@@ -129,11 +131,9 @@ interface SheetRowSpec {
 function SheetRow({
   spec,
   pointerY,
-  register,
 }: {
   spec: SheetRowSpec;
   pointerY: MotionValue<number>;
-  register: (id: string, entry: { el: HTMLButtonElement | null; press: (() => void) | null }) => void;
 }) {
   const ref = useRef<HTMLButtonElement | null>(null);
   const distance = useTransform(pointerY, (p: number) => {
@@ -145,11 +145,6 @@ function SheetRow({
   const rawSize = useTransform(distance, [0, ROW_MAG_RANGE], [ROW_ICON_SIZE * ROW_MAG_SCALE, ROW_ICON_SIZE]);
   const size = useSpring(rawSize, { stiffness: 300, damping: 22, mass: 0.5 });
   const shift = useTransform(size, [ROW_ICON_SIZE, ROW_ICON_SIZE * ROW_MAG_SCALE], [0, -12]);
-
-  useEffect(() => {
-    register(spec.id, { el: ref.current, press: spec.press ?? null });
-    return () => register(spec.id, { el: null, press: null });
-  }, [register, spec.id, spec.press]);
 
   const color = spec.selected ? "#B388FF" : spec.color;
   const interactive = Boolean(spec.press);
@@ -202,13 +197,27 @@ function SheetRow({
 }
 
 /**
- * The sheet's vertical button list. Scroll-snapped to the rows: after the
- * user has scrolled, the moment the scroll settles (the `scrollend` event,
- * or a 140 ms idle fallback on engines without it) the row closest to the
- * list centre is fired — lift the finger on a button and THAT button is
- * clicked. A plain tap never triggers this (no scroll happened), so it just
- * clicks the button under it. There are no sliding content animations — the
- * list is a plain scrollable column.
+ * The sheet's vertical button list — a PLAIN scrollable column.
+ *
+ * Owner brief, 2026-09-28:
+ *
+ *   "Course player ke andar hi module library scroll karte waqt, without
+ *    clicking, scroll karte during the scrolling click ho jata hai — isko fix
+ *    karo."
+ *
+ * What the list used to do: the moment a scroll settled (`scrollend`, a 140 ms
+ * idle fallback, and the pointer-up path on top) it fired the row closest to
+ * the list centre — "lift the finger on a button and that button is clicked".
+ * On a phone that is a phantom tap: the learner scrolls the module library to
+ * read it, and a module expands or a file opens on its own, mid-scroll scroll
+ * being the ONLY thing the finger did.
+ *
+ * So it is gone. A row is opened by a real tap on it and by nothing else: the
+ * `<button>`'s own `onClick` is the one and only press path. What stays is
+ * everything that never opened anything — the rows are still dock-style
+ * buttons, the icon plate still magnifies under the pointer (the wave), the
+ * list still scroll-snaps (which changes where it RESTS, never what it opens),
+ * and a plain tap still presses the button under the finger.
  */
 function SnapList({
   rows,
@@ -220,89 +229,7 @@ function SnapList({
   dataAttrs?: Record<string, string | number | undefined>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const entriesRef = useRef(new Map<string, { id: string; el: HTMLButtonElement | null; press: (() => void) | null }>());
   const pointerY = useMotionValue(-10000);
-  // True only after a REAL scroll happened for this gesture — a plain tap
-  // must never trigger the release-click path.
-  const scrolledRef = useRef(false);
-  // Distinguish a real drag-scroll from a plain tap or programmatic scroll.
-  const pointerDownRef = useRef(false);
-  const pointerMovedRef = useRef(false);
-  const pointerStartYRef = useRef(0);
-  // After a scroll-release fires a row, the press changes the layout (a
-  // module expands, the sheet closes…). The resulting reflow can emit more
-  // scroll events — this lock window keeps them from firing a second row.
-  // (It does NOT remember the fired row: a later, deliberate release on the
-  // same button is a new click, exactly like a tap.)
-  const lockedUntilRef = useRef(0);
-  const idleTimerRef = useRef<number | null>(null);
-
-  const register = useCallback((id: string, entry: { el: HTMLButtonElement | null; press: (() => void) | null }) => {
-    if (entry.el === null && entry.press === null) entriesRef.current.delete(id);
-    else entriesRef.current.set(id, { id, ...entry });
-  }, []);
-
-  const activate = useCallback(() => {
-    const list = listRef.current;
-    if (!list) return;
-    if (!scrolledRef.current || Date.now() < lockedUntilRef.current) return;
-    // Only ever fire when the user actually dragged — never for a tap or
-    // for a programmatic scroll triggered by React render.
-    if (!pointerMovedRef.current && !scrolledRef.current) return;
-    scrolledRef.current = false;
-    const listRect = list.getBoundingClientRect();
-    const center = listRect.top + listRect.height / 2;
-    let bestId: string | null = null;
-    let bestPress: (() => void) | null = null;
-    let bestDist = Infinity;
-    for (const entry of entriesRef.current.values()) {
-      if (!entry.el || !entry.press) continue;
-      const rect = entry.el.getBoundingClientRect();
-      if (rect.bottom < listRect.top || rect.top > listRect.bottom) continue;
-      const dist = Math.abs(rect.top + rect.height / 2 - center);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = entry.id;
-        bestPress = entry.press;
-      }
-    }
-    if (!bestId || !bestPress) return;
-    // Ignore if the closest row is too far from centre (> 38% of viewport)
-    // — the user was scrolled to an empty gap, not onto a row.
-    if (bestDist > listRect.height * 0.38) return;
-    lockedUntilRef.current = Date.now() + 800;
-    bestPress();
-  }, []);
-
-  const onScroll = useCallback(() => {
-    // Genuine user scroll only: pointer must have moved OR scrollTop actually
-    // changed after a drag. Programmatic scrolls (no pointer) still set
-    // scrolledRef, but activate's distance gate prevents misfires.
-    if (pointerDownRef.current) pointerMovedRef.current = true;
-    // Only mark scrolled when the thumb actually moved visibly; tiny
-    // sub-pixel programmatic scrolls are ignored.
-    scrolledRef.current = true;
-    if (idleTimerRef.current != null) window.clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = window.setTimeout(activate, 160);
-  }, [activate]);
-
-  // `scrollend` = the browser's own "finger lifted / fling settled" signal.
-  // Guard with pointerMoved so a fling that settled without a drag still
-  // needs a real gesture.
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el || typeof Element === "undefined" || !("onscrollend" in Element.prototype)) return undefined;
-    const onEnd = () => {
-      if (!pointerMovedRef.current && !scrolledRef.current) return;
-      activate();
-    };
-    el.addEventListener("scrollend", onEnd);
-    return () => el.removeEventListener("scrollend", onEnd);
-  }, [activate]);
-
-  useEffect(() => () => {
-    if (idleTimerRef.current != null) window.clearTimeout(idleTimerRef.current);
-  }, []);
 
   if (rows.length === 0) {
     return (
@@ -316,35 +243,13 @@ function SnapList({
     <div
       ref={listRef}
       className="h-full snap-y snap-proximity overflow-y-auto overscroll-contain px-2 py-3"
-      onPointerMove={(event) => {
-        pointerY.set(event.clientY);
-        if (pointerDownRef.current && Math.abs(event.clientY - pointerStartYRef.current) > 8) pointerMovedRef.current = true;
-      }}
+      onPointerMove={(event) => pointerY.set(event.clientY)}
       onPointerLeave={() => pointerY.set(-10000)}
-      onPointerDown={(event) => {
-        scrolledRef.current = false;
-        pointerDownRef.current = true;
-        pointerMovedRef.current = false;
-        pointerStartYRef.current = event.clientY;
-      }}
-      onPointerUp={() => {
-        pointerDownRef.current = false;
-        // If user dragged and lifted, the idle timer will fire; also
-        // immediately try activate in case the list is already idle (no
-        // momentum). Plain tap (no move) never activates — onClick handles it.
-        if (pointerMovedRef.current && scrolledRef.current) {
-          // Small defer so scrollend/idle can settle first; double-fire is
-          // blocked by lockedUntilRef.
-          window.setTimeout(activate, 60);
-        }
-      }}
-      onPointerCancel={() => { pointerDownRef.current = false; }}
-      onScroll={onScroll}
       {...dataAttrs}
     >
       <div className="relative space-y-1.5">
         {rows.map((spec) => (
-          <SheetRow key={spec.id} spec={spec} pointerY={pointerY} register={register} />
+          <SheetRow key={spec.id} spec={spec} pointerY={pointerY} />
         ))}
       </div>
     </div>

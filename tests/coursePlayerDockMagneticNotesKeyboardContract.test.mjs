@@ -17,10 +17,14 @@
 //      websiteglass Glass Sheet, right side, opening ONLY in the window
 //      between the player header and the footer dock (measured `bounds` inset
 //      both the sheet and its scrim), so it never overlaps either.
-//   4. SCROLL-RELEASE CLICK LIST — inside the sheet, list tabs render a
-//      vertical column of dock-style buttons, scroll-snapped: scroll and
-//      lift the finger and the button the finger settled on (closest to the
-//      list centre) is clicked.
+//   4. TAP-ONLY SCROLL LIST — inside the sheet, list tabs render a vertical
+//      column of dock-style buttons, scroll-snapped, whose icon plates still
+//      magnify under the pointer. Scrolling it is ONLY scrolling: a row opens
+//      on a real tap and on nothing else (owner brief, 2026-09-28: "module
+//      library scroll karte waqt, without clicking, during the scrolling
+//      click ho jata hai — isko fix karo"). The old scroll-release click
+//      ("the row closest to the centre fires when the scroll settles") is
+//      REMOVED.
 //   5. SPLIT DECK — one "Split mode" row in ⚙ Player settings turns the whole
 //      player into two glass panes with a draggable glass divider between
 //      them: the lesson pane (the lossless viewer stack) and the study pane
@@ -149,20 +153,25 @@ test("List rows are dock-style buttons (same 44px tinted plates + magnify)", () 
   assert.match(overlay, /data-course-sheet-row/);
 });
 
-test("Scrolling the list and lifting the finger clicks the settled button", () => {
-  // The list is snap-scrollable…
+test("Scrolling the list never presses a row — only a tap does", () => {
+  // The list is still snap-scrollable, and the plates still magnify…
   assert.match(overlay, /snap-y snap-proximity/);
   assert.match(overlay, /snap-center/);
-  // …and the browser's own "settle" signal (plus an idle fallback) fires the
-  // row closest to the list centre.
-  assert.match(overlay, /el\.addEventListener\("scrollend", activate\)/);
-  assert.match(overlay, /idleTimerRef\.current = window\.setTimeout\(activate, 140\)/);
-  assert.match(overlay, /const dist = Math\.abs\(rect\.top \+ rect\.height \/ 2 - center\);/);
-  // A reflow caused by the fired press (expand / sheet close) must not
-  // immediately fire a second row.
-  assert.match(overlay, /lockedUntilRef\.current = Date\.now\(\) \+ 800;/);
-  // A plain tap never triggers the scroll path.
-  assert.match(overlay, /if \(!scrolledRef\.current \|\| Date\.now\(\) < lockedUntilRef\.current\) return;/);
+  assert.match(overlay, /const ROW_MAG_RANGE = 120;/);
+  assert.match(overlay, /onPointerMove=\{\(event\) => pointerY\.set\(event\.clientY\)\}/);
+  // …and the press path is the BUTTON's own onClick, nothing else.
+  assert.match(overlay, /onClick=\{interactive \? \(\) => spec\.press\?\.\(\) : undefined\}/);
+  // The scroll-release click is gone: no settle signal, no idle timer, no
+  // "row closest to the centre" arming, no pointer-up activation.
+  assert.doesNotMatch(overlay, /addEventListener\("scrollend"/);
+  assert.doesNotMatch(overlay, /onscrollend/);
+  assert.doesNotMatch(overlay, /idleTimerRef/);
+  assert.doesNotMatch(overlay, /lockedUntilRef/);
+  assert.doesNotMatch(overlay, /scrolledRef/);
+  assert.doesNotMatch(overlay, /pointerMovedRef/);
+  assert.doesNotMatch(overlay, /setTimeout\(activate/);
+  assert.doesNotMatch(overlay, /onScroll=/);
+  assert.doesNotMatch(overlay, /onPointerUp=/);
 });
 
 // ---------------------------------------------------------------------------

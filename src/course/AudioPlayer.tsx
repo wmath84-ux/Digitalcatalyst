@@ -26,10 +26,31 @@
 // `data-course-audio-*` contract attribute carries over. Skip-back/forward
 // are wired to −15 s / +15 s seeks (there is one track in a lesson), and the
 // pagination dots became a 3-segment position indicator for the same reason.
+//
+// ── THE CARD FITS THE STAGE, WHATEVER THE STAGE IS (owner brief, 2026-09-28) ─
+//   "Module mein jo music player hai uska bhi design utna hi flexible banao
+//    taki vah apne area mein jitna bhi ho uske according vah acche se dikhe
+//    pura bina cut hue."
+//
+// The card is 320 × ~490 and it lives in the lesson pane of the Split Deck,
+// which the learner can drag to ANY size — a phone in portrait gives it ~440 px
+// of height, the same phone in landscape ~310 px, and a hard-dragged divider
+// less still. A fixed card in a smaller box is exactly the reported problem:
+// the disc and the transport row were cut off.
+//
+// So the STAGE measures itself and publishes `--audio-scale`
+// (`useFitTarget` + `audioFitScale`, src/course/panelFit.ts) and the WHOLE card
+// — disc, glow, title, seek bar, transport, all of it — is scaled as one
+// artwork to the box the stage actually has: never cut, never stretched out of
+// proportion, never past 1.2× of the reference, and never so small that the
+// 52 px play button stops being a control. It is the reference player at every
+// size, which is what "flexible" means for a fixed-size artwork; a stage below
+// the floor keeps its own scrolling instead of shrinking the card into mush.
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
 import { ArrowLeft, Heart, Pause, Play, Repeat, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { AUDIO_CARD_HEIGHT, AUDIO_CARD_WIDTH, audioFitScale, paddingOf, publishVar, useFitTarget } from "./panelFit";
 
 interface AudioPlayerProps {
   url: string;
@@ -150,292 +171,359 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   // a lesson has one track, so the dots show which third is playing.
   const segment = Math.min(2, Math.floor(ratio * 3));
 
+  /* ── The fit: the stage measures itself, the card wears the answer ─────── */
+
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Solve the scale for the box the stage has. `--audio-card-h` is the card's
+   * own (unscaled) height — the frame mirrors it so the scaled card IS the box
+   * the stage centres and scrolls, which is also why the card is measured on
+   * its own resize below (a late font or a longer track name moves it).
+   */
+  const publishAudioFit = (stage: HTMLElement | null) => {
+    if (!stage) return;
+    const cardHeight = cardRef.current?.offsetHeight || AUDIO_CARD_HEIGHT;
+    const pad = paddingOf(stage);
+    const scale = audioFitScale(
+      stage.clientWidth - pad.x,
+      stage.clientHeight - pad.y,
+      AUDIO_CARD_WIDTH,
+      cardHeight,
+    );
+    publishVar(stage, "--audio-card-h", `${cardHeight}px`);
+    publishVar(stage, "--audio-scale", String(scale));
+  };
+  const stageRef = useFitTarget(publishAudioFit);
+
+  // The card's own box is the frame's reference, so it is watched directly —
+  // its layout size never changes with the scale (the frame does the scaling),
+  // so this can never feed back into the fit.
+  useEffect(() => {
+    const card = cardRef.current;
+    const frame = frameRef.current;
+    if (!card || !frame) return undefined;
+    const publish = () => {
+      const height = card.offsetHeight;
+      if (height > 0) publishVar(frame, "--audio-card-h", `${height}px`);
+    };
+    publish();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(publish);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
+      ref={stageRef}
       className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-auto p-3 sm:p-5"
       data-course-viewer-audio
       data-compact="false"
     >
-      <motion.div
-        initial={{ y: 24, scale: 0.95 }}
-        animate={{ y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 22 }}
-        className="relative isolate w-[320px] max-w-full overflow-hidden rounded-[32px]"
+      {/* The stage's own box, in the CARD's reference px: the frame is the
+          scaled size (so centring and any scrolling agree with what is
+          painted), the scaler below wears the one transform. */}
+      <div
+        ref={frameRef}
+        data-course-audio-frame
         style={{
-          background: "rgba(12,10,14,0.55)",
-          border: "1px solid rgba(255,255,255,0.09)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
+          width: `calc(${AUDIO_CARD_WIDTH}px * var(--audio-scale, 1))`,
+          height: `calc(var(--audio-card-h, ${AUDIO_CARD_HEIGHT}px) * var(--audio-scale, 1))`,
         }}
-        data-course-audio-player
-        data-playing={playing ? "true" : "false"}
       >
-        {/* Separate blur layer — never re-blurs while the disc spins. */}
         <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-[-1]"
-          style={{ backdropFilter: "blur(48px) saturate(1.6)", WebkitBackdropFilter: "blur(48px) saturate(1.6)" }}
-        />
-        {/* Top highlight line. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute left-12 right-12 top-0 h-[1px]"
-          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }}
-        />
+          data-course-audio-scaler
+          style={{
+            width: AUDIO_CARD_WIDTH,
+            transform: "scale(var(--audio-scale, 1))",
+            transformOrigin: "top left",
+          }}
+        >
+          <motion.div
+            ref={cardRef}
+            initial={{ y: 24, scale: 0.95 }}
+            animate={{ y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 22 }}
+            className="relative isolate w-[320px] overflow-hidden rounded-[32px]"
+            style={{
+              background: "rgba(12,10,14,0.55)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
+            }}
+            data-course-audio-player
+            data-playing={playing ? "true" : "false"}
+          >
+            {/* Separate blur layer — never re-blurs while the disc spins. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-[-1]"
+              style={{ backdropFilter: "blur(48px) saturate(1.6)", WebkitBackdropFilter: "blur(48px) saturate(1.6)" }}
+            />
+            {/* Top highlight line. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-12 right-12 top-0 h-[1px]"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }}
+            />
 
-        <div className="flex flex-col items-center px-7 pb-7 pt-6">
-          {/* 1) Top bar */}
-          <div className="mb-6 flex w-full items-center justify-between">
-            <motion.button
-              type="button"
-              aria-label="Rewind 15 seconds"
-              onClick={() => skipTo(-1)}
-              whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.8)" }}
-              whileTap={{ scale: 0.85 }}
-              style={{ color: "rgba(255,255,255,0.35)" }}
-            >
-              <ArrowLeft size={20} />
-            </motion.button>
-            <span
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: "rgba(255,255,255,0.4)" }}
-            >
-              Now Playing
-            </span>
-            <motion.button
-              type="button"
-              aria-label="Like"
-              aria-pressed={liked}
-              onClick={() => setLiked((value) => !value)}
-              animate={{ color: liked ? color : "rgba(255,255,255,0.35)" }}
-              transition={{ duration: 0.2 }}
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.85 }}
-            >
-              <Heart size={20} fill={liked ? color : "transparent"} />
-            </motion.button>
-          </div>
-
-          {/* 2) Album disc */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={url}
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.85 }}
-              transition={{ type: "spring", stiffness: 260, damping: 26 }}
-              className="relative mb-7"
-            >
-              <div
-                aria-hidden
-                className="absolute inset-0 rounded-full"
-                style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
-              />
-              <div
-                className="relative flex h-44 w-44 items-center justify-center rounded-full"
-                style={{
-                  background: `radial-gradient(circle at 38% 35%, ${color}28, ${color}08 60%, transparent)`,
-                  border: `1.5px solid ${color}25`,
-                  boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
-                }}
-                data-course-audio-disc
-              >
-                <motion.div
-                  animate={{ rotate: playing ? 360 : 0 }}
-                  transition={playing ? { duration: 4, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
-                  className="relative h-28 w-28"
+            <div className="flex flex-col items-center px-7 pb-7 pt-6">
+              {/* 1) Top bar */}
+              <div className="mb-6 flex w-full items-center justify-between">
+                <motion.button
+                  type="button"
+                  aria-label="Rewind 15 seconds"
+                  onClick={() => skipTo(-1)}
+                  whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.8)" }}
+                  whileTap={{ scale: 0.85 }}
+                  style={{ color: "rgba(255,255,255,0.35)" }}
                 >
-                  {[1, 0.78, 0.58, 0.38].map((scale, index) => (
-                    <div
-                      key={scale}
-                      aria-hidden
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        transform: `scale(${scale})`,
-                        border: `1px solid ${color}${index === 0 ? "30" : index === 1 ? "1e" : "14"}`,
-                      }}
-                    />
-                  ))}
+                  <ArrowLeft size={20} />
+                </motion.button>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: "rgba(255,255,255,0.4)" }}
+                >
+                  Now Playing
+                </span>
+                <motion.button
+                  type="button"
+                  aria-label="Like"
+                  aria-pressed={liked}
+                  onClick={() => setLiked((value) => !value)}
+                  animate={{ color: liked ? color : "rgba(255,255,255,0.35)" }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.85 }}
+                >
+                  <Heart size={20} fill={liked ? color : "transparent"} />
+                </motion.button>
+              </div>
+
+              {/* 2) Album disc */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={url}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                  className="relative mb-7"
+                >
                   <div
                     aria-hidden
-                    className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                    style={{
-                      background: `radial-gradient(circle, ${color}cc, ${color}66)`,
-                      boxShadow: `0 0 10px ${color}55`,
-                    }}
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
                   />
+                  <div
+                    className="relative flex h-44 w-44 items-center justify-center rounded-full"
+                    style={{
+                      background: `radial-gradient(circle at 38% 35%, ${color}28, ${color}08 60%, transparent)`,
+                      border: `1.5px solid ${color}25`,
+                      boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
+                    }}
+                    data-course-audio-disc
+                  >
+                    <motion.div
+                      animate={{ rotate: playing ? 360 : 0 }}
+                      transition={playing ? { duration: 4, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
+                      className="relative h-28 w-28"
+                    >
+                      {[1, 0.78, 0.58, 0.38].map((scale, index) => (
+                        <div
+                          key={scale}
+                          aria-hidden
+                          className="absolute inset-0 rounded-full"
+                          style={{
+                            transform: `scale(${scale})`,
+                            border: `1px solid ${color}${index === 0 ? "30" : index === 1 ? "1e" : "14"}`,
+                          }}
+                        />
+                      ))}
+                      <div
+                        aria-hidden
+                        className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                        style={{
+                          background: `radial-gradient(circle, ${color}cc, ${color}66)`,
+                          boxShadow: `0 0 10px ${color}55`,
+                        }}
+                      />
+                    </motion.div>
+                  </div>
                 </motion.div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* 3) Track info */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={url}
-              initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
-              transition={{ type: "spring", duration: 0.4, bounce: 0 }}
-              className="mb-4 flex w-full flex-col items-center gap-1"
-            >
-              <h3 className="max-w-full truncate text-lg font-bold tracking-tight text-white/95" title={name}>
-                {name}
-              </h3>
-              <p className="text-[13px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>
-                {playing ? "Playing" : "Paused"}
-              </p>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* 4) Position dots */}
-          <div className="mb-5 flex items-center gap-[7px]">
-            {[0, 1, 2].map((index) => (
-              <motion.button
-                key={index}
-                type="button"
-                aria-label={`Jump to part ${index + 1}`}
-                onClick={() => seek(((index + 0.001) / 3) * duration)}
-                animate={{
-                  width: index === segment ? 20 : 5,
-                  opacity: index === segment ? 0.5 : 0.22,
-                  backgroundColor: index === segment ? color : "#ffffff",
-                }}
-                transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                className="h-[5px] cursor-pointer rounded-full"
-                style={{ minWidth: 5 }}
-              />
-            ))}
-          </div>
-
-          {/* 5) Progress bar — also the seek control */}
-          <div className="mb-5 w-full">
-            <div
-              ref={seekZoneRef}
-              role="slider"
-              aria-label="Seek"
-              aria-valuemin={0}
-              aria-valuemax={Math.round(duration) || 1}
-              aria-valuenow={Math.round(currentTime)}
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowRight") seek(currentTime + 5);
-                if (event.key === "ArrowLeft") seek(currentTime - 5);
-              }}
-              onPointerDown={onSeekPointerDown}
-              onPointerMove={onSeekPointerMove}
-              onPointerUp={onSeekPointerUp}
-              onPointerCancel={onSeekPointerUp}
-              className="relative h-[3px] w-full cursor-pointer touch-none select-none overflow-hidden rounded-full"
-              style={{ background: "rgba(255,255,255,0.07)" }}
-              data-course-audio-seek
-            >
-              <motion.div
-                className="absolute left-0 top-0 h-full rounded-full"
-                style={{ width: barWidth, background: `linear-gradient(90deg, ${color}70, ${color}dd)` }}
-                data-course-audio-seek-fill
-              />
-            </div>
-            <div className="mt-2 flex justify-between">
-              <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-current>
-                {formatTime(currentTime)}
-              </span>
-              <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-duration>
-                {formatTime(duration)}
-              </span>
-            </div>
-          </div>
-
-          {/* 6) Controls */}
-          <div className="flex w-full items-center justify-between">
-            <motion.button
-              type="button"
-              aria-label="Toggle loop"
-              aria-pressed={loop}
-              onClick={() => setLoop((value) => !value)}
-              animate={{ color: loop ? color : "rgba(255,255,255,0.35)" }}
-              transition={{ duration: 0.2 }}
-              whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.75)" }}
-              whileTap={{ scale: 0.85 }}
-              data-course-audio-loop
-              data-active={loop ? "true" : "false"}
-            >
-              <Repeat size={19} />
-            </motion.button>
-
-            <motion.button
-              type="button"
-              aria-label="Back 15 seconds"
-              onClick={() => skipTo(-1)}
-              style={{ color: "rgba(255,255,255,0.65)" }}
-              whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
-              whileTap={{ scale: 0.9 }}
-              data-course-audio-restart
-            >
-              <SkipBack size={26} fill="currentColor" />
-            </motion.button>
-
-            <motion.button
-              type="button"
-              aria-label={playing ? "Pause" : "Play"}
-              onClick={togglePlay}
-              animate={{
-                background: `radial-gradient(circle at 38% 35%, ${color}ee, ${color}99)`,
-                boxShadow: `0 4px 20px ${color}55, 0 0 0 1px ${color}33`,
-              }}
-              transition={{ duration: 0.3 }}
-              whileHover={{ scale: 1.07 }}
-              whileTap={{ scale: 0.92 }}
-              className="flex h-[52px] w-[52px] items-center justify-center rounded-full"
-              data-course-audio-play
-              data-playing={playing ? "true" : "false"}
-            >
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={playing ? "pause" : "play"}
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.6, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="grid place-items-center text-white"
-                >
-                  {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
-                </motion.span>
               </AnimatePresence>
-            </motion.button>
 
-            <motion.button
-              type="button"
-              aria-label="Forward 15 seconds"
-              onClick={() => skipTo(1)}
-              style={{ color: "rgba(255,255,255,0.65)" }}
-              whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <SkipForward size={26} fill="currentColor" />
-            </motion.button>
+              {/* 3) Track info */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={url}
+                  initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                  transition={{ type: "spring", duration: 0.4, bounce: 0 }}
+                  className="mb-4 flex w-full flex-col items-center gap-1"
+                >
+                  <h3 className="max-w-full truncate text-lg font-bold tracking-tight text-white/95" title={name}>
+                    {name}
+                  </h3>
+                  <p className="text-[13px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>
+                    {playing ? "Playing" : "Paused"}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
 
-            <motion.button
-              type="button"
-              aria-label="Toggle mute"
-              aria-pressed={muted}
-              onClick={() => {
-                const audio = audioRef.current;
-                if (!audio) return;
-                audio.muted = !audio.muted;
-                setMuted(audio.muted);
-              }}
-              animate={{ color: muted ? color : "rgba(255,255,255,0.35)" }}
-              transition={{ duration: 0.2 }}
-              whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.75)" }}
-              whileTap={{ scale: 0.85 }}
-              data-course-audio-mute
-              data-muted={muted ? "true" : "false"}
-            >
-              {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
-            </motion.button>
-          </div>
+              {/* 4) Position dots */}
+              <div className="mb-5 flex items-center gap-[7px]">
+                {[0, 1, 2].map((index) => (
+                  <motion.button
+                    key={index}
+                    type="button"
+                    aria-label={`Jump to part ${index + 1}`}
+                    onClick={() => seek(((index + 0.001) / 3) * duration)}
+                    animate={{
+                      width: index === segment ? 20 : 5,
+                      opacity: index === segment ? 0.5 : 0.22,
+                      backgroundColor: index === segment ? color : "#ffffff",
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                    className="h-[5px] cursor-pointer rounded-full"
+                    style={{ minWidth: 5 }}
+                  />
+                ))}
+              </div>
+
+              {/* 5) Progress bar — also the seek control */}
+              <div className="mb-5 w-full">
+                <div
+                  ref={seekZoneRef}
+                  role="slider"
+                  aria-label="Seek"
+                  aria-valuemin={0}
+                  aria-valuemax={Math.round(duration) || 1}
+                  aria-valuenow={Math.round(currentTime)}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") seek(currentTime + 5);
+                    if (event.key === "ArrowLeft") seek(currentTime - 5);
+                  }}
+                  onPointerDown={onSeekPointerDown}
+                  onPointerMove={onSeekPointerMove}
+                  onPointerUp={onSeekPointerUp}
+                  onPointerCancel={onSeekPointerUp}
+                  className="relative h-[3px] w-full cursor-pointer touch-none select-none overflow-hidden rounded-full"
+                  style={{ background: "rgba(255,255,255,0.07)" }}
+                  data-course-audio-seek
+                >
+                  <motion.div
+                    className="absolute left-0 top-0 h-full rounded-full"
+                    style={{ width: barWidth, background: `linear-gradient(90deg, ${color}70, ${color}dd)` }}
+                    data-course-audio-seek-fill
+                  />
+                </div>
+                <div className="mt-2 flex justify-between">
+                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-current>
+                    {formatTime(currentTime)}
+                  </span>
+                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-duration>
+                    {formatTime(duration)}
+                  </span>
+                </div>
+              </div>
+
+              {/* 6) Controls */}
+              <div className="flex w-full items-center justify-between">
+                <motion.button
+                  type="button"
+                  aria-label="Toggle loop"
+                  aria-pressed={loop}
+                  onClick={() => setLoop((value) => !value)}
+                  animate={{ color: loop ? color : "rgba(255,255,255,0.35)" }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.75)" }}
+                  whileTap={{ scale: 0.85 }}
+                  data-course-audio-loop
+                  data-active={loop ? "true" : "false"}
+                >
+                  <Repeat size={19} />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Back 15 seconds"
+                  onClick={() => skipTo(-1)}
+                  style={{ color: "rgba(255,255,255,0.65)" }}
+                  whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.9 }}
+                  data-course-audio-restart
+                >
+                  <SkipBack size={26} fill="currentColor" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label={playing ? "Pause" : "Play"}
+                  onClick={togglePlay}
+                  animate={{
+                    background: `radial-gradient(circle at 38% 35%, ${color}ee, ${color}99)`,
+                    boxShadow: `0 4px 20px ${color}55, 0 0 0 1px ${color}33`,
+                  }}
+                  transition={{ duration: 0.3 }}
+                  whileHover={{ scale: 1.07 }}
+                  whileTap={{ scale: 0.92 }}
+                  className="flex h-[52px] w-[52px] items-center justify-center rounded-full"
+                  data-course-audio-play
+                  data-playing={playing ? "true" : "false"}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={playing ? "pause" : "play"}
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.6, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="grid place-items-center text-white"
+                    >
+                      {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Forward 15 seconds"
+                  onClick={() => skipTo(1)}
+                  style={{ color: "rgba(255,255,255,0.65)" }}
+                  whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <SkipForward size={26} fill="currentColor" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Toggle mute"
+                  aria-pressed={muted}
+                  onClick={() => {
+                    const audio = audioRef.current;
+                    if (!audio) return;
+                    audio.muted = !audio.muted;
+                    setMuted(audio.muted);
+                  }}
+                  animate={{ color: muted ? color : "rgba(255,255,255,0.35)" }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.75)" }}
+                  whileTap={{ scale: 0.85 }}
+                  data-course-audio-mute
+                  data-muted={muted ? "true" : "false"}
+                >
+                  {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
 
       <audio
         ref={audioRef}
