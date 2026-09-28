@@ -47,6 +47,10 @@
       "destination": "/api/referral-leaderboard"
     },
     {
+      "source": "/api/my-courses",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
       "source": "/api/personal-ai",
       "destination": "/api/referral-leaderboard"
     },

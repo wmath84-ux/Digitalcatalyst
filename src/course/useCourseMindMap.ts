@@ -201,7 +201,17 @@ const sortSummaries = (rows: MindMapSummary[]): MindMapSummary[] =>
 export default function useCourseMindMap(input: UseCourseMindMapInput): UseCourseMindMapResult {
   const { uid, productId, moduleId, rootTopic = "", debounceMs = DEFAULT_DEBOUNCE_MS } = input;
 
-  const scoped = Boolean(uid) && productId != null && moduleId != null && String(moduleId).length > 0;
+  // BOTH halves of the scope have to be real: an empty `productId` (no course
+  // picked yet) used to pass `productId != null` and produce a document id like
+  // `{uid}____{moduleId}` — a shared, meaningless namespace. Unscoped means
+  // "read nothing, write nothing", so the editor stays honest instead of
+  // silently discarding every branch the learner draws.
+  const scoped =
+    Boolean(uid)
+    && productId != null
+    && String(productId).length > 0
+    && moduleId != null
+    && String(moduleId).length > 0;
 
   const [activeMapKey, setActiveMapKey] = useState<string>(MIND_MAP_DEFAULT_KEY);
   const [summaries, setSummaries] = useState<MindMapSummary[]>([]);

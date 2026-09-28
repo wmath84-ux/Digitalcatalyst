@@ -75,6 +75,28 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Course entitlements (Part 6 / Part 9) ──────────────────────────────
+    // The canonical "this learner owns this course / module / update" records,
+    // written ONLY by the server (Admin SDK) inside the payment transaction —
+    // `api/_lib/entitlements.ts`. The document id is `{uid}__{entitlementId}`
+    // and the document carries the same `uid`, so the read rule pins ownership
+    // from the path itself.
+    //
+    // This collection used to have NO rule of its own, which meant every read
+    // fell through to the admin-only catch-all at the bottom of this file: the
+    // developer's account resolved all purchased courses, while any other
+    // learner's listener (`useCourseAccess`, and the Sanctuary reading board's
+    // `useOwnedCourses`) was refused with `permission-denied` and their library
+    // looked empty. Reads are owner-scoped; writes stay server-only so no
+    // client can ever grant itself a course.
+    match /entitlements/{entitlementId} {
+      // Only the server writes these, so `resource.data.uid` is trustworthy:
+      // a learner can read exactly their own entitlements and nothing else.
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid)
@@ -187,6 +209,53 @@ service cloud.firestore {
           && request.resource.data.copyFileId is string
           && request.resource.data.copyFileId.size() > 8
           && request.resource.data.copyFileId.size() <= 200;
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      // ── Course Player / Sanctuary NOTES ─────────────────────────────────
+      // ONE document per note, exactly like `mindMaps` below: the learner's own
+      // writing, private to them, written straight from the client so
+      // Firestore's offline queue keeps a note taken on a flaky connection.
+      //
+      // The Notes tab of the Course Player and the note board inside the 3D
+      // Sanctuary are the SAME store (`src/course/useCourseNotes.ts` +
+      // `src/course/cloudNotes.ts`), scoped by `productId` — `String(product.id)`
+      // for a purchased course, `mine-<courseId>` for a course the learner
+      // built, `__library__` for the AI's personal-module notes.
+      //
+      // Ownership is re-derived from the PATH and the document id must equal
+      // the `id` field inside it, so a browser can never read — or write into —
+      // another learner's notes. The caps mirror `utils/courseNotes.js`
+      // exactly, so a payload the client built can never be rejected here.
+      match /notes/{noteId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.id == noteId
+          && request.resource.data.id is string
+          && request.resource.data.id.size() > 0
+          && request.resource.data.id.size() <= 80
+          && request.resource.data.productId is string
+          && request.resource.data.productId.size() > 0
+          && request.resource.data.productId.size() <= 120
+          && request.resource.data.html is string
+          && request.resource.data.html.size() <= 60000
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 20000
+          && request.resource.data.links is list
+          && request.resource.data.links.size() <= 50
+          && request.resource.data.links.all(link => link is string && link.size() <= 80)
+          && request.resource.data.moduleId is string
+          && request.resource.data.resourceId is string
+          && request.resource.data.personalModuleId is string
+          && request.resource.data.personalResourceId is string
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number
+          && request.resource.data.schemaVersion is int
+          && (!('aiGenerated' in request.resource.data) || request.resource.data.aiGenerated is bool)
+          && (!('aiKind' in request.resource.data)
+            || request.resource.data.aiKind in ['answer', 'summary', 'explanation', 'question', 'flashcard', 'plan'])
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier', 'email', 'phone', 'apiKey', 'authorization', 'secret']);
         allow delete: if isOwner(uid) || isAdmin();
       }
 

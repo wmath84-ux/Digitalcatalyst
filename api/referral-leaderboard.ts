@@ -14,6 +14,7 @@ import { handlePersonalCourse } from "./_lib/personalCourse.js";
 import { handlePersonalAi } from "./_lib/personalAi.js";
 import { handleStudyPacks } from "./_lib/studyPacks.js";
 import { handleGatePersonalAccess } from "./_lib/gatePersonalAccess.js";
+import { handleMyCourses } from "./_lib/myCourses.js";
 
 type SubscriberRow = {
   uid: string;
@@ -121,6 +122,7 @@ const routeQuery = (req: VercelRequest) =>
    leaderboard. */
 const SHARED_ROUTES = [
   "personal-course",
+  "my-courses",
   "personal-ai",
   "myday",
   "flowpath/control",
@@ -146,6 +148,10 @@ const sharedRouteAddressed = (req: VercelRequest & { url?: string }): SharedRout
 /** The friendly name used in dispatch-failure messages. */
 const ROUTE_LABEL: Record<SharedRoute, string> = {
   "personal-course": "My Study Library",
+  // The learner-authored course shelf (`users/{uid}/myCourses`). This is the
+  // Admin-SDK path the client falls back to when Firestore rules refuse it, so
+  // My Study Library cannot depend on the deployed rules being complete.
+  "my-courses": "My Study Library (cloud sync)",
   "personal-ai": "the AI study engine",
   myday: "My Day",
   "flowpath/control": "FlowPath",
@@ -299,6 +305,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // deployed function to stay within the Hobby 12-function cap.
     if (action.startsWith("personalCourse.")) {
       return handlePersonalCourse(req, res);
+    }
+    // My Study Library (learner-authored courses) — the guaranteed server path.
+    // Firestore rules stay the fast, offline-capable route; this handler serves
+    // the SAME documents with the Admin SDK when a learner's client is refused,
+    // so the feature can never be admin-only again. Shares this deployed
+    // function to stay within the Hobby 12-function cap.
+    if (action.startsWith("myCourses.")) {
+      try {
+        return await handleMyCourses(req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "My Study Library could not reach the server. Please try again.");
+      }
     }
     // Personal Module AI Study Engine ("Ask this Module") — grounded answers,
     // summaries, questions, flashcards, weak topics, study mode + study plans

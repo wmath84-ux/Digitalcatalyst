@@ -44,6 +44,8 @@ const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
+const notesHook = readSource("src/course/useCourseNotes.ts");
+const notesCloud = readSource("src/course/cloudNotes.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
 const courseTypes = readSource("src/types/course.ts");
@@ -244,9 +246,15 @@ test("CoursePlayer persists notes to localStorage (per user + product)", () => {
   assert.match(notesStore, /notesStorageKey = \(uid: string, productId: string\) => `dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/);
   // Notes are keyed on `storageProductId` (`mine-<courseId>` for a course the
   // learner authored) so a learner-authored course never shares a note store
-  // with an official course.
-  assert.match(coursePlayer, /persistLocalNotes\(user\.id, storageProductId, next\)/);
-  assert.match(coursePlayer, /loadLocalNotes\(user\.id, storageProductId\)/);
+  // with an official course. The cloud hook is scoped by the SAME id, and it is
+  // the hook — not the player — that reads and writes the mirror now.
+  assert.match(coursePlayer, /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/);
+  assert.match(notesHook, /const scoped = Boolean\(uid\) && productId != null && String\(productId\)\.length > 0;/);
+  assert.match(notesHook, /loadLocalNotes\(uidText, productText\)/);
+  assert.match(notesHook, /persistLocalNotes\(uidText, productText, next\)/);
+  // Firestore is the source of truth: one document per note, owner-scoped.
+  assert.match(notesCloud, /NOTES_COLLECTION,/);
+  assert.match(notesCloud, /where\("productId", "==", String\(productId\)\)/);
 });
 
 test("CoursePlayerNote type has all the fields the NotesPanel reads", () => {

@@ -235,8 +235,12 @@ test("everything the learner writes is stored under mine-<courseId>", () => {
   assert.match(types, /export const myCourseStorageId = \(courseId: string\): string => `mine-\$\{courseId\}`;/);
   // progress · notes · playback · mind maps · AI chat · split ratio
   assert.match(player, /doc\(db, "users", user\.id, "courseProgress", storageProductId\)/);
-  assert.match(player, /loadLocalNotes\(user\.id, storageProductId\)/);
-  assert.match(player, /persistLocalNotes\(user\.id, storageProductId, next\)/);
+  // Notes are scoped by the same id, through the cloud hook: one Firestore
+  // document per note at `users/{uid}/notes/{noteId}`, `productId` field =
+  // `mine-<courseId>`, plus the localStorage mirror under the same key.
+  assert.match(player, /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/);
+  assert.match(read("src/course/useCourseNotes.ts"), /persistLocalNotes\(scope\.uid, scope\.productId, sorted\);/);
+  assert.match(read("src/course/cloudNotes.ts"), /toFirestoreNote\(note, \{ uid: owner, productId: product \}\)/);
   assert.match(player, /loadPlaybackStore\(user\.id, storageProductId\)/);
   assert.match(player, /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/);
   assert.match(player, /productId: storageProductId,\s*\n\s*moduleId: activeMindMapModuleId,/);

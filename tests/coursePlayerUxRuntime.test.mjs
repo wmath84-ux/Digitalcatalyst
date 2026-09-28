@@ -30,6 +30,8 @@ const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
+const notesHook = readSource("src/course/useCourseNotes.ts");
+const notesCloud = readSource("src/course/cloudNotes.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
 const courseTypes = readSource("src/types/course.ts");
@@ -126,15 +128,28 @@ test("CoursePlayer keeps the Part 10 hook + resolver as the source of truth", ()
 });
 
 // ---------------------------------------------------------------------------
-// Sanity: notes are stored in a single Firestore collection + per-device sync
+// Sanity: notes live in Firestore (one document per note) and mirror to device
 // ---------------------------------------------------------------------------
 
-test("All note operations (add / edit / delete) write to localStorage", () => {
-  // The storage plumbing lives in the shared notesStore (player + NotesPanel).
+test("All note operations (add / edit / delete) reach Firebase and the device mirror", () => {
+  // The device plumbing still lives in the shared notesStore (player +
+  // NotesPanel) — it is the OFFLINE MIRROR now, not the only copy.
   assert.match(notesStore, /notesStorageKey/, "expected 'notesStorageKey' in source");
   assert.match(notesStore, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
   assert.match(notesStore, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
-  assert.match(coursePlayer, /persistLocalNotes\(user\.id, storageProductId, next\)/);
+
+  // The player routes every note mutation through the cloud hook…
+  assert.match(coursePlayer, /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/);
+  assert.match(coursePlayer, /notesCtl\.add\(safeHtml/);
+  assert.match(coursePlayer, /notesCtl\.edit\(id, safeHtml\);/);
+  assert.match(coursePlayer, /notesCtl\.remove\(id\);/);
+  assert.match(coursePlayer, /notesCtl\.link\(sourceId, nextLinks\);/);
+  // …which writes `users/{uid}/notes/{noteId}` and mirrors it locally.
+  assert.match(notesCloud, /collection\(db, "users", uid, NOTES_COLLECTION\)/);
+  assert.match(notesCloud, /batch\.set\(doc\(db, "users", owner, NOTES_COLLECTION, payload\.id\), payload, \{ merge: true \}\)/);
+  assert.match(notesHook, /uploadCloudNotes\(owner, scope\.productId, uploads\)/);
+  assert.match(notesHook, /persistLocalNotes\(uidText, productText, next\);/);
+  assert.match(notesHook, /persistLocalNotes\(scope\.uid, scope\.productId, sorted\);/);
 });
 
 // ---------------------------------------------------------------------------

@@ -1068,8 +1068,10 @@ test("the boards are live DOM surfaces, not textures, so every file type works",
   assert.match(STUDY_BOARDS, /import\("\.\.\/\.\.\/course\/MindMapPanel"\)/);
   assert.match(STUDY_BOARDS, /import useCourseMindMap from "\.\.\/\.\.\/course\/useCourseMindMap"/);
   // ...and they share the player's stores, so a note taken here is the same
-  // note the player shows.
-  assert.match(STUDY_BOARDS, /loadLocalNotes|persistLocalNotes/);
+  // note the player shows — one Firestore document per note under
+  // `users/{uid}/notes`, not a device-local list.
+  assert.match(STUDY_BOARDS, /import useCourseNotes from "\.\.\/\.\.\/course\/useCourseNotes"/);
+  assert.match(STUDY_BOARDS, /useCourseNotes\(\{/);
 });
 
 test("the reading board lists purchased courses and sanctuary-created modules", () => {
@@ -1510,8 +1512,13 @@ test("the learner picks the course and then the module themselves", () => {
   // Opening a resource reports the module it came from...
   assert.match(READING_BOARD, /onOpen: \(f: CourseFile, moduleId: string\) => void/);
   assert.match(READING_BOARD, /onOpen\(f, module\.id\)/);
-  // ...and the mind map scopes to it, exactly as the player does.
-  assert.match(STUDY_BOARDS, /moduleId: selectedModuleId \?\? undefined/);
+  // ...and the mind map scopes to it, exactly as the player does. Until a
+  // resource is opened there is no module id, so the board falls back to the
+  // course's own bucket — an UNSCOPED hook writes nothing at all, which is why
+  // maps drawn on the board used to vanish (see
+  // tests/sanctuaryMindMapScopeContract.test.mjs).
+  assert.match(STUDY_BOARDS, /moduleId: boardModuleId \?\? undefined/);
+  assert.match(STUDY_BOARDS, /const boardModuleId = selectedModuleId \?\? \(productId \? SANCTUARY_COURSE_MAP_SCOPE : null\);/);
 });
 
 test("the notes and mind map panels are the player's own, unmodified", () => {
@@ -1520,7 +1527,10 @@ test("the notes and mind map panels are the player's own, unmodified", () => {
   assert.match(STUDY_BOARDS, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
   assert.match(STUDY_BOARDS, /import\("\.\.\/\.\.\/course\/MindMapPanel"\)/);
   assert.match(STUDY_BOARDS, /import useCourseMindMap from "\.\.\/\.\.\/course\/useCourseMindMap"/);
-  assert.match(STUDY_BOARDS, /loadLocalNotes|persistLocalNotes/);
+  // The DATA layer is the player's own too — the same cloud hook, so a note
+  // written on the board is the same Firestore document the player shows.
+  assert.match(STUDY_BOARDS, /import useCourseNotes from "\.\.\/\.\.\/course\/useCourseNotes"/);
+  assert.match(STUDY_BOARDS, /const \{ notes, add, edit, remove, status, errorMessage, lastSavedAt \} = useCourseNotes\(\{/);
 });
 
 test("animals standing on the ground are gone, birds are not", () => {
@@ -1631,8 +1641,11 @@ test("the side boards stay empty until the learner picks a course", () => {
     read("src/course/notesStore.ts"),
     /`dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/,
   );
-  // The mind map is scoped the same way and gets no product until one is picked.
-  assert.match(STUDY_BOARDS, /productId: productId \?\? ""/);
+  // The mind map is scoped the same way and gets NO product until one is
+  // picked — `undefined`, not `""`, because an empty string passes a `!= null`
+  // check and would build a shared `{uid}____{moduleId}` document id.
+  assert.match(STUDY_BOARDS, /productId: productId \?\? undefined,/);
+  assert.doesNotMatch(STUDY_BOARDS, /productId: productId \?\? ""/);
 });
 
 test("the lesson board sits where a seated learner can read it", () => {

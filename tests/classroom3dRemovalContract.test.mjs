@@ -254,7 +254,7 @@ test("the flat Split Deck player is intact end to end", () => {
   // Resume / progress / notes / mind map brains.
   assert.match(player, /loadPlaybackStore/);
   assert.match(player, /mergePlaybackEntry/);
-  assert.match(player, /persistLocalNotes/);
+  assert.match(player, /useCourseNotes/);
   assert.match(player, /<MindMapPanel/);
   assert.match(player, /<PlayerPanel/);
   assert.match(player, /useCourseMindMap/);

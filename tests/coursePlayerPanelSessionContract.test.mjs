@@ -90,10 +90,14 @@ test("the mind map has no theme pick at all — per-visit or per-device", () => 
 });
 
 test("leaving the player resets the session and preserves an open notes draft", () => {
-  // The unmount cleanup saves any open draft as a note first…
+  // The unmount cleanup saves any open draft as a note first — and because the
+  // notes hook has already flushed and torn itself down by then, the draft goes
+  // through the standalone store helpers: device mirror synchronously, then the
+  // same `users/{uid}/notes/{noteId}` document every other note lands in.
   assert.match(coursePlayer, /const sessionNotes = getCoursePanelSession\(\)\.notes/);
   assert.match(coursePlayer, /combineHtml\(sessionNotes\.title, sessionNotes\.draft\)/);
-  assert.match(coursePlayer, /loadLocalNotes\(user\.id, storageProductId\)/);
+  assert.match(coursePlayer, /appendCloudNote\(user\.id, storageProductId, \{/);
+  assert.match(coursePlayer, /patchCloudNote\(user\.id, storageProductId, sessionNotes\.noteId, safeHtml\);/);
   // …then resets the whole panel session for the next entry.
   assert.match(coursePlayer, /resetCoursePanelSession\(\);/);
 });

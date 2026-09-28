@@ -16,6 +16,7 @@
 //     `aiGenerated: true` + `aiKind` so the Notes panel can label it.
 
 import { loadLocalNotes, persistLocalNotes } from "../course/notesStore";
+import { uploadCloudNotes } from "../course/cloudNotes";
 import { escapeHtml, richTextToPlain } from "../utils/richText";
 import type { CoursePlayerNote } from "../types/course";
 import type { PersonalAiNoteInput } from "./types";
@@ -112,5 +113,12 @@ export function saveAiNote(input: SaveAiNoteInput): CoursePlayerNote | null {
   };
   const existing = loadLocalNotes(input.uid, scope);
   persistLocalNotes(input.uid, scope, [note, ...existing]);
+  // The cloud document is written too (`users/{uid}/notes/{noteId}`): an AI note
+  // is a real note, so it must reach Firebase exactly like a typed one and
+  // render on every other device. Best-effort — the mirror above is the
+  // guarantee, and the next notes mount re-uploads anything that did not land.
+  void uploadCloudNotes(input.uid, scope, [note]).catch(() => {
+    /* offline / rules — the device mirror syncs it on the next open */
+  });
   return note;
 }

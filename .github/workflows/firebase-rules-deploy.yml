@@ -1,0 +1,63 @@
+# Deploys firestore.rules / storage.rules / firestore.indexes.json to the live
+# project on every push to `main` that touches them.
+#
+# WHY THIS EXISTS — "My Study Library keval admin account se chalta hai"
+# ────────────────────────────────────────────────────────────────────────────
+# firestore.rules ends with a catch-all:
+#
+#     match /{document=**} { allow read, write: if isAdmin(); }
+#
+# The developer's account (wmath84@gmail.com, role=admin) can therefore read and
+# write EVERY path in the database. Any collection whose owner-scoped rule is
+# missing from the DEPLOYED rules — because the rules file was edited in the repo
+# but never pushed to the project — works perfectly for the admin and fails with
+# `permission-denied` for every other learner. That single asymmetry is what
+# makes a rules gap look like "this feature is admin-only".
+#
+# Notes (`users/{uid}/notes`) and entitlements are exactly that case: they are
+# correct in this file's sibling `firestore.rules`, and useless until they are
+# deployed. Hosting has had an automatic deploy since the beginning
+# (firebase-hosting-deploy.yml); the rules did not, so the SPA and its security
+# rules could drift apart on every release.
+#
+# The client now also has a server-side fallback for My Study Library
+# (`/api/my-courses`, Admin SDK — see api/_lib/myCourses.ts), so the library
+# works even while a rules deploy is pending. This workflow is what closes the
+# gap permanently.
+name: Deploy Firebase rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firestore.indexes.json
+      - storage.rules
+      - firebase.json
+      - .github/workflows/firebase-rules-deploy.yml
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # `firebase deploy` validates the rules file before uploading it, so a
+      # syntax error fails the job loudly instead of silently leaving the old
+      # rules in place.
+      - name: Deploy Firestore + Storage rules
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: >-
+          npx --yes firebase-tools@13 deploy
+          --only firestore:rules,firestore:indexes,storage:rules
+          --project my-website-761e9
+          --non-interactive
+
+      - name: Report
+        if: success()
+        run: echo "firestore.rules / storage.rules are live on my-website-761e9."
