@@ -16,8 +16,7 @@ export function makeId(prefix = "act") {
   return `${prefix}-${Date.now().toString(36)}-${counter.toString(36)}`;
 }
 
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
+const DAY = 24 * 60 * 60 * 1000;
 
 function timeLabelFor(date: Date, refNow = new Date()): string {
   const sameDay = date.toDateString() === refNow.toDateString();
@@ -30,134 +29,44 @@ function timeLabelFor(date: Date, refNow = new Date()): string {
   return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
 }
 
-function seedActivities(): Activity[] {
-  const now = Date.now();
-  let order = 0;
-  const next = () => order++;
+/**
+ * Fresh start: FlowPath no longer seeds demo activities. A new learner sees
+ * the honest empty state ("Start your flow" + glowing + nodes) instead of
+ * fake tasks.
+ *
+ * One-time migration for existing devices: older builds seeded the exact
+ * type+title pairs below. `stripLegacySeeds` removes those demo rows once
+ * (flagged in localStorage) while keeping everything the user created.
+ */
+const SEED_CLEANUP_FLAG = "flowpath:seed-cleaned.v1";
 
-  const items: Activity[] = [
-    {
-      id: makeId(),
-      type: "revision",
-      title: "Organic Chemistry — Chapter 2",
-      description: "Reaction mechanisms recap",
-      datetime: new Date(now - 3 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now - 3 * DAY)),
-      createdAt: now - 3 * DAY,
-      completedAt: now - 3 * DAY + 40 * 60 * 1000,
-      order: next(),
-      progress: 100,
-    },
-    {
-      id: makeId(),
-      type: "task",
-      title: "Submit assignment draft",
-      description: "Literature review section",
-      datetime: new Date(now - 2 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now - 2 * DAY)),
-      createdAt: now - 2 * DAY,
-      completedAt: now - 2 * DAY + 3 * HOUR,
-      order: next(),
-      priority: "medium",
-    },
-    {
-      id: makeId(),
-      type: "mcq",
-      title: "Biology Practice Set",
-      datetime: new Date(now - 1 * DAY - 2 * HOUR).toISOString(),
-      timeLabel: timeLabelFor(new Date(now - 1 * DAY - 2 * HOUR)),
-      createdAt: now - 1 * DAY - 2 * HOUR,
-      completedAt: now - 1 * DAY - HOUR,
-      order: next(),
-      totalQuestions: 25,
-      completedQuestions: 25,
-    },
-    {
-      id: makeId(),
-      type: "note",
-      title: "Video Ideas",
-      preview: "Cinematic morning routine, desk setup tour, productivity myths...",
-      datetime: new Date(now - 1 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now - 1 * DAY)),
-      createdAt: now - 1 * DAY,
-      order: next(),
-    },
-    {
-      id: makeId(),
-      type: "reminder",
-      title: "Call Mom",
-      datetime: new Date(now - 3 * HOUR).toISOString(),
-      timeLabel: timeLabelFor(new Date(now - 3 * HOUR)),
-      createdAt: now - 5 * HOUR,
-      order: next(),
-    },
-    {
-      id: makeId(),
-      type: "task",
-      title: "Study Mathematics",
-      description: "Integration by parts, practice set 4",
-      datetime: new Date(now + 25 * 60 * 1000).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 25 * 60 * 1000)),
-      createdAt: now - HOUR,
-      order: next(),
-      priority: "high",
-    },
-    {
-      id: makeId(),
-      type: "schedule",
-      title: "Creator Session",
-      datetime: new Date(now + 5 * HOUR).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 5 * HOUR)),
-      startLabel: "4:00 PM",
-      endLabel: "5:30 PM",
-      createdAt: now - HOUR / 2,
-      order: next(),
-    },
-    {
-      id: makeId(),
-      type: "revision",
-      title: "Physics — Chapter 4",
-      description: "Rotational dynamics",
-      datetime: new Date(now + 1 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 1 * DAY)),
-      createdAt: now - HOUR / 3,
-      order: next(),
-      progress: 65,
-    },
-    {
-      id: makeId(),
-      type: "mcq",
-      title: "Biology Practice",
-      datetime: new Date(now + 1 * DAY + 3 * HOUR).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 1 * DAY + 3 * HOUR)),
-      createdAt: now - HOUR / 4,
-      order: next(),
-      totalQuestions: 25,
-      completedQuestions: 12,
-    },
-    {
-      id: makeId(),
-      type: "other",
-      title: "Plan weekend trip",
-      description: "Shortlist destinations & budget",
-      datetime: new Date(now + 2 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 2 * DAY)),
-      createdAt: now - HOUR / 5,
-      order: next(),
-    },
-    {
-      id: makeId(),
-      type: "note",
-      title: "App Feature Backlog",
-      preview: "Dark mode polish, offline sync, streak celebrations...",
-      datetime: new Date(now + 3 * DAY).toISOString(),
-      timeLabel: timeLabelFor(new Date(now + 3 * DAY)),
-      createdAt: now - HOUR / 6,
-      order: next(),
-    },
-  ];
+const LEGACY_SEED_SIGNATURES: ReadonlySet<string> = new Set([
+  "revision|Organic Chemistry — Chapter 2",
+  "task|Submit assignment draft",
+  "mcq|Biology Practice Set",
+  "note|Video Ideas",
+  "reminder|Call Mom",
+  "task|Study Mathematics",
+  "schedule|Creator Session",
+  "revision|Physics — Chapter 4",
+  "mcq|Biology Practice",
+  "other|Plan weekend trip",
+  "note|App Feature Backlog",
+]);
 
-  return items;
+function stripLegacySeeds(items: Activity[]): { cleaned: Activity[]; changed: boolean } {
+  try {
+    if (localStorage.getItem(SEED_CLEANUP_FLAG)) return { cleaned: items, changed: false };
+  } catch {
+    // Storage unavailable — still filter for this session, just don't flag.
+  }
+  const cleaned = items.filter((a) => a && !LEGACY_SEED_SIGNATURES.has(`${a.type}|${a.title}`));
+  try {
+    localStorage.setItem(SEED_CLEANUP_FLAG, "1");
+  } catch {
+    // Best-effort flag; worst case we re-filter again next load (idempotent).
+  }
+  return { cleaned, changed: cleaned.length !== items.length };
 }
 
 export function loadActivities(): Activity[] {
@@ -165,14 +74,18 @@ export function loadActivities(): Activity[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Activity[];
-      if (Array.isArray(parsed) && parsed.length) return parsed;
+      if (Array.isArray(parsed)) {
+        const { cleaned, changed } = stripLegacySeeds(parsed);
+        if (changed) persistActivities(cleaned);
+        return cleaned;
+      }
     }
   } catch {
     // ignore corrupt storage
   }
-  const seeded = seedActivities();
-  persistActivities(seeded);
-  return seeded;
+  // No stored activities (or corrupt JSON) → fresh, empty flow. The old
+  // build seeded demo activities here; that behaviour is intentionally gone.
+  return [];
 }
 
 export function persistActivities(activities: Activity[]) {

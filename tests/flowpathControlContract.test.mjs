@@ -261,12 +261,13 @@ test("client caps request at 25 seconds", () => {
   assert.match(flowpathClient, /AbortError/);
 });
 
-test("useFlowPathFirestore polls every 60s and seeds demo activities on first load", () => {
-  // A user with no Firestore docs yet sees a few demo activities
-  // so the dashboard is never empty. Polling is a single
-  // collection read per user per minute.
+test("useFlowPathFirestore polls every 60s and fresh-starts (no demo seeds) on empty", () => {
+  // Fresh start per user request: a user with no Firestore docs yet
+  // sees the honest empty state — demo seeding is intentionally gone.
+  // Polling stays a single collection read per user per minute.
   assert.match(flowpathFirestore, /setInterval\(run, 60_000\)/);
-  assert.match(flowpathFirestore, /seedActivities/);
+  assert.doesNotMatch(flowpathFirestore, /seedActivities/);
+  assert.match(flowpathFirestore, /setItems\(list\)/);
 });
 
 test("useFlowPathFirestore exposes create / bulk / update / remove / complete / broadcast", () => {

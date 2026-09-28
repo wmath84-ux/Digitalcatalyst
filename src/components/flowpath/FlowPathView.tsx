@@ -119,6 +119,7 @@ import { ActivityNode } from "./ActivityNode";
 import { ActivityCard } from "./ActivityCard";
 import { PlusNode } from "./PlusNode";
 import { CreateModal } from "./CreateModal";
+import { ScheduleTestModal, type ScheduleTestsSelection } from "./ScheduleTestModal";
 import { CreateMenuPanel, type CreateMenuSection } from "./CreateMenuPanel";
 import FlowPathImportModal from "./FlowPathImportModal";
 import { EmptyState } from "./EmptyState";
@@ -285,6 +286,8 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
   );
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importAfterId, setImportAfterId] = useState<string | null>(null);
+  const [scheduleTestOpen, setScheduleTestOpen] = useState(false);
+  const [scheduleTestAfterId, setScheduleTestAfterId] = useState<string | null>(null);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [pulseSegment, setPulseSegment] = useState<{ key: number; d: string } | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -502,7 +505,11 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
         return;
       }
       if (id === "schedule-test") {
-        setCreateType({ type: "mcq", afterId });
+        // Opens the created-tests dropdown overlay (checkbox multi-select)
+        // instead of the blank MCQ form — the blank form stays only for
+        // editing an existing mcq card.
+        setScheduleTestAfterId(afterId);
+        setScheduleTestOpen(true);
         return;
       }
       if (id === "import-test") {
@@ -541,6 +548,44 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
       setCreateType(null);
     },
     [createType, createActivity, editingActivity, updateActivity]
+  );
+
+  const handleScheduleTests = useCallback(
+    ({ tests, datetime, description, blank }: ScheduleTestsSelection) => {
+      const afterId = scheduleTestAfterId;
+      if (tests.length === 0 && blank) {
+        createActivity({
+          type: "mcq",
+          title: blank.title,
+          description,
+          datetime,
+          extra: { totalQuestions: blank.totalQuestions, completedQuestions: 0 },
+          afterId,
+        });
+        toast.success("Test plan scheduled on your flow");
+      } else {
+        // Insert in reverse so the final stair order matches the selection
+        // order — every insert lands immediately after the same anchor.
+        for (const test of [...tests].reverse()) {
+          createActivity({
+            type: "mcq",
+            title: test.title,
+            description:
+              description?.trim() ||
+              `${test.totalQuestions} questions · ~${test.estimatedMinutes} min · ${test.source === "ai" ? "AI generated" : "Imported"}`,
+            datetime,
+            extra: { totalQuestions: test.totalQuestions, completedQuestions: 0, testId: test.id },
+            afterId,
+          });
+        }
+        toast.success(
+          tests.length === 1 ? "Test scheduled on your flow" : `${tests.length} tests scheduled on your flow`,
+        );
+      }
+      setScheduleTestOpen(false);
+      setScheduleTestAfterId(null);
+    },
+    [createActivity, scheduleTestAfterId],
   );
 
   const handleEditActivity = useCallback((activity: Activity) => {
@@ -687,6 +732,22 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
           });
           setImportModalOpen(false);
           setImportAfterId(null);
+        }}
+      />
+
+      <ScheduleTestModal
+        open={scheduleTestOpen}
+        onClose={() => {
+          setScheduleTestOpen(false);
+          setScheduleTestAfterId(null);
+        }}
+        onSchedule={handleScheduleTests}
+        onImportInstead={() => {
+          // Swap to the import overlay, keeping the same stair anchor.
+          setImportAfterId(scheduleTestAfterId);
+          setScheduleTestOpen(false);
+          setScheduleTestAfterId(null);
+          setImportModalOpen(true);
         }}
       />
 
