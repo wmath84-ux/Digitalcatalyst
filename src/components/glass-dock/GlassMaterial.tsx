@@ -39,6 +39,17 @@ export const DOCK_PANEL_BLUR =
     ? `blur(${GLASS_DOCS_SURFACE.blurPx}px) saturate(${GLASS_DOCS_SURFACE.saturate})`
     : `saturate(${GLASS_DOCS_SURFACE.saturate})`
 
+/**
+ * The lens map is bucketed to this grid before it is keyed AND built, so a
+ * capsule that grows a few pixels mid-gesture keeps the map it already has.
+ * The steps are far coarser than any detail the field carries (its rim band is
+ * `min(w,h) * (0.12 + strength * 0.16)`), so the visible lens is unchanged.
+ */
+const LENS_W_STEP = 32
+const LENS_H_STEP = 24
+
+const bucket = (value: number, step: number) => Math.max(step, Math.round(value / step) * step)
+
 const MAP_CACHE = new Map<string, string>()
 
 function clampByte(v: number) {
@@ -140,15 +151,41 @@ export default function GlassMaterial({
     if (!supported) return
     const el = rootRef.current
     if (!el) return
+    let frame: number | null = null
+    let lastKey = ''
     const refresh = () => {
-      const w = el.clientWidth
-      const h = el.clientHeight
+      // The lens is a smooth displacement field that `feImage` stretches over
+      // the element anyway (`preserveAspectRatio="none"`), so it is keyed to a
+      // COARSE grid. Before this, a footer drag rebuilt it on every capsule
+      // size the wave passed through: a 220x220 pixel loop, a `putImageData`
+      // and a blocking `toDataURL()` PNG encode on the main thread, dozens of
+      // times a second — with glass on it is not even painted (the
+      // `html[data-glass="on"]` rule in src/glass.css overrides this layer's
+      // backdrop-filter with a flat blur). One rebuild per gesture now.
+      const w = bucket(el.clientWidth, LENS_W_STEP)
+      const h = bucket(el.clientHeight, LENS_H_STEP)
+      if (w < 4 || h < 4) return
+      const key = `${w}x${h}|r${Math.round(radius)}|s${strength}`
+      if (key === lastKey) return
+      lastKey = key
       setMap(buildLensMap(w, h, radius, strength))
     }
-    refresh()
-    const ro = new ResizeObserver(refresh)
+    // Coalesced to one refresh per frame: a ResizeObserver fires for every
+    // intermediate size during a gesture, and only the last one matters.
+    const schedule = () => {
+      if (frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        refresh()
+      })
+    }
+    schedule()
+    const ro = new ResizeObserver(schedule)
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
   }, [supported, radius, strength])
 
   const backdrop =
