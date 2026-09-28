@@ -288,29 +288,26 @@ export default function NatureStudioPage() {
   // while its own buttons stay clear of the tray.
   const refreshInsets = useCallback(() => {
     const eng = engineRef.current;
-    if (!eng) return;
+    const host = hostRef.current;
+    if (!eng || !host) return;
     if (hudHidden) {
-      eng.setHudInsets({ top: 10, bottom: 10, left: 10, right: 10 });
+      eng.setHudInsets({ top: 8, bottom: 8, left: 8, right: 8 });
       return;
     }
-    const hostRect = hostRef.current?.getBoundingClientRect() ?? {
-      top: 0,
-      right: window.innerWidth,
-      bottom: window.innerHeight,
-      left: 0,
-    };
-    const top = hudTopRef.current
-      ? hudTopRef.current.getBoundingClientRect().bottom - hostRect.top + 14
-      : 76;
-    let bottom = 24;
+    // Layout-box metrics (client/offset), never getBoundingClientRect.
+    // When the CSS landscape fallback rotates [data-sanctuary-root], the
+    // AABB of the rotated stage is the PORTRAIT box — mixing that with the
+    // landscape clientWidth/Height is what shrunk the floating board.
+    const frameH = host.clientHeight || window.innerHeight;
+    const topEl = hudTopRef.current;
+    const top = topEl ? Math.max(36, topEl.offsetHeight + 16) : 48;
+    let bottom = 16;
     const tray = hudTrayRef.current;
     if (trayVisible && tray) {
-      // Measure in the CANVAS' coordinates, not window.innerHeight. On mobile
-      // the visual viewport moves as browser chrome collapses; mixing those
-      // coordinate spaces was the source of stale/identical fit zooms.
-      bottom = Math.max(bottom, hostRect.bottom - tray.getBoundingClientRect().top + 12);
+      const trayTop = tray.offsetTop;
+      bottom = Math.max(bottom, frameH - trayTop + 8);
     }
-    eng.setHudInsets({ top, bottom, left: 16, right: 16 });
+    eng.setHudInsets({ top, bottom, left: 10, right: 10 });
   }, [hudHidden, trayVisible]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
@@ -318,6 +315,7 @@ export default function NatureStudioPage() {
     refreshInsets();
     const onResize = () => refreshInsets();
     window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     // iOS/Android can resize or offset only the visual viewport while the
     // layout viewport stays unchanged (URL bar, fullscreen, soft keyboard).
     // Listen to both so the fit camera always sees the live free rectangle.
@@ -325,6 +323,7 @@ export default function NatureStudioPage() {
     window.visualViewport?.addEventListener("scroll", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("scroll", onResize);
     };

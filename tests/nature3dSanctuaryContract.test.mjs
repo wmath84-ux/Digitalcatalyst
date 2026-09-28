@@ -1218,46 +1218,45 @@ test("board taps are guaranteed by the engine's raycast bridge, not by device hi
 test("board framing is square-on the face normal at every aspect", () => {
   // The camera parks ON the board's face normal (orbit target = the board's
   // own centre, pitch 0), so the full-screen board projects as an exact
-  // rectangle: the flat overlay stays pixel-exact, and off-axis large
-  // boards — where device hit-testing starts dropping taps — are never
-  // framed. The board still clears the HUD: screen-centred, it needs to
-  // clear each chrome edge by a HALF board.
-  const focusBoard = SCENE.slice(SCENE.indexOf("private focusBoard(slot: LecternSlot)"), SCENE.indexOf("private focusStudentDesk"));
+  // rectangle. The floating page letterboxes into the HUD-free rect so a
+  // landscape phone is not a shrunk overlay in front of the 3D shell.
+  const focusBoard = SCENE.slice(SCENE.indexOf("private focusBoard(slot: LecternSlot)"), SCENE.indexOf("private fitStudyDistance"));
   assert.match(focusBoard, /this\.orbit\.panTo\(this\.tmpV\.copy\(placement\.position\), distance, placement\.yaw, 0\)/);
   assert.ok(!/nx|ny|rightX|rightZ/.test(focusBoard), "the target offset that sheared the board is gone");
-  assert.match(focusBoard, /Math\.min\(this\.viewH [\/] 2 - ins\.top, this\.viewH [\/] 2 - ins\.bottom\)/);
-  assert.match(focusBoard, /Math\.min\(this\.viewW [\/] 2 - ins\.left, this\.viewW [\/] 2 - ins\.right\)/);
+  assert.match(SCENE, /private fitStudyDistance\(needW: number, needH: number\)/);
+  assert.match(SCENE, /studyLetterbox\(this\.viewW, this\.viewH, this\.hudInsets/);
+  assert.match(SCREENS, /export function studyLetterbox/);
 
-  // The symmetric fit still keeps every pixel of the board clear of the
-  // chrome at every aspect (the chrome insets here mirror the page's).
   const L = solveLectern();
   const H = (L.W * 9) / 16;
-  const margin = 0.5;
-  const chrome = { top: 84, bottom: 152, left: 84, right: 20 };
+  const chrome = { top: 48, bottom: 80, left: 12, right: 12 };
+  const gutter = 8;
   for (const [viewW, viewH] of [[390, 844], [844, 390], [1180, 820], [1920, 1080], [320, 568]]) {
-    const aspect = viewW / viewH;
-    let fov = 52;
-    if (aspect < 16 / 9) {
-      const halfH = (Math.tan((52 * Math.PI) / 360) * (16 / 9)) / aspect;
-      fov = (Math.atan(halfH) * 360) / Math.PI;
+    const padT = chrome.top + gutter;
+    const padB = chrome.bottom + gutter;
+    const padL = chrome.left + gutter;
+    const padR = chrome.right + gutter;
+    const usableW = Math.max(48, viewW - padL - padR);
+    const usableH = Math.max(48, viewH - padT - padB);
+    const boardAspect = 1920 / 1080;
+    let pinW;
+    let pinH;
+    if (usableW / usableH > boardAspect) {
+      pinH = usableH;
+      pinW = pinH * boardAspect;
+    } else {
+      pinW = usableW;
+      pinH = pinW / boardAspect;
     }
-    fov = Math.min(fov, 100);
-    const v = (fov * Math.PI) / 180;
-    const h = 2 * Math.atan(Math.tan(v / 2) * aspect);
-    const needW = L.W + 2 * margin;
-    const needH = H + 2 * margin;
-    const limitH = Math.max(8, Math.min(viewH / 2 - chrome.top, viewH / 2 - chrome.bottom));
-    const limitW = Math.max(8, Math.min(viewW / 2 - chrome.left, viewW / 2 - chrome.right));
-    const d = Math.max(
-      (needH / 2 / Math.tan(v / 2)) / (2 * limitH / viewH),
-      (needW / 2 / Math.tan(h / 2)) / (2 * limitW / viewW),
-    );
-    const fy = viewH / 2 / Math.tan(v / 2);
-    const pxW = L.W * (fy / d);
-    const pxH = H * (fy / d);
-    // The board is screen-centred: it must clear each chrome edge.
-    assert.ok(viewW / 2 - pxW / 2 >= Math.max(chrome.left, chrome.right) - 0.5, `${viewW}x${viewH}: the board eats the side chrome`);
-    assert.ok(viewH / 2 - pxH / 2 >= Math.max(chrome.top, chrome.bottom) - 0.5, `${viewW}x${viewH}: the board's bottom rows sit under the tray`);
+    const pinX = padL + (usableW - pinW) / 2;
+    const pinY = padT + (usableH - pinH) / 2;
+    assert.ok(pinW <= usableW + 0.5, `${viewW}x${viewH}: pin wider than the free rect`);
+    assert.ok(pinH <= usableH + 0.5, `${viewW}x${viewH}: pin taller than the free rect`);
+    assert.ok(pinX >= padL - 0.5, `${viewW}x${viewH}: pin eats the left chrome`);
+    assert.ok(pinY >= padT - 0.5, `${viewW}x${viewH}: pin eats the top chrome`);
+    assert.ok(pinX + pinW <= viewW - padR + 0.5, `${viewW}x${viewH}: pin eats the right chrome`);
+    assert.ok(pinY + pinH <= viewH - padB + 0.5, `${viewW}x${viewH}: pin sits under the tray`);
+    assert.ok(Math.abs(pinW / pinH - L.W / H) < 0.02, `${viewW}x${viewH}: pin is not 16:9`);
   }
 });
 

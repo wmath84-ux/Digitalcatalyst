@@ -124,6 +124,46 @@ export const SCREEN_PX_HEIGHT = 1080;
 export const PX_TO_M = LECTERN_BOARD_WIDTH / SCREEN_PX_WIDTH;
 
 /**
+ * 16:9 letterbox of a study board inside the HUD-free rectangle.
+ *
+ * Phone landscape used to frame against the SCREEN CENTRE (the nearer chrome
+ * half-space). That left a tiny floating page in the middle of a short
+ * 390 px-tall view — the 3D shell still filled more of the lectern, so the
+ * owner saw "peeche ka board dikhta hai, aage ka floating board shrink/cut
+ * ho gaya". Pin and camera now share this same rect so the live page fills
+ * the usable stage, edge to edge, at every orientation.
+ */
+export function studyLetterbox(
+  viewW: number,
+  viewH: number,
+  hud: { top: number; bottom: number; left: number; right: number },
+  gutter = 8,
+  aspect = SCREEN_PX_WIDTH / SCREEN_PX_HEIGHT,
+): { x: number; y: number; w: number; h: number } {
+  const padT = Math.max(0, hud.top) + gutter;
+  const padB = Math.max(0, hud.bottom) + gutter;
+  const padL = Math.max(0, hud.left) + gutter;
+  const padR = Math.max(0, hud.right) + gutter;
+  const usableW = Math.max(48, viewW - padL - padR);
+  const usableH = Math.max(48, viewH - padT - padB);
+  let w: number;
+  let h: number;
+  if (usableW / Math.max(1, usableH) > aspect) {
+    h = usableH;
+    w = h * aspect;
+  } else {
+    w = usableW;
+    h = w / aspect;
+  }
+  return {
+    x: padL + (usableW - w) / 2,
+    y: padT + (usableH - h) / 2,
+    w,
+    h,
+  };
+}
+
+/**
  * ── THE SCREEN HAS NO DEPTH BUFFER, THE WORLD DOES ─────────────────────
  *
  * A board's page is painted by the BROWSER, in a DOM layer that sits over the
@@ -282,6 +322,8 @@ export interface BoardScreensHandle {
   shells: THREE.Group;
   byId(slot: LecternSlot): BoardScreen | undefined;
   setSize(width: number, height: number): void;
+  /** HUD chrome the pin must letterbox inside (CSS px). */
+  setHudInsets(insets: { top: number; bottom: number; left: number; right: number }): void;
   /** Pin one board as a 2D face for native clicks; CSS3D resumes when null. */
   setReadSlot(slot: LecternSlot | null): void;
   /** Frost the perimeter without changing content, hit targets or CSS3D poses. */
@@ -490,6 +532,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let readSlot: LecternSlot | null = null;
   let liftedSlot: LecternSlot | null = null;
   let lastCamera: THREE.PerspectiveCamera | null = null;
+  let hudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
 
   /**
    * The face's projected screen rectangle, taken from its four corners.
@@ -572,12 +615,30 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
    * hid its page on a refusal, which left a black slab standing in the meadow.
    */
   const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
-    const rect = projectFace(screen, camera);
-    // Behind the camera (or a pinched-out sky view) NDC explodes and this
-    // 2D face would paint a giant page across the heavens. Refuse it.
-    if (!rect.ok) return false;
-    const { minX, minY, w, h } = rect;
-    if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
+    // Phones (especially landscape) letterbox the live page into the HUD-free
+    // 16:9 stage. Desktop keeps the projected 3D rectangle so the overlay
+    // stays glued to the wooden shell.
+    const compact = viewW < 960 || viewH < 520;
+    let minX = 0;
+    let minY = 0;
+    let w = 0;
+    let h = 0;
+    if (compact) {
+      const box = studyLetterbox(viewW, viewH, hudInsets);
+      minX = box.x;
+      minY = box.y;
+      w = box.w;
+      h = box.h;
+    }
+    if (!(w > 8 && h > 8)) {
+      const rect = projectFace(screen, camera);
+      if (!rect.ok) return false;
+      minX = rect.minX;
+      minY = rect.minY;
+      w = rect.w;
+      h = rect.h;
+      if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
+    }
     const el = screen.element;
     // Lift once onto the untransformed layer so left/top are layer pixels.
     // Do not do this every frame — moving an iframe reloads it.
@@ -627,6 +688,15 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       viewW = width;
       viewH = height;
       renderer.setSize(width, height);
+    },
+
+    setHudInsets(insets) {
+      hudInsets = {
+        top: Math.max(0, insets.top),
+        bottom: Math.max(0, insets.bottom),
+        left: Math.max(0, insets.left),
+        right: Math.max(0, insets.right),
+      };
     },
 
     setWinter(enabled) {

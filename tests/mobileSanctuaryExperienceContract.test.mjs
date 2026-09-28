@@ -51,15 +51,16 @@ test("each mobile study camera owns a projection-aware fit", () => {
   assert.match(scene, /private fittedStudyPreset: "student" \| LecternSlot \| null/);
   assert.match(scene, /if \(changed && this\.fittedStudyPreset\) this\.focus\(this\.fittedStudyPreset\)/);
   assert.match(scene, /if \(this\.fittedStudyPreset\) this\.focus\(this\.fittedStudyPreset\)/);
-  assert.match(scene, /const mobileFit: Record<LecternSlot, number>/);
-  assert.match(scene, /reading: 1,[\s\S]*notes: 1\.06,[\s\S]*mindmap: 1\.12/);
+  assert.match(scene, /private fitStudyDistance\(needW: number, needH: number\)/);
+  assert.match(scene, /studyLetterbox\(this\.viewW, this\.viewH, this\.hudInsets/);
+  assert.match(scene, /setViewOffset/);
 
   const desk = scene.slice(scene.indexOf("private focusStudentDesk()"), scene.indexOf("resize(width: number"));
-  assert.match(desk, /const ins = this\.hudInsets/);
-  assert.match(desk, /limitH/);
-  assert.match(desk, /limitW/);
+  assert.match(desk, /fitStudyDistance\(needW, needH\)/);
   assert.match(page, /window\.visualViewport\?\.addEventListener\("resize"/);
   assert.match(page, /focusStudyView/);
+  assert.match(page, /offsetTop/);
+  assert.match(page, /orientationchange/);
 });
 
 test("low-tier clarity rises while smoothness safeguards remain active", () => {
