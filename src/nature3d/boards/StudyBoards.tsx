@@ -52,6 +52,15 @@ export interface BoardHosts {
 interface BoardPortalsProps {
   hosts: BoardHosts;
   courses: Product[];
+  /** Self-authored modules (sanctuary + Study Library), already adapted to Product. */
+  myCourses?: Product[];
+  /** Open a self-authored module in the dedicated Course Player. */
+  onPlayMyCourse?: (productId: string) => void;
+  /** Select this course id on the reading board (mine-… or purchased). */
+  openCourseId?: string | null;
+  onOpenCourseConsumed?: () => void;
+  /** Highlight the created-by-you shelf. */
+  focusMine?: boolean;
   loading: boolean;
   uid: string | null;
 }
@@ -123,7 +132,7 @@ function useBoardNotes(uid: string | null, productId: string | null) {
 }
 
 export default function BoardPortals({
-  hosts, courses, loading, uid,
+  hosts, courses, myCourses = [], onPlayMyCourse, openCourseId, onOpenCourseConsumed, focusMine = false, loading, uid,
 }: BoardPortalsProps) {
   // Every board tree always renders into the engine's 3D screen — the
   // learner looks at the board itself, and the engine's input bridge
@@ -144,18 +153,31 @@ export default function BoardPortals({
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
   const activeCourse = useMemo(
-    () => courses.find((c) => c.id === selectedCourseId) ?? null,
-    [courses, selectedCourseId],
+    () => courses.find((c) => c.id === selectedCourseId) ?? myCourses.find((c) => c.id === selectedCourseId) ?? null,
+    [courses, myCourses, selectedCourseId],
   );
 
+  useEffect(() => {
+    if (!openCourseId) return;
+    setSelectedCourseId(openCourseId);
+    setSelectedModuleId(null);
+    onOpenCourseConsumed?.();
+  }, [openCourseId, onOpenCourseConsumed]);
+
   // A course that disappears from the entitlement list (subscription lapsed,
-  // refund) must not leave its notes on the board.
+  // refund) must not leave its notes on the board. A just-created sanctuary
+  // module can land here a tick before `myCourses` catches up — don't
+  // drop the selection in that window.
   useEffect(() => {
     if (selectedCourseId && !activeCourse) {
+      // A just-created sanctuary module can land here a tick before the
+      // library snapshot catches up — don't flash back to the empty shelf.
+      if (selectedCourseId === openCourseId) return;
+      if (selectedCourseId.startsWith("mine-")) return;
       setSelectedCourseId(null);
       setSelectedModuleId(null);
     }
-  }, [selectedCourseId, activeCourse]);
+  }, [selectedCourseId, activeCourse, openCourseId]);
 
   const productId = activeCourse?.id ?? null;
   const notes = useBoardNotes(uid, productId);
@@ -177,6 +199,9 @@ export default function BoardPortals({
     () => (
       <ReadingBoard
         courses={courses}
+        myCourses={myCourses}
+        onPlayMyCourse={onPlayMyCourse}
+        focusMine={focusMine}
         loading={loading}
         signedIn={signedIn}
         courseId={selectedCourseId}
@@ -185,7 +210,7 @@ export default function BoardPortals({
         onSelectModule={setSelectedModuleId}
       />
     ),
-    [courses, loading, signedIn, selectedCourseId, selectedModuleId],
+    [courses, myCourses, onPlayMyCourse, focusMine, loading, signedIn, selectedCourseId, selectedModuleId],
   );
 
   return (

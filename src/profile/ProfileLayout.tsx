@@ -27,6 +27,17 @@ import {
   Zap,
 } from "lucide-react";
 
+/** Google avatars 403 in the APK WebView when a localhost Referer is sent. */
+function profilePhotoSrc(url?: string): string {
+  const src = String(url || "").trim();
+  if (!src) return "";
+  if (/googleusercontent\.com/i.test(src)) {
+    if (/=s\d+/.test(src)) return src.replace(/=s\d+(-c)?/, "=s256-c");
+    return `${src}${src.includes("?") ? "" : "=s256-c"}`;
+  }
+  return src;
+}
+
 /* ── Shared types ───────────────────────────────────────────────────── */
 export type MembershipTier = "normal" | "basic" | "premium" | "pro";
 
@@ -359,15 +370,29 @@ function ProfileHero({
   active: boolean;
   onEdit: () => void;
 }) {
+  const src = profilePhotoSrc(photoURL);
+  const [brokenPhoto, setBrokenPhoto] = useState("");
+  const showPhoto = Boolean(src) && src !== brokenPhoto;
   return (
     <GlassCard data-profile-hero className="relative overflow-hidden">
       <div className="relative">
         <div className="flex items-center gap-4">
           <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
-            {photoURL ? (
-              <img src={photoURL} alt="" decoding="async" width={80} height={80} className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20" />
+            {showPhoto ? (
+              <img
+                src={src}
+                alt=""
+                decoding="async"
+                width={80}
+                height={80}
+                className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20"
+                referrerPolicy="no-referrer"
+                draggable={false}
+                data-profile-photo
+                onError={() => setBrokenPhoto(src)}
+              />
             ) : (
-              <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-500/20 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl">
+              <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-500/20 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl" data-profile-photo-fallback>
                 {initials}
               </div>
             )}
@@ -608,7 +633,7 @@ function LibraryCard({
               className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:p-2 [&>span>div>span]:w-full"
             >
               <span className="flex w-full items-center gap-3">
-                <img src={product.image} alt="" loading="lazy" decoding="async" width={64} height={48} className="h-12 w-16 shrink-0 rounded-xl object-cover" />
+                <img src={product.image} alt="" loading="lazy" decoding="async" width={64} height={48} className="h-12 w-16 shrink-0 rounded-xl object-cover" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black text-white">{product.title}</span>
                   <span className="text-xs font-medium text-white/55">Owned · Open course</span>

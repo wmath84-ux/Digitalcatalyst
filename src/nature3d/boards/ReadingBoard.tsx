@@ -20,7 +20,7 @@
 // it is. See `engine/boardScreens.ts` for why that decision was forced.
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, FileText, Film, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Film, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play, Sparkles } from "lucide-react";
 import ResourceViewer from "../../course/ResourceViewer";
 import type { CourseFile, CourseFileType, CourseModule } from "../../types/course";
 import type { Product } from "../../data/products";
@@ -28,6 +28,15 @@ import type { Product } from "../../data/products";
 interface ReadingBoardProps {
   /** Only the courses this learner actually owns. */
   courses: Product[];
+  /**
+   * Modules the learner built in the sanctuary (and My Study Library).
+   * Shown first on the library so the tray's Module button lands on them.
+   */
+  myCourses?: Product[];
+  /** Open a self-authored module in its dedicated Course Player. */
+  onPlayMyCourse?: (productId: string) => void;
+  /** When true, the "Created by you" shelf is the opening view. */
+  focusMine?: boolean;
   loading: boolean;
   /** Signed out — the board says so instead of pretending the library is empty. */
   signedIn: boolean;
@@ -65,15 +74,17 @@ function moduleFiles(module: CourseModule): CourseFile[] {
 }
 
 export default function ReadingBoard({
-  courses, loading, signedIn, courseId, onSelectCourse, moduleId, onSelectModule,
+  courses, myCourses = [], onPlayMyCourse, focusMine = false,
+  loading, signedIn, courseId, onSelectCourse, moduleId, onSelectModule,
 }: ReadingBoardProps) {
   const [file, setFile] = useState<CourseFile | null>(null);
   const setCourseId = onSelectCourse;
 
   const course = useMemo(
-    () => courses.find((c) => c.id === courseId) ?? null,
-    [courses, courseId],
+    () => courses.find((c) => c.id === courseId) ?? myCourses.find((c) => c.id === courseId) ?? null,
+    [courses, myCourses, courseId],
   );
+  const isMine = Boolean(course && myCourses.some((c) => c.id === course.id));
 
   // ── Level 3: a resource is open ──────────────────────────────────────
   if (course && file) {
@@ -97,13 +108,26 @@ export default function ReadingBoard({
     return (
       <BoardFrame
         title={course.title}
-        subtitle={`${modules.length} module${modules.length === 1 ? "" : "s"}`}
+        subtitle={isMine
+          ? `${modules.length} module${modules.length === 1 ? "" : "s"} · created by you`
+          : `${modules.length} module${modules.length === 1 ? "" : "s"}`}
         onBack={() => {
           onSelectModule(null);
           setCourseId(null);
         }}
         backLabel="My courses"
       >
+        {isMine && onPlayMyCourse ? (
+          <div className="flex justify-end px-8 pt-5">
+            <button
+              type="button"
+              onClick={() => onPlayMyCourse(course.id)}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-500/25 px-4 py-2 text-[14px] font-black text-violet-100 ring-1 ring-violet-300/40 transition hover:bg-violet-500/40"
+            >
+              <Play className="h-4 w-4" /> Open Course Player
+            </button>
+          </div>
+        ) : null}
         {modules.length === 0 ? (
           <Empty icon={Folder} line="This course has no modules yet." />
         ) : (
@@ -126,43 +150,109 @@ export default function ReadingBoard({
     );
   }
 
-  // ── Level 1: the purchased-course library ────────────────────────────
+  // ── Level 1: created modules + purchased-course library ──────────────
+  const mineFirst = focusMine || myCourses.length > 0;
   return (
-    <BoardFrame title="My courses" subtitle="Pick a course, then a module">
+    <BoardFrame
+      title="My courses"
+      subtitle={mineFirst ? "Your modules, then purchased courses" : "Pick a course, then a module"}
+    >
       {!signedIn ? (
         <Empty icon={Lock} line="Sign in to see the courses you have purchased." />
-      ) : loading ? (
+      ) : loading && courses.length === 0 && myCourses.length === 0 ? (
         <Empty icon={Layers} line="Loading your library…" />
-      ) : courses.length === 0 ? (
-        <Empty icon={BookOpen} line="You have not purchased any courses yet." />
+      ) : courses.length === 0 && myCourses.length === 0 ? (
+        <Empty icon={BookOpen} line="Create a module from the tray, or purchase a course." />
       ) : (
-        <div className="grid gap-6 p-8 lg:grid-cols-3 2xl:grid-cols-4">
-          {courses.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setCourseId(c.id)}
-              className="group overflow-hidden rounded-2xl border border-white/15 bg-white/[0.04] text-left transition hover:border-emerald-300/60 hover:bg-white/[0.09]"
-            >
-              <div className="aspect-video w-full overflow-hidden bg-slate-800">
-                {c.image ? (
-                  <img
-                    src={c.image}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                ) : null}
+        <div className="space-y-8 p-8">
+          {myCourses.length > 0 ? (
+            <section data-reading-mine-library>
+              <p className="mb-3 flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.16em] text-violet-300">
+                <Sparkles className="h-4 w-4" /> Created by you
+              </p>
+              <div className="grid gap-6 lg:grid-cols-3 2xl:grid-cols-4">
+                {myCourses.map((c) => (
+                  <article
+                    key={c.id}
+                    className="group overflow-hidden rounded-2xl border border-violet-300/25 bg-violet-500/[0.07] text-left transition hover:border-violet-300/60 hover:bg-violet-500/15"
+                  >
+                    <button type="button" onClick={() => setCourseId(c.id)} className="block w-full text-left">
+                      <div className="aspect-video w-full overflow-hidden bg-slate-800">
+                        {c.image ? (
+                          <img
+                            src={c.image}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="grid h-full place-items-center bg-gradient-to-br from-violet-700/40 to-indigo-900/40">
+                            <Sparkles className="h-8 w-8 text-violet-200/70" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-5">
+                        <p className="text-[19px] font-black leading-tight text-white">{c.title}</p>
+                        <p className="mt-1.5 text-[15px] text-white/55">Your module</p>
+                        <p className="mt-3 text-[14px] font-bold text-violet-300">
+                          {(c.courseContent?.length ?? 0)} modules
+                        </p>
+                      </div>
+                    </button>
+                    {onPlayMyCourse ? (
+                      <div className="border-t border-white/10 px-5 py-3">
+                        <button
+                          type="button"
+                          onClick={() => onPlayMyCourse(c.id)}
+                          className="inline-flex items-center gap-2 text-[13px] font-black text-violet-100"
+                        >
+                          <Play className="h-3.5 w-3.5" /> Open Course Player
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
               </div>
-              <div className="p-5">
-                <p className="text-[19px] font-black leading-tight text-white">{c.title}</p>
-                <p className="mt-1.5 text-[15px] text-white/55">{c.instructor}</p>
-                <p className="mt-3 text-[14px] font-bold text-emerald-300">
-                  {(c.courseContent?.length ?? 0)} modules
+            </section>
+          ) : null}
+
+          {courses.length > 0 ? (
+            <section>
+              {myCourses.length > 0 ? (
+                <p className="mb-3 text-[13px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                  Purchased
                 </p>
+              ) : null}
+              <div className="grid gap-6 lg:grid-cols-3 2xl:grid-cols-4">
+                {courses.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCourseId(c.id)}
+                    className="group overflow-hidden rounded-2xl border border-white/15 bg-white/[0.04] text-left transition hover:border-emerald-300/60 hover:bg-white/[0.09]"
+                  >
+                    <div className="aspect-video w-full overflow-hidden bg-slate-800">
+                      {c.image ? (
+                        <img
+                          src={c.image}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        />
+                      ) : null}
+                    </div>
+                    <div className="p-5">
+                      <p className="text-[19px] font-black leading-tight text-white">{c.title}</p>
+                      <p className="mt-1.5 text-[15px] text-white/55">{c.instructor}</p>
+                      <p className="mt-3 text-[14px] font-bold text-emerald-300">
+                        {(c.courseContent?.length ?? 0)} modules
+                      </p>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </button>
-          ))}
+            </section>
+          ) : null}
         </div>
       )}
     </BoardFrame>

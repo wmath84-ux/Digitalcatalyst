@@ -16,6 +16,8 @@
 //     shares its geometry, and toggling off restores the procedural sky;
 //   • daylight keeps grading the panorama (baked noon must not glow at
 //     midnight);
+//   • the dome is pole-corrected (glTF V so looking up is sky, not ground)
+//     and yaws around its centre axis as the hour moves (time-lapse);
 //   • the texture loads lazily exactly once, a failed load is cosmetic, and
 //     the scene owns the texture's lifetime;
 //   • the Studio page exposes the toggle in the Scene menu.
@@ -31,6 +33,7 @@ const exists = (p) => existsSync(new URL(p, ROOT));
 const SKY = read("src/nature3d/engine/sky.ts");
 const SCENE = read("src/nature3d/engine/scene.ts");
 const PAGE = read("src/nature3d/NatureStudioPage.tsx");
+const SETTINGS = read("src/nature3d/SanctuarySettings.tsx");
 
 // ── 1. The asset ───────────────────────────────────────────────────────
 
@@ -90,6 +93,20 @@ test("daylight keeps grading the baked panorama", () => {
   assert.match(code, /lastDaylight/, "a texture arriving mid-session is graded on arrival");
 });
 
+test("the anime dome is pole-corrected and yaws with the day", () => {
+  const code = SKY.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // The JPEG is glTF-authored (nadir at the image top). flipY=false puts
+  // the sky on +Y so looking up is sky, not the painted islands underfoot.
+  assert.match(code, /map\.flipY = false/, "glTF V so zenith is +Y, not the painted ground");
+  assert.match(code, /yawForHour/, "yaw is derived from the hour, not a frozen compass offset");
+  assert.match(code, /DAY_START/, "the spin is keyed to the daylight window");
+  assert.match(code, /DAY_END/, "the spin covers sunrise → sunset");
+  assert.match(code, /animeDome\.rotation\.y = animeYaw/, "the dome spins on its centre (+Y) axis");
+  assert.match(code, /spinAnimeSky\(state, false\)/, "hour changes lerp into a time-lapse spin");
+  assert.match(code, /spinAnimeSky\(lastDaylight, true\)/, "first enable snaps so it does not whirl from 0");
+  assert.doesNotMatch(code, /ANIME_SKY_OFFSET_U/, "the static U-offset is gone — time drives yaw now");
+});
+
 // ── 3. The scene wiring ───────────────────────────────────────────────
 
 test("the scene loads the panorama lazily, once, and survives a failure", () => {
@@ -99,6 +116,7 @@ test("the scene loads the panorama lazily, once, and survives a failure", () => 
   assert.match(code, /this\.setAnimeSky\(false\)/, "the ENGINE boots on the procedural sky by default");
   assert.match(code, /animeSkyTexture/, "the texture promise is cached on the scene");
   assert.match(code, /loadAsync\(ANIME_SKY_URL\)/, "one lazy fetch from the public URL");
+  assert.match(code, /t\.flipY = false/, "the loader pins glTF V before the first GPU upload");
   assert.match(code, /return null/, "a failed load resolves to null instead of throwing");
   assert.match(code, /console\.warn/, "the failure is reported, not silent");
   assert.match(code, /this\.animeSkyWanted \? t : null/, "fast toggles honour the last wish");
@@ -112,7 +130,7 @@ test("the Studio page exposes an Anime sky toggle wired to the engine", () => {
   // The Scene menu still toggles the panorama on/off.
   assert.match(PAGE, /const \[animeSky, setAnimeSky\] = useState\(false\)/, "the procedural sky is the default");
   assert.match(PAGE, /engine\.setAnimeSky\(false\)/, "the boot keeps anime sky off");
-  assert.match(PAGE, /label="Anime sky"/, "the Scene menu carries the item");
+  assert.match(SETTINGS, /label="Anime sky"/, "the Scene page carries the item");
   assert.match(PAGE, /engineRef\.current\?\.setAnimeSky\(next\)/, "the toggle reaches the engine");
-  assert.match(PAGE, /Icon=\{Sparkles\}/, "the item has an icon");
+  assert.match(SETTINGS, /Icon=\{Sparkles\}/, "the item has an icon");
 });

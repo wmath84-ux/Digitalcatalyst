@@ -2,6 +2,7 @@ import { Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
 import SiteFooterNav from "./SiteFooterNav";
 import { type GlassDockIcon, type GlassDockItem } from "./glass-dock/GlassDock";
+import { lockAppToLandscape } from "../utils/appOrientation";
 
 export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library" | "sanctuary";
 
@@ -103,7 +104,11 @@ export default function BottomNav({
         if (key === "study-library") window.location.hash = "#/study-library";
         else if (key === "flowpath") window.location.hash = "#/flowpath";
         else if (key === "revision") window.location.hash = "#/revision";
-        else if (key === "sanctuary") window.location.hash = "#/nature-studio";
+        else if (key === "sanctuary") {
+          // User gesture: force landscape NOW (PUBG / BGMI), then open.
+          lockAppToLandscape();
+          window.location.hash = "#/nature-studio";
+        }
         else onChange(key);
       }}
     />

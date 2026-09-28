@@ -761,9 +761,13 @@ function RootPage(): ReactNode {
   const openingVisible = useOpeningSplashVisible();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
-  // Mobile + installed PWA: never show landing. Everyone else on mobile
-  // (logged in or not) starts on landing and opens the app from there.
-  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested);
+  // Installed app (mobile PWA or the Capacitor APK): never show the
+  // marketing landing. Browser visitors still start on landing.
+  // The APK WebView is NOT `display-mode: standalone`, so PWA detection
+  // alone left the landing page on every native cold start.
+  const skipLandingForInstalledApp = Boolean(
+    (installedMobilePwa || isNativeApp()) && landingRouteRequested,
+  );
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -840,10 +844,10 @@ function RootPage(): ReactNode {
   }, [hash]);
 
   useEffect(() => {
-    if (!skipLandingForInstalledMobilePwa) return;
+    if (!skipLandingForInstalledApp) return;
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
     setHash(HOME_HASH);
-  }, [skipLandingForInstalledMobilePwa]);
+  }, [skipLandingForInstalledApp]);
 
   useEffect(() => {
     if (!user) return;
@@ -1456,7 +1460,7 @@ function RootPage(): ReactNode {
   // (Admins are still exempt from any learner-catalog gating, and
   // genuinely protected routes keep their session spinner below.)
   const showHomeShellImmediately =
-    skipLandingForInstalledMobilePwa ||
+    skipLandingForInstalledApp ||
     Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
 
   if (showHomeShellImmediately) {
@@ -1909,9 +1913,9 @@ if (typeof window !== "undefined") {
   initPerfMonitor();
   markPerf("boot");
   preloadRouteChunk(window.location.hash);
-  // Installed mobile PWAs boot with an empty hash and are sent straight to
-  // Home by RootPage, so warm that chunk too rather than the landing page.
-  if (!window.location.hash && isInstalledMobilePwa()) preloadRouteChunk("#/home");
+  // Installed mobile PWAs and the APK boot with an empty hash and are sent
+  // straight to Home by RootPage, so warm that chunk too rather than landing.
+  if (!window.location.hash && (isInstalledMobilePwa() || isNativeApp())) preloadRouteChunk("#/home");
   // A hash change renders the new route on the SAME tick, so React would
   // suspend before the import starts. Listening in the capture phase gets the
   // fetch going a beat earlier — usually enough to skip the fallback entirely.

@@ -39,4 +39,11 @@ public class MainActivity extends BridgeActivity {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         } catch (Exception ignored) {}
     }
+
+    /** Force landscape for the 3D Sanctuary — auto-rotate ON or OFF. */
+    public void lockLandscapeForSanctuary() {
+        try {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        } catch (Exception ignored) {}
+    }
 }

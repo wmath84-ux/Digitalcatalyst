@@ -66,6 +66,7 @@ import {
   PX_TO_M,
   SCREEN_PX_HEIGHT,
   SCREEN_PX_WIDTH,
+  studyLetterbox,
   type BoardScreen,
   type BoardScreensHandle,
 } from "./boardScreens";
@@ -236,7 +237,7 @@ export class Sanctuary {
   private orbit = new OrbitRig();
 
   /** The HUD chrome keeps a board framing away from the trays (see focusBoard). */
-  private hudInsets: HudInsets = { top: 84, bottom: 152, left: 84, right: 20 };
+  private hudInsets: HudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
   /** Last viewport size, for the safe-rect maths in focusBoard. */
   private viewW = 1;
   private viewH = 1;
@@ -752,6 +753,7 @@ export class Sanctuary {
     this.winter.registerTree(this.desk);
 
     this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
+    this.screens.setHudInsets(this.hudInsets);
     this.scene.add(this.screens.shells);
     // Board shells must take the same distance smoke as terrain/trees —
     // without atmosphere registration the stock fog_fragment never runs
@@ -1707,6 +1709,10 @@ export class Sanctuary {
         .then((t) => {
           t.colorSpace = THREE.SRGBColorSpace;
           t.mapping = THREE.EquirectangularReflectionMapping;
+          // GLB-extracted equirect (glTF V). flipY=true put the painted
+          // islands on the zenith — sky.ts also pins this when the dome
+          // is built, but set it here so the first upload is already right.
+          t.flipY = false;
           t.wrapS = THREE.RepeatWrapping;
           t.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
           return t;
@@ -1750,6 +1756,7 @@ export class Sanctuary {
     this.pendingReadSlot = null;
     this.pendingPinAge = 0;
     this.screens.setReadSlot(null);
+    this.camera.clearViewOffset();
     // Only these four views own a projection-aware "fit". Scenery views and
     // manual exploration must not suddenly snap back after a later resize.
     this.fittedStudyPreset =
@@ -1840,6 +1847,7 @@ export class Sanctuary {
       Math.abs(old.left - next.left) > 0.5 ||
       Math.abs(old.right - next.right) > 0.5;
     this.hudInsets = next;
+    this.screens.setHudInsets(next);
     // Hiding/showing the bottom-right eye changes the free rectangle. Re-fit
     // here, synchronously, so every study camera uses that newly available
     // space instead of retaining one shared/stale mobile zoom.
@@ -1908,41 +1916,47 @@ export class Sanctuary {
     this.pendingReadSlot = slot;
     this.pendingPinAge = 0;
 
-    const vFov = (this.camera.fov * Math.PI) / 180;
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const needW = LECTERN_BOARD_WIDTH * this.boardScale + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
-
-    // The board projects to the screen centre, so each side has to clear the
-    // chrome from the centre line: the nearer edge on that axis wins. The 8 px
-    // floor is a numeric guard only — it must NEVER push the limit past the
-    // chrome, or the board's rows sit under a tray again (the original bug).
-    const ins = this.hudInsets;
-    const limitH = Math.max(8, Math.min(this.viewH / 2 - ins.top, this.viewH / 2 - ins.bottom));
-    const limitW = Math.max(8, Math.min(this.viewW / 2 - ins.left, this.viewW / 2 - ins.right));
-    let distance = Math.max(
-      (needH / 2 / Math.tan(vFov / 2)) / (2 * limitH / this.viewH),
-      (needW / 2 / Math.tan(hFov / 2)) / (2 * limitW / this.viewW),
-    );
-
-    // CONTENT-AWARE MOBILE FIT. All three physical boards are the same size,
-    // which used to give Reading, Notes and Mind map one indistinguishable
-    // default zoom. Reading gets the tight, text-first fit; Notes keeps a
-    // little room around its editor chrome; Mind map gets the widest overview
-    // so edge nodes and its toolbar are visible before the first pinch. No
-    // profile crops — these multipliers only pull back from the proven fit.
-    if (this.viewW < 960) {
-      const mobileFit: Record<LecternSlot, number> = {
-        reading: 1,
-        notes: 1.06,
-        mindmap: 1.12,
-      };
-      distance *= mobileFit[slot];
-    }
+    const compact = this.viewW < 960 || this.viewH < 520;
+    const margin = compact ? 0.08 : BOARD_VIEW_MARGIN;
+    const needW = LECTERN_BOARD_WIDTH * this.boardScale + margin * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + margin * 2;
+    const distance = this.fitStudyDistance(needW, needH);
 
     // The orbit target is the board's own centre: with pitch 0 the camera
     // sits exactly on the face normal, square on the page, at every size.
+    // View-offset (inside fitStudyDistance) then slides that rectangle into
+    // the HUD-free stage so a landscape phone is not cropped by the tray.
     this.orbit.panTo(this.tmpV.copy(placement.position), distance, placement.yaw, 0);
+  }
+
+  /**
+   * Distance + film-gate offset so a study board (or the desk triptych)
+   * letterboxes into the HUD-free rectangle — the same rect the pinned
+   * floating page uses. Replaces the old "clear each chrome edge by a HALF
+   * board from screen centre", which on a 390 px-tall landscape phone left
+   * a shrunk overlay in front of a still-visible 3D shell.
+   */
+  private fitStudyDistance(needW: number, needH: number): number {
+    const box = studyLetterbox(this.viewW, this.viewH, this.hudInsets, 8, needW / needH);
+    const vFov = (this.camera.fov * Math.PI) / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const pinW = Math.max(1, box.w);
+    const pinH = Math.max(1, box.h);
+    const distance = Math.max(
+      (needH / 2 / Math.tan(vFov / 2)) * (this.viewH / pinH),
+      (needW / 2 / Math.tan(hFov / 2)) * (this.viewW / pinW),
+    );
+    if (this.viewW > 1 && this.viewH > 1) {
+      this.camera.setViewOffset(
+        this.viewW,
+        this.viewH,
+        this.viewW / 2 - (box.x + pinW / 2),
+        this.viewH / 2 - (box.y + pinH / 2),
+        this.viewW,
+        this.viewH,
+      );
+    }
+    return distance;
   }
 
   /**
@@ -1987,26 +2001,16 @@ export class Sanctuary {
     }
     const centreZ = sumZ / placements.length;
 
-    const vFov = (this.camera.fov * Math.PI) / 180;
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const needW = halfSpan * 2 + BOARD_VIEW_MARGIN * 2;
-    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + BOARD_VIEW_MARGIN * 2;
-    // Desk is a fit camera too. The old calculation used the entire viewport,
-    // unlike the three single-board cameras, so on a phone its outer boards
-    // sat under the top chip/bottom tray and the eye toggle appeared to keep
-    // the same zoom. Fit the whole triptych into the SAME measured safe rect.
-    const ins = this.hudInsets;
-    const limitH = Math.max(8, Math.min(this.viewH / 2 - ins.top, this.viewH / 2 - ins.bottom));
-    const limitW = Math.max(8, Math.min(this.viewW / 2 - ins.left, this.viewW / 2 - ins.right));
-    const boardDistance = Math.max(
-      (needH / 2 / Math.tan(vFov / 2)) / (2 * limitH / this.viewH),
-      (needW / 2 / Math.tan(hFov / 2)) / (2 * limitW / this.viewW),
-    );
-    // The warehouse has its own preset. This shot is the boards, not the
-    // building — pulling back to hold a 60 m tower made the desk unreadable.
-    // Four percent of breathing room on mobile keeps the curved outer boards
-    // from kissing a rounded screen corner; desktop retains the exact fit.
-    const distance = boardDistance * (this.viewW < 960 ? 1.04 : 1);
+    const compact = this.viewW < 960 || this.viewH < 520;
+    const margin = compact ? 0.08 : BOARD_VIEW_MARGIN;
+    const needW = halfSpan * 2 + margin * 2;
+    const needH = LECTERN_BOARD_HEIGHT * this.boardScale + margin * 2;
+    // Desk is a fit camera too — same HUD-free letterbox as a single board
+    // so the eye toggle and a rotation share one zoom on phones.
+    const boardDistance = this.fitStudyDistance(needW, needH);
+    // A hair of extra air on mobile keeps the curved outer boards from
+    // kissing a rounded screen corner; desktop retains the exact fit.
+    const distance = boardDistance * (compact ? 1.02 : 1);
 
     const target = this.tmpV.set(0, placements[1].position.y, centreZ);
     this.orbit.panTo(target, distance, 0, 0.06);
