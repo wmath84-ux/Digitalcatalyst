@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./social-profile-card.css";
 import { SocialLinkIcon } from "../../components/ui/SocialPlatformIcon";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { resolveSocialLink, type SocialLink } from "../../utils/socialPlatform";
 import { DEFAULT_LOGO_URL } from "../../utils/branding";
 
@@ -44,6 +45,20 @@ interface SocialProfileCardProps {
  * code change. With no accounts configured the card renders its clean
  * non-clickable state — no broken icon, no placeholder link, never
  * "undefined".
+ *
+ * ── MATERIAL (owner, 2026-09-28) ────────────────────────────────────────
+ * "Home page per sabse niche jo social card hai use card ko design glass
+ * card karo exactly like store page product card … Keval design aur look
+ * ki baat kar raha hai … edges ko vaise hi rahane dena jaise abhi hai."
+ *
+ * So the card is now a real `GlassCard` wearing the STORE's material class
+ * (`.dc-store-glass`): light-blue lens, 46% frost, pack sheen, white rim —
+ * byte-for-byte the surface every product card on the Store page paints
+ * (src/store-glass.css + the tokens in src/glass.css). The teal fill and
+ * the 4px teal frame are gone; the ROUNDING did not move (10 / 12 / 14 px,
+ * exactly the ladder this card had before) and neither did a single size:
+ * the reserved 520 / 640 / 740 box, the internal metric ramp, the icon
+ * hooks and the tooltips are all untouched.
  */
 export default function SocialProfileCard({
   logoUrl,
@@ -146,24 +161,46 @@ export default function SocialProfileCard({
 
   if (interactive) {
     return (
-      <div className="dc-social-card" data-home-social-card data-home-social-card-linked>
+      <GlassCard
+        /* The store's invocation, verbatim (src/components/ProductCard.tsx):
+           tint 0.62 over the light blue → the pinned 26% lens, `blur={0}`
+           because src/store-glass.css owns the 46% frost through the
+           `--dc-store-glass-blur` token. The radius is the card's own 10px
+           step; CSS raises it to 12 / 14 at the two breakpoints without
+           touching a single size in the ramp. */
+        tint={0.62}
+        tintColor="173,216,255"
+        blur={0}
+        radius={10}
+        contentClassName="flex h-full w-full min-h-0 flex-col items-center justify-center"
+        className="dc-store-glass dc-scene-ink dc-social-card"
+        data-home-social-card
+        data-home-social-card-linked
+      >
         {content}
-      </div>
+      </GlassCard>
     );
   }
 
   return (
-    <div
-      // The admin preview keeps the reference's hover lift so what the
-      // owner sees while editing is what a learner gets; the live card
-      // with NO account configured stays calm (no lift, nothing to click).
-      className={`dc-social-card ${preview ? "dc-social-card--preview" : "dc-social-card--static"}`}
+    <GlassCard
+      /* The admin preview keeps the reference's hover lift so what the
+         owner sees while editing is what a learner gets; the live card
+         with NO account configured stays calm (no lift, nothing to click).
+         Same store material as the live card — the owner edits on the real
+         surface, never on a stand-in. */
+      tint={0.62}
+      tintColor="173,216,255"
+      blur={0}
+      radius={10}
+      contentClassName="flex h-full w-full min-h-0 flex-col items-center justify-center"
+      className={`dc-store-glass dc-scene-ink dc-social-card ${preview ? "dc-social-card--preview" : "dc-social-card--static"}`}
       data-home-social-card
       data-home-social-card-static
       aria-label="Brand profile card"
     >
       {content}
-    </div>
+    </GlassCard>
   );
 }
 

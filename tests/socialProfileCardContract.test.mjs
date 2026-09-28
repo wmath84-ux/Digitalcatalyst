@@ -10,8 +10,13 @@
 //  1. SIZE — the card takes the exact geometry of the feedback wall box
 //     above it (same width, same 520 / 640 / 740 height steps, same
 //     section padding), at every screen size.
-//  2. DESIGN — every visual value of the reference card
-//     (https://uiverse.io/abrahamcalsin/grumpy-ape-40) is kept verbatim.
+//  2. DESIGN — since the owner's 2026-09-28 direction the card is the STORE'S
+//     GLASS CARD: light-blue lens, 46% frost, pack sheen, white rim — the same
+//     material every product card on the Store page paints (`.dc-store-glass`,
+//     src/store-glass.css + the tokens in src/glass.css). The reference card's
+//     teal fill / teal frame / teal divider are gone; its ROUNDING (10 / 12 /
+//     14 px), its metric ramp, its icon hooks and its tooltips are all kept
+//     ("edges ko vaise hi rahane dena jaise abhi hai").
 //  3. BEHAVIOUR — one account per row (link + icon), the icon follows the
 //     URL (known network → brand glyph, unknown host → that site's own
 //     icon, custom icon URL wins), and a newly added URL therefore shows
@@ -35,6 +40,11 @@ const cardSource = fs.readFileSync("src/home/components/SocialProfileCard.tsx", 
 const iconSource = fs.readFileSync("src/components/ui/SocialPlatformIcon.tsx", "utf8");
 const platformSource = fs.readFileSync("src/utils/socialPlatform.ts", "utf8");
 const css = fs.readFileSync("src/home/components/social-profile-card.css", "utf8");
+// The file's header documents what changed; the negative assertions below are
+// about the DECLARATIONS, so they run on the comment-free text.
+const cssRules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+const storeGlass = fs.readFileSync("src/store-glass.css", "utf8");
+const glassTokens = fs.readFileSync("src/glass.css", "utf8");
 const homeApp = fs.readFileSync("src/home/App.tsx", "utf8");
 const brandingPage = fs.readFileSync("src/admin/pages/BrandingPage.tsx", "utf8");
 const brandingUtil = fs.readFileSync("src/utils/branding.ts", "utf8");
@@ -70,12 +80,34 @@ test("the card fills that box instead of keeping its own 13rem tile", () => {
 /* 2 · DESIGN — the reference values, verbatim                          */
 /* ------------------------------------------------------------------ */
 
-test("every visual value of the reference card is kept", () => {
-  // Card: fill, 4px ring, 10px radius, rim shadow, padding, type.
-  assert.match(css, /background: #2cb5a0;/);
-  assert.match(css, /border: 4px solid #7cdacc;/);
-  assert.match(css, /box-shadow: 0 6px 10px rgba\(207, 212, 222, 1\);/);
-  assert.match(css, /border-radius: 10px;/);
+test("the card wears the Store's glass material", () => {
+  // The component IS a GlassCard with the store lens invocation — the exact
+  // props every Store product card passes (src/components/ProductCard.tsx).
+  assert.match(cardSource, /<GlassCard/);
+  assert.match(cardSource, /dc-store-glass dc-scene-ink dc-social-card/);
+  assert.match(cardSource, /tint=\{0\.62\}/);
+  assert.match(cardSource, /tintColor="173,216,255"/);
+  assert.match(cardSource, /blur=\{0\}/);
+  // …and the material itself stays the pinned store lens, never a local copy:
+  // 46% frost of the 40px ceiling + the 26% light-blue tint.
+  assert.match(glassTokens, /--dc-store-glass-blur: 18\.4px;/);
+  assert.match(glassTokens, /--dc-store-glass-tint: rgba\(173, 216, 255, 0\.26\);/);
+  assert.match(storeGlass, /:where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(1\)/);
+  assert.match(storeGlass, /--dc-store-glass-blur/);
+  assert.match(storeGlass, /--dc-store-glass-tint/);
+  // The old opaque teal sticker cannot come back: no fill, no teal frame,
+  // no teal divider, none of the pale plate shadow.
+  assert.doesNotMatch(cssRules, /#2cb5a0/);
+  assert.doesNotMatch(cssRules, /#7cdacc/);
+  assert.doesNotMatch(cssRules, /rgba\(207, 212, 222, 1\)/);
+  assert.match(css, /background: transparent;/);
+});
+
+test("the card keeps its own geometry, rounding and type", () => {
+  // Rounding: exactly the ladder the card had before the glass rebuild.
+  assert.match(css, /border-radius: 10px !important;/);
+  assert.match(css, /border-radius: 12px !important;/);
+  assert.match(css, /border-radius: 14px !important;/);
   assert.match(css, /padding-top: 25px;/);
   assert.match(css, /padding-bottom: 25px;/);
   assert.match(css, /padding-left: 20px;/);
@@ -84,21 +116,22 @@ test("every visual value of the reference card is kept", () => {
   assert.match(css, /font-family: "Poppins",/);
   assert.match(css, /transition: all 0\.3s ease;/);
   assert.match(css, /\.dc-social-card:hover \{\n  transform: translateY\(-10px\);/);
-  // Picture: 18rem circle (double the previous Home 9rem) with the same
-  // 4px ring, centred — the brand logo is the card's hero on every
-  // phone / tablet / desktop size.
+  // Picture: 18rem circle with a translucent white glass rim (the width
+  // steps are still part of the metric ramp), centred — the brand logo is
+  // the card's hero on every phone / tablet / desktop size.
   assert.match(css, /width: 18rem;/);
   assert.match(css, /height: 18rem;/);
+  assert.match(css, /border: 4px solid rgba\(255, 255, 255, 0\.42\);/);
   assert.match(css, /border-radius: 999px;/);
   assert.match(css, /\.dc-social-pic \{[\s\S]*?margin: auto;/);
   // Type scale: 22px name, 18px weight-200 bio line.
   assert.match(css, /\.dc-social-name \{[\s\S]*?font-size: 22px;/);
   assert.match(css, /\.dc-social-name span \{[\s\S]*?font-size: 18px;/);
   assert.match(css, /\.dc-social-name span \{[\s\S]*?font-weight: 200;/);
-  // Divider: 2px #7cdacc rule with 16px above and below.
+  // Divider: 2px translucent white rule with 16px above and below.
   assert.match(css, /\.dc-social-media::before \{[\s\S]*?height: 2px;/);
   assert.match(css, /\.dc-social-media::before \{[\s\S]*?margin: 16px 0;/);
-  assert.match(css, /\.dc-social-media::before \{[\s\S]*?background: #7cdacc;/);
+  assert.match(css, /\.dc-social-media::before \{[\s\S]*?background: rgba\(255, 255, 255, 0\.28\);/);
   // Icons: 1.5rem, currentColor, 18px apart.
   assert.match(css, /\.dc-social-icon svg,\n\.dc-social-icon img \{[\s\S]*?width: 1\.5rem;/);
   assert.match(css, /fill: currentColor;/);

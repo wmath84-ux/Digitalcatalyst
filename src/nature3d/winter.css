@@ -38,3 +38,18 @@
 .sanctuary-lite .shadow-2xl {
   box-shadow: 0 8px 24px rgba(2, 8, 23, 0.45);
 }
+
+/* ── Fullscreen chrome diet ────────────────────────────────────────────────
+   `html[data-app-fullscreen="true"]` is set by src/utils/fullscreen.ts while
+   the page-level fallback owns the screen — the layer used only where the
+   platform gives a web page no way to hide its own chrome (iOS Safari, an
+   in-app browser). The APK and every real browser hide the OS bars instead, so
+   this block never applies there.
+
+   In the fallback the WORLD gets the whole viewport: the HUD chrome steps
+   aside (the eye button and the settings overlay stay, so there is always a
+   way back out). The engine's HUD insets follow the same state in
+   NatureStudioPage.refreshInsets(). */
+html[data-app-fullscreen="true"] [data-sanctuary-root] [data-sanctuary-chrome] {
+  display: none !important;
+}

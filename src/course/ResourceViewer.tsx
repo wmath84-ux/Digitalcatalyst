@@ -46,6 +46,7 @@ import AudioPlayer from "./AudioPlayer";
 import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
+import { toggleFullscreen as toggleAppFullscreen } from "../utils/fullscreen";
 
 /**
  * The ACTIVE file's action model, reported live to the Course Player so the
@@ -249,11 +250,20 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
   // do from its old top bar (open the original, download, go fullscreen
   // and flip preview ⇄ Google editor) is reported to the player while this
   // file is ACTIVE, so the footer dock's Player tab follows the active file.
+  /**
+   * Fullscreen for the ACTIVE file's stage (video / audio / YouTube).
+   *
+   * Goes through the shared controller (src/utils/fullscreen.ts), which puts
+   * THIS element fullscreen with the browser's own API wherever it is
+   * honoured — inside the APK included, now that the shell hosts the
+   * WebChromeClient custom view that Android WebView requires — then falls
+   * back to the native immersive system bars, then to the page-level layer.
+   * One tap enters, the next leaves, whichever layer took the request.
+   */
   const toggleFullscreen = useCallback(() => {
     const root = document.querySelector("[data-course-viewer][data-active=\"true\"]") || document.querySelector("[data-course-viewer]");
     if (!root) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void (root as HTMLElement).requestFullscreen?.();
+    void toggleAppFullscreen({ element: root });
   }, []);
   const toggleEditMode = useCallback(() => {
     setEditMode((value) => !value);

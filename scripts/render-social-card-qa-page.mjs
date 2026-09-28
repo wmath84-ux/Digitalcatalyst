@@ -33,7 +33,14 @@ try {
   const { default: SocialProfileCard } = await vite.ssrLoadModule("/src/home/components/SocialProfileCard.tsx");
   const { SOCIAL_PLATFORMS } = await vite.ssrLoadModule("/src/utils/socialPlatform.ts");
 
-  const css = readFileSync(path.join(root, "src/home/components/social-profile-card.css"), "utf8");
+  // The card's own CSS plus the two sheets the STORE's material lives in
+  // (owner, 2026-09-28: the card is a glass card "exactly like store page
+  // product card"). Order matters — it is the order the app loads them in
+  // (see src/main.tsx): the pack's glass, then the store lens, then the card.
+  const cardCss = readFileSync(path.join(root, "src/home/components/social-profile-card.css"), "utf8");
+  const glassCss = readFileSync(path.join(root, "src/glass.css"), "utf8");
+  const storeGlassCss = readFileSync(path.join(root, "src/store-glass.css"), "utf8");
+  const css = [cardCss, glassCss, storeGlassCss].join("\n\n");
   // The real app icon, inlined so the sheet renders from a plain file:// open.
   const logo = `data:image/png;base64,${readFileSync(path.join(root, "public/icons/icon-192x192.png")).toString("base64")}`;
 
@@ -65,13 +72,20 @@ try {
     .replaceAll(">", "&gt;");
 
   const shotDocument = (height, markup) => `<!doctype html>
-<html lang="en">
+<html lang="en" data-glass="on">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 ${css}
-  html, body { margin: 0; padding: 0; width: 100%; background: #08080c; color: #e6e8f0; }
+  /* The winter scene the card actually sits on, compressed to one gradient:
+     the frost layer has something to blur and the light-blue tint reads the
+     way it does on Home. */
+  html, body { margin: 0; padding: 0; width: 100%; color: #e6e8f0;
+    background:
+      radial-gradient(120% 90% at 78% 8%, rgba(126, 176, 235, 0.55) 0%, rgba(16, 26, 48, 0) 58%),
+      radial-gradient(130% 100% at 12% 100%, rgba(232, 240, 252, 0.5) 0%, rgba(10, 16, 32, 0) 60%),
+      linear-gradient(180deg, #0a1020 0%, #0d1526 52%, #131d33 100%); }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;
          width: 100%; height: ${height}px; }
   .wall { display: grid; place-items: center; min-width: 0; height: 100%; border-radius: 2rem;
@@ -133,7 +147,7 @@ ${fallbackScript}
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Home social profile card — QA sheet (grumpy-ape-40 port)</title>
+<title>Home social profile card — QA sheet (store glass)</title>
 <style>
 ${css}
   :root { color-scheme: dark; }
@@ -163,26 +177,29 @@ ${css}
   </p>
   <div class="note">
     <b>Size parity</b> — both boxes use the height steps the page uses
-    (<code>h-[420px] sm:h-[520px] md:h-[600px]</code>) and the same full width, so the two cards
+    (<code>h-[520px] sm:h-[640px] md:h-[740px]</code>) and the same full width, so the two cards
     measure exactly the same at every screen size; the profile block is centred inside the box.<br />
-    <b>Internal scaling</b> — the fixed-width frames deliberately use 390px (420 step), 700px
-    (520 step, triggering <code>min-width: 640px</code>) and 900px (600 step, triggering
-    <code>min-width: 768px</code>) viewports. The internals follow <code>s = boxHeight / 420</code>:
-    1.00 → 1.238 → 1.4286.<br />
-    <b>Design</b> — every value of the reference card is kept at the 420px baseline: <code>#2cb5a0</code>
-    fill, 4px <code>#7cdacc</code> ring, 10px radius, <code>0 6px 10px rgba(207,212,222,1)</code>
-    shadow, 5rem circular logo, 18px/16px type, 2px divider with 20px gaps, 1.1rem icons 15px apart,
-    <code>#262626</code> tooltip with the 10px arrow, −10px hover lift over 0.3s.<br />
+    <b>Internal scaling</b> — the fixed-width frames deliberately use 390px (520 step), 700px
+    (640 step, triggering <code>min-width: 640px</code>) and 900px (740 step, triggering
+    <code>min-width: 768px</code>) viewports. The internals follow <code>s = boxHeight / 520</code>:
+    1.00 → 1.2308 → 1.4231.<br />
+    <b>Design (owner, 2026-09-28)</b> — the card now wears the STORE's glass
+    (<code>.dc-store-glass</code>, inlined above with <code>src/glass.css</code>): light-blue lens
+    <code>rgb(173,216,255)</code> at 26%, frost 18.4px (46% of the 40px ceiling), the pack sheen and
+    the white rim — byte-for-byte the surface a store product card paints. What did NOT move: the
+    rounding (10px / 12px / 14px at 640 / 768, exactly the ladder the card had before), the
+    <code>h-[…]</code> box, the internal metric ramp, the icon hooks and the
+    <code>#262626</code> tooltips. The old teal fill, the 4px teal frame and the pale shadow are gone.<br />
     <b>Icons</b> — one link + one icon per account. Instagram, YouTube, WhatsApp, X, LinkedIn, Telegram
     and Facebook render their brand glyph; the last account (<code>mybrand.example</code>) is a brand-new
     URL on a host no glyph ships for, so it renders that site's own <code>/favicon.ico</code> in the same
     uniform white (and falls back to the globe glyph if that image fails). Hover an icon for its tooltip,
     hover the card for the reference lift.
   </div>
-${shot(420, 390, "Phone · 420px", cardLive)}
-${shot(520, 700, "Small / tablet · 520px", cardLive)}
-${shot(600, 900, "Desktop · 600px", cardLive)}
-${shot(420, 390, "No account configured · card stays clickable-free", cardEmpty)}
+${shot(520, 390, "Phone · 520px", cardLive)}
+${shot(640, 700, "Small / tablet · 640px", cardLive)}
+${shot(740, 900, "Desktop · 740px", cardLive)}
+${shot(520, 390, "No account configured · the same glass, nothing to click", cardEmpty)}
 </body>
 </html>
 `;

@@ -289,13 +289,23 @@ try {
     const { readFileSync } = await import("node:fs");
     const css = readFileSync("src/home/components/social-profile-card.css", "utf8");
     check("name/bio have overflow-wrap in scoped CSS", /dc-social-name[\s\S]*?overflow-wrap: break-word/.test(css));
-    // Size parity with the feedback wall + the reference's visual values.
-    check("card fills its box (100% width + height)", /width: 100%;/.test(css) && /height: 100%;/.test(css) && !/width: 13rem/.test(css));
-    check("reference palette/border/radius/shadow kept", /background: #2cb5a0;/.test(css) && /border: 4px solid #7cdacc;/.test(css) && /border-radius: 10px;/.test(css) && /box-shadow: 0 6px 10px rgba\(207, 212, 222, 1\);/.test(css));
-    check("reference icon size + gap kept (1.1rem / 15px)", /width: 1\.1rem;/.test(css) && /margin-right: 15px;/.test(css));
-    check("reference tooltip kept (#262626 + 10px arrow)", /background: #262626;/.test(css) && /border-width: 10px 10px 0 10px;/.test(css));
+    // Size parity with the feedback wall + the card's own values. Owner
+    // direction (2026-09-28): the card is the STORE's glass card — the
+    // material lives in `.dc-store-glass` (src/store-glass.css), so the card
+    // itself paints nothing and keeps its own geometry + ROUNDING.
+    const cssRules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    const tsx = readFileSync("src/home/components/SocialProfileCard.tsx", "utf8");
+    check("card fills its box (100% width + height)", /width: 100%;/.test(cssRules) && /height: 100%;/.test(cssRules) && !/width: 13rem/.test(cssRules));
+    const cardRule = cssRules.slice(cssRules.indexOf(".dc-social-card {"), cssRules.indexOf(".dc-social-card:hover"));
+    check("card is the store's glass surface (no opaque fill or frame of its own)",
+      /background: transparent;/.test(cardRule) && !/#2cb5a0/.test(cssRules) && !/(^|;)\s*border(-width)?\s*:/.test(cardRule)
+      && /dc-store-glass/.test(tsx) && /dc-scene-ink/.test(tsx) && /<GlassCard/.test(tsx));
+    check("the card's own ROUNDING ladder is kept (10 / 12 / 14)",
+      /border-radius: 10px/.test(cssRules) && /border-radius: 12px/.test(cssRules) && /border-radius: 14px/.test(cssRules));
+    check("glass logo ring + the uniform white icon set kept", /border: 4px solid rgba\(255, 255, 255, 0\.42\);/.test(cssRules) && /margin-right: 18px;/.test(cssRules) && /filter: brightness\(0\) invert\(1\);/.test(cssRules));
+    check("tooltip kept (#262626 + 12px arrow)", /background: #262626;/.test(cssRules) && /border-width: 12px 12px 0 12px;/.test(cssRules));
     const homeApp = readFileSync("src/home/App.tsx", "utf8");
-    const boxes = homeApp.match(/h-\[420px\][^"`]*sm:h-\[520px\][^"`]*md:h-\[600px\]/g) || [];
+    const boxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
     check("social card shares the feedback wall's exact height steps", boxes.length === 2, `found ${boxes.length}`);
     el.remove();
   }

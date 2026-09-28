@@ -17,15 +17,29 @@
 //      in the landscape rail and (b) the first touch on the landscape player.
 //      Both are real gestures, so Android reliably hides the bar (and, with
 //      `navigationUI: "hide"`, the gesture navigation bar too).
-//   2. theme-color — paints the bar the player's own background colour so it
+//   2. NATIVE immersive (Capacitor APK) — the shared controller in
+//      src/utils/fullscreen.ts drives the `AppFullscreen` Android plugin,
+//      which hides the status AND navigation bars through
+//      WindowInsetsControllerCompat. This is the layer that makes the switch
+//      actually work inside the APK: an Android WebView can never honour
+//      `requestFullscreen()` unless the host Activity hosts the
+//      WebChromeClient custom view (Capacitor's stock client refuses it).
+//   3. theme-color — paints the bar the player's own background colour so it
 //      blends edge-to-edge even before (or without) fullscreen.
-//   3. black-translucent iOS meta — lets the player draw underneath a
+//   4. black-translucent iOS meta — lets the player draw underneath a
 //      translucent status bar (iOS PWA / Safari home-screen mode).
 //
 // The bar is restored the moment the player leaves landscape/immersive or
 // unmounts.
 
 import { setThemeColor } from "./themeColor";
+import {
+  enterFullscreen,
+  exitFullscreen,
+  getFullscreenSnapshot,
+  isFullscreenActive,
+  subscribeFullscreen,
+} from "./fullscreen";
 
 const STATUS_BAR_STYLE_SELECTOR = 'meta[name="apple-mobile-web-app-status-bar-style"]';
 
@@ -75,40 +89,33 @@ const notifyFullscreenChange = (): void => {
   for (const listener of fullscreenListeners) listener();
 };
 
-// `navigationUI: "hide"` makes Android's fullscreen "immersive" — the gesture
-// navigation bar is hidden too, leaving only the player edge-to-edge.
-const FULLSCREEN_OPTIONS: FullscreenOptions = { navigationUI: "hide" };
-
+/**
+ * Ask for the real thing through the shared controller: the native immersive
+ * bridge inside the APK (the only layer that can hide an Android WebView's
+ * system bars), the Fullscreen API in a browser. `allowAppFallback: false`
+ * keeps the switch honest — where neither layer works, the blended
+ * theme-colour of layer 3 is still there and the toggle simply stays off.
+ */
 const requestPlayerFullscreen = (): void => {
   if (typeof document === "undefined") return;
   // iOS has no usable document-level fullscreen — never attempt it there.
   if (isIOSDevice()) return;
   if (document.fullscreenElement || fullscreenRequestPending) return;
-  const root = document.documentElement;
-  const requestFs = root.requestFullscreen?.bind(root);
-  if (typeof requestFs !== "function") return;
   fullscreenRequestPending = true;
   try {
-    const request = requestFs(FULLSCREEN_OPTIONS);
-    if (request && typeof request.then === "function") {
-      request
-        .then(() => {
-          fullscreenEnteredByPlayer = true;
-        })
-        .catch(() => {
-          // Blocked (no user gesture) — the theme-colour layers still hide
-          // the bar visually. Never throw from a browser policy decision.
-          fullscreenEnteredByPlayer = false;
-        })
-        .finally(() => {
-          fullscreenRequestPending = false;
-          notifyFullscreenChange();
-        });
-    } else {
-      fullscreenEnteredByPlayer = true;
-      fullscreenRequestPending = false;
-      notifyFullscreenChange();
-    }
+    void enterFullscreen({ allowAppFallback: false })
+      .then((snapshot) => {
+        fullscreenEnteredByPlayer = snapshot.active;
+      })
+      .catch(() => {
+        // Blocked (no user gesture) — the theme-colour layer still paints the
+        // bar. Never throw from a browser policy decision.
+        fullscreenEnteredByPlayer = false;
+      })
+      .finally(() => {
+        fullscreenRequestPending = false;
+        notifyFullscreenChange();
+      });
   } catch {
     fullscreenEnteredByPlayer = false;
     fullscreenRequestPending = false;
@@ -117,12 +124,17 @@ const requestPlayerFullscreen = (): void => {
 };
 
 // Keep the module's notion of "who entered fullscreen" honest whenever the
-// browser leaves fullscreen on its own (Android swipe-down / Escape).
+// browser leaves fullscreen on its own (Android swipe-down / Escape)…
 if (typeof document !== "undefined") {
   document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement) fullscreenEnteredByPlayer = false;
     notifyFullscreenChange();
   });
+  // …and mirror EVERY change the shared controller reports. The native
+  // immersive layer (the APK) fires no browser event at all, so without this
+  // the Player-tab switch would keep showing the old state after a media
+  // viewer — or the platform itself — changed the layer.
+  subscribeFullscreen(notifyFullscreenChange);
 }
 
 /**
@@ -148,14 +160,19 @@ export const enterCoursePlayerFullscreen = (): void => {
 export const exitCoursePlayerFullscreen = (): void => {
   if (typeof document === "undefined") return;
   fullscreenEnteredByPlayer = false;
-  if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
-    void document.exitFullscreen();
-  }
+  // One call releases whichever layer took the request — the browser's own
+  // fullscreen and/or the APK's native immersive bars. The native layer fires
+  // no browser event, so the Player-tab switch is told explicitly.
+  void exitFullscreen().finally(() => notifyFullscreenChange());
 };
 
-/** Whether the document is currently fullscreen (any element). */
+/**
+ * Whether the player currently owns a fullscreen surface — the browser's own
+ * fullscreen (any element) OR the APK's native immersive bars. Both are real
+ * fullscreen for the learner, so both light the "Hide status bar" row.
+ */
 export const isCoursePlayerFullscreen = (): boolean =>
-  typeof document !== "undefined" && Boolean(document.fullscreenElement);
+  typeof document !== "undefined" && isFullscreenActive();
 
 /** Subscribe to fullscreen state changes (the rail button mirrors the icon). */
 export const onCourseFullscreenChange = (listener: () => void): (() => void) => {
@@ -185,9 +202,17 @@ export const restoreStatusBarFromCoursePlayer = (): void => {
   landscapeChromeActive = false;
   fullscreenRequestPending = false;
   if (typeof document !== "undefined") {
-    if (fullscreenEnteredByPlayer && document.fullscreenElement && typeof document.exitFullscreen === "function") {
+    // Only the fullscreen the PLAYER itself entered is released — a media
+    // viewer's element fullscreen is left exactly as the learner set it.
+    const playerOwnsWebFullscreen = fullscreenEnteredByPlayer && document.fullscreenElement;
+    if (playerOwnsWebFullscreen && typeof document.exitFullscreen === "function") {
       fullscreenEnteredByPlayer = false;
       void document.exitFullscreen();
+    }
+    if (fullscreenEnteredByPlayer || getFullscreenSnapshot().mode === "native") {
+      // …and the native immersive bars, whichever layer owns them.
+      fullscreenEnteredByPlayer = false;
+      void exitFullscreen().finally(() => notifyFullscreenChange());
     }
     if (originalThemeColor !== null) setThemeColor(originalThemeColor);
     const styleMeta = document.querySelector<HTMLMetaElement>(STATUS_BAR_STYLE_SELECTOR);
