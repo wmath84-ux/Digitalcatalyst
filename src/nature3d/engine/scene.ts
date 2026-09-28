@@ -2313,7 +2313,7 @@ export class Sanctuary {
     // one-frame black flash. Idle camera/projection updates are cached.
     const projectionChanged = this.screens.render(this.camera);
     // Keep video/input at browser cadence; only the parked ambient world is
-    // budgeted at its existing 15 Hz animation rate. Moving views never wait.
+    // budgeted at 30 Hz while parked. Moving views never wait.
     if (this.studyWorldPacer.shouldRender(frameStart, study, projectionChanged)) {
       this.renderer.render(this.scene, this.camera);
     }

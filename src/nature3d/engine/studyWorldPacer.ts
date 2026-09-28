@@ -1,7 +1,7 @@
 /**
  * Only the ambient WebGL world is paced, never the DOM/video or input loop.
- * Study animations already update at 15 Hz; drawing the whole alpha canvas
- * at 60/120 Hz anyway competes with video decoding and DOM compositing.
+ * The parked study world draws at 30 Hz (the low-tier frame budget), rather
+ * than wasting 60/120 Hz on an unchanged camera while competing with video.
  * Camera/projection changes always draw immediately so apertures stay aligned.
  */
 export class StudyWorldPacer {
@@ -11,7 +11,7 @@ export class StudyWorldPacer {
 
   shouldRender(nowMs: number, studying: boolean, projectionChanged: boolean): boolean {
     if (!studying || projectionChanged || nowMs + 0.01 >= this.nextFrame) {
-      this.nextFrame = nowMs + 1000 / 15;
+      this.nextFrame = nowMs + 1000 / 30;
       return true;
     }
     return false;

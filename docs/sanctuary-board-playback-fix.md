@@ -35,7 +35,7 @@
   last-painted-pose threshold to avoid style writes from tiny orbit damping
   tails, while accumulated slow movement remains responsive.
 - While a board is parked in Study view, the ambient world canvas is drawn at
-  15 Hz, matching the world's existing 15 Hz animation budget. The DOM/iframe
+  30 Hz (matching the low-tier render budget), instead of 15 Hz. The DOM/iframe
   and input continue at browser cadence. Any camera/projection movement draws
   immediately; Desk and navigation are never paced.
 

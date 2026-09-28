@@ -240,14 +240,14 @@ test("FOV, resize, scale and read slot changes bypass the idle cache", () => {
   assert.equal(screens.render(camera), false);
 });
 
-test("parked study world draws at 15 Hz, without pacing camera movement or Desk", () => {
+test("parked study world keeps 30 Hz minimum and never paces camera movement or Desk", () => {
   for (const hz of [30, 60, 120]) {
     const pacer = new fixture.StudyWorldPacer();
     let draws = 0;
     for (let frame = 0; frame < hz; frame++) {
       if (pacer.shouldRender(frame * 1000 / hz, true, false)) draws++;
     }
-    assert.equal(draws, 15);
+    assert.equal(draws, 30);
     for (let frame = hz; frame < hz * 2; frame++) {
       assert.equal(pacer.shouldRender(frame * 1000 / hz, true, true), true);
     }
