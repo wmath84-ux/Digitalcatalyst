@@ -27,7 +27,8 @@ import {
   setDoc,
   type Unsubscribe,
 } from "firebase/firestore";
-import { db, getFirebaseStorage } from "../../firebase";
+import { auth, db, getFirebaseStorage } from "../../firebase";
+import { apiFetch } from "../utils/apiBase";
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from "../../utils/cloudinaryUpload";
 import type { CourseFileType } from "../types/course";
 import {
@@ -268,6 +269,164 @@ export const countQuestions = (modules: MyCourseModule[]): number =>
 
 const courseRef = (uid: string, courseId: string) => doc(db, "users", uid, MY_COURSES_COLLECTION, courseId);
 
+/* ── The guaranteed server path ──────────────────────────────────────────────
+   Firestore is the fast route: it is live, it works offline through its write
+   queue, and firestore.rules derives ownership from the path.
+
+   But firestore.rules ends with `match /{document=**} { allow read, write: if
+   isAdmin(); }`, so the developer's own account can read and write EVERY path.
+   That makes any gap between the rules in this repo and the rules actually
+   deployed to the project invisible to the admin and fatal for everyone else —
+   which is exactly the reported "My Study Library keval admin account se chalta
+   hai, dusre account se nahin".
+
+   So every read and write below has a second door: `/api/my-courses`
+   (api/_lib/myCourses.ts), which authenticates the learner from their VERIFIED
+   ID token and writes the same `users/{uid}/myCourses/{courseId}` document with
+   the Admin SDK. The Admin SDK does not consult security rules, so the library
+   works for every signed-in account no matter what is deployed — while
+   ownership stays absolute, because the server builds the path from the token's
+   uid and never from the request body.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** Firestore error codes that mean "this account may not touch that path". */
+const BLOCKED_FIRESTORE_CODES = new Set([
+  "permission-denied",
+  "unauthenticated",
+  "failed-precondition",
+]);
+
+const firestoreErrorCode = (error: unknown): string =>
+  String((error as { code?: string } | null)?.code || "");
+
+/**
+ * A message the learner can act on. Firestore's own text ("Missing or
+ * insufficient permissions") names nothing, which is how a rules gap became an
+ * unexplainable "library chalta hi nahin" for every account but the admin's.
+ */
+export const describeMyCoursesError = (error: unknown): string => {
+  const code = firestoreErrorCode(error);
+  if (code === "permission-denied" || code === "unauthenticated") {
+    return "Firebase rules ne direct access refuse kiya — library ab secure server path se load ho rahi hai. Ek baar Try again dabayein.";
+  }
+  if (code === "unavailable") {
+    return "Network ya Firestore abhi unavailable hai. Aapka course is device par safe hai — connection aate hi sync ho jayega.";
+  }
+  if (code === "resource-exhausted") {
+    return "Firestore quota khatam ho gaya hai. Thodi der me dobara try karein.";
+  }
+  const message = String((error as { message?: string } | null)?.message || "").trim();
+  return message || "Your library could not be loaded.";
+};
+
+/** True when Firestore itself refused (or could not be reached), as opposed to
+ *  a validation error the learner can fix by editing their course. */
+export const isMyCoursesFirestoreBlocked = (error: unknown): boolean => {
+  const code = firestoreErrorCode(error);
+  if (BLOCKED_FIRESTORE_CODES.has(code)) return true;
+  const message = String((error as { message?: string } | null)?.message || "").toLowerCase();
+  return message.includes("missing or insufficient permissions");
+};
+
+/**
+ * Sticky for the session: once Firestore has refused this browser, later saves
+ * go straight to the server instead of paying for another rejection first. It
+ * clears itself the moment a Firestore listener answers again (i.e. the rules
+ * were deployed), so the fast path always comes back — and a one-shot read
+ * re-tests Firestore a minute after the last refusal even if no listener is
+ * open, so the fast path returns without the learner having to reopen the shelf.
+ */
+let firestoreRefusedThisSession = false;
+let firestoreRefusedAt = 0;
+const FIRESTORE_REFUSED_RETRY_MS = 60_000;
+const markFirestoreRefused = (): void => {
+  firestoreRefusedThisSession = true;
+  firestoreRefusedAt = Date.now();
+};
+/** True only while the refusal is fresh; an older one is worth re-testing. */
+const firestoreRefusedRecently = (): boolean =>
+  firestoreRefusedThisSession && Date.now() - firestoreRefusedAt < FIRESTORE_REFUSED_RETRY_MS;
+
+export const myCoursesUsingServerPath = (): boolean => firestoreRefusedThisSession;
+
+type ApiEnvelope<T> = { ok?: boolean; data?: T; error?: string; message?: string; code?: string };
+
+async function myCoursesApi<T>(payload: Record<string, unknown>): Promise<T> {
+  await auth.authStateReady();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Please sign in to sync your library.");
+  const token = await user.getIdToken();
+  const response = await apiFetch("/api/my-courses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
+  if (!response.ok || !body || body.ok === false || !body.data) {
+    const message = String(body?.error || body?.message || "").trim();
+    throw new Error(
+      message || `My Study Library server answered ${response.status}. Please try again.`,
+    );
+  }
+  return body.data;
+}
+
+/** The learner's courses, read by the server (Admin SDK). */
+export async function listMyCoursesViaApi(uid: string): Promise<MyCourse[]> {
+  const data = await myCoursesApi<{ courses?: unknown[] }>({ action: "myCourses.list", uid });
+  const rows = Array.isArray(data.courses) ? data.courses : [];
+  return rows
+    .map((row) => parseMyCourse(row, uid))
+    .filter((course): course is MyCourse => Boolean(course))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/**
+ * Polling subscription over the server path. Firestore would push; here the
+ * shelf refreshes on an interval and immediately whenever the device comes back
+ * online, which is enough for a page the learner is actively editing.
+ */
+export function subscribeMyCoursesViaApi(
+  uid: string,
+  onData: (courses: MyCourse[]) => void,
+  onError?: (error: Error) => void,
+  intervalMs = 15000,
+): Unsubscribe {
+  if (!uid) {
+    onData([]);
+    return () => undefined;
+  }
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const load = async () => {
+    if (stopped) return;
+    try {
+      const courses = await listMyCoursesViaApi(uid);
+      if (!stopped) onData(courses);
+    } catch (error) {
+      if (!stopped) onError?.(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      if (!stopped) timer = setTimeout(() => { void load(); }, intervalMs);
+    }
+  };
+
+  const onOnline = () => {
+    if (stopped) return;
+    if (timer) { clearTimeout(timer); timer = null; }
+    void load();
+  };
+  if (typeof window !== "undefined") window.addEventListener("online", onOnline);
+
+  void load();
+
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    if (typeof window !== "undefined") window.removeEventListener("online", onOnline);
+  };
+}
+
 /**
  * Live list of the learner's courses. The listener is the only read: the
  * editor and the player both render from this snapshot, so a save is visible
@@ -282,17 +441,61 @@ export function subscribeMyCourses(
     onData([]);
     return () => undefined;
   }
-  return onSnapshot(
+
+  let stopped = false;
+  let stopApi: Unsubscribe | null = null;
+
+  /** Switch the shelf to the server path — idempotent. */
+  const startApiFallback = (cause: unknown) => {
+    if (stopped || stopApi) return;
+    markFirestoreRefused();
+    console.warn(
+      "[my-courses] Firestore refused this account's library (%s) — falling back to /api/my-courses.",
+      firestoreErrorCode(cause) || "unknown",
+    );
+    stopApi = subscribeMyCoursesViaApi(uid, onData, onError);
+  };
+
+  const unsubscribe = onSnapshot(
     collection(db, "users", uid, MY_COURSES_COLLECTION),
     (snapshot) => {
+      // Firestore answered, so it is the better transport again (live pushes +
+      // the offline write queue). Drop the polling fallback and forget the
+      // refusal — this is how the fast path returns after the rules are
+      // deployed, with no reload and no code change.
+      if (stopApi) {
+        stopApi();
+        stopApi = null;
+      }
+      firestoreRefusedThisSession = false;
       const courses = snapshot.docs
         .map((entry) => parseMyCourse(entry.data(), uid))
         .filter((course): course is MyCourse => Boolean(course))
         .sort((a, b) => b.updatedAt - a.updatedAt);
       onData(courses);
     },
-    (error) => onError?.(error instanceof Error ? error : new Error(String(error))),
+    (error) => {
+      if (isMyCoursesFirestoreBlocked(error)) {
+        // Not an error the learner can act on: the server path takes over and
+        // the shelf fills in a moment later.
+        startApiFallback(error);
+        return;
+      }
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    },
   );
+
+  // A refusal earlier in this session means the listener is about to fail
+  // again: start the server path straight away so the shelf is never blank
+  // while the rejection round-trips. The listener still runs, and takes back
+  // over the moment it is allowed.
+  if (firestoreRefusedThisSession) startApiFallback(null);
+
+  return () => {
+    stopped = true;
+    unsubscribe();
+    if (stopApi) stopApi();
+  };
 }
 
 /** Create or overwrite one course document. Resolves after the write commits. */
@@ -306,7 +509,17 @@ export async function saveMyCourse(uid: string, course: MyCourse): Promise<void>
     updatedAt: now(),
     updatedAtServer: serverTimestamp(),
   };
-  await setDoc(courseRef(uid, clean.id), payload, { merge: true });
+  try {
+    await setDoc(courseRef(uid, clean.id), payload, { merge: true });
+    return;
+  } catch (error) {
+    if (!isMyCoursesFirestoreBlocked(error)) throw error;
+    // Rules refused (or Firestore is unreachable): the SAME document is written
+    // by the server with the Admin SDK, authenticated by this learner's own ID
+    // token. Without this door a rules gap makes the whole library admin-only.
+    markFirestoreRefused();
+    await myCoursesApi<{ course?: unknown }>({ action: "myCourses.save", course: clean });
+  }
 }
 
 /**
@@ -318,16 +531,30 @@ export async function saveMyCourse(uid: string, course: MyCourse): Promise<void>
  */
 export async function fetchMyCourses(uid: string): Promise<MyCourse[]> {
   if (!uid) return [];
-  const snapshot = await getDocs(collection(db, "users", uid, MY_COURSES_COLLECTION));
-  return snapshot.docs
-    .map((entry) => parseMyCourse(entry.data(), uid))
-    .filter((course): course is MyCourse => Boolean(course))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  if (firestoreRefusedRecently()) return listMyCoursesViaApi(uid);
+  try {
+    const snapshot = await getDocs(collection(db, "users", uid, MY_COURSES_COLLECTION));
+    firestoreRefusedThisSession = false;
+    return snapshot.docs
+      .map((entry) => parseMyCourse(entry.data(), uid))
+      .filter((course): course is MyCourse => Boolean(course))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch (error) {
+    if (!isMyCoursesFirestoreBlocked(error)) throw error;
+    markFirestoreRefused();
+    return listMyCoursesViaApi(uid);
+  }
 }
 
 export async function deleteMyCourse(uid: string, courseId: string): Promise<void> {
   if (!uid) throw new Error("Please sign in to delete your course.");
-  await deleteDoc(courseRef(uid, courseId));
+  try {
+    await deleteDoc(courseRef(uid, courseId));
+  } catch (error) {
+    if (!isMyCoursesFirestoreBlocked(error)) throw error;
+    markFirestoreRefused();
+    await myCoursesApi<{ courseId?: string }>({ action: "myCourses.delete", courseId });
+  }
 }
 
 // ── Uploads ────────────────────────────────────────────────────────────────

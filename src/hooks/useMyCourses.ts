@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   deleteMyCourse,
+  describeMyCoursesError,
   saveMyCourse,
   subscribeMyCourses,
 } from "../lib/myCourseClient";
@@ -61,7 +62,11 @@ export function useMyCourses(): MyCoursesController {
         setState("ready");
       },
       (nextError) => {
-        setError(nextError.message || "Your library could not be loaded.");
+        // Name what actually refused, instead of Firestore's opaque
+        // "Missing or insufficient permissions" — and note that a
+        // permission-denied listener has already switched the shelf to the
+        // server path (see `subscribeMyCourses`), so this is a last resort.
+        setError(describeMyCoursesError(nextError));
         setState("error");
       },
     );
@@ -96,7 +101,7 @@ export function useMyCourses(): MyCoursesController {
         return { ok: true };
       } catch (writeError) {
         setCourses(previous);
-        const message = writeError instanceof Error ? writeError.message : "The course was not saved.";
+        const message = describeMyCoursesError(writeError);
         setError(message);
         return { ok: false, message };
       } finally {
@@ -117,7 +122,7 @@ export function useMyCourses(): MyCoursesController {
         return { ok: true };
       } catch (writeError) {
         setCourses(previous);
-        const message = writeError instanceof Error ? writeError.message : "The course was not deleted.";
+        const message = describeMyCoursesError(writeError);
         setError(message);
         return { ok: false, message };
       } finally {

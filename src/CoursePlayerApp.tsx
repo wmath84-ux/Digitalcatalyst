@@ -37,10 +37,12 @@ import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
-import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
+import useCourseNotes from "./course/useCourseNotes";
+import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
+import { combineHtml } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
 import type { Product } from "./data/products";
-import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
+import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
@@ -452,7 +454,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return firstBrainFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
   }, [initialModuleId, modules, resolution.accessibleModuleIds]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
-  const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
+  // ── Notes: Firestore-backed, device-mirrored ─────────────────────────────
+  // One document per note at `users/{uid}/notes/{noteId}`, scoped by the SAME
+  // namespaced id everything else in this player uses — so a learner-authored
+  // course can never share notes with an official one, and one learner can
+  // never see another's. `useCourseNotes` keeps a live Firestore listener plus
+  // the localStorage mirror (`notesStore`) as the offline copy, so notes save
+  // on Firebase and render on every device.
+  const notesCtl = useCourseNotes({ uid: user?.id ?? null, productId: storageProductId });
+  const notes = notesCtl.notes;
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
   // Every file the user has opened this session stays mounted behind the
   // active one, so switching modules never tears a player down.
@@ -988,10 +998,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return () => { unsubscribeProgress(); };
   }, [progressRef, user]);
 
-  // Notes live in localStorage (per user + product), not Firestore.
-  useEffect(() => {
-    setNotes(user?.id ? loadLocalNotes(user.id, storageProductId) : []);
-  }, [user, storageProductId]);
+  // Notes no longer live only on this device: `useCourseNotes` (mounted above)
+  // reads `users/{uid}/notes` live, mirrors every change to localStorage and
+  // pushes anything device-only back up — so an old local note migrates to
+  // Firebase on the first open after this change.
 
   // ── Panel session reset on exit ─────────────────────────────────────────
   // While the player is open, the Notes and Mind Map panels keep their place
@@ -1008,24 +1018,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           const safeHtml = sanitizeRichText(combineHtml(sessionNotes.title, sessionNotes.draft));
           if (!isEmptyRichText(safeHtml)) {
             const plain = richTextToPlain(safeHtml);
+            // This runs while the player is UNMOUNTING, so the notes hook has
+            // already flushed and torn itself down: the draft is rescued
+            // through the standalone store helpers, which write the device
+            // mirror synchronously and push the same note to Firestore
+            // (`users/{uid}/notes/{noteId}`). A draft left in the editor is
+            // therefore saved to the cloud exactly like a note saved by hand.
             if (sessionNotes.view === "compose") {
-              const next: CoursePlayerNote[] = [
-                {
-                  id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  text: plain,
-                  html: safeHtml,
-                  createdAt: Date.now(),
-                },
-                ...loadLocalNotes(user.id, storageProductId),
-              ];
-              persistLocalNotes(user.id, storageProductId, next);
-            } else {
-              const next = loadLocalNotes(user.id, storageProductId).map((note) =>
-                note.id === sessionNotes.noteId
-                  ? { ...note, text: plain, html: safeHtml, updatedAt: Date.now() }
-                  : note,
-              );
-              persistLocalNotes(user.id, storageProductId, next);
+              appendCloudNote(user.id, storageProductId, {
+                id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                text: plain,
+                html: safeHtml,
+                createdAt: Date.now(),
+              });
+            } else if (sessionNotes.noteId) {
+              patchCloudNote(user.id, storageProductId, sessionNotes.noteId, safeHtml);
             }
           }
         }
@@ -1179,33 +1186,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Notes are rich text. The HTML is sanitised on the way in (so a paste from
   // any site is safe) while keeping the exact formatting, and a plain-text
   // projection is stored alongside it for the thin saved-note strip.
+  //
+  // Persistence itself belongs to `useCourseNotes`: every mutation below lands
+  // in Firestore (`users/{uid}/notes/{noteId}`) AND in the localStorage mirror,
+  // debounced into one batched commit, retried with backoff, and flushed the
+  // moment the player is left. That is what makes a note survive a device
+  // change, a browser clear and a dropped connection.
   const saveNote = (html: string) => {
     if (!user) return;
     const safeHtml = sanitizeRichText(html);
     if (isEmptyRichText(safeHtml)) return;
-    const next: CoursePlayerNote[] = [
-      {
-        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        text: richTextToPlain(safeHtml),
-        html: safeHtml,
-        createdAt: Date.now(),
-      },
-      ...notes,
-    ];
-    setNotes(next);
-    persistLocalNotes(user.id, storageProductId, next);
-    playSfxAdd();
+    const saved = notesCtl.add(safeHtml, { text: richTextToPlain(safeHtml) });
+    if (saved) playSfxAdd();
   };
 
   const editNote = (id: string, nextHtml: string) => {
     if (!user) return;
     const safeHtml = sanitizeRichText(nextHtml);
     if (isEmptyRichText(safeHtml)) return;
-    const next = notes.map((note) => note.id === id
-      ? { ...note, text: richTextToPlain(safeHtml), html: safeHtml, updatedAt: Date.now() }
-      : note);
-    setNotes(next);
-    persistLocalNotes(user.id, storageProductId, next);
+    notesCtl.edit(id, safeHtml);
   };
 
   const deleteNote = (id: string) => {
@@ -1213,14 +1212,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // Deleting a note must also drop any incoming wires from other notes,
     // so the wire layer in `NotesPanel` never tries to draw a line to a
     // card that no longer exists. The outbound side is gone with the note
-    // itself; the inbound side is pruned in this pass.
-    const next = notes
-      .filter((note) => note.id !== id)
-      .map((note) => note.links && note.links.includes(id)
-        ? { ...note, links: note.links.filter((linkId) => linkId !== id) }
-        : note);
-    setNotes(next);
-    persistLocalNotes(user.id, storageProductId, next);
+    // itself; the inbound side is pruned in the same pass — and the delete is
+    // committed to Firestore immediately (plus a device tombstone, so a later
+    // cloud snapshot can never resurrect it).
+    notesCtl.remove(id);
     playSfxRemove();
   };
 
@@ -1238,23 +1233,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    */
   const linkNote = (sourceId: string, nextLinks: string[]) => {
     if (!user) return;
-    const allowed = new Set(notes.map((note) => note.id));
-    allowed.delete(sourceId);
-    const cleanNext = Array.from(new Set(nextLinks.filter((id) => allowed.has(id))));
-    const before = new Set((notes.find((note) => note.id === sourceId)?.links) || []);
-    const after = new Set(cleanNext);
-    const added = [...after].filter((id) => !before.has(id));
-    const removed = [...before].filter((id) => !after.has(id));
-    const next = notes.map((note) => {
-      if (note.id === sourceId) return { ...note, links: cleanNext };
-      const current = new Set(note.links || []);
-      let changed = false;
-      if (added.includes(note.id) && !current.has(sourceId)) { current.add(sourceId); changed = true; }
-      if (removed.includes(note.id) && current.has(sourceId)) { current.delete(sourceId); changed = true; }
-      return changed ? { ...note, links: [...current] } : note;
-    });
-    setNotes(next);
-    persistLocalNotes(user.id, storageProductId, next);
+    // The symmetric rule now lives in `utils/courseNotes.js` (`applyNoteLinks`)
+    // so the hook can return exactly which documents changed — every one of
+    // them is written back to Firestore, not just the source note.
+    notesCtl.link(sourceId, nextLinks);
   };
 
   /**

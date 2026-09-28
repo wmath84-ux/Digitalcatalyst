@@ -17,16 +17,26 @@
 //
 // Nothing about their design is altered — the brief is explicit that these
 // must be the same pages, not lookalikes. They are given the data they need
-// from the same stores the player uses (`notesStore`, `useCourseMindMap`), so
-// a note written on the board is the same note the player shows.
+// from the same stores the player uses (`useCourseNotes`, `useCourseMindMap`),
+// so a note written on the board is the same note the player shows — and both
+// are FIRESTORE-backed:
+//
+//   notes     → users/{uid}/notes/{noteId}      (one document per note)
+//   mind maps → users/{uid}/mindMaps/{mapId}    (one document per map)
+//
+// Before this, notes were written to localStorage only, so a note taken inside
+// the Sanctuary never reached Firebase and never rendered anywhere else; and
+// the mind-map board was UNSCOPED until the learner opened a resource (the
+// module id was still null), which made `useCourseMindMap` refuse every write —
+// the map looked editable and saved nothing. Both are fixed here.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Layers } from "lucide-react";
 import NotesPanel from "../../course/NotesPanel";
 import useCourseMindMap from "../../course/useCourseMindMap";
-import { combineHtml, loadLocalNotes, persistLocalNotes } from "../../course/notesStore";
-import { richTextToPlain } from "../../utils/richText";
+import useCourseNotes from "../../course/useCourseNotes";
+import { combineHtml } from "../../course/notesStore";
 import type { CoursePlayerNote } from "../../types/course";
 import type { Product } from "../../data/products";
 import ReadingBoard, { BoardFrame } from "./ReadingBoard";
@@ -34,6 +44,47 @@ import ReadingBoard, { BoardFrame } from "./ReadingBoard";
 const MindMapPanel = lazy(() => import("../../course/MindMapPanel"));
 
 export type BoardSlot = "mindmap" | "reading" | "notes";
+
+/**
+ * Mind-map scope for a course the learner has picked but not drilled into.
+ *
+ * `useCourseMindMap` needs BOTH a course and a module before it will read or
+ * write a single document. On the reading board the module id only becomes
+ * known when a RESOURCE is opened, so "pick a course → mind map board → draw"
+ * used to be unscoped: the canvas accepted every branch and nothing was ever
+ * saved to Firebase. This bucket gives the course-level map a real, stable
+ * scope (`users/{uid}/mindMaps/{uid}__{productId}__course`); opening a resource
+ * switches the board to that module's own maps, exactly like the player.
+ */
+export const SANCTUARY_COURSE_MAP_SCOPE = "course";
+
+/** Save-state vocabulary shared by the notes and mind-map hooks. */
+type BoardSaveStatus = "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+
+const clock = (ms: number | null) =>
+  ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+/**
+ * The board's subtitle says out loud whether the work reached Firebase — a
+ * silent save is indistinguishable from a lost one, which is exactly how "save
+ * nahi ho raha" went undiagnosed.
+ */
+export function boardSubtitle(
+  title: string | undefined,
+  status: BoardSaveStatus,
+  errorMessage: string | null,
+  lastSavedAt: number | null,
+): string {
+  const head = title ? `${title} · ` : "";
+  if (status === "saving") return `${head}Firebase par save ho raha hai…`;
+  if (status === "error") return `${head}${errorMessage || "Cloud save fail — device par safe hai, dobara try hoga"}`;
+  if (status === "saved") {
+    const at = clock(lastSavedAt);
+    return `${head}Firebase par save ho gaya${at ? ` · ${at}` : ""}`;
+  }
+  if (status === "loading") return `${head}Loading…`;
+  return title || "";
+}
 
 /**
  * Frozen so the "no course picked" case passes the SAME array identity every
@@ -66,69 +117,31 @@ interface BoardPortalsProps {
 }
 
 /**
- * Notes for one course, in the same localStorage records the player uses.
+ * Notes for one course — the SAME store the Course Player uses.
  *
- * This mirrors the player's own note plumbing (`CoursePlayerApp` lines around
- * the `notes` state) rather than inventing a second store, so a note taken at
- * the board is already there when the learner opens the course normally.
+ * `useCourseNotes` keeps one Firestore document per note under
+ * `users/{uid}/notes/{noteId}`, read through a live listener, and mirrors every
+ * change into localStorage. So a note written on this 3D board is saved to
+ * Firebase, shows up on any other device without a refresh, survives an
+ * offline session, and — because the merge uploads anything that exists only
+ * on the device — every note written by the OLD localStorage-only build is
+ * pushed to the cloud the first time the board (or the player) opens.
  */
 function useBoardNotes(uid: string | null, productId: string | null) {
-  const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
+  const { notes, add, edit, remove, status, errorMessage, lastSavedAt } = useCourseNotes({
+    uid,
+    productId,
+  });
 
-  useEffect(() => {
-    setNotes(uid && productId ? loadLocalNotes(uid, productId) : []);
-  }, [uid, productId]);
+  const onAdd = useCallback((html: string) => { add(html); }, [add]);
+  const onEdit = useCallback((id: string, html: string) => { edit(id, html); }, [edit]);
+  // Dropping a note also drops every wire pointing at it — the hook's
+  // `removeNoteFromSet` pass does that, so the link layer never draws a line to
+  // a card that is not there any more. The delete is committed immediately and
+  // leaves a device tombstone, so a later snapshot cannot resurrect it.
+  const onDelete = useCallback((id: string) => { remove(id); }, [remove]);
 
-  const commit = useCallback(
-    (next: CoursePlayerNote[]) => {
-      setNotes(next);
-      if (uid && productId) persistLocalNotes(uid, productId, next);
-    },
-    [uid, productId],
-  );
-
-  const onAdd = useCallback(
-    (html: string) => {
-      const now = Date.now();
-      commit([
-        {
-          id: `note-${now}-${Math.random().toString(36).slice(2, 8)}`,
-          text: richTextToPlain(html),
-          html,
-          createdAt: now,
-          links: [],
-        },
-        ...notes,
-      ]);
-    },
-    [commit, notes],
-  );
-
-  const onEdit = useCallback(
-    (id: string, html: string) => {
-      commit(
-        notes.map((note) =>
-          note.id === id ? { ...note, html, text: richTextToPlain(html), updatedAt: Date.now() } : note,
-        ),
-      );
-    },
-    [commit, notes],
-  );
-
-  const onDelete = useCallback(
-    (id: string) => {
-      // Dropping a note must also drop every wire pointing at it, or the
-      // link layer draws a line to a card that is not there any more.
-      commit(
-        notes
-          .filter((note) => note.id !== id)
-          .map((note) => ({ ...note, links: (note.links ?? []).filter((l) => l !== id) })),
-      );
-    },
-    [commit, notes],
-  );
-
-  return { notes, onAdd, onEdit, onDelete };
+  return { notes, onAdd, onEdit, onDelete, status, errorMessage, lastSavedAt };
 }
 
 export default function BoardPortals({
@@ -182,14 +195,18 @@ export default function BoardPortals({
   const productId = activeCourse?.id ?? null;
   const notes = useBoardNotes(uid, productId);
 
-  // The mind map hook is the player's own, pointed at the same document, so
-  // maps made here appear in the player and vice versa. `moduleId` is the
-  // module the learner drilled into — the same scoping the player uses, so
-  // the two show the same maps.
+  // The mind map hook is the player's own, pointed at the same documents, so
+  // maps made here appear in the player and vice versa. The module is the one
+  // the learner drilled into — and until they do, the course's own bucket, so
+  // the board is ALWAYS scoped and every branch really is written to Firestore.
+  const boardModuleId = selectedModuleId ?? (productId ? SANCTUARY_COURSE_MAP_SCOPE : null);
+
   const mindMap = useCourseMindMap({
     uid: uid ?? undefined,
-    productId: productId ?? "",
-    moduleId: selectedModuleId ?? undefined,
+    // `undefined`, never `""`: an empty course id is not a scope, and passing
+    // one used to build a shared `uid____module` document id.
+    productId: productId ?? undefined,
+    moduleId: boardModuleId ?? undefined,
     rootTopic: activeCourse?.title || "Study map",
   });
 
@@ -219,7 +236,10 @@ export default function BoardPortals({
 
       {notesHost
         ? createPortal(
-            <BoardFrame title="Note taking" subtitle={activeCourse?.title}>
+            <BoardFrame
+              title="Note taking"
+              subtitle={boardSubtitle(activeCourse?.title, notes.status, notes.errorMessage, notes.lastSavedAt)}
+            >
               {/* The player's panel, untouched — same toolbar, same editor,
                   same library grid. With no course picked it is handed an
                   EMPTY list, so the board shows only the circular "+". */}
@@ -238,7 +258,15 @@ export default function BoardPortals({
 
       {mindmapHost
         ? createPortal(
-            <BoardFrame title="Mind map" subtitle={activeCourse?.title}>
+            <BoardFrame
+              title="Mind map"
+              subtitle={boardSubtitle(
+                activeCourse?.title,
+                mindMap.status,
+                mindMap.errorMessage,
+                mindMap.lastSavedAt,
+              )}
+            >
               <Suspense
                 fallback={
                   <div className="grid h-full place-items-center text-white/50">

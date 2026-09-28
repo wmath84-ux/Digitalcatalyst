@@ -226,7 +226,15 @@ test("Pasted HTML is sanitised but its presentational markup survives", () => {
 test("Notes carry both the rich HTML and a plain-text projection", () => {
   assert.match(courseTypes, /html\?: string;/);
   assert.match(coursePlayer, /const safeHtml = sanitizeRichText\(html\)/);
-  assert.match(coursePlayer, /text: richTextToPlain\(safeHtml\), html: safeHtml/);
+  // The player sanitises and projects, then hands both to the cloud hook…
+  assert.match(coursePlayer, /notesCtl\.add\(safeHtml, \{ text: richTextToPlain\(safeHtml\) \}\)/);
+  // …which stores the pair in the Firestore document (and in the mirror).
+  const cloudNotes = readSource("utils/courseNotes.js");
+  assert.match(cloudNotes, /const html = flatten\(source\.html\)\.slice\(0, MAX_NOTE_HTML_LENGTH\);/);
+  assert.match(cloudNotes, /const text = flatten\(source\.text\)\.slice\(0, MAX_NOTE_TEXT_LENGTH\);/);
+  assert.match(cloudNotes, /html: safe\.html,\n\s*text: safe\.text,/);
+  const notesHook = readSource("src/course/useCourseNotes.ts");
+  assert.match(notesHook, /text: richTextToPlain\(safeHtml\) \|\| note\.text/);
   // Legacy plain-text notes still render.
   assert.match(notesPanel, /note\.html \|\| plainToRichText\(note\.text \|\| ""\)/);
 });

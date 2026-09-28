@@ -1,9 +1,15 @@
 // src/course/notesStore.ts
 //
-// Course-player notes persistence + note-html helpers, shared by the player
-// (state owner) and the NotesPanel. Notes are kept in the user's
-// localStorage (per user + product) so they stay on the device and never
-// collide with Firestore course progress.
+// Course-player notes DEVICE MIRROR + note-html helpers, shared by the player
+// (state owner) and the NotesPanel.
+//
+// Firestore is the source of truth now (`users/{uid}/notes/{noteId}` — see
+// `src/course/cloudNotes.ts` and `src/course/useCourseNotes.ts`), and this file
+// is the offline half of that pair: it paints the board instantly on a cold
+// open, keeps every note when the network is down or a write is refused, and
+// holds the tombstones that stop a cloud snapshot resurrecting a note the
+// learner already deleted. Notes are keyed per user + product so they never
+// collide with Firestore course progress — or with another learner's notes.
 
 import type { CoursePlayerNote } from "../types/course";
 import { escapeHtml, richTextToPlain } from "../utils/richText";
@@ -31,6 +37,36 @@ export const loadLocalNotes = (uid: string, productId: string): CoursePlayerNote
 export const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNote[]) => {
   try {
     localStorage.setItem(notesStorageKey(uid, productId), JSON.stringify(notes));
+  } catch {
+    /* storage full / private mode — ignore */
+  }
+};
+
+/**
+ * Tombstones: ids this device has DELETED but whose cloud delete may not have
+ * committed yet (offline, rules not deployed, a tab closed mid-write).
+ *
+ * Without them a later cloud snapshot — or a cold read on another device that
+ * still holds the document — puts the deleted note straight back on the board,
+ * which reads to the learner as "delete kaam nahi karta". The list is pruned
+ * the moment Firestore confirms the delete.
+ */
+export const notesDeletedKey = (uid: string, productId: string) => `dc.courseNotesDeleted.v1.${uid}.${productId}`;
+
+export const loadDeletedNoteIds = (uid: string, productId: string): string[] => {
+  try {
+    const raw = localStorage.getItem(notesDeletedKey(uid, productId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id: unknown) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+export const persistDeletedNoteIds = (uid: string, productId: string, ids: string[]) => {
+  try {
+    localStorage.setItem(notesDeletedKey(uid, productId), JSON.stringify(Array.from(new Set(ids)).slice(-200)));
   } catch {
     /* storage full / private mode — ignore */
   }
