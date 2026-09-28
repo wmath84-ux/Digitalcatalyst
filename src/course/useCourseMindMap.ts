@@ -114,6 +114,12 @@ const DEFAULT_DEBOUNCE_MS = 700;
 const localKey = (uid: string, productId: string, moduleId: string, mapKey: string) =>
   `dc.mindMap.v1.${uid}.${productId}.${moduleId}.${sanitizeMapKey(mapKey)}`;
 
+/** A Firestore failure's code (`permission-denied`, `unavailable`, …) — or `""` when it carries none. */
+const errorCode = (thrown: unknown): string =>
+  typeof thrown === "object" && thrown !== null && "code" in thrown
+    ? String((thrown as { code?: unknown }).code || "")
+    : "";
+
 /** Where the module's map list is mirrored, so the list survives offline. */
 const indexKey = (uid: string, productId: string, moduleId: string) =>
   `dc.mindMapIndex.v1.${uid}.${productId}.${moduleId}`;
@@ -238,6 +244,12 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   /** Bumped on every local edit so a slower in-flight write cannot clobber it. */
   const revisionRef = useRef(0);
   /**
+   * The revision the cloud CONFIRMED (a resolved `setDoc`). Anything newer is
+   * stranded work — a reconnect or a return to the tab flushes it, so a
+   * dropped connection can never strand a map past the retry loop.
+   */
+  const savedRevisionRef = useRef(0);
+  /**
    * The scope a PENDING (debounced) write belongs to, captured when it was
    * queued. `scopeRef` is reassigned on every render, so by the time a
    * debounce fires after a module / map switch it already points at the NEW
@@ -255,6 +267,13 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   const pendingNewRef = useRef<{ mapKey: string; mind: MindMap } | null>(null);
   /** Latest `persist` without making it a dependency of the load effect. */
   const persistRef = useRef<(override?: typeof scopeRef.current | null) => void>(() => undefined);
+  /**
+   * Latest `scheduleSave`, for the same reason in the other direction:
+   * `persist` re-queues through it when the map is still loading instead of
+   * dropping the edit — and calling it directly would knot the two
+   * callbacks' dependency arrays together.
+   */
+  const scheduleSaveRef = useRef<() => void>(() => undefined);
 
   // ── The module's map list ───────────────────────────────────────────────
   useEffect(() => {
@@ -328,8 +347,15 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
           writeLocalIndex(indexKey(uidText, productText, moduleText), next);
           return next;
         });
-      } catch {
-        /* offline / rules — the device list already painted */
+      } catch (thrown: unknown) {
+        // The device list already painted; the warning names the cause
+        // (offline / rules / wrong account) instead of failing silently —
+        // a fresh device otherwise shows an empty library with no clue why.
+        if (typeof console !== "undefined") {
+          console.warn(
+            `[useCourseMindMap] cloud map list failed (${errorCode(thrown) || "unknown error"}) — showing the device copy`,
+          );
+        }
       } finally {
         if (!cancelled) setMapsLoading(false);
       }
@@ -419,22 +445,37 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
           if (typeof savedAt === "number") setLastSavedAt(savedAt);
         } else if (local) {
           // The device has work this account never managed to upload — adopt
-          // it instead of showing a blank canvas, then push it up.
+          // it instead of showing a blank canvas, then push it up. The doc is
+          // CONFIRMED missing, so there is no newer cloud copy to clobber;
+          // without this push, work stranded by an earlier failed save would
+          // sit on this device forever while every other device shows a seed.
           setMindState(local);
           setStatus("ready");
           revisionRef.current += 1;
+          scheduleSaveRef.current();
         } else {
           setMindState(createMindMap(rootTopic || "Central idea"));
           setStatus("ready");
         }
-      } catch {
+      } catch (thrown: unknown) {
         if (cancelled) return;
+        const code = errorCode(thrown);
+        if (typeof console !== "undefined") {
+          console.warn(`[useCourseMindMap] cloud load failed for map "${activeMapKey}" (${code || "unknown error"})`);
+        }
         if (local) {
+          // Adopted WITHOUT an auto-push: the read failed, so a newer cloud
+          // copy may exist — pushing the device copy now could clobber it.
+          // The learner's next edit saves normally.
           setMindState(local);
           setStatus("ready");
         } else {
           setStatus("error");
-          setErrorMessage("Mind map load nahi ho paya. Aap draw karna shuru kar sakte hain — hum dobara save try karenge.");
+          setErrorMessage(
+            code === "permission-denied"
+              ? "Cloud se load blocked hai (account ya security rules). Aap draw karna shuru kar sakte hain — map is device par safe rahega."
+              : "Mind map load nahi ho paya. Aap draw karna shuru kar sakte hain — hum dobara save try karenge.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -484,11 +525,29 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       scoped: isScoped,
       mapKey: currentMapKey,
     } = override ?? scopeRef.current;
-    if (!isScoped || !key || !readyRef.current) return;
+    if (!isScoped || !key) return;
+    // The map is still loading (a slow first read + a fast finger): the edit
+    // is re-queued, not dropped — dropping it here used to strand the
+    // learner's first branches with no error and no retry. The load always
+    // settles `readyRef`, so the re-queue always terminates.
+    if (!readyRef.current) {
+      scheduleSaveRef.current();
+      return;
+    }
     const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
     if (!signedInUid || signedInUid !== String(currentUid)) {
       setStatus("error");
-      setErrorMessage("Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.");
+      // Named, not generic: the map belongs to a different account than the
+      // one signed in (a second phone on another login is the classic case) —
+      // no retry uploads it, so the message says what to do instead.
+      setErrorMessage(
+        "Cloud save ruk gaya — aap jis account se signed in hain vah is map ka owner nahin hai. Map is device par safe hai; sahi account se sign in karke dobara kholein.",
+      );
+      if (typeof console !== "undefined") {
+        console.warn(
+          `[useCourseMindMap] cloud write skipped for map "${currentMapKey}": the signed-in account is not the map owner`,
+        );
+      }
       const attempt = retryAttemptRef.current + 1;
       retryAttemptRef.current = attempt;
       if (attempt <= 8) {
@@ -528,18 +587,33 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       .then(() => {
         // A newer edit may already be queued; don't downgrade its status.
         if (revisionRef.current !== revision) return;
+        savedRevisionRef.current = revision;
         retryAttemptRef.current = 0;
         setStatus("saved");
         setErrorMessage(null);
         setLastSavedAt(Date.now());
       })
-      .catch(() => {
+      .catch((thrown: unknown) => {
         if (revisionRef.current !== revision) return;
+        const code = errorCode(thrown);
+        if (typeof console !== "undefined") {
+          console.warn(
+            `[useCourseMindMap] cloud save failed for map "${currentMapKey}" (${code || "unknown error"}) — map stays safe on this device`,
+          );
+        }
         setStatus("error");
-        setErrorMessage("Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.");
+        // A refused write (rules / wrong account) never heals by retrying,
+        // so it names the cause and stops after two attempts; anything else
+        // keeps the old reassuring message and the full retry loop.
+        const blocked = code === "permission-denied";
+        setErrorMessage(
+          blocked
+            ? "Cloud save blocked hai (account ya security rules) — map is device par safe hai. Sahi account se sign in karke, ya thodi der baad, dobara kholein."
+            : "Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.",
+        );
         const attempt = retryAttemptRef.current + 1;
         retryAttemptRef.current = attempt;
-        if (attempt > 8) return;
+        if (blocked ? attempt > 2 : attempt > 8) return;
         if (retryRef.current) clearTimeout(retryRef.current);
         const delay = Math.min(20000, 700 * 2 ** Math.min(attempt, 5));
         retryRef.current = setTimeout(() => {
@@ -568,6 +642,10 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     }, debounceMs);
   }, [debounceMs, persist]);
 
+  // Published for `persist` (not-ready re-queue) and the load effect
+  // (adopted-local push) — see `scheduleSaveRef`.
+  scheduleSaveRef.current = scheduleSave;
+
   const setMind = useCallback(
     (updater: MindMap | ((current: MindMap) => MindMap)) => {
       setMindState((current) => {
@@ -591,6 +669,28 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     pendingScopeRef.current = null;
     persist(pending);
   }, [persist]);
+
+  // A dropped connection outlasts the retry loop: when the browser comes back
+  // online — or the tab comes back into view — anything the cloud never
+  // confirmed is flushed. `savedRevisionRef` keeps this from rewriting an
+  // already-saved map on every reconnect.
+  useEffect(() => {
+    if (!scoped || typeof window === "undefined") return undefined;
+    const maybeFlush = () => {
+      if (!scopeRef.current.scoped || !readyRef.current) return;
+      if (revisionRef.current === savedRevisionRef.current) return;
+      flush();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") maybeFlush();
+    };
+    window.addEventListener("online", maybeFlush);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", maybeFlush);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [flush, scoped]);
 
   // ── Map list actions ────────────────────────────────────────────────────
 

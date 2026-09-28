@@ -148,7 +148,26 @@ test("a refused or failed cloud write never strands the learner's map", () => {
   assert.match(hook, /writeLocalMindMap\(/);
   assert.match(hook, /readLocalMindMap\(/);
   assert.match(hook, /const local = readLocalMindMap\(/);
-  assert.match(hook, /\.catch\(\(\) => \{/);
+  assert.match(hook, /\.catch\(\((thrown: unknown)?\) => \{/);
+  // An edit that lands while the map is still loading is re-queued, never
+  // dropped: dropping it stranded the learner's first branches silently.
+  assert.match(hook, /if \(!readyRef\.current\) \{\s*scheduleSaveRef\.current\(\);/);
+  // A device copy adopted for a CONFIRMED-missing doc is pushed back up, so
+  // work stranded by an earlier failed save reaches every other device…
+  assert.match(hook, /revisionRef\.current \+= 1;\s*scheduleSaveRef\.current\(\);/);
+  // …while a copy adopted after a FAILED read is not (a newer cloud copy
+  // may exist, and pushing now could clobber it).
+  assert.match(hook, /Adopted WITHOUT an auto-push/);
+  // A dropped connection outlasts the retry loop: reconnects and tab returns
+  // flush whatever the cloud never confirmed.
+  assert.match(hook, /savedRevisionRef\.current = revision;/);
+  assert.match(hook, /window\.addEventListener\("online", maybeFlush\)/);
+  assert.match(hook, /document\.addEventListener\("visibilitychange", onVisible\)/);
+  // Failures name their cause (rules / wrong account vs a transient blip)
+  // instead of hiding behind one generic line.
+  assert.match(hook, /const blocked = code === "permission-denied";/);
+  assert.match(hook, /Cloud save blocked hai \(account ya security rules\)/);
+  assert.match(hook, /the signed-in account is not the map owner/);
 });
 
 test("saves are debounced so a burst of taps is one write", () => {
@@ -504,11 +523,11 @@ test("a dragged node re-faces itself LIVE, and hands back on drop", () => {
 
 const toolbar = panel.slice(
   panel.indexOf("Status strip — the mind map's toolbar"),
-  panel.indexOf("{errorMessage ? ("),
+  panel.indexOf("── Canvas ─"),
 );
 // Everything on the bar lives between those two markers; the map library
-// screen above it still carries words.
-const toolCluster = panel.slice(panel.indexOf("Right cluster: the tools"), panel.indexOf("{errorMessage ? ("));
+// screen below it still carries words.
+const toolCluster = panel.slice(panel.indexOf("Right cluster: the tools"), panel.indexOf("── Canvas ─"));
 
 test("the toolbar is icon-only: every control is a single glyph tile, no captions", () => {
   // One tile class per control, and not one of them renders a word.
@@ -553,9 +572,38 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
 });
 
 test("the toolbar stays hidden until a specific map is opened", () => {
-  // The library is the home screen: no strip and no error bar until a map is
-  // on the canvas.
+  // The library is the home screen: no strip until a map is on the canvas.
   assert.match(panel, /\{libraryOpen \? null : \(/);
+});
+
+test("the toolbar rides at the top of the sheet, like the notes editor", () => {
+  // Owner (2026-09-29): the strip moved from the bottom to the top — canvas
+  // below it, exactly the notes editor's arrangement.
+  const stripAt = panel.indexOf("Status strip — the mind map's toolbar");
+  const canvasAt = panel.indexOf("── Canvas ─");
+  assert.ok(stripAt !== -1 && canvasAt !== -1 && stripAt < canvasAt, "the strip must render above the canvas");
+  // Its divider faces the canvas below it now.
+  assert.match(toolbar, /overflow-x-auto border-b border-\[var\(--mm-border\)\]/);
+  // …and the drop-downs hang downward from their triggers instead of upward.
+  assert.match(panel, /const spaceBelow = Math\.max\(120, window\.innerHeight - anchor\.bottom - 16\);/);
+  assert.match(panel, /style=\{\{ left, width, maxHeight, top: anchor\.bottom \+ 8 \}\}/);
+  assert.doesNotMatch(panel, /spaceAbove/);
+});
+
+test("the warning text lives in the save drop-down, not in a persistent bar", () => {
+  // Owner (2026-09-29): the long warning line at the bottom is gone — tapping
+  // the blinking beacon opens the message itself.
+  assert.doesNotMatch(panel, /data-course-mindmap-error/);
+  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label="Cloud save"[\s\S]*?data-course-mindmap-save-message/);
+  assert.match(toolbar, /\{errorMessage \? \(\s*<p className="mm-menu-note" data-course-mindmap-save-message>/);
+});
+
+test("the empty-map hint is gone — an empty map shows just the root", () => {
+  // Owner (2026-09-29): the "kisi bhi node par + dabayein" line is removed
+  // entirely. The double-tap-delete armed reminder stays.
+  assert.doesNotMatch(panel, /branch wahin jud jayegi/);
+  assert.doesNotMatch(panel, /First-run hint, shown only while the map is still just a root/);
+  assert.match(panel, /data-course-mindmap-dbl-delete-hint/);
 });
 
 test("the toolbar measures itself and sizes its tiles for phone, tablet and desktop", () => {

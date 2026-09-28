@@ -32,10 +32,13 @@ const SanctuaryDinosaurIcon: GlassDockIcon = ({ className, style, size = 22 }) =
 );
 
 const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: string }[] = [
-  { key: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
+  // Owner (2026-09-29): Home sits DIRECTLY beside Purchases — the learner
+  // asked for it next to the Purchases tab, so the app's landing tab rides
+  // right after it instead of leading the row.
   { key: "myday", label: "My Day", icon: CalendarIcon, color: "#06D6A0" },
   { key: "store", label: "Store", icon: StoreIcon, color: "#FF7B54" },
   { key: "purchases", label: "Purchases", icon: BagIcon, color: "#C9A96E" },
+  { key: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
   // Owner (post Wave 14): Revision sits where FlowPath used to be and
   // FlowPath is the last (right-most) slot of the dock.
   { key: "study-library", label: "My Study Library", icon: Library, color: "#06D6A0" },

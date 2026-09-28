@@ -65,18 +65,23 @@
 // and the light palette it selected are gone with the app-wide light theme,
 // so there is nothing left to follow or override.
 //
-// ── The toolbar (the bottom strip) ───────────────────────────────────────
+// ── The toolbar (the top strip, like the notes editor) ────────────────────
 // ONE ICON PER CONTROL — the bar carries no words at all. From the left:
 //   cloud-save  the save state, tinted by it, with a blinking beacon on top
 //               while there is a message to read. Tapping it opens the
-//               message itself plus "abhi save karein" (flush now).
+//               message itself plus "abhi save karein" (flush now) — the
+//               full warning text lives in that drop-down; there is no
+//               persistent error bar any more.
 //   maps pill   this module's map list (icon + name + count).
 //   then, right-aligned: auto-arrange, the ALIGN menu (how the boxes are
 //   laid out — tree / one line / one column — and how a long label fits,
-//   wrap or clipped to one line), fit-to-screen, this window's light/dark
-//   flip, delete-branch and the double-tap-delete arm switch.
+//   wrap or clipped to one line), fit-to-screen, delete-branch and the
+//   double-tap-delete arm switch. (The light/dark flip is gone: the map is
+//   dark like the rest of the app.)
 // There are no +/− zoom buttons any more: the canvas is pinched (and panned)
 // straight with the fingers, and Fit re-frames the whole map in one tap.
+// The strip sits ABOVE the canvas (toolbar first, diagram below), the same
+// arrangement the notes editor uses — and its drop-downs open downward.
 //
 // ── Why the strip scrolls sideways (one line, never wrapped) ────────────
 // The bar is a single side-scrolling line: every tool sits side-by-side and
@@ -824,15 +829,15 @@ interface ToolbarMenuProps {
  *
  * It is PORTALLED to the body on purpose. The status strip is clipped (that
  * clip is the "toolbar slid to the left" fix), so a menu rendered inside it
- * would be sliced off at the strip's top edge. Fixed positioning against the
+ * would be sliced off at the strip's edge. Fixed positioning against the
  * trigger's own rect keeps it glued to its button while the sheet animates,
- * it opens UPWARD because the bar sits at the bottom of the sheet, and it
+ * it opens DOWNWARD because the bar sits at the top of the sheet, and it
  * clamps itself into the viewport (sideways and vertically) so it can never
  * hang off a phone screen.
  */
 function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: ToolbarMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ bottom: number; right: number } | null>(null);
 
   // Re-measure on every resize / scroll: the sheet slides, the keyboard
   // lifts it, and a menu that keeps the FIRST rect floats away from its
@@ -842,7 +847,7 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
     const measure = () => {
       const box = anchorRef.current?.getBoundingClientRect();
       if (!box) return;
-      setAnchor({ top: box.top, right: box.right });
+      setAnchor({ bottom: box.bottom, right: box.right });
     };
     measure();
     window.addEventListener("resize", measure);
@@ -882,10 +887,10 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
   const viewportWidth = window.innerWidth;
   const width = Math.min(MENU_WIDTH_PX, viewportWidth - 16);
   const left = Math.max(8, Math.min(anchor.right - width, viewportWidth - width - 8));
-  // The menu grows upward from 8px above its trigger, and is never allowed
-  // to be taller than the space above it (so it can't run off the top).
-  const spaceAbove = Math.max(120, anchor.top - 16);
-  const maxHeight = Math.min(spaceAbove, Math.round(window.innerHeight * 0.6));
+  // The menu grows downward from 8px below its trigger, and is never allowed
+  // to be taller than the space below it (so it can't run off the bottom).
+  const spaceBelow = Math.max(120, window.innerHeight - anchor.bottom - 16);
+  const maxHeight = Math.min(spaceBelow, Math.round(window.innerHeight * 0.6));
 
   return createPortal(
     <div
@@ -895,7 +900,7 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
       className="mm-menu fixed"
       data-mm-menu
       data-menu-theme={theme}
-      style={{ left, width, maxHeight, bottom: window.innerHeight - anchor.top + 8 }}
+      style={{ left, width, maxHeight, top: anchor.bottom + 8 }}
     >
       {children}
     </div>,
@@ -1569,292 +1574,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
       data-course-mindmap
       data-mindmap-theme={mindTheme}
     >
-      {/* ── Canvas ────────────────────────────────────────────────────────
-          `touch-action: none` is required, not cosmetic: without it the
-          browser claims the pinch for page zoom and React Flow never sees it. */}
-      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          edgeTypes={EDGE_TYPES}
-          defaultEdgeOptions={{ type: "rope" }}
-          onNodesChange={onNodesChange}
-          onInit={() => { requestAnimationFrame(refreshWires); }}
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
-          minZoom={0.15}
-          maxZoom={2.5}
-          nodesDraggable
-          nodesConnectable={false}
-          edgesFocusable={false}
-          // A pointer that moves less than this many px still counts as a
-          // click, so a phone tap with a pixel of jitter keeps working once
-          // nodes are draggable. Same slop the node's own tap detector uses.
-          nodeClickDistance={TAP_SLOP_PX}
-          zoomOnPinch
-          zoomOnDoubleClick={false}
-          panOnDrag
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_event, node) => {
-            // Single-tap on any node opens the inline editor (single source
-            // of truth for "rename"). The action bar appears automatically
-            // because the node is now selected. A click that trails a real
-            // drag is skipped — that was a move, not a tap.
-            if (dragMovedRef.current) return;
-            setSelectedId(node.id);
-            setEditingId(node.id);
-          }}
-          onPaneClick={() => {
-            // Tapping the canvas (outside any node) closes any open editor
-            // — the input's onBlur already committed the topic, so this is
-            // just the visual cleanup.
-            setSelectedId(null);
-            setEditingId(null);
-          }}
-          onNodeDragStart={(_event, node) => {
-            draggingRef.current = true;
-            const moving = new Set(collectSubtreeIds(mind, node.id));
-            const starts = new Map<string, { x: number; y: number }>();
-            for (const item of nodes) {
-              if (moving.has(item.id)) starts.set(item.id, { x: item.position.x, y: item.position.y });
-            }
-            dragSessionRef.current = {
-              id: node.id,
-              origin: { x: node.position.x, y: node.position.y },
-              starts,
-              moving,
-            };
-            // Arm the live facing with where the node stands right now, so the
-            // first move can only ever CHANGE it (an untouched node keeps the
-            // face the layout resolved for it).
-            syncDragFacing(node.id, node.position.x);
-          }}
-          onNodeDrag={(_event, node) => {
-            // The actual live movement of the node AND its whole connected
-            // branch is applied in `onNodesChange` above — one position
-            // change per frame, one state update. This handler only marks
-            // that a real move happened, so the click that trails the drop
-            // is never mistaken for a tap that should open the editor.
-            dragMovedRef.current = true;
-            // …and re-derives which face of the box points at the parent, so
-            // the anchor dot, the rope and the `+` swing round the moment the
-            // node crosses over — the learner sees the wire re-attach while
-            // dragging, not only after the drop.
-            syncDragFacing(node.id, node.position.x);
-          }}
-          onNodeDragStop={(_event, node) => {
-            const session = dragSessionRef.current;
-            dragSessionRef.current = null;
-            draggingRef.current = false;
-            // The drop below commits the new position into the map, so the
-            // layout re-derives every facing from it. Hand the drag's temporary
-            // answer back here: no override ever outlives the finger (and a
-            // clear back to the shared empty object costs no re-render).
-            clearDragFacing();
-            // React Flow fires drag start/stop even for a PLAIN TAP (its
-            // nodeDragThreshold is 0), so guard on real travel: a tap must
-            // never pin the node — every tapped node would silently freeze
-            // at its current spot and a later primary-node drag would leave
-            // it behind.
-            const travelled = session
-              ? Math.hypot(node.position.x - session.origin.x, node.position.y - session.origin.y)
-              : 0;
-            if (session && travelled >= TAP_SLOP_PX) {
-              // Commit the drop as one rigid group: the picked node is
-              // pinned at the drop point AND every connected node — even
-              // ones the learner had hand-placed earlier — moves by exactly
-              // the same delta. The map never tears: dragging the primary
-              // node carries its whole connected map with it.
-              onMindChange((current) =>
-                moveNodeSubtree(current, node.id, node.position.x, node.position.y, session.origin.x, session.origin.y),
-              );
-              // The dropped node becomes the selection so the toolbar trash
-              // can act on it straight away.
-              setSelectedId(node.id);
-            }
-            // A drag must never end with the rename keyboard popping up: if
-            // an editor is open anywhere, blur it so its draft commits and
-            // the sheet stays quiet.
-            const active = document.activeElement;
-            if (active instanceof HTMLElement && active.dataset.mindNodeInput) active.blur();
-            // Clear the drag flag AFTER the trailing click event has had
-            // its chance to run (click dispatches before timers fire).
-            window.setTimeout(() => {
-              dragMovedRef.current = false;
-            }, 0);
-          }}
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={22}
-            size={1}
-            color="rgba(255,255,255,0.07)"
-          />
-        </ReactFlow>
-
-        {/* First-run hint, shown only while the map is still just a root.
-            Includes a single "Add root branch" CTA that disappears as soon
-            as a child is added — the rest of the growing is done from the
-            `+` on any node, so the toolbar isn't needed. */}
-        {mind.nodes.length === 0 ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-            <GlassSurface radius={999} className="text-white" contentClassName="flex items-center gap-2 px-3 py-1.5">
-              <p className="text-center text-[11px] font-semibold text-white/80">
-                Kisi bhi node par <span className="font-black text-violet-300">+</span> dabayein — branch wahin jud jayegi
-              </p>
-            </GlassSurface>
-          </div>
-        ) : doubleTapDelete ? (
-          // The armed-state reminder: destructive mode is on, so the learner
-          // can always see why a second quick tap removed a branch.
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-            <div
-              className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-200 ring-1 ring-rose-400/30"
-              data-course-mindmap-dbl-delete-hint
-            >
-              <Trash2 size={11} />
-              <p className="text-center text-[11px] font-semibold">
-                Double-tap delete ON — node par double-tap, phir Confirm dabayein
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {/* ── Map library ───────────────────────────────────────────────────
-            The Notes panel keeps a grid of separate notes; a module keeps a
-            grid of separate MIND MAPS the same way. It slides over the canvas
-            (rather than living in a header) so the diagram surface stays
-            completely clean when the library is closed. Each card opens its
-            map on tap, and carries its own rename / delete actions. */}
-        {libraryOpen ? (
-          <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
-            {/* No header — the grid starts at the very top, and the circular
-                "+" floats at the bottom-right. Tapping any card (including
-                the open one) returns to the canvas, so no close button is
-                needed. */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-16">
-              {/* While the index is still loading, show skeletons instead of a
-                  fake single card — the grid is this panel's first screen, so
-                  it should never look emptier than it really is. */}
-              {mapsLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true">
-                  {[0, 1, 2].map((index) => (
-                    <div
-                      key={index}
-                      className="aspect-square animate-pulse rounded-2xl bg-[var(--mm-soft)] ring-1 ring-[var(--mm-border)]"
-                    />
-                  ))}
-                </div>
-              ) : (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list data-course-mindmap-map-grid="true">
-                {maps.map((entry) => {
-                  const active = entry.mapKey === activeMapKey;
-                  const renaming = renamingKey === entry.mapKey;
-                  return (
-                    <li key={entry.mapKey} className="relative aspect-square min-h-[104px]">
-                    <GlassCard
-                      className="h-full w-full [&>div:last-child]:flex [&>div:last-child]:h-full [&>div:last-child]:flex-col [&>div:last-child]:p-2.5"
-                      data-course-mindmap-map-card
-                      data-map-key={entry.mapKey}
-                      data-active={active ? "true" : "false"}
-                    >
-                      {renaming ? (
-                        <input
-                          value={renameDraft}
-                          onChange={(event) => setRenameDraft(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") commitRename();
-                            if (event.key === "Escape") { setRenamingKey(null); setRenameDraft(""); }
-                          }}
-                          onBlur={commitRename}
-                          autoFocus
-                          maxLength={120}
-                          className="dc-field w-full rounded-full px-2.5 py-1 text-[11px] font-bold text-white outline-none ring-1 ring-violet-400/60"
-                          aria-label="Map ka naam"
-                          data-course-mindmap-rename-input
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openMap(entry.mapKey)}
-                          className="flex min-h-0 w-full flex-1 items-center justify-center px-1 text-center"
-                          data-course-mindmap-open-map={entry.mapKey}
-                        >
-                          {/* The card shows ONLY the map's primary (central)
-                              node text — exactly what is written on the
-                              centre box — so the library reads like the maps
-                              themselves, not their auto "Mind map 3" names. */}
-                          <p className="line-clamp-4 text-[12px] font-black leading-snug text-[var(--mm-text)]">
-                            {entry.rootTopic || entry.title || "Untitled map"}
-                          </p>
-                        </button>
-                      )}
-                      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
-                        {renaming ? (
-                          <GlassButton
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={commitRename}
-                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-emerald-300"
-                            aria-label="Naam save karein"
-                            data-course-mindmap-rename-save
-                          >
-                            <Check size={13} />
-                          </GlassButton>
-                        ) : (
-                          <GlassButton
-                            onClick={() => startRename(entry)}
-                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
-                            aria-label="Map rename karein"
-                            data-course-mindmap-rename
-                          >
-                            <Pencil size={12} />
-                          </GlassButton>
-                        )}
-                        <GlassButton
-                          onClick={() => requestMapDelete(entry.mapKey)}
-                          className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
-                          aria-label="Map delete karein"
-                          title="Yeh mind map delete karein"
-                          data-course-mindmap-delete-map
-                        >
-                          <Trash2 size={12} />
-                        </GlassButton>
-                      </div>
-                    </GlassCard>
-                    </li>
-                  );
-                })}
-              </ul>
-              )}
-            </div>
-            {/* The one "+" — a small circular button floating at the grid's
-                bottom-right. It starts a fresh map and drops straight onto
-                its canvas. */}
-            <button
-              type="button"
-              onClick={() => {
-                onCreateMap?.();
-                setLibraryOpen(false);
-                setSelectedId(null);
-                setEditingId(null);
-              }}
-              disabled={atMapLimit || !onCreateMap}
-              className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40"
-              aria-label="Naya mind map banayein"
-              title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
-              data-course-mindmap-new
-            >
-              <Plus size={18} strokeWidth={2.8} />
-            </button>
-          </div>
-        ) : null}
-      </div>
-
       {/* The toolbar only exists on the canvas — while the library is open
-          (no specific map chosen yet) there is no strip and no error bar. */}
+          (no specific map chosen yet) there is no strip. It rides at the TOP
+          of the sheet, exactly like the notes editor: toolbar first, canvas
+          below it. */}
       {libraryOpen ? null : (
-        <>
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
           The only persistent chrome, and every control on it is a SINGLE
           ICON: the cloud-save beacon (tinted by the save state, blinking
@@ -1875,7 +1599,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           bar always paints from its left edge. */}
       <div
         ref={statusRef}
-        className="flex shrink-0 items-center overflow-x-auto border-t border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ gap: "var(--mm-tool-gap)" }}
         data-course-mindmap-status
         data-compact={toolbarCompact ? "true" : "false"}
@@ -1922,6 +1646,14 @@ function MindMapCanvas(props: MindMapPanelProps) {
               {status === "error" ? <TriangleAlert size={11} /> : null}
               {save.label}
             </p>
+            {/* The full warning text lives HERE — the persistent error bar at
+                the bottom is gone, so tapping the blinking beacon is the way
+                to read the message. */}
+            {errorMessage ? (
+              <p className="mm-menu-note" data-course-mindmap-save-message>
+                {errorMessage}
+              </p>
+            ) : null}
             <button
               type="button"
               className="mm-menu-item"
@@ -2130,17 +1862,279 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
         </div>
       </div>
-
-      {errorMessage ? (
-        <p
-          className="shrink-0 bg-rose-500/15 px-3 py-1.5 text-[10px] font-semibold text-rose-200"
-          data-course-mindmap-error
-        >
-          {errorMessage}
-        </p>
-      ) : null}
-        </>
       )}
+
+      {/* ── Canvas ────────────────────────────────────────────────────────
+          `touch-action: none` is required, not cosmetic: without it the
+          browser claims the pinch for page zoom and React Flow never sees it. */}
+      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          defaultEdgeOptions={{ type: "rope" }}
+          onNodesChange={onNodesChange}
+          onInit={() => { requestAnimationFrame(refreshWires); }}
+          fitView
+          fitViewOptions={{ padding: 0.18 }}
+          minZoom={0.15}
+          maxZoom={2.5}
+          nodesDraggable
+          nodesConnectable={false}
+          edgesFocusable={false}
+          // A pointer that moves less than this many px still counts as a
+          // click, so a phone tap with a pixel of jitter keeps working once
+          // nodes are draggable. Same slop the node's own tap detector uses.
+          nodeClickDistance={TAP_SLOP_PX}
+          zoomOnPinch
+          zoomOnDoubleClick={false}
+          panOnDrag
+          proOptions={{ hideAttribution: true }}
+          onNodeClick={(_event, node) => {
+            // Single-tap on any node opens the inline editor (single source
+            // of truth for "rename"). The action bar appears automatically
+            // because the node is now selected. A click that trails a real
+            // drag is skipped — that was a move, not a tap.
+            if (dragMovedRef.current) return;
+            setSelectedId(node.id);
+            setEditingId(node.id);
+          }}
+          onPaneClick={() => {
+            // Tapping the canvas (outside any node) closes any open editor
+            // — the input's onBlur already committed the topic, so this is
+            // just the visual cleanup.
+            setSelectedId(null);
+            setEditingId(null);
+          }}
+          onNodeDragStart={(_event, node) => {
+            draggingRef.current = true;
+            const moving = new Set(collectSubtreeIds(mind, node.id));
+            const starts = new Map<string, { x: number; y: number }>();
+            for (const item of nodes) {
+              if (moving.has(item.id)) starts.set(item.id, { x: item.position.x, y: item.position.y });
+            }
+            dragSessionRef.current = {
+              id: node.id,
+              origin: { x: node.position.x, y: node.position.y },
+              starts,
+              moving,
+            };
+            // Arm the live facing with where the node stands right now, so the
+            // first move can only ever CHANGE it (an untouched node keeps the
+            // face the layout resolved for it).
+            syncDragFacing(node.id, node.position.x);
+          }}
+          onNodeDrag={(_event, node) => {
+            // The actual live movement of the node AND its whole connected
+            // branch is applied in `onNodesChange` above — one position
+            // change per frame, one state update. This handler only marks
+            // that a real move happened, so the click that trails the drop
+            // is never mistaken for a tap that should open the editor.
+            dragMovedRef.current = true;
+            // …and re-derives which face of the box points at the parent, so
+            // the anchor dot, the rope and the `+` swing round the moment the
+            // node crosses over — the learner sees the wire re-attach while
+            // dragging, not only after the drop.
+            syncDragFacing(node.id, node.position.x);
+          }}
+          onNodeDragStop={(_event, node) => {
+            const session = dragSessionRef.current;
+            dragSessionRef.current = null;
+            draggingRef.current = false;
+            // The drop below commits the new position into the map, so the
+            // layout re-derives every facing from it. Hand the drag's temporary
+            // answer back here: no override ever outlives the finger (and a
+            // clear back to the shared empty object costs no re-render).
+            clearDragFacing();
+            // React Flow fires drag start/stop even for a PLAIN TAP (its
+            // nodeDragThreshold is 0), so guard on real travel: a tap must
+            // never pin the node — every tapped node would silently freeze
+            // at its current spot and a later primary-node drag would leave
+            // it behind.
+            const travelled = session
+              ? Math.hypot(node.position.x - session.origin.x, node.position.y - session.origin.y)
+              : 0;
+            if (session && travelled >= TAP_SLOP_PX) {
+              // Commit the drop as one rigid group: the picked node is
+              // pinned at the drop point AND every connected node — even
+              // ones the learner had hand-placed earlier — moves by exactly
+              // the same delta. The map never tears: dragging the primary
+              // node carries its whole connected map with it.
+              onMindChange((current) =>
+                moveNodeSubtree(current, node.id, node.position.x, node.position.y, session.origin.x, session.origin.y),
+              );
+              // The dropped node becomes the selection so the toolbar trash
+              // can act on it straight away.
+              setSelectedId(node.id);
+            }
+            // A drag must never end with the rename keyboard popping up: if
+            // an editor is open anywhere, blur it so its draft commits and
+            // the sheet stays quiet.
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && active.dataset.mindNodeInput) active.blur();
+            // Clear the drag flag AFTER the trailing click event has had
+            // its chance to run (click dispatches before timers fire).
+            window.setTimeout(() => {
+              dragMovedRef.current = false;
+            }, 0);
+          }}
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={22}
+            size={1}
+            color="rgba(255,255,255,0.07)"
+          />
+        </ReactFlow>
+
+        {/* The old first-run "kisi bhi node par + dabayein" hint is gone on the
+            owner's direction — an empty map shows just the root, nothing else.
+            What stays is the armed-state reminder: destructive mode is on, so
+            the learner can always see why a second quick tap removed a branch. */}
+        {mind.nodes.length > 0 && doubleTapDelete ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
+            <div
+              className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-200 ring-1 ring-rose-400/30"
+              data-course-mindmap-dbl-delete-hint
+            >
+              <Trash2 size={11} />
+              <p className="text-center text-[11px] font-semibold">
+                Double-tap delete ON — node par double-tap, phir Confirm dabayein
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ── Map library ───────────────────────────────────────────────────
+            The Notes panel keeps a grid of separate notes; a module keeps a
+            grid of separate MIND MAPS the same way. It slides over the canvas
+            (rather than living in a header) so the diagram surface stays
+            completely clean when the library is closed. Each card opens its
+            map on tap, and carries its own rename / delete actions. */}
+        {libraryOpen ? (
+          <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
+            {/* No header — the grid starts at the very top, and the circular
+                "+" floats at the bottom-right. Tapping any card (including
+                the open one) returns to the canvas, so no close button is
+                needed. */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-16">
+              {/* While the index is still loading, show skeletons instead of a
+                  fake single card — the grid is this panel's first screen, so
+                  it should never look emptier than it really is. */}
+              {mapsLoading ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true">
+                  {[0, 1, 2].map((index) => (
+                    <div
+                      key={index}
+                      className="aspect-square animate-pulse rounded-2xl bg-[var(--mm-soft)] ring-1 ring-[var(--mm-border)]"
+                    />
+                  ))}
+                </div>
+              ) : (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list data-course-mindmap-map-grid="true">
+                {maps.map((entry) => {
+                  const active = entry.mapKey === activeMapKey;
+                  const renaming = renamingKey === entry.mapKey;
+                  return (
+                    <li key={entry.mapKey} className="relative aspect-square min-h-[104px]">
+                    <GlassCard
+                      className="h-full w-full [&>div:last-child]:flex [&>div:last-child]:h-full [&>div:last-child]:flex-col [&>div:last-child]:p-2.5"
+                      data-course-mindmap-map-card
+                      data-map-key={entry.mapKey}
+                      data-active={active ? "true" : "false"}
+                    >
+                      {renaming ? (
+                        <input
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") commitRename();
+                            if (event.key === "Escape") { setRenamingKey(null); setRenameDraft(""); }
+                          }}
+                          onBlur={commitRename}
+                          autoFocus
+                          maxLength={120}
+                          className="dc-field w-full rounded-full px-2.5 py-1 text-[11px] font-bold text-white outline-none ring-1 ring-violet-400/60"
+                          aria-label="Map ka naam"
+                          data-course-mindmap-rename-input
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openMap(entry.mapKey)}
+                          className="flex min-h-0 w-full flex-1 items-center justify-center px-1 text-center"
+                          data-course-mindmap-open-map={entry.mapKey}
+                        >
+                          {/* The card shows ONLY the map's primary (central)
+                              node text — exactly what is written on the
+                              centre box — so the library reads like the maps
+                              themselves, not their auto "Mind map 3" names. */}
+                          <p className="line-clamp-4 text-[12px] font-black leading-snug text-[var(--mm-text)]">
+                            {entry.rootTopic || entry.title || "Untitled map"}
+                          </p>
+                        </button>
+                      )}
+                      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
+                        {renaming ? (
+                          <GlassButton
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={commitRename}
+                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-emerald-300"
+                            aria-label="Naam save karein"
+                            data-course-mindmap-rename-save
+                          >
+                            <Check size={13} />
+                          </GlassButton>
+                        ) : (
+                          <GlassButton
+                            onClick={() => startRename(entry)}
+                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
+                            aria-label="Map rename karein"
+                            data-course-mindmap-rename
+                          >
+                            <Pencil size={12} />
+                          </GlassButton>
+                        )}
+                        <GlassButton
+                          onClick={() => requestMapDelete(entry.mapKey)}
+                          className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
+                          aria-label="Map delete karein"
+                          title="Yeh mind map delete karein"
+                          data-course-mindmap-delete-map
+                        >
+                          <Trash2 size={12} />
+                        </GlassButton>
+                      </div>
+                    </GlassCard>
+                    </li>
+                  );
+                })}
+              </ul>
+              )}
+            </div>
+            {/* The one "+" — a small circular button floating at the grid's
+                bottom-right. It starts a fresh map and drops straight onto
+                its canvas. */}
+            <button
+              type="button"
+              onClick={() => {
+                onCreateMap?.();
+                setLibraryOpen(false);
+                setSelectedId(null);
+                setEditingId(null);
+              }}
+              disabled={atMapLimit || !onCreateMap}
+              className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40"
+              aria-label="Naya mind map banayein"
+              title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
+              data-course-mindmap-new
+            >
+              <Plus size={18} strokeWidth={2.8} />
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       {/* ── Branch delete confirmation ────────────────────────────────────
           Every branch delete path lands here first (toolbar trash AND the

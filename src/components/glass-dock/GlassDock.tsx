@@ -99,6 +99,24 @@
  * geometry, the magnification, the lift, the neighbour push, the tooltip and
  * the glyph all grow with it — one size, no separate length/width edits, and
  * nothing is frozen by a CSS `width` (which is what the old bar did).
+ *
+ * ── THE CLAMP-AWARE SQUEEZE (owner brief 2026-09-29) ──────────────────────
+ *   \"Track scroll animation keval ek side sahi se hota hai — left side drag
+ *    per footer expand hota hai, right side sahi se nahin. Khud analyse karo
+ *    aur fix karo.\"
+ *
+ * The wave's math was always symmetric — the ASYMMETRY was the clamp. A
+ * width-filled dock (Home: the capsule already spans the nav at rest) cannot
+ * grow past `max-w-full`, so a symmetric padding ask past that clamp
+ * degrades one-sided: the (border-box) content box shrinks, the fixed-width
+ * row overflows toward the right, dead space pools on the left — one end
+ * expands, the other spills. The fix keeps the geometry and bounds the ask:
+ * the measure pass records the free pixels per side (`headroom`), and the
+ * wave grows only what fits (`squeezeX`, 1 → 0). Capsule padding and
+ * neighbour push take the SAME share, so a filled dock squeezes
+ * symmetrically instead of spilling right. Docks with room (and docks
+ * outside any site footer nav) measure room to spare and wave exactly as
+ * before.
  */
 
 import {
@@ -134,6 +152,11 @@ export const MAG_RANGE = 120
 export const MAG_SCALE = 1.55
 /** How far the plate rises at full magnification (the old `y: [0, -12]`). */
 export const MAG_LIFT = 12
+/**
+ * What the squeezed wave still keeps clear of the screen edge per side. The
+ * capsule may grow into the nav's own gutter, but never onto the edge itself.
+ */
+const EDGE_KEEP_PX = 2
 /** The old `whileTap={{ scale: 0.82 }}`, kept — multiplied into the wave. */
 const TAP_SCALE = 0.82
 /**
@@ -248,6 +271,14 @@ type DockLayout = {
    * the row.
    */
   spread: boolean
+  /**
+   * Free pixels per side between the resting capsule and the footer nav's
+   * edges, measured AT REST in the same pass as the centres. The wave's
+   * horizontal growth (capsule padding + neighbour push) is squeezed to fit
+   * this room — see `squeezeX`. `Infinity` when the dock is not inside a
+   * site footer nav (peek dock, desktop rail), where nothing can clamp it.
+   */
+  headroom: number
 }
 
 function DockItem({
@@ -269,6 +300,7 @@ function DockItem({
   plateSize,
   layoutRef,
   registerItem,
+  squeezeX,
 }: GlassDockItem & {
   mouseX: MotionValue<number>
   index: number
@@ -277,6 +309,7 @@ function DockItem({
   plateSize: number
   layoutRef: { current: DockLayout }
   registerItem: (id: string, node: HTMLDivElement | null) => void
+  squeezeX: MotionValue<number>
 }) {
   // The plate's box is FIXED at plateSize. Everything the wave does is a
   // transform on this column (the neighbour push) or on the button (scale +
@@ -314,7 +347,12 @@ function DockItem({
     }
     return push / 2
   })
-  const push = useSpring(rawPush, WAVE_SPRING)
+  const pushSpring = useSpring(rawPush, WAVE_SPRING)
+  // The clamp-aware share of the push: 1 while the capsule has room to grow,
+  // shrinking toward 0 as the wave outgrows the nav. The plates part exactly
+  // as far as the capsule grows, so both ends of the wave stay in sync and a
+  // width-filled dock squeezes symmetrically instead of spilling right.
+  const push = useTransform([pushSpring, squeezeX], ([p, sq]: number[]) => p * sq)
 
   /** The −12px lift, and the tooltip riding the plate's new top edge. */
   const lift = useTransform(magnify, [1, MAG_SCALE], [0, -MAG_LIFT])
@@ -552,6 +590,7 @@ export default function GlassDock({
     padTop: fallbackPadTop,
     padInline: fallbackPadInline,
     spread: false,
+    headroom: Number.POSITIVE_INFINITY,
   })
   /**
    * The resting padding as a MOTION VALUE, not a constant: the derived
@@ -609,9 +648,25 @@ export default function GlassDock({
   })
   const growX = useSpring(rawGrowX, WAVE_SPRING)
   const growY = useSpring(rawGrowY, WAVE_SPRING)
+  /**
+   * The clamp-aware share of the HORIZONTAL wave. A width-filled dock (Home:
+   * the capsule already spans the nav at rest) cannot grow past `max-w-full`,
+   * and a symmetric padding ask past that clamp degrades one-sided — the
+   * content box shrinks, the fixed row overflows right, dead space pools
+   * left. So the wave grows only what fits: 1 while the growth fits the
+   * measured headroom, shrinking toward 0 past it. Capsule padding AND
+   * neighbour push take the same share, which keeps the wave symmetric at
+   * every frame — plates part exactly as far as the glass grows. Vertical
+   * growth is untouched (open space above the dock never clamps).
+   */
+  const squeezeX = useTransform(growX, (growth: number) => {
+    if (growth <= 0) return 1
+    const room = layoutRef.current.headroom * 2
+    return growth <= room ? 1 : Math.max(0, room / growth)
+  })
   const padInline = useTransform(
-    [growX, padInlineBase],
-    ([growth, base]: number[]) => base + (layoutRef.current.spread ? 0 : growth / 2),
+    [growX, padInlineBase, squeezeX],
+    ([growth, base, sq]: number[]) => base + (layoutRef.current.spread ? 0 : (growth * sq) / 2),
   )
   const padTop = useTransform([growY, padTopBase], ([growth, base]: number[]) => base + growth)
 
@@ -636,9 +691,20 @@ export default function GlassDock({
   const measureNow = useCallback(() => {
     const root = rootRef.current
     const centres: Record<string, number> = {}
+    // The row's resting edges, from the SAME rects the centres come from —
+    // no second layout read. With the resting padding base they re-derive
+    // the capsule's resting width, which the headroom below is measured
+    // against.
+    let minLeft = Number.POSITIVE_INFINITY
+    let maxRight = Number.NEGATIVE_INFINITY
     for (const [id, node] of nodesRef.current) {
       const rect = node.getBoundingClientRect()
-      if (rect.width > 0) centres[id] = rect.left + rect.width / 2
+      if (rect.width > 0) {
+        centres[id] = rect.left + rect.width / 2
+        if (rect.left < minLeft) minLeft = rect.left
+        const right = rect.left + rect.width
+        if (right > maxRight) maxRight = right
+      }
     }
     let padTopValue = fallbackPadTop
     let padInlineValue = fallbackPadInline
@@ -658,7 +724,18 @@ export default function GlassDock({
       spread = style.justifyContent === 'space-between'
     }
     const ids = itemsRef.current.map((item) => item.id).filter((id) => centres[id] !== undefined)
-    layoutRef.current = { centres, ids, padTop: padTopValue, padInline: padInlineValue, spread }
+    // Headroom per side: how far each end of the resting capsule sits from
+    // the nav's edges. One `clientWidth` read, in the same once-per-gesture
+    // pass as the centres — never per frame. A dock outside any site footer
+    // nav (peek dock, desktop rail) keeps Infinity: nothing clamps it, so
+    // the wave is never squeezed there.
+    let headroom = Number.POSITIVE_INFINITY
+    const nav = root?.closest?.('[data-site-footer-nav]') as HTMLElement | null | undefined
+    if (nav && minLeft <= maxRight) {
+      const capsuleWidth = maxRight - minLeft + 2 * padInlineBase.get()
+      headroom = Math.max(0, (nav.clientWidth - capsuleWidth) / 2 - EDGE_KEEP_PX)
+    }
+    layoutRef.current = { centres, ids, padTop: padTopValue, padInline: padInlineValue, spread, headroom }
     // Publish the resting padding so the capsule wears it on this frame (see
     // `padTopBase` / `padInlineBase`).
     padTopBase.set(padTopValue)
@@ -859,6 +936,7 @@ export default function GlassDock({
           plateSize={plateSize}
           layoutRef={layoutRef}
           registerItem={registerItem}
+          squeezeX={squeezeX}
           onSelect={() => onSelect(item.id)}
         />
       ))}
