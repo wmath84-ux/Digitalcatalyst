@@ -156,7 +156,7 @@ export default function LeaderboardApp() {
   return (
     <div
       data-leaderboard-page
-      className="relative min-h-screen pb-[calc(var(--dc-footer-nav-h,88px)+24px)] sm:pb-8 lg:pb-10"
+      className="relative min-h-screen pb-0 sm:pb-8 lg:pb-10"
       style={{
         // Mobile top safe area + spacing so card never sticks to status bar
         paddingTop: "env(safe-area-inset-top, 0px)",
@@ -181,8 +181,13 @@ export default function LeaderboardApp() {
           }}
         />
 
-        {/* Main scroll area — flexible padding for every breakpoint */}
-        <main className="flex-1 px-4 pb-6 pt-6 sm:px-6 sm:pt-8 md:px-8 lg:px-8 xl:px-10 2xl:px-12">
+        {/* Main scroll area — flexible padding for every breakpoint.
+            `overflow-y-auto` is what makes the page scroll on a phone: the
+            phone band pins [data-app-frame] to 100dvh + overflow hidden, so
+            the frame clips and this <main> must be the scroller (without it
+            everything below the fold was unreachable). `data-footer-nav-space`
+            reserves the floating dock's clearance inside the scroller. */}
+        <main data-footer-nav-space className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-6 sm:px-6 sm:pt-8 md:px-8 lg:px-8 xl:px-10 2xl:px-12">
           {/* Extra top spacer for mobile — user reported no gap above card and no scroll */}
           <div className="h-2 sm:h-4 lg:h-2" aria-hidden />
 

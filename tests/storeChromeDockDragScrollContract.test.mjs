@@ -302,7 +302,7 @@ test("the store's own surfaces wear the plate", () => {
   assert.match(chips, /overflow-x-auto/, "long filter lists still scroll sideways");
   // The filter sheet and the view-mode popover.
   assert.match(chips, /className="dc-scene-plate w-full overflow-hidden text-sm text-white\/85"/);
-  assert.match(storePage, /className="dc-scene-plate absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"/);
+  assert.match(searchBar, /className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1\.5 flex w-max text-white"/);
 });
 
 test("the store's copy keeps the ink scrim — on the hero card and on the scene", () => {
