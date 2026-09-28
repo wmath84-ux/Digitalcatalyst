@@ -73,7 +73,7 @@ const TIER_ICONS: Record<MembershipTier, ReactNode> = {
 /* ── Design tokens ─────────────────────────────────────────────────────
    Phase A (owner direction): every card is the pack's <GlassCard> at its
    defaults and every action is the pack's <GlassButton variant="capsule">
-   (websiteglass.com). Only ink + spacing tokens remain here. */
+   (websiteglass.com). Only ink + spacing tokens remain here. Updated: now wearing store glass material (dc-store-glass) same as home social card — tint 0.62, light blue, blur 46% — for full clarity. */
 const BTN_PRIMARY = "w-full [&>span>div]:w-full";
 const BTN_SECONDARY = "w-full [&>span>div]:w-full";
 const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300";
@@ -302,7 +302,7 @@ export default function ProfileLayout({
           onOpenPurchases={library.onOpenPurchases}
         />
 
-        <GlassCard>
+        <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink" >
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={EYEBROW}>Preferences</p>
@@ -374,7 +374,7 @@ function ProfileHero({
   const [brokenPhoto, setBrokenPhoto] = useState("");
   const showPhoto = Boolean(src) && src !== brokenPhoto;
   return (
-    <GlassCard data-profile-hero className="relative overflow-hidden">
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-hero className="dc-store-glass dc-scene-ink relative overflow-hidden">
       <div className="relative">
         <div className="flex items-center gap-4">
           <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
@@ -450,7 +450,7 @@ function MembershipCard({
 }) {
   // P3-11: profile membership card — subtle hover lift aligns with pricing glass motion
   return (
-    <GlassCard data-profile-membership-tier={tier} data-profile-membership-card className="relative overflow-hidden transition duration-300 hover:-translate-y-0.5">
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-membership-tier={tier} data-profile-membership-card className="dc-store-glass dc-scene-ink relative overflow-hidden transition duration-300 hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>
@@ -503,7 +503,7 @@ function UpgradeCard({
   onOpenSubscriberExperience: () => void;
 }) {
   return (
-    <GlassCard data-profile-upgrade-card>
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-upgrade-card className="dc-store-glass dc-scene-ink" >
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/30">
           <Rocket className="h-5 w-5" />
@@ -536,7 +536,7 @@ function UpgradeCard({
 /* ── Referral card ──────────────────────────────────────────────────── */
 function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boolean; appName: string; onCopy: () => void }) {
   return (
-    <GlassCard data-profile-referral>
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-referral className="dc-store-glass dc-scene-ink" >
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">Your referral code</p>
@@ -569,7 +569,7 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
 /* ── Personal Study Library card ────────────────────────────────────── */
 function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <GlassCard data-profile-study-library>
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-study-library className="dc-store-glass dc-scene-ink" >
       <div className="flex items-center gap-3">
         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/30">
           <Boxes className="h-5 w-5" />
@@ -600,7 +600,7 @@ function LibraryCard({
   onOpenPurchases: () => void;
 }) {
   return (
-    <GlassCard>
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink" >
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className={EYEBROW}>My library</p>
@@ -672,7 +672,7 @@ function ProfileRenewalCard({
   const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
 
   return (
-    <GlassCard data-renewal-card data-stage={expired ? "expired" : "active"}>
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-renewal-card data-stage={expired ? "expired" : "active"} className="dc-store-glass dc-scene-ink" >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${expired ? "bg-rose-500/15 text-rose-300 ring-rose-400/30" : "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"}`}>
@@ -752,13 +752,16 @@ function StatChip({ label, value, valueAttr }: { label: string; value: string; v
 
 function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; value: number; label: string; tone: string; onClick: () => void }) {
   return (
-    /* Wave 13: the quick stat is a clickable pack GlassCard. */
+    /* Wave 13: the quick stat is a clickable pack GlassCard — now wearing store glass same as home social card. */
     <GlassCard
+      tint={0.62}
+      tintColor="173,216,255"
+      blur={0}
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
-      className="cursor-pointer text-center transition active:scale-[0.97]"
+      className="dc-store-glass dc-scene-ink cursor-pointer text-center transition active:scale-[0.97]"
       contentClassName="p-3 md:p-3.5"
     >
       <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>

@@ -113,6 +113,24 @@ import {
 } from "./environment";
 import { noise } from "./simplex";
 import { addTreeObstacles, type TreeObstacle } from "./flora";
+import { lecternPlacements } from "./lectern";
+
+// Prevent flora pop-in near boards: cache board XZ and reject within radius.
+// Keeps only final state (no initial overload of many vegetables/trees near board).
+const LECTERN_BOARD_XZ_TROP = (() => {
+  try {
+    return lecternPlacements().map((p) => ({ x: p.position.x, z: p.position.z }));
+  } catch {
+    return [] as Array<{ x: number; z: number }>;
+  }
+})();
+function nearLecternBoardTrop(x: number, z: number, r = 13): boolean {
+  for (let i = 0; i < LECTERN_BOARD_XZ_TROP.length; i += 1) {
+    const b = LECTERN_BOARD_XZ_TROP[i];
+    if (Math.hypot(b.x - x, b.z - z) < r) return true;
+  }
+  return false;
+}
 
 export interface TropicalField {
   group: THREE.Group;
@@ -254,11 +272,11 @@ function acceptsPlant(
   if (insideWarehouse(x, z, 9)) return false;
   // 7–20 m plants: anything inside the wall box would swallow the roof.
   if (insideBeachHouse(x, z, 9)) return false;
-  // USER DIRECTIVE (2026-09-24 / 2026-09-25): Remove the rule that boards
-  // always stay visible and that vegetation is forced away from them.
-  // Plants and trees may grow naturally in the meadow, including in front of
-  // the study boards (only keeping clear of the student's chair/desk footprint).
+  // Chair/desk footprint.
   if (Math.hypot(x, z - 2.6) < 2.5) return false;
+  // FIX: prevent initial overload near study boards — many vegetables/trees then disappear.
+  // Keep only final state (no pop-in) by excluding board arc from start.
+  if (nearLecternBoardTrop(x, z, 13)) return false;
   // The river scours a shingle band along its edge — thin it out, keep a
   // few stragglers so the bank is ragged, not drawn (mirrors sorrel).
   if (Math.abs(x - RIVER_CENTER_X) < 8.6 && Math.random() < 0.7) return false;

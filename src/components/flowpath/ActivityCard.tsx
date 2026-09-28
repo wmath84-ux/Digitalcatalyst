@@ -163,12 +163,13 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           hierarchy are the surface's own, untouched. This is the ONE shared
           card for every Flow state (now / upcoming / overdue / completed),
           so the treatment lives here only. */}
-      {/* P3-12: ActivityCard glass — hover lift + group for icon transition, keeps 0.36 tint parity */}
+      {/* Material updated per user request: stairs created cards frost & design exactly like social card — only look, not layout */}
       <GlassSurface
         radius={16}
-        tint={0.36}
-        blur={10}
-        className={`group rounded-2xl transition duration-300 hover:-translate-y-0.5 ${isCurrent ? "ring-1 ring-violet-400/50" : ""} ${isOverdue ? "ring-1 ring-rose-400/40" : ""}`}
+        tint={0.62}
+        tintColor="173,216,255"
+        blur={0}
+        className={`dc-store-glass dc-scene-ink group rounded-2xl transition duration-300 hover:-translate-y-0.5 ${isCurrent ? "ring-1 ring-violet-400/50" : ""} ${isOverdue ? "ring-1 ring-rose-400/40" : ""}`}
         contentClassName="p-3.5 sm:p-4"
       >
       {isCurrent && (

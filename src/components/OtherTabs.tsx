@@ -4,6 +4,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { BagIcon, SearchIcon } from "./icons";
 import { GlassCard } from "./ui/GlassCard";
+import { GlassSurface } from "./ui/glass";
 import { EmptyState } from "./ui/EmptyState";
 import { WatchActionButton } from "./ui/WatchActionButton";
 
@@ -114,12 +115,22 @@ export function PurchasesTab({
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allItems;
-    return allItems.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.instructor.toLowerCase().includes(q) ||
-        String(p.category || "").toLowerCase().includes(q),
-    );
+    return allItems.filter((product) => {
+      const haystack = [
+        product.title,
+        product.instructor,
+        product.category,
+        product.subject,
+        product.classLevel,
+        product.description,
+        ...(product.tags || []),
+        ...(product.searchKeywords || []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }, [allItems, query]);
 
   if (allItems.length === 0) {
@@ -163,19 +174,36 @@ export function PurchasesTab({
         </div>
       </GlassCard>
 
-      {/* Search */}
-      <div className="relative mt-4">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35">
-          <SearchIcon className="h-4 w-4" />
-        </span>
+      {/* Search — same glass as HOME social card (store lens):
+          tint 0.62 over light blue rgb(173,216,255) @ 26%, blur 46% → 18.4px,
+          quiet sheen + white rim (src/store-glass.css). */}
+      <GlassSurface
+        tint={0.62}
+        tintColor="173,216,255"
+        blur={0}
+        radius={18}
+        className="dc-store-glass dc-scene-ink relative mt-4"
+        contentClassName="flex items-center gap-2 px-3 py-2.5"
+      >
+        <SearchIcon className="h-4 w-4 shrink-0 text-white/70" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search purchases…"
-          className="w-full rounded-2xl border border-white/10 bg-white/[0.07] py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-white/35 backdrop-blur focus:border-white/15 focus:bg-white/[0.10] focus:outline-none"
+          className="w-full min-w-0 bg-transparent text-sm font-medium text-white placeholder:text-white/60 focus:outline-none"
           data-purchases-search
         />
-      </div>
+        {query ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => setQuery("")}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+          >
+            <span aria-hidden className="text-[14px] leading-none">×</span>
+          </button>
+        ) : null}
+      </GlassSurface>
 
       {items.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-10 text-center backdrop-blur">

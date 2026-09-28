@@ -122,7 +122,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
       aria-live="polite"
       className="relative"
     >
-      <GlassSurface radius={24} className="text-white" contentClassName="p-5 lg:p-3.5">
+      <GlassSurface tint={0.62} tintColor="173,216,255" blur={0} radius={24} className="dc-store-glass dc-scene-ink text-white" contentClassName="p-5 lg:p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white lg:h-9 lg:w-9 lg:rounded-xl">

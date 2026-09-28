@@ -140,10 +140,12 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
     const payload: PushPayload = {
       title: entry.free ? "🎁 New free product available" : "🆕 New product added",
       body: entry.title,
-      tag: `content-product-${productId}`,
+      tag: `content-product-${productId}-store`,
       url: PRODUCT_URL(productId),
+      category: "store",
+      targetType: "product",
     };
-    const fcmPayload: FcmPayload = { ...payload };
+    const fcmPayload: FcmPayload = { ...payload, category: "store", targetType: "product" };
     // Fan out to both transports in parallel. Web Push is for browser
     // service workers; FCM is for the installed Android TWA. Either
     // can be misconfigured — the bell entries are written by
@@ -202,14 +204,18 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
         pushToUser(db, buyerId, {
           title: "Your course has new content",
           body,
-          tag: `content-course-${productId}`,
+          tag: `content-course-${productId}-course`,
           url: `/#/course/${productId}`,
+          category: "course",
+          targetType: "course",
         }),
         fcmPushToUser(db, buyerId, {
           title: "Your course has new content",
           body,
-          tag: `content-course-${productId}`,
+          tag: `content-course-${productId}-course`,
           url: `/#/course/${productId}`,
+          category: "course",
+          targetType: "course",
         }),
       ]);
       buyerWebPushes += webSent;

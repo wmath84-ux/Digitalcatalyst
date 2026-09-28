@@ -103,6 +103,17 @@ export interface CreateSanctuaryModuleInput {
   type: SanctuaryModuleType;
   url?: string;
   file?: File | null;
+  /** Brain: optional set name + questions from the full editor (same shape as Study Library) */
+  practiceTitle?: string;
+  practiceQuestions?: Array<{
+    id: string;
+    prompt: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+    difficulty: "easy" | "medium" | "hard";
+    topic: string;
+  }>;
 }
 
 /**
@@ -148,12 +159,28 @@ export async function createSanctuaryModule(input: CreateSanctuaryModuleInput): 
   }
 
   if (option.id === "brain") {
-    const question = createMyQuestion();
-    question.prompt = "Question 1";
-    question.options = ["Option A", "Option B", "Option C", "Option D"];
-    question.correctIndex = 0;
-    resource.practiceTitle = title;
-    resource.practiceQuestions = [question];
+    // Use the full editor's questions when provided (parity with My Study Library),
+    // otherwise fall back to a starter question so the set is always playable.
+    const incoming = Array.isArray(input.practiceQuestions) ? input.practiceQuestions : [];
+    if (incoming.length > 0) {
+      resource.practiceTitle = (input.practiceTitle || title).slice(0, 120);
+      resource.practiceQuestions = incoming.map((q) => ({
+        id: q.id || createMyQuestion().id,
+        prompt: String(q.prompt || "").trim(),
+        options: (q.options || []).map((o: string) => String(o || "")).slice(0, 6),
+        correctIndex: typeof q.correctIndex === "number" ? q.correctIndex : -1,
+        explanation: String(q.explanation || ""),
+        difficulty: (q.difficulty as any) || "medium",
+        topic: String(q.topic || ""),
+      }));
+    } else {
+      const question = createMyQuestion();
+      question.prompt = "Question 1 — edit me";
+      question.options = ["Option A", "Option B", "Option C", "Option D"];
+      question.correctIndex = 0;
+      resource.practiceTitle = title;
+      resource.practiceQuestions = [question];
+    }
   }
 
   module.resources = [resource];

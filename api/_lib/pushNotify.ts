@@ -10,11 +10,56 @@ import { setVapidDetails, sendNotification } from "./webpush.js";
 import type { Firestore } from "firebase-admin/firestore";
 import { getNotificationBrandChrome } from "./branding.js";
 
-export type PushPayload = { title: string; body: string; tag?: string; url?: string; icon?: string; badge?: string };
+export type PushPayload = { title: string; body: string; tag?: string; url?: string; icon?: string; badge?: string; category?: string; section?: string; targetType?: string; largeIcon?: string };
 
-/** Every push payload carries the live admin branding logo as `icon`. */
+const NOTIF_BASE = (() => {
+  const envUrl = (process.env.SITE_URL || process.env.VERCEL_URL || "").trim();
+  if (envUrl) {
+    const withProto = envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+    try { return new URL(withProto).origin; } catch {}
+  }
+  return "https://digitalcatalyst-five.vercel.app";
+})();
+
+function absPushIcon(path: string): string {
+  try { return new URL(path, NOTIF_BASE).toString(); } catch { return `${NOTIF_BASE}${path}`; }
+}
+
+function getContextualLargeIconPush(tag: string, category?: string, section?: string, targetType?: string): string {
+  const t = (tag || "").toLowerCase();
+  const c = (category || "").toLowerCase();
+  const s = (section || "").toLowerCase();
+  const tt = (targetType || "").toLowerCase();
+  let p = "/notif-icons/default.png";
+  if (s.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (s.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (s.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("reminder") || c.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (t.includes("task") || c.includes("task") || tt.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("schedule") || c.includes("schedule") || tt.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (t.includes("course") || c === "course" || tt === "course" || t.includes("lecture") || t.includes("revision") || t.includes("exam")) p = "/notif-icons/course.png";
+  else if (t.includes("store") || c === "store" || tt === "product") p = "/notif-icons/store.png";
+  else if (t.includes("unlock") || c === "unlock") p = "/notif-icons/unlock.png";
+  else if (t.includes("community") || c === "community") p = "/notif-icons/community.png";
+  else if (t.includes("announcement") || c === "announcement" || c === "reading") p = "/notif-icons/announcement.png";
+  else if (t.includes("subscription") || c === "subscription") p = "/notif-icons/subscription.png";
+  else if (t.includes("mayday") || c === "mayday") {
+    if (t.includes("schedule") || s === "schedule") p = "/notif-icons/schedule.png";
+    else if (t.includes("reminder") || s === "reminders") p = "/notif-icons/reminder.png";
+    else p = "/notif-icons/task.png";
+  } else if (t.includes("flowpath")) {
+    if (t.includes("reminder")) p = "/notif-icons/reminder.png";
+    else if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (t.includes("task")) p = "/notif-icons/task.png";
+    else p = "/notif-icons/course.png";
+  }
+  return absPushIcon(p);
+}
+
+/** Every push payload carries the live admin branding logo as `icon`, but right side large icon is contextual per type. */
 export async function serializePushPayload(payload: PushPayload, defaultTag = "eduvora"): Promise<string> {
   const brand = await getNotificationBrandChrome();
+  const largeIcon = payload.largeIcon || getContextualLargeIconPush(payload.tag || "", payload.category, payload.section, payload.targetType);
   return JSON.stringify({
     title: payload.title,
     body: payload.body,
@@ -22,6 +67,10 @@ export async function serializePushPayload(payload: PushPayload, defaultTag = "e
     url: payload.url || "/",
     icon: payload.icon || brand.icon,
     badge: payload.badge || brand.badge,
+    largeIcon,
+    category: payload.category || "",
+    section: payload.section || "",
+    targetType: payload.targetType || "",
   });
 }
 

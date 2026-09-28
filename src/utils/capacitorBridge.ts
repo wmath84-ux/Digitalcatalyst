@@ -183,6 +183,17 @@ async function renderForegroundPush(notification: PushNotificationSchema) {
     }
     const id = Math.floor(Math.random() * 2_000_000_000);
     const data = (notification.data || {}) as Record<string, string>;
+    // Right side contextual icon based on notification type, left is always app logo (ic_stat_eduvora)
+    const tag = String(data.tag || notification.notification?.tag || "");
+    const category = String((data as any).category || "");
+    const section = String((data as any).section || "");
+    const largeIcon = (data as any).largeIcon || data.icon
+      ? getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png" ? getAndroidLargeIconForTag(tag) : getAndroidLargeIconForCategory(category, section)
+      : getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png" ? getAndroidLargeIconForTag(tag) : getAndroidLargeIconForCategory(category, section);
+    // If data.icon is brand logo, keep it as fallback but prefer contextual
+    const contextualIcon = getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png"
+      ? getAndroidLargeIconForTag(tag)
+      : category ? getAndroidLargeIconForCategory(category, section) : getAndroidLargeIconForTag(tag);
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -190,7 +201,7 @@ async function renderForegroundPush(notification: PushNotificationSchema) {
           title: notification.title || data.title || "Eduvora",
           body: notification.body || data.body || "",
           smallIcon: "ic_stat_eduvora",
-          largeIcon: data.icon,
+          largeIcon: contextualIcon,
           extra: data,
           channelId: REMINDER_CHANNEL_ID,
         },
@@ -216,7 +227,75 @@ export type LocalAlarmItem = {
   tag: string;
   /** Optional small icon override (Android only). */
   smallIcon?: string;
+  /** Optional large icon — right side contextual icon (Android only). Left is always app logo. */
+  largeIcon?: string;
 };
+
+/** Map notification tag/category to contextual large icon for Android right side.
+ * Left small icon is always app logo (ic_stat_eduvora), right large icon shows what notification is about.
+ * This fixes: both sides showed same logo, now right shows contextual icon per notification type.
+ * Returns absolute URL when window is available so Android TWA can fetch it; falls back to relative.
+ */
+function resolveIconUrl(path: string): string {
+  try {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      // Ensure absolute https URL for Android LocalNotifications to fetch
+      return new URL(path, window.location.origin).toString();
+    }
+  } catch {}
+  return path;
+}
+
+export function getAndroidLargeIconForTag(tag: string): string {
+  const t = (tag || "").toLowerCase();
+  let p = "/notif-icons/default.png";
+  if (t.includes("reminder") || t.includes("reminders")) p = "/notif-icons/reminder.png";
+  else if (t.includes("task") || t.includes("tasks")) p = "/notif-icons/task.png";
+  else if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (t.includes("course") || t.includes("lecture") || t.includes("revision") || t.includes("exam")) p = "/notif-icons/course.png";
+  else if (t.includes("store") || t.includes("product")) p = "/notif-icons/store.png";
+  else if (t.includes("unlock")) p = "/notif-icons/unlock.png";
+  else if (t.includes("community")) p = "/notif-icons/community.png";
+  else if (t.includes("announcement")) p = "/notif-icons/announcement.png";
+  else if (t.includes("subscription")) p = "/notif-icons/subscription.png";
+  else if (t.includes("mayday")) {
+    if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (t.includes("reminder")) p = "/notif-icons/reminder.png";
+    else p = "/notif-icons/task.png";
+  } else if (t.includes("flowpath")) {
+    if (t.includes("reminder")) p = "/notif-icons/reminder.png";
+    else if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (t.includes("task")) p = "/notif-icons/task.png";
+    else p = "/notif-icons/course.png";
+  }
+  return resolveIconUrl(p);
+}
+
+export function getAndroidLargeIconForCategory(category: string, section?: string): string {
+  const c = (category || "").toLowerCase();
+  const s = (section || "").toLowerCase();
+  let p = "/notif-icons/default.png";
+  if (s) {
+    if (s.includes("reminder")) p = "/notif-icons/reminder.png";
+    else if (s.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (s.includes("task")) p = "/notif-icons/task.png";
+  }
+  if (p === "/notif-icons/default.png") {
+    if (c.includes("reminder") || c === "mayday") {
+      if (s === "schedule") p = "/notif-icons/schedule.png";
+      else if (s === "reminders") p = "/notif-icons/reminder.png";
+      else p = "/notif-icons/task.png";
+    } else if (c.includes("task")) p = "/notif-icons/task.png";
+    else if (c.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (c.includes("store") || c === "product") p = "/notif-icons/store.png";
+    else if (c.includes("unlock")) p = "/notif-icons/unlock.png";
+    else if (c.includes("course")) p = "/notif-icons/course.png";
+    else if (c.includes("community")) p = "/notif-icons/community.png";
+    else if (c.includes("announcement") || c === "reading") p = "/notif-icons/announcement.png";
+    else if (c.includes("subscription")) p = "/notif-icons/subscription.png";
+  }
+  return resolveIconUrl(p);
+}
 
 /** Schedule a single exact-time local alarm. TWA only — web falls back
  *  to the existing setTimeout-based foreground rendering. The local
@@ -305,6 +384,7 @@ export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean>
       schedule: { at: new Date(item.at), allowWhileIdle: true },
       sound: "default",
       smallIcon: item.smallIcon || "ic_stat_eduvora",
+      largeIcon: item.largeIcon || getAndroidLargeIconForTag(item.tag),
       iconColor: "#2563eb",
       extra: { url: item.url, tag: item.tag },
       channelId: REMINDER_CHANNEL_ID,

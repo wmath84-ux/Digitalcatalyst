@@ -76,12 +76,53 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
   }
 }
 
-async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
-  // Fan out to Web Push AND FCM in parallel. The Web Push side covers
-  // browsers (still useful for desktop web users); the FCM side wakes
-  // the installed Android TWA reliably — that's the channel the user
-  // was missing exact-time delivery on before this change.
+const CRON_NOTIF_BASE = (() => {
+  const envUrl = (process.env.SITE_URL || process.env.VERCEL_URL || "").trim();
+  if (envUrl) {
+    const withProto = envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+    try { return new URL(withProto).origin; } catch {}
+  }
+  return "https://digitalcatalyst-five.vercel.app";
+})();
+
+function absCronIcon(path: string): string {
+  try { return new URL(path, CRON_NOTIF_BASE).toString(); } catch { return `${CRON_NOTIF_BASE}${path}`; }
+}
+
+function getContextualLargeIconForCron(tag: string, category?: string, section?: string): string {
+  const t = (tag || "").toLowerCase();
+  const c = (category || "").toLowerCase();
+  const s = (section || "").toLowerCase();
+  let p = "/notif-icons/default.png";
+  if (s.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (s.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (s.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("reminder") || c.includes("reminder")) p = "/notif-icons/reminder.png";
+  else if (t.includes("task") || c.includes("task")) p = "/notif-icons/task.png";
+  else if (t.includes("schedule") || c.includes("schedule")) p = "/notif-icons/schedule.png";
+  else if (t.includes("course") || c === "course" || t.includes("lecture") || t.includes("revision") || t.includes("exam")) p = "/notif-icons/course.png";
+  else if (t.includes("store") || c === "store") p = "/notif-icons/store.png";
+  else if (t.includes("unlock") || c === "unlock") p = "/notif-icons/unlock.png";
+  else if (t.includes("community") || c === "community") p = "/notif-icons/community.png";
+  else if (t.includes("announcement") || c === "announcement") p = "/notif-icons/announcement.png";
+  else if (t.includes("subscription") || c === "subscription") p = "/notif-icons/subscription.png";
+  else if (t.includes("mayday") || c === "mayday") {
+    if (t.includes("schedule") || s === "schedule") p = "/notif-icons/schedule.png";
+    else if (t.includes("reminder") || s === "reminders") p = "/notif-icons/reminder.png";
+    else p = "/notif-icons/task.png";
+  } else if (t.includes("flowpath")) {
+    if (t.includes("reminder")) p = "/notif-icons/reminder.png";
+    else if (t.includes("schedule")) p = "/notif-icons/schedule.png";
+    else if (t.includes("task")) p = "/notif-icons/task.png";
+    else p = "/notif-icons/course.png";
+  }
+  return absCronIcon(p);
+}
+
+async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string; category?: string; section?: string; targetType?: string }) {
+  // Fan out to Web Push AND FCM in parallel. Left small icon always app logo, right large icon contextual per type.
   const brand = await getNotificationBrandChrome();
+  const largeIcon = getContextualLargeIconForCron(target?.tag || "", target?.category, target?.section);
   const fcmPayload: FcmPayload = {
     title,
     body,
@@ -89,6 +130,9 @@ async function sendPush(db: Firestore, uid: string, title: string, body: string,
     url: target?.url || "/",
     icon: brand.icon,
     badge: brand.badge,
+    category: target?.category,
+    section: target?.section,
+    targetType: target?.targetType,
   };
   const [webSent, fcmSent] = await Promise.all([
     vapidConfigured()
@@ -99,8 +143,12 @@ async function sendPush(db: Firestore, uid: string, title: string, body: string,
             body,
             tag: target?.tag || "eduvora",
             url: target?.url || "/",
-            icon: brand.icon,
+            icon: largeIcon || brand.icon,
             badge: brand.badge,
+            category: target?.category || "",
+            section: target?.section || "",
+            targetType: target?.targetType || "",
+            largeIcon,
           });
           let n = 0;
           for (const item of subscriptions.docs) n += await sendToSubscriptionDoc(item, payloadString);
@@ -113,11 +161,9 @@ async function sendPush(db: Firestore, uid: string, title: string, body: string,
 }
 
 async function sendPushToAll(db: Firestore, payload: PushPayload) {
-  // Same fan-out as `sendPush`, but covers every user. The web
-  // read uses the legacy webPushSubscriptions collection; the FCM
-  // read uses the new fcmTokens collection. Either side may be empty
-  // for any given device — both run.
+  // Same fan-out as `sendPush`, but covers every user. Left small icon always app logo, right large contextual.
   const brand = await getNotificationBrandChrome();
+  const largeIcon = getContextualLargeIconForCron(payload.tag || "", (payload as any).category, (payload as any).section);
   const fcmPayload: FcmPayload = {
     title: payload.title,
     body: payload.body,
@@ -125,6 +171,9 @@ async function sendPushToAll(db: Firestore, payload: PushPayload) {
     url: payload.url || "/",
     icon: brand.icon,
     badge: brand.badge,
+    category: (payload as any).category,
+    section: (payload as any).section,
+    targetType: (payload as any).targetType,
   };
   const [webResult, fcmResult] = await Promise.all([
     vapidConfigured()
@@ -135,8 +184,12 @@ async function sendPushToAll(db: Firestore, payload: PushPayload) {
             body: payload.body,
             tag: payload.tag || "eduvora-content",
             url: payload.url || "/",
-            icon: brand.icon,
+            icon: largeIcon || brand.icon,
             badge: brand.badge,
+            category: (payload as any).category || "",
+            section: (payload as any).section || "",
+            targetType: (payload as any).targetType || "",
+            largeIcon,
           });
           let sent = 0;
           for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
@@ -200,7 +253,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // tray instead of collapsing into the previous day's notification.
         // Expired stages deep-link straight into the renewal flow.
         const renewalUrl = reminder.expired ? "/#/subscription?renew=1" : "/#/subscription";
-        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: renewalUrl });
+        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: renewalUrl, category: "subscription", targetType: "subscription" });
       }
       summary.renewals = { scanned: snapshot.size, created, pushed };
     }
@@ -251,7 +304,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // same reminder twice. `item.key` is unique per item per day
           // and is exactly what the in-app path uses.
           const itemUrl = `/#/my-day?section=${item.section}&item=${encodeURIComponent(item.itemId)}`;
-          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.key}`, url: itemUrl });
+          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.key}-${item.section}`, url: itemUrl, category: "mayday", section: item.section, targetType: item.section });
         }
         try {
           await document.ref.update(logPatch);
@@ -344,7 +397,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 : undefined,
             },
           }, { merge: true });
-          const sent = await sendPush(db, jobUid, title, body, { tag, url });
+          const sent = await sendPush(db, jobUid, title, body, { tag: `${tag}-${activity.kind}`, url, category: activity.kind === "revision" || activity.kind === "mcq" || activity.kind === "lecture" ? "course" : "mayday", section: activity.kind === "task" ? "tasks" : activity.kind === "reminder" ? "reminders" : activity.kind === "schedule" ? "schedule" : undefined, targetType: String(activity.kind || "task") });
           pushed += sent;
           // If the activity was a draft, flip to active now that it fired.
           if (activity.status === "draft") {
@@ -379,9 +432,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await sendPushToAll(db, {
             title,
             body: product.title,
-            tag: `content-product-${product.id}`,
+            tag: `content-product-${product.id}-store`,
             url: `/#/product/${product.id}`,
-          });
+            category: "store",
+            targetType: "product",
+          } as any);
           // Cross-device bell entry for every user (id is per-product, so a
           // re-run can never duplicate it). The instant admin path
           // (api/push/send product-created) writes the same doc id — this is
@@ -423,9 +478,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               target: { type: "product", productId: update.id },
             }, { merge: true });
             coursePushes += await sendPush(db, buyer.id, "Your course has new content", `${update.title}: ${parts.join(" and ")}`, {
-              tag: `content-course-${update.id}`,
+              tag: `content-course-${update.id}-course`,
               // Buyers already own the course — deep-link into the player.
               url: `/#/course/${update.id}`,
+              category: "course",
+              targetType: "course",
             });
           }
         }

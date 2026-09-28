@@ -377,21 +377,26 @@ async function dispatchActivity(
   const brand = await getNotificationBrandChrome();
   const baseTitle = activity.title || "Reminder";
   const baseBody = activity.description || activity.title || "You have a new task.";
+  const activityKind = String((activity as any).kind || (activity as any).type || "task");
   const pushPayload: PushPayload = {
     title: baseTitle,
     body: baseBody,
-    tag: `flowpath-${activity.id}`,
+    tag: `flowpath-${activity.id}-${activityKind}`,
     url: deepLinkForActivity(activity),
     icon: brand.icon,
     badge: brand.badge,
+    category: activityKind,
+    targetType: activityKind,
   };
   const fcmPayload: FcmPayload = {
     title: baseTitle,
     body: baseBody,
-    tag: `flowpath-${activity.id}`,
+    tag: `flowpath-${activity.id}-${activityKind}`,
     url: deepLinkForActivity(activity),
     icon: brand.icon,
     badge: brand.badge,
+    category: activityKind,
+    targetType: activityKind,
   };
 
   // 1. FCM (installed Android TWA)
@@ -932,8 +937,8 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
       const bodyText = text(body.body, 600);
       if (!title) return void res.status(400).json({ ok: false, error: "Missing title." });
       const brand = await getNotificationBrandChrome();
-      const pushPayload: PushPayload = { title, body: bodyText, tag: "flowpath-broadcast", url: text(body.url, 500) || "/" };
-      const fcmPayload: FcmPayload = { ...pushPayload, icon: brand.icon, badge: brand.badge };
+      const pushPayload: PushPayload = { title, body: bodyText, tag: "flowpath-broadcast-announcement", url: text(body.url, 500) || "/", category: "announcement", targetType: "announcement" };
+      const fcmPayload: FcmPayload = { ...pushPayload, icon: brand.icon, badge: brand.badge, category: "announcement", targetType: "announcement" };
       const [webResult, fcmResult] = await Promise.all([
         pushConfigured() ? pushToAllDevices(db, pushPayload) : Promise.resolve({ sent: 0, devices: 0 }),
         fcmConfigured() ? fcmPushToAllDevices(db, fcmPayload) : Promise.resolve({ sent: 0, devices: 0 }),

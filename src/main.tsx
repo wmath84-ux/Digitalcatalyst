@@ -138,6 +138,8 @@ import {
   registerForPush,
   scheduleLocalAlarm,
   cancelLocalAlarms,
+  getAndroidLargeIconForCategory,
+  getAndroidLargeIconForTag,
   type LocalAlarmItem,
 } from "./utils/capacitorBridge";
 
@@ -946,6 +948,7 @@ function RootPage(): ReactNode {
         const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
         // On the TWA the local alarm is the source of truth — the
         // FCM payload that woke us is a bonus, not the only path.
+        // Left small icon always app logo, right large icon contextual per section (task/schedule/reminder)
         if (isAndroidNative()) {
           const alarm: LocalAlarmItem = {
             id: alarmId(item.key),
@@ -953,7 +956,8 @@ function RootPage(): ReactNode {
             title: item.title,
             body: item.body,
             url: itemUrl,
-            tag: `myday-${item.key}`,
+            tag: `myday-${item.key}-${item.section}`,
+            largeIcon: getAndroidLargeIconForCategory("mayday", item.section),
           };
           void scheduleLocalAlarm(alarm);
         }
@@ -1009,7 +1013,8 @@ function RootPage(): ReactNode {
           title: item.title,
           body: item.body,
           url: itemUrl,
-          tag: `myday-${item.key}`,
+          tag: `myday-${item.key}-${item.section}`,
+          largeIcon: getAndroidLargeIconForCategory("mayday", item.section),
         });
       }
       // Wipe any orphans (alarms that no longer correspond to a live
@@ -1092,7 +1097,8 @@ function RootPage(): ReactNode {
             title: item.title,
             body: item.body,
             url: itemUrl,
-            tag: `flowpath-${item.key}`,
+            tag: `flowpath-${item.key}-${item.kind}`,
+            largeIcon: getAndroidLargeIconForCategory(item.kind),
           };
           void scheduleLocalAlarm(alarm);
         }
@@ -1126,7 +1132,8 @@ function RootPage(): ReactNode {
           title: item.title,
           body: item.body,
           url: itemUrl,
-          tag: `flowpath-${item.key}`,
+          tag: `flowpath-${item.key}-${item.kind}`,
+          largeIcon: getAndroidLargeIconForCategory(item.kind),
         });
       }
       try {

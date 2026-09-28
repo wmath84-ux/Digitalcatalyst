@@ -615,8 +615,8 @@ export default function GlassDock({
   )
   const padTop = useTransform([growY, padTopBase], ([growth, base]: number[]) => base + growth)
 
-  /** The wave is settled: the capsule is wearing its resting box. */
-  const atRest = () => Math.abs(growX.get()) < 0.5 && Math.abs(growY.get()) < 0.5
+  /** The wave is settled: the capsule is wearing its resting box. Stricter threshold to prevent cumulative growth bug reported in FlowPath footer. */
+  const atRest = () => Math.abs(growX.get()) < 0.05 && Math.abs(growY.get()) < 0.05
 
   const retryRef = useRef<number | null>(null)
 
@@ -649,13 +649,12 @@ export default function GlassDock({
       // numbers it is already rendering with ARE the base. (Reading the
       // computed value would freeze the previous viewport's padding into the
       // dock, because the inline style this read returns is the one the dock
-      // itself wrote.) The row's spread mode is still the cascade's business.
-      if (!fill) {
-        const top = parseFloat(style.paddingTop)
-        const inline = parseFloat(style.paddingLeft)
-        if (Number.isFinite(top) && top > 0) padTopValue = top
-        if (Number.isFinite(inline) && inline > 0) padInlineValue = inline
-      }
+      // itself wrote.)
+      // FIX: For non-fill docks (FlowPath, etc), reading computed padding mid-animation
+      // causes cumulative growth bug — footer area size increases on each click because
+      // computed padding includes animated growth (base + growth). Keep fallback for non-fill
+      // to prevent accumulation. Only spread flag is read from cascade.
+      // Previously this read top/inline for non-fill, causing bug reported: footer nav area size badhta hi jata hai.
       spread = style.justifyContent === 'space-between'
     }
     const ids = itemsRef.current.map((item) => item.id).filter((id) => centres[id] !== undefined)

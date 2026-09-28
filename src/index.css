@@ -6751,31 +6751,28 @@ html[data-nature-studio-active="true"] {
     column-gap: clamp(20px, 2vw, 36px);
     align-items: start;
   }
+  /* Fixed container removed per user request — side rail should scroll with page, not inside its own scroll container */
   .dc-desktop-shell [data-subscription-rail] {
-    position: sticky;
-    top: -0.25rem;
-    align-self: start;
-    /* The shell scroller resolves sticky insets from its content box, which
-       already starts one topbar + 1.5rem below the viewport top — mirror the
-       PDP buy rail so the review rail seats under the glass topbar. */
-    max-height: calc(100vh - var(--desktop-topbar-height, 64px) - 3rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: rgb(100 116 139 / 0.38) transparent;
-    padding-bottom: 2px;
+    position: static !important;
+    top: auto !important;
+    align-self: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    overscroll-behavior: auto !important;
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+    padding-bottom: 0 !important;
   }
   .dc-desktop-shell [data-subscription-rail]::-webkit-scrollbar {
-    width: 8px;
+    width: auto !important;
   }
   .dc-desktop-shell [data-subscription-rail]::-webkit-scrollbar-thumb {
-    background: rgb(100 116 139 / 0.38);
-    border-radius: 9999px;
+    background: transparent !important;
   }
 }
 @supports (height: 100dvh) {
   .dc-desktop-shell [data-subscription-rail] {
-    max-height: calc(100dvh - var(--desktop-topbar-height, 64px) - 3rem);
+    max-height: none !important;
   }
 }
 

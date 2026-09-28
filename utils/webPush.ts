@@ -192,6 +192,20 @@ export const saveWebPushSubscription = async (uid: string, subscription: PushSub
   }
 };
 
+function getContextualIconForTag(tag: string): string {
+  const t = (tag || "").toLowerCase();
+  if (t.includes("reminder") || t.includes("reminders")) return "/notif-icons/reminder.png";
+  if (t.includes("task") || t.includes("tasks")) return "/notif-icons/task.png";
+  if (t.includes("schedule")) return "/notif-icons/schedule.png";
+  if (t.includes("course") || t.includes("lecture") || t.includes("revision") || t.includes("exam")) return "/notif-icons/course.png";
+  if (t.includes("store") || t.includes("product")) return "/notif-icons/store.png";
+  if (t.includes("unlock")) return "/notif-icons/unlock.png";
+  if (t.includes("community")) return "/notif-icons/community.png";
+  if (t.includes("announcement")) return "/notif-icons/announcement.png";
+  if (t.includes("subscription")) return "/notif-icons/subscription.png";
+  return "";
+}
+
 export const showLocalSystemNotification = async (
   title: string,
   body: string,
@@ -199,9 +213,12 @@ export const showLocalSystemNotification = async (
   tag = `eduvora-local-${Date.now()}`,
 ): Promise<boolean> => {
   if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
+  // Left small icon always app badge, right large icon contextual per notification type
+  const contextual = getContextualIconForTag(tag);
+  const icon = contextual || getBrandNotificationIcon();
   const options: NotificationOptions & { renotify?: boolean } = {
     body,
-    icon: getBrandNotificationIcon(),
+    icon,
     badge: '/icons/badge-96x96.png',
     tag,
     renotify: true,

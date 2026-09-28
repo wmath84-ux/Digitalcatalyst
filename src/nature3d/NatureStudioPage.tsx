@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Compass, Eye, EyeOff, Minimize2,
   PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
-  BookOpen, PenLine, Network, Users, Rows3, Settings,
+  BookOpen, PenLine, Network, Users, Rows3, Settings, Layers3,
 } from "lucide-react";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
@@ -28,6 +28,7 @@ import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import SanctuaryModuleMenu from "./boards/SanctuaryModuleMenu";
 import SanctuarySettings, { type SettingsPage } from "./SanctuarySettings";
 import { sanctuaryModulePlayHash } from "./boards/sanctuaryModules";
+import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
 import { useMyCourses } from "../hooks/useMyCourses";
@@ -398,14 +399,26 @@ export default function NatureStudioPage() {
     setMenuOpen(false);
   }, []);
 
+  // Dynamic play: inside Sanctuary (3D env) always play ON THE BOARD,
+  // not via external Course Player. From My Study Library (StudyLibraryPage)
+  // the same course opens via Course Player (myCoursePlayHash) — that route
+  // is unchanged. This satisfies: "my study library se open -> course player,
+  // sanctuary se open -> board per play".
   const playMyCourse = useCallback((course: MyCourse) => {
-    window.location.hash = sanctuaryModulePlayHash(course.id);
-  }, []);
+    // Inside sanctuary, play on the reading board (3D)
+    setFocusMine(true);
+    setOpenCourseId(myCourseStorageId(course.id));
+    setModuleMenuOpen(false);
+    focusStudyView("reading");
+  }, [focusStudyView]);
 
   const playMyCourseByProductId = useCallback((productId: string) => {
-    const raw = productId.startsWith("mine-") ? productId.slice("mine-".length) : productId;
-    window.location.hash = sanctuaryModulePlayHash(raw);
-  }, []);
+    // Product id from board is already "mine-<id>" — open on board, not course player
+    setFocusMine(true);
+    setOpenCourseId(productId);
+    setModuleMenuOpen(false);
+    focusStudyView("reading");
+  }, [focusStudyView]);
 
   const openMyCourseOnBoard = useCallback((course: MyCourse) => {
     setFocusMine(true);
@@ -478,13 +491,49 @@ export default function NatureStudioPage() {
           <canvas ref={canvasRef} className="block h-full w-full outline-none" />
         </div>
 
-        {/* ── Boot veil ── */}
+        {/* ── Natural animated loading overlay — shown when sanctuary opens from home until fully loaded ── */}
         {booting ? (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#0b1620] transition-opacity duration-500">
-            <div className="text-center">
-              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-emerald-300" />
-              <p className="mt-3 text-[12px] font-bold tracking-wide text-white/70">Growing the meadow…</p>
+          <div className="absolute inset-0 z-50 grid place-items-center bg-[#0b1620] transition-opacity duration-700">
+            {/* Soft nature gradient backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/60 via-teal-900/30 to-sky-950/40" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(16,185,129,0.18),transparent_50%),radial-gradient(ellipse_at_70%_80%,rgba(56,189,248,0.15),transparent_50%)]" />
+            {/* Floating blurred orbs — natural breathing */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute left-[20%] top-[25%] h-32 w-32 animate-[float_6s_ease-in-out_infinite] rounded-full bg-emerald-400/10 blur-2xl" />
+              <div className="absolute right-[18%] top-[35%] h-40 w-40 animate-[float_8s_ease-in-out_infinite_1s] rounded-full bg-teal-300/10 blur-2xl" />
+              <div className="absolute left-[35%] bottom-[20%] h-24 w-24 animate-[float_7s_ease-in-out_infinite_0.5s] rounded-full bg-sky-300/10 blur-xl" />
             </div>
+            {/* Center glass card — same material as home footer GlassDock */}
+            <div className="relative mx-4 w-full max-w-[320px] rounded-[24px] border border-white/[0.12] bg-white/[0.06] px-6 py-8 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-[24px] backdrop-saturate-[1.8]">
+              <div className="flex flex-col items-center text-center">
+                {/* Animated nature icon stack */}
+                <div className="relative mb-5">
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 ring-1 ring-white/15">
+                    <Trees className="h-7 w-7 text-emerald-200 animate-[pulse_2s_ease-in-out_infinite]" />
+                  </div>
+                  <div className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur">
+                    <Sparkles className="h-3 w-3 text-amber-200 animate-[spin_3s_linear_infinite]" />
+                  </div>
+                </div>
+                <h2 className="text-[15px] font-black tracking-tight text-white">Entering Sanctuary</h2>
+                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-white/60">Growing the meadow, planting the forest,<br />warming the light…</p>
+                {/* Progress dots — natural breathing */}
+                <div className="mt-5 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 animate-[bounce_1s_ease-in-out_infinite] rounded-full bg-emerald-300" />
+                  <span className="h-1.5 w-1.5 animate-[bounce_1s_ease-in-out_infinite_0.15s] rounded-full bg-teal-300" />
+                  <span className="h-1.5 w-1.5 animate-[bounce_1s_ease-in-out_infinite_0.3s] rounded-full bg-sky-300" />
+                </div>
+                {/* Subtle progress bar */}
+                <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-1/2 animate-[shimmer_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-emerald-400/60 via-teal-300/60 to-sky-300/60" />
+                </div>
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Natural world loading</p>
+              </div>
+            </div>
+            <style>{`
+              @keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
+              @keyframes shimmer { 0% { transform: translateX(-100%) } 100% { transform: translateX(200%) } }
+            `}</style>
           </div>
         ) : null}
 
@@ -525,98 +574,82 @@ export default function NatureStudioPage() {
           ref={hudTrayRef}
           data-sanctuary-chrome
           aria-label="Study boards, views and modules"
-          className="pointer-events-auto absolute bottom-3 left-3 right-16 z-40"
+          className="pointer-events-auto absolute bottom-3 left-3 right-16 z-40 flex justify-center"
         >
-          <div className="flex items-end gap-1.5">
-          <div
-            data-sanctuary-tray-scroll
-            className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-white/22 bg-slate-950/55 p-1.5 shadow-2xl backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            <div className="flex w-max items-center gap-1">
-            {BOARD_VIEWS.map(({ key, label, short, Icon }) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={activeBoard === key}
-                aria-label={label}
-                title={label}
-                onClick={() => focusStudyView(key)}
-                className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
-                  activeBoard === key
-                    ? "bg-emerald-400/25 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)]"
-                    : "text-white/85 hover:bg-white/15"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-[8px] font-bold leading-none tracking-wide">{short}</span>
-              </button>
-            ))}
-
-            <div aria-hidden className="mx-0.5 h-8 w-px bg-white/15" />
-
-            {PRESETS.map(({ key, label, short, Icon }) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={activeView === key}
-                aria-label={label}
-                title={label}
-                onClick={() => focusSceneryView(key)}
-                className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
-                  activeView === key
-                    ? "bg-sky-400/25 text-white shadow-[0_0_16px_rgba(56,189,248,0.35)]"
-                    : "text-white/85 hover:bg-white/15"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-[8px] font-bold leading-none tracking-wide">{short}</span>
-              </button>
-            ))}
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/22 bg-slate-950/55 p-1.5 shadow-2xl backdrop-blur-xl">
-            <SanctuaryModuleMenu
-              uid={user?.id ?? null}
-              courses={myCourses.courses}
-              loading={myCourses.state === "loading"}
-              open={moduleMenuOpen}
-              onToggle={() => {
-                setMenuOpen(false);
-                setModuleMenuOpen((v) => {
-                  const next = !v;
-                  if (next) {
-                    setFocusMine(true);
-                    focusStudyView("reading");
-                  }
-                  return next;
-                });
-              }}
-              onClose={() => setModuleMenuOpen(false)}
-              onOpenOnBoard={openMyCourseOnBoard}
-              onPlay={playMyCourse}
-              onCreated={onSanctuaryModuleCreated}
-            />
-
-            {/* Gear — opens the full-page Light / Scene settings. */}
-            <button
-              type="button"
-              aria-expanded={menuOpen}
-              aria-label={menuOpen ? "Close settings" : "Open settings"}
-              onClick={() => {
-                setModuleMenuOpen(false);
-                setMenuOpen((v) => !v);
-              }}
-              title={menuOpen ? "Close settings" : "Settings — light and scene"}
-              className={`grid h-12 w-12 place-items-center rounded-xl border transition ${
-                menuOpen
-                  ? "border-amber-300/70 bg-amber-400/25 text-white shadow-[0_0_24px_rgba(251,191,36,0.4)]"
-                  : "border-white/22 bg-slate-950/55 text-white/85 hover:bg-white/15"
-              }`}
+          <div className="relative w-full max-w-[min(100vw-5rem,56rem)]">
+            {/* Scrollable GlassDock — exact home footer design (GlassDock) with all buttons together */}
+            <div
+              data-sanctuary-tray-scroll
+              className="overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              <Settings className="h-5 w-5" />
-            </button>
-          </div>
+              <div className="w-max mx-auto">
+                <GlassDock
+                  items={(() => {
+                    const items: GlassDockItem[] = [
+                      ...BOARD_VIEWS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#10B981" })),
+                      ...PRESETS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#38BDF8" })),
+                      { id: "module", label: "My modules", icon: Layers3 as any, color: "#8B5CF6" },
+                      { id: "settings", label: "Settings", icon: Settings as any, color: "#F59E0B" },
+                    ];
+                    return items;
+                  })()}
+                  activeId={moduleMenuOpen ? "module" : menuOpen ? "settings" : (activeBoard ?? activeView ?? "world")}
+                  onSelect={(id) => {
+                    if (id === "module") {
+                      setMenuOpen(false);
+                      setModuleMenuOpen((v) => {
+                        const next = !v;
+                        if (next) {
+                          setFocusMine(true);
+                          focusStudyView("reading");
+                        }
+                        return next;
+                      });
+                      return;
+                    }
+                    if (id === "settings") {
+                      setModuleMenuOpen(false);
+                      setMenuOpen((v) => !v);
+                      return;
+                    }
+                    if (BOARD_VIEWS.some((b) => b.key === id)) {
+                      focusStudyView(id as ViewPreset);
+                      return;
+                    }
+                    if (PRESETS.some((p) => p.key === id)) {
+                      focusSceneryView(id as ViewPreset);
+                      return;
+                    }
+                  }}
+                  ariaLabel="Study boards, views and modules"
+                />
+              </div>
+            </div>
+            {/* Module menu panel — anchored to the dock, trigger hidden (trigger lives inside GlassDock) */}
+            <div className="absolute bottom-full right-0 mb-2">
+              <SanctuaryModuleMenu
+                uid={user?.id ?? null}
+                courses={myCourses.courses}
+                loading={myCourses.state === "loading"}
+                open={moduleMenuOpen}
+                onToggle={() => {
+                  setMenuOpen(false);
+                  setModuleMenuOpen((v) => {
+                    const next = !v;
+                    if (next) {
+                      setFocusMine(true);
+                      focusStudyView("reading");
+                    }
+                    return next;
+                  });
+                }}
+                onClose={() => setModuleMenuOpen(false)}
+                onOpenOnBoard={openMyCourseOnBoard}
+                onPlay={playMyCourse}
+                onCreated={onSanctuaryModuleCreated}
+                hideTrigger
+              />
+            </div>
           </div>
         </nav>
         ) : null}

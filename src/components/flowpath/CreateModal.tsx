@@ -19,11 +19,6 @@ interface CreateModalProps {
     datetime: string;
     extra?: Record<string, unknown>;
   }) => void;
-  /**
-   * When provided, the modal opens pre-populated with the activity's fields
-   * and the "Create" button becomes "Save changes". The same onCreate callback
-   * is used, so callers pass through the updated payload.
-   */
   editing?: Activity | null;
 }
 
@@ -42,7 +37,6 @@ function isoToDatetimeLocal(iso: string | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** "4:30 PM" -> "16:30" for an <input type="time"> value. */
 function labelToTimeInput(label: string | undefined): string {
   if (!label) return "16:00";
   const m = label.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -70,8 +64,6 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [completedQuestions, setCompletedQuestions] = useState(0);
 
-  // Pre-populate the form whenever the modal is opened in edit mode (or the
-  // editing activity changes). When not editing, fall back to empty defaults.
   useEffect(() => {
     if (!editing) {
       setTitle("");
@@ -153,202 +145,163 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
   return createPortal(
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[80] flex items-end justify-center p-0 sm:items-center sm:p-6"
+        className="fixed inset-0 z-[80] flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6 lg:p-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        <div className="absolute inset-0 bg-black/55" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
         <motion.form
           onSubmit={handleSubmit}
           initial={{ opacity: 0, y: 60, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 40, scale: 0.96 }}
           transition={{ type: "spring", stiffness: 260, damping: 26 }}
-          className="relative z-10 w-full max-w-md"
+          className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col sm:max-h-[85vh] sm:max-w-lg md:max-w-xl lg:max-w-2xl"
         >
-        {/* Wave 13c: the sheet is the pack GlassSurface (Dialog values) — the
-            `.glass-panel-strong` gradient plate + glow shadow are gone. */}
-        <GlassSurface radius={24} className="text-fp-text" contentClassName="p-5 sm:p-6">
-          <div className="mb-4 flex items-center gap-3">
-            <span
-              className="grid h-10 w-10 place-items-center rounded-xl"
-              style={{ background: `${meta.color}26`, color: meta.color }}
-            >
-              <Icon className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-fp-muted">
-                {isEditing ? "Edit" : "New"}
-              </p>
-              <h2 className="font-display text-lg font-semibold text-fp-text">
-                {isEditing ? `Edit ${meta.label}` : meta.label}
-              </h2>
-            </div>
-            <GlassButton
-              onClick={onClose}
-              className="ml-auto [&_.size-12]:size-8"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </GlassButton>
-          </div>
-
-          <div className="space-y-3.5">
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                Title
-              </label>
-              <input
-                autoFocus
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={`e.g. ${placeholderFor(type)}`}
-                className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
-              />
+          <GlassSurface radius={24} className="flex flex-col overflow-hidden text-fp-text" contentClassName="flex flex-col overflow-hidden p-0">
+            {/* Header — responsive, flexible */}
+            <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4 sm:px-5 md:px-6">
+              <span
+                className="grid h-10 w-10 place-items-center rounded-xl md:h-11 md:w-11"
+                style={{ background: `${meta.color}26`, color: meta.color }}
+              >
+                <Icon className="h-5 w-5 md:h-6 md:w-6" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] uppercase tracking-wider text-fp-muted md:text-xs">
+                  {isEditing ? "Edit" : "New"} · Direct on FlowPath
+                </p>
+                <h2 className="font-display truncate text-lg font-semibold text-fp-text md:text-xl">
+                  {isEditing ? `Edit ${meta.label}` : `${meta.label} — Plan Today`}
+                </h2>
+              </div>
+              <GlassButton onClick={onClose} className="ml-auto shrink-0 [&_.size-12]:size-8 md:[&_.size-12]:size-9" aria-label="Close">
+                <X className="h-4 w-4" />
+              </GlassButton>
             </div>
 
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                Date &amp; time
-              </label>
-              <input
-                type="datetime-local"
-                value={datetimeLocal}
-                onChange={(e) => setDatetimeLocal(e.target.value)}
-                className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
-              />
+            {/* Body — scrollable, responsive grid */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 md:p-6">
+              <div className="space-y-4 md:space-y-5">
+                <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Title</label>
+                    <input
+                      autoFocus
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={`e.g. ${placeholderFor(type)}`}
+                      className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none md:py-3.5 md:text-[15px]"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Date & time — when to place on stair</label>
+                    <input
+                      type="datetime-local"
+                      value={datetimeLocal}
+                      onChange={(e) => setDatetimeLocal(e.target.value)}
+                      className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none [color-scheme:dark] md:py-3.5 md:text-[15px]"
+                    />
+                  </div>
+                </div>
+
+                {type === "task" && (
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Priority</label>
+                    <GlassToggleGroup className="dc-segment w-full" value={priority} onValueChange={(next) => setPriority(next as Priority)} aria-label="Priority">
+                      {(["low", "medium", "high"] as Priority[]).map((p) => (
+                        <GlassToggleItem key={p} value={p} className="flex-1 px-3 py-2.5 text-xs font-medium capitalize md:py-3 md:text-sm">
+                          {p}
+                        </GlassToggleItem>
+                      ))}
+                    </GlassToggleGroup>
+                  </div>
+                )}
+
+                {type === "schedule" && (
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Start</label>
+                      <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none [color-scheme:dark] md:py-3.5" />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">End</label>
+                      <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none [color-scheme:dark] md:py-3.5" />
+                    </div>
+                  </div>
+                )}
+
+                {type === "revision" && (
+                  <div>
+                    <div className="mb-1.5 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">
+                      <span>Progress</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <GlassSlider min={0} max={100} step={1} value={progress} onValueChange={setProgress} ariaLabel="Progress" className="w-full" />
+                  </div>
+                )}
+
+                {type === "mcq" && (
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Total questions</label>
+                      <input type="number" min={1} value={totalQuestions} onChange={(e) => setTotalQuestions(Number(e.target.value))} className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none md:py-3.5" />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Completed</label>
+                      <input type="number" min={0} value={completedQuestions} onChange={(e) => setCompletedQuestions(Number(e.target.value))} className="dc-field w-full rounded-full border px-4 py-3 text-sm text-fp-text outline-none md:py-3.5" />
+                    </div>
+                  </div>
+                )}
+
+                {(type === "note" || type === "other" || type === "reminder") && (
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">
+                      {type === "note" ? "Preview / content" : "Notes (optional)"}
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      className="dc-field w-full resize-none rounded-2xl border px-4 py-3 text-sm text-fp-text outline-none md:min-h-[100px] md:text-[15px]"
+                      placeholder="Add a little detail... This will be scheduled directly on your selected stair"
+                    />
+                  </div>
+                )}
+
+                {type === "task" && (
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-fp-muted md:text-xs">Description (optional)</label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={2}
+                      className="dc-field w-full resize-none rounded-2xl border px-4 py-3 text-sm text-fp-text outline-none md:text-[15px]"
+                      placeholder="Add details for this task..."
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            {type === "task" && (
-              <div>
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                  Priority
-                </label>
-                <GlassToggleGroup className="dc-segment w-full" value={priority} onValueChange={(next) => setPriority(next as Priority)} aria-label="Priority">
-                  {(["low", "medium", "high"] as Priority[]).map((p) => (
-                    <GlassToggleItem key={p} value={p} className="flex-1 px-3 py-2 text-xs font-medium capitalize">
-                      {p}
-                    </GlassToggleItem>
-                  ))}
-                </GlassToggleGroup>
+            {/* Footer — responsive, sticky */}
+            <div className="border-t border-white/10 p-4 sm:p-5 md:p-6">
+              <div className="flex gap-2.5 md:gap-3">
+                <GlassButton variant="capsule" onClick={onClose} className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4 md:[&>span>div]:h-12">
+                  Cancel
+                </GlassButton>
+                <button
+                  type="submit"
+                  className="flex flex-1 min-h-[44px] items-center justify-center rounded-full text-sm font-semibold text-white transition hover:brightness-110 md:min-h-[48px] md:text-[15px]"
+                  style={{ background: meta.color }}
+                >
+                  {isEditing ? "Save changes" : "Create & schedule on stair"}
+                </button>
               </div>
-            )}
-
-            {type === "schedule" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                    Start
-                  </label>
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                    End
-                  </label>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
-                  />
-                </div>
-              </div>
-            )}
-
-            {type === "revision" && (
-              <div>
-                {/* Wave 6 (a11y): a <label> pointing at a `role="slider"` div
-                    labels nothing, so the caption is plain text; the slider
-                    carries its own accessible name. */}
-                <div className="mb-1 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                  <span>Progress</span>
-                  <span>{progress}%</span>
-                </div>
-                {/* Wave 4: native range -> registry glass-slider (same 0-100
-                    scale, same step-free drag semantics, plus keyboard). */}
-                <GlassSlider
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={progress}
-                  onValueChange={setProgress}
-                  ariaLabel="Progress"
-                  className="w-full"
-                />
-              </div>
-            )}
-
-            {type === "mcq" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                    Total questions
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={totalQuestions}
-                    onChange={(e) => setTotalQuestions(Number(e.target.value))}
-                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                    Completed
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={completedQuestions}
-                    onChange={(e) => setCompletedQuestions(Number(e.target.value))}
-                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            {(type === "note" || type === "other" || type === "reminder") && (
-              <div>
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
-                  {type === "note" ? "Preview / content" : "Notes (optional)"}
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  className="dc-field w-full resize-none rounded-xl border px-3.5 py-2.5 text-sm text-fp-text outline-none"
-                  placeholder="Add a little detail..."
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 flex gap-2.5">
-            <GlassButton
-              variant="capsule"
-              onClick={onClose}
-              className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
-            >
-              Cancel
-            </GlassButton>
-            {/* the activity colour carries meaning (type), so it stays — as a
-                solid fill, not a gradient + glow */}
-            <button
-              type="submit"
-              className="flex-1 rounded-full py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-              style={{ background: meta.color }}
-            >
-              {isEditing ? "Save changes" : "Create"}
-            </button>
-          </div>
-        </GlassSurface>
+              <p className="mt-2.5 text-center text-[10px] leading-5 text-white/40 md:text-[11px]">Will be scheduled directly on your selected stair — no need to leave FlowPath. Flexible for mobile, tablet, desktop.</p>
+            </div>
+          </GlassSurface>
         </motion.form>
       </motion.div>
     </AnimatePresence>,
@@ -368,15 +321,15 @@ function placeholderFor(type: ActivityType) {
     case "task":
       return "Study Mathematics";
     case "reminder":
-      return "Call Mom";
+      return "Daily reminder — e.g. Drink water";
     case "schedule":
-      return "Creator Session";
+      return "Creator Session — e.g. Deep work";
     case "note":
-      return "Video Ideas";
+      return "Quick Notes — e.g. Video Ideas";
     case "revision":
       return "Physics — Chapter 4";
     case "mcq":
-      return "Biology Practice";
+      return "Biology Practice — Schedule Test";
     default:
       return "Plan weekend trip";
   }

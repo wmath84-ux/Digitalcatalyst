@@ -13,6 +13,21 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
+
+      # ── Firebase Hosting Oct 15 2026 change ────────────────────────────────
+      # Starting Oct 15 2026, new Firebase projects no longer auto-create a
+      # default Hosting site. Existing project my-website-761e9 already has its
+      # site, so deploy would still succeed today. This explicit step makes the
+      # workflow future-proof (new projects, site deleted, or 404 Site Not Found
+      # in CI) per Firebase email: Option 1 recommended for CI/CD.
+      # https://firebase.google.com/docs/hosting/multisites#set_up_deploy_targets
+      - name: Ensure Hosting site exists (on-demand provisioning fix)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "Checking/creating Hosting site my-website-761e9 for project my-website-761e9..."
+          npx --yes firebase-tools@13 hosting:sites:create my-website-761e9 --project my-website-761e9 || echo "Site already exists or creation not needed, continuing."
+
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"

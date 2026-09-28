@@ -1118,63 +1118,18 @@ export default function SubscriptionPage({
             was removed on request; only the Cancel control remains so the
             member can exit the buy flow back to their membership dashboard. */}
         {isActiveMember && manageMode ? (
-          <div className="mx-5 mt-4 space-y-2">
-            <div className="flex items-center justify-end gap-3">
-              <GlassButton
-                variant="capsule"
-                type="button"
-                onClick={() => {
-                  setManageMode(false);
-                  setAddOnIntent(false);
-                }}
-                className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black [&>span>div]:text-violet-200"
-              >
-                Cancel
-              </GlassButton>
-            </div>
-            {isAddOnUpgrade ? (
-              <div
-                data-subscription-addon-upgrade-note
-                className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-200"
-              >
-                <span aria-hidden="true">⬆️</span>
-                <span>
-                  <strong>Add-on upgrade:</strong> you&apos;ll only be charged for
-                  the <strong>{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length} new item{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length === 1 ? "" : "s"}</strong> you
-                  added. Your current plan, cycle and expiry date stay exactly
-                  as they are — no plan price is charged again.
-                </span>
-              </div>
-            ) : null}
-            {!isAddOnUpgrade && hasOwnedCarryOver ? (
-              <div
-                data-subscription-carryover-note
-                className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-200"
-              >
-                <span aria-hidden="true">✅</span>
-                <span>
-                  <strong>Already purchased — carried over:</strong>{" "}
-                  {carriedOverFeatureRecords.length} feature
-                  {carriedOverFeatureRecords.length === 1 ? "" : "s"}
-                  {carriedOverProductRecords.length > 0
-                    ? ` and ${carriedOverProductRecords.length} course${carriedOverProductRecords.length === 1 ? "" : "s"}`
-                    : ""}{" "}
-                  you already paid for are included with the new plan. They
-                  are <strong>not charged again</strong> — you only pay for
-                  the new plan and any new items.
-                </span>
-              </div>
-            ) : null}
-            {!isAddOnUpgrade && isSelectionOwned ? (
-              <div className="flex items-start gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-violet-200">
-                <span aria-hidden="true">💡</span>
-                <span>
-                  This is your current plan + cycle. Add a new feature or
-                  course below to upgrade it, or pick another plan. Renewal of
-                  this exact package opens in the last 7 days before expiry.
-                </span>
-              </div>
-            ) : null}
+          <div className="mx-5 mt-4 flex justify-end">
+            <GlassButton
+              variant="capsule"
+              type="button"
+              onClick={() => {
+                setManageMode(false);
+                setAddOnIntent(false);
+              }}
+              className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black [&>span>div]:text-violet-200"
+            >
+              Cancel
+            </GlassButton>
           </div>
         ) : null}
         {/* Fallback catalog banner removed — default plans are always shown
@@ -1435,6 +1390,57 @@ export default function SubscriptionPage({
           </aside>
         </div>
         )}
+
+        {/* Bottom instructions — moved from top per user request: carry-over, current plan, add-on notes should be at bottom, not top */}
+        {isActiveMember && manageMode ? (
+          <div className="mx-4 mt-6 flex flex-col gap-2.5 pb-2 sm:mx-5 md:mx-6 lg:mx-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0">
+            <div className="flex flex-col gap-2.5 lg:col-span-12">
+              {isAddOnUpgrade ? (
+                <div
+                  data-subscription-addon-upgrade-note
+                  className="flex items-start gap-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-emerald-200 md:text-xs md:leading-6"
+                >
+                  <span aria-hidden="true" className="mt-0.5">⬆️</span>
+                  <span>
+                    <strong>Add-on upgrade:</strong> you&apos;ll only be charged for
+                    the <strong>{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length} new item{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length === 1 ? "" : "s"}</strong> you
+                    added. Your current plan, cycle and expiry date stay exactly
+                    as they are — no plan price is charged again.
+                  </span>
+                </div>
+              ) : null}
+              {!isAddOnUpgrade && hasOwnedCarryOver ? (
+                <div
+                  data-subscription-carryover-note
+                  className="flex items-start gap-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-emerald-200 md:text-xs md:leading-6"
+                >
+                  <span aria-hidden="true" className="mt-0.5">✅</span>
+                  <span>
+                    <strong>Already purchased — carried over:</strong>{" "}
+                    {carriedOverFeatureRecords.length} feature
+                    {carriedOverFeatureRecords.length === 1 ? "" : "s"}
+                    {carriedOverProductRecords.length > 0
+                      ? ` and ${carriedOverProductRecords.length} course${carriedOverProductRecords.length === 1 ? "" : "s"}`
+                      : ""}{" "}
+                    you already paid for are included with the new plan. They
+                    are <strong>not charged again</strong> — you only pay for
+                    the new plan and any new items.
+                  </span>
+                </div>
+              ) : null}
+              {!isAddOnUpgrade && isSelectionOwned ? (
+                <div className="flex items-start gap-2.5 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-violet-200 md:text-xs md:leading-6">
+                  <span aria-hidden="true" className="mt-0.5">💡</span>
+                  <span>
+                    This is your current plan + cycle. Add a new feature or
+                    course below to upgrade it, or pick another plan. Renewal of
+                    this exact package opens in the last 7 days before expiry.
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {submitError ? (
           <p
             role="alert"

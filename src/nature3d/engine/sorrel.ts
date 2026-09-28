@@ -57,6 +57,24 @@ import { insideWarehouse } from "./warehouseSite";
 import { insideBeachHouse } from "./beachHouseSite";
 import { createSite, siteAt, pathWeight, groundColorAt, type Site } from "./environment";
 import { GROUND_PALETTE } from "./palette";
+import { lecternPlacements } from "./lectern";
+
+// Prevent initial overload near boards: cache board XZ once and reject plants within board radius.
+// Fixes pop-in where many vegetables/trees render near board then disappear — keep only final state.
+const LECTERN_BOARD_XZ_SORREL = (() => {
+  try {
+    return lecternPlacements().map((p) => ({ x: p.position.x, z: p.position.z }));
+  } catch {
+    return [] as Array<{ x: number; z: number }>;
+  }
+})();
+function nearLecternBoardSorrel(x: number, z: number, r = 11): boolean {
+  for (let i = 0; i < LECTERN_BOARD_XZ_SORREL.length; i += 1) {
+    const b = LECTERN_BOARD_XZ_SORREL[i];
+    if (Math.hypot(b.x - x, b.z - z) < r) return true;
+  }
+  return false;
+}
 import { noise } from "./simplex";
 
 export interface SorrelField {
@@ -147,6 +165,9 @@ function acceptsPlant(
   // The trodden disc under the chair + desk, widened for the plant's
   // footprint (the grass uses 1.9 m for a 7 cm blade).
   if (Math.hypot(x, z + 1.35) < 4.5) return false;
+  // FIX: prevent initial overload near study boards — many small plants rendered then culled.
+  // Keep only final state (no pop-in) by excluding board arc from the start.
+  if (nearLecternBoardSorrel(x, z, 11)) return false;
   // The site query is the expensive part — only the survivors reach it.
   if (site.slopeDeg > 30) return false; // rock band: no soil, no plant
   if (site.soil < 0.22) return false;
