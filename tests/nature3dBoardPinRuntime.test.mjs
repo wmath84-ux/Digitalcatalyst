@@ -16,8 +16,9 @@ const FIXTURE = `
 import * as THREE from "three";
 import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
 import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
+import { OrbitRig } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/controls.ts"))};
 
-export { terrainHeight };
+export { terrainHeight, OrbitRig };
 
 export function boot(host: HTMLElement) {
   const screens = createBoardScreens(false);
@@ -87,6 +88,32 @@ for (const key of ["HTMLElement", "Element", "Node", "Event", "MouseEvent", "get
 const fixture = require(bundle);
 const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
+
+test("camera drag stops at the current pose when the final finger lifts", () => {
+  const { THREE, OrbitRig } = fixture;
+  const camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
+  const rig = new OrbitRig();
+  rig.update(1 / 60, camera);
+  rig.rotate(0.9, 0.35);
+  rig.update(1 / 60, camera);
+  const movingYaw = rig.yaw;
+  const movingPitch = rig.pitch;
+  assert.notEqual(movingYaw, -0.35, "camera responds while the drag is active");
+
+  rig.stopInertia();
+  for (let i = 0; i < 180; i++) rig.update(1 / 60, camera);
+  assert.ok(Math.abs(rig.yaw - movingYaw) < 1e-12, "yaw must not coast after release");
+  assert.ok(Math.abs(rig.pitch - movingPitch) < 1e-12, "pitch must not coast after release");
+
+  // Pinch zoom also uses a damped distance target; release must not leave a
+  // stale zoom target slowly pulling the camera for seconds.
+  rig.zoom(0.65);
+  rig.update(1 / 60, camera);
+  const releasedDistance = rig.distance;
+  rig.stopInertia();
+  for (let i = 0; i < 180; i++) rig.update(1 / 60, camera);
+  assert.ok(Math.abs(rig.distance - releasedDistance) < 1e-12);
+});
 
 test("camera navigation never disconnects or reparents a live iframe", () => {
   const board = screens.byId("reading");

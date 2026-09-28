@@ -1006,7 +1006,19 @@ export class Sanctuary {
       return;
     }
     const start = this.pointers.get(e.pointerId);
+    const down = this.downPos;
+    const dragDistance = down?.id === e.pointerId
+      ? Math.hypot(e.clientX - down.x, e.clientY - down.y)
+      : 0;
+    const cameraGesture = this.pinchTainted.has(e.pointerId) || dragDistance >= 8;
     this.pointers.delete(e.pointerId);
+    // A released camera gesture is the end of input, not the start of a long
+    // inertial coast. Keep smoothing while the finger is down; discard only
+    // the unconsumed target when the final orbit/pinch pointer lifts. Plain
+    // taps and board interactions must not cancel a preset camera pan.
+    if (start && cameraGesture && this.pointers.size === 0 && !this.studyFocus) {
+      this.orbit.stopInertia();
+    }
     if (this.pointers.size < 2) {
       this.pinchPrev = 0;
       this.pinchMid.ready = false;

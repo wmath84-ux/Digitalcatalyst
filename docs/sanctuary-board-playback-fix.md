@@ -38,6 +38,10 @@
   30 Hz (matching the low-tier render budget), instead of 15 Hz. The DOM/iframe
   and input continue at browser cadence. Any camera/projection movement draws
   immediately; Desk and navigation are never paced.
+- On final orbit/pinch pointer release, yaw/pitch/zoom damping targets reset to
+  the current camera pose. This prevents residual movement coasting after the
+  learner lifts their finger; smoothing still applies during the drag. Plain
+  taps and board interactions do not cancel a preset pan.
 
 ## Verification
 

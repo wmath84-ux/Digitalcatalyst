@@ -94,6 +94,19 @@ export class OrbitRig {
   private targetLookUp = 0;
 
 
+  /**
+   * End drag-generated camera inertia when the final pointer is released.
+   * The rig still damps while the finger is down, but it must not keep chasing
+   * a stale drag target afterwards (which felt like several seconds of lag on
+   * touch devices). Preset pans and auto-rotation do not call this method.
+   */
+  stopInertia() {
+    this.targetYaw = this.yaw;
+    this.targetPitch = this.pitch;
+    this.targetDistance = this.distance;
+    this.targetLookUp = this.lookUp;
+  }
+
   rotate(dx: number, dy: number) {
     this.targetYaw -= dx;
     const LOW = 0.03;
