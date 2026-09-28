@@ -60,6 +60,7 @@ import {
 import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
 import { OrbitRig } from "./controls";
+import { StudyWorldPacer } from "./studyWorldPacer";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
   createBoardScreens,
@@ -280,6 +281,7 @@ export class Sanctuary {
   private ambientClock = 0;
   /** True while the camera is parked on one study board (see the frame loop). */
   private studyFocus = false;
+  private readonly studyWorldPacer = new StudyWorldPacer();
   /** Board to pin once the orbit pan has settled square-on. */
   private pendingReadSlot: LecternSlot | null = null;
   private pendingPinAge = 0;
@@ -2034,6 +2036,7 @@ export class Sanctuary {
 
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    this.studyWorldPacer.invalidate();
     this.screens.setSize(width, height);
     // The CSS layer caches the last camera pose, so a resize has to force one
     // render — the pose is unchanged but the projection is not.
@@ -2308,14 +2311,19 @@ export class Sanctuary {
     this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
     // Update DOM projection + aperture visibility before WebGL to avoid a
     // one-frame black flash. Idle camera/projection updates are cached.
-    this.screens.render(this.camera);
-    this.renderer.render(this.scene, this.camera);
+    const projectionChanged = this.screens.render(this.camera);
+    // Keep video/input at browser cadence; only the parked ambient world is
+    // budgeted at its existing 15 Hz animation rate. Moving views never wait.
+    if (this.studyWorldPacer.shouldRender(frameStart, study, projectionChanged)) {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     // ── Adaptive resolution + thermal fail-safe + stats ───────────────
     const frameMs = performance.now() - frameStart;
     const newRatio = this.adaptive.sample(wallMs > 0 ? wallMs : frameMs, frameStart);
     if (newRatio !== null) {
       this.renderer.setPixelRatio(newRatio);
+      this.studyWorldPacer.invalidate();
       this.requestShadowRefresh();
     }
     // Resolution alone could not save the frame (three floor-level trims) —

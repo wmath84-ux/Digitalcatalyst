@@ -62,12 +62,12 @@ export interface BoardScreensHandle {
   setScale(scale: number): void;
   /**
    * Distance smoke on the CSS3D board faces.
-   * DOM sits below the WebGL canvas and does not receive scene.fog, so the
-   * engine pushes the same near/far/colour the world uses and each face gets
-   * a translucent overlay that matches THREE.Fog's smoothstep ramp.
+   * The depth aperture also draws the fog tint. This avoids three large
+   * animated DOM overlays above the live pages.
    */
   setFog(near: number, far: number, color: THREE.Color): void;
-  render(camera: THREE.PerspectiveCamera, force?: boolean): void;
+  /** True when the world canvas must catch up with a changed board projection. */
+  render(camera: THREE.PerspectiveCamera, force?: boolean): boolean;
   dispose(): void;
 }
 
@@ -115,7 +115,20 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
       // MeshBasicMaterial in the opaque pass forces alpha to 1. A minimal
       // shader writes zero alpha while staying in that pass, before glass.
       vertexShader: "void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-      fragmentShader: "void main() { gl_FragColor = vec4(0.0); }",
+      // Fold fog into this existing draw instead of compositing/rasterizing
+      // another 1920x1080 DOM overlay per board while zooming. The canvas is
+      // premultiplied-alpha, so both RGB and alpha must fade together.
+      uniforms: {
+        uBoardFogColor: { value: new THREE.Color(180 / 255, 204 / 255, 228 / 255) },
+        uBoardFogOpacity: { value: 0 },
+      },
+      fragmentShader: `
+        uniform vec3 uBoardFogColor;
+        uniform float uBoardFogOpacity;
+        void main() {
+          gl_FragColor = vec4(uBoardFogColor * uBoardFogOpacity, uBoardFogOpacity);
+        }
+      `,
       blending: THREE.NoBlending,
       depthTest: true, depthWrite: true, fog: false, toneMapped: false,
     }));
@@ -170,6 +183,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     host.style.width = `${SCREEN_PX_WIDTH}px`;
     host.style.height = `${SCREEN_PX_HEIGHT}px`;
     host.style.overflow = "hidden";
+    // These fixed-size panels move as compositor textures. Without an
+    // explicit hint Chromium re-rasterizes them repeatedly during zoom.
+    // Layout/paint containment prevents a notes edit invalidating siblings.
+    host.style.contain = "layout paint";
     host.style.background = "#070b12";
     host.style.borderRadius = "6px";
 
@@ -199,22 +216,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     element.style.left = "0px";
     element.style.top = "0px";
     host.appendChild(element);
-
-    // Fog veil — sits above the live DOM face, ignores pointer events so
-    // buttons/scroll still work. Opacity is driven each frame from camera
-    // distance using the same smoothstep(near, far) as THREE.Fog.
-    const fogVeil = document.createElement("div");
-    fogVeil.className = "nature3d-board-fog";
-    fogVeil.style.position = "absolute";
-    fogVeil.style.inset = "0";
-    fogVeil.style.pointerEvents = "none";
-    fogVeil.style.borderRadius = "6px";
-    fogVeil.style.opacity = "0";
-    fogVeil.style.background = "rgb(180, 204, 228)";
-    fogVeil.style.transition = "opacity 80ms linear";
-    fogVeil.style.zIndex = "20";
-    host.appendChild(fogVeil);
-    (host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil = fogVeil;
 
     // The engine's orbit/look handlers live on the shared host element, and
     // the board is a CHILD of it, so without this every click inside a panel
@@ -260,7 +261,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let faceScale = 1;
   let readSlot: LecternSlot | null = null;
   let dirty = true;
-  const lastView = new THREE.Matrix4();
+  const lastPosition = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const lastQuaternion = new THREE.Quaternion();
   const lastProjection = new THREE.Matrix4();
   const vp = new THREE.Matrix4();
   const pixelToLocal = new THREE.Matrix4();
@@ -272,13 +274,34 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const depthOrder = screens.slice();
   const frustum = new THREE.Frustum();
   const sphere = new THREE.Sphere();
+  const direction = new THREE.Vector3();
+  const halfW = SCREEN_PX_WIDTH / 2;
+  const halfH = SCREEN_PX_HEIGHT / 2;
+  const cornerX = [-halfW, -halfW, halfW, halfW];
+  const cornerY = [-halfH, halfH, -halfH, halfH];
+  // Cache DOM/scene references once, not selector/traversal queries per frame.
+  const surfaces = screens.map((screen, i) => {
+    const aperture = shells.children[i].getObjectByName("board-aperture") as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    return { screen, shell: shells.children[i], aperture, fog: aperture.material.uniforms };
+  });
+  const writeStyle = (style: CSSStyleDeclaration, key: "transform" | "visibility" | "zIndex" | "willChange", value: string) => {
+    if (style[key] !== value) style[key] = value;
+  };
+  const depthInEye = (screen: BoardScreen) => {
+    const eye = cameraView.elements;
+    const p = screen.placement.position;
+    return eye[2] * p.x + eye[6] * p.y + eye[10] * p.z;
+  };
+  const cameraView = new THREE.Matrix4();
+  const compareDepth = (a: BoardScreen, b: BoardScreen) => depthInEye(a) - depthInEye(b);
 
   return {
     screens, cssScene, domElement, shells,
     byId(slot) { return screens.find((screen) => screen.slot === slot); },
     setSize(width, height) {
-      viewW = Math.max(1, width);
-      viewH = Math.max(1, height);
+      const w = Math.max(1, width), h = Math.max(1, height);
+      if (viewW === w && viewH === h) return;
+      viewW = w; viewH = h;
       dirty = true;
     },
     setWinter(enabled) {
@@ -287,9 +310,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         else delete screen.element.dataset.iceAge;
       }
     },
-    setReadSlot(slot) { readSlot = slot; dirty = true; },
+    setReadSlot(slot) {
+      if (readSlot === slot) return;
+      readSlot = slot; dirty = true;
+    },
     setScale(scale) {
-      faceScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+      const next = Number.isFinite(scale) && scale > 0 ? scale : 1;
+      if (next === faceScale) return;
+      faceScale = next;
       const placements = lecternPlacementsAt(faceScale);
       screens.forEach((screen, i) => {
         const p = placements[i];
@@ -305,32 +333,40 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       dirty = true;
     },
     setFog(near, far, color) {
-      fogNear = Math.max(0.5, near);
-      fogFar = Math.max(fogNear + 1, far);
-      fogColorCss = `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`;
-      for (const screen of screens) {
-        const veil = screen.host.querySelector<HTMLElement>(".nature3d-board-fog");
-        if (veil) veil.style.background = fogColorCss;
+      const nextNear = Math.max(0.5, near);
+      const nextFar = Math.max(nextNear + 1, far);
+      const css = `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`;
+      if (nextNear === fogNear && nextFar === fogFar && css === fogColorCss) return;
+      fogNear = nextNear; fogFar = nextFar;
+      if (css !== fogColorCss) {
+        fogColorCss = css;
+        for (const surface of surfaces) surface.fog.uBoardFogColor.value.copy(color);
       }
       dirty = true;
     },
     render(camera, force = false) {
       camera.updateMatrixWorld();
-      if (!force && !dirty && lastView.equals(camera.matrixWorldInverse) &&
-          lastProjection.equals(camera.projectionMatrix)) return;
+      // Orbit damping has a long sub-pixel tail. Exact matrix equality kept
+      // all three pages dirty for seconds after the camera appeared settled.
+      // Compare to the LAST PAINTED pose so slow real motion accumulates.
+      if (!force && !dirty && lastPosition.distanceToSquared(camera.position) < 1e-8 &&
+          1 - Math.abs(lastQuaternion.dot(camera.quaternion)) < 1e-10 &&
+          lastProjection.equals(camera.projectionMatrix)) return false;
       dirty = false;
-      lastView.copy(camera.matrixWorldInverse);
+      lastPosition.copy(camera.position);
+      lastQuaternion.copy(camera.quaternion);
       lastProjection.copy(camera.projectionMatrix);
       cssScene.updateMatrixWorld(true);
       vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       frustum.setFromProjectionMatrix(vp);
       // Flat DOM siblings need the same far-to-near ordering as the world
       // when projected boards overlap. Changing z-index never moves a node.
-      const eye = camera.matrixWorldInverse.elements;
-      const eyeZ = (s: BoardScreen) => eye[2] * s.placement.position.x +
-        eye[6] * s.placement.position.y + eye[10] * s.placement.position.z;
-      depthOrder.sort((a, b) => eyeZ(a) - eyeZ(b));
-      depthOrder.forEach((screen, rank) => { screen.host.style.zIndex = String(rank); });
+      cameraView.copy(camera.matrixWorldInverse);
+      depthOrder.sort(compareDepth);
+      for (let rank = 0; rank < depthOrder.length; rank++) {
+        writeStyle(depthOrder[rank].host.style, "zIndex", String(rank));
+      }
+      camera.getWorldDirection(direction);
       // DOM pixels use +Y down; the board's local coordinates use +Y up.
       pixelToLocal.set(1, 0, 0, -SCREEN_PX_WIDTH / 2,
         0, -1, 0, SCREEN_PX_HEIGHT / 2, 0, 0, 1, 0, 0, 0, 0, 1);
@@ -339,7 +375,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       // tiny NDC Z does not affect X/Y on this flat DOM layer.
       viewport.set(viewW / 2, 0, 0, viewW / 2,
         0, -viewH / 2, 0, viewH / 2, 0, 0, 1, 0, 0, 0, 0, 1);
-      screens.forEach((screen, i) => {
+      for (const { screen, shell, aperture, fog } of surfaces) {
         const p = screen.placement;
         sphere.center.copy(p.position);
         sphere.radius = Math.hypot(LECTERN_BOARD_WIDTH, LECTERN_BOARD_HEIGHT) * faceScale / 2;
@@ -348,9 +384,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         toCamera.copy(camera.position).sub(p.position);
         let visible = inView && normal.dot(toCamera) > 0;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const x of [-SCREEN_PX_WIDTH / 2, SCREEN_PX_WIDTH / 2]) {
-          for (const y of [-SCREEN_PX_HEIGHT / 2, SCREEN_PX_HEIGHT / 2]) {
-            corner.set(x, y, 0).applyMatrix4(screen.object.matrixWorld)
+        for (let c = 0; c < 4 && visible; c++) {
+            corner.set(cornerX[c], cornerY[c], 0).applyMatrix4(screen.object.matrixWorld)
               .applyMatrix4(camera.matrixWorldInverse);
             // Avoid exploded CSS projections as the eye crosses a face.
             if (-corner.z < camera.near || -corner.z > camera.far) visible = false;
@@ -359,34 +394,36 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
             const sy = (1 - corner.y) * viewH / 2;
             minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
             minY = Math.min(minY, sy); maxY = Math.max(maxY, sy);
-          }
         }
         const w = maxX - minX, h = maxY - minY;
         // Pin only at the settled, square-on camera. It is a style override
         // on the SAME host, not a DOM move, and the next world matrix always
         // replaces it (no CSS3DRenderer transform cache to fight).
-        const squareOn = Math.abs(normal.dot(camera.getWorldDirection(corner))) > 0.999999;
+        const squareOn = Math.abs(normal.dot(direction)) > 0.999999;
         const pinned = visible && screen.slot === readSlot && squareOn &&
           w > 8 && h > 8 && w <= viewW * 1.6 && h <= viewH * 1.6;
         if (pinned) {
-          screen.host.style.transform = `translate(${minX}px, ${minY}px) scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
+          writeStyle(screen.host.style, "transform", `translate(${minX}px, ${minY}px) scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`);
         } else if (visible) {
           projected.copy(viewport).multiply(vp).multiply(screen.object.matrixWorld).multiply(pixelToLocal);
-          screen.host.style.transform = `matrix3d(${projected.elements.join(",")})`;
+          writeStyle(screen.host.style, "transform", `matrix3d(${projected.elements.join(",")})`);
         }
         // Hide paint/hit-testing, never detach or change iframe src. Playback
         // remains owned by the player, even when looking away or at the desk.
-        screen.host.style.visibility = visible ? "visible" : "hidden";
+        writeStyle(screen.host.style, "visibility", visible ? "visible" : "hidden");
+        // Only the (at most three) visible faces retain compositor backing.
+        writeStyle(screen.host.style, "willChange", visible ? "transform" : "auto");
         screen.object.visible = visible;
-        const shell = shells.children[i];
         shell.visible = inView;
-        shell.getObjectByName("board-aperture")!.visible = visible;
-        const veil = screen.host.querySelector<HTMLElement>(".nature3d-board-fog");
-        let t = Math.max(0, Math.min(1,
-          (camera.position.distanceTo(p.position) - fogNear) / (fogFar - fogNear)));
-        t = Math.min(0.82, t * t * (3 - 2 * t));
-        if (veil) veil.style.opacity = pinned ? "0" : String(t);
-      });
+        aperture.visible = visible;
+        if (visible) {
+          let t = Math.max(0, Math.min(1,
+            (camera.position.distanceTo(p.position) - fogNear) / (fogFar - fogNear)));
+          t = Math.min(0.82, t * t * (3 - 2 * t));
+          fog.uBoardFogOpacity.value = pinned ? 0 : t;
+        }
+      }
+      return true;
     },
     dispose() {
       for (const screen of screens) {

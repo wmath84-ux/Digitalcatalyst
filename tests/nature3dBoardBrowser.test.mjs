@@ -29,9 +29,11 @@ obstacle.position.copy(p.position).addScaledVector(normal,15);
 obstacle.rotation.y = p.yaw;
 scene.add(obstacle);
 obstacle.visible = false;
-function frame(distance=60) {
- camera.position.copy(p.position).addScaledVector(normal,distance);
- camera.lookAt(p.position); camera.updateMatrixWorld(true);
+function frame(distance=60, slot="reading") {
+ const target=boards.byId(slot).placement;
+ const targetNormal=new THREE.Vector3(Math.sin(target.yaw),0,Math.cos(target.yaw));
+ camera.position.copy(target.position).addScaledVector(targetNormal,distance);
+ camera.lookAt(target.position); camera.updateMatrixWorld(true);
 }
 function render() { boards.render(camera,true); renderer.render(scene,camera); }
 function pixel(x,y) {
@@ -51,7 +53,7 @@ window.fixture={boards,camera,reading,iframe,obstacle,frame,render,pixel,loads:(
 const executablePath = process.env.BOARD_TEST_CHROMIUM || chromium.executablePath();
 test('real browser: iframe survives pin/desk/zoom; foreground only covers its own pixels', {
   skip: existsSync(executablePath) ? false : 'Install Playwright Chromium or set BOARD_TEST_CHROMIUM',
-}, async () => {
+}, async (t) => {
   const bundle = await build({ stdin: { contents: fixture, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife' });
   const server = createServer((req, res) => {
     res.setHeader('Content-Type', req.url === '/fixture.js' ? 'text/javascript' : 'text/html');
@@ -104,6 +106,67 @@ test('real browser: iframe survives pin/desk/zoom; foreground only covers its ow
     await page.frameLocator('iframe').locator('#play').click();
     assert.equal(await page.evaluate(() => window.fixture.iframe.contentWindow.clicks), 1, 'native iframe buttons work in framed view');
     assert.equal(await page.evaluate(() => window.fixture.loads()), 1, 'camera transitions never reload iframe');
+    await t.test('fog uses the depth aperture with correct premultiplied alpha', async () => {
+      const result = await page.evaluate(() => {
+        const f = window.fixture;
+        f.boards.setReadSlot(null);
+        f.boards.setFog(1, 100, { r: 0.7, g: 0.8, b: 0.9 });
+        const screen = f.boards.screens[0];
+        f.frame(60, screen.slot); f.render();
+        const aperture = f.boards.shells.children[f.boards.screens.indexOf(screen)].getObjectByName('board-aperture');
+        return { rgba: f.pixel(500,350), opacity: aperture.material.uniforms.uBoardFogOpacity.value,
+          overlays: f.boards.domElement.querySelectorAll('.nature3d-board-fog').length };
+      });
+      assert.equal(result.overlays, 0, 'do not allocate a full-size DOM fog layer per board');
+      assert.ok(result.opacity > 0 && result.opacity <= 0.82);
+      for (let channel = 0; channel < 4; channel++) {
+        const expected = [0.7, 0.8, 0.9, 1][channel] * result.opacity * 255;
+        assert.ok(Math.abs(result.rgba[channel] - expected) <= 1, 'fog must preserve premultiplied canvas alpha');
+      }
+    });
+
+    await t.test('foggy camera zoom reuses compositor textures instead of re-rasterizing panels', async () => {
+      await page.evaluate(async () => {
+        const f = window.fixture;
+        // A populated notes/map surface makes repeated full-page raster work
+        // observable; no live external service or YouTube network dependency.
+        for (const board of f.boards.screens) {
+          if (board === f.reading) continue;
+          board.element.innerHTML = '<div style="color:white;padding:40px;display:grid;grid-template-columns:repeat(4,1fr)">' +
+            Array.from({length:240}, (_,i) => '<p style="border:1px solid gray;background:linear-gradient(40deg,#123,#456)">Study notes '+i+'</p>').join('') + '</div>';
+        }
+        f.boards.setFog(16,420,{r:0.7,g:0.8,b:0.9});
+        for (let i=0;i<30;i++) {
+          await new Promise(requestAnimationFrame);
+          f.frame(65+Math.sin(i/25)*20); f.render();
+        }
+      });
+      const cdp = await page.context().newCDPSession(page);
+      const events = [];
+      cdp.on('Tracing.dataCollected', ({value}) => events.push(...value));
+      await cdp.send('Tracing.start', {categories:'devtools.timeline,disabled-by-default-devtools.timeline,cc', transferMode:'ReportEvents'});
+      try {
+        await page.evaluate(async () => {
+          const f = window.fixture;
+          for (let i=30;i<120;i++) {
+            await new Promise(requestAnimationFrame);
+            f.frame(65+Math.sin(i/25)*20); f.render();
+          }
+        });
+      } finally {
+        const complete = new Promise(resolve => cdp.once('Tracing.tracingComplete', resolve));
+        await cdp.send('Tracing.end');
+        await complete;
+        await cdp.detach();
+      }
+      const rasters = events.filter(event => event.name === 'RasterTask' && event.ph === 'X').length;
+      // Allow initial tile allocation/cache eviction. The regression produced
+      // many raster tasks per frame; timings themselves are intentionally not
+      // asserted because headless/software GPU speed varies across CI hosts.
+      assert.ok(rasters < 90, `90 camera frames caused ${rasters} raster tasks`);
+      assert.equal(await page.evaluate(() => window.fixture.loads()), 1);
+    });
+
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();

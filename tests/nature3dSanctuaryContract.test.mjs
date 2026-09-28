@@ -1271,12 +1271,12 @@ test("board panels keep native vertical scroll on touch", () => {
 
 test("the DOM boards are culled the way BGMI culls the world", () => {
   // Camera + projection caches include zoom/resize, not only translation.
-  assert.match(SCREENS, /lastView.equals\(camera.matrixWorldInverse\)/);
+  assert.match(SCREENS, /lastPosition.distanceToSquared\(camera.position\) < 1e-8/);
   assert.match(SCREENS, /lastProjection.equals\(camera.projectionMatrix\)/);
   assert.match(SCREENS, /frustum\.intersectsSphere\(sphere\)/);
   assert.match(SCREENS, /normal\.dot\(toCamera\) > 0/);
   // Culling is paint-only: media lifetime belongs to the player.
-  assert.match(SCREENS, /style\.visibility = visible \? "visible" : "hidden"/);
+  assert.match(SCREENS, /writeStyle\(screen.host.style, "visibility", visible \? "visible" : "hidden"\)/);
   assert.doesNotMatch(SCREENS, /style\.display = visible/);
 
   // 4. Reading one board drops the ambient world to a quarter rate, the same

@@ -27,22 +27,41 @@
   MeshBasicMaterial would force alpha to one). They do not cast shadows.
 - Aperture visibility updates before WebGL rendering. Resize, zoom/projection,
   board scaling and camera pose invalidate the projection cache.
+- Fog color/opacity now rides in the existing aperture shader instead of three
+  full-resolution animated DOM overlays. The overlay layers were forcing the
+  live pages to rasterize repeatedly during camera zoom.
+- Visible board hosts use layout/paint containment and compositor transform
+  promotion; off-screen hosts release the compositor hint. Camera motion uses a
+  last-painted-pose threshold to avoid style writes from tiny orbit damping
+  tails, while accumulated slow movement remains responsive.
+- While a board is parked in Study view, the ambient world canvas is drawn at
+  15 Hz, matching the world's existing 15 Hz animation budget. The DOM/iframe
+  and input continue at browser cadence. Any camera/projection movement draws
+  immediately; Desk and navigation are never paced.
 
 ## Verification
 
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed.
-- `node --test tests/nature3dBoardPinRuntime.test.mjs`: six tests passed.
+- `node --test tests/nature3dBoardPinRuntime.test.mjs`: eleven tests passed.
 - `tests/nature3dBoardBrowser.test.mjs`: passed in real headless Chromium with
   software WebGL. Checks actual framebuffer alpha under a foreground box,
   uncovered board pixels, iframe window/document identity and load count across
-  pin/unpin/view/zoom cycles, retained iframe state, and native iframe clicks.
+  pin/unpin/view/zoom cycles, retained iframe state, native iframe clicks,
+  shader fog alpha, and compositor raster-task behavior.
 - Browser test requires `npx playwright install chromium`, or an installed binary
   supplied through `BOARD_TEST_CHROMIUM`; it explicitly skips if none is present.
 - Broad Sanctuary source-contract suite has 16 failures, also reproduced against
   the unchanged HEAD sources (old FPP/walking/UI contracts). No new failures.
-- Winter runtime suite: 8 passed, one unrelated existing furniture mesh-count
-  assertion failed (`shaders.length > 10`); its tested modules were unchanged.
+- Follow-up perf profiling used the same 180-frame, 240-card, foggy camera-zoom
+  fixture before and after: Chromium recorded 2,257 raster tasks / 42.5 ms raster
+  work before, versus 0 raster tasks after the fog shader/compositor changes.
+  Added browser regression fails if a 90-frame zoom produces 90 or more raster
+  tasks (timings are deliberately not asserted across variable CI GPUs).
+- Board runtime/browser tests: 14 passed together. Broad Sanctuary source
+  contracts retain the same unrelated legacy failures; the winter runtime suite
+  has one pre-existing furniture mesh-count assertion (`shaders.length > 10`)
+  against unchanged modules.
 
 The browser fixture is local and deterministic, not a live YouTube integration
 check. A signed-in device check with a real course/YouTube video remains useful:

@@ -37,6 +37,7 @@ export function frame(screens: any, camera: any, slot: string, distance = 60) {
 }
 
 export { THREE };
+export { StudyWorldPacer } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/studyWorldPacer.ts"))};
 `;
 
 const CACHE = path.join(ROOT, "node_modules", ".cache", "nature3d-board-pin");
@@ -179,7 +180,80 @@ test("all boards use depth-tested zero-alpha apertures, not whole-board occlusio
     assert.equal(aperture.material.depthWrite, true);
     assert.equal(aperture.material.transparent, false, "must render before transparent foliage/glass");
     assert.equal(aperture.material.blending, fixture.THREE.NoBlending);
-    assert.match(aperture.material.fragmentShader, /gl_FragColor = vec4\(0.0\)/);
+    assert.match(aperture.material.fragmentShader, /vec4\(uBoardFogColor \* uBoardFogOpacity, uBoardFogOpacity\)/);
+  }
+});
+
+test("idle setters and sub-pixel orbit damping do not mutate any board styles", () => {
+  const { THREE } = fixture;
+  fixture.frame(screens, camera, "reading");
+  screens.setReadSlot("reading");
+  screens.setFog(16, 420, new THREE.Color(0.7, 0.8, 0.9));
+  screens.render(camera, true);
+  const observer = new window.MutationObserver(() => {});
+  observer.observe(screens.domElement, { attributes: true, subtree: true });
+  for (let frame = 0; frame < 120; frame++) {
+    screens.setSize(1600, 900);
+    screens.setScale(1);
+    screens.setReadSlot("reading");
+    screens.setFog(16, 420, new THREE.Color(0.7, 0.8, 0.9));
+    camera.position.x += 1e-8;
+    assert.equal(screens.render(camera), false);
+  }
+  assert.equal(observer.takeRecords().length, 0, "settled boards must do zero DOM writes");
+  // Motion is compared against the last rendered pose, not the previous
+  // sample: small movements accumulate, so slow panning never gets stuck.
+  camera.position.x += 0.001;
+  assert.equal(screens.render(camera), true);
+  assert.ok(observer.takeRecords().length > 0);
+  observer.disconnect();
+});
+
+test("visible pages use bounded compositor layers and hidden pages release the hint", () => {
+  const b = screens.byId("reading");
+  fixture.frame(screens, camera, "reading"); screens.render(camera);
+  assert.equal(b.host.style.willChange, "transform");
+  assert.equal(b.host.style.contain, "layout paint");
+  fixture.frame(screens, camera, "reading", -60); screens.render(camera);
+  assert.equal(b.host.style.willChange, "auto");
+  assert.equal(b.element.parentElement, b.host);
+});
+
+test("unchanged forced renders do not restart fog or rewrite transforms", () => {
+  fixture.frame(screens, camera, "reading"); screens.render(camera, true);
+  const observer = new window.MutationObserver(() => {});
+  observer.observe(screens.domElement, { attributes: true, subtree: true });
+  for (let i = 0; i < 30; i++) screens.render(camera, true);
+  assert.equal(observer.takeRecords().length, 0);
+  assert.equal(screens.byId("reading").host.querySelector(".nature3d-board-fog"), null,
+    "fog belongs in the existing aperture shader, not another full-board DOM layer");
+  observer.disconnect();
+});
+
+test("FOV, resize, scale and read slot changes bypass the idle cache", () => {
+  fixture.frame(screens, camera, "reading"); screens.render(camera, true);
+  camera.fov += 1; camera.updateProjectionMatrix();
+  assert.equal(screens.render(camera), true);
+  screens.setSize(1200, 800); assert.equal(screens.render(camera), true);
+  screens.setScale(1.5); assert.equal(screens.render(camera), true);
+  screens.setReadSlot("notes"); assert.equal(screens.render(camera), true);
+  assert.equal(screens.render(camera), false);
+});
+
+test("parked study world draws at 15 Hz, without pacing camera movement or Desk", () => {
+  for (const hz of [30, 60, 120]) {
+    const pacer = new fixture.StudyWorldPacer();
+    let draws = 0;
+    for (let frame = 0; frame < hz; frame++) {
+      if (pacer.shouldRender(frame * 1000 / hz, true, false)) draws++;
+    }
+    assert.equal(draws, 15);
+    for (let frame = hz; frame < hz * 2; frame++) {
+      assert.equal(pacer.shouldRender(frame * 1000 / hz, true, true), true);
+    }
+    assert.equal(pacer.shouldRender(2001, false, false), true, "Desk restores full cadence immediately");
+    pacer.invalidate();
+    assert.equal(pacer.shouldRender(2002, true, false), true, "resize/DRS clears must repaint immediately");
   }
 });
 
