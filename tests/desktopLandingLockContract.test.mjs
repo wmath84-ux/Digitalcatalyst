@@ -25,8 +25,9 @@ test("Open App on desktop enters the app instead of an under-preparation notice"
 
 test("installed mobile PWA skips landing regardless of login", () => {
   assert.match(pwa, /export function isInstalledMobilePwa/);
-  assert.match(main, /skipLandingForInstalledMobilePwa/);
+  assert.match(main, /skipLandingForInstalledApp/);
   assert.match(main, /isInstalledMobilePwa/);
+  assert.match(main, /isNativeApp\(\)/);
   assert.doesNotMatch(main, /redirectingSignedInUser/);
 });
 

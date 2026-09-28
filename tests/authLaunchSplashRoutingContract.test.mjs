@@ -16,7 +16,7 @@ test("an installed mobile PWA skips landing and opens Home", () => {
   // an INSTALLED mobile PWA goes straight to Home (see the comment
   // above skipLandingForInstalledMobilePwa in src/main.tsx). The test
   // was pinning the superseded policy, not catching a regression.
-  assert.match(main, /installedMobilePwa && landingRouteRequested/);
+  assert.match(main, /installedMobilePwa \|\| isNativeApp\(\)/);
   assert.match(main, /history\.replaceState[\s\S]*HOME_HASH/);
   assert.match(main, /setHash\(HOME_HASH\)/);
 });
