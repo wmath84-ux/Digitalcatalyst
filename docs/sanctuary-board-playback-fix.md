@@ -42,15 +42,16 @@
   the current camera pose. This prevents residual movement coasting after the
   learner lifts their finger; smoothing still applies during the drag. Plain
   taps and board interactions do not cancel a preset pan.
-- Low-tier 30 Hz thermal pacing is bypassed while a camera gesture is actively
-  moving, so fast swipes render on each available animation frame. The cap
-  resumes immediately after release; wheel zoom gets a short responsive window.
+- Low-tier 30 Hz thermal pacing is bypassed during direct camera gestures and
+  button-driven camera transitions (fit, zoom, rotate), so movement renders on
+  each available animation frame. The cap resumes when motion settles; wheel
+  zoom gets a short responsive window.
 
 ## Verification
 
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed.
-- `node --test tests/nature3dBoardPinRuntime.test.mjs`: thirteen tests passed.
+- `node --test tests/nature3dBoardPinRuntime.test.mjs`: fourteen tests passed.
 - `tests/nature3dBoardBrowser.test.mjs`: passed in real headless Chromium with
   software WebGL. Checks actual framebuffer alpha under a foreground box,
   uncovered board pixels, iframe window/document identity and load count across

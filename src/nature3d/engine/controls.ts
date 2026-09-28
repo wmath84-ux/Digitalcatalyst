@@ -48,6 +48,7 @@ export class OrbitRig {
   pitch = 0.32;
   distance = 13.5;
   target = new THREE.Vector3(0, 2.1, 0);
+  private positionTargetDirty = false;
 
   private targetYaw = this.yaw;
   private targetPitch = this.pitch;
@@ -64,6 +65,7 @@ export class OrbitRig {
     this.yaw = this.targetYaw;
     this.pitch = this.targetPitch;
     this.distance = this.targetDistance;
+    this.positionTargetDirty = false;
   }
 
   /**
@@ -220,6 +222,7 @@ export class OrbitRig {
     } else {
       this.target.y = ground + 1.8;
     }
+    this.positionTargetDirty = true;
   }
 
   /**
@@ -238,9 +241,19 @@ export class OrbitRig {
     // frame the board and then stare over the top of it.
     this.targetLookUp = 0;
     this.target.copy(target);
+    this.positionTargetDirty = true;
     this.targetDistance = distance;
     if (yaw !== undefined) this.targetYaw = yaw;
     if (pitch !== undefined) this.targetPitch = pitch;
+  }
+
+  /** True throughout any meaningful camera transition, including button presets. */
+  isMoving(): boolean {
+    const dyaw = Math.atan2(Math.sin(this.yaw - this.targetYaw), Math.cos(this.yaw - this.targetYaw));
+    return this.autoRotate || this.positionTargetDirty || Math.abs(dyaw) > 1e-5 ||
+      Math.abs(this.pitch - this.targetPitch) > 1e-5 ||
+      Math.abs(this.distance - this.targetDistance) > 1e-3 ||
+      Math.abs(this.lookUp - this.targetLookUp) > 1e-5;
   }
 
   /** True when the live pose has caught the last panTo / zoom target. */
@@ -294,6 +307,9 @@ export class OrbitRig {
     const skySafe = Math.min(FLY_LIMIT_RADIUS * 2.4, WORLD_HALF * 2.2);
     const camR = camera.position.length();
     if (camR > skySafe) camera.position.multiplyScalar(skySafe / camR);
+    // Direct target translations (pinch-pan / fly) have now been consumed by
+    // this camera pose, so the frame pacer may return to its idle decision.
+    this.positionTargetDirty = false;
 
     this.lookUp += (this.targetLookUp - this.lookUp) * k;
 

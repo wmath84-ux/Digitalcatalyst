@@ -90,6 +90,30 @@ const fixture = require(bundle);
 const page = window.document.getElementById("page");
 const { screens, camera } = fixture.boot(page);
 
+test("button-driven camera presets are recognized as motion and bypass the low-tier cap", () => {
+  const { THREE, OrbitRig, FramePacing } = fixture;
+  const camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
+  const rig = new OrbitRig();
+  rig.update(1 / 60, camera);
+  rig.panTo(new THREE.Vector3(3, 8, -5), 40, 0.7, 0.25);
+  const pacer = new FramePacing();
+  for (let i = 0; i < 30; i++) {
+    assert.equal(rig.isMoving(), true);
+    assert.equal(pacer.shouldSkip(i * 1000 / 60, 30, rig.isMoving()), false,
+      "preset camera motion must not be quantized to the idle frame cap");
+    rig.update(1 / 60, camera);
+  }
+  for (let i = 0; i < 240 && rig.isMoving(); i++) rig.update(1 / 60, camera);
+  assert.equal(rig.isMoving(), false, "motion detection must stop once the preset settles");
+  assert.equal(pacer.shouldSkip(6000, 30, rig.isMoving()), false);
+  assert.equal(pacer.shouldSkip(6016, 30, rig.isMoving()), true, "idle thermal pacing resumes");
+
+  rig.fly(0, 1, 0);
+  assert.equal(rig.isMoving(), true, "directed camera translation gets an immediate frame");
+  rig.update(1 / 60, camera);
+  assert.equal(rig.isMoving(), false, "directed translation clears after that camera pose is applied");
+});
+
 test("low-tier frame cap is bypassed during camera input and resumes on release", () => {
   const { FramePacing } = fixture;
   const pacer = new FramePacing();

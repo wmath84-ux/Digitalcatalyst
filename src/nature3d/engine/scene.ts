@@ -2174,9 +2174,11 @@ export class Sanctuary {
 
     // ── Frame pacing (ACTIVATE_THERMAL_DRS_PACING, pacing half) ───────
     // Keep the thermal cap for ordinary world idling, but never throw away
-    // RAF ticks while a camera gesture is changing the rig. That avoids
-    // 30 Hz judder on fast touch swipes without permanently doubling GPU load.
-    const responsiveCameraInput = this.cameraGestureActive || frameStart < this.cameraInputBoostUntil;
+    // RAF ticks while direct input OR a button-driven pan/zoom/rotation is
+    // moving the camera. This avoids 30 Hz judder during every camera move
+    // without permanently doubling GPU load on a parked world.
+    const responsiveCameraInput = this.cameraGestureActive || this.orbit.isMoving() ||
+      frameStart < this.cameraInputBoostUntil;
     if (this.framePacing.shouldSkip(frameStart, this.budget.fpsCap, responsiveCameraInput)) return;
 
     // The DRS signal is the WALL-CLOCK span since the last rendered frame,
