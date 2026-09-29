@@ -21,6 +21,44 @@ export type CourseFileType =
   | "brain";
 
 /**
+ * "Interactive 2D experiment" — a learner-authored file type.
+ *
+ * ADDITIVE on purpose. The 13 members above are the OFFICIAL catalogue's
+ * vocabulary, and three registries mirror it byte-for-byte
+ * (`utils/aiFileReaders.js`, `src/lumen/course/types.ts`, the personal-course
+ * registry pinned by tests). An experiment is authored by the learner in My
+ * Study Library (or in a course they built there), so it is declared as its own
+ * union and combined below — no official/admin surface has to grow a type it
+ * does not offer, and every existing `CourseFileType` consumer keeps its
+ * exhaustive list.
+ *
+ * The content is ONE self-contained HTML document — see
+ * `src/utils/experimentSpec.ts` for the format, the sandbox and the
+ * player ⇄ experiment message bridge.
+ */
+export const EXPERIMENT_FILE_TYPE = "interactive" as const;
+export type CourseInteractiveFileType = typeof EXPERIMENT_FILE_TYPE;
+/** Anything a `CourseFile.type` may hold: official types + the experiment. */
+export type CourseContentFileType = CourseFileType | CourseInteractiveFileType;
+
+/** True for the learner-authored interactive experiment. */
+export const isExperimentFileType = (type?: string | null): type is CourseInteractiveFileType =>
+  String(type || "") === EXPERIMENT_FILE_TYPE;
+
+/**
+ * The URL-less file types, and how each of them proves it has content:
+ *
+ *   · `brain`       — the admin's practice questions (`practiceQuestions`).
+ *   · `interactive` — the learner's own HTML (`interactiveHtml`, stored inside
+ *                     the course document) or a hosted https page.
+ *
+ * Every "is this file visible / playable?" test in the player asks about these
+ * two instead of `Boolean(file.url)` — that single test used to hide both of
+ * them from the lesson list (`CourseOverlay.isVisibleFile` for the Modules tab,
+ * `CoursePlayerApp.playableFiles` for first-lesson/resume/progress).
+ */
+
+/**
  * One practice question imported by the admin into a `brain` resource.
  * The single source of truth for the shape is `utils/practiceSet.js`; this is
  * its TypeScript projection (the player reads resources straight off the
@@ -91,7 +129,7 @@ export interface CourseAccessMeta {
 export interface CourseFile extends CourseAccessMeta {
   id: string;
   name: string;
-  type: CourseFileType;
+  type: CourseContentFileType;
   url?: string;
   embedUrl?: string;
   youtubeUrl?: string;
@@ -133,6 +171,13 @@ export interface CourseFile extends CourseAccessMeta {
    */
   practiceQuestions?: CoursePracticeQuestion[];
   practiceTitle?: string;
+  /**
+   * Interactive 2D experiment source (type: "interactive" only). ONE
+   * self-contained HTML document, stored inline in the course document so the
+   * player renders it in a sandboxed iframe with no hosting and no network.
+   * A `url` MAY accompany it (a hosted page) — inline wins when both exist.
+   */
+  interactiveHtml?: string;
 }
 
 export interface CourseModule extends CourseAccessMeta {

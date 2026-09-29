@@ -3,6 +3,7 @@ import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } fro
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
+import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
@@ -378,6 +379,24 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const { logoUrl, appName } = useBranding();
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
+  /**
+   * …and the ONE lesson type that is playable with no URL at all: an
+   * interactive 2D experiment, whose source (`interactiveHtml`) travels inside
+   * the course document — the same idea as a Brain set carrying its questions.
+   *
+   * A Brain set is deliberately NOT added here: it is opened through
+   * `brainSets` / the Brain tab and never through the viewer stack, which is
+   * what `files` staying URL-only guarantees. An experiment IS a viewer
+   * lesson, so it joins `playableFiles` — the list every "what can this
+   * learner open?" decision reads: first-lesson / deep-link selection, resume,
+   * and the progress denominator (an experiment the learner can complete must
+   * count towards the bar, or completion would push the percentage past 100%).
+   */
+  const experimentFiles = useMemo(
+    () => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && isExperimentFileType(file.type) && Boolean(String(file.interactiveHtml || "").trim())),
+    [modules],
+  );
+  const playableFiles = useMemo(() => (experimentFiles.length ? [...files, ...experimentFiles] : files), [files, experimentFiles]);
   /**
    * Is this a course the LEARNER built in My Study Library?
    * Everything below that differs between "a course they bought" and "a
@@ -1076,9 +1095,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }, [storageProductId, user]);
 
   useEffect(() => {
-    if (selectedFile || files.length === 0) return;
-    // A deep-linked module (hero slide tap) wins over "first lesson".
-    const deep = deepLinkFileId ? files.find((file) => file.id === deepLinkFileId) : null;
+    if (selectedFile || playableFiles.length === 0) return;
+    // A deep-linked module (hero slide tap) wins over "first lesson". The
+    // official `files` lookup is tried first (it is the pinned, URL-backed
+    // list), then the learner's own experiment, which has no URL at all.
+    const deep = deepLinkFileId ? files.find((file) => file.id === deepLinkFileId) ?? playableFiles.find((file) => file.id === deepLinkFileId) : null;
     // A deep link that lands on a Brain resource (a module whose content IS the
     // practice set) opens it on the Brain tab — the viewer stack never receives
     // a file type it cannot render. `files` above is URL-only, so the set is
@@ -1094,7 +1115,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       return;
     }
     if (first) setSelectedFile(first);
-  }, [files, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules, brainSets, openBrainSet]);
+  }, [files, playableFiles, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules, brainSets, openBrainSet]);
 
   // Resume the last opened file when the Firestore listener delivers the id.
   // A deep-link open is the learner's explicit "take me to THIS module" intent,
@@ -1109,7 +1130,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // no longer reach.
   useEffect(() => {
     if (!lastOpenedFileId || deepLinkFileId || userSelectedRef.current) return;
-    const match = files.find((file) => file.id === lastOpenedFileId);
+    // Official lessons first (the pinned `files` lookup), then the learner's own
+    // experiment — `playableFiles` is the union of both.
+    const match = files.find((file) => file.id === lastOpenedFileId) ?? playableFiles.find((file) => file.id === lastOpenedFileId);
     if (!match) return;
     // Resume straight into a practice set the same way tapping it does.
     if (match.type === "brain") {
@@ -1125,7 +1148,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       && Boolean(match.paidUpdateId)
       && !resolution.ownedUpdateIds.has(String(accessId(match)));
     if (moduleAccessible && !filePaidLocked) setSelectedFile(match);
-  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules, brainSets, openBrainSet]);
+  }, [files, playableFiles, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules, brainSets, openBrainSet]);
 
   /**
    * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
@@ -1156,6 +1179,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       updatedAt: serverTimestamp(),
     }, { merge: true });
   };
+
+  /**
+   * An interactive experiment that finished ITSELF
+   * (`window.dcExperiment.complete()` — see src/course/ExperimentStage.tsx)
+   * marks the open lesson complete, once, and only ever in the COMPLETE
+   * direction: `toggleComplete` is a toggle, so blindly calling it would
+   * un-complete a lesson the learner is re-running to revise.
+   */
+  const completeFromExperiment = useCallback((fileId: string) => {
+    if (!fileId || !selectedFile || fileId !== selectedFile.id) return;
+    if (completedIds.has(fileId)) return;
+    void toggleComplete();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile, completedIds, toggleComplete]);
 
   // Reveal (or keep alive) the center completion control. Purely presentational
   // — the canonical completion state lives in `completedIds` + Firestore and is
@@ -1352,7 +1389,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // paid modules the learner does not own are not in it), so the denominator
     // and the Brain tab can never disagree about what exists.
     const brainFiles = brainSets.map((set) => ({ id: set.id }) as CourseFile);
-    const eligible = files.filter((file) => {
+    const eligible = playableFiles.filter((file) => {
       const visit = (node: CourseModule): boolean => {
         const fileIds = filesInModule(node).map((f) => f.id);
         if (fileIds.includes(file.id)) return !inaccessibleModuleIds.has(String(node.id));
@@ -1367,7 +1404,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       return false;
     });
     return [...eligible, ...brainFiles];
-  }, [files, modules, resolution.lockedModuleIds, brainSets]);
+  }, [playableFiles, modules, resolution.lockedModuleIds, brainSets]);
 
   // Clamped: a completed id that is no longer eligible (content removed, module
   // locked after a refund) can never render more than a full bar.
@@ -1431,6 +1468,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
                 onPlaybackChange={reportPlayback}
                 onFileActions={handleFileActions}
                 desktopView={desktopView}
+                onComplete={completeFromExperiment}
               />
             </div>
           );

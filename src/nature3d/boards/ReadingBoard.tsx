@@ -20,11 +20,11 @@
 // it is. See `engine/boardScreens.ts` for why that decision was forced.
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, FileText, Film, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play, Sparkles, Brain } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Film, FlaskConical, Folder, Headphones, Image as ImageIcon, Layers, Lock, Play, Sparkles, Brain } from "lucide-react";
 import ResourceViewer from "../../course/ResourceViewer";
 import CourseBrainPanel from "../../course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../../../utils/practiceSet.js";
-import type { CourseFile, CourseFileType, CourseModule } from "../../types/course";
+import type { CourseContentFileType, CourseFile, CourseModule } from "../../types/course";
 import type { Product } from "../../data/products";
 
 interface ReadingBoardProps {
@@ -54,7 +54,10 @@ interface ReadingBoardProps {
   onSelectModule: (id: string | null) => void;
 }
 
-const TYPE_ICON: Partial<Record<CourseFileType, typeof FileText>> = {
+// The record is keyed by EVERY type a file may hold (`CourseContentFileType`),
+// which includes the learner-authored `interactive` experiment — the board
+// opens it in the same ResourceViewer the Course Player uses.
+const TYPE_ICON: Partial<Record<CourseContentFileType, typeof FileText>> = {
   youtube: Film,
   video: Film,
   audio: Headphones,
@@ -68,6 +71,7 @@ const TYPE_ICON: Partial<Record<CourseFileType, typeof FileText>> = {
   brain: Brain,
   embed: Play,
   google_form: FileText,
+  interactive: FlaskConical,
 };
 
 /** Flatten a module tree into the files it directly owns, plus its children. */

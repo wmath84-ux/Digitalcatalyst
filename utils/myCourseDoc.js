@@ -29,6 +29,13 @@ export const MY_COURSE_MAX_RESOURCES = 400;
 export const MY_COURSE_MAX_DEPTH = 4;
 /** A cover may be an in-document data URL; Firestore's document limit is 1 MB. */
 export const MY_COURSE_MAX_COVER_CHARS = 440000;
+/**
+ * Interactive 2D experiments ("interactive" resources) also live inside the
+ * document — one HTML file per experiment, plus a whole-course budget. Keep in
+ * sync with `src/types/myCourse.ts` / `src/utils/experimentSpec.ts`.
+ */
+export const MY_EXPERIMENT_MAX_BYTES = 200 * 1024;
+export const MY_COURSE_MAX_EXPERIMENT_BYTES = 640 * 1024;
 /** Firestore's hard document limit, with room for the module tree. */
 export const MY_COURSE_MAX_URL_LENGTH = 2000;
 /** Subcollection name under `users/{uid}`. */
@@ -89,6 +96,13 @@ export const sanitizeMyCourseResource = (raw) => {
     resource.practiceTitle = clamp(source.practiceTitle, MY_RESOURCE_NAME_MAX);
     resource.practiceQuestions = questions;
   }
+  if (type === "interactive") {
+    // The experiment IS its HTML (see src/utils/experimentSpec.ts). Stored as
+    // an ordinary string field, so the only cap that matters here is the byte
+    // budget — enforced by sanitizeMyCourseDoc below, which rejects the whole
+    // save with a readable code instead of silently truncating someone's work.
+    resource.interactiveHtml = typeof source.interactiveHtml === "string" ? source.interactiveHtml : "";
+  }
   return resource;
 };
 
@@ -128,6 +142,43 @@ export const sanitizeMyCourseModule = (raw, depth = 0, budget = { modules: 0, re
   };
 };
 
+/** UTF-8 bytes of a string — the number Firestore actually counts. */
+const byteLength = (value) => {
+  const text = String(value == null ? "" : value);
+  if (!text) return 0;
+  if (typeof Buffer !== "undefined" && typeof Buffer.byteLength === "function") return Buffer.byteLength(text, "utf8");
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
+  return text.length;
+};
+
+/**
+ * Total inline experiment bytes in a (already sanitised) module tree, plus the
+ * first resource that is over the per-experiment cap — so a save can be
+ * refused with a message that names the file.
+ */
+export const experimentBudget = (modules) => {
+  let total = 0;
+  let over = null;
+  const visit = (list) => {
+    if (!Array.isArray(list)) return;
+    for (const module of list) {
+      if (!module || typeof module !== "object") continue;
+      for (const resource of (Array.isArray(module.resources) ? module.resources : [])) {
+        if (!resource || resource.type !== "interactive") continue;
+        const bytes = byteLength(resource.interactiveHtml);
+        if (bytes <= 0) continue;
+        total += bytes;
+        if (!over && bytes > MY_EXPERIMENT_MAX_BYTES) {
+          over = { id: resource.id, name: resource.name || "Untitled experiment", bytes };
+        }
+      }
+      visit(module.modules);
+    }
+  };
+  visit(modules);
+  return { total, over };
+};
+
 /**
  * Build the exact document that is written to `users/{uid}/myCourses/{id}`.
  *
@@ -162,6 +213,26 @@ export const sanitizeMyCourseDoc = (uid, raw) => {
       ok: false,
       code: "COVER_TOO_LARGE",
       message: "That cover image is too large to store inside the course document. Please use a smaller image.",
+    };
+  }
+
+  // Interactive experiments share the same 1 MB document, so their budget is
+  // checked against the WHOLE tree before anything is written. A readable code
+  // (not a silent truncation) is the only honest answer here: half an
+  // experiment is a broken lesson.
+  const experiments = experimentBudget(modules);
+  if (experiments.over) {
+    return {
+      ok: false,
+      code: "EXPERIMENT_TOO_LARGE",
+      message: `“${experiments.over.name}” is ${(experiments.over.bytes / 1024).toFixed(0)} KB — one experiment may be at most ${(MY_EXPERIMENT_MAX_BYTES / 1024).toFixed(0)} KB. Ask your AI to shorten it, or host the file and use its link.`,
+    };
+  }
+  if (experiments.total > MY_COURSE_MAX_EXPERIMENT_BYTES) {
+    return {
+      ok: false,
+      code: "EXPERIMENTS_TOO_LARGE",
+      message: `This course's experiments add up to ${(experiments.total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_EXPERIMENT_BYTES / 1024).toFixed(0)} KB. Host one of them and use its link, or split the course.`,
     };
   }
 

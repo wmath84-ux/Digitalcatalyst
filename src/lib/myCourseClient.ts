@@ -30,11 +30,12 @@ import {
 import { auth, db, getFirebaseStorage } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from "../../utils/cloudinaryUpload";
-import type { CourseFileType } from "../types/course";
 import {
   MY_COURSE_DESC_MAX,
   MY_COURSE_MAX_COVER_BYTES,
+  MY_COURSE_MAX_EXPERIMENT_BYTES,
   MY_COURSE_TITLE_MAX,
+  MY_EXPERIMENT_MAX_BYTES,
   MY_MODULE_DESC_MAX,
   MY_MODULE_TITLE_MAX,
   MY_RESOURCE_DESC_MAX,
@@ -43,7 +44,9 @@ import {
   type MyCourseModule,
   type MyCourseQuestion,
   type MyCourseResource,
+  type MyCourseResourceType,
 } from "../types/myCourse";
+import { experimentByteLength, experimentBlockingIssues } from "../utils/experimentSpec";
 
 export const MY_COURSES_COLLECTION = "myCourses";
 export const MY_COURSE_SCHEMA_VERSION = 1;
@@ -85,7 +88,7 @@ export const createMyQuestion = (): MyCourseQuestion => ({
   topic: "",
 });
 
-export const createMyResource = (type: CourseFileType = "youtube"): MyCourseResource => {
+export const createMyResource = (type: MyCourseResourceType = "youtube"): MyCourseResource => {
   const timestamp = now();
   return {
     id: newId("res"),
@@ -95,6 +98,7 @@ export const createMyResource = (type: CourseFileType = "youtube"): MyCourseReso
     description: "",
     source: "link",
     ...(type === "brain" ? { practiceTitle: "", practiceQuestions: [createMyQuestion()] } : {}),
+    ...(type === "interactive" ? { interactiveHtml: "" } : {}),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -158,7 +162,7 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
   const source = raw as Record<string, unknown>;
   const id = String(source.id || "");
   if (!id) return null;
-  const type = String(source.type || "embed") as CourseFileType;
+  const type = String(source.type || "embed") as MyCourseResourceType;
   const questions = Array.isArray(source.practiceQuestions)
     ? source.practiceQuestions.map(parseQuestion).filter((item): item is MyCourseQuestion => Boolean(item))
     : undefined;
@@ -173,6 +177,7 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
     source: source.source === "upload" ? "upload" : "link",
     practiceTitle: typeof source.practiceTitle === "string" ? source.practiceTitle : undefined,
     practiceQuestions: type === "brain" ? questions : undefined,
+    interactiveHtml: type === "interactive" && typeof source.interactiveHtml === "string" ? source.interactiveHtml : undefined,
     createdAt: asNumber(source.createdAt, 0),
     updatedAt: asNumber(source.updatedAt, 0),
   };
@@ -244,6 +249,78 @@ const sanitizeModule = (module: MyCourseModule): MyCourseModule => ({
   modules: module.modules.map(sanitizeModule),
   updatedAt: now(),
 });
+
+// ── Interactive experiments — the document budget ──────────────────────────
+//
+// An experiment's source lives INSIDE the course document (that is what makes
+// it offline), so it shares Firestore's 1 MB limit with the cover and the whole
+// module tree. Both writers must refuse the same way: the direct-Firestore path
+// checks here, the server path re-checks in `utils/myCourseDoc.js`, and the
+// editor shows the same message before the learner ever taps Save.
+
+export interface ExperimentBudget {
+  /** Every inline experiment in the course, in UTF-8 bytes. */
+  total: number;
+  /** The first experiment over the per-file cap (if any). */
+  over: { id: string; name: string; bytes: number } | null;
+}
+
+export const myCourseExperimentBudget = (modules: MyCourseModule[]): ExperimentBudget => {
+  let total = 0;
+  let over: ExperimentBudget["over"] = null;
+  const visit = (list: MyCourseModule[]) => {
+    for (const module of list) {
+      for (const resource of module.resources) {
+        if (resource.type !== "interactive") continue;
+        const bytes = experimentByteLength(resource.interactiveHtml || "");
+        if (bytes <= 0) continue;
+        total += bytes;
+        if (!over && bytes > MY_EXPERIMENT_MAX_BYTES) {
+          over = { id: resource.id, name: resource.name.trim() || "Untitled experiment", bytes };
+        }
+      }
+      visit(module.modules);
+    }
+  };
+  visit(modules);
+  return { total, over };
+};
+
+/**
+ * The message the builder shows (and `saveMyCourse` throws) when a course is
+ * over budget. Returns `null` when everything fits.
+ */
+export const myCourseExperimentBudgetError = (course: MyCourse): string | null => {
+  const { total, over } = myCourseExperimentBudget(course.modules);
+  if (over) {
+    return `“${over.name}” is ${(over.bytes / 1024).toFixed(0)} KB — one experiment may be at most ${(MY_EXPERIMENT_MAX_BYTES / 1024).toFixed(0)} KB. Ask your AI to shorten it, or host the file and paste its link.`;
+  }
+  if (total > MY_COURSE_MAX_EXPERIMENT_BYTES) {
+    return `The experiments in this course add up to ${(total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_EXPERIMENT_BYTES / 1024).toFixed(0)} KB. Host one of them and paste its link, or split the course.`;
+  }
+  // A lesson that cannot render is worse than no lesson: every experiment needs
+  // something to show (inline source, or a hosted https link).
+  const broken = findUnrunnableExperiment(course.modules);
+  if (broken) return `“${broken}” has no experiment yet — paste the HTML from your AI, upload the .html file, or pick a starter template.`;
+  return null;
+};
+
+const findUnrunnableExperiment = (modules: MyCourseModule[]): string | null => {
+  for (const module of modules) {
+    for (const resource of module.resources) {
+      if (resource.type !== "interactive") continue;
+      const html = resource.interactiveHtml || "";
+      const hosted = /^https:\/\//i.test(String(resource.url || "").trim());
+      if (!html.trim() && !hosted) return resource.name.trim() || "Untitled experiment";
+      if (html.trim() && experimentBlockingIssues(html).length > 0) {
+        return resource.name.trim() || "Untitled experiment";
+      }
+    }
+    const child = findUnrunnableExperiment(module.modules);
+    if (child) return child;
+  }
+  return null;
+};
 
 // ── Counting helpers (used by the library cards + the editor's guard rails) ─
 
@@ -502,6 +579,10 @@ export function subscribeMyCourses(
 export async function saveMyCourse(uid: string, course: MyCourse): Promise<void> {
   if (!uid) throw new Error("Please sign in to save your course.");
   const clean = sanitizeMyCourse(course);
+  // Refuse over-budget / empty experiments BEFORE the write: the server path
+  // returns the same codes, and a half-written lesson is never acceptable.
+  const budgetError = myCourseExperimentBudgetError(clean);
+  if (budgetError) throw new Error(budgetError);
   const payload = {
     ...clean,
     uid,

@@ -18,7 +18,7 @@
 //
 // Every field is Firestore-safe: plain JSON, no `undefined`, no functions.
 
-import type { CourseFileType } from "./course";
+import type { CourseContentFileType } from "./course";
 
 /** One MCQ of a Brain practice set — byte-identical to the admin's shape. */
 export interface MyCourseQuestion {
@@ -35,9 +35,11 @@ export interface MyCourseQuestion {
 /**
  * The resource types a learner may author. Same vocabulary as the official
  * Course Player (`CourseFileType`) so the viewer stack, the Brain tab and the
- * AI panel all behave exactly as they do for a purchased course.
+ * AI panel all behave exactly as they do for a purchased course — plus
+ * `interactive`, the learner-authored 2D experiment (see
+ * `src/utils/experimentSpec.ts`).
  */
-export type MyCourseResourceType = Exclude<CourseFileType, never>;
+export type MyCourseResourceType = CourseContentFileType;
 
 export interface MyCourseResource {
   id: string;
@@ -56,6 +58,13 @@ export interface MyCourseResource {
   practiceTitle?: string;
   /** Brain practice-set questions (type "brain" only). */
   practiceQuestions?: MyCourseQuestion[];
+  /**
+   * Interactive 2D experiment source (type "interactive" only): ONE
+   * self-contained HTML document authored by the learner — usually generated
+   * by an AI from the builder's prompt, then pasted or uploaded. Stored inside
+   * the course document, so it plays offline in a sandboxed iframe.
+   */
+  interactiveHtml?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -97,6 +106,13 @@ export const MY_RESOURCE_NAME_MAX = 120;
 export const MY_RESOURCE_DESC_MAX = 400;
 /** Firestore's 1 MB document limit minus room for the tree itself. */
 export const MY_COURSE_MAX_COVER_BYTES = 320 * 1024;
+/**
+ * Interactive experiments live INSIDE the course document (that is what makes
+ * them offline and instant), so they share Firestore's 1 MB document budget.
+ * Keep in sync with `utils/myCourseDoc.js` — a contract test pins the pair.
+ */
+export const MY_EXPERIMENT_MAX_BYTES = 200 * 1024;
+export const MY_COURSE_MAX_EXPERIMENT_BYTES = 640 * 1024;
 /** Guard rails so one course can never approach the 1 MB document limit. */
 export const MY_COURSE_MAX_MODULES = 200;
 export const MY_COURSE_MAX_RESOURCES = 400;

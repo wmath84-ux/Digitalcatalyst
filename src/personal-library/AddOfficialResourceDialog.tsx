@@ -10,7 +10,7 @@ import {
 import { toast } from "../components/ui/glass-toast";
 import type { MyCourse, MyCourseModule } from "../types/myCourse";
 import { MY_COURSE_TITLE_MAX, MY_MODULE_TITLE_MAX } from "../types/myCourse";
-import type { CourseFileType } from "../types/course";
+import type { CourseContentFileType } from "../types/course";
 import { trackFeatureEvent } from "../utils/featureAnalytics";
 
 /**
@@ -19,7 +19,12 @@ import { trackFeatureEvent } from "../utils/featureAnalytics";
  */
 export interface OfficialResourceDraft {
   name: string;
-  type: CourseFileType;
+  /**
+   * The destination is always a My Study Library resource, whose vocabulary
+   * now includes the learner-authored `interactive` experiment — so this is
+   * the full content-type union, not the official catalogue's 13 values.
+   */
+  type: CourseContentFileType;
   url: string;
   description: string;
   /** Brain practice payload (type "brain" only) — copied verbatim. */

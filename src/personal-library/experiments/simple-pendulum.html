@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple Pendulum — starter experiment</title>
+<style>
+  :root { --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.14); --ink:#f5f7ff; --muted:rgba(245,247,255,.62); --accent:#34d399; --accent2:#a78bfa; }
+  html[data-dc-theme="light"] { --panel:rgba(12,16,36,.05); --line:rgba(12,16,36,.14); --ink:#0b1020; --muted:rgba(11,16,32,.6); --accent:#047857; --accent2:#6d28d9; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: transparent; color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; padding: 10px 14px 6px; }
+  h1 { margin: 0; font-size: 16px; font-weight: 800; }
+  .formula { color: var(--muted); font-size: 12px; }
+  .readouts { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+  .chip b { color: var(--accent); }
+  .stage { position: relative; flex: 1; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .hint { position: absolute; left: 12px; bottom: 10px; color: var(--muted); font-size: 11px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; padding: 10px 14px 14px; background: var(--panel); border-top: 1px solid var(--line); }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; }
+  label span.value { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; height: 40px; accent-color: var(--accent); }
+  .buttons { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  button { min-height: 44px; min-width: 96px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 800 13px/1 system-ui, sans-serif; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: transparent; color: #04220f; }
+  button:active { transform: translateY(1px); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Simple Pendulum</h1>
+    <p class="formula">T = 2π·√(L / g) — independent of the mass</p>
+    <div class="readouts">
+      <span class="chip">length <b id="r-len">1.00 m</b></span>
+      <span class="chip">period <b id="r-period">2.01 s</b></span>
+      <span class="chip">angle <b id="r-angle">30°</b></span>
+      <span class="chip">speed <b id="r-speed">0.00 m/s</b></span>
+    </div>
+  </header>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <p class="hint">Drag the bob to set the starting angle · tap the canvas to pause</p>
+  </div>
+
+  <div class="controls">
+    <label>Length L <span class="value" id="v-len">1.00 m</span>
+      <input id="length" type="range" min="0.3" max="2" step="0.05" value="1">
+    </label>
+    <label>Gravity g <span class="value" id="v-g">9.8 m/s²</span>
+      <input id="gravity" type="range" min="1.6" max="24" step="0.1" value="9.8">
+    </label>
+    <label>Damping <span class="value" id="v-damp">0.02</span>
+      <input id="damping" type="range" min="0" max="0.2" step="0.005" value="0.02">
+    </label>
+    <div class="buttons">
+      <button class="primary" id="swing">Release</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  var lengthInput = document.getElementById("length");
+  var gravityInput = document.getElementById("gravity");
+  var dampingInput = document.getElementById("damping");
+
+  var running = true;
+  var swung = false;        // was the bob ever released?
+  var completed = false;
+  var periods = 0;          // full swings observed
+  var lastTheta = null;
+
+  var theta = 30 * Math.PI / 180;   // angle from the vertical
+  var omega = 0;                    // angular velocity
+  var dragging = false;
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function report() {
+    var done = Math.min(1, (swung ? 0.4 : 0) + periods * 0.15);
+    if (window.dcExperiment) window.dcExperiment.progress(done);
+  }
+  function milestone() {
+    if (completed) return;
+    completed = true;
+    if (window.dcExperiment) window.dcExperiment.complete();
+  }
+
+  var dpr = 1, W = 0, H = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(280, rect.width);
+    H = Math.max(220, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+
+  function pxPerMetre() {
+    // Keep the 2 m string visibly long without ever leaving the stage.
+    return Math.min((H - 90) / 2.2, (W - 60) / 2.2);
+  }
+  function pivot() { return { x: W / 2, y: 46 }; }
+  function bob() {
+    var L = Number(lengthInput.value);
+    var p = pivot();
+    var s = pxPerMetre() * L;
+    return { x: p.x + Math.sin(theta) * s, y: p.y + Math.cos(theta) * s, s: s };
+  }
+
+  function period() {
+    var L = Number(lengthInput.value);
+    var g = Number(gravityInput.value);
+    return 2 * Math.PI * Math.sqrt(L / g);
+  }
+
+  function physics(dt) {
+    var g = Number(gravityInput.value);
+    var L = Number(lengthInput.value);
+    var b = Number(dampingInput.value);
+    // θ'' = -(g/L)·sinθ − b·θ'
+    var alpha = -(g / L) * Math.sin(theta) - b * omega;
+    omega += alpha * dt;
+    theta += omega * dt;
+    // Count a full period each time the bob passes the lowest point a second time.
+    if (lastTheta !== null && Math.sign(theta) !== Math.sign(lastTheta) && Math.abs(omega) > 0.05) {
+      periods += 1;
+      report();
+      if (periods >= 2) milestone();
+    }
+    lastTheta = theta;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    var p = pivot();
+    var b = bob();
+    var g = Number(gravityInput.value);
+
+    // ceiling
+    ctx.fillStyle = "rgba(128,140,180,.35)";
+    ctx.fillRect(W * 0.2, p.y - 12, W * 0.6, 8);
+
+    // string
+    ctx.strokeStyle = "rgba(160,170,210,.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+    // equilibrium line
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "rgba(128,140,180,.4)";
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y + b.s); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // arc showing the swing
+    var scale = pxPerMetre() * Number(lengthInput.value);
+    ctx.strokeStyle = "rgba(52,211,153,.35)";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, scale, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5);
+    ctx.stroke();
+
+    // bob
+    var mass = 13 + Number(lengthInput.value) * 3;
+    var gradient = ctx.createRadialGradient(b.x - mass / 3, b.y - mass / 3, 2, b.x, b.y, mass);
+    gradient.addColorStop(0, "#a7f3d0");
+    gradient.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#34d399");
+    ctx.beginPath();
+    ctx.fillStyle = gradient;
+    ctx.arc(b.x, b.y, mass, 0, Math.PI * 2);
+    ctx.fill();
+
+    // gravity vector
+    ctx.strokeStyle = "#fbbf24";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x, b.y + Math.min(66, g * 3));
+    ctx.stroke();
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "700 11px system-ui, sans-serif";
+    ctx.fillText("g", b.x + 6, b.y + Math.min(66, g * 3));
+
+    // angle readout on the canvas
+    ctx.fillStyle = "rgba(160,170,210,.9)";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillText("θ = " + (theta * 180 / Math.PI).toFixed(1) + "°", p.x + 12, p.y + 20);
+
+    document.getElementById("r-len").textContent = Number(lengthInput.value).toFixed(2) + " m";
+    document.getElementById("r-period").textContent = period().toFixed(2) + " s";
+    document.getElementById("r-angle").textContent = (theta * 180 / Math.PI).toFixed(0) + "°";
+    document.getElementById("r-speed").textContent = Math.abs(omega * Number(lengthInput.value)).toFixed(2) + " m/s";
+  }
+
+  var last = performance.now();
+  function tick(now) {
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (running && !dragging && swung) physics(dt);
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  function syncLabels() {
+    document.getElementById("v-len").textContent = Number(lengthInput.value).toFixed(2) + " m";
+    document.getElementById("v-g").textContent = Number(gravityInput.value).toFixed(1) + " m/s²";
+    document.getElementById("v-damp").textContent = Number(dampingInput.value).toFixed(3);
+  }
+
+  function release() {
+    swung = true;
+    omega = 0;
+    lastTheta = null;
+    report();
+  }
+  function reset() {
+    lengthInput.value = "1";
+    gravityInput.value = "9.8";
+    dampingInput.value = "0.02";
+    theta = 30 * Math.PI / 180;
+    omega = 0;
+    swung = false;
+    periods = 0;
+    lastTheta = null;
+    syncLabels();
+    report();
+  }
+
+  lengthInput.addEventListener("input", function () { syncLabels(); if (swung) release(); });
+  gravityInput.addEventListener("input", function () { syncLabels(); if (swung) release(); });
+  dampingInput.addEventListener("input", syncLabels);
+  document.getElementById("swing").addEventListener("click", release);
+  document.getElementById("reset").addEventListener("click", reset);
+
+  document.addEventListener("dc:pause", function () { running = false; });
+  document.addEventListener("dc:play", function () { running = true; });
+
+  // ── Drag the bob (pointer events cover touch, pen and mouse) ───────────
+  function setFromPointer(event) {
+    var rect = canvas.getBoundingClientRect();
+    var p = pivot();
+    var dx = event.clientX - rect.left - p.x;
+    var dy = event.clientY - rect.top - p.y;
+    var next = Math.atan2(dx, Math.max(dy, 12));
+    theta = clamp(next, -1.45, 1.45);
+    omega = 0;
+  }
+  canvas.addEventListener("pointerdown", function (event) {
+    dragging = true;
+    swung = false;
+    canvas.setPointerCapture(event.pointerId);
+    setFromPointer(event);
+  });
+  canvas.addEventListener("pointermove", function (event) { if (dragging) setFromPointer(event); });
+  canvas.addEventListener("pointerup", function (event) {
+    if (!dragging) return;
+    dragging = false;
+    setFromPointer(event);
+    release();
+  });
+  canvas.addEventListener("pointercancel", function () { dragging = false; });
+
+  syncLabels();
+  resize();
+  report();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

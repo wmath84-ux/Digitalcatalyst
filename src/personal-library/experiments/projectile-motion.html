@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projectile Motion — starter experiment</title>
+<style>
+  :root { --bg:#0b1020; --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.14); --ink:#f5f7ff; --muted:rgba(245,247,255,.62); --accent:#a78bfa; --accent2:#22d3ee; }
+  html[data-dc-theme="light"] { --bg:#f4f6ff; --panel:rgba(12,16,36,.05); --line:rgba(12,16,36,.14); --ink:#0b1020; --muted:rgba(11,16,32,.6); --accent:#6d28d9; --accent2:#0e7490; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; padding: 10px 14px 6px; }
+  h1 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: .2px; }
+  .formula { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .readouts { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+  .chip b { color: var(--accent); }
+  .stage { position: relative; flex: 1; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; padding: 10px 14px 14px; background: var(--panel); border-top: 1px solid var(--line); }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; }
+  label span.value { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; height: 40px; accent-color: var(--accent); }
+  .buttons { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  button { min-height: 44px; min-width: 96px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 800 13px/1 system-ui, sans-serif; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: transparent; color: #0b1020; }
+  button:active { transform: translateY(1px); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Projectile Motion</h1>
+    <p class="formula">R = v²·sin(2θ) / g &nbsp;·&nbsp; H = v²·sin²θ / (2g) &nbsp;·&nbsp; t = 2v·sinθ / g</p>
+    <div class="readouts">
+      <span class="chip">angle <b id="r-angle">45°</b></span>
+      <span class="chip">speed <b id="r-speed">22 m/s</b></span>
+      <span class="chip">range <b id="r-range">0 m</b></span>
+      <span class="chip">height <b id="r-height">0 m</b></span>
+      <span class="chip">time <b id="r-time">0.0 s</b></span>
+    </div>
+  </header>
+
+  <div class="stage"><canvas id="c"></canvas></div>
+
+  <div class="controls">
+    <label>Angle θ <span class="value" id="v-angle">45°</span>
+      <input id="angle" type="range" min="10" max="80" step="1" value="45">
+    </label>
+    <label>Speed v <span class="value" id="v-speed">22 m/s</span>
+      <input id="speed" type="range" min="8" max="40" step="1" value="22">
+    </label>
+    <label>Gravity g <span class="value" id="v-gravity">9.8 m/s²</span>
+      <input id="gravity" type="range" min="1.6" max="24" step="0.1" value="9.8">
+    </label>
+    <div class="buttons">
+      <button class="primary" id="launch">Launch</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  var angle = document.getElementById("angle");
+  var speed = document.getElementById("speed");
+  var gravity = document.getElementById("gravity");
+
+  var running = true;          // host sends dc:pause / dc:play
+  var touched = {};            // which controls the learner has used
+  var completed = false;
+
+  var state = { t: 0, flying: false, trail: [], landed: false };
+
+  function progress() {
+    var count = Object.keys(touched).length;
+    if (window.dcExperiment) window.dcExperiment.progress(Math.min(0.8, 0.2 + count * 0.2));
+  }
+  function milestone() {
+    if (completed) return;
+    completed = true;
+    if (window.dcExperiment) window.dcExperiment.complete();
+  }
+
+  // ── sizing: crisp on every screen (devicePixelRatio aware) ──────────────
+  var dpr = 1, W = 0, H = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(280, rect.width);
+    H = Math.max(200, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener("resize", resize);
+
+  // ── world → screen: 1 unit is 1 metre, scaled to fit the flight ────────
+  var PAD = 26;
+  function world() {
+    var v = Number(speed.value), a = Number(angle.value) * Math.PI / 180, g = Number(gravity.value);
+    var range = (v * v * Math.sin(2 * a)) / g;
+    var height = (v * v * Math.sin(a) * Math.sin(a)) / (2 * g);
+    var flight = (2 * v * Math.sin(a)) / g;
+    return { v: v, a: a, g: g, range: range, height: height, flight: flight };
+  }
+  function projector(flight, height) {
+    var w = world();
+    var spanX = Math.max(w.range, 4) * 1.12;
+    var spanY = Math.max(w.height, 2) * 1.35;
+    var scale = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
+    var originX = PAD;
+    var originY = H - PAD;
+    return {
+      scale: scale,
+      px: function (x) { return originX + x * scale; },
+      py: function (y) { return originY - y * scale; },
+      originX: originX, originY: originY,
+      spanX: spanX, spanY: spanY,
+    };
+  }
+
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#a78bfa"; }
+
+  function draw() {
+    var w = world();
+    var p = projector(w.flight, w.height);
+    ctx.clearRect(0, 0, W, H);
+
+    // ground + grid
+    ctx.strokeStyle = "rgba(128,140,180,.28)";
+    ctx.lineWidth = 1;
+    var step = Math.max(1, Math.round((p.spanX / 8) * 10) / 10);
+    for (var gx = 0; gx <= p.spanX; gx += step) {
+      var x = p.px(gx);
+      if (x > W - PAD * 0.4) break;
+      ctx.beginPath(); ctx.moveTo(x, p.originY); ctx.lineTo(x, p.originY - 6); ctx.stroke();
+      ctx.fillStyle = "rgba(128,140,180,.75)";
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.fillText(gx.toFixed(0) + "m", x + 2, p.originY + 13);
+    }
+    ctx.strokeStyle = "rgba(128,140,180,.55)";
+    ctx.beginPath(); ctx.moveTo(PAD * 0.5, p.originY); ctx.lineTo(W - 6, p.originY); ctx.stroke();
+
+    // launcher
+    var barrel = 34;
+    ctx.save();
+    ctx.translate(p.originX, p.originY);
+    ctx.rotate(-w.a);
+    ctx.fillStyle = css("--accent");
+    ctx.fillRect(0, -5, barrel, 10);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.fillStyle = css("--accent");
+    ctx.arc(p.originX, p.originY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // trail
+    if (state.trail.length > 1) {
+      ctx.beginPath();
+      ctx.strokeStyle = css("--accent2");
+      ctx.lineWidth = 2;
+      for (var i = 0; i < state.trail.length; i++) {
+        var pt = state.trail[i];
+        if (i === 0) ctx.moveTo(p.px(pt.x), p.py(pt.y));
+        else ctx.lineTo(p.px(pt.x), p.py(pt.y));
+      }
+      ctx.stroke();
+    }
+
+    // projectile
+    var x = w.v * Math.cos(w.a) * state.t;
+    var y = w.v * Math.sin(w.a) * state.t - 0.5 * w.g * state.t * state.t;
+    if (state.flying || state.landed) {
+      if (y < 0) y = 0;
+      // velocity vectors (vx constant, vy growing downwards)
+      var vx = w.v * Math.cos(w.a);
+      var vy = w.v * Math.sin(w.a) - w.g * state.t;
+      var s = 3.4;
+      ctx.strokeStyle = "#f472b6"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.px(x), p.py(y)); ctx.lineTo(p.px(x) + vx * s, p.py(y)); ctx.stroke();
+      ctx.strokeStyle = "#fbbf24";
+      ctx.beginPath(); ctx.moveTo(p.px(x), p.py(y)); ctx.lineTo(p.px(x), p.py(y) + vy * s); ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = "#f8fafc";
+      ctx.arc(p.px(x), p.py(y), 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.stroke();
+
+      // height marker
+      ctx.strokeStyle = "rgba(255,255,255,.25)";
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(p.px(x), p.py(y)); ctx.lineTo(p.px(x), p.originY); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // readouts are updated by the tick, not by draw
+  }
+
+  function tick() {
+    if (running) {
+      var w = world();
+      if (state.flying) {
+        state.t += 1 / 60;
+        var x = w.v * Math.cos(w.a) * state.t;
+        var y = w.v * Math.sin(w.a) * state.t - 0.5 * w.g * state.t * state.t;
+        if (y <= 0 && state.t > 0.05) {
+          state.flying = false;
+          state.landed = true;
+          state.t = w.flight;
+          milestone();
+        } else {
+          state.trail.push({ x: x, y: y });
+          if (state.trail.length > 900) state.trail.shift();
+        }
+        updateReadouts(w);
+      }
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  function updateReadouts(w) {
+    var t = state.t;
+    var r = Math.min(w.v * Math.cos(w.a) * t, w.range);
+    var h = Math.max(0, w.v * Math.sin(w.a) * t - 0.5 * w.g * t * t);
+    document.getElementById("r-range").textContent = r.toFixed(1) + " m";
+    document.getElementById("r-height").textContent = h.toFixed(1) + " m";
+    document.getElementById("r-time").textContent = t.toFixed(1) + " s";
+    document.getElementById("r-angle").textContent = Number(angle.value) + "°";
+    document.getElementById("r-speed").textContent = Number(speed.value) + " m/s";
+  }
+
+  function syncLabels() {
+    document.getElementById("v-angle").textContent = angle.value + "°";
+    document.getElementById("v-speed").textContent = speed.value + " m/s";
+    document.getElementById("v-gravity").textContent = Number(gravity.value).toFixed(1) + " m/s²";
+    draw();
+  }
+
+  function launch() {
+    state.t = 0;
+    state.trail = [];
+    state.flying = true;
+    state.landed = false;
+    updateReadouts(world());
+  }
+  function reset() {
+    state = { t: 0, flying: false, trail: [], landed: false };
+    angle.value = 45; speed.value = 22; gravity.value = 9.8;
+    syncLabels(); updateReadouts(world());
+  }
+
+  angle.addEventListener("input", function () { touched.angle = 1; syncLabels(); progress(); });
+  speed.addEventListener("input", function () { touched.speed = 1; syncLabels(); progress(); });
+  gravity.addEventListener("input", function () { touched.gravity = 1; syncLabels(); progress(); });
+  document.getElementById("launch").addEventListener("click", launch);
+  document.getElementById("reset").addEventListener("click", function () { reset(); progress(); });
+
+  document.addEventListener("dc:pause", function () { running = false; });
+  document.addEventListener("dc:play", function () { running = true; });
+
+  // Drag anywhere on the canvas to aim: horizontal distance sets the speed,
+  // vertical position sets the angle — mouse and touch both, via pointer events.
+  canvas.addEventListener("pointerdown", function (event) {
+    var a = Number(angle.value);
+    var v = Number(speed.value);
+    function move(e) {
+      var rect = canvas.getBoundingClientRect();
+      var dx = e.clientX - rect.left;
+      var dy = rect.bottom - e.clientY;
+      var deg = Math.max(10, Math.min(80, Math.atan2(Math.max(dy, 1), Math.max(dx, 1)) * 180 / Math.PI));
+      angle.value = String(Math.round(deg));
+      var speedGuess = Math.max(8, Math.min(40, Math.round(Math.hypot(dx, dy) / 6)));
+      speed.value = String(speedGuess);
+      touched.drag = 1;
+      syncLabels(); progress();
+    }
+    move(event);
+    canvas.setPointerCapture(event.pointerId);
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", function up() {
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+    });
+  });
+
+  syncLabels();
+  updateReadouts(world());
+  progress();
+  resize();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

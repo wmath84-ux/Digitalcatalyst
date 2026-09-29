@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wave Superposition — starter experiment</title>
+<style>
+  :root { --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.14); --ink:#f5f7ff; --muted:rgba(245,247,255,.62); --a:#22d3ee; --b:#f472b6; --sum:#facc15; }
+  html[data-dc-theme="light"] { --panel:rgba(12,16,36,.05); --line:rgba(12,16,36,.14); --ink:#0b1020; --muted:rgba(11,16,32,.6); --a:#0e7490; --b:#be185d; --sum:#a16207; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: transparent; color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; padding: 10px 14px 6px; }
+  h1 { margin: 0; font-size: 16px; font-weight: 800; }
+  .formula { color: var(--muted); font-size: 12px; }
+  .legend { display: flex; gap: 10px; margin-left: auto; font-size: 11px; font-weight: 700; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .stage { position: relative; flex: 1; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; padding: 10px 14px 14px; background: var(--panel); border-top: 1px solid var(--line); }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; }
+  label span.value { color: var(--muted); font-variant-numeric: tabular-nums; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; height: 40px; accent-color: var(--a); }
+  .buttons { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  button { min-height: 44px; min-width: 96px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 800 13px/1 system-ui, sans-serif; cursor: pointer; }
+  button.primary { background: var(--a); border-color: transparent; color: #04212b; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Superposition of Two Waves</h1>
+    <p class="formula">y = A₁·sin(k₁x − ω₁t) + A₂·sin(k₂x − ω₂t)</p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--a)"></i>wave 1</span>
+      <span><i class="dot" style="background:var(--b)"></i>wave 2</span>
+      <span><i class="dot" style="background:var(--sum)"></i>sum</span>
+    </div>
+  </header>
+
+  <div class="stage"><canvas id="c"></canvas></div>
+
+  <div class="controls">
+    <label>Wave 1 amplitude <span class="value" id="v-a1">1.0</span>
+      <input id="a1" type="range" min="0" max="1.5" step="0.05" value="1">
+    </label>
+    <label>Wave 1 frequency <span class="value" id="v-f1">1.0 Hz</span>
+      <input id="f1" type="range" min="0.2" max="3" step="0.05" value="1">
+    </label>
+    <label>Wave 2 amplitude <span class="value" id="v-a2">1.0</span>
+      <input id="a2" type="range" min="0" max="1.5" step="0.05" value="1">
+    </label>
+    <label>Wave 2 frequency <span class="value" id="v-f2">1.0 Hz</span>
+      <input id="f2" type="range" min="0.2" max="3" step="0.05" value="1">
+    </label>
+    <label>Phase difference <span class="value" id="v-phase">0°</span>
+      <input id="phase" type="range" min="0" max="360" step="5" value="0">
+    </label>
+    <label>Wave speed <span class="value" id="v-speed">1.0 m/s</span>
+      <input id="speed" type="range" min="0.3" max="3" step="0.1" value="1">
+    </label>
+    <div class="buttons">
+      <button class="primary" id="play">Pause</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  var ids = ["a1", "f1", "a2", "f2", "phase", "speed"];
+  var inputs = {};
+  ids.forEach(function (id) { inputs[id] = document.getElementById(id); });
+
+  var running = true;       // dc:pause / dc:play
+  var animating = true;     // this experiment's own Pause button
+  var t = 0;
+  var touched = {};
+  var completed = false;
+  var closed = false;       // did the learner hit a fully constructive / destructive phase?
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function report() {
+    if (window.dcExperiment) window.dcExperiment.progress(clamp(0.15 + Object.keys(touched).length * 0.15, 0, 0.85));
+  }
+  function milestone() {
+    if (completed) return;
+    completed = true;
+    if (window.dcExperiment) window.dcExperiment.complete();
+  }
+
+  var dpr = 1, W = 0, H = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(280, rect.width);
+    H = Math.max(220, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+
+  function colors() {
+    var s = getComputedStyle(document.documentElement);
+    return {
+      a: s.getPropertyValue("--a").trim() || "#22d3ee",
+      b: s.getPropertyValue("--b").trim() || "#f472b6",
+      sum: s.getPropertyValue("--sum").trim() || "#facc15",
+      grid: "rgba(128,140,180,.28)",
+    };
+  }
+
+  function wave(x, amplitude, frequency, phase, speed) {
+    var k = 2 * Math.PI * frequency / speed;       // k = 2πf / v
+    var omega = 2 * Math.PI * frequency;           // ω = 2πf
+    return amplitude * Math.sin(k * x - omega * t + phase);
+  }
+
+  function drawLane(y0, height, fn, colour, width) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (var x = 0; x <= W; x += 2) {
+      var metres = (x / W) * 6;                    // 6 m of "string" across
+      var y = y0 - fn(metres) * height;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(128,140,180,.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
+  }
+
+  function draw() {
+    var c = colors();
+    var a1 = Number(inputs.a1.value), f1 = Number(inputs.f1.value);
+    var a2 = Number(inputs.a2.value), f2 = Number(inputs.f2.value);
+    var phase = Number(inputs.phase.value) * Math.PI / 180;
+    var v = Number(inputs.speed.value);
+
+    ctx.clearRect(0, 0, W, H);
+    var lane = H / 3.35;
+    var scale = Math.min(lane * 0.42, 74);
+
+    ctx.font = "700 11px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(160,170,210,.9)";
+    ctx.fillText("wave 1", 10, 16);
+    ctx.fillText("wave 2", 10, 16 + lane);
+    ctx.fillText("superposition", 10, 16 + lane * 2);
+
+    drawLane(lane * 0.62, scale, function (x) { return wave(x, a1, f1, 0, v); }, c.a, 2);
+    drawLane(lane * 1.62, scale, function (x) { return wave(x, a2, f2, phase, v); }, c.b, 2);
+    drawLane(lane * 2.62, scale, function (x) {
+      return wave(x, a1, f1, 0, v) + wave(x, a2, f2, phase, v);
+    }, c.sum, 2.6);
+
+    // Resultant amplitude of two equal-frequency waves, A = √(A₁²+A₂²+2A₁A₂cosφ)
+    if (Math.abs(f1 - f2) < 0.001) {
+      var amp = Math.sqrt(a1 * a1 + a2 * a2 + 2 * a1 * a2 * Math.cos(phase));
+      ctx.fillStyle = "rgba(160,170,210,.95)";
+      ctx.fillText("resultant amplitude = " + amp.toFixed(2), 10, H - 10);
+      // Constructive (φ≈0) and destructive (φ≈180°, equal amplitudes) both make
+      // the learner's goal obvious — either one finishes the experiment.
+      if (phase < 0.2 && a1 > 0.4 && a2 > 0.4 && !closed) { closed = true; milestone(); }
+      if (Math.abs(phase - Math.PI) < 0.2 && Math.abs(a1 - a2) < 0.2 && !closed) { closed = true; milestone(); }
+    }
+
+    document.getElementById("v-a1").textContent = a1.toFixed(2);
+    document.getElementById("v-f1").textContent = f1.toFixed(2) + " Hz";
+    document.getElementById("v-a2").textContent = a2.toFixed(2);
+    document.getElementById("v-f2").textContent = f2.toFixed(2) + " Hz";
+    document.getElementById("v-phase").textContent = Number(inputs.phase.value) + "°";
+    document.getElementById("v-speed").textContent = Number(inputs.speed.value).toFixed(1) + " m/s";
+  }
+
+  var last = performance.now();
+  function tick(now) {
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (running && animating) t += dt;
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  ids.forEach(function (id) {
+    inputs[id].addEventListener("input", function () {
+      touched[id] = 1;
+      report();
+      draw();
+    });
+  });
+
+  document.getElementById("play").addEventListener("click", function (event) {
+    animating = !animating;
+    event.currentTarget.textContent = animating ? "Pause" : "Play";
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    inputs.a1.value = "1"; inputs.f1.value = "1";
+    inputs.a2.value = "1"; inputs.f2.value = "1";
+    inputs.phase.value = "0"; inputs.speed.value = "1";
+    t = 0;
+    document.getElementById("play").textContent = "Pause";
+    animating = true;
+    report(); draw();
+  });
+
+  document.addEventListener("dc:pause", function () { running = false; });
+  document.addEventListener("dc:play", function () { running = true; });
+
+  report();
+  resize();
+  draw();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
