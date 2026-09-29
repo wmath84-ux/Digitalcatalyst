@@ -18,21 +18,26 @@
 // fully visible and selectable, on every tablet width and desktop
 // viewport.
 //
+// NOTE: the popover moved from StorePage.tsx to SearchBar.tsx when the
+// controls row was extracted — this contract reads the real home now.
+// Per owner request the popover opens ABOVE the toggle (it used to drop
+// below it and collide with the sticky filter bar underneath).
+//
 // Pure code-shape — no React, no DOM, no browser.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const storePage = fs.readFileSync("src/components/StorePage.tsx", "utf8");
+const searchBar = fs.readFileSync("src/components/SearchBar.tsx", "utf8");
 const css = fs.readFileSync("src/index.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
 test("the view-mode popover opts out of the 36px anchor's width cap", () => {
   // The popover carries a data attribute and an explicit max-content width
   // (Tailwind `w-max`), so the containing block can never crush it.
   assert.match(
-    storePage,
-    /data-store-view-options\s*\n\s*className="[^"]*\bw-max\b/,
+    searchBar,
+    /data-store-view-options\s*className="[^"]*\bw-max\b/,
     "the popover must declare width: max-content (w-max)",
   );
 });
@@ -41,14 +46,14 @@ test("the three option buttons keep their fixed tap-target size", () => {
   // `flex-none` (flex: 0 0 auto) pins each button to h-9 w-9 regardless of
   // how wide the popover's containing block is.
   assert.match(
-    storePage,
+    searchBar,
     /className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition/,
     "each option button must be flex-none with a fixed 36px box",
   );
   // The popover is a horizontal row — options must never stack. Phase A6:
   // the row is the pack's GlassSurface (radius 16 = rounded-2xl), whose
   // content div carries the flex row.
-  assert.match(storePage, /contentClassName="flex w-max gap-1 p-1\.5"/);
+  assert.match(searchBar, /contentClassName="flex w-max gap-1 p-1\.5"/);
 });
 
 test("the unlayered CSS rule pins the same guarantees", () => {
@@ -62,16 +67,13 @@ test("the unlayered CSS rule pins the same guarantees", () => {
   assert.match(buttonRule, /flex:\s*0\s*0\s*auto/);
 });
 
-test("the popover still opens below the toggle, right-aligned to it", () => {
-  // The anchor geometry is untouched — the popover drops below the button
-  // (top-full) and stays right-aligned (right-0), just at its natural size.
-  // 2026-09-06 (store legibility): the class list now also carries
-  // `dc-scene-plate`, the shared contrast backing from src/glass.css — the
-  // popover floats over the scene and its pack frost is 21% dark, so its white
-  // icons had nothing to sit on. Paint only: every geometry token this contract
-  // exists to protect (`right-0 top-full z-30 mt-1.5 flex w-max`) is unchanged.
+test("the popover opens above the toggle, right-aligned to it", () => {
+  // Owner request: the popover rises above the button (bottom-full) and
+  // stays right-aligned (right-0) — dropping below it collided with the
+  // sticky filter bar underneath. Paint tokens (`dc-scene-plate` contrast
+  // backing, radius 16, w-max row) are unchanged.
   assert.match(
-    storePage,
-    /className="dc-scene-plate absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"\s*\n\s*radius=\{16\}/,
+    searchBar,
+    /className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1\.5 flex w-max text-white"\s*radius=\{16\}/,
   );
 });

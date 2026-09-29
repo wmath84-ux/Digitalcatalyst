@@ -183,7 +183,7 @@ export default function SearchBar({
                 </GlassButton>
 
                 {viewDropdownOpen && (
-                  <GlassSurface data-store-view-options className="dc-scene-plate absolute right-0 top-full z-30 mt-1.5 flex w-max text-white" radius={16} contentClassName="flex w-max gap-1 p-1.5">
+                  <GlassSurface data-store-view-options className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1.5 flex w-max text-white" radius={16} contentClassName="flex w-max gap-1 p-1.5">
                     {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
                       <GlassButton
                         key={mode}

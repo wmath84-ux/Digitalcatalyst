@@ -67,6 +67,13 @@ type HeaderProps = {
    * overlay so the shortcut lives on the main header itself.
    */
   onHelpClick?: () => void;
+  /**
+   * Allow-list for the ExpandingTabs action cluster. When omitted every
+   * contextual action renders (search/download/cart + alerts + plans +
+   * help). The notifications page passes `["notifications"]` so the bell
+   * is the only header action while the learner is already on that page.
+   */
+  visibleActions?: Array<"search" | "download" | "cart" | "notifications" | "subscription" | "help">;
 };
 
 /**
@@ -94,6 +101,7 @@ export default function Header({
   searchActive = false,
   centerSearch,
   onHelpClick,
+  visibleActions,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
@@ -157,6 +165,10 @@ export default function Header({
         }]
       : []),
   ];
+
+  const visibleTabItems = visibleActions
+    ? tabItems.filter((item) => (visibleActions as string[]).includes(item.id))
+    : tabItems;
 
   // The expanded pill follows context: an open search wins, otherwise the
   // route the header currently sits on (notifications / cart / subscription).
@@ -228,7 +240,7 @@ export default function Header({
 
         <div className="flex shrink-0 items-center gap-2">
           <ExpandingTabs
-            items={tabItems}
+            items={visibleTabItems}
             activeId={activeId}
             onSelect={handleSelect}
             ariaLabel="Header actions"

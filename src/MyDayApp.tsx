@@ -34,7 +34,6 @@ import { GlassButton } from "./components/ui/glass-button";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
 import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
-import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 import { useCommerce } from "./context/CommerceContext";
 import { useAuth } from "./context/AuthContext";
@@ -62,6 +61,55 @@ const MYDAY_STORAGE_KEYS: Record<keyof MyDayCloudData, string> = {
   notes: "myday_notes",
   reminders: "myday_reminders",
 };
+
+/**
+ * One-time fresh-start migration.
+ *
+ * Older builds seeded demo content (sampleData.ts) into these lists on
+ * first run, and the local-first save mirrored those demo rows to cloud.
+ * The ids below are the ONLY ids the demo content ever used — real user
+ * creations always use crypto.randomUUID() — so filtering them is safe and
+ * never touches genuine user data. Runs once per device (the cleaned
+ * arrays are written straight back to localStorage), plus once against
+ * the cloud snapshot when it loads.
+ */
+const LEGACY_SAMPLE_IDS: Record<keyof MyDayCloudData, ReadonlySet<string>> = {
+  tasks: new Set(["t1", "t2", "t3", "t4", "t5"]),
+  schedule: new Set(["e1", "e2", "e3", "e4", "e5", "e6", "e7"]),
+  notes: new Set(["n1", "n2", "n3", "n4", "n5"]),
+  reminders: new Set(["r1", "r2", "r3"]),
+};
+
+function stripLegacySamples(data: MyDayCloudData): { cleaned: MyDayCloudData; removed: number } {
+  const before = data.tasks.length + data.schedule.length + data.notes.length + data.reminders.length;
+  const cleaned: MyDayCloudData = {
+    tasks: data.tasks.filter((t) => t && !LEGACY_SAMPLE_IDS.tasks.has(t.id)),
+    schedule: data.schedule.filter((e) => e && !LEGACY_SAMPLE_IDS.schedule.has(e.id)),
+    notes: data.notes.filter((n) => n && !LEGACY_SAMPLE_IDS.notes.has(n.id)),
+    reminders: data.reminders.filter((r) => r && !LEGACY_SAMPLE_IDS.reminders.has(r.id)),
+  };
+  const after = cleaned.tasks.length + cleaned.schedule.length + cleaned.notes.length + cleaned.reminders.length;
+  return { cleaned, removed: before - after };
+}
+
+/** Load a My Day list and drop any lingering demo rows (fresh start). */
+function loadCleanedList<K extends keyof MyDayCloudData>(key: K): MyDayCloudData[K] {
+  const storageKey = MYDAY_STORAGE_KEYS[key];
+  const items = loadFromStorage<MyDayCloudData[K]>(storageKey, [] as unknown as MyDayCloudData[K]);
+  if (!Array.isArray(items)) return [] as unknown as MyDayCloudData[K];
+  const legacy = LEGACY_SAMPLE_IDS[key];
+  const cleaned = (items as Array<{ id?: unknown }>).filter(
+    (item) => item && typeof item.id === "string" && !legacy.has(item.id),
+  );
+  if (cleaned.length !== items.length) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(cleaned));
+    } catch {
+      // Best-effort: the in-memory state below is already clean for this visit.
+    }
+  }
+  return cleaned as MyDayCloudData[K];
+}
 
 /**
  * My Day is intentionally local-first: the learner taps a task/note/etc. and
@@ -102,10 +150,13 @@ export default function App() {
   } = useMyDayAccess();
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>(() => loadFromStorage("myday_tasks", initialTasks));
-  const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadFromStorage("myday_schedule", initialSchedule));
-  const [notes, setNotes] = useState<QuickNote[]>(() => loadFromStorage("myday_notes", initialNotes));
-  const [reminders, setReminders] = useState<Reminder[]>(() => loadFromStorage("myday_reminders", initialReminders));
+  // Fresh start: new learners begin with empty lists (no demo rows). Any
+  // demo rows left on this device by older builds are stripped by
+  // loadCleanedList — real user items always survive (see comment above).
+  const [tasks, setTasks] = useState<Task[]>(() => loadCleanedList("tasks"));
+  const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadCleanedList("schedule"));
+  const [notes, setNotes] = useState<QuickNote[]>(() => loadCleanedList("notes"));
+  const [reminders, setReminders] = useState<Reminder[]>(() => loadCleanedList("reminders"));
 
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -296,8 +347,20 @@ export default function App() {
           // Cloud data is authoritative for this account — apply it (the
           // server normalises/validates every row) so the same tasks,
           // schedule, notes and reminders appear on every device the
-          // learner signs in on.
-          applyCloudData(result.data);
+          // learner signs in on. Demo rows an older build may have synced
+          // to cloud are stripped first (fresh start), and the cleaned
+          // snapshot is pushed straight back so the server copy is clean
+          // too. Genuine user items always survive the strip.
+          const { cleaned, removed } = stripLegacySamples(result.data);
+          applyCloudData(cleaned);
+          if (removed > 0) {
+            saveMyDayData(cleaned, { tzOffsetMinutes: new Date().getTimezoneOffset() })
+              .then((saved) => setMyDayAccess(saved.access))
+              .catch(() => {
+                // Best-effort: the device copy is already clean and the
+                // next user save retries the cloud mirror.
+              });
+          }
           setCloudSyncFailed(false);
         } else {
           // Status fetch failed (network). Keep showing this device's data

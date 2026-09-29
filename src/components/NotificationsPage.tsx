@@ -48,10 +48,26 @@ function ExactAlarmCard() {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
-    getExactAlarmPermissionStatus().then((s) => {
-      if (alive) setStatus(s as any);
-    });
-    return () => { alive = false; };
+    const refresh = () => {
+      getExactAlarmPermissionStatus().then((s) => {
+        if (alive) setStatus(s as any);
+      });
+    };
+    refresh();
+    // The grant happens in the system Settings app while ours is
+    // backgrounded — re-check every time the learner returns so the card
+    // disappears the moment exact alarms are allowed, even if the
+    // settings result arrived before the toggle finished applying.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
   const request = async () => {
     setBusy(true);
@@ -63,8 +79,11 @@ function ExactAlarmCard() {
       else toast({ title: "Not granted", description: "Enable Alarms & reminders in system settings to get exact-time delivery.", variant: "warning" });
     } finally { setBusy(false); }
   };
-  if (status === "unsupported") return null;
-  const granted = status === "granted";
+  // Once exact alarms are allowed the whole explainer goes away — the
+  // learner already granted it, so there is nothing left to act on. While
+  // the native check is still in flight we also render nothing instead of
+  // flashing a wrong "Needs permission" state for a frame.
+  if (status === "unsupported" || status === "granted" || status === "loading") return null;
   return (
     <div className="mx-4 mt-2 rounded-2xl border border-white/15 bg-white/[0.07] p-4 backdrop-blur-md">
       <p className="text-sm font-bold text-white">Exact-time reminders (Android)</p>
@@ -72,14 +91,12 @@ function ExactAlarmCard() {
         On Android 14+ the system denies exact alarms by default. Without <span className="font-semibold text-white/80">Alarms &amp; reminders</span> (SCHEDULE_EXACT_ALARM) your My Day reminders can drift by minutes. We use the native AlarmManager — not inexact WorkManager — so each reminder fires on the dot even when the app is closed. We never declare <code className="rounded bg-white/10 px-1 py-0.5 text-[10px]">USE_EXACT_ALARM</code> (Play Store restricts it to alarm/calendar apps).
       </p>
       <div className="mt-3 flex items-center gap-2">
-        <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${granted ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30" : "bg-amber-500/20 text-amber-200 border border-amber-400/30"}`}>
-          {granted ? "Allowed" : status === "denied" ? "Denied" : "Needs permission"}
+        <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-500/20 px-2 py-1 text-[10px] font-bold text-amber-200">
+          {status === "denied" ? "Denied" : "Needs permission"}
         </span>
-        {!granted && (
-          <button type="button" onClick={() => void request()} disabled={busy} className="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-indigo-500 disabled:opacity-50">
-            {busy ? "Opening…" : "Allow exact alarms"}
-          </button>
-        )}
+        <button type="button" onClick={() => void request()} disabled={busy} className="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-indigo-500 disabled:opacity-50">
+          {busy ? "Opening…" : "Allow exact alarms"}
+        </button>
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-white/35">Tap Allow → system Settings opens → toggle Eduvora → Allow setting exact alarms. No extra permission is stored by us.</p>
     </div>
@@ -466,6 +483,7 @@ export default function NotificationsPage({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
           onNavigateToNotifications={() => undefined}
+          visibleActions={["notifications"]}
           icon={BellIcon}
           title="Notifications"
           subtitle={unread > 0 ? `${unread} unread update${unread === 1 ? "" : "s"}` : "You're all caught up"}

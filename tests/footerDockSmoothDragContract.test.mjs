@@ -321,3 +321,35 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
   // the same transform-only wave.
   assert.match(read("src/course/CoursePeekDock.tsx"), /<GlassDock compact items=\{items\} onSelect=\{handleSelect\} pointerX=\{pointerX\} \/>/);
 });
+
+/* ------------------------------------------------------------------ */
+/* 5. The clamp-aware squeeze (owner brief 2026-09-29)                 */
+/* ------------------------------------------------------------------ */
+
+// "Track scroll animation keval ek side sahi se hota hai — left side drag
+// per footer expand hota hai, right side sahi se nahin." The wave's math was
+// always symmetric; the asymmetry was the `max-w-full` clamp. A width-filled
+// dock (Home: the capsule already spans the nav at rest) cannot grow past
+// it, so the symmetric padding ask degraded one-sided — the content box
+// shrank, the fixed row overflowed right, dead space pooled left. The wave
+// now grows only what fits: the measure pass records the free pixels per
+// side, and capsule padding + neighbour push take the same squeezed share,
+// so a filled dock squeezes symmetrically instead of spilling right.
+test("a width-filled dock squeezes the wave symmetrically instead of spilling one-sided", () => {
+  // Headroom is measured in the same once-per-gesture pass — from the SAME
+  // rects as the centres, so the file still holds exactly one layout read.
+  assert.match(dockCode, /headroom = Number\.POSITIVE_INFINITY/);
+  assert.match(dockCode, /closest\?\.\('\[data-site-footer-nav\]'\)/);
+  assert.match(dockCode, /nav\.clientWidth - capsuleWidth/);
+  // The squeeze is 1 while the growth fits, shrinking toward 0 past it…
+  assert.match(dockCode, /const squeezeX = useTransform\(growX/);
+  assert.match(dockCode, /return growth <= room \? 1 : Math\.max\(0, room \/ growth\)/);
+  // …the capsule padding takes the squeezed share…
+  assert.match(dockCode, /\[growX, padInlineBase, squeezeX\]/);
+  assert.match(dockCode, /\(growth \* sq\) \/ 2/);
+  // …as does the neighbour push, so the plates part exactly as far as the
+  // glass grows (the push arithmetic itself is untouched — section 2 pins it).
+  assert.match(dockCode, /const pushSpring = useSpring\(rawPush, WAVE_SPRING\)/);
+  assert.match(dockCode, /const push = useTransform\(\[pushSpring, squeezeX\], \(\[p, sq\]: number\[\]\) => p \* sq\)/);
+  assert.match(dockCode, /squeezeX=\{squeezeX\}/);
+});

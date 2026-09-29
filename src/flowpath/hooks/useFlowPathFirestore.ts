@@ -17,9 +17,9 @@
 //     server multiplexer that mirrors the activity into My Day /
 //     Revision, schedules a TWA local alarm, and dispatches the
 //     push notifications).
-//   • Backward compatibility: if the user has no Firestore docs
-//     yet (e.g. just signed in for the first time), the hook
-//     seeds a few demo activities so the dashboard is never empty.
+//   • Fresh start: if the user has no Firestore docs yet the hook
+//     returns an empty list (older builds seeded demo activities
+//     here; that behaviour is intentionally gone per user request).
 //   • Admin override: when the user is the admin, an extra
 //     `targetUid` argument picks any user to read / write.
 //   • Offline-friendly: every mutation surfaces a clear error
@@ -45,87 +45,6 @@ type MutationState = {
 const isAdmin = (email: string | null | undefined) =>
   String(email || "").toLowerCase() === "wmath84@gmail.com";
 
-const seedActivities = (uid: string): FlowPathActivity[] => {
-  const now = Date.now();
-  const hour = 60 * 60 * 1000;
-  const day = 24 * hour;
-  const seeds: Array<Omit<FlowPathActivity, "uid" | "createdBy" | "source">> = [
-    {
-      id: `seed-revision-${uid}`,
-      kind: "revision",
-      title: "Organic Chemistry — Chapter 2",
-      description: "Reaction mechanisms recap",
-      scheduledFor: now - 3 * day,
-      status: "completed",
-      completedAt: now - 3 * day + 40 * 60_000,
-      createdAt: now - 3 * day,
-      updatedAt: now - 3 * day,
-      testConfig: { totalQuestions: 25, difficulty: "medium", questionMode: "mixed", estimatedMinutes: 30 },
-      progress: 100,
-    },
-    {
-      id: `seed-task-${uid}`,
-      kind: "task",
-      title: "Submit assignment draft",
-      description: "Literature review section",
-      scheduledFor: now + 1 * hour,
-      status: "active",
-      createdAt: now - 2 * hour,
-      updatedAt: now - 2 * hour,
-      taskPriority: "medium",
-      taskStatus: "pending",
-    },
-    {
-      id: `seed-mcq-${uid}`,
-      kind: "mcq",
-      title: "Biology Practice Set",
-      description: "20 MCQs on cell biology",
-      scheduledFor: now - 1 * day,
-      status: "completed",
-      completedAt: now - 1 * day + 30 * 60_000,
-      createdAt: now - 1 * day,
-      updatedAt: now - 1 * day,
-      testConfig: { totalQuestions: 20, difficulty: "easy", questionMode: "theory", estimatedMinutes: 15 },
-      progress: 100,
-    },
-    {
-      id: `seed-note-${uid}`,
-      kind: "note",
-      title: "Quick thoughts on Chapter 4",
-      description: "The redox section felt thin — check the appendix for the worked examples before next class.",
-      scheduledFor: null,
-      status: "active",
-      createdAt: now - 6 * hour,
-      updatedAt: now - 6 * hour,
-      noteColor: "violet",
-    },
-    {
-      id: `seed-schedule-${uid}`,
-      kind: "schedule",
-      title: "Physics tutorial",
-      description: "Weekly slot with Mr Khan",
-      scheduledFor: now + 2 * day,
-      status: "active",
-      createdAt: now - 1 * day,
-      updatedAt: now - 1 * day,
-      scheduleStartTime: "17:00",
-      scheduleEndTime: "18:00",
-      scheduleType: "study",
-    },
-    {
-      id: `seed-reminder-${uid}`,
-      kind: "reminder",
-      title: "Drink water 💧",
-      scheduledFor: now + 2 * hour,
-      status: "active",
-      createdAt: now - 1 * hour,
-      updatedAt: now - 1 * hour,
-      reminderTime: "11:00",
-    },
-  ];
-  return seeds.map((s) => ({ ...s, uid, createdBy: uid, source: "user" }));
-};
-
 export function useFlowPathFirestore(targetUidOverride?: string) {
   const { user } = useAuth();
   const uid = targetUidOverride || user?.id || null;
@@ -136,7 +55,6 @@ export function useFlowPathFirestore(targetUidOverride?: string) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<number>(0);
-  const [didSeed, setDidSeed] = useState<boolean>(false);
 
   // Initial fetch + poll every 60s. The poll is cheap (a single
   // collection read for the current user) and lets the dashboard
@@ -170,17 +88,9 @@ export function useFlowPathFirestore(targetUidOverride?: string) {
             typeof (item as { id?: unknown }).id === "string" &&
             typeof (item as { title?: unknown }).title === "string",
         );
-        if (list.length === 0 && !didSeed) {
-          // First-load empty state. Seed demo activities so the
-          // dashboard is never blank; the user can edit / delete
-          // them right away.
-          const seeds = seedActivities(uid);
-          setItems(seeds);
-          setDidSeed(true);
-        } else {
-          setItems(list);
-          setDidSeed(true);
-        }
+        // Fresh start: an empty server list stays empty — the dashboard
+        // shows its honest empty state instead of demo activities.
+        setItems(list);
         setLastSyncedAt(Date.now());
       } catch (err) {
         if (cancelled) return;
@@ -195,7 +105,7 @@ export function useFlowPathFirestore(targetUidOverride?: string) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [uid, didSeed]);
+  }, [uid]);
 
   const create = useCallback(
     async (input: Partial<FlowPathActivity>): Promise<FlowPathControlResult<{ ok: boolean; activity: FlowPathActivity }>> => {
