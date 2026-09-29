@@ -21,17 +21,50 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppOrientationPlugin.class);
         registerPlugin(AppFullscreenPlugin.class);
         super.onCreate(savedInstanceState);
-        // HARD RULE: Default to portrait for all screens except course player.
-        // The JS layer (appOrientation.ts) will unlock to FULL_SENSOR when
-        // the course player mounts and re-lock to portrait when it unmounts.
-        // This ensures mobile users with auto-rotate ON still stay in portrait
-        // everywhere else, and users with auto-rotate OFF never see rotation
-        // outside the course player.
+        // HARD RULE (PHONES ONLY): Default to portrait for all screens except
+        // the course player. The JS layer (appOrientation.ts) unlocks to
+        // FULL_SENSOR when the course player mounts and re-locks to portrait
+        // when it unmounts. This keeps phone users with auto-rotate ON in
+        // portrait everywhere else, and users with auto-rotate OFF never see
+        // rotation outside the course player.
+        //
+        // TABLETS ARE NEVER PORTRAIT-LOCKED. The old code force-locked EVERY
+        // device to portrait here, which overrode the manifest's `fullSensor`
+        // and left tablets pinned to portrait — they would not open rotated
+        // even when physically held in landscape, and in Samsung DeX / Android
+        // desktop mode the app was squeezed into a narrow portrait window so
+        // the desktop side panel (which needs a wide/landscape viewport) never
+        // appeared. `smallestScreenWidthDp >= 600` is Android's canonical
+        // tablet (sw600dp) check: it is derived from the physical display, so
+        // it stays correct inside a resizable DeX window. On tablets we use
+        // FULL_SENSOR so the app follows the physical orientation even when the
+        // system auto-rotate lock is ON (matching the user's expectation that a
+        // tablet held in landscape opens in landscape).
         try {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            if (isTabletDevice()) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+            } else {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
         } catch (Exception ignored) {}
 
         installFullscreenWebChromeClient();
+    }
+
+    /**
+     * True when this device is a tablet (or larger), using Android's canonical
+     * sw600dp rule. `smallestScreenWidthDp` is the shortest dimension of the
+     * available screen in density-independent pixels and is computed from the
+     * physical display, so it does not shrink when the app runs in a small
+     * Samsung DeX / freeform window. Phones report < 600; 7"+ tablets report
+     * >= 600.
+     */
+    private boolean isTabletDevice() {
+        try {
+            return getResources().getConfiguration().smallestScreenWidthDp >= 600;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     /**
@@ -110,8 +143,16 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void lockPortraitForApp() {
+        // Tablets are never portrait-locked (see onCreate): a re-lock request
+        // from the JS layer (e.g. after leaving the course player) must leave a
+        // tablet free to rotate, so we restore FULL_SENSOR instead of forcing
+        // portrait on tablet-sized screens.
         try {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            if (isTabletDevice()) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+            } else {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
         } catch (Exception ignored) {}
     }
 

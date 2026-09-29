@@ -15,7 +15,7 @@
 // updates through a direct DOM write, and the joysticks talk to the engine
 // through a ref. That is what keeps the panel at a locked frame rate.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   Compass, Eye, EyeOff, Minimize2,
   PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
@@ -92,7 +92,7 @@ export default function NatureStudioPage() {
   // Measured chrome so the engine can frame boards clear of it: the slim top
   // row (stats chip only — the menu moved into the tray) and the bottom tray.
   const hudTopRef = useRef<HTMLElement | null>(null);
-  const hudTrayRef = useRef<HTMLElement | null>(null);
+  const hudTrayRef = useRef<HTMLDivElement | null>(null);
 
   const [supported] = useState(() => webglSupported());
   const [booting, setBooting] = useState(true);
@@ -151,6 +151,15 @@ export default function NatureStudioPage() {
   const [trayInstructionVisible, setTrayInstructionVisible] = useState(true);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<ViewPreset | null>(null);
+  // The bottom DOCK is hidden behind a slim drag handle by default so the 3D
+  // world keeps the whole screen (this is what makes every icon fit in mobile
+  // landscape). Swiping up / tapping the handle reveals the dock — the same
+  // peek behaviour the desktop shell's footer dock uses. Selecting a view
+  // closes it again to free the screen.
+  const [dockOpen, setDockOpen] = useState(false);
+  // Drag tracking for the handle: distinguishes a tap (toggle) from a
+  // swipe (open on up, close on down) without a library.
+  const dockDrag = useRef<{ startY: number; moved: boolean } | null>(null);
   const [openCourseId, setOpenCourseId] = useState<string | null>(null);
   const [focusMine, setFocusMine] = useState(false);
 
@@ -343,11 +352,15 @@ export default function NatureStudioPage() {
     let bottom = 16;
     const tray = hudTrayRef.current;
     if (trayVisible && tray) {
+      // `hudTrayRef` is the whole bottom-dock column: when the dock is
+      // collapsed it is just the slim handle (small inset → more world),
+      // when it is open it also holds the GlassDock (larger inset). Reading
+      // its live offsetTop keeps the board framing correct in both states.
       const trayTop = tray.offsetTop;
       bottom = Math.max(bottom, frameH - trayTop + 8);
     }
     eng.setHudInsets({ top, bottom, left: 10, right: 10 });
-  }, [appImmersive, hudHidden, trayVisible]);
+  }, [appImmersive, hudHidden, trayVisible, dockOpen]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
   useEffect(() => {
@@ -436,6 +449,82 @@ export default function NatureStudioPage() {
 
   const consumeOpenCourse = useCallback(() => setOpenCourseId(null), []);
 
+  // ── Bottom dock (peek) ───────────────────────────────────────────────
+  // One handler for every dock button. Picking a board / scenery view also
+  // collapses the dock so the world gets the whole screen back; opening the
+  // module panel keeps it up (the panel anchors to the dock), and Settings
+  // opens its own full overlay.
+  const handleDockSelect = useCallback((id: string) => {
+    if (id === "module") {
+      setMenuOpen(false);
+      setModuleMenuOpen((v) => {
+        const next = !v;
+        if (next) {
+          setFocusMine(true);
+          focusStudyView("reading");
+        }
+        return next;
+      });
+      return;
+    }
+    if (id === "settings") {
+      setModuleMenuOpen(false);
+      setMenuOpen((v) => !v);
+      setDockOpen(false);
+      return;
+    }
+    if (BOARD_VIEWS.some((b) => b.key === id)) {
+      focusStudyView(id as ViewPreset);
+      setDockOpen(false);
+      return;
+    }
+    if (PRESETS.some((p) => p.key === id)) {
+      focusSceneryView(id as ViewPreset);
+      setDockOpen(false);
+    }
+  }, [focusStudyView, focusSceneryView]);
+
+  // Drag handle: swipe up reveals the dock, swipe down hides it, a plain tap
+  // toggles. Pointer capture keeps the gesture alive if the finger slides off.
+  const onHandlePointerDown = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
+    dockDrag.current = { startY: e.clientY, moved: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not captured */ }
+  }, []);
+  const onHandlePointerMove = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dockDrag.current;
+    if (!drag) return;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dy) > 10) drag.moved = true;
+    if (dy < -24) {
+      setDockOpen(true);
+      dockDrag.current = null;
+    } else if (dy > 24) {
+      setDockOpen(false);
+      dockDrag.current = null;
+    }
+  }, []);
+  const onHandlePointerUp = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dockDrag.current;
+    dockDrag.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
+    // A tap (no meaningful drag) toggles the dock.
+    if (drag && !drag.moved) setDockOpen((v) => !v);
+  }, []);
+
+  // Which dock button reads as active — used to tint the current view.
+  const activeDockId = moduleMenuOpen
+    ? "module"
+    : menuOpen
+      ? "settings"
+      : (activeBoard ?? activeView ?? "world");
+
+  const dockItems: GlassDockItem[] = useMemo(() => [
+    ...BOARD_VIEWS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#10B981", active: activeDockId === key })),
+    ...PRESETS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#38BDF8", active: activeDockId === key })),
+    { id: "module", label: "My modules", icon: Layers3 as any, color: "#8B5CF6", active: activeDockId === "module" },
+    { id: "settings", label: "Settings", icon: Settings as any, color: "#F59E0B", active: activeDockId === "settings" },
+  ], [activeDockId]);
+
   // The bottom-right eye: one tap hides EVERY button (tray + stats chip) —
   // only the eye remains. If a study board is in focus it re-frames
   // full-bleed at the freed rect (the effect below reframes); if no board is
@@ -461,7 +550,7 @@ export default function NatureStudioPage() {
   useEffect(() => {
     refreshInsets();
     reframeActiveBoard();
-  }, [appImmersive, hudHidden, trayVisible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appImmersive, hudHidden, trayVisible, dockOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!supported || error) {
     return (
@@ -556,46 +645,55 @@ export default function NatureStudioPage() {
         </header>
         ) : null}
 
-        {/* ── Bottom tray — study boards, scenery views, Module, ⋮ menu.
-            Views used to live in the settings dropdown; they sit on the
-            tray now. Module opens the create/library panel. The ⋮ keeps
-            light / scene / exit. One tap on the eye hides every button. ── */}
-        {!hudHidden && trayVisible && trayInstructionVisible ? (
+        {/* ── Bottom dock — study boards, scenery views, Module, Settings.
+            Hidden behind a slim drag handle by default so the 3D world owns
+            the whole screen (this is what lets every icon fit in mobile
+            landscape). Swipe up / tap the handle to reveal the dock, the same
+            peek behaviour the desktop shell's footer dock uses. All buttons
+            live together in ONE GlassDock. ── */}
+        {!hudHidden && trayVisible && trayInstructionVisible && !dockOpen ? (
         <p
           data-tray-instruction
           data-sanctuary-chrome
-          className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md"
+          className="pointer-events-none absolute bottom-14 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/50 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md"
         >
-          Two fingers fly · double-tap to go
+          Swipe up for the dock · two fingers fly
         </p>
         ) : null}
         {!hudHidden && trayVisible ? (
-        <nav
+        <div
           ref={hudTrayRef}
           data-sanctuary-chrome
-          aria-label="Study boards, views and modules"
-          className="pointer-events-auto absolute bottom-3 left-3 right-16 z-40 flex justify-center"
+          data-sanctuary-bottom-dock
+          data-open={dockOpen ? "true" : "false"}
+          className="pointer-events-none absolute inset-x-0 bottom-2 z-40 flex flex-col items-center"
         >
-          <div className="relative w-full max-w-[min(100vw-5rem,56rem)]">
-            {/* Scrollable GlassDock — exact home footer design (GlassDock) with all buttons together */}
-            <div
-              data-sanctuary-tray-scroll
-              className="overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          {/* The revealed dock — mounted only while open so it takes no screen
+              space (and adds no board inset) when collapsed. */}
+          {dockOpen ? (
+            <nav
+              aria-label="Study boards, views and modules"
+              className="pointer-events-auto mb-1.5 w-full max-w-[min(100vw-1.5rem,60rem)] px-3"
             >
-              <div className="w-max mx-auto">
-                <GlassDock
-                  items={(() => {
-                    const items: GlassDockItem[] = [
-                      ...BOARD_VIEWS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#10B981" })),
-                      ...PRESETS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#38BDF8" })),
-                      { id: "module", label: "My modules", icon: Layers3 as any, color: "#8B5CF6" },
-                      { id: "settings", label: "Settings", icon: Settings as any, color: "#F59E0B" },
-                    ];
-                    return items;
-                  })()}
-                  activeId={moduleMenuOpen ? "module" : menuOpen ? "settings" : (activeBoard ?? activeView ?? "world")}
-                  onSelect={(id) => {
-                    if (id === "module") {
+              <div className="relative w-full">
+                <div
+                  data-sanctuary-tray-scroll
+                  className="overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  <div className="w-max mx-auto">
+                    {/* `dense` = 34px plates so the whole row of boards + scenery
+                        + module + settings fits on a phone in landscape. */}
+                    <GlassDock dense items={dockItems} onSelect={handleDockSelect} />
+                  </div>
+                </div>
+                {/* Module menu panel — anchored to the dock, trigger hidden. */}
+                <div className="absolute bottom-full right-0 mb-2">
+                  <SanctuaryModuleMenu
+                    uid={user?.id ?? null}
+                    courses={myCourses.courses}
+                    loading={myCourses.state === "loading"}
+                    open={moduleMenuOpen}
+                    onToggle={() => {
                       setMenuOpen(false);
                       setModuleMenuOpen((v) => {
                         const next = !v;
@@ -605,53 +703,36 @@ export default function NatureStudioPage() {
                         }
                         return next;
                       });
-                      return;
-                    }
-                    if (id === "settings") {
-                      setModuleMenuOpen(false);
-                      setMenuOpen((v) => !v);
-                      return;
-                    }
-                    if (BOARD_VIEWS.some((b) => b.key === id)) {
-                      focusStudyView(id as ViewPreset);
-                      return;
-                    }
-                    if (PRESETS.some((p) => p.key === id)) {
-                      focusSceneryView(id as ViewPreset);
-                      return;
-                    }
-                  }}
-                  ariaLabel="Study boards, views and modules"
-                />
+                    }}
+                    onClose={() => setModuleMenuOpen(false)}
+                    onOpenOnBoard={openMyCourseOnBoard}
+                    onPlay={playMyCourse}
+                    onCreated={onSanctuaryModuleCreated}
+                    hideTrigger
+                  />
+                </div>
               </div>
-            </div>
-            {/* Module menu panel — anchored to the dock, trigger hidden (trigger lives inside GlassDock) */}
-            <div className="absolute bottom-full right-0 mb-2">
-              <SanctuaryModuleMenu
-                uid={user?.id ?? null}
-                courses={myCourses.courses}
-                loading={myCourses.state === "loading"}
-                open={moduleMenuOpen}
-                onToggle={() => {
-                  setMenuOpen(false);
-                  setModuleMenuOpen((v) => {
-                    const next = !v;
-                    if (next) {
-                      setFocusMine(true);
-                      focusStudyView("reading");
-                    }
-                    return next;
-                  });
-                }}
-                onClose={() => setModuleMenuOpen(false)}
-                onOpenOnBoard={openMyCourseOnBoard}
-                onPlay={playMyCourse}
-                onCreated={onSanctuaryModuleCreated}
-                hideTrigger
-              />
-            </div>
-          </div>
-        </nav>
+            </nav>
+          ) : null}
+
+          {/* The drag handle — always shown (unless HUD is hidden). Swipe up
+              to reveal, swipe down / tap to hide. */}
+          <button
+            type="button"
+            aria-label={dockOpen ? "Hide bottom dock" : "Show bottom dock"}
+            aria-expanded={dockOpen}
+            onPointerDown={onHandlePointerDown}
+            onPointerMove={onHandlePointerMove}
+            onPointerUp={onHandlePointerUp}
+            className="pointer-events-auto flex h-8 w-28 touch-none items-center justify-center"
+          >
+            <span
+              className={`rounded-full bg-white/45 shadow-[0_1px_5px_rgba(0,0,0,0.45)] backdrop-blur-md transition-all ${
+                dockOpen ? "h-1.5 w-10 bg-white/60" : "h-1.5 w-16"
+              }`}
+            />
+          </button>
+        </div>
         ) : null}
 
         {/* ── The live board surfaces ───────────────────────────────────

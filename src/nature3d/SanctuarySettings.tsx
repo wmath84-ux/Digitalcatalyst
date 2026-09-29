@@ -179,7 +179,7 @@ export default function SanctuarySettings({
               />
               <SceneRow
                 Icon={Rows3}
-                label="Bottom tray"
+                label="Bottom dock"
                 right="Hide"
                 onClick={onHideTray}
               />

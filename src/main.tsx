@@ -89,6 +89,7 @@ const RenewalPreviewPage = lazyRoute(() => import("./components/subscription/Ren
 const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/OpeningAnimationPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import { StudyLibraryErrorBoundary } from "./personal-library/StudyLibraryErrorBoundary";
+import { SanctuaryErrorBoundary } from "./nature3d/SanctuaryErrorBoundary";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
@@ -1751,7 +1752,18 @@ function RootPage(): ReactNode {
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
-  if (hash.startsWith(NATURE_STUDIO_HASH)) return <NatureStudioPage />;
+  if (hash.startsWith(NATURE_STUDIO_HASH)) {
+    // The boundary keeps a Sanctuary render crash contained to this route:
+    // instead of the whole app unmounting to a black canvas (and the learner
+    // being thrown back to Home), they get a recoverable card with a working
+    // Try again / Back to Home — the same protection FlowPath and Study
+    // Library already have.
+    return (
+      <SanctuaryErrorBoundary>
+        <NatureStudioPage />
+      </SanctuaryErrorBoundary>
+    );
+  }
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
   // Learner-authored courses (My Study Library): `#/my-course/new` and
   // `#/my-course/<id>/edit` open the builder, `#/my-course/<id>` opens the
