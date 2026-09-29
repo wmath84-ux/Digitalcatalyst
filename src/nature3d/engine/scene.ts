@@ -45,6 +45,7 @@ import { createWinter, winterDaylight, type WinterSystem } from "./winter";
 import { createRockField, type RockField } from "./rocks";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createMountainForest, type MountainForest } from "./mountainForest";
+import { createFarRange, type FarRange } from "./farRange";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
@@ -172,6 +173,12 @@ export class Sanctuary {
    * leaves the terrain's own 150 m hills on skyline duty.
    */
   private mountainForest: MountainForest | null = null;
+  /**
+   * THE FAR RANGE — distant mountains on the open sea, far out beyond the
+   * world's edge (see `farRange.ts`). Built synchronously at boot (one
+   * ~1.4 k-vertex mesh, one draw call); static for the life of the scene.
+   */
+  private farRange: FarRange | null = null;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -443,6 +450,18 @@ export class Sanctuary {
     this.atmosphere.registerTree(terrain);
     this.winter.registerTree(terrain, "ground");
     if (this.budget.halfPrecision) halfPrecisionTree(terrain);
+
+    // THE FAR RANGE — "out of the world bhi expand karo … dur pahad bhi
+    // dikhte hain bahut dur, to vah aur bhi real lagenge" (owner brief
+    // 2026-09-29). A ridged mountain chain standing on the open sea way past
+    // the island edge, registered with the SAME atmosphere pass as the
+    // island: the reduced daytime smoke (fogFar 420 → 4200) is what makes it
+    // visible, and the time-of-day smoke curve is what buries it again in
+    // the dawn haze and the night — the range breathes with the day.
+    this.farRange = createFarRange(this.budget);
+    this.scene.add(this.farRange.group);
+    this.atmosphere.registerTree(this.farRange.group);
+    if (this.budget.halfPrecision) halfPrecisionTree(this.farRange.group);
 
     // ROCKS BEFORE GRASS: the rock kit publishes the base of every boulder it
     // places, and the grass field plants a skirt of blades around each one
@@ -1657,8 +1676,21 @@ export class Sanctuary {
     // seams against the sky. Daylight fog colour drives both; the sky dome
     // still paints the upper sky, the fog colour fills the distant air.
     fog.color.copy(state.fog);
-    fog.near = this.budget.fogNear * (this.iceAge ? 0.75 : 1);
-    fog.far = this.budget.fogFar * (this.iceAge ? 0.72 : 1);
+    // ── TIME-OF-DAY SMOKE (owner brief 2026-09-29) ──────────────────────
+    // "Subah ke samay thoda sa smoke … jaise-jaise sun aata hai smoke gayab
+    //  hone lagte hain … din mein hat jaaye, aur shaam aur raat mein rahe."
+    //
+    // `state.smoke` is that curve (daylight.ts): ~0.75 at dawn, burning off
+    // to 0.14 by late morning, back up to ~0.6 through the evening and
+    // ~0.68 overnight. The smoke moves the RAMP, not a global tint: a hazy
+    // dawn pulls the full-smoke line in to ~2.2 km (the far range melts
+    // away), a clear midday pushes it out to 4.2 km (the whole island, the
+    // sea and the distant mountains resolve), and the night keeps the air
+    // thick again. In Auto mode the clock re-reads every 20 s, so the haze
+    // visibly burns off in a time-lapse as the sun climbs.
+    const smoke = state.smoke;
+    fog.near = this.budget.fogNear * (1.5 - 0.9 * smoke) * (this.iceAge ? 0.75 : 1);
+    fog.far = this.budget.fogFar * (1 - 0.58 * smoke) * (this.iceAge ? 0.72 : 1);
     // CSS3D board faces sit above the canvas — push the same smoke ramp so
     // black boards haze into the air just like terrain and trees.
     // Guard: applyDaylight runs once before createBoardScreens during boot.
@@ -2373,6 +2405,7 @@ export class Sanctuary {
     this.birds.dispose();
     this.wildlife.dispose();
     this.mountainForest?.dispose();
+    this.farRange?.dispose();
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();
