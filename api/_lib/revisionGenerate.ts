@@ -1251,7 +1251,25 @@ async function generateWithProvider(config: AiConfig, syllabus: RevisionSyllabus
 
 const FALLBACK_CURRICULUM_SYSTEM = "You output only JSON for a school exam syllabus. No markdown, no commentary.";
 
-async function completeJsonText(config: AiConfig, system: string, user: string, origin: string): Promise<string> {
+/** One image for a vision-capable model call. `base64` is raw bytes (no data-URL prefix). */
+export interface AiVisionImage {
+  mimeType: string;
+  base64: string;
+  name?: string;
+}
+
+/** True when a provider rejection names images/vision — i.e. the MODEL can't see, not a bad key. */
+const isVisionRejection = (detail: string): boolean =>
+  /image|vision|visual|inline_?data|multimodal|media_type|image_url/i.test(String(detail || ""));
+
+const visionRejectionError = (): Error =>
+  Object.assign(
+    new Error("The configured AI model can't read images — switch to a vision-capable model (e.g. Gemini Flash) in Revision → AI Configuration."),
+    { statusCode: 502, code: "AI_MODEL_NO_VISION" },
+  );
+
+async function completeJsonText(config: AiConfig, system: string, user: string, origin: string, images: AiVisionImage[] = []): Promise<string> {
+  const withVision = images.filter((image) => image && image.base64 && image.mimeType).slice(0, 4);
   if (config.provider === "gemini") {
     const url = geminiGenerateUrl(config.baseUrl || DEFAULT_BASE.gemini, config.model);
     const gRes = await fetchWithTimeout(url, {
@@ -1259,12 +1277,20 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
       headers: { "Content-Type": "application/json", "x-goog-api-key": config.apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
+        contents: [{
+          role: "user",
+          parts: [
+            { text: user },
+            ...withVision.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } })),
+          ],
+        }],
         generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
       }),
     });
     if (!gRes.ok) {
-      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(gRes.status, await gRes.text().catch(() => "")));
+      const detail = await gRes.text().catch(() => "");
+      if (withVision.length && isVisionRejection(detail)) throw visionRejectionError();
+      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(gRes.status, detail));
     }
     const text = extractGeminiText(await gRes.json());
     if (!text) throw Object.assign(new Error("Gemini returned an empty response."), { statusCode: 502 });
@@ -1275,10 +1301,25 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
     const aRes = await fetchWithTimeout(`${base}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: config.model, max_tokens: 8192, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 8192,
+        system,
+        messages: [{
+          role: "user",
+          content: withVision.length
+            ? [
+                { type: "text", text: user },
+                ...withVision.map((image) => ({ type: "image", source: { type: "base64", media_type: image.mimeType, data: image.base64 } })),
+              ]
+            : user,
+        }],
+      }),
     });
     if (!aRes.ok) {
-      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(aRes.status, await aRes.text().catch(() => "")));
+      const detail = await aRes.text().catch(() => "");
+      if (withVision.length && isVisionRejection(detail)) throw visionRejectionError();
+      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(aRes.status, detail));
     }
     const text = extractAnthropicText(await aRes.json());
     if (!text) throw Object.assign(new Error("Anthropic returned an empty response."), { statusCode: 502 });
@@ -1290,6 +1331,12 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
     headers["HTTP-Referer"] = origin || "https://eduvora.app";
     headers["X-Title"] = "Digital Catalyst";
   }
+  const openAiUserContent = withVision.length
+    ? [
+        { type: "text", text: user },
+        ...withVision.map((image) => ({ type: "image_url", image_url: { url: `data:${image.mimeType};base64,${image.base64}` } })),
+      ]
+    : user;
   const call = (withJson: boolean) =>
     fetchWithTimeout(`${base}/chat/completions`, {
       method: "POST",
@@ -1299,7 +1346,7 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
         temperature: 0.2,
         messages: [
           { role: "system", content: system },
-          { role: "user", content: user },
+          { role: "user", content: openAiUserContent },
         ],
         ...(withJson ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -1308,10 +1355,15 @@ async function completeJsonText(config: AiConfig, system: string, user: string, 
   if (oRes.status === 400) {
     const detail = await oRes.text().catch(() => "");
     if (/response_format|json_object/i.test(detail)) oRes = await call(false);
-    else throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(400, detail));
+    else {
+      if (withVision.length && isVisionRejection(detail)) throw visionRejectionError();
+      throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(400, detail));
+    }
   }
   if (!oRes.ok) {
-    throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(oRes.status, await oRes.text().catch(() => "")));
+    const detail = await oRes.text().catch(() => "");
+    if (withVision.length && isVisionRejection(detail)) throw visionRejectionError();
+    throw Object.assign(new Error("AI provider rejected the request."), aiProviderFailure(oRes.status, detail));
   }
   const text = extractOpenAiText(await oRes.json());
   if (!text) throw Object.assign(new Error("The model returned an empty response."), { statusCode: 502 });

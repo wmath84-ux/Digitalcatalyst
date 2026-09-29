@@ -47,7 +47,17 @@ export type ProductResource = {
      * is `practiceQuestions` below (bulk-imported / hand-written in the
      * product editor) and it renders in the Course Player's Brain tab.
      */
-    | "brain";
+    | "brain"
+    /**
+     * Interactive 2D experiment — the admin-authored twin of the Study
+     * Library's experiment: ONE self-contained HTML file (usually generated
+     * by an AI from the builder's prompt), designed in the product editor
+     * with the same prompt → paste/upload/template → live-preview flow and
+     * played in the Course Player's sandboxed stage. Its content is
+     * `interactiveHtml` below (a hosted https link in `url` is the fallback
+     * for files too big to store).
+     */
+    | "interactive";
   url: string;
   provider: string;
   sortOrder: number;
@@ -68,6 +78,12 @@ export type ProductResource = {
   practiceQuestions?: ProductPracticeQuestion[];
   /** Optional learner-facing name for the set (falls back to the resource name). */
   practiceTitle?: string;
+  /**
+   * Interactive 2D experiment source (`type: "interactive"` only): ONE
+   * self-contained HTML document, stored inline in the product document so it
+   * plays offline in a sandboxed iframe. See `src/utils/experimentSpec.ts`.
+   */
+  interactiveHtml?: string;
 };
 
 export type ProductModule = {

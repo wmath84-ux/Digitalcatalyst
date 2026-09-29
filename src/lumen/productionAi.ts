@@ -9,6 +9,7 @@ import type { PersonalAiNoteInput } from "../types/personalAi";
 import type { Attachment, Chat, ResponseFormat } from "./lib/types";
 import type { GenerationSpec } from "./lib/engine";
 import { FORMAT_LABEL } from "./lib/engine";
+import { toVisionImage } from "./lib/utils";
 
 export interface LumenAiScope {
   uid: string;
@@ -119,6 +120,12 @@ export async function runProductionAssistant(input: {
   const { chat, text, attachments, scope, signal } = input;
   const format = formatOf(text);
   const question = withCourseLead(text, scope, attachments);
+  // Captures/uploads travel WITH the turn as vision inputs — the model looks
+  // at the pixels, not just the filenames. Unrasterizable rows are skipped, so
+  // one bad attachment can never fail the whole ask.
+  const images = (await Promise.all(attachments.map((a) => toVisionImage(a.src, a.name))))
+    .filter((row): row is { name: string; dataUrl: string } => Boolean(row))
+    .slice(0, 3);
   const payload: AskModuleAiInput = {
     uid: scope.uid,
     question,
@@ -126,6 +133,7 @@ export async function runProductionAssistant(input: {
     storageModuleId: scope.storageModuleId,
     resourceId: scope.resourceId,
     notes: scope.notes,
+    images,
     history: historyOf(chat),
     signal,
     source: scope.source,

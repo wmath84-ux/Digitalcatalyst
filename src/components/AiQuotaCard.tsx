@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Clock3, Coins, RefreshCw, Sparkles } from "lucide-react";
-import { GlassCard } from "./ui/GlassCard";
+import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
 import { defaultCatalogAiSettings, type CatalogAiSettings } from "../revision/engine/aiConfig";
 import { fetchRemoteCatalog } from "../revision/engine/catalogService";
@@ -48,7 +48,13 @@ function Bar({ used, limit, unlimited, tone }: { used: number; limit: number; un
   );
 }
 
-export default function AiQuotaCard({ uid }: { uid: string }) {
+export default function AiQuotaCard({ uid, material = "store" }: { uid: string; material?: "store" | "cart" }) {
+  // `store` (default) keeps the Revision Profile page's card byte-identical
+  // (pack surface at tint 0.62 · light blue · blur 0 + the store hooks); the
+  // Profile page passes `cart` for the Cart empty-state card's bare
+  // <GlassSurface> — radius 32, pack defaults, no re-skin, no text scrim
+  // (owner brief 2026-09-29, cart card → profile).
+  const cartGlass = material === "cart";
   const [settings, setSettings] = useState<CatalogAiSettings>(defaultCatalogAiSettings);
   const [record, setRecord] = useState(() => emptyUsage(uid));
   const [recordAvailable, setRecordAvailable] = useState(false);
@@ -141,7 +147,16 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     : snap.allowed ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/30";
 
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-ai-quota-card aria-live="polite" className="dc-store-glass dc-scene-ink relative text-white" contentClassName="p-5 lg:p-3.5">
+    <GlassSurface
+      data-ai-quota-card
+      aria-live="polite"
+      radius={cartGlass ? 32 : 24}
+      tint={cartGlass ? 0.5 : 0.62}
+      tintColor={cartGlass ? undefined : "173,216,255"}
+      blur={cartGlass ? 14 : 0}
+      className={cartGlass ? "text-white" : "dc-glass-card dc-store-glass dc-scene-ink relative text-white"}
+      contentClassName="p-5 lg:p-3.5"
+    >
       {/* Wave 14: the pack Glass Card — the white plate + drop shadow are gone. */}
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
@@ -151,7 +166,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300">School AI allowance</p>
-              <h3 className="mt-1 truncate text-lg font-black text-white">
+              <h3 className={cartGlass ? "mt-1 truncate text-lg font-bold text-white" : "mt-1 truncate text-lg font-black text-white"}>
                 {hasAuthoritativeSnapshot
                   ? `${snap.planName} · ${snap.planId === "free" ? "No billing cycle" : `${formatCycle(snap.cycle)} billing`}`
                   : "Checking your effective plan…"}
@@ -280,6 +295,6 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
           </p>
         )}
       </div>
-    </GlassCard>
+    </GlassSurface>
   );
 }

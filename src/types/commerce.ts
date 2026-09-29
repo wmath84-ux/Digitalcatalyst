@@ -72,7 +72,14 @@ export type ResourceType =
    * `practiceQuestions`, imported by the admin on the Product / Course-content
    * page and played back on the Course Player's Brain tab.
    */
-  | "brain";
+  | "brain"
+  /**
+   * Interactive 2D experiment — designed by the admin in the product editor
+   * (same builder as the Study Library) and played in the Course Player's
+   * sandboxed stage. Its content is `interactiveHtml` below; a hosted https
+   * page in `url` is the fallback for files too big to store inline.
+   */
+  | "interactive";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -101,6 +108,8 @@ export interface CanonicalCourseResource {
   /** Brain practice set (`type: "brain"` only). */
   practiceQuestions?: CoursePracticeQuestion[];
   practiceTitle?: string;
+  /** Interactive 2D experiment source (`type: "interactive"` only). */
+  interactiveHtml?: string;
 }
 
 export interface CanonicalCourseModule {

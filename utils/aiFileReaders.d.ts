@@ -18,7 +18,7 @@ export type AiFileType =
   | "mindmap"
   | "brain";
 
-export type AiReadKind = "google-export" | "pdf-bytes" | "caption-file" | "text-file" | "in-document" | "none";
+export type AiReadKind = "google-export" | "pdf-bytes" | "caption-file" | "text-file" | "in-document" | "image-link" | "download" | "none";
 
 export type AiReaderFallback = "screenshot" | "metadata" | "none";
 
@@ -73,6 +73,8 @@ export const UNKNOWN_AI_FILE_REASON: string;
 export const AI_TEXT_EXTENSIONS: RegExp;
 export const AI_CAPTION_EXTENSIONS: RegExp;
 export const AI_MEDIA_EXTENSIONS: RegExp;
+export const AI_OFFICE_EXTENSIONS: RegExp;
+export const AI_IMAGE_EXTENSIONS: RegExp;
 
 export const aiReaderFor: (type: string | null | undefined) => AiFileReader;
 export const aiReaderLabel: (type: string | null | undefined) => string;

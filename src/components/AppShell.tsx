@@ -124,6 +124,17 @@ export default function AppShell({
     return () => {
       window.removeEventListener("resize", check);
       window.removeEventListener("orientationchange", check);
+      // Unmount cleanup: this shell unmounts whenever the routing layer
+      // (`DesktopAppHost`) or this branch flips to mobile — e.g. a tablet
+      // going from fullscreen landscape to a narrow 9:16 window. The
+      // attributes below hide the mobile header (`[data-site-header]`) and
+      // switch off the whole mobile scroll model (`html:not(
+      // [data-tablet-landscape-desktop])` gates it), so leaving them behind
+      // strands the page with NO header and a broken scroller even though
+      // the mobile branch is mounted. Removing them here makes that
+      // impossible: whichever shell is mounted re-syncs them on mount.
+      document.documentElement.removeAttribute("data-tablet-landscape-desktop");
+      document.documentElement.removeAttribute("data-tablet-landscape");
     };
   }, []);
 

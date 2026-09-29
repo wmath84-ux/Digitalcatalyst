@@ -21,6 +21,7 @@ import {
   Check,
   CircleAlert,
   CircleCheck,
+  FlaskConical,
   Info,
   Package,
   PackageOpen,
@@ -120,6 +121,7 @@ const RESOURCE_TYPE_LABEL = {
   embed: "Embed",
   mindmap: "Mind map",
   brain: "Practice set",
+  interactive: "Experiment",
 };
 
 const RESOURCE_TYPE_ICON = {
@@ -136,6 +138,7 @@ const RESOURCE_TYPE_ICON = {
   embed: Package,
   mindmap: Sparkles,
   brain: BrainCircuit,
+  interactive: FlaskConical,
 };
 
 // ---------------------------------------------------------------------------

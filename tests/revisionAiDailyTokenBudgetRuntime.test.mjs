@@ -20,13 +20,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 // Inside the repo (and inside node_modules, so it is never committed) because
 // the bundle imports the Firestore stub as a sibling file.
 const OUT_DIR = path.join(ROOT, "node_modules/.tmp-ai-token-budget-contract");
-const STUB = path.join(OUT_DIR, "firebaseAdminStub.mjs");
-const OUT = path.join(OUT_DIR, "revisionGenerate.mjs");
+const STUB = path.join(OUT_DIR, "firebaseAdminStub.cjs");
+const OUT = path.join(OUT_DIR, "revisionGenerate.cjs");
+const PERSONAL_AI_OUT = path.join(OUT_DIR, "personalAi.cjs");
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(STUB, `
@@ -63,7 +67,7 @@ class Col {
   doc(id) { return new Doc(id ? \`\${this.path}/\${id}\` : \`\${this.path}/auto\`); }
 }
 
-export const db = {
+const db = {
   __store: store,
   collection(name) { return new Col(name); },
   // Transactions run immediately; the assertions here care about the resulting
@@ -78,11 +82,13 @@ export const db = {
   },
 };
 
-export function adminDb() { return db; }
-export function errorResponse(res, status, code, message) {
+function adminDb() { return db; }
+function errorResponse(res, status, code, message) {
   return res.status(status).json({ ok: false, code, message });
 }
-export async function requireFirebaseUser(req) { return { uid: req.__uid || "learner-1" }; }
+async function requireFirebaseUser(req) { return { uid: req.__uid || "learner-1" }; }
+
+module.exports = { db, adminDb, errorResponse, requireFirebaseUser };
 `);
 
 let runtime = null;
@@ -93,11 +99,16 @@ try {
   const esbuildPkg = path.join(ROOT, "node_modules/esbuild");
   if (!fs.existsSync(esbuildPkg)) throw new Error("esbuild is not installed");
   const { build } = await import(pathToFileURL(path.join(esbuildPkg, "lib/main.js")).href);
+  // CJS, not ESM: the server graph pulls in CJS-only dynamic requires (the
+  // Office readers) that esbuild cannot lower to static ESM imports — and
+  // Vercel runs these files as CJS in production too, so the bundle stays
+  // faithful. The stub is required by absolute path so both bundles and this
+  // file share the very same module instance for seeding and inspection.
   await build({
     entryPoints: [path.join(ROOT, "api/_lib/revisionGenerate.ts")],
     outfile: OUT,
     bundle: true,
-    format: "esm",
+    format: "cjs",
     platform: "node",
     target: "es2022",
     logLevel: "silent",
@@ -106,9 +117,9 @@ try {
       setup(build) {
         // The server module imports its Firebase helpers relatively, so the stub
         // is swapped in by path (esbuild keeps the specifier verbatim) and the
-        // test file imports the very same module instance to seed and inspect it.
+        // test file requires the very same module instance to seed and inspect it.
         build.onResolve({ filter: /firebaseAdmin\.js$/ }, () => ({
-          path: "./firebaseAdminStub.mjs",
+          path: "./firebaseAdminStub.cjs",
           external: true,
         }));
       },
@@ -116,9 +127,9 @@ try {
   });
   await build({
     entryPoints: [path.join(ROOT, "api/_lib/personalAi.ts")],
-    outfile: path.join(OUT_DIR, "personalAi.mjs"),
+    outfile: PERSONAL_AI_OUT,
     bundle: true,
-    format: "esm",
+    format: "cjs",
     platform: "node",
     target: "es2022",
     logLevel: "silent",
@@ -126,16 +137,16 @@ try {
       name: "in-memory-firestore",
       setup(build) {
         build.onResolve({ filter: /firebaseAdmin\.js$/ }, () => ({
-          path: "./firebaseAdminStub.mjs",
+          path: "./firebaseAdminStub.cjs",
           external: true,
         }));
       },
     }],
   });
-  const stub = await import(pathToFileURL(STUB).href);
+  const stub = require(STUB);
   store = stub.db.__store;
-  runtime = (await import(pathToFileURL(OUT).href)).revisionAiRuntime;
-  personalAi = await import(pathToFileURL(path.join(OUT_DIR, "personalAi.mjs")).href);
+  runtime = require(OUT).revisionAiRuntime;
+  personalAi = require(PERSONAL_AI_OUT);
 } catch (error) {
   loadError = error;
 }

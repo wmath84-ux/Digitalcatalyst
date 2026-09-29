@@ -488,9 +488,9 @@ test("AI availability is derived from the reader registry, never from a copy", (
   assert.equal(personalAiAvailability("sheet").readable, true);
   assert.equal(personalAiAvailability("slides").readable, true);
   assert.equal(personalAiAvailability("brain").readable, true);
-  assert.equal(personalAiAvailability("embed").readable, false);
+  assert.equal(personalAiAvailability("embed").readable, true, "public article pages read as text");
   assert.equal(personalAiAvailability("google_form").readable, false);
-  assert.equal(personalAiAvailability("image").readable, false);
+  assert.equal(personalAiAvailability("image").readable, true, "images read visually at ask time");
 });
 
 test("the reader registry covers every course file type the player can hold", () => {

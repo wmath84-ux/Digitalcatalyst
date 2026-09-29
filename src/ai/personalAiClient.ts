@@ -291,10 +291,17 @@ export interface CoursePlayerAiContext {
   productDocumentId?: string | null;
 }
 
+/** One chat-attached image for ask-time vision (capture or upload). Never stored — sent with this turn only. */
+export interface PersonalAiImageInput {
+  name?: string;
+  dataUrl: string;
+}
+
 export interface AskModuleAiInput extends PersonalAiScopeInput {
   uid: string;
   question: string;
   notes?: PersonalAiNoteInput[];
+  images?: PersonalAiImageInput[];
   history?: { role: "user" | "assistant"; text: string }[];
   signal?: AbortSignal;
   /** Prefer the learner's own key or the school AI for this turn. */
@@ -309,6 +316,7 @@ export const askModuleAi = async (input: AskModuleAiInput): Promise<PersonalAiAn
     ...scopePayload(input),
     question: input.question,
     notes: input.notes || [],
+    images: (input.images || []).slice(0, 3),
     history: (input.history || []).slice(-8),
     courseContext: input.courseContext || undefined,
   }, input.source);

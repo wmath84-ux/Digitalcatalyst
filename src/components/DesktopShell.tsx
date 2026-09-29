@@ -300,6 +300,22 @@ export default function DesktopShell({
     return () => {
       window.removeEventListener("resize", updateBodyClass);
       window.removeEventListener("orientationchange", updateBodyClass);
+      // Unmount cleanup: this shell unmounts on every desktop → mobile
+      // transition (e.g. a tablet resized from fullscreen landscape to a
+      // narrow 9:16 window). `body.is-desktop` HARD-HIDES the mobile footer
+      // (`body.is-desktop [data-site-footer-nav] { display: none !important }`
+      // in index.css), and the html attributes hide the mobile header and
+      // gate the mobile scroll model — so every marker this effect manages
+      // is scrubbed here. Note the last resize's `updateBodyClass` runs with
+      // the STALE `screenSize` state ("desktop") and re-adds `is-desktop`
+      // before React commits the unmount, which is exactly how the footer
+      // used to stay hidden on the mobile branch. Removing them here makes
+      // a stranded desktop marker impossible: whichever shell is mounted
+      // re-syncs them on mount.
+      document.body.classList.remove("is-desktop", "is-tablet", "is-mobile", "is-tablet-landscape", "is-wide-tablet");
+      document.documentElement.removeAttribute("data-tablet-landscape-desktop");
+      document.documentElement.removeAttribute("data-tablet-landscape");
+      document.documentElement.removeAttribute("data-wide-tablet");
     };
   }, [screenSize]);
   const { appName, logoUrl } = useBranding();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GlassCard } from "../components/ui/GlassCard";
+import { GlassSurface } from "../components/ui/glass";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
@@ -36,32 +36,32 @@ export default function ProfilePreview() {
 
   // Mock slots to represent the account cards that live in the real app.
   const mockMyDayCard = (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass">
+    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">My Day</p>
-          <h3 className="mt-0.5 text-base font-black text-white">3 free creations left today</h3>
+          <h3 className="mt-0.5 text-base font-bold text-white">3 free creations left today</h3>
           <p className="mt-0.5 text-xs font-medium text-white/55">Resets at midnight.</p>
         </div>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/15">
         <div className="h-full w-1/4 rounded-full bg-emerald-600" />
       </div>
-    </GlassCard>
+    </GlassSurface>
   );
 
   const mockAiQuotaCard = subscriber ? (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass">
+    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">AI quota</p>
-          <h3 className="mt-0.5 text-base font-black text-white">9 AI questions remaining</h3>
+          <h3 className="mt-0.5 text-base font-bold text-white">9 AI questions remaining</h3>
           <p className="mt-0.5 text-xs font-medium text-white/55">Resets weekly.</p>
         </div>
       </div>
-    </GlassCard>
+    </GlassSurface>
   ) : null;
 
   const tierLabel = tier === "normal" ? "Free learner" : tier === "premium" ? "Premium" : "Premium";

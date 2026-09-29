@@ -30,7 +30,9 @@ export type EditorResourceType =
   | "whimsical"
   | "iframe"
   /** Brain practice set — the one editor type with no URL. */
-  | "brain";
+  | "brain"
+  /** Interactive 2D experiment — inline HTML (`interactiveHtml`) or a hosted page. */
+  | "interactive";
 
 export interface EditorResource {
   id: string;
@@ -54,6 +56,8 @@ export interface EditorResource {
   /** Brain practice set (`type: "brain"` only) — the resource's whole content. */
   practiceQuestions?: unknown[];
   practiceTitle?: string;
+  /** Interactive 2D experiment (`type: "interactive"` only) — the inline HTML source. */
+  interactiveHtml?: string;
 }
 
 export interface EditorModule {
@@ -321,6 +325,16 @@ export declare const firestoreToCatalogProduct: (
   raw: unknown,
   documentId: string,
 ) => CatalogProductShape | null;
+
+/** One experiment's inline source cap (see `utils/productMapping.js`). */
+export declare const PRODUCT_EXPERIMENT_MAX_BYTES: number;
+/** All inline experiments of one product together, counted once. */
+export declare const PRODUCT_MAX_EXPERIMENT_BYTES: number;
+export declare const productExperimentBudget: (flatModules: unknown) => {
+  total: number;
+  over: { id: string; name: string; bytes: number } | null;
+};
+export declare const productExperimentBudgetError: (flatModules: unknown) => string | null;
 
 export declare const __testHelpers: {
   isValidHttpsUrl: (v: unknown) => boolean;

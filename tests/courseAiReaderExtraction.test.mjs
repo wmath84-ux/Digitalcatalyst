@@ -23,7 +23,7 @@ import { pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT_DIR = path.join(ROOT, "node_modules/.tmp-ai-reader-extraction");
-const OUT = path.join(OUT_DIR, "personalAiContent.mjs");
+const OUT = path.join(OUT_DIR, "personalAiContent.cjs");
 
 let extract = null;
 let loadError = null;
@@ -36,7 +36,10 @@ try {
     entryPoints: [path.join(ROOT, "api/_lib/personalAiContent.ts")],
     outfile: OUT,
     bundle: true,
-    format: "esm",
+    // CJS, not ESM: the Office readers pull in CJS-only dynamic requires that
+    // esbuild cannot lower to static ESM imports (and Vercel runs this file as
+    // CJS in production too, so the bundle stays faithful).
+    format: "cjs",
     platform: "node",
     target: "es2022",
     logLevel: "silent",
@@ -100,6 +103,67 @@ Today we finish electromagnetic induction.
 00:12.000 --> 00:26.000
 Flux equals B times A times cosine theta.
 `;
+
+/** Minimal real Office zips, built with the same jszip the extractor reads with. */
+const officeZip = async (contentTypes, files) => {
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", contentTypes);
+  for (const [name, body] of Object.entries(files)) zip.file(name, body);
+  return zip.generateAsync({ type: "nodebuffer" });
+};
+
+const TYPES_XML = (override) =>
+  `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>${override}</Types>`;
+
+const docxFile = (paragraphs) => officeZip(
+  TYPES_XML(`<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`),
+  {
+    "word/document.xml":
+      `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${
+        paragraphs.map((text) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`).join("")
+      }</w:body></w:document>`,
+  },
+);
+
+const xlsxFile = (rows) => officeZip(
+  TYPES_XML(
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+  ),
+  {
+    "_rels/.rels":
+      `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    "xl/workbook.xml":
+      `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Marks" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    "xl/_rels/workbook.xml.rels":
+      `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+    "xl/worksheets/sheet1.xml":
+      `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${
+        rows.map((cells, index) => `<row r="${index + 1}">${
+          cells.map((cell, col) => `<c r="${String.fromCharCode(65 + col)}${index + 1}" t="inlineStr"><is><t>${cell}</t></is></c>`).join("")
+        }</row>`).join("")
+      }</sheetData></worksheet>`,
+  },
+);
+
+const pptxFile = (slides) => officeZip(
+  TYPES_XML(slides.map((_, index) => `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("")),
+  Object.fromEntries(slides.map((texts, index) => [`ppt/slides/slide${index + 1}.xml`,
+    `<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody>${
+      texts.map((text) => `<a:p><a:r><a:t>${text}</a:t></a:r></a:p>`).join("")
+    }</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`])),
+);
+
+/** Bytes that start like a PNG — enough for magic verification, nothing more. */
+const pngBytes = () => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 0)]);
+
+const ARTICLE_HTML = `<!DOCTYPE html><html><head><title>Faraday's law</title><script>window.track(1);</script></head><body>
+<nav><a>Home</a><a>Courses</a><button>Sign Up For Free Now</button></nav>
+<article><h1>Faraday's law of induction</h1>
+<p>A changing magnetic field creates an electric current in a nearby conductor. The size of the induced EMF equals the rate of change of magnetic flux through the circuit.</p>
+<p>Lenz's law fixes the direction: the induced current always opposes the change that produced it. Together the two laws explain transformers, generators and induction stoves.</p>
+</article><footer>Copyright 2026 Example Academy. All rights reserved worldwide.</footer></body></html>`;
 
 const skip = { skip: Boolean(loadError) || !extract };
 
@@ -210,17 +274,21 @@ test("a Brain practice set is readable with no URL at all", skip, async () => {
   assert.match(empty.reason, /no questions imported yet/i);
 });
 
-test("forms and third-party embeds are refused by construction, not by accident", skip, async () => {
+test("forms are refused by construction; embeds get one honest attempt that chrome fails", skip, async () => {
   const asked = mockFetch({ "pen": { contentType: "text/html", body: "<html><body>secret page content that must never be read as a lesson here</body></html>" } });
   const embed = await extract.extractResourceContent({ id: "res-embed", type: "embed", url: "https://codepen.io/team/full/penABCD" });
-  assert.equal(embed.status, "unsupported");
-  assert.match(embed.reason, /never scraped/i);
+  // An interactive app page has no article text, so the attempt reports empty —
+  // and empty means NOTHING is grounded, exactly like a refusal.
+  assert.equal(embed.status, "empty");
   assert.equal(embed.text, "");
+  assert.match(embed.reason, /screenshot/i);
+  assert.deepEqual(asked, ["https://codepen.io/team/full/penABCD"], "one honest attempt, then an honest report");
 
+  const formAsked = mockFetch({});
   const form = await extract.extractResourceContent({ id: "res-form", type: "google_form", url: "https://docs.google.com/forms/d/1AbCdEfGhIjKlMnOp/viewform" });
   assert.notEqual(form.status, "ok");
   assert.equal(form.text, "", "no answer may be built out of a form nobody shared");
-  assert.deepEqual(asked, [], "a refused type must not even open a connection");
+  assert.deepEqual(formAsked, [], "a refused type must not even open a connection");
 });
 
 test("local and private addresses are refused before any request is made", skip, async () => {
@@ -245,4 +313,106 @@ test("a timeout is retryable and never answered with invented content", skip, as
   assert.equal(result.status, "error");
   assert.match(result.reason, /timed out/i);
   assert.equal(result.text, "");
+});
+
+test("a docx upload reads from its own bytes, even served as octet-stream", skip, async () => {
+  mockFetch({
+    "handout.docx": {
+      contentType: "application/octet-stream",
+      body: await docxFile([
+        "Magnetic flux changes in exactly three ways for this chapter.",
+        "First the field strength changes, then the area, then the angle between them.",
+      ]),
+    },
+  });
+  const result = await extract.extractResourceContent({ id: "res-docx", type: "doc", url: "https://cdn.example.test/handout.docx" });
+  assert.equal(result.status, "ok", result.reason);
+  assert.equal(result.planKind, "download");
+  assert.match(result.text, /exactly three ways/);
+});
+
+test("an xlsx upload reads as labelled rows, sheet by sheet", skip, async () => {
+  mockFetch({
+    "marks.xlsx": {
+      contentType: "application/octet-stream",
+      body: await xlsxFile([["Student Name", "Physics Marks"], ["Aarav Sharma", "92"], ["Diya Patel", "88"]]),
+    },
+  });
+  const result = await extract.extractResourceContent({ id: "res-xlsx", type: "sheet", url: "https://cdn.example.test/marks.xlsx" });
+  assert.equal(result.status, "ok", result.reason);
+  assert.match(result.text, /Sheet: Marks/);
+  assert.match(result.text, /Aarav Sharma \| 92/);
+});
+
+test("a pptx upload reads slide by slide", skip, async () => {
+  mockFetch({
+    "deck.pptx": {
+      contentType: "application/octet-stream",
+      body: await pptxFile([["Induction", "A changing field creates current"], ["Faraday", "EMF equals minus N dPhi by dt"]]),
+    },
+  });
+  const result = await extract.extractResourceContent({ id: "res-pptx", type: "slides", url: "https://cdn.example.test/deck.pptx" });
+  assert.equal(result.status, "ok", result.reason);
+  assert.match(result.text, /Slide 1:/);
+  assert.match(result.text, /A changing field creates current/);
+  assert.match(result.text, /Slide 2:/);
+});
+
+test("a legacy .doc names the fix instead of pretending to read", skip, async () => {
+  mockFetch({ "old.doc": { contentType: "application/octet-stream", body: Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(64, 0)]) } });
+  const result = await extract.extractResourceContent({ id: "res-doc", type: "doc", url: "https://cdn.example.test/old.doc" });
+  assert.equal(result.status, "invalid");
+  assert.equal(result.text, "");
+  assert.match(result.reason, /re-save it as \.docx/i);
+});
+
+test("an image link verifies to visual — the model looks at ask time, nothing is faked here", skip, async () => {
+  mockFetch({ "fig1.png": { contentType: "image/png", body: pngBytes() } });
+  const result = await extract.extractResourceContent({ id: "res-img", type: "image", url: "https://cdn.example.test/fig1.png" });
+  assert.equal(result.status, "visual", result.reason);
+  assert.equal(result.planKind, "image-link");
+  assert.equal(result.text, "", "verification carries no text — vision carries the meaning");
+  assert.equal(result.contentType, "image/png");
+
+  mockFetch({ "notimage.png": { contentType: "text/html", body: "<html><body>nope</body></html>" } });
+  const fake = await extract.extractResourceContent({ id: "res-img2", type: "image", url: "https://cdn.example.test/notimage.png" });
+  assert.equal(fake.status, "invalid");
+  assert.match(fake.reason, /didn't return an image/i);
+});
+
+test("a PDF without its extension still reads from its bytes", skip, async () => {
+  mockFetch({ "o%2Fhandout": { contentType: "application/octet-stream", body: tinyPdf("Extensionless storage bytes still parse", 4) } });
+  const result = await extract.extractResourceContent({ id: "res-sniff", type: "embed", url: "https://firebasestorage.example.test/o%2Fhandout?alt=media" });
+  assert.equal(result.status, "ok", result.reason);
+  assert.equal(result.planKind, "download");
+  assert.match(result.text, /Extensionless storage bytes still parse/);
+});
+
+test("a public article reads as prose; chrome never grounds an answer", skip, async () => {
+  mockFetch({ "faraday": { contentType: "text/html; charset=utf-8", body: ARTICLE_HTML } });
+  const result = await extract.extractResourceContent({ id: "res-article", type: "embed", url: "https://example.test/articles/faraday" });
+  assert.equal(result.status, "ok", result.reason);
+  assert.match(result.text, /changing magnetic field creates an electric current/);
+  assert.doesNotMatch(result.text, /Sign Up For Free Now/, "nav chrome must not read as lesson content");
+  assert.doesNotMatch(result.text, /window\.track/, "scripts must never leak into grounding");
+
+  mockFetch({ "chrome": { contentType: "text/html", body: "<html><body><nav>Home Products Pricing Login Contact About Careers</nav><button>Start free trial now</button></body></html>" } });
+  const chrome = await extract.extractResourceContent({ id: "res-chrome", type: "embed", url: "https://example.test/chrome" });
+  assert.equal(chrome.status, "empty");
+  assert.equal(chrome.text, "");
+  assert.match(chrome.reason, /screenshot/i);
+});
+
+test("a code file reads as text, labelled or sniffed", skip, async () => {
+  const code = "# Flux helper for the induction chapter worked examples.\n# Change the field, the area or the angle and watch the EMF.\ndef total_flux(field, area, angle):\n    import math\n    change = field * area * math.cos(angle)\n    results = [change * step for step in range(ten)]\n    average = sum(results) / len(results)\n    print('mean flux over the sweep:', average)\n    return average\n";
+  mockFetch({ "flux.py": { contentType: "text/plain", body: code } });
+  const labelled = await extract.extractResourceContent({ id: "res-code", type: "embed", url: "https://site.example.test/flux.py" });
+  assert.equal(labelled.status, "ok", labelled.reason);
+  assert.equal(labelled.planKind, "text-file");
+  assert.match(labelled.text, /def total_flux/);
+
+  mockFetch({ "o%2Fscript": { contentType: "application/octet-stream", body: code } });
+  const sniffed = await extract.extractResourceContent({ id: "res-code2", type: "embed", url: "https://firebasestorage.example.test/o%2Fscript?alt=media" });
+  assert.equal(sniffed.status, "ok", sniffed.reason);
+  assert.match(sniffed.text, /def total_flux/);
 });

@@ -37,7 +37,9 @@ import {
 } from "@/components/admin/ui";
 import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/admin/products/CloudinaryImageUploadField";
 import PracticeSetImportPanel from "@/components/admin/products/PracticeSetImportPanel";
+import AdminExperimentEditor from "@/components/admin/products/ExperimentEditor";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
+import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
 import type { PaidUpdate, ProductModule, ProductResource } from "@/lib/admin/types";
 
@@ -57,6 +59,7 @@ const RESOURCE_TYPES = [
   "whimsical",
   "iframe",
   "brain",
+  "interactive",
 ] as const;
 
 const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
@@ -75,12 +78,15 @@ const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
   whimsical: "Whimsical",
   iframe: "Other embed / iframe",
   brain: "Brain · practice set",
+  interactive: "Interactive 2D experiment",
 };
 
 function providerForType(type: ProductResource["type"]) {
   // The Brain practice set is the ONE resource type with no external provider:
-  // its content is the question list the admin imports below.
+  // its content is the question list the admin imports below. An experiment is
+  // the same idea — its content is the HTML designed in the panel below.
   if (type === "brain") return "Brain";
+  if (type === "interactive") return "Experiment";
   if (type === "youtube") return "YouTube";
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
@@ -730,18 +736,25 @@ function ResourceCard({
   const isLast = index === module.resources.length - 1;
 
   // A Brain resource is the ONE type that is ready WITHOUT a URL: its content
-  // is the practice set below. Everything else keeps the URL-ready rule.
+  // is the practice set below. An experiment is the same idea — its content is
+  // the HTML designed in the panel below (or a hosted page). Everything else
+  // keeps the URL-ready rule.
   const isBrain = resource.type === "brain";
   const brainQuestions = normalizePracticeQuestions(resource.practiceQuestions);
   const brainReady = isBrain && practiceQuestionsReady(resource.practiceQuestions);
-  const readyForPlayer = isBrain ? brainReady : Boolean(cleanUrl);
+  const isExperiment = resource.type === "interactive";
+  const experimentHtml = isExperiment ? String(resource.interactiveHtml || "") : "";
+  const experimentHosted = isExperiment && Boolean(cleanUrl);
+  const experimentErrors = isExperiment && experimentHtml.trim() ? experimentBlockingIssues(experimentHtml) : [];
+  const experimentReady = isExperiment && (Boolean(experimentHtml.trim()) || experimentHosted) && experimentErrors.length === 0;
+  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : Boolean(cleanUrl);
 
   return (
     <article
       data-admin-resource-card
       data-resource-id={resource.id}
       data-resource-type={resource.type}
-      className={`space-y-3 rounded-xl border p-3 ${readyForPlayer ? "border-slate-200 bg-slate-50/60" : isBrain ? "border-amber-300 bg-amber-50/40" : "border-red-300 bg-red-50/30"}`}
+      className={`space-y-3 rounded-xl border p-3 ${readyForPlayer ? "border-slate-200 bg-slate-50/60" : isBrain || isExperiment ? "border-amber-300 bg-amber-50/40" : "border-red-300 bg-red-50/30"}`}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -754,6 +767,14 @@ function ResourceCard({
               : brainReady
                 ? `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} ready`
                 : `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} · answer missing`}
+          </Pill>
+        ) : isExperiment ? (
+          <Pill tone={experimentReady ? "success" : experimentErrors.length ? "danger" : "warn"}>
+            {!experimentHtml.trim() && !experimentHosted
+              ? "Source required"
+              : experimentErrors.length
+                ? `${experimentErrors.length} error${experimentErrors.length === 1 ? "" : "s"} to fix`
+                : "Experiment ready"}
           </Pill>
         ) : (
           <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
@@ -806,6 +827,29 @@ function ResourceCard({
             })
           }
         />
+      ) : isExperiment ? (
+        <div className="space-y-3">
+          <Field
+            label="Hosted experiment link (optional)"
+            hint="Only for experiments too big to store — the player uses this only when the HTML box below is empty."
+          >
+            <textarea
+              className={`${textareaClass} min-h-[52px] bg-white`}
+              placeholder="https://…"
+              value={resource.url}
+              onChange={(event) => onUpdate({ url: event.target.value })}
+              onBlur={() => {
+                const normalized = normalizeResourceUrl(resource.url, resource.type);
+                if (normalized && normalized !== resource.url) {
+                  onUpdate({ url: normalized });
+                }
+              }}
+            />
+          </Field>
+          {/* The Study Library's experiment builder, re-skinned for the admin
+              panel: AI prompt → paste/upload/template → live preview → checks. */}
+          <AdminExperimentEditor resource={resource} onChange={onUpdate} />
+        </div>
       ) : resource.type === "image_url" ? (
         <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
           <div>
@@ -878,7 +922,7 @@ function ResourceCard({
         </Field>
       )}
 
-      {!cleanUrl && !isBrain ? (
+      {!cleanUrl && !isBrain && !isExperiment ? (
         <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">
           Add a valid public URL before publishing. This resource cannot appear in the player yet.
         </p>
@@ -887,6 +931,13 @@ function ResourceCard({
         <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
           Every practice question needs text, two options and a marked answer. The set only reaches the learner&apos;s Brain tab once it is
           complete — drafts stay saved here meanwhile.
+        </p>
+      ) : null}
+      {isExperiment && !experimentReady ? (
+        <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
+          {experimentErrors.length
+            ? "This experiment has errors the player cannot run past — fix them in the panel above before publishing."
+            : "Paste the HTML the AI gave you (or upload the .html file, or start from a template) — an experiment with no source cannot open in the player."}
         </p>
       ) : null}
       {resource.type === "whimsical" ? (
@@ -996,7 +1047,9 @@ function ResourceCard({
       </details>
 
       <div className="flex flex-wrap gap-2">
-        {!isBrain ? (
+        {/* An inline-only experiment has no URL to open — the button appears
+            only when a hosted link is set. */}
+        {!isBrain && (!isExperiment || cleanUrl) ? (
           <SecondaryButton
             className="h-9 px-3 text-xs"
             disabled={!cleanUrl}

@@ -21,7 +21,9 @@ import {
   AI_FILE_LABELS,
   AI_FILE_READERS,
   AI_FILE_TYPES,
+  AI_IMAGE_EXTENSIONS,
   AI_MEDIA_EXTENSIONS,
+  AI_OFFICE_EXTENSIONS,
   AI_READ_KINDS,
   AI_TEXT_EXTENSIONS,
   aiCapabilitiesFor,
@@ -257,16 +259,27 @@ test("payload text never invents content from an empty description", () => {
 /* What must never be read                                            */
 /* ------------------------------------------------------------------ */
 
-test("forms, embeds and images stay unreadable — and say why, without scraping", () => {
+test("forms stay refused — embeds read public pages, images read visually", () => {
+  // A form's questions and responses belong to its owner: never read, ever.
   assert.equal(aiReaderFor("google_form").hasReadPath, false);
   assert.match(aiReaderReason("google_form"), /owner/i);
-  assert.equal(aiReaderFor("embed").hasReadPath, false);
-  assert.match(aiReaderReason("embed"), /never scraped/i);
-  assert.equal(aiReaderFor("image").hasReadPath, false);
-  // …but all three are visible to the learner, so a capture is a real path.
+  assert.equal(aiReadPlan({ type: "google_form", url: "https://example.com/form.html" }).kind, "none");
+  // An embed gets ONE honest attempt at the page's public text (interactive
+  // apps and login walls still fail at the extractor's article gate).
+  assert.equal(aiReaderFor("embed").hasReadPath, true);
+  assert.equal(aiReaderFor("embed").via, "download");
+  assert.match(aiReaderReason("embed"), /screenshot/i);
+  // An image is read by looking: vision at ask time, verified by the extractor.
+  assert.equal(aiReaderFor("image").hasReadPath, true);
+  assert.equal(aiReaderFor("image").via, "image-link");
+  // …and all three stay visible to the learner, so a capture is a real path.
   assert.equal(aiCapabilitiesFor("image").fallback, "screenshot");
   assert.equal(aiCapabilitiesFor("embed").fallback, "screenshot");
   assert.equal(aiCapabilitiesFor("audio").fallback, "metadata", "an audio player has nothing to screenshot");
+  // Vision is not text: an image never contributes text chunks to retrieval.
+  assert.equal(aiCapabilitiesFor("image").text, false);
+  assert.equal(aiCapabilitiesFor("image").searchableChunks, false);
+  assert.equal(aiCapabilitiesFor("image").serverAnalyzable, true);
 });
 
 test("google id extraction is shared, not duplicated per surface", () => {
@@ -310,10 +323,10 @@ test("the honesty table is derived, so it cannot claim or deny on its own", () =
     assert.doesNotMatch(availability.reason, /isn't supported yet/i, type);
   }
   // Readable kinds: real pipelines. Unreadable kinds: honest refusals.
-  for (const type of ["pdf", "doc", "sheet", "slides", "ebook", "mindmap", "brain"]) {
+  for (const type of ["pdf", "doc", "sheet", "slides", "ebook", "mindmap", "brain", "image", "embed"]) {
     assert.equal(aiTypeHasReadPath(type), true, type);
   }
-  for (const type of ["youtube", "video", "audio", "image", "google_form", "embed"]) {
+  for (const type of ["youtube", "video", "audio", "google_form"]) {
     assert.equal(aiTypeHasReadPath(type), false, type);
   }
 });
@@ -322,4 +335,55 @@ test("every row is frozen — no surface can rewrite the table at runtime", () =
   assert.ok(Object.isFrozen(AI_FILE_READERS));
   assert.ok(Object.isFrozen(AI_FILE_TYPES));
   assert.ok(Object.isFrozen(AI_READ_KINDS));
+});
+
+/* ------------------------------------------------------------------ */
+/* Code, Office, images and extensionless URLs                         */
+/* ------------------------------------------------------------------ */
+
+test("code files read as text, whatever the label says", () => {
+  for (const file of ["https://site.com/sort.py", "https://site.com/app.ts", "https://site.com/Main.java", "https://site.com/query.sql", "https://site.com/deploy.yml", "https://site.com/note.ipynb"]) {
+    assert.equal(aiReadPlan({ type: "embed", url: file }).kind, "text-file", file);
+  }
+  assert.equal(aiReadPlan({ type: "pdf", url: "https://site.com/a.py" }).kind, "text-file", "the extension wins over the label");
+  assert.ok(AI_TEXT_EXTENSIONS.test("x.py") && AI_TEXT_EXTENSIONS.test("x.tsx") && AI_TEXT_EXTENSIONS.test("x.java"));
+});
+
+test("Office uploads read from their own bytes — even under a Google label", () => {
+  const docx = aiReadPlan({ type: "doc", url: "https://cdn.example.com/handout.docx" });
+  assert.equal(docx.kind, "download");
+  assert.equal(docx.format, "office");
+  assert.equal(aiReadPlan({ type: "sheet", url: "https://cdn.example.com/marks.xlsx" }).kind, "download");
+  assert.equal(aiReadPlan({ type: "slides", url: "https://cdn.example.com/deck.pptx" }).kind, "download");
+  assert.equal(aiReadPlan({ type: "doc", url: "https://cdn.example.com/old.doc" }).kind, "download", "legacy .doc routes here so the learner hears 're-save as .docx'");
+  assert.ok(AI_OFFICE_EXTENSIONS.test("x.docx") && AI_OFFICE_EXTENSIONS.test("x.xlsx") && AI_OFFICE_EXTENSIONS.test("x.pptx"));
+});
+
+test("images route to vision, with Drive links rewritten to direct downloads", () => {
+  const direct = aiReadPlan({ type: "image", url: "https://cdn.example.com/fig1.png" });
+  assert.equal(direct.kind, "image-link");
+  assert.equal(direct.url, "https://cdn.example.com/fig1.png");
+  const drive = aiReadPlan({ type: "image", url: "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view" });
+  assert.equal(drive.kind, "image-link");
+  assert.equal(drive.url, "https://drive.google.com/uc?export=download&id=1AbCdEfGhIjKlMnOp");
+  assert.equal(aiReadPlan({ type: "embed", url: "https://site.com/photo.jpg" }).kind, "image-link", "an image is an image whatever the label");
+  assert.equal(aiReadPlan({ type: "image", url: "" }).kind, "none", "no link is still its own fact");
+  assert.ok(AI_IMAGE_EXTENSIONS.test("x.png") && AI_IMAGE_EXTENSIONS.test("x.jpg") && AI_IMAGE_EXTENSIONS.test("x.webp"));
+});
+
+test("extensionless storage URLs get one honest attempt; unknown binaries stay refused", () => {
+  const sniff = aiReadPlan({ type: "embed", url: "https://firebasestorage.example.test/o/handout?alt=media" });
+  assert.equal(sniff.kind, "download");
+  assert.equal(sniff.format, "sniff");
+  assert.equal(aiReadPlan({ type: "mystery-type", url: "https://example.com/file" }).kind, "download");
+  assert.equal(aiReadPlan({ type: "not-a-real-type", url: "https://example.com/x.bin" }).kind, "none", "an unreadable extension is still a refusal");
+  assert.equal(aiReadPlan({ type: "embed", url: "https://example.com/app.exe" }).kind, "none");
+  assert.equal(aiReadPlan({ type: "video", url: "https://example.com/lesson" }).kind, "none", "media types never gain a link read");
+  assert.equal(aiReadPlan({ type: "video", url: "https://example.com/lesson.mp4" }).kind, "none");
+});
+
+test("the resource's own filename witnesses an extensionless URL", () => {
+  assert.equal(aiReadPlan({ type: "doc", name: "notes.docx", url: "https://firebasestorage.example.test/o/abc?alt=media" }).kind, "download");
+  assert.equal(aiReadPlan({ type: "embed", name: "sort.py", url: "https://firebasestorage.example.test/o/def?alt=media" }).kind, "text-file");
+  assert.equal(aiReadPlan({ type: "embed", name: "figure.png", url: "https://firebasestorage.example.test/o/ghi?alt=media" }).kind, "image-link");
 });

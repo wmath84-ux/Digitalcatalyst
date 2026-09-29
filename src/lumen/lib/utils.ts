@@ -59,6 +59,48 @@ export async function readImageAttachment(file: File): Promise<Attachment> {
   }
 }
 
+/**
+ * Prepare one attachment for ask-time vision: rasterize (GIF first frame, SVG
+ * drawing) and downscale to a bounded JPEG the model can actually receive.
+ * Returns null when the bytes cannot be rasterized AND are not already a
+ * model-readable data URL — the caller skips those instead of failing the ask.
+ */
+export async function toVisionImage(src: string, name: string): Promise<{ name: string; dataUrl: string } | null> {
+  const cleanName = (name || "attached image").slice(0, 80);
+  const passthrough = /^data:image\/(jpeg|png|webp);base64,/i.test(src || "") ? { name: cleanName, dataUrl: src } : null;
+  try {
+    const raster = await new Promise<string | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const nw = img.naturalWidth || 0;
+          const nh = img.naturalHeight || 0;
+          if (!nw || !nh) return resolve(null);
+          const MAX = 1568;
+          const scale = Math.min(1, MAX / Math.max(nw, nh));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(2, Math.round(nw * scale));
+          canvas.height = Math.max(2, Math.round(nh * scale));
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(null);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    if (raster) return { name: cleanName, dataUrl: raster };
+    return passthrough;
+  } catch {
+    return passthrough;
+  }
+}
+
 export function makeScreenshotAttachment(src: string, w: number, h: number): Attachment {
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, "0");

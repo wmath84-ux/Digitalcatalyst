@@ -23,6 +23,8 @@ export type PersonalAiReadKind =
   | "caption-file"
   | "text-file"
   | "in-document"
+  | "image-link"
+  | "download"
   | "none";
 export const PERSONAL_AI_READ_KINDS: readonly PersonalAiReadKind[];
 
@@ -34,6 +36,7 @@ export type PersonalAiOutcomeStatus =
   | "error"
   | "skipped"
   | "pending"
+  | "visual"
   | "unsupported";
 export const PERSONAL_AI_OUTCOMES: readonly PersonalAiOutcomeStatus[];
 
@@ -66,6 +69,7 @@ export const PERSONAL_AI_MODULE_ROOT_LABEL: string;
 export const PERSONAL_AI_COURSE_ROOT_LABEL: string;
 
 export const cleanAiText: (value: unknown, max?: number) => string;
+export const cleanAiAnswerText: (value: unknown, max?: number) => string;
 export const stripAiMarkup: (value: unknown, max?: number) => string;
 export const personalAiHash: (value: unknown) => string;
 export const googleFileIdFromUrl: (rawUrl: unknown) => string;

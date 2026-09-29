@@ -155,7 +155,7 @@ test("every CourseFileType has a reader row, an adapter and an icon", async () =
 
 test("the extractor executes the registry's decision and nothing else", () => {
   assert.match(extractor, /import \{ aiPayloadText, parseCaptionText \} from "\.\.\/\.\.\/utils\/aiFileReaders\.js"/);
-  for (const kind of ["in-document", "caption-file", "pdf-bytes", "google-export", "text-file"]) {
+  for (const kind of ["in-document", "caption-file", "pdf-bytes", "google-export", "text-file", "image-link", "download"]) {
     assert.ok(extractor.includes(`plan.kind === "${kind}"`) || (kind === "text-file" && extractor.includes('// plan.kind === "text-file"')), `${kind} is decided by the registry but never executed`);
   }
   assert.doesNotMatch(extractor, /plan\.kind === "pdf"[^-\w]/, "the old 'pdf' kind must be gone, not half-renamed");

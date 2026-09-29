@@ -150,14 +150,33 @@ change (rules owner-scoped hain aur type allowlist nahi rakhte). Offline queue
   4 templates), live preview + warnings.
 - `src/personal-library/experimentTemplates.ts` — 4 templates, `?raw` imports.
 
+### Builder (Admin — official products)
+
+- `src/components/admin/products/ModulesResourcesEditor.tsx` — `RESOURCE_TYPES` me
+  `interactive` ("Interactive 2D experiment"), Study Library jaisa hi card: optional
+  hosted-link field + builder panel + ready/warn pill + amber draft state.
+- `src/components/admin/products/ExperimentEditor.tsx` — wahi 3-step flow
+  (AI prompt → paste/upload/4 templates → **wahi** `ExperimentStage` preview →
+  checks), sirf admin ki light theme me. Templates, prompt aur checks dono
+  builders me **same modules** se aate hain, isliye design kabhi diverge nahi hota.
+- `src/components/admin/products/ProductEditor.tsx` — publish checklist
+  (source required, over-size block) + **har save** (draft bhi) par budget gate.
+- `utils/productMapping.js` — `interactive` har mapper se guzarta hai
+  (`editor → canonical → legacy CourseFile`, `editor → Firestore → editor`);
+  URL-less inline source usable hai, khaali resource drop hota hai (Brain jaisa rule).
+- Budget: per-experiment **200 KB** (same), per-product **320 KB single-count**
+  (`PRODUCT_EXPERIMENT_MAX_BYTES`) — kyunki official document tree ko **do baar**
+  store karta hai (`courseContent` + `adminProduct`), stored ≈ 640 KB, learner
+  budget ke barabar.
+
 ---
 
 ## 6. Limits / jo abhi nahi hua
 
-1. **Official (admin) courses** me ye type abhi nahi hai — admin ke
-   `ModulesResourcesEditor` me add karna ek alag (chhota) kaam hai. Learner-authored
-   courses aur My Study Library me poora kaam karta hai, jaisa aapne kaha tha:
-   "abhi keval isko course player tak hi rakhte hain".
+1. ~~**Official (admin) courses** me ye type abhi nahi hai~~ — **ho gaya:**
+   admin product editor (`Modules & Resources` tab) me "Interactive 2D experiment"
+   type hai, Study Library wale builder ke saath. Product ke saath module ke andar
+   resource ki tarah add hota hai aur Course Player me waisa hi chalta hai.
 2. **AI chat** is file ko `embed` ki tarah dekhta hai (`asResourceType` demotion) —
    experiment ki HTML ko AI context me dena next step ho sakta hai.
 3. **Blob "new tab"** kuch purane Android WebViews me kaam nahi karta — Restart +
@@ -175,6 +194,7 @@ npx tsc --noEmit -p tsconfig.json        # naye errors: 0
 npx vite build                           # green
 node --test tests/*.test.mjs             # baseline ke exactly wahi 76 purane failures, 0 naye
 node --test tests/coursePlayerInteractiveExperimentsContract.test.mjs
+node --test tests/adminInteractiveExperimentsContract.test.mjs
 ```
 
 Naya contract suite (`tests/coursePlayerInteractiveExperimentsContract.test.mjs`,
@@ -182,3 +202,9 @@ Naya contract suite (`tests/coursePlayerInteractiveExperimentsContract.test.mjs`
 **nahi**), bridge + shell injection, builder checks + prompt rules, dual-writer caps,
 player wiring (visibility/resume/denominator/completion), aur **jsdom runtime** me
 chaaron templates ka asli run (`ready` + `progress` messages, zero errors).
+
+Admin suite (`tests/adminInteractiveExperimentsContract.test.mjs`) pin karta hai:
+admin type + builder panel (prompt → paste/upload/templates → live preview →
+checks), `utils/productMapping.js` ka end-to-end carry (`editor → Firestore →
+editor`, `editor → canonical → legacy `CourseFile``), Brain ka untouched rehna,
+aur official budget (200 KB / file, 320 KB / product single-count).
