@@ -7,8 +7,6 @@ import {
   CalendarClock,
   ClipboardList,
   NotebookPen,
-  Search,
-  X,
 } from "lucide-react";
 import StoreHeader from "./components/Header";
 import { useBranding } from "./context/BrandingContext";
@@ -29,8 +27,6 @@ import { QuoteCard, StreakCard } from "./components/myday/OverviewSideCards";
 import StoreBanner from "./components/myday/StoreBanner";
 import { useStudyStreak } from "./hooks/useStudyStreak";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
-import { GlassInput } from "./components/ui/glass-input";
-import { GlassButton } from "./components/ui/glass-button";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
 import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
@@ -418,24 +414,6 @@ export default function App() {
     return () => window.removeEventListener("hashchange", applyDeepLink);
   }, []);
 
-  // The desktop header search pill carries a Ctrl+K hint — honour it: focus
-  // the pill on desktop widths, otherwise open the phone search strip.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        const pill = document.getElementById("myday-header-search");
-        if (pill && pill.offsetParent !== null) {
-          (pill as HTMLInputElement).focus();
-        } else {
-          setShowMobileSearch(true);
-        }
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
   const showConfirm = useCallback((title: string, message: string, onConfirm: () => void, confirmLabel = "Delete") => {
     setConfirmConfig({ title, message, onConfirm, confirmLabel });
     setConfirmOpen(true);
@@ -696,9 +674,6 @@ export default function App() {
     addToast("Report downloaded");
   }, [schedule, reminders, completedCount, tasks, notes, addToast]);
 
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
-
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
     <div className="dc-app-shell myday-scope min-h-screen">
@@ -710,14 +685,6 @@ export default function App() {
           title={`${appName} Tasker`}
           subtitle="My Day Activities"
           onDownloadReport={handleDownloadReport}
-          onToggleSearch={() => setShowMobileSearch((s) => !s)}
-          searchActive={showMobileSearch || Boolean(globalSearch)}
-          centerSearch={{
-            value: globalSearch,
-            onChange: setGlobalSearch,
-            placeholder: "Search for notes, tasks, topics...",
-            inputId: "myday-header-search",
-          }}
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
@@ -737,38 +704,6 @@ export default function App() {
             </button>
           )}
         />
-
-        {/* The phone search strip is CHROME, so it wears the bar plate the
-            shared header and the store's filter bar wear: `dc-scene-plate--bar`
-            paints the strip's own box (there is no pack surface inside it) and
-            `dc-scene-field` gives the pill a rim + a legible placeholder. A
-            search that reads clearly is the one feature every My Day page is
-            reached through. */}
-        {showMobileSearch && (
-          <div className="dc-scene-plate dc-scene-plate--bar animate-slideUp border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-2 [backdrop-filter:var(--dc-chrome-glass-blur)]">
-            <div className="flex items-center gap-2">
-              <GlassInput
-                type="search"
-                autoFocus
-                className="dc-scene-field w-full"
-                icon={<Search className="h-4 w-4" aria-hidden="true" />}
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                placeholder="Search tasks, notes..."
-              />
-              {globalSearch && (
-                <GlassButton
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 [&_.size-12]:size-10"
-                >
-                  <X className="h-4 w-4" />
-                </GlassButton>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* No horizontal tab strip here any more. My Day switches pages with
             the side rail (`SideNav`, from 768 px up) and the floating bottom
@@ -887,7 +822,6 @@ export default function App() {
                 onEdit={openEditTask}
                 onDelete={handleDeleteTask}
                 onAdd={openAddTask}
-                globalSearch={globalSearch}
                 highlightId={highlightId}
                 streak={streak}
                 onViewSchedule={() => handleNavigate("schedule")}
@@ -914,7 +848,6 @@ export default function App() {
                 highlightId={highlightId}
                 onRequireAccess={requireMyDayAccess}
                 loading={!cloudLoaded && reminders.length === 0}
-                globalSearch={globalSearch}
               />
             )}
 
@@ -924,7 +857,6 @@ export default function App() {
                 onAdd={handleAddNote}
                 onEdit={handleEditNote}
                 onDelete={handleDeleteNote}
-                globalSearch={globalSearch}
                 onRequireAccess={requireMyDayAccess}
               />
             )}

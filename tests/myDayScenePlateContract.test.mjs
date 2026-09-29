@@ -96,9 +96,10 @@ test("the plate is the ONE recipe — My Day added no material of its own", () =
 /* 2. Fields, segments, chrome and loose ink                          */
 /* ------------------------------------------------------------------ */
 
-test("search — global and per-page — takes the field hook", () => {
-  // The phone search strip in the page chrome.
-  assert.match(myDay, /className="dc-scene-field w-full"/);
+test("search — per-page — takes the field hook", () => {
+  // OWNER BRIEF (2026-09-29): the My Day HEADER search is gone (the pages
+  // own their search), so the page chrome no longer holds a field.
+  assert.doesNotMatch(myDay, /dc-scene-field/);
   // Tasks and Notes each have their own search pill.
   assert.match(taskList, /cn\("dc-scene-field min-w-0 flex-1", isSearchActive && "ring-2 ring-indigo-400\/30 rounded-full"\)/);
   assert.match(quickNotes, /cn\("dc-scene-field min-w-0 flex-1", isSearchActive && "rounded-full ring-2 ring-rose-400\/30"\)/);
@@ -127,11 +128,14 @@ test("the segmented controls take the store / PDP segment recipe", () => {
   assert.match(css, /:where\(\.dc-segment\)\[data-stretch\] > div\[role="group"\]/);
 });
 
-test("the phone search strip is chrome, so it wears the bar plate", () => {
-  assert.match(
-    myDay,
-    /className="dc-scene-plate dc-scene-plate--bar animate-slideUp border-b border-white\/10 bg-\[var\(--dc-chrome-glass\)\]/,
-  );
+test("the phone search strip is GONE — the header search was removed", () => {
+  // OWNER BRIEF (2026-09-29): "header mein search icon nahin dikhna chahiye
+  // — remove karo use kyunki already page per hai." The strip existed only
+  // to carry the header's global search, so with the icon the strip goes
+  // too. The header itself still wears the bar plate (the shared Header
+  // component owns it).
+  assert.doesNotMatch(myDay, /animate-slideUp/);
+  assert.doesNotMatch(myDay, /showMobileSearch/);
   // The published chrome token is NOT retuned to get the contrast — the bar
   // plate overrides at the call site, exactly like the shared header and the
   // store's filter bar.
