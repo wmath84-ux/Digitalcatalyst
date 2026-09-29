@@ -118,32 +118,39 @@
  * outside any site footer nav) measure room to spare and wave exactly as
  * before.
  *
- * ── THE FILLED DOCK'S WAVE IS TRANSFORM-ONLY (owner brief 2026-09-29) ─────
- *   "Home page ka footer navigation use tarike se animate nahin karta jaise
- *    dusre dock jaise My Day ke karte hain drag scroll left right karne per."
+ * ── THE GLASS FOLLOWS THE WAVE (owner brief 2026-09-29, round three) ──────
+ *   "Drag left right scroll karne per icon dock container area se bahar
+ *    chale ja rahe hain — hona chahiye ki container bhi left right expand
+ *    ho taki icons container ke andar hi dikhen."
  *
- * The squeeze fixed the spill — and on Home it also froze the wave. The fill
- * consumed the nav's whole width, so `headroom` measures ~2 px there,
- * `squeezeX` resolves to ~0.05, and the horizontal half of the wave — the
- * neighbour push that makes the row RIPPLE under a dragging finger, the half
- * that makes My Day's dock feel alive — simply stopped playing. Same
- * component, same springs: one dock had room, the other hadn't.
+ * Round two gave the filled dock the full push but froze the glass, so the
+ * pushed / magnified end plates sailed visibly past the capsule edge. The
+ * arithmetic that contains a wave is rigid: with a uniform share k, the row
+ * spreads by exactly k × ask while the padding grows k × ask / 2 per side,
+ * so every plate keeps its RESTING glass margin for any k — the wave's shape
+ * never distorts, it only scales. So the share is now applied to the WHOLE
+ * wave, not just the push:
  *
- * So on a width-filled dock the wave now rides transforms ONLY:
+ *   · `squeezeX` = k (1 with room, shrinking toward 0 as the ask outgrows
+ *     the measured headroom — the headroom already counts the nav gutter,
+ *     keeping EDGE_KEEP_PX clear of the screen edge);
+ *   · magnification, lift, tooltip ride and neighbour push ALL take k —
+ *     gaps between neighbouring plates stay at their resting width at every
+ *     frame (a squeezed push can no longer crowd plates into each other),
+ *     and the end plates end exactly where the padding ends;
+ *   · the capsule padding grows k × ask / 2 per side — the glass ALWAYS
+ *     expands to its full measured budget, visibly, left AND right;
+ *   · `glassMaxWidth` releases the `max-w-full` clamp by the same amount
+ *     (resting width + growth, inline px) so the padding ask can never
+ *     degrade one-sided — the clamp that caused the original right spill
+ *     is removed by exactly the ask instead of being fought.
  *
- *   · the neighbour push takes its FULL share again (the ripple is back);
- *   · the capsule asks for NO horizontal layout growth (`padding-inline`
- *     stays at rest), so the `max-w-full` clamp that caused the one-sided
- *     spill can never be hit — the squeeze's job (symmetry) is guaranteed
- *     by construction instead of by throttling;
- *   · the vertical half is untouched — the glass still breathes upward with
- *     the lift, which never clamps.
- *
- * At full magnification an end plate overhangs the capsule edge by at most
- * ~0.3 × plate — well inside the nav gutter plus the fill's own reserve, so
- * nothing reaches the screen edge. And with the capsule no longer resizing
- * during a gesture, GlassMaterial's lens can never rebuild mid-drag on Home
- * at all.
+ * On docks with room (My Day, the 7-tab nav on most phones) k resolves to 1
+ * and the wave plays exactly as before. On the width-filled Home dock k
+ * scales the wave to what the nav can hold; the pop stays lively (it is the
+ * least-squeezed visual at every width), the glass breathes with the finger,
+ * and the icons never leave the container. At rest every value lands back on
+ * the resting geometry the fill solved.
  */
 
 import {
@@ -306,6 +313,13 @@ type DockLayout = {
    * site footer nav (peek dock, desktop rail), where nothing can clamp it.
    */
   headroom: number
+  /**
+   * The capsule's resting border-box width in px, from the SAME rects as the
+   * centres (row + resting padding). 0 when no plate reported a box. This is
+   * the base a FILLED dock releases its `max-w-full` clamp from — see
+   * `glassMaxWidth`.
+   */
+  capsuleWidth: number
 }
 
 function DockItem({
@@ -327,7 +341,7 @@ function DockItem({
   plateSize,
   layoutRef,
   registerItem,
-  pushShare,
+  waveShare,
 }: GlassDockItem & {
   mouseX: MotionValue<number>
   index: number
@@ -336,7 +350,7 @@ function DockItem({
   plateSize: number
   layoutRef: { current: DockLayout }
   registerItem: (id: string, node: HTMLDivElement | null) => void
-  pushShare: MotionValue<number>
+  waveShare: MotionValue<number>
 }) {
   // The plate's box is FIXED at plateSize. Everything the wave does is a
   // transform on this column (the neighbour push) or on the button (scale +
@@ -351,6 +365,16 @@ function DockItem({
     wide ? 1 : 1 + (MAG_SCALE - 1) * ramp(d),
   )
   const magnify = useSpring(rawScale, WAVE_SPRING)
+  /**
+   * The wave's uniform share, applied to the magnification itself (round
+   * three): 1 + (m − 1) · k keeps the pop's SHAPE and scales only its
+   * strength, so magnification, lift, tooltip ride and neighbour push all
+   * shrink together. That is what makes the squeeze safe everywhere: a plate
+   * pair's gap changes by k · ((δi + δj)/2 − shove) = 0 — squeezed plates
+   * can never crowd into each other, and an end plate's outer edge lands
+   * exactly on the padding the capsule grew.
+   */
+  const waveScale = useTransform([magnify, waveShare], ([m, k]: number[]) => 1 + (m - 1) * k)
 
   /**
    * Neighbour push, as a transform. In the old flex row a growing plate
@@ -376,20 +400,20 @@ function DockItem({
   })
   const pushSpring = useSpring(rawPush, WAVE_SPRING)
   /**
-   * The share of the push the wave may use. Everywhere the glass has room
+   * The share of the push the wave may use — the SAME uniform share the
+   * magnification takes (`waveScale` above). Everywhere the glass has room
    * (or nothing can clamp it) this is the clamp-aware squeeze — 1 with room,
-   * shrinking toward 0 as the wave outgrows the nav, so the plates part
-   * exactly as far as the capsule grows. A WIDTH-FILLED dock (Home) takes
-   * the FULL share: its glass never grows horizontally any more (see the
-   * header), so there is nothing to keep in sync — the ripple lives entirely
-   * in these transforms, exactly like My Day's.
+   * shrinking toward 0 as the wave outgrows the nav. Because push and
+   * magnification shrink together, the plates part exactly as far as the
+   * capsule grows AND neighbouring plates never crowd each other — the gap
+   * arithmetic in `waveScale`'s comment.
    */
-  const push = useTransform([pushSpring, pushShare], ([p, share]: number[]) => p * share)
+  const push = useTransform([pushSpring, waveShare], ([p, share]: number[]) => p * share)
 
   /** The −12px lift, and the tooltip riding the plate's new top edge. */
-  const lift = useTransform(magnify, [1, MAG_SCALE], [0, -MAG_LIFT])
+  const lift = useTransform(waveScale, [1, MAG_SCALE], [0, -MAG_LIFT])
   const tooltipY = useTransform(
-    magnify,
+    waveScale,
     [1, MAG_SCALE],
     [0, -(plateSize * (MAG_SCALE - 1) + MAG_LIFT)],
   )
@@ -398,7 +422,7 @@ function DockItem({
   // `whileTap={{scale}}` and `style={{scale}}` would fight for one slot.
   const pressTarget = useMotionValue(1)
   const press = useSpring(pressTarget, { stiffness: 420, damping: 26 })
-  const scale = useTransform([magnify, press], ([m, p]: number[]) => m * p)
+  const scale = useTransform([waveScale, press], ([m, p]: number[]) => m * p)
 
   const setButtonRef = (node: HTMLButtonElement | null) => {
     if (typeof buttonRef === 'function') buttonRef(node)
@@ -628,6 +652,7 @@ export default function GlassDock({
     padInline: fallbackPadInline,
     spread: false,
     headroom: Number.POSITIVE_INFINITY,
+    capsuleWidth: 0,
   })
   /**
    * The resting padding as a MOTION VALUE, not a constant: the derived
@@ -686,40 +711,56 @@ export default function GlassDock({
   const growX = useSpring(rawGrowX, WAVE_SPRING)
   const growY = useSpring(rawGrowY, WAVE_SPRING)
   /**
-   * The clamp-aware share of the HORIZONTAL wave. A width-filled dock (Home:
-   * the capsule already spans the nav at rest) cannot grow past `max-w-full`,
-   * and a symmetric padding ask past that clamp degrades one-sided — the
-   * content box shrinks, the fixed row overflows right, dead space pools
-   * left. So the wave grows only what fits: 1 while the growth fits the
-   * measured headroom, shrinking toward 0 past it. Capsule padding AND
-   * neighbour push take the same share, which keeps the wave symmetric at
-   * every frame — plates part exactly as far as the glass grows. Vertical
-   * growth is untouched (open space above the dock never clamps).
-   *
-   * A FILLED dock skips this throttle entirely — see `filled` below: its
-   * glass asks for no horizontal growth at all, so the clamp is unreachable.
+   * The clamp-aware share of the HORIZONTAL wave — and, since round three,
+   * of the WHOLE wave. A width-filled dock (Home: the capsule already spans
+   * the nav at rest) cannot grow past `max-w-full`, and a symmetric padding
+   * ask past that clamp degrades one-sided — the content box shrinks, the
+   * fixed row overflows right, dead space pools left. So the wave grows only
+   * what fits: 1 while the growth fits the measured headroom, shrinking
+   * toward 0 past it. Capsule padding, neighbour push AND magnification take
+   * the same share, which keeps the wave symmetric at every frame — plates
+   * part exactly as far as the glass grows, and never crowd each other.
+   * Vertical growth is untouched (open space above the dock never clamps).
    */
   const squeezeX = useTransform(growX, (growth: number) => {
     if (growth <= 0) return 1
     const room = layoutRef.current.headroom * 2
     return growth <= room ? 1 : Math.max(0, room / growth)
   })
-  // OWNER BRIEF (2026-09-29): "Home page ka footer navigation use tarike se
-  // animate nahin karta jaise dusre dock jaise My Day ke karte hain drag
-  // scroll left right karne per." The fill consumed the nav's whole width, so
-  // the squeeze above — sized to protect exactly that dock — had throttled
-  // Home's ripple to ~5 %: icons popped under the finger but the row never
-  // parted. On a filled dock the wave is therefore TRANSFORM-ONLY: the plates
-  // take the full neighbour push (`pushShare` below) and the glass asks for
-  // no horizontal growth — the clamp the squeeze guards against is never hit,
-  // so the one-sided spill stays impossible by construction.
-  const filled = fill !== null
-  const pushShare = useTransform(squeezeX, (sq: number) => (filled ? 1 : sq))
+  // OWNER BRIEF (2026-09-29, round three): "drag left right scroll karne per
+  // icon dock container area se bahar chale ja rahe hain — hona chahiye ki
+  // container bhi left right expand ho, taki icons container ke andar hi
+  // dikhen." Round two gave the filled dock the full push but froze the
+  // glass, so pushed / magnified end plates sailed past the capsule edge.
+  // Round three applies the squeeze to the WHOLE wave (see `squeezeX` and the
+  // `waveScale` comment in DockItem) and lets the glass follow it:
+  //
+  //   · `padInline` grows by share × ask, half per side — for EVERY dock,
+  //     filled or not (the spread band keeps its fixed padding). At k = 1
+  //     this is the exact room a pushed + magnified row needs to keep its
+  //     resting glass margin; at any k the margin is still exactly the
+  //     resting one.
+  //   · `glassMaxWidth` releases the `max-w-full` clamp by the same amount
+  //     (resting width + growth, inline px), so the border box can actually
+  //     take that padding: content box = row width at every spring frame —
+  //     the row can never overflow one-sided, which was the original spill.
+  //     At rest it equals the resting width, so the box is unchanged.
+  //   · The neighbour push and the magnification take the share too
+  //     (`waveShare={squeezeX}`), so gaps between plates stay at their
+  //     resting width mid-gesture — no crowding, no escape.
+  //
+  // Net: the icons ripple and the glass breathes left-right with them, every
+  // icon stays INSIDE the container at rest and mid-gesture, and at rest
+  // every value lands back on the exact resting geometry the fill solved.
   const padInline = useTransform(
     [growX, padInlineBase, squeezeX],
     ([growth, base, sq]: number[]) =>
-      base + (filled || layoutRef.current.spread ? 0 : (growth * sq) / 2),
+      base + (layoutRef.current.spread ? 0 : (growth * sq) / 2),
   )
+  const glassMaxWidth = useTransform(growX, (growth: number) => {
+    const resting = layoutRef.current.capsuleWidth
+    return resting > 0 ? resting + growth : null
+  })
   const padTop = useTransform([growY, padTopBase], ([growth, base]: number[]) => base + growth)
 
   /** The wave is settled: the capsule is wearing its resting box. Stricter threshold to prevent cumulative growth bug reported in FlowPath footer. */
@@ -780,14 +821,16 @@ export default function GlassDock({
     // the nav's edges. One `clientWidth` read, in the same once-per-gesture
     // pass as the centres — never per frame. A dock outside any site footer
     // nav (peek dock, desktop rail) keeps Infinity: nothing clamps it, so
-    // the wave is never squeezed there.
+    // the wave is never squeezed there. `capsuleWidth` uses THIS pass's
+    // padding (not the published base), so a fill that just re-solved on a
+    // resize is measured with its own numbers, never last viewport's.
+    const capsuleWidth = minLeft <= maxRight ? maxRight - minLeft + 2 * padInlineValue : 0
     let headroom = Number.POSITIVE_INFINITY
     const nav = root?.closest?.('[data-site-footer-nav]') as HTMLElement | null | undefined
-    if (nav && minLeft <= maxRight) {
-      const capsuleWidth = maxRight - minLeft + 2 * padInlineBase.get()
+    if (nav && capsuleWidth > 0) {
       headroom = Math.max(0, (nav.clientWidth - capsuleWidth) / 2 - EDGE_KEEP_PX)
     }
-    layoutRef.current = { centres, ids, padTop: padTopValue, padInline: padInlineValue, spread, headroom }
+    layoutRef.current = { centres, ids, padTop: padTopValue, padInline: padInlineValue, spread, headroom, capsuleWidth }
     // Publish the resting padding so the capsule wears it on this frame (see
     // `padTopBase` / `padInlineBase`).
     padTopBase.set(padTopValue)
@@ -961,6 +1004,12 @@ export default function GlassDock({
         gap: fill ? fill.gap : undefined,
         paddingTop: padTop,
         paddingInline: padInline,
+        // Releases the class `max-w-full` clamp by exactly the wave's growth
+        // (resting width + growth): the padding ask above can actually take
+        // effect instead of degrading one-sided (the original right spill).
+        // `null` clears the inline value, so the class clamp governs whenever
+        // no resting width was ever measured.
+        maxWidth: glassMaxWidth,
         paddingBottom: fill ? fill.padBlock : undefined,
         // The capsule's own box is the only thing that re-lays out during a
         // gesture; keep that work inside the dock and off the page.
@@ -988,7 +1037,7 @@ export default function GlassDock({
           plateSize={plateSize}
           layoutRef={layoutRef}
           registerItem={registerItem}
-          pushShare={pushShare}
+          waveShare={squeezeX}
           onSelect={() => onSelect(item.id)}
         />
       ))}

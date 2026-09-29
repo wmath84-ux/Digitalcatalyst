@@ -216,6 +216,9 @@ const settled = async () => {
   await nextFrame();
 };
 
+/** Real settle time for the wave's springs (jsdom rAF runs on real timers). */
+const settle = (ms = 320) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 
 const nav = () => window.document.querySelector("[data-site-footer-nav]");
@@ -320,19 +323,21 @@ test("a seven-tab footer keeps the dock it always had — no fill, no inline rhy
   mounted.unmount();
 });
 
-/* ── 4b. the wave inside a filled dock is TRANSFORM-ONLY ─────────────────── */
+/* ── 4b. the glass follows the wave inside the filled dock ───────────────── */
 //
-// Owner brief (2026-09-29): "Home page ka footer navigation use tarike se
-// animate nahin karta jaise dusre dock jaise My Day ke karte hain drag
-// scroll left right karne per." The fill consumed the nav's whole width, so
-// the clamp-aware squeeze throttled Home's neighbour push to ~5 % — the row
-// stopped rippling. The filled dock's wave now rides transforms only: the
-// plates take the FULL neighbour push (the ripple, same as My Day), the
-// capsule asks for NO horizontal growth (padding-inline stays at rest, so
-// the max-w-full clamp that once degraded the wave one-sided is
-// unreachable), and the vertical half is untouched.
+// Owner brief (2026-09-29, round three): "drag left right scroll karne per
+// icon dock container area se bahar chale ja rahe hain — hona chahiye ki
+// container bhi left right expand ho taki icons container ke andar hi
+// dikhen." Round two rippled the plates but froze the glass, so pushed /
+// magnified end plates sailed past the capsule edge. Round three applies the
+// clamp-aware squeeze to the WHOLE wave and lets the glass follow it:
+// `padding-inline` grows by share × ask / 2 — the capsule's whole measured
+// headroom, left AND right, on every gesture — while the magnification and
+// the neighbour push take the same share, so every plate keeps its resting
+// glass margin at ANY share and neighbouring plates never crowd. At rest
+// the capsule lands back on the fill's exact resting numbers.
 
-test("a drag across the filled dock ripples the plates and the glass stays put", async () => {
+test("a drag across the filled dock grows the glass with the wave and every plate stays inside", async () => {
   viewport.width = 430;
   const mounted = fixture.mount(host, 8);
   await settled();
@@ -344,7 +349,8 @@ test("a drag across the filled dock ripples the plates and the glass stays put",
   // jsdom has no layout engine: give the plates the resting boxes the fill
   // just solved (this is the layout `measure()` reads once per gesture).
   const LEFT = 20;
-  Array.from(window.document.querySelectorAll("[data-glass-dock-item]")).forEach((item, i) => {
+  const items = Array.from(window.document.querySelectorAll("[data-glass-dock-item]"));
+  items.forEach((item, i) => {
     const left = LEFT + i * (plate + gap);
     item.getBoundingClientRect = () => ({
       left,
@@ -358,6 +364,7 @@ test("a drag across the filled dock ripples the plates and the glass stays put",
       toJSON: () => ({}),
     });
   });
+  const centres = items.map((_, i) => LEFT + i * (plate + gap) + plate / 2);
 
   const event = (type, x) => {
     const pointerEvent = new window.MouseEvent(type, {
@@ -372,13 +379,11 @@ test("a drag across the filled dock ripples the plates and the glass stays put",
     dock().dispatchEvent(pointerEvent);
   };
 
-  // A finger on the third plate, then a couple of frames of spring.
+  // A finger on the third plate, then real settle time so the springs reach
+  // their targets and the numbers below can be asserted to the pixel.
   event("pointerdown", 100);
   event("pointermove", 120);
-  await nextFrame();
-  await nextFrame();
-  await nextFrame();
-  await nextFrame();
+  await settle(900);
 
   for (const button of buttons()) {
     assert.equal(button.style.width, `${plate}px`, "the tap target never resizes");
@@ -389,21 +394,66 @@ test("a drag across the filled dock ripples the plates and the glass stays put",
     transforms.some((transform) => /scale\(1\.[0-9]/.test(transform)),
     `no plate magnified inside the fill: ${JSON.stringify(transforms)}`,
   );
-  // THE RIPPLE: the neighbours part with the full push (My Day's wave), as
-  // transform translates on the fixed-layout columns.
-  const columns = Array.from(window.document.querySelectorAll("[data-glass-dock-item]")).map(
-    (item) => item.style.transform,
-  );
+  // THE RIPPLE: the neighbours still part (a squeezed push, the same share
+  // the magnification takes), as transform translates on the fixed-layout
+  // columns.
+  const columns = items.map((item) => item.style.transform);
   assert.ok(
     columns.some((transform) => /translateX\(-?[1-9]/.test(transform)),
     `no neighbour push inside the fill: ${JSON.stringify(columns)}`,
   );
-  // THE GLASS STAYS PUT: no horizontal layout ask at all — the clamp that
-  // once degraded the wave one-sided can never be hit on a filled dock.
+  // THE GLASS FOLLOWS: padding-inline grows by share × ask / 2 — the
+  // capsule's whole measured headroom, and never a pixel past it (the share
+  // is room/ask, so ask × share ≤ room at every frame, overshoot included).
   const pad = parseFloat(dock().style.paddingInline);
-  assert.equal(pad, restingPad, "the filled capsule never grows horizontally");
+  const growth = pad - restingPad;
+  const capsule = items.length * plate + (items.length - 1) * gap + 2 * restingPad;
+  const headroom = (viewport.width - capsule) / 2 - 2;
+  assert.ok(growth > 3, `the filled capsule did not widen (padding-inline ${pad})`);
+  assert.ok(
+    Math.abs(growth - headroom) < 0.75,
+    `the capsule must grow by its whole headroom: +${growth} vs +${headroom}`,
+  );
 
+  // Read the wave back off the transforms: each column's translateX and each
+  // button's scale.
+  const wave = items.map((item, i) => ({
+    translate: parseFloat(/translateX\((-?[\d.]+)px\)/.exec(item.style.transform)?.[1] ?? "0"),
+    scale: parseFloat(/scale\(([\d.]+)\)/.exec(buttons()[i].style.transform)?.[1] ?? "1"),
+  }));
+  const leftEdge = (i) => centres[i] - (plate / 2) * wave[i].scale + wave[i].translate;
+  const rightEdge = (i) => centres[i] + (plate / 2) * wave[i].scale + wave[i].translate;
+
+  // CONTAINMENT: at any share every plate keeps its resting glass margin, so
+  // the row's spread may not exceed the padding the capsule grew.
+  const restRight = LEFT + (items.length - 1) * (plate + gap) + plate;
+  for (const [i] of wave.entries()) {
+    assert.ok(
+      leftEdge(i) >= LEFT - growth - 0.75,
+      `plate ${i} escaped the capsule's left edge: ${leftEdge(i)} < ${LEFT - growth}`,
+    );
+    assert.ok(
+      rightEdge(i) <= restRight + growth + 0.75,
+      `plate ${i} escaped the capsule's right edge: ${rightEdge(i)} > ${restRight + growth}`,
+    );
+  }
+  // NO CROWDING: push and magnification share one number, so a plate pair's
+  // gap change is k · ((δi + δj)/2 − shove) = 0 — the resting rhythm is
+  // preserved at every frame of the squeeze.
+  for (let i = 0; i < items.length - 1; i += 1) {
+    const visualGap = leftEdge(i + 1) - rightEdge(i);
+    assert.ok(
+      Math.abs(visualGap - gap) < 0.75,
+      `plates ${i}/${i + 1} crowded: gap ${visualGap} vs resting ${gap}`,
+    );
+  }
+
+  // And the finger lifts: the capsule comes all the way home.
   event("pointerup", 120);
+  event("pointerleave", 120);
+  await settle(1200);
+  const homePad = parseFloat(dock().style.paddingInline);
+  assert.ok(Math.abs(homePad - restingPad) < 0.3, `the capsule did not settle (${homePad})`);
   mounted.unmount();
 });
 
