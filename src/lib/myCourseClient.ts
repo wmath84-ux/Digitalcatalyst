@@ -47,6 +47,7 @@ import {
   type MyCourseResourceType,
 } from "../types/myCourse";
 import { experimentByteLength, experimentBlockingIssues } from "../utils/experimentSpec";
+import { randomCoverImage } from "./myCourseCovers";
 
 export const MY_COURSES_COLLECTION = "myCourses";
 export const MY_COURSE_SCHEMA_VERSION = 1;
@@ -579,6 +580,10 @@ export function subscribeMyCourses(
 export async function saveMyCourse(uid: string, course: MyCourse): Promise<void> {
   if (!uid) throw new Error("Please sign in to save your course.");
   const clean = sanitizeMyCourse(course);
+  // A learner who never picks a cover still gets one: a random bundled image
+  // is assigned and PERSISTED with the save, so every card on the shelf
+  // always shows an image (owner brief 2026-09-29).
+  if (!String(clean.coverImage || "").trim()) clean.coverImage = randomCoverImage();
   // Refuse over-budget / empty experiments BEFORE the write: the server path
   // returns the same codes, and a half-written lesson is never acceptable.
   const budgetError = myCourseExperimentBudgetError(clean);

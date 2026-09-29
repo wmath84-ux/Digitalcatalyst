@@ -17,13 +17,16 @@ What is there now:
 
 | Element | What it does |
 | --- | --- |
-| **Course grid** (`data-my-course-grid`) | One card per course the learner built, drawn with the store's own product-card material (`dc-scene-plate`, radius 24, 4:3 artwork) |
-| Card contents | **Cover image**, **title**, **Play**, **Edit** — nothing else (no price, rating, favourite or share row) |
+| **Course grid** (`data-my-course-grid`) | One card per course the learner built, drawn with the store's own product-card material (`dc-scene-plate`, radius 24, 4:3 artwork). The column count is fluid (`auto-fill`, 15rem floor) so a phone gets one column, a tablet more and a desktop as many as fit |
+| Card contents | **Cover image**, **title**, **Play**, **Edit**, **Delete** (`data-my-course-delete`) — nothing else (no price, rating, favourite or share row). Delete asks first, in an overlay that wears the Profile page's own glass |
 | **"+" tile** in the grid (`data-my-course-create`) | Opens the builder |
 | **Floating "+"** (`data-my-course-create-fab`) | The same builder, one tap away on every screen size |
 | Empty state | Explains the flow in Hinglish and opens the builder |
 
-**Play** → `#/my-course/<courseId>` · **Edit** → `#/my-course/<courseId>/edit`
+**Play** → `#/my-course/<courseId>` · **Edit** → `#/my-course/<courseId>/edit` ·
+**Delete** → confirmation overlay → the course is removed from the shelf (the
+builder's own **Delete** in the sticky bar does the same, so a learner can
+delete from either place)
 
 ## 2. The builder — `+` / `#/my-course/new`
 
@@ -31,7 +34,17 @@ What is there now:
 
 * **Cover image** — upload from the device (Cloudinary when configured →
   Firebase Storage → a downscaled in-document data URL, so it never dead-ends)
-  or paste any image URL.
+  or paste any image URL. **A learner who sets no image still gets one**: a
+  random cover from the bundled pool (`src/lib/myCourseCovers.ts`) is previewed
+  in the builder and persisted with the save, so no card, preview or player
+  identity ever shows an empty frame.
+* **The overlay's glass** — every panel (Course identity, Modules) and the
+  sticky action bar wear the EXACT material the Profile page's cards wear: the
+  pack surface at `tint 0.62 · rgb(173,216,255) · blur 0` with `.dc-rev-glass`
+  painting the frost (18.4px + saturate 1.3), the flat 26% light-blue tint,
+  the sheen, the rim and the soft lift. The layout is fluid too — single column
+  on a phone, cover beside the fields from 640px, Course identity | Modules
+  side by side from 1280px.
 * **Title + description.**
 * **Modules** — add, rename, describe, reorder (↑ ↓) and delete, with a
   confirmation before anything destructive.

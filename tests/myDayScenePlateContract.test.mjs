@@ -165,10 +165,15 @@ test("the shared sheet and the confirm dialog wear the plate", () => {
   // all render through `Modal`; every delete confirmation through
   // `ConfirmDialog`.
   assert.match(modal, /"dc-scene-plate glass-dialog-in relative flex w-full flex-col overflow-hidden text-white"/);
+  // 2026-09-29 (My Study Library brief): the shared dialog grew a second
+  // material — `material="profile"` renders the Profile-card glass — so the
+  // plate is now the default branch of a ternary instead of a static
+  // `className="…"`. The pin below still proves the scene path is byte-exact.
   assert.match(
     confirmDialog,
-    /className="dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/,
+    /: "dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/,
   );
+  assert.match(confirmDialog, /material = "scene"/);
   for (const [name, source] of [["TaskModal", taskModal], ["ScheduleModal", scheduleModal], ["Reminders", reminders]]) {
     assert.match(source, /from "\.\.\/ui\/Modal"/, `${name} must keep going through the shared sheet`);
   }

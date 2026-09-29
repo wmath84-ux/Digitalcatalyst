@@ -9,7 +9,9 @@
 //   · a "+" tile / button opens the builder (cover image, title, modules,
 //     folders inside folders, resources, Brain MCQ sets)
 //   · every course is a card drawn with the store's own product-card
-//     material, carrying only the cover, the title, Play and Edit
+//     material, carrying the cover, the title, Play, Edit and Delete
+//     (owner brief 2026-09-29: a self-created course deletes from its card —
+//     through the same profile-card glass the Profile page wears)
 //   · Play opens the SAME Course Player a purchased course opens, on the
 //     modules and practice the learner built.
 //
@@ -23,6 +25,8 @@ import {
 } from "lucide-react";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { toast } from "../components/ui/glass-toast";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
@@ -79,6 +83,34 @@ export default function StudyLibraryPage() {
     trackFeatureEvent("my_course_edited", { surface: "study_library" });
     window.location.hash = myCourseEditHash(course.id);
   }, []);
+
+  // Delete from the card (owner brief 2026-09-29). The card only ASKS — the
+  // course is removed after the confirmation, which wears the exact glass the
+  // Profile page's cards wear. The builder keeps its own Delete for edits.
+  const [pendingDelete, setPendingDelete] = useState<MyCourse | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const requestDelete = useCallback((course: MyCourse) => {
+    setPendingDelete(course);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    const result = await myCourses.remove(pendingDelete.id);
+    setDeleting(false);
+    setPendingDelete(null);
+    if (!result.ok) {
+      toast({
+        title: "The course was not deleted",
+        description: result.message,
+        variant: "error",
+      });
+      return;
+    }
+    trackFeatureEvent("my_course_deleted", { surface: "study_library" });
+    toast({ title: "Course deleted", description: `“${pendingDelete.title || "Untitled course"}” is gone.`, variant: "success" });
+  }, [deleting, myCourses, pendingDelete]);
 
   if (!user) {
     return (
@@ -190,12 +222,16 @@ export default function StudyLibraryPage() {
                     </button>
                   </div>
 
+                  {/* A fluid shelf: `auto-fill` + a 15rem floor means the
+                      column count follows the actual viewport — one column on
+                      a phone, more on a tablet, as many as a desktop can
+                      carry — instead of jumping at fixed breakpoints. */}
                   <div
-                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                    className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3"
                     data-my-course-grid
                   >
                     {courses.map((course) => (
-                      <MyCourseCard key={course.id} course={course} onPlay={openCourse} onEdit={editCourse} />
+                      <MyCourseCard key={course.id} course={course} onPlay={openCourse} onEdit={editCourse} onDelete={requestDelete} />
                     ))}
 
                     {/* The "+" tile is the same size as a card, so the grid
@@ -262,6 +298,20 @@ export default function StudyLibraryPage() {
         </button>
 
         <BottomNav active="study-library" onChange={navigateFromBottom} purchasesBadge={purchasedIds.size} />
+
+        {/* Card-level delete confirmation — the Profile card glass (tint 0.62 ·
+            rgb(173,216,255) · blur 0 + `.dc-rev-glass`), sized by the shared
+            responsive overlay: full-width sheet on a phone, centred dialog on
+            a tablet / desktop. */}
+        <ConfirmDialog
+          open={Boolean(pendingDelete)}
+          material="profile"
+          title="Delete this course?"
+          message={`“${pendingDelete?.title || "Untitled course"}” and everything inside it will be permanently deleted. This can't be undone.`}
+          confirmLabel={deleting ? "Deleting…" : "Delete"}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => { if (!deleting) setPendingDelete(null); }}
+        />
       </div>
     </div>
   );
@@ -271,7 +321,7 @@ function LibrarySkeleton() {
   return (
     <div className="space-y-4" role="status" aria-label="Loading My Study Library" data-my-course-skeleton>
       <div className="h-32 animate-pulse rounded-3xl bg-white/[0.05]" />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
         {Array.from({ length: 4 }, (_, index) => (
           <div key={index} className="aspect-[4/3] animate-pulse rounded-3xl bg-white/[0.05]" />
         ))}

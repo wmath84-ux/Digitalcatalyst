@@ -14,6 +14,18 @@
 // The saved tree is what the Course Player opens (src/lib/myCourseAdapter.ts),
 // so everything built here shows up as real modules, real lessons and real
 // practice in the player — the learner's own course, their own design.
+//
+// Look & feel (owner brief 2026-09-29):
+//   · every panel of this overlay wears EXACTLY the glass the Profile page's
+//     cards wear — the pack surface at tint 0.62 · rgb(173,216,255) · blur 0,
+//     re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3, flat 26%
+//     light-blue tint, quiet sheen, rim, soft lift);
+//   · the layout is fluid: one column on a phone, the cover beside the fields
+//     on a tablet, and Course-identity | Modules side by side from 1280px;
+//   · a course without a cover shows (and, at save, keeps) a random bundled
+//     image, so no surface ever renders an empty frame;
+//   · Delete sits in the sticky action bar of the builder AND on the card in
+//     the shelf — both behind the same confirmation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -25,6 +37,7 @@ import type { ComponentType } from "react";
 import Header from "../components/Header";
 import { toast } from "../components/ui/glass-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { GlassSurface } from "../components/ui/glass";
 import { useAuth } from "../context/AuthContext";
 import { useMyCourses } from "../hooks/useMyCourses";
 import {
@@ -37,6 +50,7 @@ import {
   uploadMyCourseCover,
   uploadMyCourseResourceFile,
 } from "../lib/myCourseClient";
+import { fallbackCoverImage } from "../lib/myCourseCovers";
 import {
   MY_COURSE_DESC_MAX, MY_COURSE_MAX_DEPTH, MY_COURSE_MAX_MODULES, MY_COURSE_MAX_RESOURCES,
   MY_COURSE_TITLE_MAX, MY_MODULE_DESC_MAX, MY_MODULE_TITLE_MAX, MY_RESOURCE_DESC_MAX,
@@ -83,6 +97,16 @@ const TYPE_OPTIONS: TypeOption[] = [
 
 const typeOption = (type: MyCourseResourceType): TypeOption =>
   TYPE_OPTIONS.find((option) => option.id === type) || TYPE_OPTIONS[0];
+
+/**
+ * The Profile page's card material, spelled once (owner brief 2026-09-29):
+ * the pack surface at tint 0.62 · light blue rgb(173,216,255) · blur 0, with
+ * `.dc-rev-glass` painting the frost (18.4px + saturate 1.3), the flat 26%
+ * tint, the quiet sheen, the rim and the soft lift — the exact numbers
+ * src/profile/ProfileLayout.tsx hands its cards, now on every panel of this
+ * overlay (sections, the sticky action bar and the delete confirmation).
+ */
+const PROFILE_GLASS = { tint: 0.62, tintColor: "173,216,255", blur: 0 } as const;
 
 /* ── immutable tree helpers ──────────────────────────────────────────────── */
 
@@ -322,6 +346,10 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
     );
   }
 
+  // A course without a cover of its own previews the random bundled image the
+  // client persists at save time — the overlay never shows an empty frame.
+  const previewCover = String(draft.coverImage || "").trim() || fallbackCoverImage(draft.id);
+
   return (
     <div className="min-h-screen text-white" data-my-course-editor data-course-id={draft.id}>
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
@@ -336,7 +364,10 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
         />
 
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-28 pt-3 sm:px-5 lg:px-7 xl:px-9" data-my-course-editor-content>
-          <div className="mx-auto w-full max-w-[1100px] space-y-4">
+          {/* The overlay lays itself out by the space it is given: a single
+              column on a phone, the cover beside the fields from 640px, and
+              Course identity | Modules side by side from 1280px. */}
+          <div className="mx-auto w-full max-w-[1280px] space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -351,142 +382,155 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               </span>
             </div>
 
-            {/* ── 1. Course identity ─────────────────────────────────── */}
-            <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4" data-my-course-meta>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Course</p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
-              <p className="mt-1 text-xs font-medium leading-5 text-white/50">
-                Cover, modules, lessons aur apne MCQ — sab kuch aap design karein. Save ke baad Play se Course Player khulega.
-              </p>
+            {/* Two panels, one fluid grid: stacked on a phone and a portrait
+                tablet, side by side from 1280px on a desktop. */}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+              {/* ── 1. Course identity ─────────────────────────────────── */}
+              <GlassSurface {...PROFILE_GLASS} radius={20} className="dc-rev-glass relative overflow-hidden" contentClassName="p-4 sm:p-5" data-my-course-meta>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Course</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
+                <p className="mt-1 text-xs font-medium leading-5 text-white/50">
+                  Cover, modules, lessons aur apne MCQ — sab kuch aap design karein. Save ke baad Play se Course Player khulega.
+                </p>
 
-              <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-                <div>
-                  <span className={labelClass}>Cover image</span>
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-                    {draft.coverImage ? (
-                      <img src={draft.coverImage} alt="Course cover" className="h-full w-full object-cover" data-my-course-cover-preview />
-                    ) : (
-                      <span className="grid h-full w-full place-items-center text-white/30">
-                        <ImageIcon size={30} />
-                      </span>
-                    )}
-                    {coverUploading ? (
-                      <span className="absolute inset-0 grid place-items-center bg-black/55">
-                        <LoaderCircle className="h-6 w-6 animate-spin text-white" />
-                      </span>
-                    ) : null}
-                    {draft.coverImage ? (
-                      <button
-                        type="button"
-                        onClick={() => patch({ coverImage: "" })}
-                        aria-label="Remove cover image"
-                        className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white ring-1 ring-white/20"
-                      >
-                        <X size={14} />
-                      </button>
-                    ) : null}
+                <div className="mt-4 grid gap-4 sm:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-1">
+                  <div>
+                    <span className={labelClass}>Cover image</span>
+                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                      <img
+                        src={previewCover}
+                        alt="Course cover"
+                        className="h-full w-full object-cover"
+                        data-my-course-cover-preview
+                        data-my-course-cover-source={String(draft.coverImage || "").trim() ? "own" : "random"}
+                      />
+                      {coverUploading ? (
+                        <span className="absolute inset-0 grid place-items-center bg-black/55">
+                          <LoaderCircle className="h-6 w-6 animate-spin text-white" />
+                        </span>
+                      ) : null}
+                      {draft.coverImage ? (
+                        <button
+                          type="button"
+                          onClick={() => patch({ coverImage: "" })}
+                          aria-label="Remove cover image"
+                          className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white ring-1 ring-white/20"
+                        >
+                          <X size={14} />
+                        </button>
+                      ) : (
+                        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/75 ring-1 ring-white/15" data-my-course-cover-auto>
+                          Auto cover · saves with the course
+                        </span>
+                      )}
+                    </div>
+                    <label className="mt-2 flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3 text-[11px] font-black text-white/70 transition hover:border-violet-400/50 hover:bg-white/[0.06]">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={coverUploading}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) void handleCoverFile(file);
+                        }}
+                        data-my-course-cover-input
+                      />
+                      {coverUploading ? "Uploading…" : <><Upload size={13} /> Upload cover</>}
+                    </label>
+                    <input
+                      value={draft.coverImage?.startsWith("data:") ? "" : draft.coverImage || ""}
+                      onChange={(event) => patch({ coverImage: event.target.value })}
+                      placeholder="…or paste an image URL"
+                      className={`${inputClass} mt-2`}
+                      aria-label="Cover image URL"
+                    />
+                    <p className="mt-1.5 text-[10px] font-semibold leading-4 text-white/40" data-my-course-cover-hint>
+                      {draft.coverImage
+                        ? "Apna cover lag gaya — save par yahi rahega."
+                        : "Koi cover nahi — ek random image apne aap set ho kar save ho jayegi."}
+                    </p>
                   </div>
-                  <label className="mt-2 flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3 text-[11px] font-black text-white/70 transition hover:border-violet-400/50 hover:bg-white/[0.06]">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={coverUploading}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (file) void handleCoverFile(file);
-                      }}
-                      data-my-course-cover-input
-                    />
-                    {coverUploading ? "Uploading…" : <><Upload size={13} /> Upload cover</>}
-                  </label>
-                  <input
-                    value={draft.coverImage?.startsWith("data:") ? "" : draft.coverImage || ""}
-                    onChange={(event) => patch({ coverImage: event.target.value })}
-                    placeholder="…or paste an image URL"
-                    className={`${inputClass} mt-2`}
-                    aria-label="Cover image URL"
-                  />
-                </div>
 
-                <div className="space-y-3">
-                  <label className="block">
-                    <span className={labelClass}>Course title</span>
-                    <input
-                      value={draft.title}
-                      onChange={(event) => patch({ title: event.target.value })}
-                      maxLength={MY_COURSE_TITLE_MAX}
-                      placeholder="e.g. NEET Biology — my revision plan"
-                      className={inputClass}
-                      data-my-course-title-input
-                    />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>Description (optional)</span>
-                    <textarea
-                      value={draft.description || ""}
-                      onChange={(event) => patch({ description: event.target.value })}
-                      maxLength={MY_COURSE_DESC_MAX}
-                      rows={4}
-                      placeholder="What is this course for?"
-                      className={`${inputClass} resize-y py-2`}
-                      data-my-course-description-input
-                    />
-                  </label>
+                  <div className="space-y-3">
+                    <label className="block">
+                      <span className={labelClass}>Course title</span>
+                      <input
+                        value={draft.title}
+                        onChange={(event) => patch({ title: event.target.value })}
+                        maxLength={MY_COURSE_TITLE_MAX}
+                        placeholder="e.g. NEET Biology — my revision plan"
+                        className={inputClass}
+                        data-my-course-title-input
+                      />
+                    </label>
+                    <label className="block">
+                      <span className={labelClass}>Description (optional)</span>
+                      <textarea
+                        value={draft.description || ""}
+                        onChange={(event) => patch({ description: event.target.value })}
+                        maxLength={MY_COURSE_DESC_MAX}
+                        rows={4}
+                        placeholder="What is this course for?"
+                        className={`${inputClass} resize-y py-2`}
+                        data-my-course-description-input
+                      />
+                    </label>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </GlassSurface>
 
-            {/* ── 2. Modules ────────────────────────────────────────── */}
-            <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4" data-my-course-modules>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Structure</p>
-                  <h2 className="mt-0.5 text-lg font-black">Modules & resources</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addModule(null)}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-violet-600 px-4 text-[11px] font-black transition hover:bg-violet-500"
-                  data-my-course-add-module
-                >
-                  <FolderPlus size={14} /> Add module
-                </button>
-              </div>
-              <p className="mt-1 text-[11px] font-medium leading-5 text-white/45">
-                Har module ke andar resources (video, PDF, link, Brain MCQ) aur nested sub-modules — jaise admin course banata hai.
-              </p>
-
-              <div className="mt-3 space-y-3">
-                {draft.modules.map((module, index) => (
-                  <ModuleNodeEditor
-                    key={module.id}
-                    module={module}
-                    depth={1}
-                    index={index}
-                    siblingCount={draft.modules.length}
-                    uid={user.id}
-                    courseId={draft.id}
-                    onUpdate={(next) => updateModule(module.id, next)}
-                    onRemove={() => removeModule(module.id)}
-                    onMove={(delta) => moveModule(module.id, delta)}
-                    onAddChild={() => addModule(module.id)}
-                    onAddResource={(type) => addResource(module.id, type)}
-                  />
-                ))}
-                {draft.modules.length === 0 ? (
+              {/* ── 2. Modules ────────────────────────────────────────── */}
+              <GlassSurface {...PROFILE_GLASS} radius={20} className="dc-rev-glass relative overflow-hidden" contentClassName="p-4 sm:p-5" data-my-course-modules>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Structure</p>
+                    <h2 className="mt-0.5 text-lg font-black">Modules & resources</h2>
+                  </div>
                   <button
                     type="button"
                     onClick={() => addModule(null)}
-                    className="w-full rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 text-center text-[12px] font-black text-white/55 transition hover:bg-white/[0.05]"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-violet-600 px-4 text-[11px] font-black transition hover:bg-violet-500"
+                    data-my-course-add-module
                   >
-                    <Plus className="mx-auto mb-2 h-6 w-6 text-white/35" />
-                    Add your first module
+                    <FolderPlus size={14} /> Add module
                   </button>
-                ) : null}
-              </div>
-            </section>
+                </div>
+                <p className="mt-1 text-[11px] font-medium leading-5 text-white/45">
+                  Har module ke andar resources (video, PDF, link, Brain MCQ) aur nested sub-modules — jaise admin course banata hai.
+                </p>
+
+                <div className="mt-3 space-y-3">
+                  {draft.modules.map((module, index) => (
+                    <ModuleNodeEditor
+                      key={module.id}
+                      module={module}
+                      depth={1}
+                      index={index}
+                      siblingCount={draft.modules.length}
+                      uid={user.id}
+                      courseId={draft.id}
+                      onUpdate={(next) => updateModule(module.id, next)}
+                      onRemove={() => removeModule(module.id)}
+                      onMove={(delta) => moveModule(module.id, delta)}
+                      onAddChild={() => addModule(module.id)}
+                      onAddResource={(type) => addResource(module.id, type)}
+                    />
+                  ))}
+                  {draft.modules.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => addModule(null)}
+                      className="w-full rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 text-center text-[12px] font-black text-white/55 transition hover:bg-white/[0.05]"
+                    >
+                      <Plus className="mx-auto mb-2 h-6 w-6 text-white/35" />
+                      Add your first module
+                    </button>
+                  ) : null}
+                </div>
+              </GlassSurface>
+            </div>{/* /fluid panel grid */}
 
             {error ? (
               <p role="alert" className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100">
@@ -496,9 +540,16 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
           </div>
         </main>
 
-        {/* ── Sticky action bar ─────────────────────────────────────── */}
-        <div className="sticky bottom-0 z-30 border-t border-white/10 bg-slate-950/85 px-3 py-3 backdrop-blur sm:px-5" data-my-course-editor-actions>
-          <div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-2">
+        {/* ── Sticky action bar — the same Profile glass as the panels, so
+            the bar reads as part of the overlay instead of a dark slab ── */}
+        <GlassSurface
+          {...PROFILE_GLASS}
+          radius={0}
+          className="dc-rev-glass sticky bottom-0 z-30 border-t border-white/15"
+          contentClassName="px-3 py-3 sm:px-5"
+          data-my-course-editor-actions
+        >
+          <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-2">
             {!isNew ? (
               <button
                 type="button"
@@ -532,11 +583,14 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               <Play size={15} /> Save & play
             </button>
           </div>
-        </div>
+        </GlassSurface>
       </div>
 
+      {/* The delete confirmation wears the exact glass of the Profile page's
+          cards (tint 0.62 · rgb(173,216,255) · blur 0 · `.dc-rev-glass`). */}
       <ConfirmDialog
         open={deleteOpen}
+        material="profile"
         title="Delete this course?"
         message={`“${draft.title || "Untitled course"}” and everything inside it will be permanently deleted. This can't be undone.`}
         confirmLabel="Delete"
