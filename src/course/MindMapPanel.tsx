@@ -1578,7 +1578,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
           (no specific map chosen yet) there is no strip. It rides at the TOP
           of the sheet, exactly like the notes editor: toolbar first, canvas
           below it. */}
-      {libraryOpen ? null : (
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
           The only persistent chrome, and every control on it is a SINGLE
           ICON: the cloud-save beacon (tinted by the save state, blinking
@@ -1597,6 +1596,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           or clipping. Any stale offset a browser hands it (soft keyboard,
           orientation flip, reopen) is reset when the sheet opens, so the
           bar always paints from its left edge. */}
+      {libraryOpen ? null : (
       <div
         ref={statusRef}
         className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
