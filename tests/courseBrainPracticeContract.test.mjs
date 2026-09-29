@@ -245,10 +245,13 @@ test("the player builds the sets from the SAME access rule as the modules list",
 // ---------------------------------------------------------------------------
 
 test("resource type list offers Brain · practice set", () => {
-  assert.match(editor, /"iframe",\s*\n\s*"brain",\s*\n\] as const;/, "brain joins RESOURCE_TYPES");
+  // `brain` joins RESOURCE_TYPES (it is no longer the last entry: the
+  // Interactive 2D experiment is its URL-less sibling — see
+  // tests/adminInteractiveExperimentsContract.test.mjs).
+  assert.match(editor, /"iframe",\s*\n\s*"brain",/, "brain joins RESOURCE_TYPES");
   assert.match(editor, /brain: "Brain · practice set"/);
   assert.match(editor, /if \(type === "brain"\) return "Brain";/);
-  assert.match(adminTypes, /\| "brain";/, "the editor's ProductResource type knows brain");
+  assert.match(adminTypes, /\| "brain"/, "the editor's ProductResource type knows brain");
   assert.match(adminTypes, /export type ProductPracticeQuestion = \{/);
   assert.match(adminTypes, /practiceQuestions\?: ProductPracticeQuestion\[\];/);
 });
@@ -258,9 +261,11 @@ test("picking Brain swaps the URL fields for the importer", () => {
   assert.match(editor, /const isBrain = resource\.type === "brain";/);
   assert.match(editor, /\{isBrain \? \(\s*\n\s*<PracticeSetImportPanel/);
   assert.match(editor, /practiceTitle: title \|\| undefined,/);
-  // The URL-only publish rule must not fire for a type that has no URL.
-  assert.match(editor, /\{!cleanUrl && !isBrain \? \(/);
-  assert.match(editor, /\{!isBrain \? \(\s*\n\s*<SecondaryButton/);
+  // The URL-only publish rule must not fire for a type that has no URL. The
+  // Interactive 2D experiment is the second such type, so both conditions name
+  // it next to Brain (Brain's own behaviour is unchanged).
+  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment \? \(/);
+  assert.match(editor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
   // …and a ready / incomplete set is spelled out on the resource card.
   assert.match(editor, /const brainReady = isBrain && practiceQuestionsReady\(resource\.practiceQuestions\);/);
 });

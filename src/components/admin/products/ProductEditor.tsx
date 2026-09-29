@@ -21,7 +21,8 @@ import type { PaidUpdate, ProductImage, ProductModule } from "@/lib/admin/types"
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import ModulesResourcesEditor from "@/components/admin/products/ModulesResourcesEditor";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
-import { normalizeResourceUrl } from "../../../../utils/productMapping";
+import { normalizeResourceUrl, productExperimentBudget, productExperimentBudgetError } from "../../../../utils/productMapping";
+import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import {
   DEFAULT_STORE_FILTER_GROUP,
   STORE_FILTER_GROUPS,
@@ -203,10 +204,41 @@ export function ProductEditor({ productId }: { productId?: string }) {
             const incomplete = questions.filter((q) => !String(q?.prompt || "").trim() || (q?.options || []).map((o) => String(o || "").trim()).filter(Boolean).length < 2 || !(Number(q?.correctIndex) >= 0 && Number(q?.correctIndex) < (q?.options || []).length)).length;
             add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each needs text, two options and a marked answer.`, "modules", learnerVisible);
           }
+        } else if (r.type === "interactive") {
+          // An experiment is playable with its inline HTML OR a hosted page —
+          // the same rule the Course Player's Modules tab reads. Its source is
+          // designed in the resource card's own builder panel (AI prompt →
+          // paste/upload/template → live preview), exactly like the Study
+          // Library.
+          const html = typeof r.interactiveHtml === "string" ? r.interactiveHtml : "";
+          const hasInline = Boolean(html.trim());
+          const hasHosted = Boolean(normalizeResourceUrl(r.url, r.type));
+          if (!hasInline && !hasHosted) {
+            add(`Interactive experiment “${r.name || "Untitled resource"}” in “${m.title}” has no source yet — paste the HTML, upload the .html file, start from a template, or add a hosted link.`, "modules", learnerVisible);
+          } else if (hasInline) {
+            // Unlike a missing URL (which the mapper drops from the learner
+            // tree but keeps as a draft), an over-size experiment breaks the
+            // Firestore write itself — so this stays blocking even for hidden
+            // resources.
+            for (const issue of experimentBlockingIssues(html)) {
+              add(`Interactive experiment “${r.name || "Untitled resource"}” in “${m.title}”: ${issue.message}`, "modules", true);
+            }
+          }
         } else if (!normalizeResourceUrl(r.url, r.type)) {
           add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "modules", learnerVisible);
         }
       }
+    }
+
+    // Inline experiments share the product document with everything else (and the
+    // document stores them twice — player tree + admin blob), so their whole
+    // budget is checked here. An over-sized single file is already named above
+    // with its module; only the whole-product overflow needs its own line.
+    // Always blocking: an over-budget tree would fail inside Firestore.
+    const experimentBudget = productExperimentBudget(form.modules);
+    if (!experimentBudget.over) {
+      const totalError = productExperimentBudgetError(form.modules);
+      if (totalError) add(totalError, "modules", true);
     }
 
     // Parent cycles would make every affected module disappear from the nested
@@ -243,6 +275,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
   async function persist(nextStatus?: ProductForm["status"]) {
     const status = nextStatus ?? form.status;
+    // The experiment budget gates EVERY save — draft included — because an
+    // over-budget tree fails inside Firestore with an unreadable error after
+    // the admin already waited for the write.
+    const budgetError = productExperimentBudgetError(form.modules);
+    if (budgetError) {
+      setTab("modules");
+      notify("error", budgetError);
+      return;
+    }
     if (status === "published") {
       const blocker = validation.find((issue) => issue.blocking);
       if (blocker) {
@@ -277,6 +318,18 @@ export function ProductEditor({ productId }: { productId?: string }) {
             paidUpdateId,
             practiceQuestions: normalizePracticeQuestions(resource.practiceQuestions),
             practiceTitle: (resource.practiceTitle || "").trim(),
+          };
+        }
+        if (resource.type === "interactive") {
+          // An experiment's content is its inline HTML (designed in the
+          // resource card's builder panel); the link field is only the hosted
+          // fallback for files too big to store, so it stays optional.
+          return {
+            ...resource,
+            url: resource.url.trim() ? normalizeResourceUrl(resource.url, resource.type) || resource.url.trim() : "",
+            sortOrder: index,
+            paidUpdateId,
+            interactiveHtml: typeof resource.interactiveHtml === "string" ? resource.interactiveHtml : "",
           };
         }
         return {
