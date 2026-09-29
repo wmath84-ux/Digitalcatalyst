@@ -7,6 +7,10 @@
 // "you are limited" on every visit. It now lives in Profile next to the other
 // account/allowance cards (membership, renewal, AI allowance) where usage
 // information belongs, using the same server-authoritative snapshot.
+//
+// Material (owner brief 2026-09-29, cart card → profile): the Cart
+// empty-state card's bare <GlassSurface> — radius 32, pack defaults, no
+// re-skin class, no text scrim. This card renders on the Profile page only.
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -122,7 +126,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
       aria-live="polite"
       className="relative"
     >
-      <GlassSurface tint={0.62} tintColor="173,216,255" blur={0} radius={24} className="dc-store-glass dc-scene-ink text-white" contentClassName="p-5 lg:p-3.5">
+      <GlassSurface radius={32} className="text-white" contentClassName="p-5 lg:p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white lg:h-9 lg:w-9 lg:rounded-xl">
@@ -130,7 +134,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300">My Day allowance</p>
-              <h3 data-myday-allowance-headline className="mt-1 text-lg font-black leading-tight text-white">
+              <h3 data-myday-allowance-headline className="mt-1 text-lg font-bold leading-tight text-white">
                 {resolved ? headline : "Checking today’s allowance…"}
               </h3>
             </div>

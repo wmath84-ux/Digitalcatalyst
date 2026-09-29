@@ -49,7 +49,7 @@ test("profile page is clean: no legacy orbs or animated gradients", () => {
 
 test("profile actions and cards are the pack components, not the old brand gradient (Phase A / A3)", () => {
   assert.doesNotMatch(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
-  assert.match(profilePage, /<GlassCard data-profile-hero/);
+  assert.match(profilePage, /<GlassSurface data-profile-hero/);
   assert.match(profilePage, /<GlassButton variant="capsule"/);
 });
 

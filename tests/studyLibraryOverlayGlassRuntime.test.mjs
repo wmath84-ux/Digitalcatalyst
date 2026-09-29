@@ -1,17 +1,18 @@
 // tests/studyLibraryOverlayGlassRuntime.test.mjs
 //
 // Runtime proof for the My Study Library overlay glass (owner brief
-// 2026-09-29): the delete confirmation — the overlay the shelf AND the builder
-// open — can wear the EXACT material the Profile page's cards wear.
+// 2026-09-29, cart card → profile): the delete confirmation — the overlay
+// the shelf AND the builder open — can wear the EXACT material the Profile
+// page's cards wear.
 //
-// `.dc-rev-glass` (src/revision-glass.css) paints the frost, the light-blue
-// tint, the sheen and the rim by LAYER POSITION (`> div[aria-hidden]
-// :nth-of-type(1…4)`), so a wrong DOM order would silently drop the blur.
-// Rendering the real component is the only way to pin that.
+// The Profile recipe is the Cart empty-state card's bare pack surface
+// (GlassSurface defaults: tint 0.5 · rgb(60,62,68) · blur 14), so the frost,
+// tint, sheen and rim are INLINE engine styles on the four aria-hidden
+// layers — a wrong DOM order or a stray re-skin class would silently change
+// them. Rendering the real component is the only way to pin that.
 //
-//   · `material="profile"` → the Profile recipe: pack surface at tint 0.62 ·
-//     rgb(173,216,255) · blur 0 (frost comes from the CSS), four layers, white
-//     ink.
+//   · `material="profile"` → the Profile recipe: frost blur 9.8px + saturate
+//     1.3, flat rgba(60,62,68,0.21) tint, four layers, white ink.
 //   · default `material="scene"` → the dark `dc-scene-plate` My Day / Home
 //     keep, unchanged.
 
@@ -81,19 +82,20 @@ const render = (props) => {
 test("the profile material is the Profile card's own surface, layer for layer", () => {
   const panel = render({ material: "profile" });
   assert.ok(panel, "the confirmation renders an alertdialog");
-  assert.match(panel.className, /dc-rev-glass/, "the panel wears the Profile glass");
+  assert.doesNotMatch(panel.className, /dc-rev-glass/, "no revision re-skin");
   assert.doesNotMatch(panel.className, /dc-scene-plate/, "…and not the dark plate");
 
-  // `.dc-rev-glass` restyles layers 1–4 by position: frost, tint, sheen, rim.
+  // The bare surface paints layers 1–4 inline by position: frost, tint,
+  // sheen, rim — the same four the Cart card and every Profile card wear.
   const [frost, tint, sheen, rim] = layers(panel);
   assert.ok(frost && tint && sheen && rim, `four aria-hidden layers, got ${layers(panel).length}`);
 
-  // tint 0.62 → the engine paints the light blue at 0.62 * 0.42, exactly what
-  // ProfileLayout's cards compute; the CSS then pins the flat 26% tint.
-  assert.match(tint.style.background, /173,\s*216,\s*255,\s*0\.26/, tint.style.background);
-  // blur 0: the inline style carries NO blur stage — the frost comes from
-  // `.dc-rev-glass`, the same division the Profile page relies on.
-  assert.doesNotMatch(frost.style.backdropFilter || "", /blur\(/);
+  // tint 0.5 → the engine paints rgb(60,62,68) at 0.5 * 0.42 = 0.21, exactly
+  // what the Cart card and the Profile cards compute.
+  assert.match(tint.style.background, /60,\s*62,\s*68,\s*0\.21/, tint.style.background);
+  // blur 14 → the inline frost carries the blur stage itself (14 * 0.7px in
+  // float math): no CSS re-skin is involved anywhere.
+  assert.match(frost.style.backdropFilter || "", /blur\(9\.7999\d*px\)/, frost.style.backdropFilter);
   // The panel is fluid: phone sheet → centred dialog from `sm`.
   assert.match(panel.className, /max-w-sm/, "phone width by default");
   assert.match(panel.className, /sm:max-w-md/, "wider on a tablet");

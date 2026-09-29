@@ -23,10 +23,11 @@ interface ConfirmDialogProps {
   /**
    * Which glass the panel wears:
    *  · `scene`   — the dark `dc-scene-plate` (Home / My Day over the scene);
-   *  · `profile` — EXACTLY the material the Profile page's cards wear: the
-   *    pack surface at tint 0.62 · light blue rgb(173,216,255) · blur 0,
-   *    re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3, flat
-   *    26% tint, quiet sheen, rim, soft lift) — owner brief 2026-09-29.
+   *  · `profile` — EXACTLY the material the Profile page's cards wear:
+   *    the Cart empty-state card's bare pack surface (tint 0.5 ·
+   *    rgb(60,62,68) · blur 14 — the GlassSurface defaults: frost 9.8px +
+   *    saturate 1.3, flat 21% tint, pack sheen + rim), no re-skin class —
+   *    owner brief 2026-09-29 (cart card → profile).
    */
   material?: "scene" | "profile";
 }
@@ -59,9 +60,10 @@ export default function ConfirmDialog({
   tone = "danger",
   material = "scene",
 }: ConfirmDialogProps) {
-  // The Profile-card recipe, verbatim (owner brief 2026-09-29): the pack
-  // surface at tint 0.62 · tintColor "173,216,255" · blur 0, re-skinned by
-  // `.dc-rev-glass`. `scene` keeps the dark plate exactly as before.
+  // The Profile-card recipe, verbatim (owner brief 2026-09-29, cart card
+  // → profile): the Cart empty-state card's bare pack surface —
+  // GlassSurface defaults (tint 0.5, blur 14), no re-skin class. `scene`
+  // keeps the dark plate exactly as before.
   const profileGlass = material === "profile";
   const boundsRef = useOverlayBounds();
   const { scoped, box } = useOverlayBox(open, boundsRef);
@@ -105,18 +107,17 @@ export default function ConfirmDialog({
       />
       <GlassSurface
         radius={0}
-        tint={profileGlass ? 0.62 : 0.5}
-        tintColor={profileGlass ? "173,216,255" : undefined}
-        blur={profileGlass ? 0 : 14}
+        tint={0.5}
+        blur={14}
         style={{ borderRadius: "var(--glass-sheet-radius)" }}
         // The `scene` string stays byte-identical to what My Day / Home pin
         // (tests/myDayScenePlateContract.test.mjs). The Profile-material
-        // variant swaps the plate for `.dc-rev-glass` and grows with the
-        // screen: a full-width sheet on a phone, a wider centred dialog from
-        // 640px up — never a panel that outgrows its viewport.
+        // variant is the bare Cart-card surface (no plate class) and grows
+        // with the screen: a full-width sheet on a phone, a wider centred
+        // dialog from 640px up — never a panel that outgrows its viewport.
         className={
           profileGlass
-            ? "dc-rev-glass glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"
+            ? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"
             : "dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
         }
         contentClassName={profileGlass ? "max-h-full overflow-y-auto overscroll-contain p-5 custom-scrollbar sm:p-6" : "max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"}

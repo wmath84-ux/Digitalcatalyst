@@ -1,5 +1,5 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
-import { GlassCard } from "../components/ui/GlassCard";
+import { GlassSurface } from "../components/ui/glass";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -71,9 +71,15 @@ const TIER_ICONS: Record<MembershipTier, ReactNode> = {
 };
 
 /* ── Design tokens ─────────────────────────────────────────────────────
-   Phase A (owner direction): every card is the pack's <GlassCard> at its
-   defaults and every action is the pack's <GlassButton variant="capsule">
-   (websiteglass.com). Only ink + spacing tokens remain here. Updated (owner brief 2026-09-29): every card now wears the EXACT material the Revision Progress page's cards wear — `.dc-rev-glass` (revision-glass.css): the same light-blue frost 18.4px + saturate 1.3, the same flat rgba(173,216,255,0.26) tint, the same quiet sheen, rim and soft lift — with NO text scrim, so the copy reads exactly as clean as it does on Progress. */
+   Phase A (owner direction): every action is the pack's <GlassButton
+   variant="capsule"> (websiteglass.com). Only ink + spacing tokens remain
+   here. Updated (owner brief 2026-09-29, cart card → profile): every card is
+   the pack's bare <GlassSurface> at its defaults with radius 32 — EXACTLY
+   the material of the Cart empty-state "Continue Shopping" card
+   (src/cartWishlist/components/EmptyState.tsx): frost blur 9.8px + saturate
+   1.3, flat rgba(60,62,68,0.21) tint, the pack sheen + rim — with NO re-skin
+   class (neither revision/store glass hooks nor a text scrim) and NO hover lift, so the copy reads exactly as clean as it does
+   on the Cart card. Card titles are font-bold (the Cart title's weight). */
 const BTN_PRIMARY = "w-full [&>span>div]:w-full";
 const BTN_SECONDARY = "w-full [&>span>div]:w-full";
 const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300";
@@ -302,11 +308,11 @@ export default function ProfileLayout({
           onOpenPurchases={library.onOpenPurchases}
         />
 
-        <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass" >
+        <GlassSurface radius={32} className="text-white" contentClassName="p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={EYEBROW}>Preferences</p>
-              <h3 className="mt-1 text-base font-black text-white">Notifications & privacy</h3>
+              <h3 className="mt-1 text-base font-bold text-white">Notifications & privacy</h3>
               <p className="mt-0.5 text-xs font-medium text-white/55">Saved securely to your account.</p>
             </div>
             <GlassButton
@@ -317,7 +323,7 @@ export default function ProfileLayout({
               <Bell size={18} />
             </GlassButton>
           </div>
-        </GlassCard>
+        </GlassSurface>
 
         <GlassButton
           variant="capsule"
@@ -374,7 +380,7 @@ function ProfileHero({
   const [brokenPhoto, setBrokenPhoto] = useState("");
   const showPhoto = Boolean(src) && src !== brokenPhoto;
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-hero className="dc-rev-glass relative overflow-hidden">
+    <GlassSurface data-profile-hero radius={32} className="relative overflow-hidden text-white" contentClassName="p-5">
       <div className="relative">
         <div className="flex items-center gap-4">
           <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
@@ -405,7 +411,7 @@ function ProfileHero({
                 {planLabel}
               </span>
             </div>
-            <h2 className="mt-2 truncate text-xl font-black tracking-tight md:text-2xl">{name}</h2>
+            <h2 className="mt-2 truncate text-xl font-bold tracking-tight md:text-2xl">{name}</h2>
             <p className="truncate text-sm font-medium text-white/85 md:text-base">{email}</p>
           </div>
 
@@ -428,7 +434,7 @@ function ProfileHero({
           <span className="inline-flex items-center gap-2"><Pencil size={15} /> Edit profile</span>
         </GlassButton>
       </div>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
@@ -448,9 +454,8 @@ function MembershipCard({
   subscription: SubscriptionSnapshot | null;
   onOpenPlans: () => void;
 }) {
-  // P3-11: profile membership card — subtle hover lift aligns with pricing glass motion
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-membership-tier={tier} data-profile-membership-card className="dc-rev-glass relative overflow-hidden transition duration-300 hover:-translate-y-0.5">
+    <GlassSurface data-profile-membership-tier={tier} data-profile-membership-card radius={32} className="relative overflow-hidden text-white" contentClassName="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>
@@ -458,7 +463,7 @@ function MembershipCard({
           </span>
           <div>
             <p className={EYEBROW}>Membership</p>
-            <h3 className="mt-0.5 text-lg font-black text-white">{tierLabel} membership</h3>
+            <h3 className="mt-0.5 text-lg font-bold text-white">{tierLabel} membership</h3>
             <span data-profile-plan-label className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-200 ring-1 ring-indigo-400/30">
               <BadgeCheck className="h-3 w-3" />
               {planLabel}
@@ -490,7 +495,7 @@ function MembershipCard({
       <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
       </p>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
@@ -503,14 +508,14 @@ function UpgradeCard({
   onOpenSubscriberExperience: () => void;
 }) {
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-upgrade-card className="dc-rev-glass" >
+    <GlassSurface data-profile-upgrade-card radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/30">
           <Rocket className="h-5 w-5" />
         </span>
         <div>
           <p className={EYEBROW}>Basic learner access</p>
-          <h3 className="mt-0.5 text-lg font-black leading-tight text-white">Upgrade your learning space</h3>
+          <h3 className="mt-0.5 text-lg font-bold leading-tight text-white">Upgrade your learning space</h3>
         </div>
       </div>
       <p className="mt-4 text-sm leading-6 text-white/75">
@@ -529,14 +534,14 @@ function UpgradeCard({
           <Sparkles className="h-4 w-4" /> See the subscriber app experience
         </GlassButton>
       </div>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
 /* ── Referral card ──────────────────────────────────────────────────── */
 function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boolean; appName: string; onCopy: () => void }) {
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-referral className="dc-rev-glass" >
+    <GlassSurface data-profile-referral radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">Your referral code</p>
@@ -562,28 +567,28 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
           </GlassButton>
         </div>
       )}
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
 /* ── Personal Study Library card ────────────────────────────────────── */
 function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-profile-study-library className="dc-rev-glass" >
+    <GlassSurface data-profile-study-library radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/30">
           <Boxes className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">Personal workspace</p>
-          <h3 className="mt-0.5 text-base font-black text-white">My Study Library</h3>
+          <h3 className="mt-0.5 text-base font-bold text-white">My Study Library</h3>
           <p className="mt-0.5 text-xs font-medium leading-5 text-white/55">Open your modules, Saved for Later and recently viewed resources.</p>
         </div>
       </div>
       <GlassButton variant="capsule" onClick={onOpen} className="mt-4 w-full text-cyan-100 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-black">
         <span className="inline-flex items-center gap-2">Open Study Library <ArrowRight className="h-4 w-4" /></span>
       </GlassButton>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
@@ -600,11 +605,11 @@ function LibraryCard({
   onOpenPurchases: () => void;
 }) {
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass" >
+    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className={EYEBROW}>My library</p>
-          <h3 className="mt-1 text-base font-black text-white">Your courses</h3>
+          <h3 className="mt-1 text-base font-bold text-white">Your courses</h3>
           <p className="mt-0.5 text-xs font-medium text-white/55">Jump back into everything you own.</p>
         </div>
         <span className={`${ICON_CHIP}`}>
@@ -648,7 +653,7 @@ function LibraryCard({
           Nothing owned yet — find a course in the store to start your library.
         </p>
       )}
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
@@ -672,7 +677,7 @@ function ProfileRenewalCard({
   const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
 
   return (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} data-renewal-card data-stage={expired ? "expired" : "active"} className="dc-rev-glass" >
+    <GlassSurface data-renewal-card data-stage={expired ? "expired" : "active"} radius={32} className="text-white" contentClassName="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${expired ? "bg-rose-500/15 text-rose-300 ring-rose-400/30" : "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"}`}>
@@ -680,7 +685,7 @@ function ProfileRenewalCard({
           </span>
           <div>
             <p className={`text-[10px] font-black uppercase tracking-[0.16em] ${expired ? "text-rose-300" : "text-indigo-300"}`}>Membership renewal</p>
-            <h3 data-renewal-card-headline className="mt-0.5 text-lg font-black leading-tight text-white">{expired ? "Your access needs a refresh" : "Your access is active"}</h3>
+            <h3 data-renewal-card-headline className="mt-0.5 text-lg font-bold leading-tight text-white">{expired ? "Your access needs a refresh" : "Your access is active"}</h3>
             <p className="mt-0.5 text-xs font-semibold text-white/55">{TIER_LABELS[tier]} · {cycleLabel(subscription.cycle)}</p>
           </div>
         </div>
@@ -736,7 +741,7 @@ function ProfileRenewalCard({
       <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
       </p>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 
@@ -752,22 +757,20 @@ function StatChip({ label, value, valueAttr }: { label: string; value: string; v
 
 function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; value: number; label: string; tone: string; onClick: () => void }) {
   return (
-    /* Wave 13: the quick stat is a clickable pack GlassCard — now wearing store glass same as home social card. */
-    <GlassCard
-      tint={0.62}
-      tintColor="173,216,255"
-      blur={0}
+    /* Wave 13: the quick stat is a clickable pack surface — the Cart card's bare GlassSurface, radius 32. Press feedback (active:scale) stays; it is not a lift. */
+    <GlassSurface
+      radius={32}
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
-      className="dc-rev-glass cursor-pointer text-center transition active:scale-[0.97]"
+      className="cursor-pointer text-center text-white transition active:scale-[0.97]"
       contentClassName="p-3 md:p-3.5"
     >
       <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>
       <span className="mt-2 block text-2xl font-black text-white md:text-3xl">{value}</span>
       <span className="block text-[10px] font-bold uppercase tracking-wide text-white/55 md:text-[11px]">{label}</span>
-    </GlassCard>
+    </GlassSurface>
   );
 }
 

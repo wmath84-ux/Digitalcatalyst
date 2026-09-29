@@ -15,11 +15,11 @@
 // so everything built here shows up as real modules, real lessons and real
 // practice in the player — the learner's own course, their own design.
 //
-// Look & feel (owner brief 2026-09-29):
+// Look & feel (owner brief 2026-09-29, cart card → profile):
 //   · every panel of this overlay wears EXACTLY the glass the Profile page's
-//     cards wear — the pack surface at tint 0.62 · rgb(173,216,255) · blur 0,
-//     re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3, flat 26%
-//     light-blue tint, quiet sheen, rim, soft lift);
+//     cards wear — the Cart empty-state card's bare pack surface at radius
+//     32 (GlassSurface defaults: tint 0.5 · rgb(60,62,68) · blur 14 — frost
+//     9.8px + saturate 1.3, flat 21% tint, pack sheen + rim), no re-skin;
 //   · the layout is fluid: one column on a phone, the cover beside the fields
 //     on a tablet, and Course-identity | Modules side by side from 1280px;
 //   · a course without a cover shows (and, at save, keeps) a random bundled
@@ -99,14 +99,13 @@ const typeOption = (type: MyCourseResourceType): TypeOption =>
   TYPE_OPTIONS.find((option) => option.id === type) || TYPE_OPTIONS[0];
 
 /**
- * The Profile page's card material, spelled once (owner brief 2026-09-29):
- * the pack surface at tint 0.62 · light blue rgb(173,216,255) · blur 0, with
- * `.dc-rev-glass` painting the frost (18.4px + saturate 1.3), the flat 26%
- * tint, the quiet sheen, the rim and the soft lift — the exact numbers
- * src/profile/ProfileLayout.tsx hands its cards, now on every panel of this
- * overlay (sections, the sticky action bar and the delete confirmation).
+ * The Profile page's card material is the Cart empty-state card's bare pack
+ * surface — GlassSurface at its defaults (tint 0.5 · rgb(60,62,68) · blur
+ * 14) with radius 32 — so there is nothing to spell: the panels below pass
+ * no material props at all (owner brief 2026-09-29, cart card → profile).
+ * The sticky action bar keeps radius 0 (it is an edge-to-edge bar, not a
+ * card); the delete confirmation follows via ConfirmDialog material="profile".
  */
-const PROFILE_GLASS = { tint: 0.62, tintColor: "173,216,255", blur: 0 } as const;
 
 /* ── immutable tree helpers ──────────────────────────────────────────────── */
 
@@ -386,7 +385,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                 tablet, side by side from 1280px on a desktop. */}
             <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
               {/* ── 1. Course identity ─────────────────────────────────── */}
-              <GlassSurface {...PROFILE_GLASS} radius={20} className="dc-rev-glass relative overflow-hidden" contentClassName="p-4 sm:p-5" data-my-course-meta>
+              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Course</p>
                 <h1 className="mt-1 text-2xl font-black tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
                 <p className="mt-1 text-xs font-medium leading-5 text-white/50">
@@ -482,7 +481,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               </GlassSurface>
 
               {/* ── 2. Modules ────────────────────────────────────────── */}
-              <GlassSurface {...PROFILE_GLASS} radius={20} className="dc-rev-glass relative overflow-hidden" contentClassName="p-4 sm:p-5" data-my-course-modules>
+              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Structure</p>
@@ -540,12 +539,12 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
           </div>
         </main>
 
-        {/* ── Sticky action bar — the same Profile glass as the panels, so
-            the bar reads as part of the overlay instead of a dark slab ── */}
+        {/* ── Sticky action bar — the same bare Profile glass as the panels
+            (radius 0: it is an edge-to-edge bar), so it reads as part of the
+            overlay instead of a dark slab ── */}
         <GlassSurface
-          {...PROFILE_GLASS}
           radius={0}
-          className="dc-rev-glass sticky bottom-0 z-30 border-t border-white/15"
+          className="sticky bottom-0 z-30 border-t border-white/15 text-white"
           contentClassName="px-3 py-3 sm:px-5"
           data-my-course-editor-actions
         >
@@ -587,7 +586,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
       </div>
 
       {/* The delete confirmation wears the exact glass of the Profile page's
-          cards (tint 0.62 · rgb(173,216,255) · blur 0 · `.dc-rev-glass`). */}
+          cards (the Cart card's bare surface) via material="profile". */}
       <ConfirmDialog
         open={deleteOpen}
         material="profile"

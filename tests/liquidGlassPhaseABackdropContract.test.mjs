@@ -247,9 +247,9 @@ test("A3: profile + settings paint no opaque white / gradient surface; cards, ac
     assert.doesNotMatch(src, /backdrop-blur/, `${file}: hand-rolled frost left`);
   }
   const layout = read("src/profile/ProfileLayout.tsx");
-  assert.match(layout, /<GlassCard data-profile-hero/);
-  assert.match(layout, /<GlassCard data-profile-membership-tier/);
-  assert.match(layout, /<GlassCard data-renewal-card/);
+  assert.match(layout, /<GlassSurface data-profile-hero/);
+  assert.match(layout, /<GlassSurface data-profile-membership-tier/);
+  assert.match(layout, /<GlassSurface data-renewal-card/);
   assert.match(layout, /<GlassButton variant="capsule"/);
   assert.match(layout, /<DialogContent/);
   assert.match(layout, /<GlassSwitch/);

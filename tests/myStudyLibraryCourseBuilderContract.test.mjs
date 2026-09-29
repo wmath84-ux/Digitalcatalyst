@@ -108,25 +108,31 @@ test("the card's Delete asks first, through the Profile page's own glass", () =>
   assert.match(study, /await myCourses\.remove\(pendingDelete\.id\)/);
   assert.match(study, /<ConfirmDialog[\s\S]{0,160}material="profile"/);
   // The shared dialog grew a material switch, and "profile" is verbatim the
-  // Profile cards' recipe: pack surface at tint 0.62 · rgb(173,216,255) ·
-  // blur 0, re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3).
+  // Profile cards' recipe: the Cart card's bare pack surface (GlassSurface
+  // defaults — tint 0.5 · blur 14), no re-skin class.
   assert.match(confirm, /material\?: "scene" \| "profile"/);
-  assert.match(confirm, /tint=\{profileGlass \? 0\.62 : 0\.5\}/);
-  assert.match(confirm, /tintColor=\{profileGlass \? "173,216,255" : undefined\}/);
-  assert.match(confirm, /blur=\{profileGlass \? 0 : 14\}/);
-  assert.match(confirm, /profileGlass\n\s+\? "dc-rev-glass glass-dialog-in/);
+  assert.match(confirm, /tint=\{0\.5\}/);
+  assert.match(confirm, /blur=\{14\}/);
+  assert.doesNotMatch(confirm, /tintColor=\{/);
+  assert.doesNotMatch(confirm, /dc-rev-glass/);
+  assert.match(confirm, /profileGlass\n\s+\? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"/);
   // …and the `scene` path is byte-for-byte what My Day / Home pin.
   assert.match(confirm, /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/);
-  assert.match(profile, /tint=\{0\.62\} tintColor="173,216,255" blur=\{0\}[^>]*className="dc-rev-glass/);
+  assert.match(profile, /<GlassSurface data-profile-hero radius=\{32\}/);
 });
 
 test("the builder overlay wears the Profile glass and lays out for every screen", () => {
-  // 1 · ONE material, spelled once and shared by every panel + the bar.
-  assert.match(editor, /const PROFILE_GLASS = \{ tint: 0\.62, tintColor: "173,216,255", blur: 0 \} as const;/);
-  const panels = editor.match(/\{\.\.\.PROFILE_GLASS\}/g) ?? [];
-  assert.ok(panels.length >= 3, `every panel must wear the glass (found ${panels.length})`);
-  assert.match(editor, /className="dc-rev-glass relative overflow-hidden"/);
-  assert.match(editor, /className="dc-rev-glass sticky bottom-0/);
+  // 1 · ONE material — the Cart card's bare surface at its defaults — shared
+  // by every panel + the bar. Defaults need no const and no re-skin class.
+  assert.doesNotMatch(editor, /PROFILE_GLASS/);
+  assert.doesNotMatch(editor, /dc-rev-glass/);
+  assert.doesNotMatch(editor, /tint=\{|tintColor|blur=\{/);
+  const panels = editor.match(/<GlassSurface radius=\{32\}/g) ?? [];
+  assert.equal(panels.length, 2, `both panels wear the radius-32 surface (found ${panels.length})`);
+  assert.match(editor, /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta/);
+  assert.match(editor, /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules/);
+  // The sticky action bar keeps radius 0 (edge-to-edge bar, not a card).
+  assert.match(editor, /radius=\{0\}\s+className="sticky bottom-0 z-30 border-t border-white\/15 text-white"/);
   // No dark slabs left in the overlay.
   assert.doesNotMatch(editor, /bg-slate-950\/85/);
   assert.doesNotMatch(editor, /rounded-3xl border border-white\/10 bg-white\/\[0\.04\]/);
