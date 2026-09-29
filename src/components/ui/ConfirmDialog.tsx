@@ -20,6 +20,15 @@ interface ConfirmDialogProps {
   onCancel: () => void;
   /** Danger is the default because every current call-site deletes something. */
   tone?: "danger" | "primary";
+  /**
+   * Which glass the panel wears:
+   *  · `scene`   — the dark `dc-scene-plate` (Home / My Day over the scene);
+   *  · `profile` — EXACTLY the material the Profile page's cards wear: the
+   *    pack surface at tint 0.62 · light blue rgb(173,216,255) · blur 0,
+   *    re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3, flat
+   *    26% tint, quiet sheen, rim, soft lift) — owner brief 2026-09-29.
+   */
+  material?: "scene" | "profile";
 }
 
 /**
@@ -48,7 +57,12 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
   tone = "danger",
+  material = "scene",
 }: ConfirmDialogProps) {
+  // The Profile-card recipe, verbatim (owner brief 2026-09-29): the pack
+  // surface at tint 0.62 · tintColor "173,216,255" · blur 0, re-skinned by
+  // `.dc-rev-glass`. `scene` keeps the dark plate exactly as before.
+  const profileGlass = material === "profile";
   const boundsRef = useOverlayBounds();
   const { scoped, box } = useOverlayBox(open, boundsRef);
   const visualViewportBox = useVisualViewportBox(open);
@@ -91,9 +105,21 @@ export default function ConfirmDialog({
       />
       <GlassSurface
         radius={0}
+        tint={profileGlass ? 0.62 : 0.5}
+        tintColor={profileGlass ? "173,216,255" : undefined}
+        blur={profileGlass ? 0 : 14}
         style={{ borderRadius: "var(--glass-sheet-radius)" }}
-        className="dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
-        contentClassName="max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"
+        // The `scene` string stays byte-identical to what My Day / Home pin
+        // (tests/myDayScenePlateContract.test.mjs). The Profile-material
+        // variant swaps the plate for `.dc-rev-glass` and grows with the
+        // screen: a full-width sheet on a phone, a wider centred dialog from
+        // 640px up — never a panel that outgrows its viewport.
+        className={
+          profileGlass
+            ? "dc-rev-glass glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"
+            : "dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
+        }
+        contentClassName={profileGlass ? "max-h-full overflow-y-auto overscroll-contain p-5 custom-scrollbar sm:p-6" : "max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"}
         role="alertdialog"
         aria-modal="true"
       >

@@ -19,6 +19,7 @@
 
 import type { Product } from "../data/products";
 import type { CourseFile, CourseModule, CoursePracticeQuestion } from "../types/course";
+import { fallbackCoverImage } from "./myCourseCovers";
 import { myCourseStorageId, type MyCourse, type MyCourseModule, type MyCourseResource } from "../types/myCourse";
 
 const isBrainResource = (resource: MyCourseResource): boolean =>
@@ -94,7 +95,10 @@ export const myCourseToProduct = (course: MyCourse): Product => ({
   id: myCourseStorageId(course.id),
   title: course.title || "Untitled course",
   instructor: "My own course",
-  image: course.coverImage || "",
+  // A course saved without a cover already carries a random one (the client
+  // assigns it at save time); this keeps the player showing an image even for
+  // a course that has never been saved since before that rule existed.
+  image: course.coverImage || fallbackCoverImage(course.id),
   category: "Course",
   classLevel: "My Study Library",
   subject: "Self study",

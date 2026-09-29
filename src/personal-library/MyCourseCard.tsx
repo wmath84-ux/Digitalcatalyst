@@ -7,24 +7,30 @@
 // artwork, title underneath), so a course the learner built sits in the
 // library exactly like a course they bought.
 //
-// The card carries ONLY what the learner asked for: the cover image, the
-// title, Play and Edit. Everything else (rename, delete, the module tree, the
-// questions) lives in the editor, behind Edit.
+// Owner brief (2026-09-29): a self-created course can be deleted straight from
+// its card — the row under the title carries Play, Edit AND Delete (Delete
+// asks for a confirmation first; the builder keeps its own delete as well) —
+// and a course whose learner never picked a cover shows a random bundled one
+// instead of an empty placeholder (the client also persists one at save time).
 
-import { ImagePlus, Layers3, PencilLine, Play } from "lucide-react";
+import { Layers3, PencilLine, Play, Trash2 } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import { countModules, countResources } from "../lib/myCourseClient";
+import { fallbackCoverImage } from "../lib/myCourseCovers";
 import type { MyCourse } from "../types/myCourse";
 
 interface MyCourseCardProps {
   course: MyCourse;
   onPlay: (course: MyCourse) => void;
   onEdit: (course: MyCourse) => void;
+  onDelete: (course: MyCourse) => void;
 }
 
-export default function MyCourseCard({ course, onPlay, onEdit }: MyCourseCardProps) {
+export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCourseCardProps) {
   const moduleCount = countModules(course.modules);
   const resourceCount = countResources(course.modules);
+  // No cover set → a stable random one from the bundled pool (never a gap).
+  const cover = String(course.coverImage || "").trim() || fallbackCoverImage(course.id);
 
   return (
     <GlassSurface
@@ -36,23 +42,14 @@ export default function MyCourseCard({ course, onPlay, onEdit }: MyCourseCardPro
       data-my-course-card={course.id}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden">
-        {course.coverImage ? (
-          <img
-            src={course.coverImage}
-            alt={course.title || "Course cover"}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            data-my-course-cover=""
-          />
-        ) : (
-          <span
-            className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600/35 via-indigo-600/25 to-cyan-500/25"
-            data-my-course-cover="empty"
-          >
-            <ImagePlus className="h-9 w-9 text-white/45" />
-          </span>
-        )}
+        <img
+          src={cover}
+          alt={course.title || "Course cover"}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          data-my-course-cover={course.coverImage ? "" : "fallback"}
+        />
         <span className="absolute left-2 top-2 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
           My course
         </span>
@@ -82,7 +79,7 @@ export default function MyCourseCard({ course, onPlay, onEdit }: MyCourseCardPro
           onClick={() => onEdit(course)}
           aria-label={`Edit ${course.title || "course"}`}
           title="Edit this course"
-          className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white ring-1 ring-white/20 backdrop-blur transition hover:bg-black/65 active:scale-95"
+          className="absolute right-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white ring-1 ring-white/20 backdrop-blur transition hover:bg-black/65 active:scale-95"
           data-my-course-edit={course.id}
         >
           <PencilLine size={15} />
@@ -98,7 +95,9 @@ export default function MyCourseCard({ course, onPlay, onEdit }: MyCourseCardPro
         ) : (
           <p className="text-[11px] text-white/40">Tap play to open the Course Player</p>
         )}
-        <div className="mt-1.5 flex items-center gap-2">
+        {/* The action row is fluid: the buttons wrap rather than overflow on a
+            narrow card, and Play keeps the leftover space. */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => onPlay(course)}
@@ -114,6 +113,18 @@ export default function MyCourseCard({ course, onPlay, onEdit }: MyCourseCardPro
             data-my-course-edit-button={course.id}
           >
             <PencilLine size={12} /> Edit
+          </button>
+          {/* Delete lives right next to Edit — the card is where the learner
+              looks for it. It only ASKS; the shelf deletes after the confirm. */}
+          <button
+            type="button"
+            onClick={() => onDelete(course)}
+            aria-label={`Delete ${course.title || "course"}`}
+            title="Delete this course"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[11px] font-black text-rose-300 ring-1 ring-rose-400/25 transition hover:bg-rose-500/15 active:scale-[0.98]"
+            data-my-course-delete={course.id}
+          >
+            <Trash2 size={12} /> Delete
           </button>
         </div>
       </div>

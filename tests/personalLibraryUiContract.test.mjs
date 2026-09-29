@@ -46,9 +46,10 @@ test("My Study Library is one lazy authenticated route reachable from desktop an
 test("central workspace is a course shelf: product-card grid + a '+' that opens the builder", () => {
   assert.match(study, /My Study Library/);
   // Every course the learner built is a card drawn with the store's own
-  // product-card material, carrying only cover, title, Play and Edit.
+  // product-card material, carrying cover, title, Play, Edit and Delete
+  // (owner brief 2026-09-29: a self-created course deletes from its card).
   assert.match(study, /data-my-course-grid/);
-  assert.match(study, /<MyCourseCard key=\{course\.id\} course=\{course\} onPlay=\{openCourse\} onEdit=\{editCourse\} \/>/);
+  assert.match(study, /<MyCourseCard key=\{course\.id\} course=\{course\} onPlay=\{openCourse\} onEdit=\{editCourse\} onDelete=\{requestDelete\} \/>/);
   assert.match(myCard, /dc-scene-plate/);
   assert.match(myCard, /aspect-\[4\/3\]/);
   assert.match(myCard, /data-my-course-play/);

@@ -44,6 +44,9 @@ const peekDock = read("src/course/CoursePeekDock.tsx");
 const routes = read("src/utils/appRoutes.ts");
 const main = read("src/main.tsx");
 const rules = read("firestore.rules");
+const covers = read("src/lib/myCourseCovers.ts");
+const profile = read("src/profile/ProfileLayout.tsx");
+const confirm = read("src/components/ui/ConfirmDialog.tsx");
 
 // ---------------------------------------------------------------------------
 // 1. The shelf — a grid of the learner's own courses + the "+" entry
@@ -66,7 +69,7 @@ test("the Study Library is a course shelf, not the old saved-link organiser", ()
   }
 });
 
-test("every course card is the store's product card — image, title, Play and Edit only", () => {
+test("every course card is the store's product card — image, title, Play, Edit and Delete", () => {
   // Same material and geometry as src/home/components/ProductCard.tsx.
   assert.match(card, /dc-scene-plate/);
   assert.match(card, /radius=\{24\}/);
@@ -75,6 +78,12 @@ test("every course card is the store's product card — image, title, Play and E
   assert.match(card, /data-my-course-title/);
   assert.match(card, /data-my-course-play/);
   assert.match(card, /data-my-course-edit/);
+  // Owner brief 2026-09-29: a self-created course deletes from its card too.
+  assert.match(card, /data-my-course-delete/);
+  assert.match(card, /onDelete: \(course: MyCourse\) => void;/);
+  // …and a course without a cover never shows an empty frame: the bundled
+  // random cover pool backs it out (the client persists one at save).
+  assert.match(card, /fallbackCoverImage\(course\.id\)/);
   // Nothing else on the card: no favourite heart, no price, no rating, no
   // rating count, no share/study-pack row.
   for (const gone of [/onToggleFavorite/, /₹/, /ratingCount/, /Trending/, /data-create-study-pack/]) {
@@ -90,6 +99,61 @@ test("the '+' opens the builder from the grid tile, the empty state and a floati
   // Play and Edit go to the player / editor routes for that course.
   assert.match(study, /export const myCoursePlayHash = \(courseId: string\) => `#\/my-course\/\$\{encodeURIComponent\(courseId\)\}`;/);
   assert.match(study, /export const myCourseEditHash = \(courseId: string\) => `#\/my-course\/\$\{encodeURIComponent\(courseId\)\}\/edit`;/);
+});
+
+test("the card's Delete asks first, through the Profile page's own glass", () => {
+  // The card only requests; the shelf confirms and deletes (the builder keeps
+  // its own delete for the edit flow — "card par hi delete, andar bhi").
+  assert.match(study, /const \[pendingDelete, setPendingDelete\] = useState<MyCourse \| null>\(null\);/);
+  assert.match(study, /await myCourses\.remove\(pendingDelete\.id\)/);
+  assert.match(study, /<ConfirmDialog[\s\S]{0,160}material="profile"/);
+  // The shared dialog grew a material switch, and "profile" is verbatim the
+  // Profile cards' recipe: pack surface at tint 0.62 · rgb(173,216,255) ·
+  // blur 0, re-skinned by `.dc-rev-glass` (frost 18.4px + saturate 1.3).
+  assert.match(confirm, /material\?: "scene" \| "profile"/);
+  assert.match(confirm, /tint=\{profileGlass \? 0\.62 : 0\.5\}/);
+  assert.match(confirm, /tintColor=\{profileGlass \? "173,216,255" : undefined\}/);
+  assert.match(confirm, /blur=\{profileGlass \? 0 : 14\}/);
+  assert.match(confirm, /profileGlass\n\s+\? "dc-rev-glass glass-dialog-in/);
+  // …and the `scene` path is byte-for-byte what My Day / Home pin.
+  assert.match(confirm, /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/);
+  assert.match(profile, /tint=\{0\.62\} tintColor="173,216,255" blur=\{0\}[^>]*className="dc-rev-glass/);
+});
+
+test("the builder overlay wears the Profile glass and lays out for every screen", () => {
+  // 1 · ONE material, spelled once and shared by every panel + the bar.
+  assert.match(editor, /const PROFILE_GLASS = \{ tint: 0\.62, tintColor: "173,216,255", blur: 0 \} as const;/);
+  const panels = editor.match(/\{\.\.\.PROFILE_GLASS\}/g) ?? [];
+  assert.ok(panels.length >= 3, `every panel must wear the glass (found ${panels.length})`);
+  assert.match(editor, /className="dc-rev-glass relative overflow-hidden"/);
+  assert.match(editor, /className="dc-rev-glass sticky bottom-0/);
+  // No dark slabs left in the overlay.
+  assert.doesNotMatch(editor, /bg-slate-950\/85/);
+  assert.doesNotMatch(editor, /rounded-3xl border border-white\/10 bg-white\/\[0\.04\]/);
+  // 2 · fluid layout: single column on a phone, side-by-side panels on a
+  // desktop, and the cover beside the fields from 640px.
+  assert.match(editor, /max-w-\[1280px\]/);
+  assert.match(editor, /grid grid-cols-1 items-start gap-4 xl:grid-cols-\[minmax\(0,20rem\)_minmax\(0,1fr\)\]/);
+  assert.match(editor, /mt-4 grid gap-4 sm:grid-cols-\[190px_minmax\(0,1fr\)\] xl:grid-cols-1/);
+  // 3 · the builder's own delete still rides the same profile-glass dialog.
+  assert.match(editor, /<ConfirmDialog[\s\S]{0,120}material="profile"/);
+});
+
+test("a course without a cover gets a random one, persisted at save", () => {
+  // The pool is bundled artwork that already ships in public/images.
+  assert.match(covers, /export const FALLBACK_COVERS: string\[\] = \[/);
+  for (const image of ["/images/course-webdev.jpg", "/images/mechanics.jpg"]) {
+    assert.ok(covers.includes(image), `cover pool missing ${image}`);
+  }
+  // Display fallback is stable per course (never flickers); the save-time
+  // assignment is a true random pick.
+  assert.match(covers, /export const fallbackCoverImage = \(seed = ""\)/);
+  assert.match(covers, /export const randomCoverImage = \(\): string =>/);
+  // Persisted in the write itself, so BOTH paths (Firestore and the server
+  // fallback, which sends `clean`) carry the cover.
+  assert.match(client, /if \(!String\(clean\.coverImage \|\| ""\)\.trim\(\)\) clean\.coverImage = randomCoverImage\(\);/);
+  // The player's identity image falls back the same way.
+  assert.match(adapter, /image: course\.coverImage \|\| fallbackCoverImage\(course\.id\)/);
 });
 
 // ---------------------------------------------------------------------------
