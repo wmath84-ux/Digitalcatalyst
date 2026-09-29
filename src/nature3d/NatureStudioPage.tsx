@@ -21,6 +21,7 @@ import {
   PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
   BookOpen, PenLine, Network, Users, Rows3, Settings, Layers3,
 } from "lucide-react";
+import { useMotionValue } from "framer-motion";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
 import { webglSupported } from "./engine/quality";
@@ -83,6 +84,17 @@ const BOARD_VIEWS: Array<{ key: ViewPreset; label: string; short: string; Icon: 
 
 /** The tray instruction is visible on open, then must leave within this cap. */
 const TRAY_INSTRUCTION_MS = 3000;
+
+/**
+ * Drag-scroll gesture thresholds (same numbers the course player's peek line
+ * uses): below this travel a press is a TAP, and a drag only selects when it
+ * is dominantly HORIZONTAL — a mostly-vertical swipe is a scroll/system
+ * intent and must never activate a dock button by accident.
+ */
+const DOCK_DRAG_THRESHOLD = 12;
+
+/** The drag-scroll auto-hide preference survives the session (comfort toggle). */
+const DOCK_AUTO_HIDE_KEY = "sanctuary.dockAutoHide";
 
 export default function NatureStudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -157,9 +169,45 @@ export default function NatureStudioPage() {
   // peek behaviour the desktop shell's footer dock uses. Selecting a view
   // closes it again to free the screen.
   const [dockOpen, setDockOpen] = useState(false);
+  // ── DRAG SCROLL AUTO-HIDE (owner brief 2026-09-29) ────────────────────
+  // The dock's own Advanced setting (Settings → Dock). When ON (the
+  // default), the bottom line behaves exactly like the home footer and every
+  // course dock already do: HOLD + drag left/right along the line and the
+  // dock reveals under the finger, the magnification wave follows it, and
+  // the button the finger LIFTS on is the one that clicks — the dock then
+  // hides again the moment the finger comes up. When OFF, the dock opens
+  // only by tap / swipe and stays open until the learner closes it.
+  const [dockAutoHide, setDockAutoHide] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(DOCK_AUTO_HIDE_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const toggleDockAutoHide = useCallback(() => {
+    setDockAutoHide((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(DOCK_AUTO_HIDE_KEY, next ? "on" : "off");
+      } catch { /* private mode — the session default still applies */ }
+      return next;
+    });
+  }, []);
+  // The magnification wave's pointer X — the dock follows it. The handle's
+  // hold-drag drives the SAME wave the dock's own pointer moves do (the
+  // course player's peek line pattern).
+  const dockPointerX = useMotionValue(-200);
   // Drag tracking for the handle: distinguishes a tap (toggle) from a
-  // swipe (open on up, close on down) without a library.
-  const dockDrag = useRef<{ startY: number; moved: boolean } | null>(null);
+  // vertical swipe (open on up, close on down) from the horizontal
+  // drag-scroll (reveal → follow → select on lift → auto-hide) — no library.
+  const dockDrag = useRef<{
+    startX: number;
+    startY: number;
+    moved: boolean;
+    axis: "none" | "x" | "y";
+    /** The gesture itself revealed the dock (it was closed on press). */
+    revealed: boolean;
+  } | null>(null);
   const [openCourseId, setOpenCourseId] = useState<string | null>(null);
   const [focusMine, setFocusMine] = useState(false);
 
@@ -484,32 +532,106 @@ export default function NatureStudioPage() {
     }
   }, [focusStudyView, focusSceneryView]);
 
-  // Drag handle: swipe up reveals the dock, swipe down hides it, a plain tap
-  // toggles. Pointer capture keeps the gesture alive if the finger slides off.
-  const onHandlePointerDown = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
-    dockDrag.current = { startY: e.clientY, moved: false };
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not captured */ }
+  /**
+   * The dock button under a lifted finger — the same elementsFromPoint
+   * lookup the home footer's dock does on pointerup, so a drag that ends on
+   * an icon CLICKS that icon.
+   */
+  const dockItemAtPoint = useCallback((clientX: number, clientY: number): string | null => {
+    const stack = document.elementsFromPoint(clientX, clientY);
+    for (const node of stack) {
+      if (!(node instanceof Element)) continue;
+      const id = node.closest("[data-glass-dock-item]")?.getAttribute("data-glass-dock-item");
+      if (id) return id;
+    }
+    return null;
   }, []);
+
+  // The bottom line (drag handle). THE DRAG-SCROLL GESTURE, mirroring the
+  // course player's peek line / home footer dock:
+  //   · press on the line            → the dock reveals under the finger;
+  //   · drag LEFT / RIGHT            → the magnification wave follows the
+  //                                    finger (via `dockPointerX`);
+  //   · lift on a button             → THAT button is clicked;
+  //   · lift anywhere else (auto-hide ON) → the dock hides again;
+  //   · a plain tap                  → toggles the dock (stays open);
+  //   · a mostly-vertical swipe      → the old peek: up reveals, down hides.
+  // The dominant axis is decided once, past the threshold, so a diagonal
+  // never does both. Pointer capture keeps the gesture alive if the finger
+  // slides off the line.
+  const onHandlePointerDown = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
+    const wasOpen = dockOpen;
+    dockDrag.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      axis: "none",
+      revealed: !wasOpen,
+    };
+    // Reveal immediately so the dock is visible under the finger while it
+    // drags — the wave follows `dockPointerX` from here on.
+    if (!wasOpen) setDockOpen(true);
+    dockPointerX.set(e.clientX);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not captured */ }
+  }, [dockOpen, dockPointerX]);
   const onHandlePointerMove = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dockDrag.current;
     if (!drag) return;
+    const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    if (Math.abs(dy) > 10) drag.moved = true;
-    if (dy < -24) {
-      setDockOpen(true);
-      dockDrag.current = null;
-    } else if (dy > 24) {
-      setDockOpen(false);
-      dockDrag.current = null;
+    if (drag.axis === "none" && (Math.abs(dx) >= DOCK_DRAG_THRESHOLD || Math.abs(dy) >= DOCK_DRAG_THRESHOLD)) {
+      drag.moved = true;
+      drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
     }
-  }, []);
+    if (drag.axis === "x") {
+      dockPointerX.set(e.clientX);
+      return;
+    }
+    if (drag.axis === "y") {
+      if (dy < -24) {
+        setDockOpen(true);
+        dockDrag.current = null;
+      } else if (dy > 24) {
+        setDockOpen(false);
+        dockDrag.current = null;
+      }
+    }
+  }, [dockPointerX]);
   const onHandlePointerUp = useCallback((e: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dockDrag.current;
     dockDrag.current = null;
+    dockPointerX.set(-200);
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
-    // A tap (no meaningful drag) toggles the dock.
-    if (drag && !drag.moved) setDockOpen((v) => !v);
-  }, []);
+    if (!drag) return;
+    // A tap (no meaningful drag) toggles the dock. Press already opened a
+    // closed line, and `revealed` records exactly that — so a tap on a
+    // closed dock KEEPS it open (revealed=true), and a tap on an open dock
+    // closes it (revealed=false). Same net toggle as before, one rule.
+    if (!drag.moved) {
+      setDockOpen(drag.revealed);
+      return;
+    }
+    if (drag.axis !== "x") return;
+    // A real left/right drag: the button the finger settled on is the one
+    // that is clicked. `handleDockSelect` closes the dock for board / scenery
+    // / settings picks (its own rule); the module menu keeps it open because
+    // the panel anchors to the dock. With auto-hide ON the dock also hides
+    // when the lift lands on empty dock/world — "finger hatate hi hide".
+    const id = dockItemAtPoint(e.clientX, e.clientY);
+    if (id) {
+      handleDockSelect(id);
+      return;
+    }
+    if (dockAutoHide) setDockOpen(false);
+  }, [dockAutoHide, dockItemAtPoint, dockPointerX, handleDockSelect]);
+  const onHandlePointerCancel = useCallback(() => {
+    const drag = dockDrag.current;
+    dockDrag.current = null;
+    dockPointerX.set(-200);
+    // The finger was lost mid-gesture: with auto-hide on, a dock that THIS
+    // gesture revealed goes back down (never strand an orphaned dock).
+    if (dockAutoHide && drag?.revealed) setDockOpen(false);
+  }, [dockAutoHide, dockPointerX]);
 
   // Which dock button reads as active — used to tint the current view.
   const activeDockId = moduleMenuOpen
@@ -674,6 +796,18 @@ export default function NatureStudioPage() {
             <nav
               aria-label="Study boards, views and modules"
               className="pointer-events-auto mb-1.5 w-full max-w-[min(100vw-1.5rem,60rem)] px-3"
+              onPointerUp={(e) => {
+                // The auto-hide complement for drags ACROSS the open dock:
+                // GlassDock selects the tab the finger lifts on (the home
+                // dock's own rule); if the lift lands on bare glass instead,
+                // auto-hide takes the dock back down. (The line's own
+                // drag-release is handled on the handle below.)
+                if (!dockAutoHide) return;
+                const onItem = document
+                  .elementsFromPoint(e.clientX, e.clientY)
+                  .some((n) => n instanceof Element && n.closest("[data-glass-dock-item]"));
+                if (!onItem) setDockOpen(false);
+              }}
             >
               <div className="relative w-full">
                 <div
@@ -683,7 +817,12 @@ export default function NatureStudioPage() {
                   <div className="w-max mx-auto">
                     {/* `dense` = 34px plates so the whole row of boards + scenery
                         + module + settings fits on a phone in landscape. */}
-                    <GlassDock dense items={dockItems} onSelect={handleDockSelect} />
+                    <GlassDock
+                      dense
+                      items={dockItems}
+                      onSelect={handleDockSelect}
+                      pointerX={dockPointerX}
+                    />
                   </div>
                 </div>
                 {/* Module menu panel — anchored to the dock, trigger hidden. */}
@@ -724,6 +863,7 @@ export default function NatureStudioPage() {
             onPointerDown={onHandlePointerDown}
             onPointerMove={onHandlePointerMove}
             onPointerUp={onHandlePointerUp}
+            onPointerCancel={onHandlePointerCancel}
             className="pointer-events-auto flex h-8 w-28 touch-none items-center justify-center"
           >
             <span
@@ -782,6 +922,8 @@ export default function NatureStudioPage() {
           onWind={cycleWind}
           autoOrbit={autoOrbit}
           onOrbit={toggleOrbit}
+          dockAutoHide={dockAutoHide}
+          onDockAutoHide={toggleDockAutoHide}
           immersive={immersive}
           onFullscreen={() => {
             toggleFullscreen();

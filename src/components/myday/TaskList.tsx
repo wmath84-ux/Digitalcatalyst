@@ -246,11 +246,18 @@ export default function TaskList({
 
             <div className="mt-3 flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <h2 className="myday-greeting text-[1.9rem] leading-tight sm:text-[2.1rem] lg:text-[2.4rem]">
+                {/* OWNER BRIEF (2026-09-29): "My day ka reminder page ka jo
+                    font hai aur font ka size hai vahi task page per bhi apply
+                    karo — jo heading ka size hai, jo sub heading ka size hai."
+                    The Tasks hero wears the exact Reminders type scale
+                    (`.myrem-title` / `.myrem-sub`, shared in
+                    myday-reminders.css as `.myday-tasks-title` /
+                    `.myday-tasks-sub`). */}
+                <h2 className="myday-tasks-title">
                   <span className="sm:hidden">Tasks 🚀</span>
                   <span className="hidden sm:block">Today&apos;s Tasks</span>
                 </h2>
-                <p className="myday-subtitle mt-1 text-[0.82rem] sm:text-[0.95rem]">
+                <p className="myday-tasks-sub">
                   <span className="sm:hidden">Turn today&apos;s efforts into tomorrow&apos;s success.</span>
                   <span className="hidden sm:block">Small steps, big progress! 🚀</span>
                   {hasActiveFilters && (
@@ -287,8 +294,10 @@ export default function TaskList({
                 <ProgressRing percent={percent} size={74} strokeWidth={8} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-extrabold leading-tight text-white">Today&apos;s Progress</p>
-                <p className="mt-0.5 text-[11.5px] font-semibold leading-snug text-white/65">
+                {/* The mini-card labels ride the same Reminders scale: a
+                    0.78rem / 700 chip-title and a 0.74rem / 500 note. */}
+                <p className="text-[0.78rem] font-bold leading-tight text-white">Today&apos;s Progress</p>
+                <p className="mt-0.5 text-[0.74rem] font-medium leading-snug text-white/65">
                   {counts.completed} of {counts.all} tasks completed
                 </p>
               </div>

@@ -196,7 +196,7 @@ test("the plates keep a fixed box — no layout property is animated on an item"
   // Tap feedback survives as a spring multiplied into the wave, because a
   // `whileTap` scale would fight `style={{scale}}` for the same slot.
   assert.match(dockCode, /const TAP_SCALE = 0\.82/);
-  assert.match(dockCode, /useTransform\(\[magnify, press\]/);
+  assert.match(dockCode, /useTransform\(\[waveScale, press\]/);
   assert.doesNotMatch(dockCode, /whileTap=/);
 });
 
@@ -247,7 +247,10 @@ test("centres are measured once per gesture, never once per frame", () => {
   // ANIMATED padding, so measuring a magnified dock would take it for the
   // resting one and grow the footer a little further on every gesture.
   assert.match(dockCode, /if \(atRest\(\)\) \{\s*\n\s*measureNow\(\)/);
-  assert.match(dockCode, /const atRest = \(\) => Math\.abs\(growX\.get\(\)\) < 0\.5 && Math\.abs\(growY\.get\(\)\) < 0\.5/);
+  // 0.05 px, not the old 0.5: the stricter threshold is the deliberate fix
+  // for the FlowPath "footer area keeps growing" report (see atRest's own
+  // comment) — a settled dock must measure again the moment it is settled.
+  assert.match(dockCode, /const atRest = \(\) => Math\.abs\(growX\.get\(\)\) < 0\.05 && Math\.abs\(growY\.get\(\)\) < 0\.05/);
   assert.match(dockCode, /retryRef\.current = window\.setTimeout/);
   // The transforms read the cached layout instead.
   assert.match(dock, /const centre = layoutRef\.current\.centres\[id\]/);
@@ -323,7 +326,7 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
 });
 
 /* ------------------------------------------------------------------ */
-/* 5. The clamp-aware squeeze (owner brief 2026-09-29)                 */
+/* 5. The clamp-aware squeeze, and the glass that follows the wave     */
 /* ------------------------------------------------------------------ */
 
 // "Track scroll animation keval ek side sahi se hota hai — left side drag
@@ -335,7 +338,20 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
 // now grows only what fits: the measure pass records the free pixels per
 // side, and capsule padding + neighbour push take the same squeezed share,
 // so a filled dock squeezes symmetrically instead of spilling right.
-test("a width-filled dock squeezes the wave symmetrically instead of spilling one-sided", () => {
+//
+// OWNER BRIEF, round three (2026-09-29): "drag left right scroll karne per
+// icon dock container area se bahar chale ja rahe hain — hona chahiye ki
+// container bhi left right expand ho taki icons container ke andar hi
+// dikhen." Round two's full push with a frozen glass let the end plates
+// sail past the capsule. Round three applies the squeeze to the WHOLE wave
+// — padding, neighbour push AND magnification take the same share — and the
+// glass follows: `padding-inline` grows by share × ask / 2 per side on every
+// dock, and `max-w-full` is released inline by the same amount (resting
+// width + growth). With one share everywhere, a plate pair's gap change is
+// k · ((δi + δj)/2 − shove) = 0: no crowding, and every plate keeps its
+// resting glass margin at EVERY share — the icons cannot leave the
+// container at any k.
+test("the squeeze owns the whole wave and the glass follows it", () => {
   // Headroom is measured in the same once-per-gesture pass — from the SAME
   // rects as the centres, so the file still holds exactly one layout read.
   assert.match(dockCode, /headroom = Number\.POSITIVE_INFINITY/);
@@ -344,12 +360,26 @@ test("a width-filled dock squeezes the wave symmetrically instead of spilling on
   // The squeeze is 1 while the growth fits, shrinking toward 0 past it…
   assert.match(dockCode, /const squeezeX = useTransform\(growX/);
   assert.match(dockCode, /return growth <= room \? 1 : Math\.max\(0, room \/ growth\)/);
-  // …the capsule padding takes the squeezed share…
+  // …the capsule padding takes the squeezed share on EVERY dock (half per
+  // side — the room a pushed + magnified row needs to keep its resting glass
+  // margin), except the spread band whose capsule is pinned edge to edge…
   assert.match(dockCode, /\[growX, padInlineBase, squeezeX\]/);
-  assert.match(dockCode, /\(growth \* sq\) \/ 2/);
-  // …as does the neighbour push, so the plates part exactly as far as the
-  // glass grows (the push arithmetic itself is untouched — section 2 pins it).
+  assert.match(dockCode, /layoutRef\.current\.spread \? 0 : \(growth \* sq\) \/ 2/);
+  // …and `max-w-full` is released by the same growth (resting width +
+  // growth, inline px), so the padding ask can never degrade one-sided —
+  // the clamp that caused the original right spill is removed, not fought.
+  assert.match(dockCode, /const glassMaxWidth = useTransform\(growX/);
+  assert.match(dockCode, /return resting > 0 \? resting \+ growth : null/);
+  assert.match(dockCode, /maxWidth: glassMaxWidth/);
+  // The push arithmetic itself is untouched (section 2); its share is the
+  // squeeze, the SAME share the magnification takes in DockItem (`waveScale`
+  // = 1 + (m − 1) · k) — one number scales the whole wave, so plates part
+  // exactly as far as the glass grows and never crowd each other.
   assert.match(dockCode, /const pushSpring = useSpring\(rawPush, WAVE_SPRING\)/);
-  assert.match(dockCode, /const push = useTransform\(\[pushSpring, squeezeX\], \(\[p, sq\]: number\[\]\) => p \* sq\)/);
-  assert.match(dockCode, /squeezeX=\{squeezeX\}/);
+  assert.match(dockCode, /const waveScale = useTransform\(\[magnify, waveShare\]/);
+  assert.match(dockCode, /const push = useTransform\(\[pushSpring, waveShare\], \(\[p, share\]: number\[\]\) => p \* share\)/);
+  assert.match(dockCode, /waveShare=\{squeezeX\}/);
+  // The lift-to-select hit-test fails soft on a DOM without
+  // `elementsFromPoint` (jsdom, old WebViews) instead of throwing mid-gesture.
+  assert.match(dockCode, /typeof document\.elementsFromPoint !== 'function'/);
 });

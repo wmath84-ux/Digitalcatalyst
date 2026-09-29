@@ -151,11 +151,13 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         <SubjectIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
       </span>
 
-      {/* Content */}
+      {/* Content — the row wears the Reminders card scale (owner brief
+          2026-09-29): title `.myrem-card-title` = 0.9rem / 700, the meta line
+          `.myrem-card-note` = 0.74rem / 500. */}
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "myday-task-title truncate text-sm font-bold leading-snug text-white/95 transition-all sm:text-[15px]",
+            "myday-task-title truncate text-[0.9rem] font-bold leading-snug text-white/95 transition-all",
             done && "text-white/55 line-through",
           )}
         >
@@ -163,7 +165,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         </p>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
           {task.subject && (
-            <span className="max-w-[12rem] truncate text-[11.5px] font-semibold text-white/55">
+            <span className="max-w-[12rem] truncate text-[0.74rem] font-medium text-white/55">
               {highlightQuery ? highlightText(task.subject, highlightQuery) : task.subject}
             </span>
           )}

@@ -47,6 +47,30 @@ uniform vec3 uHorizon;
 uniform vec3 uGround;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
+uniform float uNight;
+uniform float uTime;
+
+// One hash → one star. The dome direction is gridded into 3D cells; each
+// cell that hashes "lucky" grows ONE round star at a jittered point inside
+// itself, so the field never reads as a lattice and costs ~12 ALU.
+float hash13(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+
+float stars(vec3 dir, float h) {
+  vec3 grid = dir * 60.0;
+  vec3 cell = floor(grid);
+  float lucky = step(0.80, hash13(cell + 31.0));
+  vec3 f = fract(grid) - 0.5;
+  vec3 jitter = vec3(hash13(cell), hash13(cell + 11.0), hash13(cell + 23.0)) - 0.5;
+  float d = length(f - jitter * 0.72);
+  // Twinkle: a slow per-star sine, driven by the shared uTime clock.
+  float twinkle = 0.7 + 0.3 * sin(uTime * 1.9 + hash13(cell + 7.0) * 6.2831);
+  // Fade out at the horizon where the air (and the haze) is thickest.
+  return lucky * smoothstep(0.075, 0.0, d) * twinkle * smoothstep(0.0, 0.24, h);
+}
 
 // Physically-motivated sky, after Preetham/Bruneton but reduced to the two
 // terms that actually matter for a morning scene (the full precomputed model
@@ -98,11 +122,20 @@ void main() {
   // Ground haze below the horizon line.
   sky = mix(uGround, sky, smoothstep(-0.12, 0.05, h));
 
-  // Sun disc with a soft limb, plus the broad glow.
+  // Sun disc with a soft limb, plus the broad glow. At night the same code
+  // paints the MOON — uSunDir / uSunColor are handed the moon's direction
+  // and its pale blue tint by daylight.ts, so the crisp disc + halo reads as
+  // a full moon with zero extra shader.
   float d = max(cosTheta, 0.0);
   sky += uSunColor * pow(d, 900.0) * 3.2;
   sky += uSunColor * pow(d, 14.0) * 0.30;
   sky += uSunColor * pow(d, 3.0) * 0.07;
+
+  // THE NIGHT: the star field mixes in with uNight (0 day → 1 deep night),
+  // riding the twilight blend so stars fade in DURING dusk instead of
+  // snapping on. The graded dome palette (daylight.ts) already owns the
+  // night blue — the stars only add light, never take it away.
+  sky += vec3(0.85, 0.92, 1.0) * stars(dir, h) * uNight * 0.9;
 
   gl_FragColor = vec4(sky, 1.0);
   #include <colorspace_fragment>
@@ -130,6 +163,10 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       uGround: { value: new THREE.Color(0xdceec0) },
       uSunDir: { value: sunDir.clone() },
       uSunColor: { value: new THREE.Color(0xfff8e0) },
+      // THE NIGHT: 0 by day → 1 deep night (the twilight blend in
+      // daylight.ts walks it continuously). Drives the star field.
+      uNight: { value: 0 },
+      uTime: { value: 0 },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -187,11 +224,13 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
     if (!animeMat) return;
     // The panorama is baked at noon: stay true to its art in daylight, lean
     // on the sun's tint near the edges of the day. At night it dips toward
-    // a deep blue multiply but never more than 42 % — the owner studies at
-    // night and the panorama must stay READABLE ("sky to dikh hi nahin
-    // raha hai"), not sink into a black dome.
+    // a deep blue multiply — 42 % at dusk, and with the REAL night scene
+    // (2026-09-29) up to ~60 % deep in the night, so the painted sky reads
+    // as moonlit while the stars of the world's own dark stay visible. The
+    // floor is deliberately shallow: the owner studies at night and the
+    // panorama must stay READABLE, not sink into a black dome.
     animeMat.color.copy(state.sunTint).lerp(ANIME_DAY, 0.65 * state.dayFactor + 0.18);
-    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * 0.42);
+    animeMat.color.lerp(ANIME_NIGHT, (1 - state.dayFactor) * (0.42 + 0.18 * state.night));
   };
 
   /** Centre-axis yaw for this hour: 0 at sunrise, −2π at sunset. */
@@ -330,6 +369,8 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
   cloudMat.side = THREE.DoubleSide;
   group.add(clouds);
   const CLOUD_WHITE = new THREE.Color(0xffffff);
+  // Moonlit clouds: slate blue, not white lamps in the dark.
+  const CLOUD_NIGHT = new THREE.Color(0x394a66);
 
   // ── Volumetric sun shafts ────────────────────────────────────────────
   let shafts: THREE.Group | null = null;
@@ -470,6 +511,8 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       (domeMat.uniforms.uZenith.value as THREE.Color).copy(state.zenith);
       (domeMat.uniforms.uHorizon.value as THREE.Color).copy(state.horizon);
       (domeMat.uniforms.uGround.value as THREE.Color).copy(state.ground);
+      // The star field rides the twilight blend — stars fade IN through dusk.
+      domeMat.uniforms.uNight.value = state.night;
 
       sun.color.copy(state.sunColor);
       sun.intensity = state.sunIntensity;
@@ -479,6 +522,13 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       fill.intensity = state.fillIntensity;
       // Clouds pick up the sun's warmth — pure white at sunset is a dead give-away.
       cloudMat.color.copy(state.sunTint).lerp(CLOUD_WHITE, 0.72);
+      // NIGHT: clouds become dim moonlit slate (never white lamps in the
+      // dark) and thin out a little, so the stars own the sky.
+      cloudMat.color.lerp(CLOUD_NIGHT, state.night);
+      cloudMat.opacity = 0.92 * (1 - state.night * 0.4);
+      // The volumetric sun shafts are a DAYLIGHT effect — additive bars over
+      // a night sky would read as searchlights. Off once night falls.
+      if (shafts) shafts.visible = state.night < 0.45;
       // The anime panorama (when enabled) rides the same hour: grade AND
       // a centre-axis yaw, lerped in update() so a mode switch time-lapses.
       gradeAnime(state);
@@ -489,6 +539,8 @@ export function createSky(tex: TextureSet, budget: QualityBudget): SkySystem {
       // by the far plane into a rotating black circle the moment the camera
       // leaves the origin — follow the camera and the whole sky stays lit.
       dome.position.copy(camera.position);
+      // The star field's twinkle clock (uTime feeds the dome shader).
+      domeMat.uniforms.uTime.value = time;
       if (animeDome) {
         // Centre follows the eye so the far plane never clips the sphere
         // into a black disc; yaw is independent — the time-lapse spin

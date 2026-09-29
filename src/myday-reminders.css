@@ -103,7 +103,8 @@
   background: linear-gradient(140deg, #8b5cf6 0%, #6d28d9 60%, #5b21b6 100%);
   box-shadow: 0 10px 24px -8px rgba(124, 93, 250, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-.myrem-title {
+.myrem-title,
+.myday-tasks-title {
   margin: 0;
   font-size: 1.32rem;
   font-weight: 800;
@@ -112,16 +113,22 @@
   color: #fff;
   white-space: nowrap;
 }
-.myrem-sub {
+.myrem-sub,
+.myday-tasks-sub {
   margin: 0.2rem 0 0;
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.45;
-  color: var(--myrem-muted);
+  /* The muted tone lives on the Reminders scope; the Tasks hero gets the
+     same colour through the fallback (owner brief 2026-09-29: apply the
+     Reminders page's font + sizes to the Tasks page). */
+  color: var(--myrem-muted, rgba(226, 232, 255, 0.62));
 }
 @media (min-width: 640px) {
-  .myrem-title { font-size: 1.5rem; }
-  .myrem-sub { font-size: 0.83rem; }
+  .myrem-title,
+  .myday-tasks-title { font-size: 1.5rem; }
+  .myrem-sub,
+  .myday-tasks-sub { font-size: 0.83rem; }
 }
 
 .myrem-add {

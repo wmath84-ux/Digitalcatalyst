@@ -1,20 +1,29 @@
 // src/nature3d/SanctuarySettings.tsx
 //
 // Full-page GAME settings for the Sanctuary. The tray's gear opens this
-// overlay — no extra features, only the Light and Scene controls that used
-// to live in the ⋮ dropdown, laid out like a pause-menu:
+// overlay — laid out like a pause-menu:
 //
 //   · LEFT  — the selected page's settings
-//   · RIGHT — a vertical tray with exactly two tabs: Light and Scene
+//   · RIGHT — a vertical tray with three tabs: Light, Scene and Dock
+//
+// DOCK (added 2026-09-29, owner brief: "sanctuary dock ke liye ek advance
+// option setting mein rakhna"): the dock's own behaviour, away from the look
+// of the world. The first row is DRAG SCROLL AUTO-HIDE — the bottom line's
+// hold-and-drag gesture (drag left/right along the line, the dock reveals
+// under the finger, the button the finger lifts on is the one that clicks,
+// the dock hides again the moment the finger lifts). On by default — the
+// same gesture the home footer and every course dock already speak — and
+// switchable for anyone whose comfort is the older peek behaviour.
 
 import type { ComponentType } from "react";
 import {
-  Clock, LogOut, Maximize2, Minimize2, RotateCw, Rows3, Settings,
+  Clock, LogOut, Maximize2, Minimize2, Moon, RotateCw, Rows3, Settings,
   Snowflake, Sparkles, Sun, Sunrise, Sunset, Trees, Wind, X,
+  MoveHorizontal, PanelBottom,
 } from "lucide-react";
 import type { DaylightMode } from "./engine/daylight";
 
-export type SettingsPage = "light" | "scene";
+export type SettingsPage = "light" | "scene" | "dock";
 
 const DAYLIGHT_MODES: Array<{
   key: DaylightMode;
@@ -26,6 +35,7 @@ const DAYLIGHT_MODES: Array<{
   { key: "morning", label: "Morning", hint: "08:00 light", Icon: Sunrise },
   { key: "midday", label: "Midday", hint: "Hard noon sun", Icon: Sun },
   { key: "evening", label: "Evening", hint: "Warm last light", Icon: Sunset },
+  { key: "night", label: "Night", hint: "22:00 · stars & moon", Icon: Moon },
 ];
 
 interface SanctuarySettingsProps {
@@ -44,24 +54,39 @@ interface SanctuarySettingsProps {
   onWind: () => void;
   autoOrbit: boolean;
   onOrbit: () => void;
+  dockAutoHide: boolean;
+  onDockAutoHide: () => void;
   immersive: boolean;
   onFullscreen: () => void;
   onHideTray: () => void;
   onExit: () => void;
 }
 
+const PAGE_META: Record<SettingsPage, { title: string; index: string }> = {
+  light: { title: "Light", index: "01" },
+  scene: { title: "Scene", index: "02" },
+  dock: { title: "Dock", index: "03" },
+};
+
 export default function SanctuarySettings({
   open, page, onPage, onClose,
   daylight, clockHour, onDaylight,
   iceAge, onIceAge, animeSky, onAnimeSky,
   windLabel, onWind, autoOrbit, onOrbit,
+  dockAutoHide, onDockAutoHide,
   immersive, onFullscreen, onHideTray, onExit,
 }: SanctuarySettingsProps) {
   if (!open) return null;
 
-  const clock =
-    `${String(Math.floor(clockHour)).padStart(2, "0")}:` +
-    `${String(Math.floor((clockHour % 1) * 60)).padStart(2, "0")}`;
+  const clockHourLabel = (h: number) => {
+    const wrapped = ((h % 24) + 24) % 24;
+    return (
+      `${String(Math.floor(wrapped)).padStart(2, "0")}:` +
+      `${String(Math.floor((wrapped % 1) * 60)).padStart(2, "0")}`
+    );
+  };
+
+  const meta = PAGE_META[page];
 
   return (
     <div
@@ -86,12 +111,10 @@ export default function SanctuarySettings({
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-300/80">
               Sanctuary
             </p>
-            <h1 className="text-[17px] font-black tracking-tight">
-              {page === "light" ? "Light" : "Scene"}
-            </h1>
+            <h1 className="text-[17px] font-black tracking-tight">{meta.title}</h1>
           </div>
           <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-[10px] font-bold text-white/45 sm:inline">
-            {page === "light" ? "01" : "02"} / 02
+            {meta.index} / 03
           </span>
         </header>
 
@@ -99,7 +122,8 @@ export default function SanctuarySettings({
           {page === "light" ? (
             <section data-settings-page="light" className="mx-auto max-w-2xl">
               <p className="mb-4 text-[12px] font-medium leading-5 text-white/50">
-                Pick the hour. Auto follows the real clock — the sun travels on its own.
+                Pick the hour. Auto follows the real clock — the sun travels on its own,
+                dusk melts into a starlit night, and the morning haze burns off with the sunrise.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {DAYLIGHT_MODES.map(({ key, label, hint, Icon }) => {
@@ -130,11 +154,11 @@ export default function SanctuarySettings({
               </div>
               {daylight === "auto" ? (
                 <p className="mt-4 font-mono text-[12px] font-bold text-amber-200/85">
-                  {clock} · following your clock
+                  {clockHourLabel(clockHour)} · following your clock
                 </p>
               ) : null}
             </section>
-          ) : (
+          ) : page === "scene" ? (
             <section data-settings-page="scene" className="mx-auto max-w-2xl space-y-2">
               <p className="mb-3 text-[12px] font-medium leading-5 text-white/50">
                 Weather, sky and camera — the look of the world.
@@ -177,12 +201,34 @@ export default function SanctuarySettings({
                 active={immersive}
                 onClick={onFullscreen}
               />
-              <SceneRow
-                Icon={Rows3}
-                label="Bottom dock"
-                right="Hide"
-                onClick={onHideTray}
-              />
+            </section>
+          ) : (
+            <section data-settings-page="dock" className="mx-auto max-w-2xl">
+              <p className="mb-1 text-[12px] font-medium leading-5 text-white/50">
+                Advanced — how the bottom dock behaves.
+              </p>
+              <div className="mt-3 space-y-2">
+                <SceneRow
+                  Icon={MoveHorizontal}
+                  label="Drag scroll auto-hide"
+                  pressed={dockAutoHide}
+                  right={dockAutoHide ? "On" : "Off"}
+                  active={dockAutoHide}
+                  onClick={onDockAutoHide}
+                />
+                <p className="px-1 pb-1 text-[11px] font-medium leading-5 text-white/40">
+                  Hold the bottom line and drag left / right — the dock reveals under your
+                  finger, the button you lift on is the one that clicks, and the dock hides
+                  again the moment your finger comes up. Turn it off to keep the dock open
+                  until you close it yourself.
+                </p>
+                <SceneRow
+                  Icon={PanelBottom}
+                  label="Bottom dock"
+                  right="Hide"
+                  onClick={onHideTray}
+                />
+              </div>
             </section>
           )}
         </div>
@@ -199,7 +245,7 @@ export default function SanctuarySettings({
         </footer>
       </div>
 
-      {/* ── RIGHT: vertical page tray — Light and Scene only ──────────── */}
+      {/* ── RIGHT: vertical page tray — Light, Scene, Dock ────────────── */}
       <aside
         data-settings-rail
         className="flex w-[4.25rem] shrink-0 flex-col items-center gap-2 border-l border-white/10 bg-black/35 py-4"
@@ -218,6 +264,12 @@ export default function SanctuarySettings({
           Icon={Trees}
           active={page === "scene"}
           onClick={() => onPage("scene")}
+        />
+        <RailTab
+          label="Dock"
+          Icon={Rows3}
+          active={page === "dock"}
+          onClick={() => onPage("dock")}
         />
       </aside>
     </div>

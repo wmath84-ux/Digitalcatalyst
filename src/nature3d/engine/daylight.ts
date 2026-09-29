@@ -3,11 +3,13 @@
 // TIME OF DAY — one function that turns a clock reading into every lighting
 // value the scene needs.
 //
-// The brief: the learner can switch between morning / midday / evening, but
-// by DEFAULT the sanctuary follows the real clock, the sun visibly travels
-// across the sky as the hours pass, and the light strengthens towards midday
-// and weakens towards dusk. After sunset it holds at the evening look rather
-// than going dark.
+// The brief: the learner can switch between morning / midday / evening /
+// night, but by DEFAULT the sanctuary follows the real clock, the sun visibly
+// travels across the sky as the hours pass, and the light strengthens towards
+// midday and weakens towards dusk. After sunset the world now rolls into a
+// REAL night — stars, moon, dark-blue air — instead of holding at the evening
+// look (OWNER DIRECTIVE 2026-09-29: "abhi kya hai ki raat nahin hoti hai,
+// raat wala bhi scene design karo").
 //
 // ── Why the sun is computed, not keyframed ──────────────────────────────
 //
@@ -16,17 +18,31 @@
 // would be blending two poses, and the blend of two directions is not a point
 // on the arc — it cuts the chord, so the sun would sag below its true path in
 // mid-morning and mid-afternoon. Here the arc is evaluated directly from the
-// hour, and the three named modes are just three times of day fed through the
-// same function. One code path, no drift between "auto" and "manual".
+// hour, and the named modes are just four times of day fed through the same
+// function. One code path, no drift between "auto" and "manual".
 //
 // ── What is deliberately simple ─────────────────────────────────────────
 //
 // This is not an ephemeris. There is no latitude, declination or equation of
 // time: the sun rises at DAY_START, sets at DAY_END and arcs symmetrically
-// between them. A real solar model would need the learner's coordinates
-// (a permission prompt) to change a result nobody can check by eye. The
-// device clock is the one input, because that is the thing the learner can
-// actually verify by looking out of a window.
+// between them; the moon takes the opposite half of the clock. A real solar
+// model would need the learner's coordinates (a permission prompt) to change
+// a result nobody can check by eye. The device clock is the one input,
+// because that is the thing the learner can actually verify by looking out of
+// a window.
+//
+// ── TIME-OF-DAY SMOKE (OWNER DIRECTIVE 2026-09-29) ──────────────────────
+//
+// "Subah ke samay thoda sa smoke … jaise-jaise sun aata hai smoke gayab
+//  hone lagte hain … din mein hat jaaye, aur shaam aur raat mein rahe."
+//
+// `smoke` in the returned state is exactly that curve, 0 clear → 1 haziest.
+// `scene.applyDaylight` turns it into the live fog ramp (near/far), so the
+// dawn haze visibly BURNS OFF as the sun climbs, midday reads as crystal
+// clear air, and the smoke comes back with the evening and stays through the
+// night. In Auto mode the clock is re-read every 20 s, so sitting in the
+// sanctuary across a sunrise you can watch the far hills emerge from the
+// haze — a real time-lapse, not a menu switch.
 
 import * as THREE from "three";
 
@@ -57,17 +73,18 @@ const HORIZON_SWING = THREE.MathUtils.degToRad(70);
  */
 const MIN_ELEVATION = THREE.MathUtils.degToRad(10);
 
-export type DaylightMode = "auto" | "morning" | "midday" | "evening";
+export type DaylightMode = "auto" | "morning" | "midday" | "evening" | "night";
 
 /** The representative hour each manual mode jumps to. */
 export const MODE_HOURS: Record<Exclude<DaylightMode, "auto">, number> = {
   morning: 8,
   midday: 12.75,
   evening: 17.75,
+  night: 22.25,
 };
 
 export interface DaylightState {
-  /** Unit vector from the origin towards the sun. */
+  /** Unit vector from the origin towards the sun (the MOON at night). */
   sunDir: THREE.Vector3;
   sunColor: THREE.Color;
   sunIntensity: number;
@@ -86,30 +103,76 @@ export interface DaylightState {
   exposure: number;
   /** 0 at the horizon, 1 at peak — what everything above is driven from. */
   dayFactor: number;
-  /** Decimal hour this state was computed for. */
+  /**
+   * 0 full day → 1 deep night. Drives the dome's star field, the cloud
+   * grade and the anime panorama's night dip. The twilight windows blend it
+   * continuously, so dusk melts into starlight instead of snapping.
+   */
+  night: number;
+  /**
+   * TIME-OF-DAY SMOKE, 0 clear → 1 haziest (see the header block).
+   * `scene.applyDaylight` scales the live fog near/far with it.
+   */
+  smoke: number;
+  /** Decimal hour this state was computed for (world timeline, see below). */
   hour: number;
 }
 
 const lerpColor = (a: number, b: number, t: number) =>
   new THREE.Color(a).lerp(new THREE.Color(b), t);
 
+const smooth = (a: number, b: number, x: number) =>
+  THREE.MathUtils.smoothstep(x, a, b);
+
 /** Local clock as a decimal hour, e.g. 14.5 for 14:30. */
 export const currentHour = (now: Date = new Date()): number =>
   now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 
 /**
- * Clamp a wall-clock hour into the daylit window.
+ * Fold a wall-clock hour onto the world's timeline.
  *
- * Night deliberately reads as evening rather than as darkness: this is a
- * study space, and a learner who opens it at 23:00 needs to be able to see
- * the boards. Before sunrise it holds at first light for the same reason.
+ * The day arc owns [DAY_START, DAY_END]. The hours after sunset and before
+ * sunrise are REAL HOURS now (the world renders night there) — they just
+ * continue past midnight as 24→30 so every downstream `t` computation sees
+ * one monotonically rising timeline: 6:00 sunrise → 18:30 sunset → 30:00
+ * (= 6:00) sunrise again.
  */
-export const clampToDaylight = (hour: number): number =>
-  THREE.MathUtils.clamp(hour, DAY_START, DAY_END);
+export const clampToDaylight = (hour: number): number => {
+  const h = ((hour % 24) + 24) % 24;
+  return h < DAY_START ? h + 24 : h;
+};
 
-/** Resolve a mode (and the real clock, for "auto") to an hour on the arc. */
+/** Resolve a mode (and the real clock, for "auto") to an hour on the timeline. */
 export const hourForMode = (mode: DaylightMode, now: Date = new Date()): number =>
   mode === "auto" ? clampToDaylight(currentHour(now)) : MODE_HOURS[mode];
+
+/** How deep into the night this timeline hour is, 0 at sunset → 1 deep night. */
+function nightAmount(h: number): number {
+  // Two 1.5 h twilights: sunset → full night, and full night → sunrise.
+  const up = smooth(DAY_END, DAY_END + 1.5, h);
+  const down = 1 - smooth(30 - 1.5, 30, h);
+  return Math.min(up, down);
+}
+
+/**
+ * TIME-OF-DAY SMOKE — the owner's dawn-haze curve, 0 clear → 1 haziest.
+ *
+ *   dawn  6:00–7:00   haze sits low over the valleys (the "thoda sa smoke")
+ *   sun up 7:00–11:00 the haze visibly burns off as the sun climbs
+ *   day  11:00–15:30  clear air — the smoke is gone
+ *   eve  15:30–18:30  it thickens again with the golden hour
+ *   night 18:30–6:00  it stays (shaam aur raat mein rahe)
+ */
+export function smokeForHour(h: number): number {
+  if (h >= DAY_END) return THREE.MathUtils.lerp(0.6, 0.68, nightAmount(h));
+  const dawn = 0.75;
+  const day = 0.14;
+  const eve = 0.6;
+  if (h <= 7) return dawn;
+  if (h <= 11) return THREE.MathUtils.lerp(dawn, day, smooth(7, 11, h));
+  if (h <= 15.5) return day;
+  return THREE.MathUtils.lerp(day, eve, smooth(15.5, DAY_END, h));
+}
 
 /**
  * Everything the renderer needs, for one moment of the day.
@@ -123,6 +186,18 @@ export const hourForMode = (mode: DaylightMode, now: Date = new Date()): number 
  */
 export function daylightAt(hour: number): DaylightState {
   const h = clampToDaylight(hour);
+  // The day state owns the sun arc; night hours evaluate it at the FROZEN
+  // sunset and blend towards the night state — that blend IS the twilight.
+  const day = dayState(Math.min(h, DAY_END));
+  if (h <= DAY_END) return day;
+
+  const night = nightState(h);
+  const t = nightAmount(h);
+  return blendStates(day, night, t);
+}
+
+/** The daylight arc — untouched by night, evaluated on [DAY_START, DAY_END]. */
+function dayState(h: number): DaylightState {
   const t = (h - DAY_START) / (DAY_END - DAY_START); // 0 sunrise → 1 sunset
 
   // Elevation follows a sine: fastest near the horizon, slowest overhead,
@@ -192,6 +267,87 @@ export function daylightAt(hour: number): DaylightState {
     fog: lerpColor(0xb4cce4, 0xe8d0b0, warm),
     exposure: THREE.MathUtils.lerp(1.02, 1.16, dayFactor),
     dayFactor,
+    night: 0,
+    smoke: smokeForHour(h),
     hour: h,
   };
+}
+
+/**
+ * THE NIGHT SCENE (OWNER DIRECTIVE 2026-09-29: "raat wala bhi scene design
+ * karo").
+ *
+ * A study space first: the night is a deep, starlit BLUE, never a black
+ * screen — the standing dusk-floor directive ("dark green dikhna chahiye, na
+ * ki black") is honoured by a lifted exposure, a green-tinted ground bounce
+ * and a moon that keeps real direction on the ground. The sun's slot in the
+ * state is simply TAKEN OVER by the moon: one arc, opposite half of the
+ * clock, pale-blue light — which is why every consumer (shadow rig, water
+ * glint, dome disc) renders moonlight with no per-consumer wiring.
+ */
+function nightState(h: number): DaylightState {
+  // The moon's own arc across the night half: rises around dusk, peaks at
+  // midnight, sets towards dawn.
+  const tn = (h - DAY_END) / (30 - DAY_END); // 0 sunset → 1 sunrise
+  const elevation = Math.max(Math.sin(Math.PI * tn) * THREE.MathUtils.degToRad(58), THREE.MathUtils.degToRad(14));
+  const azimuth = (1 - 2 * tn) * HORIZON_SWING + Math.PI; // opposite the sun
+  const ce = Math.cos(elevation);
+  const moonDir = new THREE.Vector3(
+    ce * Math.sin(azimuth),
+    Math.sin(elevation),
+    -ce * Math.cos(azimuth),
+  ).normalize();
+
+  return {
+    sunDir: moonDir,
+    // Moonlight: pale steel-blue, a fraction of the sun's power but a real
+    // directional light so the meadow keeps shape and the shadow map works.
+    sunColor: new THREE.Color(0xaec6ff),
+    sunIntensity: 0.62,
+    hemiSky: new THREE.Color(0x2b4166),
+    // Ground bounce stays GREEN (the standing directive) — a dark pine green,
+    // not mud, so night shadows read as night-green instead of black.
+    hemiGround: new THREE.Color(0x1c3a24),
+    hemiIntensity: 1.15,
+    fillIntensity: 0.72,
+    zenith: new THREE.Color(0x0a1530),
+    horizon: new THREE.Color(0x2b3c5a),
+    ground: new THREE.Color(0x172939),
+    sunTint: new THREE.Color(0xcfe0ff),
+    // Night air: dark blue-grey, pinned to the horizon so the sea and the
+    // far range melt into the night instead of cutting a hard line.
+    fog: new THREE.Color(0x27364e),
+    exposure: 0.98,
+    dayFactor: 0,
+    night: 1,
+    smoke: smokeForHour(h),
+    hour: h,
+  };
+}
+
+/**
+ * Twilight: blend the last daylight into the night state field by field.
+ * The blend runs over two 1.5 h windows (dusk and dawn), so in Auto mode the
+ * sanctuary visibly dims into starlight after sunset and brightens back
+ * before sunrise — a real time-lapse, no menu switch.
+ */
+function blendStates(day: DaylightState, night: DaylightState, t: number): DaylightState {
+  const l = THREE.MathUtils.lerp;
+  day.sunDir.lerp(night.sunDir, t).normalize();
+  day.sunColor.lerp(night.sunColor, t);
+  day.sunIntensity = l(day.sunIntensity, night.sunIntensity, t);
+  day.hemiSky.lerp(night.hemiSky, t);
+  day.hemiGround.lerp(night.hemiGround, t);
+  day.hemiIntensity = l(day.hemiIntensity, night.hemiIntensity, t);
+  day.fillIntensity = l(day.fillIntensity, night.fillIntensity, t);
+  day.zenith.lerp(night.zenith, t);
+  day.horizon.lerp(night.horizon, t);
+  day.ground.lerp(night.ground, t);
+  day.sunTint.lerp(night.sunTint, t);
+  day.fog.lerp(night.fog, t);
+  day.exposure = l(day.exposure, night.exposure, t);
+  day.dayFactor = l(day.dayFactor, night.dayFactor, t);
+  day.night = t;
+  day.smoke = l(day.smoke, night.smoke, t);
+  return day;
 }

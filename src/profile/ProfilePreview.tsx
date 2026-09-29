@@ -36,7 +36,7 @@ export default function ProfilePreview() {
 
   // Mock slots to represent the account cards that live in the real app.
   const mockMyDayCard = (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink">
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
         <div>
@@ -52,7 +52,7 @@ export default function ProfilePreview() {
   );
 
   const mockAiQuotaCard = subscriber ? (
-    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink">
+    <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-rev-glass">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
         <div>

@@ -1675,6 +1675,7 @@ test("the lesson board sits where a seated learner can read it", () => {
 // ─────────────────────────────────────────────────────────────────────────
 
 const DAYLIGHT = read("src/nature3d/engine/daylight.ts");
+const SETTINGS = read("src/nature3d/SanctuarySettings.tsx");
 // SKY and WATER are already declared at the top of this file — reuse them.
 
 test("the sun is computed from the clock, not keyframed", () => {
@@ -1717,9 +1718,12 @@ test("the dusk floor keeps evening and night a readable DARK GREEN", () => {
   assert.match(DAYLIGHT, /fillIntensity: THREE\.MathUtils\.lerp\(0\.8, 1\.05, dayFactor\)/);
   assert.match(DAYLIGHT, /hemiGround: lerpColor\(0x62b032, 0x3d8f2e, warm\)/);
   assert.ok(!/0x6a5a32/.test(DAYLIGHT), "the olive dusk bounce is what read as mud-black");
-  // The baked panorama's night grade must dim, not black out (sky.ts).
+  // The baked panorama's night grade must dim, not black out (sky.ts). With
+  // the real night scene the dip may go a little deeper than dusk (up to
+  // 60 %), but the ANIME_NIGHT colour stays the light slate-blue — never a
+  // black multiply.
   assert.match(SKY, /ANIME_NIGHT = new THREE\.Color\(0x46597e\)/);
-  assert.match(SKY, /\(1 - state\.dayFactor\) \* 0\.42/);
+  assert.match(SKY, /\(1 - state\.dayFactor\) \* \(0\.42 \+ 0\.18 \* state\.night\)/);
   // And the dusk haze tint is multiplied INTO the fog, so it must stay pale.
   // Comment-stripped: palette.ts documents the old value it replaced.
   const PALETTE = read("src/nature3d/engine/palette.ts")
@@ -1729,11 +1733,32 @@ test("the dusk floor keeps evening and night a readable DARK GREEN", () => {
   assert.ok(!/0xc49262/.test(PALETTE), "the dark ochre dusk haze is back");
 });
 
-test("night holds the evening look and the sun never touches the horizon", () => {
-  // A study space must stay readable: 23:00 renders as sunset, not darkness.
-  // Measured: 23h, 21h and 19.5h all resolve to hour 18.50; 02h and 04:30 to
-  // 06.00 — and the sun's y stays above 0.05 at every hour of the clock.
-  assert.match(DAYLIGHT, /clampToDaylight = \(hour: number\): number =>\s*\n?\s*THREE\.MathUtils\.clamp\(hour, DAY_START, DAY_END\)/);
+test("night is a real starlit scene, and the sun never touches the horizon", () => {
+  // OWNER DIRECTIVE (2026-09-29): "abhi kya hai ki raat nahin hoti hai,
+  // raat wala bhi scene design karo." The clock's night hours are REAL now:
+  // clampToDaylight folds the pre-sunrise hours past midnight onto one
+  // timeline (0:00–6:00 → 24:00–30:00) instead of clamping to the sunset,
+  // and daylightAt blends a dedicated night state across two 1.5 h
+  // twilights — dusk melts into starlight, starlight melts into dawn.
+  assert.match(DAYLIGHT, /const h = \(\(hour % 24\) \+ 24\) % 24;/);
+  assert.match(DAYLIGHT, /return h < DAY_START \? h \+ 24 : h;/);
+  assert.match(DAYLIGHT, /function nightAmount\(h: number\): number/);
+  assert.match(DAYLIGHT, /function nightState\(h: number\): DaylightState/);
+  // The moon TAKES OVER the sun's slot (one arc, opposite half of the
+  // clock) so every consumer — shadow rig, water glint, dome disc — renders
+  // moonlight with no per-consumer wiring.
+  assert.match(DAYLIGHT, /sunDir: moonDir/);
+  assert.match(DAYLIGHT, /night: 1/);
+  // Still a study space: the night is deep blue and GREEN-floored, never a
+  // black screen (the standing "dark green dikhna chahiye, na ki black"
+  // directive) — a lifted exposure and a green ground bounce.
+  assert.match(DAYLIGHT, /hemiGround: new THREE\.Color\(0x1c3a24\)/);
+  assert.match(DAYLIGHT, /exposure: 0\.98/);
+  // The dome shader owns the stars: a uNight-driven field (twilight blends
+  // it in), and the moon rides the sun-disc code.
+  assert.match(SKY, /uniform float uNight;/);
+  assert.match(SKY, /float stars\(vec3 dir, float h\)/);
+  assert.match(SKY, /domeMat\.uniforms\.uNight\.value = state\.night/);
   // At exactly 0 elevation the shadow frustum degenerates and shadows stretch
   // to infinity — which reads as a black screen, not a sunset. 10° is the
   // floor now: at 4° the ground lost the sun entirely (dot N,L = 0.07) and
@@ -1741,6 +1766,28 @@ test("night holds the evening look and the sun never touches the horizon", () =>
   // the "shaam ko sab black dikhta hai" report.
   assert.match(DAYLIGHT, /const MIN_ELEVATION = THREE\.MathUtils\.degToRad\(10\)/);
   assert.match(DAYLIGHT, /Math\.max\(Math\.sin\(Math\.PI \* t\) \* MAX_ELEVATION, MIN_ELEVATION\)/);
+});
+
+test("time-of-day smoke: dawn haze burns off, day is clear, dusk and night keep it", () => {
+  // OWNER DIRECTIVE (2026-09-29): "subah ke samay thoda sa smoke …
+  // jaise-jaise sun aata hai smoke gayab hone lagte hain … din mein hat
+  // jaaye, aur shaam aur raat mein rahe." daylight.ts publishes the curve,
+  // scene.applyDaylight turns it into the live fog ramp.
+  assert.match(DAYLIGHT, /export function smokeForHour\(h: number\): number/);
+  assert.match(DAYLIGHT, /smoke: smokeForHour\(h\)/);
+  const applyBody = SCENE.slice(SCENE.indexOf("private applyDaylight()"));
+  assert.match(applyBody, /const smoke = state\.smoke;/);
+  assert.match(applyBody, /fog\.near = this\.budget\.fogNear \* \(1\.5 - 0\.9 \* smoke\)/);
+  assert.match(applyBody, /fog\.far = this\.budget\.fogFar \* \(1 - 0\.58 \* smoke\)/);
+  // THE SMOKE REDUCTION (same brief): the tier budget itself breathes —
+  // fogNear 16 → 90 m of guaranteed-clear air, fogFar 420 → 4200 m so the
+  // far range and the open sea resolve on a clear midday. Every tier.
+  const nears = [...QUALITY.matchAll(/fogNear: (\d+)/g)].map((m) => Number(m[1]));
+  const fars = [...QUALITY.matchAll(/fogFar: (\d+)/g)].map((m) => Number(m[1]));
+  assert.equal(nears.length, 4);
+  assert.equal(fars.length, 4);
+  for (const n of nears) assert.ok(n >= 90, `fogNear ${n} must keep the near field clear`);
+  for (const f of fars) assert.ok(f >= 4200, `fogFar ${f} must clear the far range`);
 });
 
 test("everything that reads the sun shares one vector", () => {
@@ -1779,14 +1826,17 @@ test("everything that reads the sun shares one vector", () => {
   assert.ok(!/position\.set\(\s*\n?\s*this\.camera\.position\.x \+ 44/.test(SCENE));
 });
 
-test("the learner can switch lighting from the top tray", () => {
-  assert.match(PAGE, /const DAYLIGHT_MODES/);
-  for (const mode of ["auto", "morning", "midday", "evening"]) {
-    assert.ok(PAGE.includes(`key: "${mode}"`), `${mode} must be offered`);
+test("the learner can switch lighting from the settings overlay", () => {
+  // The mode tiles live on the settings overlay's Light page (the tray
+  // itself holds only the gear). Five moments now: auto, morning, midday,
+  // evening and — since the night scene — NIGHT.
+  assert.match(SETTINGS, /const DAYLIGHT_MODES/);
+  for (const mode of ["auto", "morning", "midday", "evening", "night"]) {
+    assert.ok(SETTINGS.includes(`key: "${mode}"`), `${mode} must be offered`);
   }
   // Auto is the default, so the sanctuary matches the real world unprompted.
   assert.match(PAGE, /useState<DaylightMode>\("auto"\)/);
-  assert.match(PAGE, /engineRef\.current\?\.setDaylightMode\(key\)/);
+  assert.match(PAGE, /engineRef\.current\?\.setDaylightMode\(mode\)/);
   assert.match(SCENE, /setDaylightMode\(mode: DaylightMode\)/);
   // Auto re-reads the clock while the page is open — otherwise a long session
   // started in the morning would still be lit as morning at dusk.
