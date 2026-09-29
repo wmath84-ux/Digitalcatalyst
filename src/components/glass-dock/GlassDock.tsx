@@ -117,6 +117,33 @@
  * symmetrically instead of spilling right. Docks with room (and docks
  * outside any site footer nav) measure room to spare and wave exactly as
  * before.
+ *
+ * ── THE FILLED DOCK'S WAVE IS TRANSFORM-ONLY (owner brief 2026-09-29) ─────
+ *   "Home page ka footer navigation use tarike se animate nahin karta jaise
+ *    dusre dock jaise My Day ke karte hain drag scroll left right karne per."
+ *
+ * The squeeze fixed the spill — and on Home it also froze the wave. The fill
+ * consumed the nav's whole width, so `headroom` measures ~2 px there,
+ * `squeezeX` resolves to ~0.05, and the horizontal half of the wave — the
+ * neighbour push that makes the row RIPPLE under a dragging finger, the half
+ * that makes My Day's dock feel alive — simply stopped playing. Same
+ * component, same springs: one dock had room, the other hadn't.
+ *
+ * So on a width-filled dock the wave now rides transforms ONLY:
+ *
+ *   · the neighbour push takes its FULL share again (the ripple is back);
+ *   · the capsule asks for NO horizontal layout growth (`padding-inline`
+ *     stays at rest), so the `max-w-full` clamp that caused the one-sided
+ *     spill can never be hit — the squeeze's job (symmetry) is guaranteed
+ *     by construction instead of by throttling;
+ *   · the vertical half is untouched — the glass still breathes upward with
+ *     the lift, which never clamps.
+ *
+ * At full magnification an end plate overhangs the capsule edge by at most
+ * ~0.3 × plate — well inside the nav gutter plus the fill's own reserve, so
+ * nothing reaches the screen edge. And with the capsule no longer resizing
+ * during a gesture, GlassMaterial's lens can never rebuild mid-drag on Home
+ * at all.
  */
 
 import {
@@ -300,7 +327,7 @@ function DockItem({
   plateSize,
   layoutRef,
   registerItem,
-  squeezeX,
+  pushShare,
 }: GlassDockItem & {
   mouseX: MotionValue<number>
   index: number
@@ -309,7 +336,7 @@ function DockItem({
   plateSize: number
   layoutRef: { current: DockLayout }
   registerItem: (id: string, node: HTMLDivElement | null) => void
-  squeezeX: MotionValue<number>
+  pushShare: MotionValue<number>
 }) {
   // The plate's box is FIXED at plateSize. Everything the wave does is a
   // transform on this column (the neighbour push) or on the button (scale +
@@ -348,11 +375,16 @@ function DockItem({
     return push / 2
   })
   const pushSpring = useSpring(rawPush, WAVE_SPRING)
-  // The clamp-aware share of the push: 1 while the capsule has room to grow,
-  // shrinking toward 0 as the wave outgrows the nav. The plates part exactly
-  // as far as the capsule grows, so both ends of the wave stay in sync and a
-  // width-filled dock squeezes symmetrically instead of spilling right.
-  const push = useTransform([pushSpring, squeezeX], ([p, sq]: number[]) => p * sq)
+  /**
+   * The share of the push the wave may use. Everywhere the glass has room
+   * (or nothing can clamp it) this is the clamp-aware squeeze — 1 with room,
+   * shrinking toward 0 as the wave outgrows the nav, so the plates part
+   * exactly as far as the capsule grows. A WIDTH-FILLED dock (Home) takes
+   * the FULL share: its glass never grows horizontally any more (see the
+   * header), so there is nothing to keep in sync — the ripple lives entirely
+   * in these transforms, exactly like My Day's.
+   */
+  const push = useTransform([pushSpring, pushShare], ([p, share]: number[]) => p * share)
 
   /** The −12px lift, and the tooltip riding the plate's new top edge. */
   const lift = useTransform(magnify, [1, MAG_SCALE], [0, -MAG_LIFT])
@@ -511,6 +543,11 @@ function glyphFor(plateSize: number) {
 }
 
 function idFromPoint(clientX: number, clientY: number): string | null {
+  // Guard the hit-test itself: a DOM without `elementsFromPoint` (jsdom, old
+  // WebViews) must fail soft — no selection — instead of throwing mid-gesture.
+  if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') {
+    return null
+  }
   const stack = document.elementsFromPoint(clientX, clientY)
   for (const node of stack) {
     if (!(node instanceof Element)) continue
@@ -658,15 +695,30 @@ export default function GlassDock({
    * neighbour push take the same share, which keeps the wave symmetric at
    * every frame — plates part exactly as far as the glass grows. Vertical
    * growth is untouched (open space above the dock never clamps).
+   *
+   * A FILLED dock skips this throttle entirely — see `filled` below: its
+   * glass asks for no horizontal growth at all, so the clamp is unreachable.
    */
   const squeezeX = useTransform(growX, (growth: number) => {
     if (growth <= 0) return 1
     const room = layoutRef.current.headroom * 2
     return growth <= room ? 1 : Math.max(0, room / growth)
   })
+  // OWNER BRIEF (2026-09-29): "Home page ka footer navigation use tarike se
+  // animate nahin karta jaise dusre dock jaise My Day ke karte hain drag
+  // scroll left right karne per." The fill consumed the nav's whole width, so
+  // the squeeze above — sized to protect exactly that dock — had throttled
+  // Home's ripple to ~5 %: icons popped under the finger but the row never
+  // parted. On a filled dock the wave is therefore TRANSFORM-ONLY: the plates
+  // take the full neighbour push (`pushShare` below) and the glass asks for
+  // no horizontal growth — the clamp the squeeze guards against is never hit,
+  // so the one-sided spill stays impossible by construction.
+  const filled = fill !== null
+  const pushShare = useTransform(squeezeX, (sq: number) => (filled ? 1 : sq))
   const padInline = useTransform(
     [growX, padInlineBase, squeezeX],
-    ([growth, base, sq]: number[]) => base + (layoutRef.current.spread ? 0 : (growth * sq) / 2),
+    ([growth, base, sq]: number[]) =>
+      base + (filled || layoutRef.current.spread ? 0 : (growth * sq) / 2),
   )
   const padTop = useTransform([growY, padTopBase], ([growth, base]: number[]) => base + growth)
 
@@ -936,7 +988,7 @@ export default function GlassDock({
           plateSize={plateSize}
           layoutRef={layoutRef}
           registerItem={registerItem}
-          squeezeX={squeezeX}
+          pushShare={pushShare}
           onSelect={() => onSelect(item.id)}
         />
       ))}

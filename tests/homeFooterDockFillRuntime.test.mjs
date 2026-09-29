@@ -320,9 +320,19 @@ test("a seven-tab footer keeps the dock it always had — no fill, no inline rhy
   mounted.unmount();
 });
 
-/* ── 4b. the wave still runs inside a filled dock ────────────────────────── */
+/* ── 4b. the wave inside a filled dock is TRANSFORM-ONLY ─────────────────── */
+//
+// Owner brief (2026-09-29): "Home page ka footer navigation use tarike se
+// animate nahin karta jaise dusre dock jaise My Day ke karte hain drag
+// scroll left right karne per." The fill consumed the nav's whole width, so
+// the clamp-aware squeeze throttled Home's neighbour push to ~5 % — the row
+// stopped rippling. The filled dock's wave now rides transforms only: the
+// plates take the FULL neighbour push (the ripple, same as My Day), the
+// capsule asks for NO horizontal growth (padding-inline stays at rest, so
+// the max-w-full clamp that once degraded the wave one-sided is
+// unreachable), and the vertical half is untouched.
 
-test("a drag across the filled dock still magnifies, and the plates stay fixed", async () => {
+test("a drag across the filled dock ripples the plates and the glass stays put", async () => {
   viewport.width = 430;
   const mounted = fixture.mount(host, 8);
   await settled();
@@ -379,8 +389,19 @@ test("a drag across the filled dock still magnifies, and the plates stay fixed",
     transforms.some((transform) => /scale\(1\.[0-9]/.test(transform)),
     `no plate magnified inside the fill: ${JSON.stringify(transforms)}`,
   );
+  // THE RIPPLE: the neighbours part with the full push (My Day's wave), as
+  // transform translates on the fixed-layout columns.
+  const columns = Array.from(window.document.querySelectorAll("[data-glass-dock-item]")).map(
+    (item) => item.style.transform,
+  );
+  assert.ok(
+    columns.some((transform) => /translateX\(-?[1-9]/.test(transform)),
+    `no neighbour push inside the fill: ${JSON.stringify(columns)}`,
+  );
+  // THE GLASS STAYS PUT: no horizontal layout ask at all — the clamp that
+  // once degraded the wave one-sided can never be hit on a filled dock.
   const pad = parseFloat(dock().style.paddingInline);
-  assert.ok(pad > restingPad, `the capsule did not grow (padding-inline ${pad})`);
+  assert.equal(pad, restingPad, "the filled capsule never grows horizontally");
 
   event("pointerup", 120);
   mounted.unmount();
@@ -397,6 +418,10 @@ test("a resize re-solves the fill instead of freezing the first viewport", async
   fixture.act(() => {
     window.dispatchEvent(new window.Event("resize"));
   });
+  // The re-solve is coalesced into a rAF and lands as a React update from
+  // outside `act` — give the scheduler (rAF + the concurrent render it
+  // schedules) real time to flush before asserting.
+  await new Promise((resolve) => setTimeout(resolve, 80));
   await settled();
 
   assert.equal(buttons()[0].style.width, "60px", "the plate followed the viewport");

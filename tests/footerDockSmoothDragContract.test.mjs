@@ -247,7 +247,10 @@ test("centres are measured once per gesture, never once per frame", () => {
   // ANIMATED padding, so measuring a magnified dock would take it for the
   // resting one and grow the footer a little further on every gesture.
   assert.match(dockCode, /if \(atRest\(\)\) \{\s*\n\s*measureNow\(\)/);
-  assert.match(dockCode, /const atRest = \(\) => Math\.abs\(growX\.get\(\)\) < 0\.5 && Math\.abs\(growY\.get\(\)\) < 0\.5/);
+  // 0.05 px, not the old 0.5: the stricter threshold is the deliberate fix
+  // for the FlowPath "footer area keeps growing" report (see atRest's own
+  // comment) — a settled dock must measure again the moment it is settled.
+  assert.match(dockCode, /const atRest = \(\) => Math\.abs\(growX\.get\(\)\) < 0\.05 && Math\.abs\(growY\.get\(\)\) < 0\.05/);
   assert.match(dockCode, /retryRef\.current = window\.setTimeout/);
   // The transforms read the cached layout instead.
   assert.match(dock, /const centre = layoutRef\.current\.centres\[id\]/);
@@ -323,7 +326,7 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
 });
 
 /* ------------------------------------------------------------------ */
-/* 5. The clamp-aware squeeze (owner brief 2026-09-29)                 */
+/* 5. The clamp-aware squeeze, and the filled dock's transform wave    */
 /* ------------------------------------------------------------------ */
 
 // "Track scroll animation keval ek side sahi se hota hai — left side drag
@@ -335,7 +338,17 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
 // now grows only what fits: the measure pass records the free pixels per
 // side, and capsule padding + neighbour push take the same squeezed share,
 // so a filled dock squeezes symmetrically instead of spilling right.
-test("a width-filled dock squeezes the wave symmetrically instead of spilling one-sided", () => {
+//
+// OWNER BRIEF, later the same day (2026-09-29): "Home page ka footer
+// navigation use tarike se animate nahin karta jaise dusre dock jaise My Day
+// ke karte hain drag scroll left right karne per." The squeeze fixed the
+// spill — and froze Home's wave: the fill leaves ~2 px of headroom, so the
+// push share resolved to ~0 and the row stopped rippling. On a FILLED dock
+// the wave is now TRANSFORM-ONLY: the plates take the full neighbour push
+// and the capsule asks for no horizontal layout growth — the clamp is
+// unreachable, so symmetry is guaranteed by construction and the squeeze
+// keeps governing every dock that still has room to grow into.
+test("a width-filled dock rides a transform-only wave; roomy docks keep the squeeze", () => {
   // Headroom is measured in the same once-per-gesture pass — from the SAME
   // rects as the centres, so the file still holds exactly one layout read.
   assert.match(dockCode, /headroom = Number\.POSITIVE_INFINITY/);
@@ -344,12 +357,19 @@ test("a width-filled dock squeezes the wave symmetrically instead of spilling on
   // The squeeze is 1 while the growth fits, shrinking toward 0 past it…
   assert.match(dockCode, /const squeezeX = useTransform\(growX/);
   assert.match(dockCode, /return growth <= room \? 1 : Math\.max\(0, room \/ growth\)/);
-  // …the capsule padding takes the squeezed share…
+  // …the capsule padding takes the squeezed share on a roomy dock, and NO
+  // share at all on a filled one (there the glass never grows horizontally)…
   assert.match(dockCode, /\[growX, padInlineBase, squeezeX\]/);
-  assert.match(dockCode, /\(growth \* sq\) \/ 2/);
-  // …as does the neighbour push, so the plates part exactly as far as the
-  // glass grows (the push arithmetic itself is untouched — section 2 pins it).
+  assert.match(dockCode, /filled \|\| layoutRef\.current\.spread \? 0 : \(growth \* sq\) \/ 2/);
+  // …and the neighbour push runs at FULL strength on a filled dock (the
+  // ripple is the point of the brief) while the squeeze still owns it
+  // everywhere else. The push arithmetic itself is untouched (section 2).
   assert.match(dockCode, /const pushSpring = useSpring\(rawPush, WAVE_SPRING\)/);
-  assert.match(dockCode, /const push = useTransform\(\[pushSpring, squeezeX\], \(\[p, sq\]: number\[\]\) => p \* sq\)/);
-  assert.match(dockCode, /squeezeX=\{squeezeX\}/);
+  assert.match(dockCode, /const filled = fill !== null/);
+  assert.match(dockCode, /const pushShare = useTransform\(squeezeX, \(sq: number\) => \(filled \? 1 : sq\)\)/);
+  assert.match(dockCode, /const push = useTransform\(\[pushSpring, pushShare\], \(\[p, share\]: number\[\]\) => p \* share\)/);
+  assert.match(dockCode, /pushShare=\{pushShare\}/);
+  // The lift-to-select hit-test fails soft on a DOM without
+  // `elementsFromPoint` (jsdom, old WebViews) instead of throwing mid-gesture.
+  assert.match(dockCode, /typeof document\.elementsFromPoint !== 'function'/);
 });
