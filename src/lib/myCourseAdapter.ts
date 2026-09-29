@@ -24,9 +24,19 @@ import { myCourseStorageId, type MyCourse, type MyCourseModule, type MyCourseRes
 const isBrainResource = (resource: MyCourseResource): boolean =>
   resource.type === "brain" && (resource.practiceQuestions?.length ?? 0) > 0;
 
-/** A resource the player can actually open (a link, an upload, or a Brain set). */
+/**
+ * An interactive experiment carries its own source (the pasted/uploaded HTML),
+ * so it is playable with no URL at all — exactly like a Brain set. A hosted
+ * experiment URL also counts, which lets a learner point at a big page instead
+ * of storing the file.
+ */
+const isExperimentResource = (resource: MyCourseResource): boolean =>
+  resource.type === "interactive"
+  && (Boolean(String(resource.interactiveHtml || "").trim()) || Boolean(String(resource.url || "").trim()));
+
+/** A resource the player can actually open (a link, an upload, a Brain set or an experiment). */
 export const myResourceIsPlayable = (resource: MyCourseResource): boolean =>
-  isBrainResource(resource) || Boolean(String(resource.url || "").trim());
+  isBrainResource(resource) || isExperimentResource(resource) || Boolean(String(resource.url || "").trim());
 
 const toPracticeQuestions = (resource: MyCourseResource): CoursePracticeQuestion[] | undefined => {
   if (resource.type !== "brain") return undefined;
@@ -43,11 +53,14 @@ const toPracticeQuestions = (resource: MyCourseResource): CoursePracticeQuestion
 
 const toCourseFile = (resource: MyCourseResource): CourseFile => ({
   id: resource.id,
-  name: resource.name || (resource.type === "brain" ? "Practice set" : "Resource"),
+  name: resource.name || (resource.type === "brain" ? "Practice set" : resource.type === "interactive" ? "Experiment" : "Resource"),
   type: resource.type,
   url: resource.url || undefined,
   description: resource.description || undefined,
-  provider: resource.source === "upload" ? "upload" : "link",
+  // `interactive` files carry their source in the course document itself; the
+  // player renders it in a sandboxed iframe (src/utils/experimentSpec.ts).
+  interactiveHtml: resource.type === "interactive" ? resource.interactiveHtml || "" : undefined,
+  provider: resource.type === "interactive" ? "dc_experiment" : resource.source === "upload" ? "upload" : "link",
   accessLevel: "included",
   // No `source: "personal"` on purpose — this is not an official course's
   // borrowed resource, it is the learner's own course. The player therefore

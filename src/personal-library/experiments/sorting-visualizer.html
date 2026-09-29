@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorting Algorithms — starter experiment</title>
+<style>
+  :root { --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.14); --ink:#f5f7ff; --muted:rgba(245,247,255,.62); --bar:#60a5fa; --active:#f472b6; --done:#34d399; }
+  html[data-dc-theme="light"] { --panel:rgba(12,16,36,.05); --line:rgba(12,16,36,.14); --ink:#0b1020; --muted:rgba(11,16,32,.6); --bar:#2563eb; --active:#be185d; --done:#047857; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: transparent; color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; padding: 10px 14px 6px; }
+  h1 { margin: 0; font-size: 16px; font-weight: 800; }
+  .formula { color: var(--muted); font-size: 12px; }
+  .readouts { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+  .chip b { color: var(--bar); }
+  .stage { position: relative; flex: 1; min-height: 0; padding: 4px 14px 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px 16px; padding: 10px 14px 14px; background: var(--panel); border-top: 1px solid var(--line); align-items: end; }
+  label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
+  label span.value { color: var(--muted); }
+  select, input[type=range] { width: 100%; height: 40px; accent-color: var(--bar); }
+  select { border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 700 13px/1 system-ui, sans-serif; padding: 0 10px; }
+  .buttons { display: flex; gap: 8px; justify-content: flex-end; }
+  button { min-height: 44px; min-width: 96px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 800 13px/1 system-ui, sans-serif; cursor: pointer; }
+  button.primary { background: var(--bar); border-color: transparent; color: #06162e; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Sorting Algorithms, Step by Step</h1>
+    <p class="formula">comparisons O(n²) for bubble/selection/insertion · O(n log n) for merge</p>
+    <div class="readouts">
+      <span class="chip">comparisons <b id="r-compare">0</b></span>
+      <span class="chip">swaps <b id="r-swap">0</b></span>
+      <span class="chip">steps <b id="r-steps">0</b></span>
+    </div>
+  </header>
+
+  <div class="stage"><canvas id="c"></canvas></div>
+
+  <div class="controls">
+    <label>Algorithm
+      <select id="algorithm">
+        <option value="bubble">Bubble sort</option>
+        <option value="selection">Selection sort</option>
+        <option value="insertion">Insertion sort</option>
+        <option value="merge">Merge sort</option>
+      </select>
+    </label>
+    <label>Size <span class="value" id="v-size">24 items</span>
+      <input id="size" type="range" min="8" max="48" step="1" value="24">
+    </label>
+    <label>Speed <span class="value" id="v-speed">1.0×</span>
+      <input id="speed" type="range" min="0.2" max="6" step="0.1" value="1">
+    </label>
+    <div class="buttons">
+      <button class="primary" id="run">Start</button>
+      <button id="shuffle">Shuffle</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  var algorithm = document.getElementById("algorithm");
+  var sizeInput = document.getElementById("size");
+  var speedInput = document.getElementById("speed");
+  var runButton = document.getElementById("run");
+
+  var running = true;       // dc:pause / dc:play
+  var playing = false;
+  var values = [];
+  var done = false;
+  var completed = false;
+  var compareCount = 0, swapCount = 0, stepCount = 0;
+  var high = { a: -1, b: -1 };      // indices being compared
+  var sortedFrom = 0;               // tail already in place (bubble/selection)
+
+  /** The animation is a queue of steps, so ANY algorithm can be visualised by
+   *  the same renderer: each step is {type:"compare"|"swap"|"write", a, b, sortedFrom}. */
+  var queue = [];
+
+  function report() {
+    if (window.dcExperiment) window.dcExperiment.progress(Math.min(0.9, playing || done ? 0.6 : 0.2));
+  }
+  function milestone() {
+    if (completed) return;
+    completed = true;
+    if (window.dcExperiment) window.dcExperiment.complete();
+  }
+
+  function shuffle() {
+    values = [];
+    for (var i = 0; i < Number(sizeInput.value); i++) values.push(6 + Math.round(Math.random() * 94));
+    compareCount = swapCount = stepCount = 0;
+    sortedFrom = values.length;
+    queue = [];
+    playing = false;
+    done = false;
+    high = { a: -1, b: -1 };
+    runButton.textContent = "Start";
+    updateReadouts();
+    report();
+  }
+
+  function plan(algorithmId) {
+    var list = values.slice();
+    var steps = [];
+    var n = list.length;
+    var i, j, key, k;
+
+    if (algorithmId === "bubble") {
+      for (i = 0; i < n - 1; i++) {
+        for (j = 0; j < n - 1 - i; j++) {
+          steps.push({ type: "compare", a: j, b: j + 1, sortedFrom: n - i });
+          if (list[j] > list[j + 1]) {
+            var tmp = list[j]; list[j] = list[j + 1]; list[j + 1] = tmp;
+            steps.push({ type: "swap", a: j, b: j + 1, sortedFrom: n - i, values: list.slice() });
+          }
+        }
+      }
+    } else if (algorithmId === "selection") {
+      for (i = 0; i < n - 1; i++) {
+        var min = i;
+        for (j = i + 1; j < n; j++) {
+          steps.push({ type: "compare", a: min, b: j, sortedFrom: n });
+          if (list[j] < list[min]) min = j;
+        }
+        if (min !== i) {
+          var t2 = list[i]; list[i] = list[min]; list[min] = t2;
+          steps.push({ type: "swap", a: i, b: min, sortedFrom: n, values: list.slice() });
+        }
+        steps.push({ type: "sorted", index: i, sortedFrom: n });
+      }
+    } else if (algorithmId === "insertion") {
+      for (i = 1; i < n; i++) {
+        key = list[i];
+        j = i - 1;
+        while (j >= 0) {
+          steps.push({ type: "compare", a: j, b: j + 1, sortedFrom: n });
+          if (list[j] <= key) break;
+          list[j + 1] = list[j];
+          steps.push({ type: "write", a: j + 1, value: list[j], values: list.slice(), sortedFrom: n });
+          j--;
+        }
+        list[j + 1] = key;
+        steps.push({ type: "write", a: j + 1, value: key, values: list.slice(), sortedFrom: n });
+      }
+    } else {
+      // Merge sort — recorded as a plain "compare two positions" trace on a
+      // working copy, which is enough to show why it is faster.
+      var temp = list.slice();
+      var merge = function (lo, hi) {
+        if (hi - lo < 2) return;
+        var mid = (lo + hi) >> 1;
+        merge(lo, mid);
+        merge(mid, hi);
+        var left = temp.slice(lo, mid), right = temp.slice(mid, hi);
+        var li = 0, ri = 0, out = lo;
+        while (li < left.length && ri < right.length) {
+          steps.push({ type: "compare", a: lo + li, b: mid + ri, sortedFrom: n });
+          if (left[li] <= right[ri]) {
+            temp[out] = left[li];
+            steps.push({ type: "write", a: out, value: left[li], values: temp.slice(), sortedFrom: n });
+            li++;
+          } else {
+            temp[out] = right[ri];
+            steps.push({ type: "write", a: out, value: right[ri], values: temp.slice(), sortedFrom: n });
+            ri++;
+          }
+          out++;
+        }
+        while (li < left.length) { temp[out] = left[li]; steps.push({ type: "write", a: out, value: left[li], values: temp.slice(), sortedFrom: n }); li++; out++; }
+        while (ri < right.length) { temp[out] = right[ri]; steps.push({ type: "write", a: out, value: right[ri], values: temp.slice(), sortedFrom: n }); ri++; out++; }
+      };
+      merge(0, n);
+    }
+    return steps;
+  }
+
+  function start() {
+    if (!queue.length) queue = plan(algorithm.value);
+    playing = true;
+    runButton.textContent = "Pause";
+    report();
+  }
+  function toggle() {
+    if (done) { shuffle(); return; }
+    if (playing) { playing = false; runButton.textContent = "Resume"; }
+    else start();
+  }
+
+  function step() {
+    if (!queue.length) {
+      if (!done) {
+        done = true;
+        playing = false;
+        runButton.textContent = "Again";
+        high = { a: -1, b: -1 };
+        sortedFrom = 0;
+        milestone();
+      }
+      return;
+    }
+    var next = queue.shift();
+    stepCount += 1;
+    if (next.type === "compare") {
+      compareCount += 1;
+      high = { a: next.a, b: next.b };
+    } else {
+      swapCount += 1;
+      high = { a: next.a, b: next.b };
+      if (next.values) values = next.values.slice();
+      else if (typeof next.value === "number") values[next.a] = next.value;
+      if (typeof next.sortedFrom === "number") sortedFrom = next.sortedFrom;
+    }
+    if (next.type === "sorted") sortedFrom = values.length - (next.index + 1);
+    updateReadouts();
+  }
+
+  function updateReadouts() {
+    document.getElementById("r-compare").textContent = String(compareCount);
+    document.getElementById("r-swap").textContent = String(swapCount);
+    document.getElementById("r-steps").textContent = String(stepCount);
+  }
+
+  var dpr = 1, W = 0, H = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(260, rect.width);
+    H = Math.max(180, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+
+  function colours() {
+    var s = getComputedStyle(document.documentElement);
+    return {
+      bar: s.getPropertyValue("--bar").trim() || "#60a5fa",
+      active: s.getPropertyValue("--active").trim() || "#f472b6",
+      done: s.getPropertyValue("--done").trim() || "#34d399",
+      ink: s.getPropertyValue("--ink").trim() || "#f5f7ff",
+    };
+  }
+
+  function draw() {
+    var c = colours();
+    ctx.clearRect(0, 0, W, H);
+    var n = values.length || 1;
+    var gap = Math.max(1, Math.min(4, W / n / 6));
+    var barWidth = (W - gap * (n - 1)) / n;
+    var max = 100;
+
+    for (var i = 0; i < n; i++) {
+      var x = i * (barWidth + gap);
+      var height = (values[i] / max) * (H - 26);
+      var y = H - height;
+      var colour = c.bar;
+      if (i === high.a || i === high.b) colour = c.active;
+      else if (done || i >= sortedFrom) colour = c.done;
+      ctx.fillStyle = colour;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, barWidth, height, Math.min(4, barWidth / 2));
+      else ctx.rect(x, y, barWidth, height);
+      ctx.fill();
+      if (barWidth > 16 && n <= 30) {
+        ctx.fillStyle = c.ink;
+        ctx.font = "700 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(String(values[i]), x + barWidth / 2, y - 4);
+        ctx.textAlign = "start";
+      }
+    }
+    ctx.fillStyle = c.ink;
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillText(algorithm.options[algorithm.selectedIndex].text + (done ? " — sorted" : playing ? " — running" : " — paused"), 10, H - 8);
+  }
+
+  var accumulator = 0;
+  function tick() {
+    if (running && playing) {
+      accumulator += Number(speedInput.value);
+      var budget = Math.min(24, Math.floor(accumulator));
+      accumulator -= budget;
+      for (var i = 0; i < budget; i++) step();
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  runButton.addEventListener("click", toggle);
+  document.getElementById("shuffle").addEventListener("click", shuffle);
+  algorithm.addEventListener("change", function () { queue = []; done = false; shuffle(); });
+  sizeInput.addEventListener("input", function () {
+    document.getElementById("v-size").textContent = sizeInput.value + " items";
+    shuffle();
+  });
+  speedInput.addEventListener("input", function () {
+    document.getElementById("v-speed").textContent = Number(speedInput.value).toFixed(1) + "×";
+  });
+
+  document.addEventListener("dc:pause", function () { running = false; });
+  document.addEventListener("dc:play", function () { running = true; });
+
+  document.getElementById("v-size").textContent = sizeInput.value + " items";
+  document.getElementById("v-speed").textContent = "1.0×";
+  shuffle();
+  resize();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

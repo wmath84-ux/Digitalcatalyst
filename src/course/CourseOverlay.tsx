@@ -40,7 +40,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -76,18 +76,37 @@ const flattenModules = (modules: CourseModule[], depth = 0): FlatModule[] =>
   modules.flatMap((module) => [{ module, depth }, ...flattenModules(module.modules || [], depth + 1)]);
 
 /**
- * A `brain` resource is the ONE file type with no URL — its content is the
- * practice set the admin imported (`practiceQuestions`). It is visible exactly
- * when it holds at least one question.
+ * A `brain` resource is the ONE official file type with no URL — its content is
+ * the practice set the admin imported (`practiceQuestions`). It is visible
+ * exactly when it holds at least one question.
  */
 const isBrainFile = (file: CourseFile) => file.type === "brain" && (file.practiceQuestions?.length ?? 0) > 0;
 
-const isVisibleFile = (file: CourseFile) =>
-  file.accessLevel !== "hidden" &&
+/**
+ * The OFFICIAL catalogue's visibility rule: a lesson shows when it has a URL —
+ * with a Brain set as the one URL-less official type (it counts when it holds
+ * questions). `tests/courseBrainPracticeContract.test.mjs` pins this exact
+ * expression, because it is what keeps a Brain set out of the viewer stack.
+ */
+const hasUrlContent = (file: CourseFile) =>
   (isBrainFile(file) || Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId));
+
+/**
+ * …and an `interactive` 2D experiment is the LEARNER-authored URL-less type:
+ * its content is its own HTML (`interactiveHtml`, stored in the course
+ * document) or a hosted page. The Modules tab must show both, or a lesson the
+ * learner built never appears in their own course.
+ */
+const isExperimentFile = (file: CourseFile) =>
+  file.type === "interactive"
+  && (Boolean(String(file.interactiveHtml || "").trim()) || /^https:\/\//i.test(String(file.url || "").trim()));
+
+const isVisibleFile = (file: CourseFile) =>
+  file.accessLevel !== "hidden" && (hasUrlContent(file) || isExperimentFile(file));
 
 const fileIcon = (file: CourseFile) => {
   if (file.type === "brain") return Brain;
+  if (file.type === "interactive") return FlaskConical;
   if (file.type === "youtube" || file.type === "video" || file.type === "audio") return PlayCircle;
   if (file.type === "pdf" || file.type === "ebook") return FileText;
   if (file.type === "sheet") return FileSpreadsheet;

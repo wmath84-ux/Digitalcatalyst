@@ -41,8 +41,11 @@ import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
+import { isExperimentFileType } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
+import ExperimentStage from "./ExperimentStage";
+import { buildExperimentDocument, experimentDownloadName } from "../utils/experimentSpec";
 import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
@@ -150,9 +153,16 @@ interface ResourceViewerProps {
    * the host's mobile rendering, which is far easier to read on a phone.
    */
   desktopView?: boolean;
+  /**
+   * An interactive experiment may mark ITSELF finished
+   * (`window.dcExperiment.complete()`), which is a far better completion
+   * signal than "the learner scrolled past it". The player decides what that
+   * means (it marks the open lesson complete) — the viewer only reports it.
+   */
+  onComplete?: (fileId: string) => void;
 }
 
-export default function ResourceViewer({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true }: ResourceViewerProps) {
+export default function ResourceViewer({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true, onComplete }: ResourceViewerProps) {
   // No file selected — show the empty state.
   if (!file) {
     return (
@@ -175,6 +185,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
       onPlaybackChange={onPlaybackChange}
       onFileActions={onFileActions}
       desktopView={desktopView}
+      onComplete={onComplete}
     />
   );
 }
@@ -184,7 +195,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
  * state — like the Google Docs edit-mode toggle — never leaks between
  * documents.
  */
-function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
+function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true, onComplete }: ResourceViewerProps & { file: CourseFile }) {
   // ── Google in-frame editor (admin-controlled, PER FILE TYPE) ────────
   // The admin decides in Admin → Content → Course Player what learners
   // get — separately for Docs, Sheets and Slides:
@@ -224,7 +235,46 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
   const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview", editorChrome });
-  const download = useMemo(() => getCourseDownload(file), [file]);
+  const nativeDownload = useMemo(() => getCourseDownload(file), [file]);
+
+  // ── Interactive 2D experiment ──────────────────────────────────────────
+  // A learner-authored HTML file (see src/utils/experimentSpec.ts). It is NOT
+  // an embed: there is no host, no URL and no Google/Docs path — the source
+  // itself is the lesson, so it gets its own branch below and its own actions
+  // (restart / pause, download the .html, open it full-page in a new tab).
+  const isExperiment = isExperimentFileType(file.type);
+  const experimentHtml = isExperiment ? String(file.interactiveHtml || "") : "";
+  const hasInlineExperiment = isExperiment && Boolean(experimentHtml.trim());
+
+  /** The learner's own file back — byte-identical, so it can be re-imported. */
+  const experimentDownload = useMemo(() => {
+    if (!hasInlineExperiment) return null;
+    try {
+      const url = URL.createObjectURL(new Blob([experimentHtml], { type: "text/html" }));
+      return { url, label: "Download .html", downloadable: true, extension: "html", fileName: experimentDownloadName(file.name) };
+    } catch {
+      return null;
+    }
+  }, [hasInlineExperiment, experimentHtml, file.name]);
+  useEffect(() => () => { if (experimentDownload) URL.revokeObjectURL(experimentDownload.url); }, [experimentDownload]);
+
+  /**
+   * "Open in a new tab" for an inline experiment: the WRAPPED document (shell +
+   * bridge included) as a blob URL, so the experiment runs standalone the same
+   * way the player runs it. A hosted experiment simply opens its own URL.
+   */
+  const experimentExternalUrl = useMemo(() => {
+    if (!isExperiment) return "";
+    if (!hasInlineExperiment) return embed.url;
+    try {
+      return URL.createObjectURL(new Blob([buildExperimentDocument(experimentHtml, { theme: "dark" })], { type: "text/html" }));
+    } catch {
+      return embed.url;
+    }
+  }, [isExperiment, hasInlineExperiment, experimentHtml, embed.url]);
+  useEffect(() => () => { if (experimentExternalUrl.startsWith("blob:")) URL.revokeObjectURL(experimentExternalUrl); }, [experimentExternalUrl]);
+
+  const download = experimentDownload ?? nativeDownload;
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
   const isVideo = file.type === "video" && embed.kind === "direct";
@@ -268,16 +318,23 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
   const toggleEditMode = useCallback(() => {
     setEditMode((value) => !value);
   }, []);
-  const fileKindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
+  const fileKindLabel = isExperiment
+    ? "2D experiment"
+    : embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
   const isYouTube = embed.kind === "youtube";
   const isMedia = isYouTube || file.type === "video" || file.type === "audio";
-  const externalUrl = isYouTube ? getYouTubeWatchUrl(file) : embed.url;
+  const externalUrl = isExperiment ? experimentExternalUrl : isYouTube ? getYouTubeWatchUrl(file) : embed.url;
+  /** The experiment reports its own completion — forwarded to the player once. */
+  const handleExperimentComplete = useCallback(() => {
+    if (!active) return;
+    onComplete?.(file.id);
+  }, [active, onComplete, file.id]);
   useEffect(() => {
     if (!active || !onFileActions) return undefined;
     onFileActions(file.id, {
       fileId: file.id,
       fileName: file.name,
-      kindLabel: `${fileKindLabel} ${isEditingInline ? "editor" : "preview"}`,
+      kindLabel: isExperiment ? fileKindLabel : `${fileKindLabel} ${isEditingInline ? "editor" : "preview"}`,
       externalUrl,
       isYouTube,
       isMedia,
@@ -298,7 +355,15 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
     <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-doc-mode={canEditInline ? (isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
 
       <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : ""}`}>
-        {isImage ? (
+        {isExperiment ? (
+          <ExperimentStage
+            html={experimentHtml}
+            url={file.url || ""}
+            title={file.name}
+            active={active}
+            onComplete={handleExperimentComplete}
+          />
+        ) : isImage ? (
           <ImageViewer
             url={embed.url}
             name={file.name}
