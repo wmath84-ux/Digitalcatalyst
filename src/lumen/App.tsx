@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, X } from "lucide-react";
 import "./index.css";
 import Composer from "./components/Composer";
 import Header from "./components/Header";
@@ -49,32 +50,39 @@ const asPersonalId = (value?: string | null): string | undefined => {
   return isValidPersonalId(id) ? id : undefined;
 };
 
-/* Graceful visual fallback if DOM capture is unavailable in this browser. */
-function fallbackShot(r: ShotRect): Attachment {
-  const w = 640;
-  const h = Math.max(220, Math.round((640 * r.h) / Math.max(1, r.w)));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "#f1efe8";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#e2e0d5";
-    for (let x = 20; x < w; x += 28) for (let y = 20; y < h; y += 28) ctx.fillRect(x, y, 2, 2);
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2 - 16, 20, 0, Math.PI * 2);
-    ctx.fillStyle = "#4f46e5";
-    ctx.fill();
-    ctx.fillStyle = "#dcdacc";
-    ctx.fillRect(w / 2 - 120, h / 2 + 20, 240, 12);
-    ctx.fillRect(w / 2 - 78, h / 2 + 42, 156, 12);
-    ctx.fillStyle = "#8c8a7d";
-    ctx.font = "12px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`Captured area · ${Math.round(r.w)} × ${Math.round(r.h)}`, w / 2, h - 18);
+/**
+ * True when a capture is a flat field — a region the browser refuses to
+ * photograph (video players, cross-origin embeds) renders as exactly that.
+ * Measured on a 32px probe, so it costs nothing; anything unprovable (a
+ * tainted canvas throws on read) returns false and lets the normal error path
+ * speak instead of silently filing a blank "screenshot".
+ */
+function isBlankCanvas(canvas: HTMLCanvasElement): boolean {
+  try {
+    const w = Math.min(32, canvas.width);
+    const h = Math.min(32, Math.round((canvas.height * w) / Math.max(1, canvas.width)));
+    if (!w || !h) return true;
+    const probe = document.createElement("canvas");
+    probe.width = w;
+    probe.height = h;
+    const ctx = probe.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.drawImage(canvas, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let sum = 0;
+    let sumSq = 0;
+    let n = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      const lum = 0.299 * data[index] + 0.587 * data[index + 1] + 0.114 * data[index + 2];
+      sum += lum;
+      sumSq += lum * lum;
+      n += 1;
+    }
+    const mean = sum / Math.max(1, n);
+    return sumSq / Math.max(1, n) - mean * mean < 25;
+  } catch {
+    return false;
   }
-  return makeScreenshotAttachment(canvas.toDataURL("image/png"), Math.round(r.w), Math.round(r.h));
 }
 
 function LumenChatInner({
@@ -109,6 +117,14 @@ function LumenChatInner({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [shotMode, setShotMode] = useState(false);
+  const [captureNotice, setCaptureNotice] = useState<string | null>(null);
+
+  // A failed capture explains itself once, then gets out of the way.
+  useEffect(() => {
+    if (!captureNotice) return;
+    const t = window.setTimeout(() => setCaptureNotice(null), 9000);
+    return () => window.clearTimeout(t);
+  }, [captureNotice]);
   const [lightbox, setLightbox] = useState<Attachment | null>(null);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [studentModel, setStudentModel] = useState<StudentModel>(loadStudentModel);
@@ -580,32 +596,52 @@ function LumenChatInner({
   /* ── screenshot capture ────────────────────────────────── */
 
   const captureRegion = async (r: ShotRect) => {
-    let att: Attachment | null = null;
+    const failCapture = (message: string) => {
+      // Never file a fake placeholder: a capture that is not a photograph of
+      // the region must say why, not attach a lookalike the AI would "read".
+      setCaptureNotice(message);
+      setShotMode(false);
+    };
     try {
       const { default: html2canvas } = await import("html2canvas");
       const scale = Math.min(PERF.SHOT_SCALE_MAX, window.devicePixelRatio || 1);
+      // Viewport-sized render + native crop. The selection rect is already in
+      // viewport coordinates, so rendering the whole document and re-adding
+      // scroll offsets is both slower and a classic source of shifted shots.
+      // `useCORS` keeps cross-origin lesson images from tainting the canvas —
+      // a tainted canvas throws on toDataURL, which used to surface as a
+      // blank placeholder with no explanation at all.
       const canvas = await html2canvas(document.documentElement, {
         scale,
         logging: false,
+        useCORS: true,
         backgroundColor: "#f7f6f2",
+        windowWidth: document.documentElement.clientWidth,
+        windowHeight: window.innerHeight,
+        x: Math.max(0, Math.round(r.x)),
+        y: Math.max(0, Math.round(r.y)),
+        width: Math.max(2, Math.round(r.w)),
+        height: Math.max(2, Math.round(r.h)),
       });
-      const sx = Math.max(0, Math.round((r.x + window.scrollX) * scale));
-      const sy = Math.max(0, Math.round((r.y + window.scrollY) * scale));
-      const sw = Math.max(2, Math.round(r.w * scale));
-      const sh = Math.max(2, Math.round(r.h * scale));
       // Bound output size — caps memory + future upload cost on huge regions.
-      const outScale = Math.min(1, PERF.SHOT_MAX_EDGE / Math.max(sw, sh));
-      const crop = document.createElement("canvas");
-      crop.width = Math.round(sw * outScale);
-      crop.height = Math.round(sh * outScale);
-      const ctx = crop.getContext("2d");
-      if (!ctx) throw new Error("capture unsupported");
-      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, crop.width, crop.height);
+      const outScale = Math.min(1, PERF.SHOT_MAX_EDGE / Math.max(canvas.width, canvas.height));
+      let out = canvas;
+      if (outScale < 1) {
+        const small = document.createElement("canvas");
+        small.width = Math.max(2, Math.round(canvas.width * outScale));
+        small.height = Math.max(2, Math.round(canvas.height * outScale));
+        const sctx = small.getContext("2d");
+        if (sctx) {
+          sctx.drawImage(canvas, 0, 0, small.width, small.height);
+          out = small;
+        }
+      }
+      if (isBlankCanvas(out)) {
+        failCapture("That area couldn't be photographed — video players and embedded pages are protected by the browser. Take a device screenshot and attach it with + instead.");
+        return;
+      }
       // JPEG for UI captures: far smaller than PNG, visually identical here.
-      att = makeScreenshotAttachment(crop.toDataURL("image/jpeg", PERF.SHOT_JPEG_QUALITY), Math.round(r.w), Math.round(r.h));
-    } catch {
-      att = fallbackShot(r);
-    }
+      let att: Attachment = makeScreenshotAttachment(out.toDataURL("image/jpeg", PERF.SHOT_JPEG_QUALITY), Math.round(r.w), Math.round(r.h));
     // Link the capture to what was on screen — the AI reads it as
     // "region of THIS resource at THIS position", not a loose image.
     if (inPlayer) {
@@ -622,6 +658,9 @@ function LumenChatInner({
     }
     setAttachments((p) => [...p, att]);
     setShotMode(false);
+    } catch {
+      failCapture("The capture failed in this browser. Take a device screenshot and attach it with + instead.");
+    }
   };
 
   /* ── layout ────────────────────────────────────────────── */
@@ -716,6 +755,26 @@ function LumenChatInner({
         </section>
       </div>
 
+      {captureNotice && (
+        <div
+          className="fixed left-1/2 z-[95] w-[min(520px,calc(100%-32px))] -translate-x-1/2"
+          style={{ bottom: "max(96px, calc(env(safe-area-inset-bottom) + 88px))" }}
+          role="status"
+        >
+          <div className="anim-fade-up flex items-start gap-2.5 rounded-[14px] bg-[rgba(24,22,16,0.94)] px-3.5 py-3 text-[12.5px] leading-snug text-[#f1efe8] shadow-[var(--sh-pop)]">
+            <Camera size={15} aria-hidden="true" className="mt-px flex-none opacity-80" />
+            <span className="flex-1">{captureNotice}</span>
+            <button
+              type="button"
+              onClick={() => setCaptureNotice(null)}
+              aria-label="Dismiss"
+              className="focus-ring flex-none rounded-full p-1 text-[#f1efe8]/70 transition-colors hover:bg-[rgba(255,255,255,0.1)] hover:text-[#f1efe8]"
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
       {shotMode && <ScreenshotOverlay onCancel={() => setShotMode(false)} onCapture={captureRegion} />}
       {lightbox && <Lightbox attachment={lightbox} onClose={() => setLightbox(null)} />}
     </div>

@@ -122,13 +122,13 @@ const EbookAdapter: ResourceContextAdapter = {
 const ImageAdapter: ResourceContextAdapter = {
   type: "image",
   label: "Image",
-  // An image is only "readable" through what the learner captures: the app has
-  // no text-recognition path for a course image, and says so instead of
-  // inventing a description of the figure.
-  capabilities: () => CAPS({ ...registryCaps("image"), visual: true, text: false, searchableChunks: false, original: true, serverAnalyzable: false, fallback: "screenshot" }),
+  // Read by looking, not by text: a verified image is sent to the model with
+  // vision at ask time, so it contributes no text chunks but IS analyzable.
+  capabilities: (r) => CAPS({ ...registryCaps("image"), visual: true, text: false, searchableChunks: false, original: true, serverAnalyzable: r.availability === "ready", fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "viewing the figure",
-  fallbackMessage: () => "I couldn't analyse this image. Try capturing the specific area you're asking about.",
+  fallbackMessage: (r) =>
+    r.availabilityNote ?? "I couldn't open this image file. Check that the link is public — or capture the part you mean and I'll look at that.",
 };
 
 const GoogleFormAdapter: ResourceContextAdapter = {
@@ -145,12 +145,14 @@ const GoogleFormAdapter: ResourceContextAdapter = {
 const EmbedAdapter: ResourceContextAdapter = {
   type: "embed",
   label: "Embedded app",
-  // Sandboxed third-party iframe: metadata + screenshot only, ever.
-  capabilities: () => CAPS({ ...registryCaps("embed"), text: false, searchableChunks: false, visual: false, fallback: "screenshot" }),
+  // A public article page behind the link reads as text; an interactive app or
+  // login-walled page stays closed (the extractor proves which), with a
+  // screenshot as the honest fallback either way.
+  capabilities: (r) => CAPS({ ...registryCaps("embed"), text: r.availability === "ready", searchableChunks: r.availability === "ready", visual: true, serverAnalyzable: r.availability === "ready", fallback: "screenshot" }),
   locate: () => ({}),
   describePosition: () => "in the embedded app",
   fallbackMessage: (r) =>
-    r.availabilityNote ?? "This is a third-party embed, so I can only see its title — not what's inside it. A screenshot lets me help properly.",
+    r.availabilityNote ?? "I couldn't read this page's text — interactive apps and login-walled pages stay closed to me. A screenshot of the part you mean works.",
 };
 
 const MindmapAdapter: ResourceContextAdapter = {

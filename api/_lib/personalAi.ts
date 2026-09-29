@@ -39,8 +39,8 @@
 import { randomUUID } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { adminDb, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
-import { revisionAiRuntime, type RevisionAiConfig, type RevisionAiPolicy, type RevisionAiProviderUsage, type RevisionAiReservation } from "./revisionGenerate.js";
-import { readResourceContent, type ContentExtraction } from "./personalAiContent.js";
+import { revisionAiRuntime, type AiVisionImage, type RevisionAiConfig, type RevisionAiPolicy, type RevisionAiProviderUsage, type RevisionAiReservation } from "./revisionGenerate.js";
+import { fetchImageBytes, readResourceContent, type ContentExtraction } from "./personalAiContent.js";
 import { isValidPersonalId } from "../../utils/personalCourse.js";
 import { collectEntitlementOwnership, isSubscriptionRecordActive, resolveCourseAccess } from "../../utils/courseAccess.js";
 import { firestoreToCatalogProduct } from "../../utils/productMapping.js";
@@ -706,6 +706,8 @@ interface ResourceAvailability {
   reason: string;
   chars: number;
   planKind: string;
+  /** True when the file is read by vision at ask time (an image), not through text. */
+  visual: boolean;
   originKind: "official" | "manual";
   provenance: string;
   fromCache: boolean;
@@ -773,6 +775,7 @@ async function readScopeContent(
       reason: state.reason,
       chars: extraction.chars,
       planKind: plan.kind,
+      visual: extraction.status === "visual",
       originKind: resource.originKind,
       provenance: personalAiProvenance({
         scope: "resource",
@@ -1117,6 +1120,10 @@ interface ModelCall {
   sources: ReturnType<typeof personalAiSources>;
   coverage: PersonalAiCoverage;
   contentHash: string;
+  /** Images the model actually looked at on this call (chat attachments + resource images). */
+  imagesRead: number;
+  /** True when images were attached but the model couldn't see — the answer fell back to text only. */
+  visionSkipped: boolean;
 }
 
 /**
@@ -1236,8 +1243,10 @@ async function groundedCompletion(input: {
   query: string;
   resourceId?: string | null;
   estimatedOutputTokens: number;
+  images?: AiVisionImage[];
 }): Promise<ModelCall> {
   const { uid, req, body, prompt, grounding } = input;
+  const visionImages = (Array.isArray(input.images) ? input.images : []).filter((image) => image && image.base64 && image.mimeType).slice(0, 4);
   const aiSettings = await loadAiSettings();
   const policy: RevisionAiPolicy = await resolveEffectiveAiPolicy(uid, aiSettings);
   const requestedSource = body.source === "own" ? "own" : "default";
@@ -1284,7 +1293,9 @@ async function groundedCompletion(input: {
   // The prompt is built by the shared pure layer from these exact chunks, so
   // the caller passes the chunk-scoped prompt in; recompute the token estimate
   // from what we are actually sending.
-  const estimatedInputTokens = estimateTokensFromText(`${PERSONAL_AI_SYSTEM_PROMPT}\n${prompt}`);
+  // Vision inputs cost provider tokens too — a coarse per-image bump keeps the
+  // school-key reservation honest instead of systematically under-charging.
+  const estimatedInputTokens = estimateTokensFromText(`${PERSONAL_AI_SYSTEM_PROMPT}\n${prompt}`) + visionImages.length * 1000;
   const estimatedOutputTokens = Math.max(200, Math.min(6000, Math.round(input.estimatedOutputTokens)));
   const price = findAiModelPrice(policy.pricing, config.provider, config.model);
 
@@ -1296,18 +1307,37 @@ async function groundedCompletion(input: {
     reservation = await reserveUsage(uid, policy, price, estimatedInputTokens, estimatedOutputTokens, tzOffsetMinutes);
   }
 
-  let rawText = "";
-  try {
-    rawText = await completeJsonText(config, PERSONAL_AI_SYSTEM_PROMPT, prompt, origin);
-  } catch (error) {
-    if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
+  const mapProviderError = (error: unknown): ApiError => {
     const statusCode = number((error as { statusCode?: unknown })?.statusCode, 502);
     const code = text((error as { code?: unknown })?.code);
-    throw new ApiError(
+    return new ApiError(
       statusCode === 429 ? 429 : statusCode >= 500 ? 502 : statusCode,
       code === "AI_PROVIDER_KEY_INVALID" && requestedSource === "default" ? "AI_SCHOOL_KEY_INVALID" : code || "PROVIDER_ERROR",
       (error as Error)?.message || "The AI provider didn't answer.",
     );
+  };
+
+  let rawText = "";
+  let visionSkipped = false;
+  try {
+    rawText = await completeJsonText(config, PERSONAL_AI_SYSTEM_PROMPT, prompt, origin, visionImages);
+  } catch (error) {
+    // A model without vision rejects image parts with a 400 that names them.
+    // Answering from text (with an honest note appended by the caller) beats a
+    // dead error — but the retry MUST drop the vision line, or the model would
+    // be told about images it was never sent.
+    if (visionImages.length && text((error as { code?: unknown })?.code) === "AI_MODEL_NO_VISION") {
+      visionSkipped = true;
+      try {
+        rawText = await completeJsonText(config, PERSONAL_AI_SYSTEM_PROMPT, prompt.replace(/^Attached images \(\d+[^:\n]*:[^\n]*\n?/m, "").trim(), origin, []);
+      } catch (retryError) {
+        if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
+        throw mapProviderError(retryError);
+      }
+    } else {
+      if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
+      throw mapProviderError(error);
+    }
   }
   if (!rawText) {
     if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
@@ -1351,6 +1381,8 @@ async function groundedCompletion(input: {
     sources: personalAiSources(chunks),
     coverage: grounding.coverage,
     contentHash: grounding.contentHash,
+    imagesRead: visionSkipped ? 0 : visionImages.length,
+    visionSkipped,
   };
 }
 
@@ -1452,6 +1484,58 @@ async function handleContext(db: Db, uid: string, body: Body) {
 }
 
 /** `personalAi.ask` — one grounded chat answer scoped to a module or resource. */
+/* ------------------------------------------------------------------ */
+/* Vision inputs (chat attachments + resource images)                   */
+/* ------------------------------------------------------------------ */
+
+const VISION_DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/;
+const MAX_CHAT_VISION_IMAGES = 3;
+const MAX_CHAT_VISION_BYTES = 1_200_000;
+const MAX_RESOURCE_VISION_IMAGES = 2;
+
+/**
+ * Validate chat-attached captures/uploads into vision inputs. Never throws:
+ * a malformed or oversized row is skipped, and the model is told about the
+ * images it was ACTUALLY sent (see handleAsk), so the prompt can never claim
+ * an image the provider never received.
+ */
+const cleanChatVisionImages = (raw: unknown): AiVisionImage[] => {
+  const rows = Array.isArray(raw) ? raw : [];
+  const out: AiVisionImage[] = [];
+  for (const item of rows.slice(0, MAX_CHAT_VISION_IMAGES)) {
+    const row = asRecord(item);
+    const match = VISION_DATA_URL_RE.exec(String(row.dataUrl || row.src || ""));
+    if (!match) continue;
+    const base64 = match[2].replace(/\s+/g, "");
+    if (!base64 || (base64.length * 3) / 4 > MAX_CHAT_VISION_BYTES) continue;
+    out.push({ mimeType: match[1].toLowerCase(), base64, name: cleanAiText(row.name, 80) || "attached image" });
+  }
+  return out;
+};
+
+/**
+ * Fetch the bytes of resource images verified `visual` by the extractor, so a
+ * question scoped to an image lesson sends the pixels — not just the title.
+ * A resource-scoped ask reads ONLY its own image; a module ask takes the first
+ * two. Transient fetch failures skip the image rather than failing the ask.
+ */
+const collectResourceVisionImages = async (scope: Scope, availability: ResourceAvailability[]): Promise<AiVisionImage[]> => {
+  const visualIds = new Set(availability.filter((row) => row.visual && row.readable).map((row) => row.id));
+  if (!visualIds.size) return [];
+  const candidates = scope.resources
+    .filter((row) => visualIds.has(row.id) && (!scope.resourceId || row.id === scope.resourceId || row.aliases?.includes(scope.resourceId)))
+    .slice(0, MAX_RESOURCE_VISION_IMAGES);
+  const out: AiVisionImage[] = [];
+  for (const resource of candidates) {
+    const plan = personalAiReadPlan(resource);
+    if (!plan.url) continue;
+    const fetched = await fetchImageBytes(plan.url);
+    if (!fetched.ok) continue;
+    out.push({ mimeType: fetched.mimeType, base64: fetched.base64, name: cleanAiText(resource.name, 80) || "lesson image" });
+  }
+  return out;
+};
+
 async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
   const scope = await resolveAskScope(db, uid, body);
   const question = cleanAiText(body.question, PERSONAL_AI_QUESTION_CHARS_MAX);
@@ -1467,6 +1551,9 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     })
     .filter((message) => message.text);
 
+  // Images resolve BEFORE the prompt is built, so the vision line names exactly
+  // what the model is about to receive — never a skipped or failed fetch.
+  const visionImages = [...cleanChatVisionImages(body.images), ...(await collectResourceVisionImages(scope, content.availability))].slice(0, 4);
   const prompt = buildPersonalAiAskPrompt({
     chunks: retrievePersonalAiChunks({
       units: grounding.units,
@@ -1479,6 +1566,7 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     scopeLabel: grounding.scopeLabel,
     question,
     history,
+    images: visionImages.map((image) => image.name || "attached image"),
   });
   const call = await groundedCompletion({
     uid,
@@ -1489,16 +1577,24 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     query: question,
     resourceId: scope.resourceId,
     estimatedOutputTokens: 700,
+    images: visionImages,
   });
   const unitIds = call.chunks.map((chunk) => chunk.unitId);
   const answer = normalizePersonalAiAnswer(call.payload, unitIds);
+  if (call.visionSkipped && visionImages.length) {
+    // The model answered blind: the note lives ON the answer, or "grounded"
+    // would be a claim the learner cannot verify.
+    answer.answer = `${answer.answer}\n\n_I couldn't look at the attached image${visionImages.length === 1 ? "" : "s"} — the configured AI model can't read images, so this answer uses the lesson text only. Switch to a vision-capable model in Revision → AI Configuration to fix this._`;
+  }
   const sources = call.sources.filter((source) => answer.sources.includes(source.unitId));
   const readableCount = grounding.coverage.readable;
   const coverageNote = grounding.coverage.total
     ? `${readableCount} of ${grounding.coverage.total} file${grounding.coverage.total === 1 ? "" : "s"} in this lesson could be read.`
-    : scope.origin === "official"
-      ? "No file in this lesson has a readable text source yet, so this answer uses titles, notes and the course material the app can legitimately open."
-      : "";
+    : visionImages.length
+      ? `${visionImages.length} attached image${visionImages.length === 1 ? " was" : "s were"} read visually for this answer.`
+      : scope.origin === "official"
+        ? "No file in this lesson has a readable text source yet, so this answer uses titles, notes and the course material the app can legitimately open."
+        : "";
   const at = Date.now();
   await appendThread(db, uid, scope, [
     { id: `m_${randomUUID().slice(0, 12)}`, role: "user", text: question, sources: [], grounded: true, resourceId: scope.resourceId, at },
@@ -1526,6 +1622,8 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     coverage: grounding.coverage,
     unreadable: content.availability.filter((row) => !row.readable).map((row) => ({ id: row.id, name: row.name, type: row.type, state: row.state, reason: row.reason })),
     scopeLabel: grounding.scopeLabel,
+    imagesRead: call.imagesRead,
+    visionSkipped: call.visionSkipped,
     provider: call.provider,
     model: call.model,
     aiSource: call.aiSource,

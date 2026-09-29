@@ -47,14 +47,46 @@ export default function ScreenshotOverlay({
   const rectRef = useRef<ShotRect | null>(null);
   rectRef.current = rect;
 
+  // Pointermove can fire far faster than the screen refreshes (120Hz+ mice) —
+  // committing React state per event queues renders faster than they can
+  // paint, which is exactly the resize lag. Updates coalesce to one render
+  // per animation frame instead, with the final position flushed on pointerup.
+  const frameRef = useRef(0);
+  const nextRect = useRef<{ v: ShotRect | null; active: boolean }>({ v: null, active: false });
+  const nextGuide = useRef<{ v: { x: number; y: number } | null; active: boolean }>({ v: null, active: false });
+  const flushFrame = useRef(() => {});
+  flushFrame.current = () => {
+    frameRef.current = 0;
+    if (nextRect.current.active) {
+      nextRect.current.active = false;
+      setRect(nextRect.current.v);
+    }
+    if (nextGuide.current.active) {
+      nextGuide.current.active = false;
+      setGuide(nextGuide.current.v);
+    }
+  };
+
   useEffect(() => {
     const vw = () => window.innerWidth;
     const vh = () => window.innerHeight;
 
+    const schedule = () => {
+      if (!frameRef.current) frameRef.current = requestAnimationFrame(() => flushFrame.current());
+    };
+    const queueRect = (v: ShotRect | null) => {
+      nextRect.current = { v, active: true };
+      schedule();
+    };
+    const queueGuide = (v: { x: number; y: number } | null) => {
+      nextGuide.current = { v, active: true };
+      schedule();
+    };
+
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d) {
-        if (!rectRef.current) setGuide({ x: e.clientX, y: e.clientY });
+        if (!rectRef.current) queueGuide({ x: e.clientX, y: e.clientY });
         return;
       }
       e.preventDefault();
@@ -62,14 +94,14 @@ export default function ScreenshotOverlay({
       const cy = clamp(e.clientY, 0, vh());
 
       if (d.kind === "draw") {
-        setRect({
+        queueRect({
           x: Math.min(d.sx, cx),
           y: Math.min(d.sy, cy),
           w: Math.abs(cx - d.sx),
           h: Math.abs(cy - d.sy),
         });
       } else if (d.kind === "move") {
-        setRect({
+        queueRect({
           ...d.rect,
           x: clamp(cx - d.ox, 0, vw() - d.rect.w),
           y: clamp(cy - d.oy, 0, vh() - d.rect.h),
@@ -89,14 +121,23 @@ export default function ScreenshotOverlay({
           h = h + (y - ny);
           y = ny;
         }
-        setRect({ x, y, w, h });
+        queueRect({ x, y, w, h });
       }
     };
 
     const onUp = () => {
       const d = dragRef.current;
       dragRef.current = null;
-      if (d?.kind === "draw" && rectRef.current && (rectRef.current.w < MIN || rectRef.current.h < MIN)) {
+      // A queued move means the drag's latest position hasn't committed yet —
+      // read it BEFORE flushing, while `active` still marks it as this drag's.
+      const live = nextRect.current.active ? nextRect.current.v : rectRef.current;
+      // Commit the final frame synchronously — capture must use the position
+      // under the pointer, not the one from the last painted frame.
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+        flushFrame.current();
+      }
+      if (d?.kind === "draw" && live && (live.w < MIN || live.h < MIN)) {
         setRect(null); // tap without drag → reset
       }
     };
@@ -110,6 +151,10 @@ export default function ScreenshotOverlay({
     window.addEventListener("pointerup", onUp);
     window.addEventListener("keydown", onKey);
     return () => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = 0;
+      }
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("keydown", onKey);

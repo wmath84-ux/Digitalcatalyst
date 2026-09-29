@@ -128,6 +128,10 @@ export interface PersonalAiAnswerResult {
    * be explained to the learner instead of reading like a permissions problem.
    */
   scopeNote?: string;
+  /** Images the model actually looked at for this answer (captures, uploads, resource images). */
+  imagesRead?: number;
+  /** True when images were attached but the model couldn't see — the answer fell back to text only. */
+  visionSkipped?: boolean;
   provider: string;
   model: string;
   aiSource: "own" | "default";

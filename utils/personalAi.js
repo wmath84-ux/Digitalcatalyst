@@ -52,7 +52,7 @@ export const PERSONAL_AI_READABLE_STATES = ["ready", "partial"];
 export const PERSONAL_AI_READ_KINDS = AI_READ_KINDS;
 
 /** Extraction outcomes reported by the server content service. */
-export const PERSONAL_AI_OUTCOMES = ["ok", "empty", "invalid", "permission", "error", "skipped", "pending", "unsupported"];
+export const PERSONAL_AI_OUTCOMES = ["ok", "empty", "invalid", "permission", "error", "skipped", "pending", "visual", "unsupported"];
 
 /** Grounding corpus caps — keep every request small and predictable. */
 export const PERSONAL_AI_MAX_CONTEXT_CHARS = 18000;
@@ -114,6 +114,34 @@ const asArray = (value) => (Array.isArray(value) ? value : []);
 export const cleanAiText = (value, max = 0) => {
   const text = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
   return max > 0 ? text.slice(0, max) : text;
+};
+
+/**
+ * Clean a full MODEL ANSWER while keeping its structure.
+ *
+ * `cleanAiText` collapses every newline run into one space, which is right
+ * for titles, follow-ups and grounding snippets — but applied to an answer
+ * body it crushes paragraphs and `- ` bullet lines into a single dummy
+ * paragraph, and no renderer can resurrect structure that never arrives.
+ * This is the ONLY cleaner the `answer` field may pass through: it trims
+ * each line, folds 3+ blank lines into one paragraph break, squeezes runs of
+ * spaces/tabs (never across a newline), and caps the length on a paragraph
+ * boundary when it can.
+ */
+export const cleanAiAnswerText = (value, max = 0) => {
+  let text = String(value == null ? "" : value).replace(/\r\n?/g, "\n");
+  text = text
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").replace(/\u00a0/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!(max > 0) || text.length <= max) return text;
+  const cut = text.lastIndexOf("\n\n", max);
+  if (cut > max * 0.5) return text.slice(0, cut).trim();
+  const space = text.lastIndexOf(" ", max);
+  if (space > max * 0.5) return text.slice(0, space).trim();
+  return text.slice(0, max).trim();
 };
 
 /** Strip markup so only prose reaches the model (and the UI). */
@@ -223,6 +251,20 @@ export const personalAiState = (input) => {
       state: "ready",
       readable: true,
       reason: `Text read from this ${label}.`,
+      chars,
+      authored,
+      type,
+      typeLabel: label,
+    };
+  }
+  if (status === "visual") {
+    // The link was verified to serve a real image: there is no text to count,
+    // but the model looks at the bytes with vision every time you ask, so the
+    // file IS readable — just not through characters.
+    return {
+      state: "ready",
+      readable: true,
+      reason: `Image read visually when you ask about this ${label}.`,
       chars,
       authored,
       type,
@@ -718,10 +760,15 @@ export const buildPersonalAiAskPrompt = (input) => {
     const message = asRecord(row);
     return `${message.role === "assistant" ? "Tutor" : "Learner"}: ${cleanAiText(message.text, 900)}`;
   }).filter((line) => line.split(": ")[1]);
+  const attachedImages = asArray(options.images).map((name) => cleanAiText(name, 80)).filter(Boolean);
+  const visionLine = attachedImages.length
+    ? `Attached images (${attachedImages.length}): ${attachedImages.map((name) => `"${name}"`).join(", ")} — look at each image and use what you see alongside the CONTENT block; say briefly what each image shows when it matters for the answer, and set grounded true when the images support it.`
+    : "";
   return [
     contentBlock(options.chunks, options.coverage, String(options.scopeLabel || "module")),
     history.length ? `EARLIER IN THIS CONVERSATION (context only, not new content):\n${history.join("\n")}` : "",
     `LEARNER'S QUESTION: ${question}`,
+    visionLine,
     "Answer in the learner's own language when the question is not in English (Hinglish is fine).",
     "Return JSON: {\"answer\":\"...\",\"sources\":[\"unit-id\",...],\"grounded\":true|false,\"followUps\":[\"...\"]}",
     "- answer: 40-220 words of plain prose. Use short bullet lines with a leading '- ' where a list genuinely helps.",
@@ -867,7 +914,7 @@ const normalizeSourceIds = (value, known) => {
 /** `{ answer, sources, grounded, followUps }` */
 export const normalizePersonalAiAnswer = (raw, knownUnitIds) => {
   const row = asRecord(raw);
-  const answer = cleanAiText(row.answer || row.text || row.response, 4000);
+  const answer = cleanAiAnswerText(row.answer || row.text || row.response, 4000);
   return {
     answer,
     sources: normalizeSourceIds(row.sources, knownUnitIds),

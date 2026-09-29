@@ -86,6 +86,14 @@ export const AI_FILE_LABELS = Object.freeze({
  *   in-document   — the readable text is ALREADY inside the resource document
  *                   (practice questions, a transcript the owner pasted, the
  *                   learner's own mind-map topics). No network, ever.
+ *   image-link    — the URL is fetched and its bytes are read VISUALLY by the
+ *                   model at ask time (vision), not turned into text. The
+ *                   extractor only verifies the link really serves an image.
+ *   download      — fetch the bytes, then dispatch on what they actually are:
+ *                   an Office document (docx/xlsx/pptx), a PDF served without
+ *                   its extension, a code/text file, or a public article page
+ *                   whose main text is stripped and quality-gated. This is how
+ *                   uploads with extensionless storage URLs stay readable.
  *   none          — no legitimate read path exists for this file.
  */
 export const AI_READ_KINDS = Object.freeze([
@@ -94,6 +102,8 @@ export const AI_READ_KINDS = Object.freeze([
   "caption-file",
   "text-file",
   "in-document",
+  "image-link",
+  "download",
   "none",
 ]);
 
@@ -200,12 +210,13 @@ export const AI_FILE_READERS = Object.freeze({
       "I couldn't read text out of this e-book. PDFs are read directly; an EPUB behind a login or a scan isn't — a screenshot of the passage works.",
   }),
   image: entry("image", {
-    via: "none",
+    via: "image-link",
     payload: true,
+    hasReadPath: true,
     visual: true,
     fallback: "screenshot",
     reason:
-      "I can't see the contents of this image — the app has no text-recognition path for it yet. Capture the area you mean and I'll work from what you send.",
+      "I read images visually — open this image and ask, or capture the part you mean, and I'll look at it directly.",
   }),
   google_form: entry("google_form", {
     via: "none",
@@ -216,12 +227,13 @@ export const AI_FILE_READERS = Object.freeze({
       "A form's questions and responses belong to its owner, so they are never read from here. Screenshot the exact question and I'll help with that one.",
   }),
   embed: entry("embed", {
-    via: "none",
+    via: "download",
     payload: true,
+    hasReadPath: true,
     visual: true,
     fallback: "screenshot",
     reason:
-      "This is an embedded third-party page, so only its title is visible to me — its contents are never scraped. A screenshot of the part you mean lets me help properly.",
+      "I can only read this page's public article text — app screens and login-walled pages have nothing readable in them. A screenshot of the part you mean works.",
   }),
   mindmap: entry("mindmap", {
     via: "in-document",
@@ -308,14 +320,28 @@ export const googleFileIdFromUrl = (rawUrl) => {
 /** Any host that is a Google Docs-family host (used by the extractor's hints). */
 export const isGoogleFileUrl = (rawUrl) => Boolean(googleFileIdFromUrl(rawUrl));
 
-/** Links that are plain prose — the extension, not the label, decides. */
-export const AI_TEXT_EXTENSIONS = /\.(txt|md|markdown|csv|tsv|html?|xml|json|log|rtf)$/i;
+/**
+ * Links that are plain prose — the extension, not the label, decides.
+ * Code files are text: a `.py` or `.java` handout reads exactly like the
+ * `.md` next to it, so every common source extension is covered.
+ */
+export const AI_TEXT_EXTENSIONS = /\.(txt|md|markdown|csv|tsv|html?|xml|json|jsonl|ndjson|log|rtf|tex|r|js|jsx|mjs|cjs|ts|tsx|mts|cts|py|pyw|java|kt|kts|scala|c|h|cpp|hpp|cc|cs|go|rs|rb|swift|sql|sh|bash|zsh|ps1|ya?ml|toml|ini|cfg|conf|css|scss|less|vue|svelte|dart|lua|ipynb)$/i;
 
 /** Caption/transcript containers. */
 export const AI_CAPTION_EXTENSIONS = /\.(vtt|srt|subrip|webvtt)$/i;
 
 /** Direct-media links, recognised so a caption plan never guesses at them. */
 export const AI_MEDIA_EXTENSIONS = /\.(mp4|m4v|webm|mov|mkv|mp3|m4a|aac|ogg|oga|wav|opus)$/i;
+
+/**
+ * Office uploads — read from the file's own bytes (never through a viewer).
+ * `.doc` is the legacy binary format: it routes here so the extractor can say
+ * \"re-save as .docx\" instead of calling an unreadable file unknown.
+ */
+export const AI_OFFICE_EXTENSIONS = /\.(docx|xlsx|pptx|ppsx|xls|doc)$/i;
+
+/** Raster images the model reads visually (see the `image-link` kind). */
+export const AI_IMAGE_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
 
 const extensionOf = (rawUrl) => {
   const clean = String(rawUrl || "").trim().split("#")[0].split("?")[0];
@@ -474,10 +500,13 @@ export const aiCaptionUrl = (resource) => {
  *   1. `in-document` — the text is already here; never spend a network call
  *      (or a permission problem) on content we already hold.
  *   2. `caption-file` — an explicit transcript link, for any type.
- *   3. the type's own path (Google export / PDF bytes).
- *   4. extension fallback — a link ending in .txt/.md/.html is text whatever
- *      the label says, and a `.vtt`/`.srt` is a transcript.
- *   5. `none` + the registry's honest reason for that type.
+ *   3. the type's own path (Google export / PDF bytes / image-link).
+ *   4. extension fallback — a link ending in .txt/.md/.html/.py is text
+ *      whatever the label says, a `.vtt`/`.srt` is a transcript, an Office
+ *      file reads from its own bytes, and an image reads visually.
+ *   5. `download` — an embed (or unknown type) behind an extensionless https
+ *      URL gets one honest attempt: the bytes decide what they are.
+ *   6. `none` + the registry's honest reason for that type.
  *
  * `noUrl` is reported separately from `unsupported` so "the admin never
  * attached a link" and "this kind of file can't be read" don't become the same
@@ -536,17 +565,35 @@ export const aiReadPlan = (resource) => {
     return none("This link isn't on https, so the app won't open it. Publish it behind https and I can read it.");
   }
 
+  // Uploads often live behind extensionless storage URLs (`…/o/handout?alt=media`),
+  // while the resource's own NAME still says what the file is ("notes.docx").
+  // The URL's extension wins; the name is the fallback witness — never the
+  // other way round, so a file can never be misread because of its label.
+  const meta = asRecord(row.metadata);
+  const namePath = [row.name, row.fileName, row.file, meta.fileName, meta.originalName, meta.name]
+    .map((candidate) => String(candidate || "").trim())
+    .find((candidate) => candidate.includes("."))
+    || "";
+  const isTextLike = AI_TEXT_EXTENSIONS.test(path) || (namePath ? AI_TEXT_EXTENSIONS.test(namePath) : false);
+  const isOfficeLike = AI_OFFICE_EXTENSIONS.test(path) || (namePath ? AI_OFFICE_EXTENSIONS.test(namePath) : false);
+  const isImageLike = AI_IMAGE_EXTENSIONS.test(path) || (namePath ? AI_IMAGE_EXTENSIONS.test(namePath) : false);
+  const mediaOnly = type === "youtube" || type === "video" || type === "audio" || type === "google_form";
+
   // A link that IS a text or caption document is read as one, whatever the
   // resource is labelled — an ".md" attached under "Google Doc" is still
   // markdown, and calling that unreadable is how a learner ends up being told
-  // the assistant cannot see content sitting in plain view.
-  if (AI_CAPTION_EXTENSIONS.test(path)) return { kind: "caption-file", url, format: "vtt", reason: "", via: reader.via };
-  if (AI_TEXT_EXTENSIONS.test(path)) return { kind: "text-file", url, format: "text", reason: "", via: reader.via };
+  // the assistant cannot see content sitting in plain view. Forms are the one
+  // exception: a form's refusal is total by privacy design, no matter what its
+  // link ends in (owner-pasted text in the document itself still reads).
+  if (type !== "google_form" && AI_CAPTION_EXTENSIONS.test(path)) return { kind: "caption-file", url, format: "vtt", reason: "", via: reader.via };
+  if (type !== "google_form" && isTextLike) return { kind: "text-file", url, format: "text", reason: "", via: reader.via };
 
   if (googleExport) {
     // A "Google Doc" that is not a Google file: a deck or handout published as a
     // PDF under a Google label is common in this app, and the bytes win.
     if (/\.pdf$/i.test(path)) return { kind: "pdf-bytes", url, format: "pdf", reason: "", via: reader.via };
+    // …and an Office upload filed under a Google label reads from its own bytes.
+    if (isOfficeLike) return { kind: "download", url, format: "office", reason: "", via: reader.via };
     return none(`This ${reader.label} link isn't a Google file I can open, so there's nothing for me to read from it.`);
   }
 
@@ -558,6 +605,27 @@ export const aiReadPlan = (resource) => {
   }
 
   if (reader.via === "text-file") return { kind: "text-file", url, format: "text", reason: "", via: reader.via };
+
+  // An image IS its own read path now: the model looks at the bytes with
+  // vision at ask time. A Drive view-link serves HTML, never bytes, so it is
+  // rewritten to the direct download first — exactly like a Drive PDF.
+  if (!mediaOnly && (type === "image" || isImageLike)) {
+    const direct = type === "image" && fileId && !AI_IMAGE_EXTENSIONS.test(path) ? driveDownloadUrl(fileId) : url;
+    return { kind: "image-link", url: direct, format: "image", reason: "", via: reader.via };
+  }
+
+  // An Office upload reads from its own bytes whatever the label says.
+  if (!mediaOnly && isOfficeLike) return { kind: "download", url, format: "office", reason: "", via: reader.via };
+
+  // An embed — or a type nobody has heard of — behind an extensionless https
+  // URL gets ONE honest attempt: fetch the bytes and dispatch on what they
+  // actually are (article text, a PDF without its extension, a code file).
+  // Anything with an extension we do not read (.bin, .exe, .zip of unknowns)
+  // stays `none`, so "can't be read" is never a guess.
+  const knownType = Boolean(AI_FILE_READERS[type]);
+  if (!mediaOnly && (type === "embed" || !knownType) && !/\.[a-z0-9]{1,8}$/i.test(path)) {
+    return { kind: "download", url, format: "sniff", reason: "", via: reader.via };
+  }
 
   // A media file itself is never a read path — say so in the type's own words,
   // which name the one thing that would change the answer (a transcript).
@@ -639,15 +707,18 @@ export const parseCaptionText = (raw) => {
 export const aiCapabilitiesFor = (type) => {
   const reader = aiReaderFor(type);
   const links = reader.via !== "none";
+  // An image is read by looking, not by text: it has a real pipeline
+  // (`serverAnalyzable`) but contributes no text chunks to retrieval.
+  const visionOnly = reader.via === "image-link";
   return {
     label: reader.label,
-    text: links || reader.payload,
+    text: visionOnly ? false : links || reader.payload,
     metadata: true,
     position: reader.captions || reader.via === "pdf-bytes" || type === "slides",
     pages: reader.via === "pdf-bytes",
     slides: type === "slides",
     transcript: reader.captions,
-    searchableChunks: links || reader.payload,
+    searchableChunks: visionOnly ? false : links || reader.payload,
     visual: reader.visual,
     original: reader.via !== "none",
     serverAnalyzable: reader.hasReadPath,
