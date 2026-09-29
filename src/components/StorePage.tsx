@@ -8,6 +8,7 @@ import ProductCard from "./ProductCard";
 import TiltedCoverflow from "./TiltedCoverflow";
 import { EmptyState } from "./ui/EmptyState";
 import { GlassCard } from "./ui/GlassCard";
+import { GlassButton } from "./ui/glass-button";
 import Skeleton from "./ui/Skeleton";
 import { BookOpenIcon } from "./icons";
 import { useStoreFilters } from "../hooks/useStoreFilters";
