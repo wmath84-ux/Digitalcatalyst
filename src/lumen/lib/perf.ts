@@ -89,9 +89,16 @@ export const perf = {
 };
 
 /**
- * Split streaming text into a stable prefix (whole paragraphs, safe to
- * markdown-render once per paragraph) and a volatile tail (rendered as
- * cheap plain text while streaming). Keeps code fences intact.
+ * Split streaming text into a stable prefix (every COMPLETE line, safe to
+ * markdown-render) and a volatile tail (the line still being typed, rendered as
+ * cheap plain text while streaming). An unclosed code fence stays whole in the
+ * tail, so half a program is never parsed as prose.
+ *
+ * The split used to fall at the last BLANK line. Structured answers are made of
+ * blocks with no blank line inside — a numbered walkthrough, a bullet list, a
+ * table — so the learner watched raw `**`, backticks and `| --- |` pipes for the
+ * whole block before it snapped into shape. Completed lines now render as they
+ * land, so the layout materialises line by line instead.
  */
 export function splitStable(text: string): { stable: string; tail: string } {
   const fenceHits = text.match(/```/g)?.length ?? 0;
@@ -100,7 +107,7 @@ export function splitStable(text: string): { stable: string; tail: string } {
     const start = text.lastIndexOf("```");
     return { stable: text.slice(0, start).trimEnd(), tail: text.slice(start) };
   }
-  const idx = text.lastIndexOf("\n\n");
+  const idx = text.lastIndexOf("\n");
   if (idx <= 0) return { stable: "", tail: text };
-  return { stable: text.slice(0, idx).trimEnd(), tail: text.slice(idx + 2) };
+  return { stable: text.slice(0, idx).trimEnd(), tail: text.slice(idx + 1) };
 }

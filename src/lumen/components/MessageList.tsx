@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, ArrowUpRight, Binary, Check, Copy, ImagePlay, ListChecks, RotateCcw, SquareFunction, TriangleAlert,
+  ArrowDown, ArrowUpRight, Check, Copy, ImagePlay, RotateCcw, TriangleAlert,
 } from "lucide-react";
 import type { Attachment, Chat, Message, Tier } from "../lib/types";
 import { tierLte } from "../lib/tier";
@@ -279,15 +279,7 @@ function MessageCell({ children }: { children: React.ReactNode }) {
 
 /* ── empty state ────────────────────────────────────────────── */
 
-const SUGGESTIONS = [
-  { icon: Binary, label: "Explain binary search simply", tag: "CS 101 · Algorithms", prompt: "Explain binary search simply — I keep mixing up the pointers." },
-  { icon: ListChecks, label: "Practice quiz — answer right here", tag: "BIO 110 · Cell Biology", prompt: "Give me a practice quiz on Chapter 4: Photosynthesis." },
-  { icon: ImagePlay, label: "Draw a diagram of the Calvin cycle", tag: "Generates an image", prompt: "Draw a diagram of photosynthesis and the Calvin cycle." },
-  { icon: SquareFunction, label: "Compare the chain and product rules", tag: "MATH 121 · Calculus I", prompt: "What is the difference between the chain rule and the product rule?" },
-];
-
-function EmptyState({ tier, courseShort, onSuggestion }: { tier: Tier; courseShort: string; onSuggestion: (text: string) => void }) {
-  const small = tierLte(tier, "sm");
+function EmptyState({ tier, courseShort }: { tier: Tier; courseShort: string }) {
   const micro = tier === "xxs";
   return (
     <div className="flex min-h-full flex-1 flex-col items-center justify-center px-4 py-8 text-center">
@@ -309,19 +301,6 @@ function EmptyState({ tier, courseShort, onSuggestion }: { tier: Tier; courseSho
           Ask about any lesson in {courseShort}, paste a problem, or share a screenshot of where you're stuck.
         </p>
       )}
-      <div className={cn("stagger mt-6 grid w-full gap-2", small ? "max-w-[420px] grid-cols-1" : "mt-8 max-w-[600px] grid-cols-2")}>
-        {SUGGESTIONS.map(({ icon: Icon, label, tag, prompt }) => (
-          <button key={label} type="button" onClick={() => onSuggestion(prompt)} className="suggestion focus-ring">
-            <span className="suggestion__icon" aria-hidden="true">
-              <Icon size={15.5} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[13px] font-medium text-[--ink]">{label}</span>
-              {!micro && <span className="mt-px block truncate text-[11px] text-[--ink-3]">{tag}</span>}
-            </span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -368,12 +347,11 @@ function Sentinel({
 /* ── the scrollable conversation ────────────────────────────── */
 
 export default function MessageList({
-  chat, tier, generating, onSuggestion, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp, onOpenPlans,
+  chat, tier, generating, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp, onOpenPlans,
 }: {
   chat: Chat;
   tier: Tier;
   generating: boolean;
-  onSuggestion: (text: string) => void;
   onRetry: (id: string) => void;
   onImageClick: (a: Attachment) => void;
   onToggleThinking: (id: string) => void;
@@ -486,7 +464,7 @@ export default function MessageList({
       >
         <div className={cn("mx-auto flex min-h-full w-full flex-col", tierLte(tier, "sm") ? "max-w-none" : "max-w-[820px]", pad, tier === "xxs" ? "pb-4 pt-3" : "pb-8 pt-5")}>
           {chat.messages.length === 0 ? (
-            <EmptyState tier={tier} courseShort={chat.courseShort} onSuggestion={onSuggestion} />
+            <EmptyState tier={tier} courseShort={chat.courseShort} />
           ) : (
             <div className={cn("flex flex-col", tier === "xxs" ? "gap-5" : tierLte(tier, "sm") ? "gap-6" : "gap-7")}>
               <Sentinel

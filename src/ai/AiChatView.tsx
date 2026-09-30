@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BookmarkPlus, ChevronDown, Copy, HelpCircle, Lightbulb, MessageCircleQuestion,
+  BookmarkPlus, ChevronDown, Copy, HelpCircle, Info, Lightbulb, MessageCircleQuestion,
   RotateCcw, Send, Sparkles, TriangleAlert,
 } from "lucide-react";
 import { toast } from "../components/ui/glass-toast";
@@ -16,7 +16,9 @@ import {
   AiActionButton, AiBusyRow, AiCoverageLine, AiEmptyState, AiFailureBanner, AiProse,
   AiSourceChips, useStickToBottom,
 } from "./components";
+import { AiMarkdown } from "./AiMarkdown";
 import { saveAiNote } from "./aiNotes";
+import { mentorMarkdownToPlainText } from "../../utils/mentorAnswer";
 import type { ModuleAiController } from "./useModuleAi";
 import type { PersonalAiThreadMessage } from "./types";
 
@@ -83,11 +85,10 @@ export default function AiChatView({
     setPendingQuestion(trimmed);
     setDraft("");
     setSentOnce(true);
-    const result = await ai.ask(trimmed);
+    // An answer that is not grounded in the files is the mentor teaching from its
+    // own knowledge, not a failure — the answer card itself says where it came from.
+    await ai.ask(trimmed);
     setPendingQuestion(null);
-    if (result && !result.grounded) {
-      toast({ title: "Answered from limited material", description: "The readable content didn't fully cover this question.", variant: "info" });
-    }
   }, [ai]);
 
   // "Ask AI about this" from the resource viewer arrives with a pre-filled
@@ -122,17 +123,13 @@ export default function AiChatView({
         tone: "violet" as const,
       };
     }
-    if (!ai.hasReadableContent) {
-      return {
-        title: "Nothing readable in this module yet",
-        message: "I can see your resources, but I couldn't read any content to ground an answer in. Add a description to a resource, save a note, or open a readable file (a PDF, or a Google Doc shared with 'anyone with the link').",
-        primaryLabel: undefined,
-        onPrimary: undefined,
-        tone: "amber" as const,
-      };
-    }
     return null;
-  }, [ai.hasReadableContent, ai.phase, ai.snapshot?.ai, onConfigureAi, onOpenUpgrade]);
+  }, [ai.phase, ai.snapshot?.ai, onConfigureAi, onOpenUpgrade]);
+
+  // Nothing readable is NOT a reason to stop answering: the mentor teaches from
+  // its own knowledge. It used to replace the composer with a dead-end card; now
+  // it is a notice above an input that still works.
+  const noReadableNotice = ai.phase === "ready" && !gate && !ai.hasReadableContent;
 
   const prompts = resourceTitle ? RESOURCE_PROMPTS : STARTER_PROMPTS;
   const unreadable = ai.snapshot?.unreadable || [];
@@ -145,7 +142,8 @@ export default function AiChatView({
       moduleId,
       resourceId: message.resourceId,
       title: ai.snapshot?.scope.title || "My module",
-      body: message.text,
+      // Notes are plain text: keep the words and the list/step shape, drop the Markdown marks.
+      body: mentorMarkdownToPlainText(message.text),
       kind: "answer",
     });
     if (saved) {
@@ -157,7 +155,7 @@ export default function AiChatView({
   };
 
   const dontUnderstand = async (message: PersonalAiThreadMessage) => {
-    const topic = message.sources[0]?.label || message.text.slice(0, 60) || "This topic";
+    const topic = message.sources[0]?.label || mentorMarkdownToPlainText(message.text).slice(0, 60) || "This topic";
     await ai.recordEvidence("dont_understand", topic, message.resourceId);
     toast({ title: "Noted as a weak topic", description: `Keep going — “${topic}” will show up in Weak Topics.`, variant: "info" });
   };
@@ -186,11 +184,17 @@ export default function AiChatView({
                 </p>
                 <p className="mt-2 text-[13px] font-medium leading-6 text-white/75">
                   {resourceTitle
-                    ? `Questions here are scoped to “${resourceTitle}” first. I only use content I could actually read from it.`
-                    : "Ask anything about the material in this module. I answer only from what I could actually read, and I show you exactly which resource each part came from."}
+                    ? `Questions here are scoped to “${resourceTitle}” first. I use what I could read from it, and my own subject knowledge when it doesn't cover your question.`
+                    : "Ask anything about this module's topic. I use your material when it covers the question, my own subject knowledge when it doesn't — and I tell you which one you're getting."}
                 </p>
                 {ai.coverageSentence ? <AiCoverageLine coverage={ai.snapshot!.coverage} note={ai.scopeNote} className="mt-2.5" /> : null}
               </div>
+              {noReadableNotice ? (
+                <p className="flex items-start gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-bold leading-4 text-white/70" data-module-ai-notice="">
+                  <Info size={13} className="mt-0.5 shrink-0 text-violet-300" />
+                  <span>I couldn't read any files in this module yet, so I'll answer from my own subject knowledge. Add a description or a note, or open a readable file (a PDF, or a Google Doc shared with “anyone with the link”), and I'll tie answers to your material.</span>
+                </p>
+              ) : null}
               <div className="grid gap-2 sm:grid-cols-2">
                 {prompts.map((prompt) => (
                   <button
@@ -227,11 +231,11 @@ export default function AiChatView({
               <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white/35">
                 {message.role === "user" ? "You" : resourceTitle ? `AI · ${resourceTitle}` : "AI tutor"}
               </p>
-              {message.role === "assistant" ? <AiProse text={message.text} /> : <p className="whitespace-pre-wrap break-words text-[13px] font-medium leading-[1.65] text-white/85">{message.text}</p>}
+              {message.role === "assistant" ? <AiMarkdown text={message.text} /> : <p className="whitespace-pre-wrap break-words text-[13px] font-medium leading-[1.65] text-white/85">{message.text}</p>}
               {message.role === "assistant" && !message.grounded ? (
-                <p className="mt-2.5 flex items-start gap-2 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-[11px] font-bold leading-4 text-amber-100">
-                  <TriangleAlert size={13} className="mt-0.5 shrink-0" />
-                  <span>This wasn't covered by the readable content in this module, so treat it as a pointer rather than a fact from your material.</span>
+                <p className="mt-2.5 flex items-start gap-2 rounded-2xl border border-violet-400/20 bg-violet-500/[0.08] px-3 py-2 text-[11px] font-bold leading-4 text-violet-100" data-ai-general-knowledge="">
+                  <Info size={13} className="mt-0.5 shrink-0" />
+                  <span>This wasn't in your module's files, so I answered from general knowledge. Check it against your own material when it matters.</span>
                 </p>
               ) : null}
               {message.role === "assistant" && message.sources.length ? (
@@ -264,7 +268,7 @@ export default function AiChatView({
                               const lastUser = [...messages].reverse().find((row) => row.role === "user");
                               void ai.explainAgain({
                                 question: lastUser?.text || message.text.slice(0, 200),
-                                answer: message.text,
+                                answer: mentorMarkdownToPlainText(message.text),
                                 mode: mode.id,
                               }).then((result) => {
                                 if (result) toast({ title: `Explained · ${mode.label}`, variant: "success" });
@@ -318,7 +322,7 @@ export default function AiChatView({
                 </p>
               ) : null}
               {!ai.explanation.grounded ? (
-                <p className="mt-2 text-[11px] font-bold leading-4 text-amber-200">This concept isn't really covered by the readable content here.</p>
+                <p className="mt-2 text-[11px] font-bold leading-4 text-violet-200">This isn't in your module's files, so it is explained from general knowledge.</p>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-1 border-t border-white/[0.07] pt-2.5">
                 {EXPLAIN_MODES.map((mode) => (
@@ -408,7 +412,7 @@ export default function AiChatView({
               </button>
             </div>
             <p className="py-2 text-[10px] font-medium leading-4 text-white/30">
-              Answers come only from what the AI could read in this module{ai.snapshot ? ` · ${ai.snapshot.coverage.readable}/${ai.snapshot.coverage.total} resources readable` : ""}. Ask again if a file was still being read.
+              Answers use what the AI could read in this module{ai.snapshot ? ` (${ai.snapshot.coverage.readable}/${ai.snapshot.coverage.total} resources readable)` : ""} and fall back to its own subject knowledge when your files don't cover the question. Ask again if a file was still being read.
               {ai.scopeNote ? <span className="text-white/40"> {ai.scopeNote}</span> : null}
             </p>
           </div>

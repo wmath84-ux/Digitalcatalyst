@@ -245,6 +245,14 @@ html.kb-open .lumen-root .composer-disclaimer {
 .md h3 { font-size: 1.06em; margin: 20px 0 7px; }
 .md h4 { font-size: 0.95em; margin: 18px 0 6px; }
 .md ul, .md ol { margin: 0 0 14px; padding-left: 1.35em; }
+/* Tailwind's preflight resets every list to `list-style: none`, and the marker
+   rule below only COLOURS a marker that was never drawn. Without these lines a
+   numbered walkthrough lost its numbers and a bullet list lost its dots — a
+   perfectly structured answer read as indented paragraphs, and a quiz's answer
+   key could not be matched to its questions. */
+.md ul { list-style: disc outside; }
+.md ol { list-style: decimal outside; }
+.md ul ul, .md ol ul { list-style-type: circle; }
 .md li { margin: 5px 0; }
 .md li::marker { color: var(--ink-3); font-weight: 500; }
 .md li > ul, .md li > ol { margin: 5px 0 8px; }
@@ -614,30 +622,6 @@ html.kb-open .lumen-root .composer-disclaimer {
 }
 
 /* ── empty state ─────────────────────────────────────────── */
-
-.suggestion {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 12px 14px;
-  border-radius: 13px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
-}
-.suggestion:hover { border-color: var(--border-2); background: var(--surface); box-shadow: var(--sh-sm); transform: translateY(-1px); }
-.suggestion:active { transform: translateY(0); }
-.suggestion__icon {
-  flex: none;
-  width: 32px; height: 32px;
-  border-radius: 9px;
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  display: flex; align-items: center; justify-content: center;
-}
 
 /* ── screenshot overlay ──────────────────────────────────── */
 
