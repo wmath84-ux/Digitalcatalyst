@@ -46,37 +46,18 @@ test("the Cart reference card is the bare pack surface, radius 32", () => {
   assert.match(cart, /text-sm leading-relaxed text-white\/55/);
 });
 
-test("every profile card is the Cart card's bare surface, radius 32", () => {
+test("every profile card wears the STORE glass via ProfileCard (brief 2026-09-30)", () => {
+  const card = read("src/profile/ProfileCard.tsx");
+  assert.match(card, /tintColor="173,216,255"/);
+  assert.match(card, /radius=\{22\}/);
+  assert.match(card, /dc-store-glass dc-scene-ink dc-profile-card/);
   for (const file of PROFILE_FILES) {
     const src = read(file);
-    // No wrapper, no material props, no re-skin hooks, no hover lift left.
-    assert.doesNotMatch(src, /<GlassCard/, `${file}: GlassCard wrapper left`);
-    assert.doesNotMatch(src, /tint=\{|tintColor|blur=\{/, `${file}: material override left`);
-    assert.doesNotMatch(src, /dc-rev-glass/, `${file}: revision glass left`);
-    assert.doesNotMatch(src, /dc-store-glass/, `${file}: store glass left`);
-    assert.doesNotMatch(src, /dc-scene-ink/, `${file}: text scrim left`);
-    assert.doesNotMatch(src, /dc-glass-card/, `${file}: card plate hook left`);
+    assert.doesNotMatch(src, /<GlassSurface|<GlassCard/, `${file}: raw surface left`);
     assert.doesNotMatch(src, /hover:-translate-y/, `${file}: hover lift left`);
   }
   const layout = read(PROFILE_FILES[0]);
-  const preview = read(PROFILE_FILES[1]);
-  // ProfileLayout's 9 surfaces (hero, 3 quick-stats via one component,
-  // membership, upgrade, referral, study library, courses, renewal,
-  // preferences) + ProfilePreview's 2 mock allowance cards: every one a
-  // radius-32 surface. Count the prop (the doc comment spells "radius 32"
-  // without braces, so it cannot inflate this).
-  const countRadius = (src) => (src.match(/radius=\{32\}/g) || []).length;
-  assert.equal(countRadius(layout), 9, `ProfileLayout: expected 9 radius-32 surfaces, found ${countRadius(layout)}`);
-  assert.equal(countRadius(preview), 2, `ProfilePreview: expected 2 radius-32 surfaces, found ${countRadius(preview)}`);
-  // The surfaces still carry the page's data hooks and content padding.
-  for (const hook of [
-    "data-profile-hero",
-    "data-profile-membership-card",
-    "data-profile-upgrade-card",
-    "data-profile-referral",
-    "data-profile-study-library",
-    "data-renewal-card",
-  ]) {
+  for (const hook of ["data-profile-hero","data-profile-membership-card","data-profile-upgrade-card","data-profile-referral","data-profile-study-library","data-renewal-card"]) {
     assert.ok(layout.includes(hook), `ProfileLayout keeps ${hook}`);
   }
   assert.match(layout, /contentClassName="p-5"/);
@@ -94,11 +75,9 @@ test("profile card titles wear the Cart title's font-bold weight", () => {
   assert.match(layout, /text-base font-bold/, "card titles");
 });
 
-test("the My Day allowance card (profile-only) wears the same surface", () => {
+test("the My Day allowance card (profile-only) wears the profile card", () => {
   const src = read("src/components/MyDayAllowanceCard.tsx");
-  assert.match(src, /<GlassSurface radius=\{32\}/);
-  assert.doesNotMatch(src, /tint=\{|tintColor|blur=\{/);
-  assert.doesNotMatch(src, /dc-rev-glass|dc-store-glass|dc-scene-ink|dc-glass-card/);
+  assert.match(src, /ProfileCard as GlassSurface/);
   assert.doesNotMatch(src, /<h[23][^>]*font-black/);
   assert.match(src, /text-lg font-bold/);
 });
@@ -111,8 +90,8 @@ test("the AI quota card follows the profile only when asked", () => {
   assert.match(src, /material = "store"/);
   assert.match(src, /radius=\{cartGlass \? 32 : 24\}/);
   assert.match(src, /className=\{cartGlass \? "text-white" : "dc-glass-card dc-store-glass dc-scene-ink relative text-white"\}/);
-  // The Profile page opts in; the Revision page keeps the default.
-  assert.match(read("src/profile/App.tsx"), /<AiQuotaCard uid=\{user\.id\} material="cart" \/>/);
+  // Profile now uses the default store material, like Revision.
+  assert.match(read("src/profile/App.tsx"), /<AiQuotaCard uid=\{user\.id\} \/>/);
   assert.doesNotMatch(
     read("src/revision/pages/RevisionProfilePage.tsx"),
     /<AiQuotaCard[^>]*material=/,
@@ -129,6 +108,6 @@ test("the shared material still comes from ONE module — ui/glass", () => {
   assert.match(engine, /blur = 14/, "default blur");
   assert.match(engine, /saturation = 1\.6/, "default saturation");
   for (const file of [...PROFILE_FILES, "src/components/MyDayAllowanceCard.tsx", "src/components/AiQuotaCard.tsx"]) {
-    assert.match(read(file), /from "\.\.\/components\/ui\/glass"|from "\.\/ui\/glass"/, `${file} imports the pack surface`);
+    assert.match(read(file), /from "\.\.\/components\/ui\/glass"|from "\.\/ui\/glass"|ProfileCard"/, `${file} imports the pack surface`);
   }
 });

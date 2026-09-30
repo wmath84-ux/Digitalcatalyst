@@ -322,7 +322,7 @@ export default function ProfileApp() {
                 onSubscribe={openPlans}
               />
             }
-            aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} material="cart" /> : null}
+            aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
             onOpenStudyLibrary={() => { window.location.hash = "#/study-library"; }}
             library={{
               items: purchasedProducts.map((p) => ({ id: p.id, title: p.title, image: p.image })),

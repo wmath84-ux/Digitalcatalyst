@@ -1,5 +1,5 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
-import { GlassSurface } from "../components/ui/glass";
+import { ProfileCard } from "./ProfileCard";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -74,7 +74,7 @@ const TIER_ICONS: Record<MembershipTier, ReactNode> = {
    Phase A (owner direction): every action is the pack's <GlassButton
    variant="capsule"> (websiteglass.com). Only ink + spacing tokens remain
    here. Updated (owner brief 2026-09-29, cart card → profile): every card is
-   the pack's bare <GlassSurface> at its defaults with radius 32 — EXACTLY
+   the pack's bare <ProfileCard> at its defaults with radius 32 — EXACTLY
    the material of the Cart empty-state "Continue Shopping" card
    (src/cartWishlist/components/EmptyState.tsx): frost blur 9.8px + saturate
    1.3, flat rgba(60,62,68,0.21) tint, the pack sheen + rim — with NO re-skin
@@ -209,9 +209,9 @@ export default function ProfileLayout({
       {/* ── Page header ── */}
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <p className={EYEBROW}>Your space</p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight text-white md:text-3xl">Profile</h1>
-          <p className="mt-0.5 text-xs font-medium text-white/55 md:text-sm sm:text-[0.8rem]">Account, plan and library — in one place.</p>
+          <p className={`dc-scene-ink ${EYEBROW}`}>Account overview</p>
+          <h1 className="dc-scene-ink dc-profile-title mt-1">My profile</h1>
+          <p className="dc-scene-ink mt-1 text-sm font-medium text-white/85">Account, plan and library — in one place.</p>
         </div>
         <div className="flex items-center gap-2 pb-0.5">
           {membershipBadge}
@@ -308,7 +308,7 @@ export default function ProfileLayout({
           onOpenPurchases={library.onOpenPurchases}
         />
 
-        <GlassSurface radius={32} className="text-white" contentClassName="p-5">
+        <ProfileCard className="text-white" contentClassName="p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={EYEBROW}>Preferences</p>
@@ -323,7 +323,7 @@ export default function ProfileLayout({
               <Bell size={18} />
             </GlassButton>
           </div>
-        </GlassSurface>
+        </ProfileCard>
 
         <GlassButton
           variant="capsule"
@@ -380,10 +380,10 @@ function ProfileHero({
   const [brokenPhoto, setBrokenPhoto] = useState("");
   const showPhoto = Boolean(src) && src !== brokenPhoto;
   return (
-    <GlassSurface data-profile-hero radius={32} className="relative overflow-hidden text-white" contentClassName="p-5">
+    <ProfileCard data-profile-hero className="relative overflow-hidden text-white" contentClassName="p-5">
       <div className="relative">
         <div className="flex items-center gap-4">
-          <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
+          <div className="shrink-0 rounded-full p-[3px] ring-2 ring-white/40 shadow-[0_10px_26px_-12px_rgba(2,6,16,0.9)]">
             {showPhoto ? (
               <img
                 src={src}
@@ -391,14 +391,14 @@ function ProfileHero({
                 decoding="async"
                 width={80}
                 height={80}
-                className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20"
+                className="h-16 w-16 rounded-full object-cover md:h-20 md:w-20"
                 referrerPolicy="no-referrer"
                 draggable={false}
                 data-profile-photo
                 onError={() => setBrokenPhoto(src)}
               />
             ) : (
-              <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-500/20 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl" data-profile-photo-fallback>
+              <div className="grid h-16 w-16 place-items-center rounded-full bg-indigo-600 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl" data-profile-photo-fallback>
                 {initials}
               </div>
             )}
@@ -406,7 +406,7 @@ function ProfileHero({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-white/25">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
                 {active ? <BadgeCheck className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
                 {planLabel}
               </span>
@@ -420,7 +420,7 @@ function ProfileHero({
           </GlassButton>
         </div>
 
-        <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-white/80">
+        <div className="mt-4 flex items-center gap-1.5 border-t border-white/15 pt-3 text-xs font-semibold text-white/90">
           <CalendarDays className="h-3.5 w-3.5" /> Member since {memberSince}
         </div>
 
@@ -430,11 +430,11 @@ function ProfileHero({
           </p>
         ) : null}
 
-        <GlassButton variant="capsule" onClick={onEdit} className="mt-4">
-          <span className="inline-flex items-center gap-2"><Pencil size={15} /> Edit profile</span>
-        </GlassButton>
+        <button type="button" onClick={onEdit} className="dc-focusable mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]">
+          <Pencil size={14} /> Edit profile
+        </button>
       </div>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
@@ -455,7 +455,7 @@ function MembershipCard({
   onOpenPlans: () => void;
 }) {
   return (
-    <GlassSurface data-profile-membership-tier={tier} data-profile-membership-card radius={32} className="relative overflow-hidden text-white" contentClassName="p-5">
+    <ProfileCard data-profile-membership-tier={tier} data-profile-membership-card className="relative overflow-hidden text-white" contentClassName="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>
@@ -495,7 +495,7 @@ function MembershipCard({
       <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
       </p>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
@@ -508,7 +508,7 @@ function UpgradeCard({
   onOpenSubscriberExperience: () => void;
 }) {
   return (
-    <GlassSurface data-profile-upgrade-card radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard data-profile-upgrade-card className="text-white" contentClassName="p-5">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/30">
           <Rocket className="h-5 w-5" />
@@ -534,14 +534,14 @@ function UpgradeCard({
           <Sparkles className="h-4 w-4" /> See the subscriber app experience
         </GlassButton>
       </div>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
 /* ── Referral card ──────────────────────────────────────────────────── */
 function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boolean; appName: string; onCopy: () => void }) {
   return (
-    <GlassSurface data-profile-referral radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard data-profile-referral className="text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">Your referral code</p>
@@ -567,14 +567,14 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
           </GlassButton>
         </div>
       )}
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
 /* ── Personal Study Library card ────────────────────────────────────── */
 function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <GlassSurface data-profile-study-library radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard data-profile-study-library className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/30">
           <Boxes className="h-5 w-5" />
@@ -588,7 +588,7 @@ function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
       <GlassButton variant="capsule" onClick={onOpen} className="mt-4 w-full text-cyan-100 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-black">
         <span className="inline-flex items-center gap-2">Open Study Library <ArrowRight className="h-4 w-4" /></span>
       </GlassButton>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
@@ -605,7 +605,7 @@ function LibraryCard({
   onOpenPurchases: () => void;
 }) {
   return (
-    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard className="text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className={EYEBROW}>My library</p>
@@ -653,7 +653,7 @@ function LibraryCard({
           Nothing owned yet — find a course in the store to start your library.
         </p>
       )}
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
@@ -677,7 +677,7 @@ function ProfileRenewalCard({
   const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
 
   return (
-    <GlassSurface data-renewal-card data-stage={expired ? "expired" : "active"} radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard data-renewal-card data-stage={expired ? "expired" : "active"} className="text-white" contentClassName="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${expired ? "bg-rose-500/15 text-rose-300 ring-rose-400/30" : "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"}`}>
@@ -741,7 +741,7 @@ function ProfileRenewalCard({
       <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
       </p>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
@@ -758,8 +758,8 @@ function StatChip({ label, value, valueAttr }: { label: string; value: string; v
 function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; value: number; label: string; tone: string; onClick: () => void }) {
   return (
     /* Wave 13: the quick stat is a clickable pack surface — the Cart card's bare GlassSurface, radius 32. Press feedback (active:scale) stays; it is not a lift. */
-    <GlassSurface
-      radius={32}
+    <ProfileCard
+     
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -770,7 +770,7 @@ function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; val
       <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>
       <span className="mt-2 block text-2xl font-black text-white md:text-3xl">{value}</span>
       <span className="block text-[10px] font-bold uppercase tracking-wide text-white/55 md:text-[11px]">{label}</span>
-    </GlassSurface>
+    </ProfileCard>
   );
 }
 
