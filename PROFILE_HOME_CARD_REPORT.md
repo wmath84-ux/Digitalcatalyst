@@ -77,7 +77,7 @@ Home's pill metric (40px tall, 12px label) instead of the pack's 48px default.
 | Referral: eyebrow + "Share it with a learner joining …" + chip + code + 2-line used note | label + code + Copy (used ⇒ struck through, `Used` badge, one short line) |
 | Study Library: eyebrow, title, a full sentence, CTA | title, one line, CTA |
 | Your courses: subtitle, a count chip row, rows with "Owned · Open course" | title + count, Home's quiet "View all", Home-style rows |
-| Preferences: eyebrow, title, "Saved securely to your account." | title + one line + the settings icon button |
+| Preferences: eyebrow, title, "Saved securely to your account." | just the title + the settings icon button |
 | My Day allowance: badge, bar, 3 stat chips, reset clock, a 2–3 line paragraph, 2 CTAs | badge, bar, one reset line, **one** short line per state, 2 CTAs |
 | AI quota (Profile): 2 bars + a 3-line explanation + per-request detail lines | the bars + the reset line only (`compact`) |
 

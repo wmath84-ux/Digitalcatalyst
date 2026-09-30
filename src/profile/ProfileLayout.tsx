@@ -643,7 +643,7 @@ function LibraryCard({
               />
               <span className="min-w-0 flex-1">
                 <span className="dc-profile-card-title block truncate">{product.title}</span>
-                <span className="dc-profile-card-meta block">Open course</span>
+                <span className="dc-profile-card-meta block">Owned</span>
               </span>
               <ChevronRight size={16} className="shrink-0 text-white/40" />
             </button>
