@@ -665,7 +665,6 @@ function PreferencesCard({ onOpen }: { onOpen: () => void }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="dc-profile-card-title truncate">Notifications &amp; privacy</h3>
-          <p className="dc-profile-card-meta mt-0.5">Saved securely to your account.</p>
         </div>
         <GlassButton
           onClick={onOpen}
