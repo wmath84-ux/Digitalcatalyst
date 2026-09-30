@@ -29,6 +29,10 @@ import "./empty-state-glass.css";
 // transparent lens the store hero wears. AFTER glass.css + store-glass.css
 // so it out-ranks the navy contrast plate on `.dc-glass-card`.
 import "./revision-glass.css";
+// The Profile page's cards take HOME's card material + type scale (owner brief
+// 2026-09-30): the navy contrast plate Home paints, with the Home card's copy
+// ramp. AFTER glass.css, which owns the plate the profile hooks sit on.
+import "./profile-glass.css";
 // The Course Player's panel language, ported from the removed 3D Classroom:
 // deep navy plates, one hairline, crisp white ink and the room's five surface
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come

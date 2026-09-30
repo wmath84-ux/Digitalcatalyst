@@ -10,19 +10,16 @@ import {
   Boxes,
   CalendarDays,
   ChevronRight,
-  CircleCheck,
   Crown,
   Heart,
   LoaderCircle,
   LogOut,
   Pencil,
-  RefreshCcw,
   Rocket,
   Save,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  UserRound,
   X,
   Zap,
 } from "lucide-react";
@@ -64,28 +61,35 @@ export const PLAN_LABELS: Record<MembershipTier, string> = {
 };
 
 const TIER_ICONS: Record<MembershipTier, ReactNode> = {
-  normal: <Crown className="h-5 w-5" />,
-  basic: <Crown className="h-5 w-5" />,
-  premium: <Sparkles className="h-5 w-5" />,
-  pro: <Zap className="h-5 w-5" />,
+  normal: <Crown className="h-4 w-4" />,
+  basic: <Crown className="h-4 w-4" />,
+  premium: <Sparkles className="h-4 w-4" />,
+  pro: <Zap className="h-4 w-4" />,
 };
 
 /* ── Design tokens ─────────────────────────────────────────────────────
-   Phase A (owner direction): every action is the pack's <GlassButton
-   variant="capsule"> (websiteglass.com). Only ink + spacing tokens remain
-   here. Updated (owner brief 2026-09-29, cart card → profile): every card is
-   the pack's bare <ProfileCard> at its defaults with radius 32 — EXACTLY
-   the material of the Cart empty-state "Continue Shopping" card
-   (src/cartWishlist/components/EmptyState.tsx): frost blur 9.8px + saturate
-   1.3, flat rgba(60,62,68,0.21) tint, the pack sheen + rim — with NO re-skin
-   class (neither revision/store glass hooks nor a text scrim) and NO hover lift, so the copy reads exactly as clean as it does
-   on the Cart card. Card titles are font-bold (the Cart title's weight). */
-const BTN_PRIMARY = "w-full [&>span>div]:w-full";
-const BTN_SECONDARY = "w-full [&>span>div]:w-full";
-const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300";
-const ICON_CHIP =
-  "grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30 md:h-12 md:w-12";
-const STAT_CHIP = "rounded-2xl px-2.5 py-2.5 text-center ring-1 ring-white/15";
+   Owner brief (2026-09-30): the Profile page wears the HOME page's card —
+   material, type and tone ("home page ke card ka design … vahi exactly hi
+   look aur design profile ke cards per apply karo … text design bhi exactly
+   jaisa home page ka hai vaise hi profile page ka ho jaaye … bahut jyada text
+   … ekadam clean professional aur classic look").
+
+   So there is no card-local material here any more: `ProfileCard` is the Home
+   plate (see ./ProfileCard.tsx) and the copy wears the Home card ramp pinned
+   in src/profile-glass.css (`.dc-profile-card-title` · `-meta` · `-note` ·
+   `-accent` · `-value` · `.dc-profile-bar`). Every action stays the pack's
+   <GlassButton variant="capsule"> (websiteglass.com). What is left below is
+   the pill metric, the icon chip and the form field's ink. */
+/* Home's pill metrics: 40px tall with a 12px label, instead of the pack
+   capsule's 48px default, so a Profile action sits at the weight Home's
+   "Resume" / "View All" controls do. The label is the pack's own inner
+   <span>, so the size override targets it (a font-size on the root would be
+   beaten by that span's own `text-sm`). */
+const BTN = "[&>span>div]:h-10 [&>span>div]:px-4 [&_span]:text-xs [&_span]:font-semibold";
+const BTN_PRIMARY = `w-full [&>span>div]:w-full ${BTN}`;
+const BTN_SECONDARY = `w-full [&>span>div]:w-full ${BTN}`;
+const BTN_SMALL = "[&>span>div]:h-9 [&>span>div]:px-3.5 [&_span]:text-[11px] [&_span]:font-semibold";
+const ICON_CHIP = "grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1";
 // Wave 5: `glass-input` is the pack's *search* pill (radius 9999, focus glow,
 // no textarea twin), so profile fields do not wear it as a skin. Same material,
 // right anatomy: the frost + rim come from `.dc-field` in src/glass.css and the
@@ -104,9 +108,6 @@ const formatDate = (value: number): string => {
 };
 
 const cycleLabel = (cycle: string): string => (cycle === "yearly" ? "Yearly" : "Monthly");
-
-const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): boolean =>
-  subscription.status === "active" && subscription.expiresAt > now;
 
 /* ── Props ──────────────────────────────────────────────────────────── */
 export interface ProfileLayoutMembership {
@@ -145,7 +146,6 @@ export type ProfileLayoutProps = {
   referral: {
     code: string;
     used: boolean;
-    appName: string;
     onCopy: () => void;
   } | null;
 
@@ -206,17 +206,18 @@ export default function ProfileLayout({
 }: ProfileLayoutProps) {
   return (
     <div data-profile-layout>
-      {/* ── Page header ── */}
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div>
-          <p className={`dc-scene-ink ${EYEBROW}`}>Account overview</p>
-          <h1 className="dc-scene-ink dc-profile-title mt-1">My profile</h1>
-          <p className="dc-scene-ink mt-1 text-sm font-medium text-white/85">Account, plan and library — in one place.</p>
-        </div>
-        <div className="flex items-center gap-2 pb-0.5">
+      {/* ── Page header ──
+          Three lines became one: the "Account overview" eyebrow and the
+          one-line subtitle repeated what the page itself already shows. The
+          title wears Home's greeting type (`.dc-profile-title`) and keeps the
+          scrim, because it is the one line of copy sitting straight on the
+          scene. */}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <h1 className="dc-scene-ink dc-profile-title truncate">My profile</h1>
           {membershipBadge}
-          {saving ? <LoaderCircle className="h-4 w-4 animate-spin text-violet-300" /> : null}
         </div>
+        {saving ? <LoaderCircle className="h-4 w-4 animate-spin text-violet-300" /> : null}
       </header>
 
       {message ? (
@@ -234,28 +235,27 @@ export default function ProfileLayout({
         initials={initials}
         memberSince={memberSince}
         planLabel={membership.subscriber ? membership.planLabel : PLAN_LABELS.normal}
-        active={membership.active}
         onEdit={onEdit}
       />
 
       {/* ── Full-width quick stats ── */}
       <div className="grid grid-cols-3 gap-2.5 md:gap-3" data-profile-stats>
         <QuickStat
-          icon={<ShoppingBag className="h-5 w-5" />}
+          icon={<ShoppingBag className="h-4 w-4" />}
           value={stats.ownedCount}
           label="Purchased"
           tone="bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"
           onClick={stats.onOpenPurchases}
         />
         <QuickStat
-          icon={<Heart className="h-5 w-5" />}
+          icon={<Heart className="h-4 w-4" />}
           value={stats.favoriteCount}
           label="Favorites"
-          tone="bg-rose-500/15 text-rose-500 ring-rose-400/30"
+          tone="bg-rose-500/15 text-rose-400 ring-rose-400/30"
           onClick={stats.onOpenFavorites}
         />
         <QuickStat
-          icon={<Boxes className="h-5 w-5" />}
+          icon={<Boxes className="h-4 w-4" />}
           value={stats.cartCount}
           label="In cart"
           tone="bg-amber-500/15 text-amber-300 ring-amber-400/30"
@@ -272,21 +272,12 @@ export default function ProfileLayout({
             tierLabel={membership.tierLabel}
             planLabel={membership.planLabel}
             subscription={membership.subscription}
+            renewal={renewal}
             onOpenPlans={onOpenPlans}
           />
         ) : (
           <UpgradeCard onOpenPlans={onOpenPlans} onOpenSubscriberExperience={onOpenSubscriberExperience} />
         )}
-
-        {renewal ? (
-          <ProfileRenewalCard
-            tier={renewal.tier}
-            subscription={renewal.subscription}
-            now={renewal.now}
-            onRenew={renewal.onRenew}
-            onToggleReminders={renewal.onToggleReminders}
-          />
-        ) : null}
 
         {myDayCard}
 
@@ -295,9 +286,7 @@ export default function ProfileLayout({
 
       {/* ── Side column: library + preferences + account actions ── */}
       <div data-profile-col="side">
-        {referral ? (
-          <ReferralCard code={referral.code} used={referral.used} appName={referral.appName} onCopy={referral.onCopy} />
-        ) : null}
+        {referral ? <ReferralCard code={referral.code} used={referral.used} onCopy={referral.onCopy} /> : null}
 
         <StudyLibraryCard onOpen={onOpenStudyLibrary} />
 
@@ -308,35 +297,20 @@ export default function ProfileLayout({
           onOpenPurchases={library.onOpenPurchases}
         />
 
-        <ProfileCard className="text-white" contentClassName="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className={EYEBROW}>Preferences</p>
-              <h3 className="mt-1 text-base font-bold text-white">Notifications & privacy</h3>
-              <p className="mt-0.5 text-xs font-medium text-white/55">Saved securely to your account.</p>
-            </div>
-            <GlassButton
-              onClick={onOpenSettings}
-              className="shrink-0 [&_.size-12]:size-10 [&_svg]:text-indigo-300"
-              aria-label="Open preferences"
-            >
-              <Bell size={18} />
-            </GlassButton>
-          </div>
-        </ProfileCard>
+        <PreferencesCard onOpen={onOpenSettings} />
 
         <GlassButton
           variant="capsule"
           onClick={onLogout}
-          className="w-full text-rose-300 [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:py-4 [&>span>div]:text-sm [&>span>div]:font-black [&>span>div]:ring-1 [&>span>div]:ring-rose-400/30 lg:[&>span>div]:py-3"
+          className="w-full text-rose-300 [&>span>div]:w-full [&>span>div]:ring-1 [&>span>div]:ring-rose-400/30 [&_span]:text-sm [&_span]:font-semibold"
         >
-          <span className="inline-flex items-center gap-2 text-rose-300"><LogOut size={17} /> Log out</span>
+          <span className="inline-flex items-center gap-2 text-rose-300"><LogOut size={16} /> Log out</span>
         </GlassButton>
 
-        <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-[11px] font-semibold text-white/55">
-          <a href="/privacy-policy.html" className="transition hover:text-violet-300 hover:underline">Privacy Policy</a>
+        <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-[11px] font-medium text-white/70">
+          <a href="/privacy-policy.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">Privacy Policy</a>
           <span aria-hidden="true" className="text-white/40">·</span>
-          <a href="/terms-of-service.html" className="transition hover:text-violet-300 hover:underline">Terms of Service</a>
+          <a href="/terms-of-service.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">Terms of Service</a>
         </nav>
 
         {isAdmin ? (
@@ -354,7 +328,12 @@ export default function ProfileLayout({
   );
 }
 
-/* ── Profile hero (identity) ────────────────────────────────────────── */
+/* ── Profile hero (identity) ──────────────────────────────────────────
+   One Home-card block: avatar, name, email, one 11px fact line and the edit
+   pencil. The old stack (plan pill · name · email · bordered "Member since"
+   row · bio block · a second full-width "Edit profile" button) said the same
+   four things twice; the duplicate CTA is gone and the bio clamps to two
+   lines, exactly like a card's copy clamp on Home. */
 function ProfileHero({
   name,
   email,
@@ -363,7 +342,6 @@ function ProfileHero({
   initials,
   memberSince,
   planLabel,
-  active,
   onEdit,
 }: {
   name: string;
@@ -373,78 +351,73 @@ function ProfileHero({
   initials: string;
   memberSince: string;
   planLabel: string;
-  active: boolean;
   onEdit: () => void;
 }) {
   const src = profilePhotoSrc(photoURL);
   const [brokenPhoto, setBrokenPhoto] = useState("");
   const showPhoto = Boolean(src) && src !== brokenPhoto;
   return (
-    <ProfileCard data-profile-hero className="relative overflow-hidden text-white" contentClassName="p-5">
-      <div className="relative">
-        <div className="flex items-center gap-4">
-          <div className="shrink-0 rounded-full p-[3px] ring-2 ring-white/40 shadow-[0_10px_26px_-12px_rgba(2,6,16,0.9)]">
-            {showPhoto ? (
-              <img
-                src={src}
-                alt=""
-                decoding="async"
-                width={80}
-                height={80}
-                className="h-16 w-16 rounded-full object-cover md:h-20 md:w-20"
-                referrerPolicy="no-referrer"
-                draggable={false}
-                data-profile-photo
-                onError={() => setBrokenPhoto(src)}
-              />
-            ) : (
-              <div className="grid h-16 w-16 place-items-center rounded-full bg-indigo-600 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl" data-profile-photo-fallback>
-                {initials}
-              </div>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
-                {active ? <BadgeCheck className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
-                {planLabel}
-              </span>
+    <ProfileCard data-profile-hero className="relative overflow-hidden">
+      <div className="flex items-center gap-3">
+        <div className="shrink-0 rounded-full p-[2px] ring-2 ring-white/25">
+          {showPhoto ? (
+            <img
+              src={src}
+              alt=""
+              decoding="async"
+              width={64}
+              height={64}
+              className="h-14 w-14 rounded-full object-cover md:h-16 md:w-16"
+              referrerPolicy="no-referrer"
+              draggable={false}
+              data-profile-photo
+              onError={() => setBrokenPhoto(src)}
+            />
+          ) : (
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-indigo-600 text-lg font-bold text-white md:h-16 md:w-16 md:text-xl" data-profile-photo-fallback>
+              {initials}
             </div>
-            <h2 className="mt-2 truncate text-xl font-bold tracking-tight md:text-2xl">{name}</h2>
-            <p className="truncate text-sm font-medium text-white/85 md:text-base">{email}</p>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-base font-bold tracking-tight text-white md:text-lg">{name}</h2>
+          <p className="dc-profile-card-meta mt-0.5 truncate">{email}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span data-profile-plan-label className="dc-profile-card-accent inline-flex items-center gap-1">
+              <BadgeCheck className="h-3 w-3" /> {planLabel}
+            </span>
+            <span aria-hidden="true" className="text-[10px] text-white/40">·</span>
+            <span className="dc-profile-card-meta inline-flex items-center gap-1">
+              <CalendarDays className="h-3 w-3" /> Since {memberSince}
+            </span>
           </div>
-
-          <GlassButton onClick={onEdit} aria-label="Edit profile" className="shrink-0 [&_.size-12]:size-10">
-            <Pencil size={17} />
-          </GlassButton>
         </div>
 
-        <div className="mt-4 flex items-center gap-1.5 border-t border-white/15 pt-3 text-xs font-semibold text-white/90">
-          <CalendarDays className="h-3.5 w-3.5" /> Member since {memberSince}
-        </div>
-
-        {bio ? (
-          <p className="mt-3 rounded-2xl px-4 py-3 text-sm leading-6 text-white/85 ring-1 ring-white/15">
-            {bio}
-          </p>
-        ) : null}
-
-        <button type="button" onClick={onEdit} className="dc-focusable mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]">
-          <Pencil size={14} /> Edit profile
-        </button>
+        <GlassButton onClick={onEdit} aria-label="Edit profile" className="shrink-0 [&_.size-12]:size-9">
+          <Pencil size={15} />
+        </GlassButton>
       </div>
+
+      {bio ? <p className="dc-profile-card-note mt-3 line-clamp-2">{bio}</p> : null}
     </ProfileCard>
   );
 }
 
-/* ── Membership (subscriber) card ───────────────────────────────────── */
+/* ── Membership card (subscriber) ─────────────────────────────────────
+   Membership and renewal were two cards saying the same thing — tier, plan,
+   billing cycle, status, expiry, a manual-renewal note — one right under the
+   other. They are one card now, on Home's material: the tier + status line,
+   one fact line, Home's progress bar and the two actions. All the hooks the
+   rest of the app reads (`data-profile-membership-*`, `data-renewal-*`) stay
+   on the same elements, so nothing that deep-links into them changes. */
 function MembershipCard({
   tier,
   active,
   tierLabel,
   planLabel,
   subscription,
+  renewal,
   onOpenPlans,
 }: {
   tier: MembershipTier;
@@ -452,54 +425,92 @@ function MembershipCard({
   tierLabel: string;
   planLabel: string;
   subscription: SubscriptionSnapshot | null;
+  renewal: ProfileLayoutProps["renewal"];
   onOpenPlans: () => void;
 }) {
+  const snapshot = renewal?.subscription || subscription;
+  const now = renewal?.now || Date.now();
+  const expired = !active;
+  const daysRemaining = snapshot && snapshot.expiresAt > now
+    ? Math.max(1, Math.ceil((snapshot.expiresAt - now) / 86400000))
+    : 0;
+  const totalDays = snapshot?.cycle === "yearly" ? 365 : 30;
+  const progress = snapshot && snapshot.expiresAt > 0
+    ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100)))
+    : 0;
+
   return (
-    <ProfileCard data-profile-membership-tier={tier} data-profile-membership-card className="relative overflow-hidden text-white" contentClassName="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>
-            {TIER_ICONS[tier]}
-          </span>
-          <div>
-            <p className={EYEBROW}>Membership</p>
-            <h3 className="mt-0.5 text-lg font-bold text-white">{tierLabel} membership</h3>
-            <span data-profile-plan-label className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-200 ring-1 ring-indigo-400/30">
-              <BadgeCheck className="h-3 w-3" />
-              {planLabel}
-            </span>
-          </div>
+    <ProfileCard data-profile-membership-tier={tier}
+      data-profile-membership-card
+      data-renewal-card
+      data-stage={expired ? "expired" : "active"}
+      className="relative overflow-hidden"
+    >
+      <div className="flex items-center gap-3">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${active ? "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30" : "bg-rose-500/15 text-rose-300 ring-rose-400/30"}`}>
+          {TIER_ICONS[tier]}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h3 data-renewal-card-headline className="dc-profile-card-title truncate">{tierLabel} membership</h3>
+          <p className="dc-profile-card-meta mt-0.5 truncate">
+            {planLabel}
+            {snapshot ? ` · ${cycleLabel(snapshot.cycle)} billing` : ""}
+          </p>
         </div>
+
         <span
           data-profile-plan-status={active ? "active" : "expired"}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${active ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"}`}
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${active ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-rose-400/30"}`}
         >
-          {active ? "Subscribed" : "Expired"}
+          {active ? "Active" : "Expired"}
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <StatChip label="Plan" value={tierLabel} />
-        <StatChip label="Billing" value={cycleLabel(subscription?.cycle || "monthly")} />
-        <StatChip label="Access" value={active ? "Active" : "Ended"} />
+      {snapshot ? (
+        <div className="mt-3">
+          <div className="dc-profile-card-meta flex items-center justify-between gap-2">
+            <span data-renewal-expiry className="truncate">
+              {expired ? `Ended ${formatDate(snapshot.expiresAt)}` : `Access until ${formatDate(snapshot.expiresAt)}`}
+            </span>
+            <span data-renewal-remaining className="shrink-0">
+              {expired ? "Renew to continue" : `${daysRemaining} days left`}
+            </span>
+          </div>
+          {expired ? null : (
+            <div className="dc-profile-bar mt-1.5">
+              <span data-renewal-progress style={{ width: `${Math.max(4, progress)}%` }} />
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex items-center gap-2">
+        <GlassButton variant="capsule" onClick={onOpenPlans} className={BTN_PRIMARY}>
+          {active ? "Manage subscription" : "Renew subscription"} <ArrowRight className="h-3.5 w-3.5" />
+        </GlassButton>
+        {snapshot && renewal ? (
+          <GlassButton
+            variant="capsule"
+            data-renewal-reminder-toggle
+            onClick={() => renewal.onToggleReminders(!snapshot.reminderOptOut)}
+            className={`shrink-0 ${BTN_SMALL}`}
+          >
+            {snapshot.reminderOptOut ? "Reminders off" : "Reminders on"}
+          </GlassButton>
+        ) : null}
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-white/75">
-        {active
-          ? `You are enjoying the ${tierLabel} experience. Manage your plan or extend access whenever you are ready.`
-          : `Your ${tierLabel} access has ended. Renew to bring your saved learning experience back instantly.`}
-      </p>
-      <GlassButton variant="capsule" onClick={onOpenPlans} className={BTN_PRIMARY}>
-        <RefreshCcw className="h-4 w-4" /> {active ? "Manage subscription" : "Renew subscription"} <ArrowRight className="h-4 w-4" />
-      </GlassButton>
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
-        <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
+      <p className="dc-profile-card-meta mt-2 flex items-center gap-1.5">
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-300" /> Renewal is manual and secure — no automatic charge.
       </p>
     </ProfileCard>
   );
 }
 
-/* ── Upgrade card (free learner) ────────────────────────────────────── */
+/* ── Upgrade card (free learner) ──────────────────────────────────────
+   The paragraph + three checkpoints + two stacked CTAs became one line and
+   the same two actions, side by side. */
 function UpgradeCard({
   onOpenPlans,
   onOpenSubscriberExperience,
@@ -508,65 +519,52 @@ function UpgradeCard({
   onOpenSubscriberExperience: () => void;
 }) {
   return (
-    <ProfileCard data-profile-upgrade-card className="text-white" contentClassName="p-5">
-      <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/30">
-          <Rocket className="h-5 w-5" />
+    <ProfileCard data-profile-upgrade-card>
+      <div className="flex items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white ring-1 ring-indigo-400/40">
+          <Rocket className="h-4 w-4" />
         </span>
-        <div>
-          <p className={EYEBROW}>Basic learner access</p>
-          <h3 className="mt-0.5 text-lg font-bold leading-tight text-white">Upgrade your learning space</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="dc-profile-card-title truncate">Free plan</h3>
+          <p className="dc-profile-card-meta mt-0.5">Subscriber plans unlock more practice, notes and My Day.</p>
         </div>
       </div>
-      <p className="mt-4 text-sm leading-6 text-white/75">
-        You are currently learning on the free plan. Move to a subscriber plan for a richer app experience, more focused tools, and benefits designed around your progress.
-      </p>
-      <div className="mt-4 space-y-2.5">
-        <UpgradePoint>Unlock subscriber-only learning features</UpgradePoint>
-        <UpgradePoint>Choose the plan that fits your learning goals</UpgradePoint>
-        <UpgradePoint>Keep your learning journey organised in one place</UpgradePoint>
-      </div>
-      <div className="mt-5 grid gap-2.5">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <GlassButton variant="capsule" onClick={onOpenPlans} className={BTN_PRIMARY}>
-          Explore plans <ArrowRight className="h-4 w-4" />
+          Explore plans <ArrowRight className="h-3.5 w-3.5" />
         </GlassButton>
         <GlassButton variant="capsule" onClick={onOpenSubscriberExperience} data-subscriber-experience-cta className={BTN_SECONDARY}>
-          <Sparkles className="h-4 w-4" /> See the subscriber app experience
+          Subscriber experience
         </GlassButton>
       </div>
     </ProfileCard>
   );
 }
 
-/* ── Referral card ──────────────────────────────────────────────────── */
-function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boolean; appName: string; onCopy: () => void }) {
+/* ── Referral card ────────────────────────────────────────────────────
+   The code is the card: label, code, Copy (or the Used badge). The header
+   icon chip, the "Share it with a learner joining …" line and the two-line
+   used note are gone — the used state still strikes the code through and
+   still says it is no longer active, in one short line. */
+function ReferralCard({ code, used, onCopy }: { code: string; used: boolean; onCopy: () => void }) {
   return (
-    <ProfileCard data-profile-referral className="text-white" contentClassName="p-5">
+    <ProfileCard data-profile-referral>
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">Your referral code</p>
-          <p className="mt-1 text-xs font-medium text-white/55">{`Share it with a learner joining ${appName}.`}</p>
+        <div className="min-w-0">
+          <p className="dc-profile-card-meta">Your referral code</p>
+          <code className={`mt-0.5 block truncate text-sm font-bold ${used ? "text-white/60 line-through decoration-2 decoration-rose-400" : "text-white"}`}>
+            {code}
+          </code>
         </div>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30">
-          <Sparkles className="h-5 w-5" />
-        </span>
-      </div>
-      {used ? (
-        <div data-profile-referral-used className="mt-3">
-          <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 ring-1 ring-white/15">
-            <code className="min-w-0 truncate text-sm font-black text-white/55 line-through decoration-2 decoration-rose-400">{code}</code>
-            <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">Used</span>
-          </div>
-          <p className="mt-1.5 text-[11px] font-medium text-white/55">This referral ID has been used and is no longer active.</p>
-        </div>
-      ) : (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/15 px-3 py-2.5">
-          <code className="min-w-0 truncate text-sm font-black text-indigo-200">{code}</code>
-          <GlassButton variant="capsule" onClick={onCopy} className="shrink-0 text-indigo-200 [&>span>div]:h-7 [&>span>div]:rounded-lg [&>span>div]:px-2.5 [&>span>div]:text-[10px] [&>span>div]:font-black">
+        {used ? (
+          <span data-profile-referral-used className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">Used</span>
+        ) : (
+          <GlassButton variant="capsule" onClick={onCopy} className={`shrink-0 ${BTN_SMALL}`}>
             Copy
           </GlassButton>
-        </div>
-      )}
+        )}
+      </div>
+      {used ? <p className="dc-profile-card-meta mt-2">This referral ID is no longer active.</p> : null}
     </ProfileCard>
   );
 }
@@ -574,25 +572,26 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
 /* ── Personal Study Library card ────────────────────────────────────── */
 function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <ProfileCard data-profile-study-library className="text-white" contentClassName="p-5">
+    <ProfileCard data-profile-study-library>
       <div className="flex items-center gap-3">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/30">
-          <Boxes className="h-5 w-5" />
+        <span className={`${ICON_CHIP} bg-cyan-500/15 text-cyan-200 ring-cyan-400/30`}>
+          <Boxes className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">Personal workspace</p>
-          <h3 className="mt-0.5 text-base font-bold text-white">My Study Library</h3>
-          <p className="mt-0.5 text-xs font-medium leading-5 text-white/55">Open your modules, Saved for Later and recently viewed resources.</p>
+          <h3 className="dc-profile-card-title truncate">My Study Library</h3>
+          <p className="dc-profile-card-meta mt-0.5 truncate">Your modules, saved items and recent resources.</p>
         </div>
       </div>
-      <GlassButton variant="capsule" onClick={onOpen} className="mt-4 w-full text-cyan-100 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-black">
-        <span className="inline-flex items-center gap-2">Open Study Library <ArrowRight className="h-4 w-4" /></span>
+      <GlassButton variant="capsule" onClick={onOpen} className={`mt-3 text-cyan-100 ${BTN_PRIMARY}`}>
+        <span className="inline-flex items-center gap-2">Open Study Library <ArrowRight className="h-3.5 w-3.5" /></span>
       </GlassButton>
     </ProfileCard>
   );
 }
 
-/* ── Owned course library card ───────────────────────────────────────── */
+/* ── Owned course library card ────────────────────────────────────────
+   Home's list row, on a Home card: the artwork thumbnail, the title, one
+   meta line and the chevron. "View all" is Home's quiet section link. */
 function LibraryCard({
   items,
   ownedCount,
@@ -605,51 +604,53 @@ function LibraryCard({
   onOpenPurchases: () => void;
 }) {
   return (
-    <ProfileCard className="text-white" contentClassName="p-5">
+    <ProfileCard>
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className={EYEBROW}>My library</p>
-          <h3 className="mt-1 text-base font-bold text-white">Your courses</h3>
-          <p className="mt-0.5 text-xs font-medium text-white/55">Jump back into everything you own.</p>
+        <div className="min-w-0">
+          <h3 className="dc-profile-card-title truncate">Your courses</h3>
+          {items.length > 0 ? (
+            <p className="dc-profile-card-meta mt-0.5">{ownedCount} course{ownedCount === 1 ? "" : "s"}</p>
+          ) : null}
         </div>
-        <span className={`${ICON_CHIP}`}>
-          <ShoppingBag className="h-5 w-5" />
-        </span>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between rounded-2xl bg-indigo-500/15 px-3 py-2.5 ring-1 ring-indigo-400/30">
-        <span className="text-xs font-bold text-white/75">{ownedCount} owned {ownedCount === 1 ? "course" : "courses"}</span>
-        <GlassButton
-          variant="capsule"
+        <button
+          type="button"
           onClick={onOpenPurchases}
-          className="shrink-0 text-indigo-200 [&>span>div]:h-7 [&>span>div]:rounded-lg [&>span>div]:px-2.5 [&>span>div]:text-[10px] [&>span>div]:font-black"
+          className="shrink-0 text-xs font-semibold text-white/55 transition hover:text-white/85"
         >
-          <span className="inline-flex items-center gap-1">View all <ArrowRight className="h-3 w-3" /></span>
-        </GlassButton>
+          View all
+        </button>
       </div>
 
       {items.length > 0 ? (
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-2.5">
           {items.slice(0, 3).map((product) => (
-            <GlassButton
-              variant="capsule"
+            <button
               key={product.id}
+              type="button"
               onClick={() => onOpenCourse(product.id)}
-              className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:p-2 [&>span>div>span]:w-full"
+              className="flex w-full items-center gap-3 text-left transition active:scale-[0.99]"
             >
-              <span className="flex w-full items-center gap-3">
-                <img src={product.image} alt="" loading="lazy" decoding="async" width={64} height={48} className="h-12 w-16 shrink-0 rounded-xl object-cover" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-black text-white">{product.title}</span>
-                  <span className="text-xs font-medium text-white/55">Owned · Open course</span>
-                </span>
-                <ChevronRight size={16} className="shrink-0 text-white/40" />
+              <img
+                src={product.image}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                width={64}
+                height={48}
+                className="h-12 w-16 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+                referrerPolicy="no-referrer"
+                onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="dc-profile-card-title block truncate">{product.title}</span>
+                <span className="dc-profile-card-meta block">Open course</span>
               </span>
-            </GlassButton>
+              <ChevronRight size={16} className="shrink-0 text-white/40" />
+            </button>
           ))}
         </div>
       ) : (
-        <p className="mt-4 rounded-2xl px-3 py-2.5 text-xs font-semibold leading-5 text-white/55 ring-1 ring-white/15">
+        <p className="dc-profile-card-meta mt-3">
           Nothing owned yet — find a course in the store to start your library.
         </p>
       )}
@@ -657,125 +658,58 @@ function LibraryCard({
   );
 }
 
-/* ── Renewal card ───────────────────────────────────────────────────── */
-function ProfileRenewalCard({
-  tier,
-  subscription,
-  now,
-  onRenew,
-  onToggleReminders,
-}: {
-  tier: MembershipTier;
-  subscription: SubscriptionSnapshot;
-  now: number;
-  onRenew: () => void;
-  onToggleReminders: (next: boolean) => void;
-}) {
-  const expired = !isActiveSubscription(subscription, now);
-  const daysRemaining = subscription.expiresAt > now ? Math.max(1, Math.ceil((subscription.expiresAt - now) / 86400000)) : 0;
-  const totalDays = subscription.cycle === "yearly" ? 365 : 30;
-  const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
-
+/* ── Preferences card ───────────────────────────────────────────────── */
+function PreferencesCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <ProfileCard data-renewal-card data-stage={expired ? "expired" : "active"} className="text-white" contentClassName="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${expired ? "bg-rose-500/15 text-rose-300 ring-rose-400/30" : "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"}`}>
-            <CalendarDays className="h-5 w-5" />
-          </span>
-          <div>
-            <p className={`text-[10px] font-black uppercase tracking-[0.16em] ${expired ? "text-rose-300" : "text-indigo-300"}`}>Membership renewal</p>
-            <h3 data-renewal-card-headline className="mt-0.5 text-lg font-bold leading-tight text-white">{expired ? "Your access needs a refresh" : "Your access is active"}</h3>
-            <p className="mt-0.5 text-xs font-semibold text-white/55">{TIER_LABELS[tier]} · {cycleLabel(subscription.cycle)}</p>
-          </div>
+    <ProfileCard>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="dc-profile-card-title truncate">Notifications &amp; privacy</h3>
+          <p className="dc-profile-card-meta mt-0.5">Saved securely to your account.</p>
         </div>
-        <span data-renewal-remaining className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ${expired ? "bg-rose-500/15 text-rose-300 ring-rose-400/30" : "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30"}`}>
-          {expired ? "Renew now" : daysRemaining > 0 ? `${daysRemaining}d left` : "Active"}
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <StatChip label="Access until" value={subscription.expiresAt ? formatDate(subscription.expiresAt) : "Active access"} valueAttr="data-renewal-expiry" />
-        <StatChip label="Renewal mode" value="Manual & secure" />
-      </div>
-
-      {!expired ? (
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-[10px] font-bold text-white/55">
-            <span>Current access window</span>
-            <span>{progress}% remaining</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full border border-white/15">
-            <div data-renewal-progress className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      ) : (
-        <p className="mt-4 rounded-2xl bg-rose-500/15 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-200 ring-1 ring-rose-400/30">
-          Your saved learning data is safe. Renew to restore your plan access.
-        </p>
-      )}
-
-      <p className="mt-4 text-xs leading-5 text-white/75">
-        {expired
-          ? "Choose Renew access to return to your plan. Renewal is manual and secure."
-          : "Renewal is manual and secure. We will never charge you automatically; every renewal needs your confirmation."}
-      </p>
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onRenew}
-          data-renewal-card-cta
-          className={`flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-black text-white transition active:scale-[0.98] ${expired ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
-        >
-          {expired ? "Renew access" : "Renew / extend access"}
-        </button>
         <GlassButton
-          variant="capsule"
-          onClick={() => onToggleReminders(!subscription.reminderOptOut)}
-          data-renewal-reminder-toggle
-          className="shrink-0 [&>span>div]:h-auto [&>span>div]:px-3 [&>span>div]:py-3 [&>span>div]:text-[11px] [&>span>div]:font-black"
+          onClick={onOpen}
+          className="shrink-0 [&_.size-12]:size-9 [&_svg]:text-indigo-300"
+          aria-label="Open preferences"
         >
-          {subscription.reminderOptOut ? "Reminders off" : "Reminders on"}
+          <Bell size={16} />
         </GlassButton>
       </div>
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
-        <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
-      </p>
     </ProfileCard>
   );
 }
 
 /* ── Small building blocks ──────────────────────────────────────────── */
-function StatChip({ label, value, valueAttr }: { label: string; value: string; valueAttr?: string }) {
+function QuickStat({
+  icon,
+  value,
+  label,
+  tone,
+  onClick,
+}: {
+  icon: ReactNode;
+  value: number;
+  label: string;
+  tone: string;
+  onClick: () => void;
+}) {
   return (
-    <div className={STAT_CHIP}>
-      <p className="text-[9px] font-black uppercase tracking-wider text-white/55">{label}</p>
-      <p {...(valueAttr ? { [valueAttr]: true } : {})} className="mt-1 truncate text-xs font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; value: number; label: string; tone: string; onClick: () => void }) {
-  return (
-    /* Wave 13: the quick stat is a clickable pack surface — the Cart card's bare GlassSurface, radius 32. Press feedback (active:scale) stays; it is not a lift. */
+    /* The Home stat tile: a small icon chip, the number at Home's card value
+       weight and one 11px label. Press feedback (active:scale) stays; it is
+       not a lift. */
     <ProfileCard
-     
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
-      className="cursor-pointer text-center text-white transition active:scale-[0.97]"
-      contentClassName="p-3 md:p-3.5"
+      className="cursor-pointer text-center transition active:scale-[0.97]"
+      contentClassName="p-3"
     >
-      <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>
-      <span className="mt-2 block text-2xl font-black text-white md:text-3xl">{value}</span>
-      <span className="block text-[10px] font-bold uppercase tracking-wide text-white/55 md:text-[11px]">{label}</span>
+      <span className={`mx-auto grid h-9 w-9 place-items-center rounded-xl ring-1 ${tone}`}>{icon}</span>
+      <span className="dc-profile-card-value mt-2 block">{value}</span>
+      <span className="dc-profile-card-meta block">{label}</span>
     </ProfileCard>
   );
-}
-
-function UpgradePoint({ children }: { children: ReactNode }) {
-  return <div className="flex items-center gap-2 text-xs font-bold text-white/85"><CircleCheck className="h-4 w-4 shrink-0 text-indigo-300" />{children}</div>;
 }
 
 /* ── Modals (shared) ────────────────────────────────────────────────── */
@@ -785,7 +719,7 @@ export function BaseModal({ title, onClose, children }: { title: string; onClose
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent aria-label={title} className="max-h-[90dvh] max-w-lg overflow-y-auto text-white">
         <div className="mb-5 flex items-center justify-between">
-          <DialogTitle className="text-xl font-black">{title}</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{title}</DialogTitle>
           <GlassButton onClick={onClose} aria-label="Close" className="[&_.size-12]:size-9">
             <X size={17} />
           </GlassButton>
@@ -800,7 +734,7 @@ export function PreferenceRow({ icon, label, checked, onChange }: { icon: ReactN
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-white/10 p-4">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">{icon}</span>
-      <span className="flex-1 text-sm font-bold text-white">{label}</span>
+      <span className="flex-1 text-sm font-semibold text-white">{label}</span>
       {/* Wave 5: this was a hand-built 44×24 track with a translated knob.
           The registry switch keeps the same { checked, onChange } API and adds
           what the fake one could not: the knob squashes along the travel while
@@ -859,9 +793,11 @@ export function EditModal({
           <textarea className={INPUT} value={bio} onChange={(e) => setBio(e.target.value.slice(0, 240))} rows={3} placeholder="Tell learners about yourself" />
         </Field>
         {error && <p className="rounded-xl bg-rose-500/15 p-3 text-sm font-semibold text-rose-200">{error}</p>}
-        <GlassButton variant="capsule" type="submit" disabled={saving} className="w-full [&>span>div]:w-full disabled:opacity-60"><span className="inline-flex items-center gap-2">
-          {saving ? <LoaderCircle className="animate-spin" size={17} /> : <Save size={17} />} {saving ? "Saving…" : "Save changes"}
-        </span></GlassButton>
+        <GlassButton variant="capsule" type="submit" disabled={saving} className="w-full [&>span>div]:w-full disabled:opacity-60">
+          <span className="inline-flex items-center gap-2">
+            {saving ? <LoaderCircle className="animate-spin" size={17} /> : <Save size={17} />} {saving ? "Saving…" : "Save changes"}
+          </span>
+        </GlassButton>
       </form>
     </BaseModal>
   );
@@ -870,7 +806,7 @@ export function EditModal({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-bold text-white/55">{label}</span>
+      <span className="mb-1.5 block text-xs font-semibold text-white/70">{label}</span>
       {children}
     </label>
   );

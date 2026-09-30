@@ -48,13 +48,29 @@ function Bar({ used, limit, unlimited, tone }: { used: number; limit: number; un
   );
 }
 
-export default function AiQuotaCard({ uid, material = "store" }: { uid: string; material?: "store" | "cart" }) {
+export default function AiQuotaCard({
+  uid,
+  material = "store",
+  compact = false,
+}: {
+  uid: string;
+  /** `store` = the Revision Profile page's card (unchanged default);
+   *  `cart` = the Cart empty-state card's bare surface (radius 32);
+   *  `home` = the Home page's card — the navy contrast plate at the pinned
+   *  docs sensitivity, the material every Profile card now wears. */
+  material?: "store" | "cart" | "home";
+  /** Profile-only: drops the long explanation paragraph and the last-request
+   *  detail lines so the card is the numbers, not the essay (owner brief
+   *  2026-09-30 — "bahut jyada text … ekadam clean professional"). */
+  compact?: boolean;
+}) {
   // `store` (default) keeps the Revision Profile page's card byte-identical
   // (pack surface at tint 0.62 · light blue · blur 0 + the store hooks); the
-  // Profile page passes `cart` for the Cart empty-state card's bare
-  // <GlassSurface> — radius 32, pack defaults, no re-skin, no text scrim
-  // (owner brief 2026-09-29, cart card → profile).
+  // Profile page passes `home` (home card + home type, brief 2026-09-30) or
+  // `cart` for the Cart empty-state card's bare <GlassSurface> (brief
+  // 2026-09-29).
   const cartGlass = material === "cart";
+  const homeGlass = material === "home";
   const [settings, setSettings] = useState<CatalogAiSettings>(defaultCatalogAiSettings);
   const [record, setRecord] = useState(() => emptyUsage(uid));
   const [recordAvailable, setRecordAvailable] = useState(false);
@@ -151,11 +167,17 @@ export default function AiQuotaCard({ uid, material = "store" }: { uid: string; 
       data-ai-quota-card
       aria-live="polite"
       radius={cartGlass ? 32 : 24}
-      tint={cartGlass ? 0.5 : 0.62}
-      tintColor={cartGlass ? undefined : "173,216,255"}
-      blur={cartGlass ? 14 : 0}
-      className={cartGlass ? "text-white" : "dc-glass-card dc-store-glass dc-scene-ink relative text-white"}
-      contentClassName="p-5 lg:p-3.5"
+      tint={homeGlass ? 0.25 : cartGlass ? 0.5 : 0.62}
+      tintColor={homeGlass || cartGlass ? undefined : "173,216,255"}
+      blur={homeGlass ? 0 : cartGlass ? 14 : 0}
+      className={
+        cartGlass
+          ? "text-white"
+          : homeGlass
+            ? "dc-scene-plate dc-profile-card relative text-white"
+            : "dc-glass-card dc-store-glass dc-scene-ink relative text-white"
+      }
+      contentClassName={compact ? "p-4" : "p-5 lg:p-3.5"}
     >
       {/* Wave 14: the pack Glass Card — the white plate + drop shadow are gone. */}
       <div className="relative">
@@ -165,8 +187,8 @@ export default function AiQuotaCard({ uid, material = "store" }: { uid: string; 
               <Sparkles className="h-6 w-6 lg:h-4 lg:w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300">School AI allowance</p>
-              <h3 className={cartGlass ? "mt-1 truncate text-lg font-bold text-white" : "mt-1 truncate text-lg font-black text-white"}>
+              <p className={homeGlass ? "dc-profile-card-accent" : "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300"}>School AI allowance</p>
+              <h3 className={homeGlass ? "dc-profile-card-title mt-1 truncate" : cartGlass ? "mt-1 truncate text-lg font-bold text-white" : "mt-1 truncate text-lg font-black text-white"}>
                 {hasAuthoritativeSnapshot
                   ? `${snap.planName} · ${snap.planId === "free" ? "No billing cycle" : `${formatCycle(snap.cycle)} billing`}`
                   : "Checking your effective plan…"}
@@ -223,7 +245,7 @@ export default function AiQuotaCard({ uid, material = "store" }: { uid: string; 
                     Resets in {tokensResetIn} · {new Date(snap.tokensResetsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
                   </p>
                 )}
-                {record.lastUsage && (
+                {record.lastUsage && !compact && (
                   <p className="mt-1 text-[10px] leading-relaxed text-white/55" data-ai-quota-last-usage>
                     Last request: {record.lastUsage.totalTokens.toLocaleString()} tokens ({record.lastUsage.usageSource}) · {record.lastUsage.model}
                   </p>
@@ -269,7 +291,7 @@ export default function AiQuotaCard({ uid, material = "store" }: { uid: string; 
                 </div>
                 <Bar used={snap.costUsedMicros} limit={snap.costBudgetMicros} unlimited={snap.costUnlimited} tone="bg-amber-500" />
                 {snap.termEndsAt > now && <p className="mt-1.5 text-[11px] font-semibold text-white/55">Budget term ends {new Date(snap.termEndsAt).toLocaleDateString()}.</p>}
-                {record.lastUsage && (
+                {record.lastUsage && !compact && (
                   <p className="mt-1 text-[10px] leading-relaxed text-white/55">
                     Last test: {record.lastUsage.totalTokens.toLocaleString()} tokens ({record.lastUsage.usageSource}) · {record.lastUsage.model} · ${(record.lastUsage.actualCostMicros / 1_000_000).toFixed(4)}
                   </p>
@@ -279,7 +301,7 @@ export default function AiQuotaCard({ uid, material = "store" }: { uid: string; 
 
             {snap.blockedReason ? (
               <p className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-200">{snap.blockedReason}</p>
-            ) : (
+            ) : compact ? null : (
               <p className="mt-4 text-xs leading-5 text-white/75">
                 {snap.tokensEnabled
                   ? "Tokens are counted from the provider's own usage report for every school-AI request you make — Revision tests and Roman AI Pro alike. Failed or incomplete requests are not charged, and the budget resets at midnight your local time."
