@@ -565,10 +565,6 @@ function LumenChatInner({
     (msgId: string) => handlersRef.current.patchMessage(activeChatRef.current.id, msgId, (m) => ({ thinkingOpen: !m.thinkingOpen })),
     []
   );
-  const cbSuggestion = useCallback(
-    (text: string) => setDrafts((d) => (d[activeChatRef.current.id] === text ? d : { ...d, [activeChatRef.current.id]: text })),
-    []
-  );
   const cbDraftSync = useCallback(
     (v: string) => setDrafts((d) => (d[activeChatRef.current.id] === v ? d : { ...d, [activeChatRef.current.id]: v })),
     []
@@ -702,7 +698,6 @@ function LumenChatInner({
             chat={chat}
             tier={tier}
             generating={generating}
-            onSuggestion={cbSuggestion}
             onRetry={cbRetry}
             onImageClick={setLightbox}
             onToggleThinking={cbToggleThinking}

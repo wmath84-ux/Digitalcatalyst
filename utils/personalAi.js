@@ -25,6 +25,13 @@
 
 import { personalAiAvailability, personalCourseTypeLabel } from "./personalCourse.js";
 import { AI_READ_KINDS, aiReadPlan } from "./aiFileReaders.js";
+import {
+  MENTOR_SYSTEM_PROMPT,
+  detectMentorFormat,
+  finalizeMentorAnswer,
+  isMentorFormat,
+  mentorFormatInstructions,
+} from "./mentorAnswer.js";
 
 /* ------------------------------------------------------------------ */
 /* Constants + limits                                                  */
@@ -123,19 +130,48 @@ export const cleanAiText = (value, max = 0) => {
  * for titles, follow-ups and grounding snippets — but applied to an answer
  * body it crushes paragraphs and `- ` bullet lines into a single dummy
  * paragraph, and no renderer can resurrect structure that never arrives.
- * This is the ONLY cleaner the `answer` field may pass through: it trims
- * each line, folds 3+ blank lines into one paragraph break, squeezes runs of
+ * This is the ONLY cleaner an answer body may pass through: it trims each
+ * line, folds 3+ blank lines into one paragraph break, squeezes runs of
  * spaces/tabs (never across a newline), and caps the length on a paragraph
  * boundary when it can.
+ *
+ * Two structures a plain per-line trim used to destroy are kept verbatim:
+ *   · fenced code blocks — indentation and inner spacing are the program
+ *     (Python breaks without them), so only trailing spaces are removed;
+ *   · nested list items — an indented `- ` / `1. ` line stays indented, so a
+ *     sub-bullet does not silently become a top-level bullet.
  */
 export const cleanAiAnswerText = (value, max = 0) => {
-  let text = String(value == null ? "" : value).replace(/\r\n?/g, "\n");
-  text = text
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+/g, " ").replace(/\u00a0/g, " ").trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const source = String(value == null ? "" : value).replace(/\r\n?/g, "\n").split("\n");
+  const lines = [];
+  let fence = "";
+  let blanks = 0;
+  for (const raw of source) {
+    const marker = raw.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (fence) {
+      lines.push(raw.replace(/\s+$/, ""));
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !raw.trim().slice(marker[1].length).trim()) fence = "";
+      blanks = 0;
+      continue;
+    }
+    const plain = raw.replace(/\u00a0/g, " ");
+    const trimmed = plain.trim();
+    if (!trimmed) {
+      blanks += 1;
+      if (blanks <= 1) lines.push("");
+      continue;
+    }
+    blanks = 0;
+    if (marker) {
+      fence = marker[1];
+      lines.push(plain.replace(/\s+$/, "").replace(/^\s+/, ""));
+      continue;
+    }
+    const indent = plain.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
+    const squeezed = trimmed.replace(/[ \t]+/g, " ");
+    lines.push(indent >= 2 && /^(?:[-*+•]|\d{1,3}[.)])\s+/.test(squeezed) ? `${" ".repeat(Math.min(indent, 8))}${squeezed}` : squeezed);
+  }
+  const text = lines.join("\n").trim();
   if (!(max > 0) || text.length <= max) return text;
   const cut = text.lastIndexOf("\n\n", max);
   if (cut > max * 0.5) return text.slice(0, cut).trim();
@@ -733,7 +769,25 @@ export const PERSONAL_AI_SYSTEM_PROMPT = [
   "- Return ONLY valid JSON in the exact shape the request specifies. No markdown, no code fences, no commentary outside the JSON.",
 ].join("\n");
 
-const contentBlock = (chunks, coverage, scopeLabel) => {
+/**
+ * The chat mentor's standing orders (see `utils/mentorAnswer.js`). Used for
+ * `ask` and `explain`; the generators keep `PERSONAL_AI_SYSTEM_PROMPT`, whose
+ * "this content only" rule is exactly right for a summary or a question bank.
+ */
+export const PERSONAL_AI_MENTOR_SYSTEM_PROMPT = MENTOR_SYSTEM_PROMPT;
+
+/**
+ * The grounding block every prompt starts with.
+ *
+ * `general` is the mentor chat: the block is the learner's material to PREFER,
+ * not a wall around what may be said, so an empty block tells the model to
+ * teach from its own knowledge ("do not answer from memory" is what produced
+ * "it isn't in the file" replies to good questions) and the coverage line is
+ * marked as context, not as a limit. Generators (summary, questions, cards…)
+ * keep the strict wording: they must never invent material.
+ */
+const contentBlock = (chunks, coverage, scopeLabel, options = {}) => {
+  const general = asRecord(options).general === true;
   const rows = asArray(chunks).map((chunk, index) => {
     const row = asRecord(chunk);
     return [
@@ -742,17 +796,68 @@ const contentBlock = (chunks, coverage, scopeLabel) => {
       String(row.text || ""),
     ].join("\n");
   });
+  const coverageLine = asRecord(coverage).sentence || "";
   return [
     `SCOPE: ${scopeLabel}`,
-    `COVERAGE: ${asRecord(coverage).sentence || ""}`,
-    rows.length ? "CONTENT:" : "CONTENT: (nothing readable — do not answer from memory)",
+    general ? `COVERAGE (context only — never a limit on what you may answer): ${coverageLine}` : `COVERAGE: ${coverageLine}`,
+    rows.length
+      ? "CONTENT:"
+      : general
+        ? "CONTENT: (none of the learner's files could be read for this question — answer from your own expert knowledge)"
+        : "CONTENT: (nothing readable — do not answer from memory)",
     rows.join("\n\n"),
   ].join("\n");
 };
 
 const sourceRule = "sources: an array of the unit ids (the `id=` value) you actually used, in the order you used them. Use [] if you used none.";
 
-/** Module/resource chat question. */
+/**
+ * One line telling the model where the learner is, from the course player's
+ * own labels. Titles are folded to a single short line so a hostile title can
+ * never start its own prompt section.
+ */
+export const buildPersonalAiTopicLine = (input) => {
+  const options = asRecord(input);
+  const parts = [
+    ["course", options.courseTitle],
+    ["module", options.moduleTitle],
+    ["open file", options.resourceName],
+  ]
+    .map(([label, value]) => [label, cleanAiText(value, 120)])
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label} "${value}"`);
+  const type = cleanAiText(options.resourceType, 30);
+  if (parts.length && type && options.resourceName) parts[parts.length - 1] = `${parts[parts.length - 1]} (${type})`;
+  return parts.join(" · ");
+};
+
+/**
+ * The text the retriever should search for. A follow-up such as "quiz me on
+ * this" has no topic words of its own, so it borrows the learner's previous
+ * question — otherwise the chunks that best match the conversation are never
+ * sent and the answer falls back to general knowledge for no reason.
+ */
+export const personalAiRetrievalQuery = (question, history) => {
+  const current = cleanAiText(question, PERSONAL_AI_QUESTION_CHARS_MAX);
+  if (personalAiTokens(current).length >= 3) return current;
+  const previous = [...asArray(history)].reverse().find((row) => asRecord(row).role !== "assistant" && cleanAiText(asRecord(row).text));
+  const before = previous ? cleanAiText(asRecord(previous).text, 400) : "";
+  return before ? cleanAiText(`${before} ${current}`, PERSONAL_AI_QUESTION_CHARS_MAX) : current;
+};
+
+/**
+ * Module/resource chat question — the MENTOR prompt.
+ *
+ * Three things changed from the old "40-220 words of plain prose" prompt:
+ *   1. the answer is requested as FIELDS for a chosen layout
+ *      (`mentorFormatInstructions`), which the server lays out itself — the
+ *      model never writes Markdown into a JSON string;
+ *   2. an empty CONTENT block means "answer from your own knowledge";
+ *   3. where the learner is (`topic`) is stated, so relevance can be judged.
+ *
+ * The `Attached images (N): …` line keeps its exact one-line shape: the server
+ * strips it with a regex when it retries a vision rejection as text only.
+ */
 export const buildPersonalAiAskPrompt = (input) => {
   const options = asRecord(input);
   const question = cleanAiText(options.question, PERSONAL_AI_QUESTION_CHARS_MAX);
@@ -764,17 +869,16 @@ export const buildPersonalAiAskPrompt = (input) => {
   const visionLine = attachedImages.length
     ? `Attached images (${attachedImages.length}): ${attachedImages.map((name) => `"${name}"`).join(", ")} — look at each image and use what you see alongside the CONTENT block; say briefly what each image shows when it matters for the answer, and set grounded true when the images support it.`
     : "";
+  const format = isMentorFormat(options.format) ? options.format : detectMentorFormat(question, attachedImages.length > 0);
+  const topic = cleanAiText(options.topic, 400);
   return [
-    contentBlock(options.chunks, options.coverage, String(options.scopeLabel || "module")),
+    contentBlock(options.chunks, options.coverage, String(options.scopeLabel || "module"), { general: true }),
+    topic ? `WHERE THE LEARNER IS: ${topic}` : "",
     history.length ? `EARLIER IN THIS CONVERSATION (context only, not new content):\n${history.join("\n")}` : "",
     `LEARNER'S QUESTION: ${question}`,
     visionLine,
+    mentorFormatInstructions(format, { question }),
     "Answer in the learner's own language when the question is not in English (Hinglish is fine).",
-    "Return JSON: {\"answer\":\"...\",\"sources\":[\"unit-id\",...],\"grounded\":true|false,\"followUps\":[\"...\"]}",
-    "- answer: 40-220 words of plain prose. Use short bullet lines with a leading '- ' where a list genuinely helps.",
-    "- grounded: false ONLY when the CONTENT block did not contain the answer.",
-    sourceRule,
-    "- followUps: up to 2 short questions the learner is likely to ask next (empty array if none).",
   ].filter(Boolean).join("\n\n");
 };
 
@@ -845,7 +949,7 @@ export const buildPersonalAiExplainPrompt = (input) => {
     exam: "Explain it the way an examiner wants it written: the exact definition/derivation the content gives, the marks-worthy points, and the common mistake to avoid.",
   }[mode];
   return [
-    contentBlock(options.chunks, options.coverage, String(options.scopeLabel || "module")),
+    contentBlock(options.chunks, options.coverage, String(options.scopeLabel || "module"), { general: true }),
     `QUESTION THE LEARNER STRUGGLED WITH: ${cleanAiText(options.question, 900)}`,
     options.answer ? `CORRECT ANSWER: ${cleanAiText(options.answer, 600)}` : "",
     options.explanation ? `SHORT EXPLANATION ALREADY GIVEN: ${cleanAiText(options.explanation, 600)}` : "",
@@ -920,6 +1024,43 @@ export const normalizePersonalAiAnswer = (raw, knownUnitIds) => {
     sources: normalizeSourceIds(row.sources, knownUnitIds),
     grounded: row.grounded !== false && Boolean(answer),
     followUps: cleanList(row.followUps, 3, 160),
+  };
+};
+
+/**
+ * The mentor's answer, made structurally certain.
+ *
+ * `raw` is whatever the model returned (fields, legacy `{answer}`, Markdown in
+ * a string, or plain text wrapped by `parseMentorModelText`). The result's
+ * `answer` is Markdown that passes `validateMentorAnswer` for `format` — the
+ * layout actually delivered, which is what the learner's chip must say — or
+ * "" when the reply carried no text at all.
+ *
+ * @param options.format     the layout asked for (`detectMentorFormat`)
+ * @param options.hasImages  true when images went to the model with the question
+ */
+export const normalizePersonalAiMentorAnswer = (raw, knownUnitIds, options) => {
+  const settings = asRecord(options);
+  const row = asRecord(raw);
+  const done = finalizeMentorAnswer(row, { format: settings.format });
+  const known = asArray(knownUnitIds).map((id) => String(id));
+  const sources = known.length ? normalizeSourceIds(row.sources, known) : [];
+  let grounded = typeof row.grounded === "boolean" ? row.grounded : sources.length > 0;
+  // With nothing to read and nothing to look at, no answer can be grounded.
+  if (!known.length && settings.hasImages !== true) grounded = false;
+  if (!done.answer) grounded = false;
+  return {
+    answer: done.answer,
+    format: done.format,
+    sources,
+    grounded,
+    followUps: cleanList(row.followUps, 3, 160),
+    structure: {
+      requested: done.requested,
+      delivered: done.format,
+      reshaped: Boolean(done.reshaped),
+      downgraded: Boolean(done.downgraded),
+    },
   };
 };
 

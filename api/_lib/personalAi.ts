@@ -56,6 +56,7 @@ import {
   PERSONAL_AI_QUESTION_DEFAULT,
   PERSONAL_AI_QUESTION_MAX,
   PERSONAL_AI_QUESTION_CHARS_MAX,
+  PERSONAL_AI_MENTOR_SYSTEM_PROMPT,
   PERSONAL_AI_SYSTEM_PROMPT,
   PERSONAL_AI_WEAK_MAX_TOPICS,
   buildPersonalAiAskPrompt,
@@ -65,7 +66,9 @@ import {
   buildPersonalAiPlanPrompt,
   buildPersonalAiQuestionsPrompt,
   buildPersonalAiSummaryPrompt,
+  buildPersonalAiTopicLine,
   buildPersonalAiUnits,
+  cleanAiAnswerText,
   cleanAiText,
   isReusablePersonalAiArtifact,
   normalizePersonalAiAnswer,
@@ -73,6 +76,7 @@ import {
   normalizePersonalAiFlashcards,
   normalizePersonalAiOrientation,
   normalizePersonalAiPlan,
+  normalizePersonalAiMentorAnswer,
   normalizePersonalAiQuestions,
   normalizePersonalAiSummary,
   personalAiContentHash,
@@ -81,6 +85,7 @@ import {
   personalAiHash,
   personalAiProvenance,
   personalAiReadPlan,
+  personalAiRetrievalQuery,
   personalAiSources,
   personalAiState,
   retrievePersonalAiChunks,
@@ -89,6 +94,7 @@ import {
   type PersonalAiCoverage,
   type PersonalAiUnit,
 } from "../../utils/personalAi.js";
+import { MENTOR_RETRY_NOTE, detectMentorFormat, isMentorDeadEnd, parseMentorModelText } from "../../utils/mentorAnswer.js";
 
 const {
   asRecord,
@@ -177,6 +183,15 @@ const MAX_EXTRACT_PER_REQUEST = 8;
 const EXTRACTION_BUDGET_MS = 14_000;
 const MAX_RESOURCES_IN_SCOPE = 60;
 const MAX_THREAD_MESSAGES = 40;
+/**
+ * A stored answer is Markdown (headings, tables, fenced code), so it is kept
+ * with `cleanAiAnswerText`, never `cleanAiText`: the latter folds every
+ * newline into a space, and because `appendThread` re-saves the WHOLE thread
+ * through `loadThread`, one flattening read used to destroy the structure of
+ * every earlier answer for good.
+ */
+const THREAD_ANSWER_CHARS = 20_000;
+const THREAD_QUESTION_CHARS = 4_000;
 
 interface ScopeResource {
   id: string;
@@ -1071,7 +1086,7 @@ async function loadThread(db: Db, uid: string, storageModuleId: string): Promise
       return {
         id: text(message.id) || personalAiHash(text(message.text)),
         role: message.role === "user" ? "user" as const : "assistant" as const,
-        text: cleanAiText(message.text, 4000),
+        text: cleanAiAnswerText(message.text, message.role === "user" ? THREAD_QUESTION_CHARS : THREAD_ANSWER_CHARS),
         sources: Array.isArray(message.sources)
           ? message.sources.slice(0, 6).map((item) => {
               const source = asRecord(item);
@@ -1124,6 +1139,8 @@ interface ModelCall {
   imagesRead: number;
   /** True when images were attached but the model couldn't see — the answer fell back to text only. */
   visionSkipped: boolean;
+  /** Provider calls made for this one metered request (2 only after a dead-end reply). */
+  attempts: number;
 }
 
 /**
@@ -1244,8 +1261,28 @@ async function groundedCompletion(input: {
   resourceId?: string | null;
   estimatedOutputTokens: number;
   images?: AiVisionImage[];
+  /**
+   * The model's standing orders. The generators keep the strict "this content
+   * only" prompt (a summary must never be invented); the chat mentor passes its
+   * own, which answers from the model's knowledge when the files don't.
+   */
+  system?: string;
+  /**
+   * Read a damaged or non-JSON reply as an answer instead of failing with
+   * AI_INVALID_JSON. Only the chat asks for this: a generator's payload has to
+   * be exact, while a chat reply can always be repaired or reshaped.
+   */
+  lenientJson?: boolean;
+  /**
+   * Look at a parsed reply. `retry` is a correction note that buys ONE more
+   * attempt inside this same metered call (the learner pays once, never
+   * twice), and `usable: false` means there is nothing to show, so the call
+   * is released uncharged.
+   */
+  review?: (payload: unknown) => { retry: string | null; usable: boolean };
 }): Promise<ModelCall> {
   const { uid, req, body, prompt, grounding } = input;
+  const system = input.system || PERSONAL_AI_SYSTEM_PROMPT;
   const visionImages = (Array.isArray(input.images) ? input.images : []).filter((image) => image && image.base64 && image.mimeType).slice(0, 4);
   const aiSettings = await loadAiSettings();
   const policy: RevisionAiPolicy = await resolveEffectiveAiPolicy(uid, aiSettings);
@@ -1295,7 +1332,7 @@ async function groundedCompletion(input: {
   // from what we are actually sending.
   // Vision inputs cost provider tokens too — a coarse per-image bump keeps the
   // school-key reservation honest instead of systematically under-charging.
-  const estimatedInputTokens = estimateTokensFromText(`${PERSONAL_AI_SYSTEM_PROMPT}\n${prompt}`) + visionImages.length * 1000;
+  const estimatedInputTokens = estimateTokensFromText(`${system}\n${prompt}`) + visionImages.length * 1000;
   const estimatedOutputTokens = Math.max(200, Math.min(6000, Math.round(input.estimatedOutputTokens)));
   const price = findAiModelPrice(policy.pricing, config.provider, config.model);
 
@@ -1319,8 +1356,12 @@ async function groundedCompletion(input: {
 
   let rawText = "";
   let visionSkipped = false;
+  // What was actually sent — a vision retry strips the image line, and the
+  // dead-end retry below must resend exactly that, never the original.
+  let sentPrompt = prompt;
+  let sentImages = visionImages;
   try {
-    rawText = await completeJsonText(config, PERSONAL_AI_SYSTEM_PROMPT, prompt, origin, visionImages);
+    rawText = await completeJsonText(config, system, prompt, origin, visionImages);
   } catch (error) {
     // A model without vision rejects image parts with a 400 that names them.
     // Answering from text (with an honest note appended by the caller) beats a
@@ -1328,8 +1369,10 @@ async function groundedCompletion(input: {
     // be told about images it was never sent.
     if (visionImages.length && text((error as { code?: unknown })?.code) === "AI_MODEL_NO_VISION") {
       visionSkipped = true;
+      sentPrompt = prompt.replace(/^Attached images \(\d+[^:\n]*:[^\n]*\n?/m, "").trim();
+      sentImages = [];
       try {
-        rawText = await completeJsonText(config, PERSONAL_AI_SYSTEM_PROMPT, prompt.replace(/^Attached images \(\d+[^:\n]*:[^\n]*\n?/m, "").trim(), origin, []);
+        rawText = await completeJsonText(config, system, sentPrompt, origin, []);
       } catch (retryError) {
         if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
         throw mapProviderError(retryError);
@@ -1344,18 +1387,58 @@ async function groundedCompletion(input: {
     fail(502, "AI_EMPTY", "The AI returned an empty answer. Nothing was charged — please try again.");
   }
 
-  let parsed: unknown;
-  try {
-    parsed = extractJson(rawText);
-  } catch {
+  const readReply = (value: string): { ok: true; payload: unknown } | { ok: false } => {
+    // The chat reshapes whatever arrives (plain text, cut-off JSON, raw
+    // newlines in a string) instead of turning a formatting slip into an error.
+    if (input.lenientJson) return { ok: true, payload: parseMentorModelText(value).value };
+    try {
+      return { ok: true, payload: extractJson(value) };
+    } catch {
+      return { ok: false };
+    }
+  };
+  const firstReply = readReply(rawText);
+  if (!firstReply.ok) {
     if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
     fail(502, "AI_INVALID_JSON", "The AI returned something I couldn't read as an answer. Nothing was charged — please try again.");
   }
+  let parsed: unknown = firstReply.ok ? firstReply.payload : null;
+  let spentText = rawText;
+  let attempts = 1;
+
+  // A reply that is a dead end ("it isn't in the file", "I can't access it") or
+  // empty gets exactly ONE more attempt with an explicit correction. Only when
+  // the handler still has the time for a second provider call, and the attempt
+  // is capped: a provider can stall for 45 s, which would carry the request past
+  // the platform's 60 s limit and lose the answer we already hold.
+  const verdict = input.review ? input.review(parsed) : null;
+  if (verdict?.retry && !isBudgetLow(CORRECTION_MIN_BUDGET_MS)) {
+    try {
+      const again = await withinMs(
+        completeJsonText(config, system, `${sentPrompt}\n\n${verdict.retry}`, origin, sentImages),
+        CORRECTION_TIMEOUT_MS,
+      );
+      attempts += 1;
+      spentText += again;
+      const second = again ? readReply(again) : { ok: false as const };
+      if (second.ok) {
+        const secondVerdict = input.review ? input.review(second.payload) : null;
+        // Keep the retry unless it is no better than what we already had.
+        if (!secondVerdict || secondVerdict.usable && (!verdict.usable || !secondVerdict.retry)) parsed = second.payload;
+      }
+    } catch {
+      // The first reply stands; a failed correction must never cost the answer.
+    }
+  }
+  if (input.review && !input.review(parsed).usable) {
+    if (reservation) await releaseUsage(uid, reservation.id).catch(() => undefined);
+    fail(502, "AI_EMPTY", "The AI returned an empty answer. Nothing was charged — please try again.");
+  }
 
   const usage: RevisionAiProviderUsage = {
-    inputTokens: estimatedInputTokens,
-    outputTokens: estimateTokensFromText(rawText),
-    totalTokens: estimatedInputTokens + estimateTokensFromText(rawText),
+    inputTokens: estimatedInputTokens * attempts,
+    outputTokens: estimateTokensFromText(spentText),
+    totalTokens: estimatedInputTokens * attempts + estimateTokensFromText(spentText),
     source: "estimated",
   };
 
@@ -1383,6 +1466,7 @@ async function groundedCompletion(input: {
     contentHash: grounding.contentHash,
     imagesRead: visionSkipped ? 0 : visionImages.length,
     visionSkipped,
+    attempts,
   };
 }
 
@@ -1536,6 +1620,39 @@ const collectResourceVisionImages = async (scope: Scope, availability: ResourceA
   return out;
 };
 
+/** A dead-end correction only starts with this much of the handler's budget left … */
+const CORRECTION_MIN_BUDGET_MS = 30_000;
+/** … and is abandoned (the first reply stands) after this long. */
+const CORRECTION_TIMEOUT_MS = 20_000;
+
+/** Race `work` against a timer. The loser keeps running but can no longer affect the request. */
+async function withinMs<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("CORRECTION_TIMEOUT")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Output budget per layout — a deep dive needs more room than a quick answer. */
+const ASK_OUTPUT_TOKENS: Record<string, number> = {
+  concise: 420,
+  steps: 850,
+  comparison: 850,
+  timeline: 750,
+  code: 1000,
+  "deep-dive": 1250,
+  visual: 850,
+  practice: 1250,
+  feedback: 950,
+};
+
 async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
   const scope = await resolveAskScope(db, uid, body);
   const question = cleanAiText(body.question, PERSONAL_AI_QUESTION_CHARS_MAX);
@@ -1553,37 +1670,70 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
 
   // Images resolve BEFORE the prompt is built, so the vision line names exactly
   // what the model is about to receive — never a skipped or failed fetch.
-  const visionImages = [...cleanChatVisionImages(body.images), ...(await collectResourceVisionImages(scope, content.availability))].slice(0, 4);
+  const attachedImages = cleanChatVisionImages(body.images);
+  const visionImages = [...attachedImages, ...(await collectResourceVisionImages(scope, content.availability))].slice(0, 4);
+
+  // The layout this question deserves, decided from the learner's own words by
+  // the same function the player's "thinking" chip uses. Everything after this
+  // line — the prompt's field list, the renderer, the validator — works from
+  // this one decision, so the chip, the prompt and the answer cannot disagree.
+  // Only what the LEARNER attached counts as "they showed me something" — an
+  // image the open lesson happens to be must not turn every question into a
+  // walkthrough — and it is the very signal the player's own chip uses.
+  const format = detectMentorFormat(question, attachedImages.length > 0);
+  const query = personalAiRetrievalQuery(question, history);
+  const chunks = retrievePersonalAiChunks({
+    units: grounding.units,
+    query,
+    resourceId: scope.resourceId || undefined,
+    maxChunks: PERSONAL_AI_MAX_CHUNKS,
+    maxChars: PERSONAL_AI_MAX_CONTEXT_CHARS,
+  });
+  const context = asRecord(body.courseContext);
+  const openResource = scope.resourceId ? scope.resources.find((row) => row.id === scope.resourceId) : undefined;
+  const topic = buildPersonalAiTopicLine(
+    text(context.courseTitle) || text(context.moduleTitle) || text(context.resourceName)
+      ? { courseTitle: context.courseTitle, moduleTitle: context.moduleTitle, resourceName: context.resourceName, resourceType: context.resourceType }
+      : { moduleTitle: scope.module.title, resourceName: openResource?.name, resourceType: openResource?.type },
+  );
   const prompt = buildPersonalAiAskPrompt({
-    chunks: retrievePersonalAiChunks({
-      units: grounding.units,
-      query: question,
-      resourceId: scope.resourceId || undefined,
-      maxChunks: PERSONAL_AI_MAX_CHUNKS,
-      maxChars: PERSONAL_AI_MAX_CONTEXT_CHARS,
-    }),
+    chunks,
     coverage: grounding.coverage,
     scopeLabel: grounding.scopeLabel,
     question,
     history,
     images: visionImages.map((image) => image.name || "attached image"),
+    topic,
+    format,
   });
+  const knownUnitIds = chunks.map((chunk) => chunk.unitId);
+  const hasImages = visionImages.length > 0;
   const call = await groundedCompletion({
     uid,
     req,
     body,
     prompt,
     grounding,
-    query: question,
+    query,
     resourceId: scope.resourceId,
-    estimatedOutputTokens: 700,
+    estimatedOutputTokens: ASK_OUTPUT_TOKENS[format] || 900,
     images: visionImages,
+    system: PERSONAL_AI_MENTOR_SYSTEM_PROMPT,
+    lenientJson: true,
+    // A reply that stops at "it isn't in the file" / "I can't access it" is the
+    // bug this mentor exists to avoid, so it gets one correction; an empty
+    // reply is released uncharged instead of being billed and shown as blank.
+    review: (payload) => {
+      const probe = normalizePersonalAiMentorAnswer(payload, knownUnitIds, { format, hasImages });
+      return { retry: !probe.answer || isMentorDeadEnd(probe.answer) ? MENTOR_RETRY_NOTE : null, usable: Boolean(probe.answer) };
+    },
   });
   const unitIds = call.chunks.map((chunk) => chunk.unitId);
-  const answer = normalizePersonalAiAnswer(call.payload, unitIds);
+  const answer = normalizePersonalAiMentorAnswer(call.payload, unitIds, { format, hasImages: call.imagesRead > 0 });
   if (call.visionSkipped && visionImages.length) {
     // The model answered blind: the note lives ON the answer, or "grounded"
-    // would be a claim the learner cannot verify.
+    // would be a claim the learner cannot verify. It trails the structured
+    // layout as a footnote, which the validator allows for every format.
     answer.answer = `${answer.answer}\n\n_I couldn't look at the attached image${visionImages.length === 1 ? "" : "s"} — the configured AI model can't read images, so this answer uses the lesson text only. Switch to a vision-capable model in Revision → AI Configuration to fix this._`;
   }
   const sources = call.sources.filter((source) => answer.sources.includes(source.unitId));
@@ -1624,6 +1774,7 @@ async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
     scopeLabel: grounding.scopeLabel,
     imagesRead: call.imagesRead,
     visionSkipped: call.visionSkipped,
+    attempts: call.attempts,
     provider: call.provider,
     model: call.model,
     aiSource: call.aiSource,
@@ -1710,7 +1861,12 @@ async function handleGenerate(db: Db, uid: string, body: Body, req: VercelReques
   // Honest insufficiency WITHOUT spending allowance: nothing readable at all.
   const hasReadableText = chunks.some((chunk) => chunk.kind === "resource-text" || chunk.kind === "note");
   const authoredOnly = !hasReadableText && chunks.some((chunk) => chunk.kind === "resource-meta" || chunk.kind === "module-brief");
-  if (!chunks.length) {
+  // Generators (summary, questions, cards, plan, orientation) must be built from
+  // the material, so with nothing to read there is honestly nothing to make.
+  // "Explain again" is tutoring, not generation: the learner is stuck on a
+  // concept and the mentor explains it from its own knowledge when the files
+  // don't cover it — the same answer-first rule the chat follows.
+  if (!chunks.length && effectiveType !== "explanation") {
     fail(422, "NO_READABLE_CONTENT", "I couldn't read any content in this module yet, so there is nothing to ground this in. Add a description or notes, or open a readable file (PDF / shared Google Doc).");
   }
 
@@ -1765,6 +1921,7 @@ async function handleGenerate(db: Db, uid: string, body: Body, req: VercelReques
     query,
     resourceId: scope.resourceId,
     estimatedOutputTokens: OUTPUT_TOKEN_ESTIMATE[effectiveType] || 900,
+    ...(effectiveType === "explanation" ? { system: PERSONAL_AI_MENTOR_SYSTEM_PROMPT } : {}),
   });
   const unitIds = call.chunks.map((chunk) => chunk.unitId);
   // Every normalizer returns a plain JSON object; the union is narrowed to a

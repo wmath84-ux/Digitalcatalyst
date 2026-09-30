@@ -3,6 +3,8 @@
 // `.js` file so the Node test runner, the browser bundle and the serverless
 // API all import exactly the same honesty/retrieval/prompt rules.
 
+import type { MentorFormat } from "./mentorAnswer";
+
 /** Honest availability vocabulary shared by extractor, API and UI. */
 export type PersonalAiState =
   | "ready"
@@ -217,7 +219,16 @@ export const isReusablePersonalAiArtifact: (input: {
 }) => boolean;
 
 export const PERSONAL_AI_SYSTEM_PROMPT: string;
+/** The chat mentor's standing orders — answer from its own knowledge when the files don't cover the question. */
+export const PERSONAL_AI_MENTOR_SYSTEM_PROMPT: string;
 export const buildPersonalAiAskPrompt: (input: unknown) => string;
+export const buildPersonalAiTopicLine: (input: {
+  courseTitle?: unknown;
+  moduleTitle?: unknown;
+  resourceName?: unknown;
+  resourceType?: unknown;
+}) => string;
+export const personalAiRetrievalQuery: (question: unknown, history?: unknown) => string;
 export const buildPersonalAiSummaryPrompt: (input: unknown) => string;
 export const buildPersonalAiQuestionsPrompt: (input: unknown) => string;
 export const buildPersonalAiFlashcardsPrompt: (input: unknown) => string;
@@ -232,6 +243,17 @@ export interface PersonalAiAnswer {
   followUps: string[];
 }
 export const normalizePersonalAiAnswer: (raw: unknown, knownUnitIds?: unknown) => PersonalAiAnswer;
+
+export interface PersonalAiMentorAnswer extends PersonalAiAnswer {
+  /** The layout actually delivered — the learner's chip must name this one. */
+  format: MentorFormat;
+  structure: { requested: MentorFormat; delivered: MentorFormat; reshaped: boolean; downgraded: boolean };
+}
+export const normalizePersonalAiMentorAnswer: (
+  raw: unknown,
+  knownUnitIds?: unknown,
+  options?: { format?: unknown; hasImages?: boolean },
+) => PersonalAiMentorAnswer;
 
 export interface PersonalAiSummary {
   overview: string;

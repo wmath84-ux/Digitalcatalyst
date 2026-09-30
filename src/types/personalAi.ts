@@ -1,4 +1,5 @@
 import type { PersonalAiCoverage, PersonalAiSource, PersonalAiState } from "../../utils/personalAi";
+import type { MentorFormat } from "../../utils/mentorAnswer";
 
 /** One resource's honest AI availability inside a personal module. */
 export interface PersonalAiResourceAvailability {
@@ -113,8 +114,20 @@ export interface PersonalAiStateSnapshot {
 export interface PersonalAiAnswerResult {
   kind: "answer";
   question: string;
+  /** Markdown laid out by the server; it always passes the skeleton check for `format`. */
   answer: string;
+  /**
+   * The layout the answer was actually delivered in — what the learner's chip
+   * names. Absent only on a response from a server that predates the contract.
+   */
+  format?: MentorFormat;
+  structure?: { requested: MentorFormat; delivered: MentorFormat; reshaped: boolean; downgraded: boolean };
   sources: string[];
+  /**
+   * True when the answer draws on the learner's files or images (even partly).
+   * False is NOT a failure: it means the files did not cover the question and
+   * the mentor answered from its own knowledge.
+   */
   grounded: boolean;
   followUps: string[];
   sourceDetails: PersonalAiSource[];

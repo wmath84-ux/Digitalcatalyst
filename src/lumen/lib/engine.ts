@@ -1,4 +1,5 @@
 import type { Attachment, GeneratedImage, InteractiveQuiz, QuizQuestion, ResponseFormat } from "./types";
+import { detectMentorFormat } from "../../../utils/mentorAnswer";
 
 export interface GenerationSpec {
   steps: { label: string; detail?: string }[];
@@ -328,22 +329,15 @@ export function detectTopic(text: string, courseShort: string): Topic {
    Format detection — the "dynamic output structure" decision
    ───────────────────────────────────────────────────────────── */
 
+/**
+ * The rule that picks a layout for a question now lives in ONE place,
+ * `utils/mentorAnswer.js`, shared by this mock engine, the player's chip and
+ * the server that lays the real answer out. It used to be defined here and
+ * copied (with a weaker regex) into `productionAi.ts`, so the layouts written
+ * below were applied to the mock and only a label reached the real answer.
+ */
 export function detectFormat(text: string, hasMedia: boolean): ResponseFormat {
-  const t = text.toLowerCase();
-  // Image generation needs an explicit *creation* verb — otherwise
-  // "explain this diagram" would wrongly redraw instead of explaining.
-  if (/\b(visuali[sz]e|illustrate)\b/.test(t)) return "visual";
-  if (/\b(draw|sketch|render|generate|create|make|give me|show me)\b[^.?!]{0,30}\b(diagram|image|picture|illustration|infographic|visual|chart)\b/.test(t))
-    return "visual";
-  if (/\b(practice|quiz|test me|check-?up|drill|questions to answer|harder set|fresh set|another set|set of \d)\b/.test(t)) return "practice";
-  if (/\b(essay|feedback|my draft|paragraph|critique|review my)\b/.test(t)) return "feedback";
-  if (/\b(differen\w*|compare|comparison|versus|vs\.?|contrast|better than)\b/.test(t)) return "comparison";
-  if (/\b(timeline|chronolog\w*|order of events|phases|sequence|what happened when)\b/.test(t)) return "timeline";
-  if (/\b(code|implement|pseudocode|write (a|the) function|program|syntax|in python|snippet)\b/.test(t)) return "code";
-  if (/\b(step by step|steps|how do|how does|how to|walk me through|process|procedure|derive)\b/.test(t)) return "steps";
-  if (/\b(brief\w*|short|quick|tl;?dr|in one|one-?line|simply|simple|eli5|summar\w*|recap|key points)\b/.test(t)) return "concise";
-  if (hasMedia) return "steps";
-  return "deep-dive";
+  return detectMentorFormat(text, hasMedia);
 }
 
 /* ─────────────────────────────────────────────────────────────
