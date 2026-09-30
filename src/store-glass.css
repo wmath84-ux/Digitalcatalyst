@@ -225,3 +225,21 @@ html[data-glass="off"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2)
     ) !important;
   }
 }
+
+/* ── Profile page (2026-09-30): same lens as the store, classic type ─────── */
+.dc-profile-card h2,
+.dc-profile-card h3 {
+  letter-spacing: -0.015em;
+  color: #ffffff;
+}
+.dc-profile-card h2 { font-weight: 800; }
+.dc-profile-card .text-indigo-300,
+.dc-profile-card .text-cyan-300,
+.dc-profile-card .text-amber-300 { color: #dbeafe; }
+.dc-profile-title {
+  font-size: clamp(1.7rem, 7vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: #fff;
+}

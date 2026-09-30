@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GlassSurface } from "../components/ui/glass";
+import { ProfileCard } from "./ProfileCard";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
@@ -36,7 +36,7 @@ export default function ProfilePreview() {
 
   // Mock slots to represent the account cards that live in the real app.
   const mockMyDayCard = (
-    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
         <div>
@@ -48,11 +48,11 @@ export default function ProfilePreview() {
       <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/15">
         <div className="h-full w-1/4 rounded-full bg-emerald-600" />
       </div>
-    </GlassSurface>
+    </ProfileCard>
   );
 
   const mockAiQuotaCard = subscriber ? (
-    <GlassSurface radius={32} className="text-white" contentClassName="p-5">
+    <ProfileCard className="text-white" contentClassName="p-5">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
         <div>
@@ -61,7 +61,7 @@ export default function ProfilePreview() {
           <p className="mt-0.5 text-xs font-medium text-white/55">Resets weekly.</p>
         </div>
       </div>
-    </GlassSurface>
+    </ProfileCard>
   ) : null;
 
   const tierLabel = tier === "normal" ? "Free learner" : tier === "premium" ? "Premium" : "Premium";

@@ -118,7 +118,7 @@ test("the card's Delete asks first, through the Profile page's own glass", () =>
   assert.match(confirm, /profileGlass\n\s+\? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"/);
   // …and the `scene` path is byte-for-byte what My Day / Home pin.
   assert.match(confirm, /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/);
-  assert.match(profile, /<GlassSurface data-profile-hero radius=\{32\}/);
+  assert.match(profile, /<ProfileCard data-profile-hero/);
 });
 
 test("the builder overlay wears the Profile glass and lays out for every screen", () => {
