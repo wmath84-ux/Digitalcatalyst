@@ -19,6 +19,7 @@ newlines, which was real but only one of several leaks:
 | 6 | `AiProse` (Library chat) only understood paragraphs and all-bullet blocks. | Headings/tables/code showed as raw `###`, `**`, `\|---\|`. |
 | 7 | Tailwind's preflight sets `list-style: none`; `.md` only *coloured* the marker. | Numbered steps lost their numbers, bullets their dots, a quiz's key could not be matched to questions. |
 | 8 | `withCourseLead` prefixed the course/module **title** to the question the layout was chosen from. | A module called "Programming in Python" made every answer a code answer. |
+| 9 | The streaming renderer (`splitStable`, `src/lumen/lib/perf.ts`) split at the last *blank* line. | A list, table or walkthrough being written showed raw `**`, backticks and `\|---\|` until the whole block finished. |
 
 Refusals came from the same place:
 
