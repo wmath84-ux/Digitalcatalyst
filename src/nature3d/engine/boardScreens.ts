@@ -137,6 +137,8 @@ export interface BoardScreensHandle {
    * media survives and resumes where it was.
    */
   setOverlayOpen(open: boolean): void;
+  /** Keep boards painted/media alive while character input owns the scene. */
+  setInteractive(enabled: boolean): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
   /**
@@ -352,6 +354,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   // last opacity string written, so an unchanged frame does no DOM work.
   // True while a full-screen HUD panel owns the screen. See setOverlayOpen.
   let overlayOpen = false;
+  let interactive = true;
   const occlusion = new Map<LecternSlot, number>();
   const lastOpacity = new Map<LecternSlot, string>();
   const occEye = new THREE.Vector3();
@@ -572,6 +575,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       dirty = true;
     },
 
+    setInteractive(enabled) { interactive = enabled; dirty = true; },
+
     setFog(near, far, color) {
       const nextNear = Math.max(0.5, near);
       const nextFar = Math.max(nextNear + 1, far);
@@ -711,7 +716,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         }
         // A board more than half buried behind the world should not swallow
         // clicks meant for whatever is actually in front of it.
-        const interactable = visible && occ < 0.5;
+        const interactable = interactive && visible && occ < 0.5;
         const alpha = visible ? 1 - occ : 0;
         const alphaStr = alpha >= 0.999 ? "1" : alpha <= 0.001 ? "0" : alpha.toFixed(3);
         if (lastOpacity.get(screen.slot) !== alphaStr) {

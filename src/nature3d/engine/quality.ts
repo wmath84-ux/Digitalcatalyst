@@ -552,36 +552,25 @@ export class AdaptiveResolution {
 }
 
 /**
- * `FORCE_MEDIUMP_SHADER_PRECISION`, web edition.
+ * Legacy low-tier precision entry point; keep BOTH shader stages highp.
  *
- * Chains onto a material's existing `onBeforeCompile` (the grass wind uses
- * that hook too — composition, never replacement, the same discipline the
- * atmosphere pass applies) and re-declares the default float precision as
- * MEDIUMP at the top of the FRAGMENT shader string. Everything three.js
- * declares after that point — varyings, uniforms, locals — lands in fp16,
- * which on Mali/Adreno tile GPUs means double ALU rate and half the register
- * pressure for exactly the shaders that fill the screen (grass, plants,
- * water, sky).
+ * Prepending `precision mediump` to only the fragment source changed the
+ * precision of shared uniforms (directionalLightShadows, uTime, …), while
+ * their vertex declarations stayed highp. WebGL2 rejects that at LINK time:
+ * every patched terrain/house/plant disappeared, leaving just the DOM boards.
+ * Varyings also need matching precision. Grepping GLSL cannot catch this;
+ * tests/sanctuaryWorldBrowser.test.mjs actually links the low-tier programs.
  *
- * The VERTEX stage is deliberately untouched: world coordinates span
- * ±1.7 km, and fp16 vertex math would make distant geometry visibly jitter.
- * Interpolated varyings still arrive from highp vertex outputs — only the
- * fragment-side arithmetic goes half rate, which is where the fill-rate cost
- * actually lives.
+ * Three's material.precision sets a consistent program prefix for both
+ * stages. Use highp: mediump in BOTH stages would link, but lose centimetre
+ * accuracy across the kilometre-wide world. Resolution, LOD and thermal
+ * shedding still provide the mobile budget. Future fp16 optimisations must
+ * qualify individual LOCAL fragment expressions, never the stage default.
+ * Do not wrap/replace onBeforeCompile: wind, atmosphere and winter keep
+ * their existing chain, and repeat registration is naturally idempotent.
  */
 export function halfPrecisionMaterial(material: THREE.Material): void {
-  const previous = material.onBeforeCompile as unknown as
-    ((shader: { fragmentShader: string; vertexShader: string }, renderer: unknown) => void)
-    | undefined;
-  material.onBeforeCompile = ((shader: { fragmentShader: string; vertexShader: string }, renderer: unknown) => {
-    previous?.call(material, shader, renderer);
-    if (!shader.fragmentShader.startsWith("precision mediump")) {
-      shader.fragmentShader =
-        "precision mediump float;\nprecision mediump int;\n" + shader.fragmentShader;
-    }
-  }) as THREE.Material["onBeforeCompile"];
-  const prevKey = material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey = () => `${prevKey ? prevKey() : "dc"}-fp16`;
+  material.precision = "highp";
 }
 
 /** Apply `halfPrecisionMaterial` to every mesh material under a root. */

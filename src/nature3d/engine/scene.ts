@@ -31,10 +31,10 @@ import {
   type QualityTier,
 } from "./quality";
 import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GROUND_PHOTO_URL, type TextureSet } from "./textures";
-import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
+import { buildTerrain, coastWeight, FLY_LIMIT_RADIUS, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createHillGrassField, type HillGrassField } from "./hillGrass";
-import { canopyShadowDiscs, createFlora, type Flora } from "./flora";
+import { canopyShadowDiscs, createFlora, getTreeObstacles, type Flora } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
 import { createMossBank, type MossBank } from "./moss";
@@ -50,7 +50,6 @@ import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
 import { createBoard, createBoardStand, BOARD_HILL, type BoardHandle } from "./board";
-import { createStudent, type StudentRig } from "./student";
 import { createDayBed, type DayBed } from "./dayBed";
 import { createWarehouse, type Warehouse } from "./warehouse";
 import {
@@ -61,6 +60,7 @@ import {
 import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
 import { OrbitRig } from "./controls";
+import { stageLocalDelta } from "../stagePointer";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
 import {
   createBoardScreens,
@@ -71,7 +71,11 @@ import {
   type BoardScreen,
   type BoardScreensHandle,
 } from "./boardScreens";
-import { TrekPlayer, type TrekAvatar } from "./trekAvatar";
+import { createEmptyAvatar, type TrekAvatar } from "./characterPlayer";
+import { CharacterController } from "./characterController";
+import { CharacterCollisionWorld, type CharacterCollider } from "./characterCollision";
+import { CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SCALE, CHARACTER_SPAWN, characterEyeHeight, type CharacterCameraMode } from "./characterConfig";
+import { FALLBACK_CHARACTER_STATUS, readCharacterManifest, type CharacterAssetStatus } from "./characterManifest";
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
 import { cullDistanceForPx } from "./cull";
@@ -155,6 +159,9 @@ export interface SanctuaryOptions {
   onBoardTap?: () => void;
   onBoardGrab?: (grabbed: boolean) => void;
   onReady?: () => void;
+  /** Discrete changes only; no React updates in the movement/render loop. */
+  onCharacterMode?: (mode: CharacterCameraMode) => void;
+  onCharacterAsset?: (status: CharacterAssetStatus) => void;
   /** Force a tier (dev/debug); defaults to auto-detect. */
   tier?: QualityTier;
 }
@@ -231,7 +238,6 @@ export class Sanctuary {
   /** The bay district: tropical-modern buildings, landmark, jetty, props. */
   private structures: Structures;
   private board: BoardHandle;
-  private student: StudentRig;
   /** The Vintage Day Bed — the learner's seat, loaded async (dayBed.ts). */
   private dayBed: DayBed | null = null;
   /** The abandoned warehouse, loaded async (warehouse.ts). */
@@ -243,14 +249,18 @@ export class Sanctuary {
    * are there; the model itself is async and fail-soft.
    */
   private beachHouses: BeachHouses | null = null;
-  /**
-   * The seated learner figure. Removed on request: only the day bed should sit
-   * in front of the board now. Kept as a nullable field rather than deleted
-   * outright because `trek.ts` and the walk-mode plumbing still reference the
-   * avatar contract; a later pass can drop those too.
-   */
-  private avatar: TrekAvatar | null = null;
-  private trek = new TrekPlayer();
+  /** One standing playable character; no seated student is constructed. */
+  private avatar: TrekAvatar;
+  private characterWorld: CharacterCollisionWorld;
+  private character: CharacterController;
+  private characterPaused = false;
+  private characterStarted = false;
+  private characterSpawn = new THREE.Vector3(CHARACTER_SPAWN.x, 0, CHARACTER_SPAWN.z);
+  private characterAssetStatus: CharacterAssetStatus = FALLBACK_CHARACTER_STATUS;
+  private movementStick = new THREE.Vector2();
+  private gamepadJumpHeld = false;
+  private gamepadCoverHeld = false;
+  private gamepadCameraHeld = false;
   /** The three live course-player boards + their WebGL frames. */
   private screens: BoardScreensHandle;
   private desk: THREE.Group;
@@ -343,6 +353,7 @@ export class Sanctuary {
   private pointers = new Map<number, { x: number; y: number }>();
   private keys = new Set<string>();
   private lastGroundTap = 0;
+  private pointerDelta = new THREE.Vector2();
   /**
    * Foliage atmosphere registration option. On the plant-diet tier the
    * per-fragment sun-transmission chain (one pow + several dot products over
@@ -450,6 +461,13 @@ export class Sanctuary {
     // grass standing where a floor is, houses floating over a green hollow.
     // Deterministic and idempotent: the same six sites on every machine.
     ensureBeachHouseSites();
+    const waterAt = (x: number, z: number) => insideRiver(x, z) ? WATER_LEVEL : coastWeight(x, z) > 0.42 ? OCEAN_LEVEL : -Infinity;
+    this.characterWorld = new CharacterCollisionWorld(
+      (x, z) => this.iceAge ? Math.max(terrainHeight(x, z), waterAt(x, z)) : terrainHeight(x, z),
+      FLY_LIMIT_RADIUS - 12,
+      waterAt,
+    );
+    this.character = new CharacterController(this.characterWorld);
 
     this.sky = createSky(this.textures, this.budget);
     this.scene.add(this.sky.group);
@@ -495,6 +513,7 @@ export class Sanctuary {
     // on, however good the rock is).
     this.rocks = createRockField(this.textures, this.budget, this.weathering);
     this.scene.add(this.rocks.group);
+    this.installRockColliders();
     this.atmosphere.registerTree(this.rocks.group);
     this.winter.registerTree(this.rocks.group);
     if (this.budget.halfPrecision) halfPrecisionTree(this.rocks.group);
@@ -546,6 +565,7 @@ export class Sanctuary {
 
     this.flora = createFlora(this.textures, this.budget);
     this.scene.add(this.flora.group);
+    this.syncTreeColliders();
     // Leaves glow when the sun is behind them; bark, shrubs and flower stems do
     // not. The factory publishes the two lists rather than leaving the scene to
     // guess which material is which.
@@ -643,6 +663,7 @@ export class Sanctuary {
         return;
       }
       this.tropical = field;
+      this.syncTreeColliders();
       field.group.visible = false;
       this.scene.add(field.group);
       field.materials.forEach((m) => this.atmosphere.register(m, this.foliageOpts));
@@ -716,13 +737,9 @@ export class Sanctuary {
     this.applyDaylight();
     this.scene.add(this.water.group);
 
-    this.student = createStudent(this.budget);
-    this.scene.add(this.student.group);
-    this.winter.registerTree(this.student.chair);
-
-    // THE VINTAGE DAY BED — the real seat the boy occupies ("chair ki
-    // jagah"): loaded async like the plant fields, placed around the
-    // student in `dayBed.ts`, snowable like any other solid.
+    // Only the sofa remains at the seat. No createStudent(), hidden figure,
+    // breathing animation or student-owned furniture is mounted here.
+    // The sofa is exactly 2× its PREVIOUS rendered dimensions (dayBed.ts).
     createDayBed(this.budget, aniso)
       .then((bed) => {
         if (this.disposed) {
@@ -731,6 +748,7 @@ export class Sanctuary {
         }
         this.dayBed = bed;
         this.scene.add(bed.group);
+        this.installPropCollider("sofa", bed.group);
         this.winter.registerTree(bed.group);
       })
       .catch((err) => console.warn("[sanctuary] day bed failed", err));
@@ -761,6 +779,7 @@ export class Sanctuary {
         }
         this.warehouse = building;
         this.scene.add(building.group);
+        this.installPropCollider("villa", building.group);
         building.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(building.group);
         this.winter.registerTree(building.group);
@@ -782,6 +801,10 @@ export class Sanctuary {
         }
         this.beachHouses = district;
         this.scene.add(district.group);
+        this.characterWorld.setGroup("houses", district.sites.map((site, i) => ({
+          id: `house-${i}`, kind: "box", x: site.x, z: site.z, yaw: site.yaw,
+          halfX: site.halfX, halfZ: site.halfZ, baseY: site.padY, height: 18.92 * site.scale, cover: true,
+        })));
         district.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(district.group);
         this.winter.registerTree(district.group);
@@ -806,6 +829,7 @@ export class Sanctuary {
     // caret — and stay sharp at any board size.
     this.desk = createDesk(this.budget.shadowMapSize > 0);
     this.scene.add(this.desk);
+    this.installPropCollider("desk", this.desk);
     this.winter.registerTree(this.desk);
 
     this.screens = createBoardScreens(this.budget.shadowMapSize > 0);
@@ -867,10 +891,40 @@ export class Sanctuary {
 // The board is scenery now: no controller, no drag, no resize, no
     // persistence. Nothing to restore either — its place is fixed in code.
 
-    // No walking character any more — the day bed alone faces the board. The
-    // trek state is still reset so walk mode has a defined start position if
-    // it is ever driven by something other than the avatar.
-    this.trek.reset(0, 3.4);
+    this.syncStudyColliders();
+    // No procedural stand-in. The Sanctuary shows the authorized character
+    // or no character at all — never a substitute that hides a failed import.
+    this.avatar = createEmptyAvatar();
+    this.avatar.group.position.copy(this.character.position);
+    this.avatar.setLowEnd(this.budget.tier === "low");
+    this.scene.add(this.avatar.group);
+    opts.onCharacterAsset?.(this.characterAssetStatus);
+    // Local, character-only licensed export; never load the reference map.
+    // No export configured yet => the explicitly labelled web guide remains.
+    void readCharacterManifest(import.meta.env.BASE_URL).then(async (manifest) => {
+      if (!manifest.modelUrl || this.disposed) return null;
+      const { loadCharacterAvatar } = await import("./characterAsset");
+      return loadCharacterAvatar(this.budget.shadowMapSize > 0, manifest);
+    }).then((loaded) => {
+      if (!loaded) return;
+      if (this.disposed) { loaded.avatar.dispose(); return; }
+      this.avatar.group.removeFromParent();
+      this.avatar.dispose();
+      this.avatar = loaded.avatar;
+      this.avatar.setLowEnd(this.budget.tier === "low");
+      this.avatar.group.position.copy(this.character.position);
+      this.avatar.group.rotation.y = this.character.rotation;
+      this.scene.add(this.avatar.group);
+      this.atmosphere.registerTree(this.avatar.group);
+      this.characterAssetStatus = loaded.status;
+      opts.onCharacterAsset?.(loaded.status);
+      this.requestShadowRefresh();
+    }).catch((err) => {
+      if (this.disposed) return;
+      this.characterAssetStatus = { ...FALLBACK_CHARACTER_STATUS, kind: "error", detail: `Character import failed; web guide retained. ${String(err)}` };
+      opts.onCharacterAsset?.(this.characterAssetStatus);
+      console.warn("[sanctuary] character export unavailable — web guide retained", err);
+    });
 
     // OPENING SHOT: a wide establishing view. You arrive high and far enough
     // back to read the whole valley — the herds, the river, the hills on the
@@ -905,6 +959,9 @@ export class Sanctuary {
     dom.addEventListener("contextmenu", this.onContextMenu);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.clearCharacterInput);
+    document.addEventListener("pointerlockchange", this.onPointerLockChange);
+    document.addEventListener("mousemove", this.onLockedMouseMove);
   }
 
   private detachPointer(dom: HTMLElement) {
@@ -916,6 +973,10 @@ export class Sanctuary {
     dom.removeEventListener("contextmenu", this.onContextMenu);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("blur", this.clearCharacterInput);
+    document.removeEventListener("pointerlockchange", this.onPointerLockChange);
+    document.removeEventListener("mousemove", this.onLockedMouseMove);
+    this.releaseCharacterMouse();
     this.keys.clear();
   }
 
@@ -933,6 +994,19 @@ export class Sanctuary {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (this.character.enabled) {
+      if (this.characterPaused) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (document.pointerLockElement === this.opts.canvas) return;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { this.opts.dom.setPointerCapture(e.pointerId); } catch { /* drag fallback */ }
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.armPinch(a.x, a.y, b.x, b.y);
+      } else this.pointerPrev = { x: e.clientX, y: e.clientY, id: e.pointerId, down: true };
+      return;
+    }
     // FULL-SCREEN BOARD: the framed face is pinned as a 2D rectangle, so
     // nested controls (notes heading/body, mind-map +, YouTube iframe)
     // hit-test natively. Synthetic events cannot enter an iframe or place
@@ -1014,6 +1088,7 @@ export class Sanctuary {
   };
 
   private onPointerMove = (e: PointerEvent) => {
+    if (this.character.enabled && (this.characterPaused || document.pointerLockElement === this.opts.canvas)) return;
     // A finger being replayed into a board follows the bridge, not the rig.
     if (this.bridge && e.pointerId === this.bridge.pointerId) {
       this.moveBridge(e);
@@ -1032,10 +1107,15 @@ export class Sanctuary {
         const ratio = this.pinchPrev / Math.max(dist, 1);
         // A pure slide barely changes the finger gap. Ignore that noise so
         // flying does not also zoom.
-        if (ratio > 1.012 || ratio < 0.988) this.orbit.zoom(ratio);
+        if (ratio > 1.012 || ratio < 0.988) {
+          if (this.character.enabled) this.character.cameraRig.zoom(ratio);
+          else this.orbit.zoom(ratio);
+        }
       }
       if (this.pinchMid.ready) {
-        this.orbit.flyByDrag(midX - this.pinchMid.x, midY - this.pinchMid.y);
+        const delta = stageLocalDelta(this.opts.dom, midX - this.pinchMid.x, midY - this.pinchMid.y, this.pointerDelta);
+        if (this.character.enabled) this.character.rotateCamera(delta.x * 0.005, delta.y * 0.005);
+        else this.orbit.flyByDrag(delta.x, delta.y);
       }
       this.pinchPrev = dist;
       this.pinchMid.x = midX;
@@ -1045,17 +1125,29 @@ export class Sanctuary {
     }
 
     if (!this.pointerPrev.down || e.pointerId !== this.pointerPrev.id) return;
-    const dx = (e.clientX - this.pointerPrev.x) * 0.005;
-    const dy = (e.clientY - this.pointerPrev.y) * 0.005;
+    const delta = stageLocalDelta(this.opts.dom, e.clientX - this.pointerPrev.x, e.clientY - this.pointerPrev.y, this.pointerDelta);
+    const dx = delta.x * 0.005, dy = delta.y * 0.005;
     this.pointerPrev.x = e.clientX;
     this.pointerPrev.y = e.clientY;
     if (this.studyFocus) return;
-    this.orbit.rotate(dx, dy);
+    if (this.character.enabled) this.character.rotateCamera(dx, dy);
+    else this.orbit.rotate(dx, dy);
   };
 
   private onPointerUp = (e: PointerEvent) => {
     if (this.bridge && e.pointerId === this.bridge.pointerId) {
       this.endBridge(e);
+      return;
+    }
+    if (this.character.enabled) {
+      this.pointers.delete(e.pointerId);
+      this.pinchTainted.delete(e.pointerId);
+      if (this.pointers.size < 2) { this.pinchPrev = 0; this.pinchMid.ready = false; }
+      if (this.pointerPrev.id === e.pointerId) this.pointerPrev.down = false;
+      try { this.opts.dom.releasePointerCapture(e.pointerId); } catch { /* no capture */ }
+      // The remaining pinch finger starts a NEW drag, never a ground tap.
+      const remaining = this.pointers.entries().next().value;
+      if (remaining) this.pointerPrev = { x: remaining[1].x, y: remaining[1].y, id: remaining[0], down: true };
       return;
     }
     const start = this.pointers.get(e.pointerId);
@@ -1102,13 +1194,81 @@ export class Sanctuary {
   private onKeyDown = (e: KeyboardEvent) => {
     const t = e.target;
     if (t instanceof HTMLElement && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-    if (e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
+    if (this.characterPaused || this.boardTarget(t) || t instanceof HTMLElement && t.closest("[data-character-help]") || t instanceof HTMLElement && t.closest("button, select") && (e.code === "Space" || e.code === "Enter")) return;
+    if (e.code === "Space" || e.code.startsWith("Arrow") || this.character.enabled && ["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "KeyV", "KeyQ", "KeyR", "ControlLeft", "ControlRight"].includes(e.code)) e.preventDefault();
+    if (this.character.enabled && !e.repeat) {
+      switch (e.code) {
+        case "Space": this.character.jump(); break;
+        case "KeyE": this.character.toggleCover(); break;
+        case "KeyV": this.toggleCharacterCamera(); break;
+        case "KeyQ": this.character.cameraRig.swapShoulder(); break;
+        case "KeyR": this.characterAction("reset"); break;
+        case "Escape": this.clearCharacterInput(); break;
+      }
+    }
     this.keys.add(e.code);
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.code);
+    if (this.character.enabled && e.code === "Space") this.character.releaseJump();
   };
+
+  private clearCharacterInput = () => {
+    this.keys.clear();
+    this.movementStick.set(0, 0);
+    this.character.clearInput();
+    this.pointers.clear();
+    this.pinchTainted.clear();
+    this.pointerPrev.down = false;
+    this.pinchPrev = 0;
+    this.pinchMid.ready = false;
+    this.gamepadJumpHeld = this.gamepadCoverHeld = this.gamepadCameraHeld = false;
+  };
+
+  private onPointerLockChange = () => {
+    if (document.pointerLockElement !== this.opts.canvas) this.clearCharacterInput();
+  };
+
+  private onLockedMouseMove = (e: MouseEvent) => {
+    if (document.pointerLockElement === this.opts.canvas && this.character.enabled && !this.characterPaused) {
+      const delta = stageLocalDelta(this.opts.dom, e.movementX, e.movementY, this.pointerDelta);
+      this.character.rotateCamera(delta.x * 0.003, delta.y * 0.003);
+    }
+  };
+
+  /** Standard-mapping pads: left move, right look, A jump, B crouch, X cover. */
+  private characterInput(dt: number) {
+    let x = this.movementStick.x;
+    let y = this.movementStick.y;
+    if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) y++;
+    if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) y--;
+    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) x++;
+    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) x--;
+    let run = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    let crouch = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
+    if (typeof navigator.getGamepads === "function") {
+      const pads = navigator.getGamepads();
+      let pad: Gamepad | null = null;
+      for (let i = 0; i < pads.length; i++) if (pads[i]?.connected && pads[i]?.mapping === "standard") { pad = pads[i]; break; }
+      if (pad) {
+        const axis = (v: number) => Math.abs(v) < 0.14 ? 0 : Math.sign(v) * (Math.abs(v) - 0.14) / 0.86;
+        x += axis(pad.axes[0] ?? 0); y -= axis(pad.axes[1] ?? 0);
+        this.character.rotateCamera(axis(pad.axes[2] ?? 0) * dt * 2.2, axis(pad.axes[3] ?? 0) * dt * 1.7);
+        run ||= pad.buttons[10]?.pressed ?? false;
+        crouch ||= pad.buttons[1]?.pressed ?? false;
+        const jump = pad.buttons[0]?.pressed ?? false;
+        const cover = pad.buttons[2]?.pressed ?? false;
+        const camera = pad.buttons[3]?.pressed ?? false;
+        if (jump && !this.gamepadJumpHeld) this.character.jump();
+        if (!jump && this.gamepadJumpHeld) this.character.releaseJump();
+        if (cover && !this.gamepadCoverHeld) this.character.toggleCover();
+        if (camera && !this.gamepadCameraHeld) this.toggleCharacterCamera();
+        this.gamepadJumpHeld = jump; this.gamepadCoverHeld = cover; this.gamepadCameraHeld = camera;
+      } else this.gamepadJumpHeld = this.gamepadCoverHeld = this.gamepadCameraHeld = false;
+    }
+    this.character.setInput(x, y, run, crouch);
+  }
 
   /** WASD / arrows fly, Q and E climb. Held keys, so it rides the frame. */
   private flyKeys(dt: number) {
@@ -1193,6 +1353,11 @@ export class Sanctuary {
   }
 
   private onWheel = (e: WheelEvent) => {
+    if (this.character.enabled) {
+      e.preventDefault();
+      if (!this.characterPaused) this.character.cameraRig.zoom(1 + Math.sign(e.deltaY) * 0.1);
+      return;
+    }
     // Wheeling inside a board scrolls the panel — it must never zoom the rig.
     if (this.boardTarget(e.target)) return;
     if (this.studyFocus) {
@@ -1655,6 +1820,175 @@ export class Sanctuary {
     this.synthetic("pointercancel", b.target, b.lastX, b.lastY, b.pointerId);
   }
 
+  // ── Player collision data: installed once, not rebuilt per frame ─────
+  private installPropCollider(id: string, root: THREE.Object3D) {
+    root.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(root);
+    if (bounds.isEmpty()) return;
+    this.characterWorld.setGroup(id, [{
+      id, kind: "box", x: (bounds.min.x + bounds.max.x) / 2, z: (bounds.min.z + bounds.max.z) / 2,
+      halfX: (bounds.max.x - bounds.min.x) / 2, halfZ: (bounds.max.z - bounds.min.z) / 2, yaw: 0,
+      baseY: bounds.min.y, height: bounds.max.y - bounds.min.y, cover: true,
+    }]);
+  }
+
+  private installRockColliders() {
+    const boxes: CharacterCollider[] = [];
+    const matrix = new THREE.Matrix4();
+    const instance = new THREE.Matrix4();
+    const bounds = new THREE.Box3();
+    this.rocks.group.updateMatrixWorld(true);
+    this.rocks.group.traverse(o => {
+      const mesh = o as THREE.InstancedMesh;
+      if (!mesh.isInstancedMesh || !mesh.name.startsWith("rock-master") || mesh.name.endsWith("-far")) return;
+      mesh.geometry.computeBoundingBox();
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, instance);
+        matrix.multiplyMatrices(mesh.matrixWorld, instance);
+        bounds.copy(mesh.geometry.boundingBox!).applyMatrix4(matrix);
+        boxes.push({ id: `${mesh.name}-${i}`, kind: "box", x: (bounds.min.x + bounds.max.x) / 2, z: (bounds.min.z + bounds.max.z) / 2,
+          halfX: (bounds.max.x - bounds.min.x) / 2, halfZ: (bounds.max.z - bounds.min.z) / 2, yaw: 0,
+          baseY: bounds.min.y, height: bounds.max.y - bounds.min.y, cover: bounds.max.y - bounds.min.y > 0.65 });
+      }
+    });
+    this.characterWorld.setGroup("rocks", boxes);
+  }
+
+  private syncTreeColliders() {
+    this.characterWorld.setGroup("trunks", getTreeObstacles().map((t, i) => ({
+      id: `trunk-${i}`, kind: "circle", x: t.x, z: t.z, baseY: t.baseY, height: t.height,
+      // The board registry describes CROWNS, not trunks. Do not erect
+      // invisible 6 m-wide walls around every tree's leaves.
+      radius: Math.max(0.15, Math.min(0.65, t.radius * 0.12)),
+    })));
+  }
+
+  private syncStudyColliders() {
+    this.characterWorld.setGroup("study-boards", this.screens.screens.map((s, i) => ({
+      id: `study-board-${i}`, kind: "box", x: s.placement.position.x, z: s.placement.position.z,
+      halfX: LECTERN_BOARD_WIDTH * this.boardScale / 2, halfZ: 0.22, yaw: s.placement.yaw,
+      baseY: terrainHeight(s.placement.position.x, s.placement.position.z),
+      height: s.placement.position.y + LECTERN_BOARD_HEIGHT * this.boardScale / 2 - terrainHeight(s.placement.position.x, s.placement.position.z), cover: true,
+    })));
+  }
+
+  /** Pick an OPEN patch from this world, not an imported reference spawn.
+   * The original vegetation is 7–20 m tall: spawning inside a random leaf
+   * card made the guide disappear even with a correctly working camera.
+   * Every probe below scales with the body, so an 18 ft character is tested
+   * against the clearance IT needs, not the clearance a 6 ft one needed.
+   * This is a one-shot placement query on entry/reset, never a frame loop. */
+  private resetCharacterAtClearSpawn() {
+    const S = CHARACTER_SCALE;
+    const probeRadius = CHARACTER_RADIUS + 0.05 * S;
+    const eye = characterEyeHeight();
+    const candidates = [
+      [CHARACTER_SPAWN.x, CHARACTER_SPAWN.z], [-10, 0], [-12, -6], [-8, -8],
+      [0, -10], [8, -8], [12, -6], [10, 0], [-14, 12], [0, 14], [14, 12],
+    ];
+    const crowns = getTreeObstacles();
+    let best = -Infinity;
+    for (const [x, z] of candidates) {
+      const y = this.characterWorld.terrainAt(x, z);
+      // Hard requirement: standable, dry and clear of props for the whole
+      // body plus a jump of headroom. Everything else only prefers a spot.
+      if (this.characterWorld.waterAt(x, z) - y > 0.65 * S ||
+          !this.characterWorld.canOccupy(x, y, z, probeRadius, CHARACTER_HEIGHT + 1.5 * S) ||
+          !this.characterWorld.canOccupy(x, y, z - 3.5 * S, probeRadius, CHARACTER_HEIGHT)) continue;
+      // An entry point should also be camera-visible, not on a steep river
+      // bank whose foreground ridge hides the character's lower half.
+      const ground = this.characterWorld.terrainAt;
+      const relief = Math.max(Math.abs(ground(x + 0.5 * S, z) - y), Math.abs(ground(x - 0.5 * S, z) - y),
+        Math.abs(ground(x, z + 0.5 * S) - y), Math.abs(ground(x, z - 0.5 * S) - y));
+      const visible = relief <= 0.12 * S && Math.abs(ground(x + 0.32 * S, z + 4 * S) - y) <= 0.4 * S &&
+        !this.characterWorld.cameraBlocked(x + 0.32 * S, y + eye, z + 4 * S, 0.2 * S);
+      let clearance = Infinity;
+      for (const crown of crowns) {
+        if (y + eye < crown.baseY - 0.5 * S || y > crown.baseY + crown.height) continue;
+        const margin = crown.radius * 1.5 + CHARACTER_RADIUS * 2.5;
+        clearance = Math.min(clearance, Math.hypot(x - crown.x, z - crown.z) - margin,
+          Math.hypot(x + 0.32 * S - crown.x, z + 4 * S - crown.z) - margin);
+      }
+      // Ranked, not rejected: a visible opening always beats a hidden one, but
+      // an 18 ft body that cannot find a perfect ledge still gets the most open
+      // standable ground instead of silently keeping a buried default.
+      const score = (visible ? 1e4 : 0) + Math.max(clearance, -1e3);
+      if (score > best) { best = score; this.characterSpawn.set(x, y, z); }
+    }
+    this.character.reset(this.characterSpawn.x, this.characterSpawn.z, CHARACTER_SPAWN.yaw);
+  }
+
+  setCharacterMode(mode: CharacterCameraMode) {
+    if (mode === this.character.mode) return;
+    const entering = !this.character.enabled;
+    const leaving = mode === "orbit";
+    this.cancelBridge();
+    if (entering || leaving) this.clearCharacterInput();
+    if (entering && !this.characterStarted) { this.resetCharacterAtClearSpawn(); this.characterStarted = true; }
+    if (leaving) this.releaseCharacterMouse();
+    this.character.setMode(mode);
+    this.orbit.autoRotate = false;
+    this.studyFocus = false;
+    this.pendingReadSlot = null;
+    this.fittedStudyPreset = null;
+    this.screens.setReadSlot(null);
+    this.screens.setInteractive(leaving);
+    this.camera.clearViewOffset();
+    this.applyFov();
+    if (leaving) {
+      this.orbit.target.copy(this.character.position); this.orbit.target.y += 1.35;
+      this.orbit.setFromCamera(this.camera);
+      this.orbit.panTo(this.orbit.target, 12, this.character.cameraRig.yaw, 0.25);
+    } else {
+      if (entering) this.character.cameraRig.reset(this.character.rotation);
+      this.opts.canvas.tabIndex = 0;
+      this.opts.canvas.focus({ preventScroll: true });
+    }
+    this.opts.onCharacterMode?.(mode);
+    this.requestShadowRefresh();
+  }
+
+  toggleCharacterCamera() {
+    this.setCharacterMode(this.character.mode === "first-person" ? "third-person" : "first-person");
+  }
+
+  setCharacterMove(strafe: number, forward: number) { this.movementStick.set(strafe, forward).clampLength(0, 1); }
+  setCharacterLook(x: number, y: number) { this.character.setLookStick(x, y); }
+
+  characterAction(action: "jump" | "jump-release" | "run" | "crouch" | "cover" | "reset" | "shoulder") {
+    if (!this.character.enabled || this.characterPaused) return;
+    switch (action) {
+      case "jump": this.character.jump(); break;
+      case "jump-release": this.character.releaseJump(); break;
+      case "run": this.character.toggleRun(); break;
+      case "crouch": this.character.toggleCrouch(); break;
+      case "cover": this.character.toggleCover(); break;
+      case "reset": this.clearCharacterInput(); this.resetCharacterAtClearSpawn(); break;
+      case "shoulder": this.character.cameraRig.swapShoulder(); break;
+    }
+  }
+
+  /** Optional mouse capture; dragging the scene always works if denied. */
+  captureCharacterMouse() {
+    if (!this.character.enabled || this.characterPaused || !this.opts.canvas.requestPointerLock) return;
+    try {
+      const request = this.opts.canvas.requestPointerLock();
+      if (request && typeof request.catch === "function") void request.catch(() => { /* iframe/mobile: use drag + right stick */ });
+    } catch { /* Drag remains available on WebView / restricted previews. */ }
+  }
+
+  private releaseCharacterMouse() {
+    if (document.pointerLockElement === this.opts.canvas) document.exitPointerLock();
+  }
+
+  getCharacterSnapshot() {
+    return { mode: this.character.mode, state: this.character.state, height: CHARACTER_HEIGHT,
+      position: this.character.position.toArray(), spawn: this.characterSpawn.toArray(), speed: this.character.speed, grounded: this.character.grounded,
+      inCover: this.character.inCover, crouched: this.character.crouched,
+      runLatched: this.character.runLatched, crouchLatched: this.character.crouchLatched,
+      source: this.characterAssetStatus.kind, bodyVisible: this.avatar.group.children.some(c => c.visible) };
+  }
+
   // ───────────────────────────────────────────────────────────────────
   //  Public API used by React
   // ───────────────────────────────────────────────────────────────────
@@ -1677,7 +2011,7 @@ export class Sanctuary {
   }
 
   setAutoOrbit(on: boolean) {
-    this.orbit.autoRotate = on;
+    this.orbit.autoRotate = on && !this.character.enabled;
   }
 
   getAutoOrbit(): boolean {
@@ -1817,6 +2151,7 @@ export class Sanctuary {
   }
 
   focus(preset: ViewPreset) {
+    if (this.character.enabled) this.setCharacterMode("orbit");
     // Any view that is not a single board puts the full world back on budget.
     this.studyFocus = false;
     this.pendingReadSlot = null;
@@ -1928,6 +2263,8 @@ export class Sanctuary {
    */
   setOverlayOpen(open: boolean) {
     this.screens.setOverlayOpen(open);
+    this.characterPaused = open;
+    if (open) { this.clearCharacterInput(); this.releaseCharacterMouse(); }
   }
 
   setBoardScale(scale: number) {
@@ -1936,6 +2273,7 @@ export class Sanctuary {
     this.boardScale = s;
     this.screens.setScale(s);
     this.syncBoardPlanes();
+    this.syncStudyColliders();
     this.requestShadowRefresh();
   }
 
@@ -2122,7 +2460,7 @@ export class Sanctuary {
 
   /** The fov before the aspect correction (one camera: orbit only). */
   private get baseFovForMode() {
-    return 52;
+    return this.character.mode === "first-person" ? 74 : this.character.mode === "third-person" ? 62 : 52;
   }
 
   /**
@@ -2194,6 +2532,7 @@ export class Sanctuary {
 
   setVisible(v: boolean) {
     this.visible = v;
+    if (!v) { this.clearCharacterInput(); this.releaseCharacterMouse(); }
     if (v && this.running && !this.raf) {
       this.clock.getDelta();
       this.raf = requestAnimationFrame(this.tick);
@@ -2209,6 +2548,7 @@ export class Sanctuary {
 
   stop() {
     this.running = false;
+    this.clearCharacterInput();
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
   }
@@ -2260,11 +2600,16 @@ export class Sanctuary {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
 
-    // ── Camera ────────────────────────────────────────────────────────
-    // One camera only now — orbit, plus drone flight (two-finger drag,
-    // double-tap, or WASD). The old first-person body stays gone.
-    this.flyKeys(dt);
-    this.orbit.update(dt, this.camera);
+    // ── Camera + authoritative player simulation ────────────────────
+    if (this.character.enabled) {
+      if (!this.characterPaused) this.characterInput(dt);
+      this.character.update(dt, this.camera, this.characterPaused);
+      if (!this.characterPaused && (this.character.speed > 0.01 || !this.character.grounded)) this.requestShadowRefresh();
+    } else {
+      this.flyKeys(dt);
+      this.orbit.update(dt, this.camera);
+      this.character.update(dt);
+    }
     if (this.pendingReadSlot) {
       this.pendingPinAge += dt;
       if (this.orbit.settled() || this.pendingPinAge > 0.85) {
@@ -2273,11 +2618,10 @@ export class Sanctuary {
         this.pendingPinAge = 0;
       }
     }
-    if (this.avatar) {
-      this.avatar.setVisible(true);
-      // Seated: breathing only — the folds stay where setSeated put them.
-      this.avatar.update(dt, time, this.trek, this.camera);
-    }
+    this.avatar.group.position.copy(this.character.position);
+    this.avatar.group.rotation.y = this.character.rotation;
+    this.avatar.setVisible(!this.character.enabled || this.character.cameraRig.bodyVisible);
+    if (!this.characterPaused) this.avatar.update(dt, time, this.character, this.camera);
 
     // Underwater: when the camera dips under the waterline the whole view
     // goes saturated blue so it reads as being inside the water, not as a
@@ -2347,7 +2691,6 @@ export class Sanctuary {
       const viewH = this.viewH;
       const herdCull = cullDistanceForPx(1.1, 3.2, fov, viewH);
       this.wildlife.update(this.aiClock, time, this.camera.position, herdCull * herdCull);
-      this.student.update(time);
       this.aiClock = 0;
     }
 
@@ -2476,7 +2819,8 @@ export class Sanctuary {
     this.detachPointer(this.opts.dom);
     this.screens.dispose();
     disposeGroup(this.desk);
-    this.avatar?.dispose();
+    this.avatar.dispose();
+    this.characterWorld.dispose();
     this.grass.dispose();
     this.hillGrass.dispose();
     this.rocks.dispose();
@@ -2494,7 +2838,6 @@ export class Sanctuary {
     // The anime panorama is scene-owned (cached for instant re-toggles).
     void this.animeSkyTexture?.then((t) => t?.dispose());
     this.board.dispose();
-    this.student.dispose();
     this.dayBed?.dispose();
     this.warehouse?.dispose();
     this.beachHouses?.dispose();

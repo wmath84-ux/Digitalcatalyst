@@ -56,5 +56,5 @@ test("created modules show on the reading board and can open the course player",
   assert.match(BOARDS, /myCourses/, "board portals receive self-authored courses");
   assert.match(PAGE, /myCourseToProduct/, "sanctuary projects library courses onto the board");
   assert.match(PAGE, /focusStudyView\(\"reading\"\)/, "the Module button lands on the reading board");
-  assert.match(PAGE, /sanctuaryModulePlayHash/, "Play navigates to the dedicated player");
+  assert.match(PAGE, /setOpenCourseId\(myCourseStorageId\(course\.id\)\)/, "Play loads the self-authored course inline without leaving the Sanctuary");
 });

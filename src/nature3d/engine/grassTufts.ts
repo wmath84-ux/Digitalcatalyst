@@ -380,6 +380,11 @@ function makeMesh(
   shadows: boolean,
 ): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(geo, material, capacity);
+  // InstancedMesh starts with count=capacity (identity matrices). The scatter
+  // appends at mesh.count; starting full wrote beyond the matrix/color buffers
+  // and then drew more instances than existed — giant neon triangles across
+  // the world. Capacity is storage; count is the number actually populated.
+  mesh.count = 0;
   // Never cast: alpha-tested foliage in the shadow pass is 2× overdraw for
   // shadows the ground's baked AO gradient already sells (same rule as the
   // blade field and the sorrel).
@@ -543,6 +548,7 @@ function placeAt(
   hsl: { h: number; s: number; l: number },
 ): void {
   const slot = mesh.count;
+  if (slot >= mesh.instanceMatrix.count) return;
   // Target clump height 2.5–4.3 m in the near ring (6× the original 0.42–0.7
   // m per the owner's directive); the far ring grows the clumps ×1.7 on top
   // so the sparse far field still reads as continuous turf.

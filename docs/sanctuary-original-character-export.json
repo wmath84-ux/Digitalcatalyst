@@ -1,0 +1,257 @@
+{
+  "sourceCommit": "bf56bcd56c5dd149590d1e5a0dc45575ae2fa95c",
+  "meshSHA256": "da714540cec5b64267ac7430507445b65fe1305638a8413d904784077e14dc56",
+  "glbSHA256": "74bb7b35253f462dc7620448bf955d9559f2272a7d5c920ce1439e9799835d4a",
+  "bytes": 43188972,
+  "sourceVertices": 20376,
+  "exportedVertices": 18633,
+  "triangles": 32954,
+  "materials": 8,
+  "bones": 84,
+  "originalAnimations": 26,
+  "maxSourceInfluences": 4,
+  "textures": [
+    {
+      "source": "Eye_Blue_D",
+      "role": "base",
+      "sourceSize": [
+        331,
+        331
+      ],
+      "webSize": [
+        331,
+        331
+      ]
+    },
+    {
+      "source": "ButR3_D",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "ButR3_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "KoszulaGood_D2",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "KoszulaGood_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "KoszulaGood_S",
+      "role": "specular",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "ButL_D2",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "ButL_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Reka_D",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Reka_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "RightHand_O",
+      "role": "occlusion",
+      "sourceSize": [
+        2048,
+        2048
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Reka_S",
+      "role": "specular",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Hlava4_D",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Hlava4_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Head_O",
+      "role": "occlusion",
+      "sourceSize": [
+        2048,
+        2048
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Hlava4_S",
+      "role": "specular",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "KoszulaGood_S",
+      "role": "roughness",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Spodnie3_D2",
+      "role": "base",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "source": "Spodnie3_N",
+      "role": "normal",
+      "sourceSize": [
+        8192,
+        8192
+      ],
+      "webSize": [
+        2048,
+        2048
+      ]
+    }
+  ],
+  "sourceBoundsCm": [
+    -0.8868789672851562,
+    -1.3120040893554688,
+    131.03265380859375,
+    74.37055206298828,
+    32.724403381347656,
+    140.3148956298828,
+    162.142333984375
+  ],
+  "sourceTextureChannels": "BGRA decoded to RGBA; DirectX normals green flipped for glTF",
+  "sourceDirection": "Original -Y converted to -Z",
+  "environmentImported": false,
+  "clothPhysicsPorted": false,
+  "nativeAnimationGraphsPorted": false
+}

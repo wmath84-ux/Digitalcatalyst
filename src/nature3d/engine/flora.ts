@@ -86,6 +86,9 @@ export function addTreeObstacles(trees: readonly TreeObstacle[]): void {
   activeTreeObstacles.push(...trees);
 }
 
+/** Read-only world placement data for the playable capsule/camera. */
+export function getTreeObstacles(): readonly TreeObstacle[] { return activeTreeObstacles; }
+
 /** Check if any placed tree stands directly between the eye and a target. */
 export function treesBlockSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
   if (activeTreeObstacles.length === 0) return false;
