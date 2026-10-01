@@ -45,16 +45,16 @@ test("the mind-map board is ALWAYS scoped once a course is picked", () => {
   assert.match(boards, /const \[selectedModuleId, setSelectedModuleId\] = useState<string \| null>\(null\);/);
 });
 
-test("an unpicked course passes undefined, never an empty-string scope", () => {
+test("an unpicked course has a private personal scope, never an empty-string scope", () => {
   assert.match(boards, /productId: productId \?\? undefined,/);
   assert.doesNotMatch(boards, /productId: productId \?\? ""/);
-  assert.match(boards, /const productId = activeCourse\?\.id \?\? null;/);
+  assert.match(boards, /const productId = activeCourse\?\.id \?\? \(uid \? SANCTUARY_PERSONAL_SCOPE : null\);/);
 });
 
 test("the hook itself refuses an empty product id, so no caller can repeat the bug", () => {
   assert.match(
     mindHook,
-    /const scoped =\n\s*Boolean\(uid\)\n\s*&& productId != null\n\s*&& String\(productId\)\.length > 0\n\s*&& moduleId != null\n\s*&& String\(moduleId\)\.length > 0;/,
+    /const scoped =\n\s*Boolean\(uid\)\n\s*&& productId != null\n\s*&& String\(productId\)\.trim\(\)\.length > 0\n\s*&& moduleId != null\n\s*&& String\(moduleId\)\.trim\(\)\.length > 0;/,
   );
 });
 
@@ -64,7 +64,7 @@ test("the board says whether the map and the notes reached Firebase", () => {
   assert.match(boards, /export function boardSubtitle\(/);
   assert.match(boards, /Firebase par save ho gaya/);
   assert.match(boards, /Firebase par save ho raha hai…/);
-  assert.match(boards, /subtitle=\{boardSubtitle\(activeCourse\?\.title, notes\.status, notes\.errorMessage, notes\.lastSavedAt\)\}/);
+  assert.match(boards, /subtitle=\{boardSubtitle\(scopeTitle, notes\.status, notes\.errorMessage, notes\.lastSavedAt\)\}/);
   assert.match(boards, /mindMap\.status,\n\s*mindMap\.errorMessage,\n\s*mindMap\.lastSavedAt,/);
   // The mind-map panel keeps its own status row too (unchanged design).
   assert.match(boards, /status=\{mindMap\.status\}/);
@@ -84,10 +84,13 @@ test("the board still writes the learner's OWN mind-map documents", () => {
   assert.match(rules, /request\.resource\.data\.moduleId\.size\(\) > 0/);
 });
 
-test("nothing is auto-selected, so the boards still open empty", () => {
-  // The 2026-09 behaviour that must NOT regress: an unpicked course means an
-  // empty board, not somebody else's notes.
+test("no course is auto-selected; personal boards remain writable and private", () => {
+  // No catalogue course is auto-selected. Returning learners see THEIR
+  // personal workspace instead of somebody else's course or an unsaveable editor.
   assert.match(boards, /const \[selectedCourseId, setSelectedCourseId\] = useState<string \| null>\(null\);/);
-  assert.match(boards, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
-  assert.match(boards, /const EMPTY_NOTES: CoursePlayerNote\[\] = \[\];/);
+  assert.match(boards, /SANCTUARY_PERSONAL_SCOPE = "__sanctuary__"/);
+  assert.match(boards, /notes=\{notes\.notes\}/);
+  assert.match(boards, /sessionKey=\{notesSessionKey\}/);
+  assert.match(boards, /signedIn \? <NotesPanel/);
+  assert.match(boards, /signedIn \? <MindMapPanel/);
 });

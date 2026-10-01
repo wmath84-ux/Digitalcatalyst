@@ -34,6 +34,11 @@ on:
       - firestore.indexes.json
       - storage.rules
       - firebase.json
+      - tests/sanctuaryFirestoreRules.emulator.mjs
+      - utils/courseNotes.js
+      - utils/mindMapTree.js
+      - package.json
+      - package-lock.json
       - .github/workflows/firebase-rules-deploy.yml
   workflow_dispatch:
 
@@ -44,14 +49,40 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+
+      # Compile the complete rules and exercise real normal-user note/map
+      # writes against a demo emulator BEFORE touching the live project.
+      - name: Verify sanctuary Firestore rules
+        run: npm run test:sanctuary:rules
+
+      # FIREBASE_SERVICE_ACCOUNT alone is not understood by firebase-tools.
+      # Use ADC, without logging the secret or keeping it in the checkout.
+      - name: Authenticate Firebase CLI
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync, appendFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+          if (!raw) throw new Error('Configure the FIREBASE_SERVICE_ACCOUNT GitHub Actions secret before deploying rules.');
+          const account = JSON.parse(raw);
+          if (!account.client_email || !account.private_key) throw new Error('FIREBASE_SERVICE_ACCOUNT must be a valid service-account JSON object.');
+          const path = join(process.env.RUNNER_TEMP, 'firebase-rules-service-account.json');
+          writeFileSync(path, JSON.stringify(account), { mode: 0o600 });
+          appendFileSync(process.env.GITHUB_ENV, `GOOGLE_APPLICATION_CREDENTIALS=${path}\n`);
+          NODE
 
       # `firebase deploy` validates the rules file before uploading it, so a
       # syntax error fails the job loudly instead of silently leaving the old
       # rules in place.
       - name: Deploy Firestore + Storage rules
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: >-
           npx --yes firebase-tools@13 deploy
           --only firestore:rules,firestore:indexes,storage:rules
@@ -61,3 +92,7 @@ jobs:
       - name: Report
         if: success()
         run: echo "firestore.rules / storage.rules are live on my-website-761e9."
+
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-rules-service-account.json"

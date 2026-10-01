@@ -77,6 +77,7 @@ export interface UseCourseMindMapInput {
 export interface UseCourseMindMapResult {
   mind: MindMap;
   /** Replace the whole map (every editor mutation returns a new mind map). */
+  /** Bound to the returned map, including commits from an outgoing editor. */
   setMind: (updater: MindMap | ((current: MindMap) => MindMap)) => void;
   status: MindMapSaveStatus;
   errorMessage: string | null;
@@ -128,25 +129,22 @@ const indexKey = (uid: string, productId: string, moduleId: string) =>
 const activeKeyStorageKey = (uid: string, productId: string, moduleId: string) =>
   `dc.mindMapActive.v1.${uid}.${productId}.${moduleId}`;
 
-const readLocalMindMap = (key: string): MindMap | null => {
+interface LocalMap { mind: MindMap; updatedAt: number }
+
+const readLocalMindMap = (key: string): LocalMap | null => {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    const parsed = parseMindMap(JSON.parse(raw));
-    // An empty shell is not worth resurrecting — it would silently overwrite
-    // a richer copy living on another device.
-    return parsed.nodes.length > 0 || parsed.rootTopic !== "Central idea" ? parsed : null;
-  } catch {
-    return null;
-  }
+    const data = JSON.parse(raw);
+    if (!isMindMap(data)) return null;
+    const updatedAt = (data as MindMap & { updatedAt?: unknown }).updatedAt;
+    return { mind: parseMindMap(data), updatedAt: typeof updatedAt === "number" && Number.isFinite(updatedAt) ? updatedAt : 0 };
+  } catch { return null; }
 };
 
-const writeLocalMindMap = (key: string, mind: MindMap) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(mind));
-  } catch {
-    /* private mode / quota — Firestore still has the copy */
-  }
+const writeLocalMindMap = (key: string, mind: MindMap, updatedAt: number) => {
+  try { localStorage.setItem(key, JSON.stringify({ ...mind, updatedAt })); }
+  catch { /* private mode / quota — the live queue still writes Firestore */ }
 };
 
 const readLocalIndex = (key: string): MindMapSummary[] => {
@@ -204,699 +202,590 @@ const sortSummaries = (rows: MindMapSummary[]): MindMapSummary[] =>
     return (a.createdAt || a.updatedAt) - (b.createdAt || b.updatedAt);
   });
 
+/** Durable upload/delete markers distinguish unsynced work from a stale cache. */
+const outboxKey = (uid: string, productId: string, moduleId: string) =>
+  `dc.mindMapOutbox.v1.${uid}.${productId}.${moduleId}`;
+
+interface MapOutbox { uploads: Set<string>; deletes: Set<string> }
+const readOutbox = (key: string): MapOutbox => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || "{}");
+    return {
+      uploads: new Set(Array.isArray(raw.uploads) ? raw.uploads.map(sanitizeMapKey) : []),
+      deletes: new Set(Array.isArray(raw.deletes) ? raw.deletes.map(sanitizeMapKey) : []),
+    };
+  } catch { return { uploads: new Set(), deletes: new Set() }; }
+};
+
+interface MapDraft {
+  mapKey: string;
+  mind: MindMap;
+  updatedAt: number;
+  revision: number;
+  savedRevision: number;
+  loaded: boolean;
+  hasLocal: boolean;
+  hasStoredMap: boolean;
+  deleted: boolean;
+  loadError: boolean;
+  loadPromise: Promise<void> | null;
+  status: MindMapSaveStatus;
+  errorMessage: string | null;
+  lastSavedAt: number | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  retry: ReturnType<typeof setTimeout> | null;
+  attempts: number;
+  inFlight: boolean;
+  flushWanted: boolean;
+}
+
+interface MapDeletion {
+  predecessor: MapDraft | null;
+  inFlight: boolean;
+  retry: ReturnType<typeof setTimeout> | null;
+  attempts: number;
+}
+
+interface MapSession extends MapOutbox {
+  uid: string;
+  productId: string;
+  moduleId: string;
+  scoped: boolean;
+  rootTopic: string;
+  activeMapKey: string;
+  summaries: MindMapSummary[];
+  drafts: Map<string, MapDraft>;
+  deletions: Map<string, MapDeletion>;
+  retiredKeys: Set<string>;
+  mapsLoading: boolean;
+  listError: string | null;
+  listReadFailed: boolean;
+  listAttempts: number;
+  listRetry: ReturnType<typeof setTimeout> | null;
+  disposed: boolean;
+}
+
+const scopeLocalKey = (scope: MapSession, key: string) => localKey(scope.uid, scope.productId, scope.moduleId, key);
+const scopeIndexKey = (scope: MapSession) => indexKey(scope.uid, scope.productId, scope.moduleId);
+const scopeOutboxKey = (scope: MapSession) => outboxKey(scope.uid, scope.productId, scope.moduleId);
+const persistOutbox = (scope: MapSession) => {
+  try { localStorage.setItem(scopeOutboxKey(scope), JSON.stringify({ uploads: [...scope.uploads], deletes: [...scope.deletes] })); }
+  catch { /* offline state also remains in the live session */ }
+};
+const persistIndex = (scope: MapSession) => writeLocalIndex(scopeIndexKey(scope), scope.summaries);
+const storedActiveKey = (uid: string, productId: string, moduleId: string): string => {
+  try { return sanitizeMapKey(localStorage.getItem(activeKeyStorageKey(uid, productId, moduleId))); }
+  catch { return MIND_MAP_DEFAULT_KEY; }
+};
+
+const getDraft = (scope: MapSession, mapKey: string): MapDraft => {
+  const key = sanitizeMapKey(mapKey);
+  const existing = scope.drafts.get(key);
+  if (existing) return existing;
+  const local = scope.scoped ? readLocalMindMap(scopeLocalKey(scope, key)) : null;
+  const dirty = scope.uploads.has(key);
+  const draft: MapDraft = {
+    mapKey: key, mind: local?.mind || createMindMap(scope.rootTopic || "Central idea"),
+    updatedAt: local?.updatedAt || 0, revision: dirty ? 1 : 0, savedRevision: 0,
+    loaded: !scope.scoped, hasLocal: Boolean(local), hasStoredMap: false, deleted: false,
+    loadError: false, loadPromise: null, status: scope.scoped ? "loading" : "idle",
+    errorMessage: null, lastSavedAt: null, timer: null, retry: null, attempts: 0,
+    inFlight: false, flushWanted: false,
+  };
+  scope.drafts.set(key, draft);
+  return draft;
+};
+
+const touchSummary = (scope: MapSession, draft: MapDraft) => {
+  if (draft.deleted) return;
+  const previous = scope.summaries.find((row) => row.mapKey === draft.mapKey);
+  scope.summaries = sortSummaries([
+    ...scope.summaries.filter((row) => row.mapKey !== draft.mapKey),
+    normalizeSummary({
+      mapKey: draft.mapKey, title: draft.mind.title, rootTopic: draft.mind.rootTopic,
+      nodeCount: draft.mind.nodes.length + 1, updatedAt: draft.updatedAt,
+      createdAt: previous?.createdAt || draft.updatedAt,
+    }),
+  ]);
+  persistIndex(scope);
+};
+
+const describeMapError = (thrown: unknown): string => {
+  const code = errorCode(thrown);
+  if (code === "permission-denied") return "Cloud save blocked hai (account ya security rules, permission-denied) — map is device par safe hai. Rules deploy hone ke baad dobara Save karein.";
+  if (code === "unauthenticated") return "Firebase sign-in session ready nahi hai — map is device par safe hai aur login ke baad sync hoga.";
+  if (code === "unavailable") return "Firestore/network unavailable hai — map is device par safe hai, dobara try hoga.";
+  return `Cloud sync fail hua${code ? ` (${code})` : ""} — map is device par safe hai, dobara try hoga.`;
+};
+
 export default function useCourseMindMap(input: UseCourseMindMapInput): UseCourseMindMapResult {
   const { uid, productId, moduleId, rootTopic = "", debounceMs = DEFAULT_DEBOUNCE_MS } = input;
-
-  // BOTH halves of the scope have to be real: an empty `productId` (no course
-  // picked yet) used to pass `productId != null` and produce a document id like
-  // `{uid}____{moduleId}` — a shared, meaningless namespace. Unscoped means
-  // "read nothing, write nothing", so the editor stays honest instead of
-  // silently discarding every branch the learner draws.
   const scoped =
     Boolean(uid)
     && productId != null
-    && String(productId).length > 0
+    && String(productId).trim().length > 0
     && moduleId != null
-    && String(moduleId).length > 0;
+    && String(moduleId).trim().length > 0;
+  const uidText = String(uid || "");
+  const productText = String(productId ?? "");
+  const moduleText = String(moduleId ?? "");
 
-  const [activeMapKey, setActiveMapKey] = useState<string>(MIND_MAP_DEFAULT_KEY);
-  const [summaries, setSummaries] = useState<MindMapSummary[]>([]);
-  const [mapsLoading, setMapsLoading] = useState(scoped);
-
-  const docKey = scoped ? mindMapDocId(String(uid), String(productId), String(moduleId), activeMapKey) : "";
-
-  const [mind, setMindState] = useState<MindMap>(() => createMindMap(rootTopic || "Central idea"));
-  const [status, setStatus] = useState<MindMapSaveStatus>(scoped ? "loading" : "idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [loading, setLoading] = useState(scoped);
-  const [hasStoredMap, setHasStoredMap] = useState(false);
-
-  // The latest map + scope, readable from a timeout without re-subscribing.
-  const mindRef = useRef(mind);
-  mindRef.current = mind;
-  const scopeRef = useRef({ uid, productId, moduleId, docKey, scoped, mapKey: activeMapKey });
-  scopeRef.current = { uid, productId, moduleId, docKey, scoped, mapKey: activeMapKey };
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryAttemptRef = useRef(0);
-  const readyRef = useRef(false);
-  /** Bumped on every local edit so a slower in-flight write cannot clobber it. */
-  const revisionRef = useRef(0);
-  /**
-   * The revision the cloud CONFIRMED (a resolved `setDoc`). Anything newer is
-   * stranded work — a reconnect or a return to the tab flushes it, so a
-   * dropped connection can never strand a map past the retry loop.
-   */
-  const savedRevisionRef = useRef(0);
-  /**
-   * The scope a PENDING (debounced) write belongs to, captured when it was
-   * queued. `scopeRef` is reassigned on every render, so by the time a
-   * debounce fires after a module / map switch it already points at the NEW
-   * document — and the edit the learner just made would either be written to
-   * the wrong map or, because the load effect drops `readyRef` first, not
-   * written at all. This is the ref that makes "mind map save nahi ho raha"
-   * on a lesson switch impossible.
-   */
-  const pendingScopeRef = useRef<typeof scopeRef.current | null>(null);
-  /**
-   * A map the learner just created. The load effect adopts it instead of
-   * fetching a document that cannot exist yet, so "New map" opens instantly
-   * with the chosen name rather than flashing an empty default first.
-   */
-  const pendingNewRef = useRef<{ mapKey: string; mind: MindMap } | null>(null);
-  /** Latest `persist` without making it a dependency of the load effect. */
-  const persistRef = useRef<(override?: typeof scopeRef.current | null) => void>(() => undefined);
-  /**
-   * Latest `scheduleSave`, for the same reason in the other direction:
-   * `persist` re-queues through it when the map is still loading instead of
-   * dropping the edit — and calling it directly would knot the two
-   * callbacks' dependency arrays together.
-   */
-  const scheduleSaveRef = useRef<() => void>(() => undefined);
-
-  // ── The module's map list ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!scoped) {
-      setSummaries([]);
-      setMapsLoading(false);
-      setActiveMapKey(MIND_MAP_DEFAULT_KEY);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const uidText = String(uid);
-    const productText = String(productId);
-    const moduleText = String(moduleId);
-    setMapsLoading(true);
-
-    // 1. The device copy paints the list immediately (works offline too).
-    const localRows = readLocalIndex(indexKey(uidText, productText, moduleText));
-    if (localRows.length) setSummaries(sortSummaries(localRows));
-    else setSummaries([seedSummary(rootTopic || "Central idea")]);
-
-    let storedActive: string = MIND_MAP_DEFAULT_KEY;
-    try {
-      const raw = localStorage.getItem(activeKeyStorageKey(uidText, productText, moduleText));
-      if (raw) storedActive = sanitizeMapKey(raw);
-    } catch {
-      /* ignore */
-    }
-    setActiveMapKey(storedActive);
-
-    // 2. Firestore is authoritative: every map document for this learner in
-    //    this module. Equality-only filters need no composite index.
-    void (async () => {
-      try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, "users", uidText, "mindMaps"),
-            where("productId", "==", productText),
-            where("moduleId", "==", moduleText),
-          ),
-        );
-        if (cancelled) return;
-        const rows: MindMapSummary[] = snapshot.docs.map((entry) => {
-          const data = entry.data() as Record<string, unknown>;
-          // Older documents predate `mapKey`; their three-part id IS `main`.
-          const key = sanitizeMapKey(
-            typeof data.mapKey === "string" && data.mapKey
-              ? data.mapKey
-              : entry.id.split("__")[3] || MIND_MAP_DEFAULT_KEY,
-          );
-          return normalizeSummary({
-            mapKey: key,
-            title: typeof data.title === "string" ? data.title : "",
-            rootTopic: typeof data.rootTopic === "string" ? data.rootTopic : "",
-            nodeCount: typeof data.nodeCount === "number" ? data.nodeCount : 1,
-            updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
-            createdAt: typeof data.createdAt === "number" ? (data.createdAt as number) : undefined,
-          });
-        });
-
-        setSummaries((current) => {
-          // Keep device-only maps that never reached the cloud; the cloud
-          // copy wins wherever both sides know a key.
-          const byKey = new Map(current.map((row) => [row.mapKey, row]));
-          for (const row of rows) {
-            const previous = byKey.get(row.mapKey);
-            byKey.set(row.mapKey, previous ? { ...row, createdAt: previous.createdAt || row.createdAt } : row);
-          }
-          const merged = sortSummaries([...byKey.values()]);
-          const next = merged.length ? merged : [seedSummary(rootTopic || "Central idea")];
-          writeLocalIndex(indexKey(uidText, productText, moduleText), next);
-          return next;
-        });
-      } catch (thrown: unknown) {
-        // The device list already painted; the warning names the cause
-        // (offline / rules / wrong account) instead of failing silently —
-        // a fresh device otherwise shows an empty library with no clue why.
-        if (typeof console !== "undefined") {
-          console.warn(
-            `[useCourseMindMap] cloud map list failed (${errorCode(thrown) || "unknown error"}) — showing the device copy`,
-          );
-        }
-      } finally {
-        if (!cancelled) setMapsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+  // Every module/account has its OWN drafts, revisions and queues. Changing
+  // the visible scope cannot redirect an old timeout or promise to a new doc.
+  const session = useMemo<MapSession>(() => {
+    const outbox = scoped ? readOutbox(outboxKey(uidText, productText, moduleText)) : { uploads: new Set<string>(), deletes: new Set<string>() };
+    const rows = scoped ? readLocalIndex(indexKey(uidText, productText, moduleText)).filter((row) => !outbox.deletes.has(row.mapKey) || outbox.uploads.has(row.mapKey)) : [];
+    return {
+      uid: uidText, productId: productText, moduleId: moduleText, scoped, rootTopic,
+      ...outbox, activeMapKey: scoped ? storedActiveKey(uidText, productText, moduleText) : MIND_MAP_DEFAULT_KEY,
+      summaries: rows.length ? sortSummaries(rows) : scoped ? [seedSummary(rootTopic || "Central idea")] : [],
+      drafts: new Map(), deletions: new Map(), retiredKeys: new Set(outbox.deletes),
+      mapsLoading: scoped, listError: null, listReadFailed: false,
+      listAttempts: 0, listRetry: null, disposed: false,
     };
-    // `rootTopic` only seeds an empty list, so it must not re-run the read.
+    // rootTopic only seeds a new scope; changing a title must not reload a diagram.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoped, uid, productId, moduleId]);
+  }, [scoped, uidText, productText, moduleText]);
+  const scopeRef = useRef(session);
+  scopeRef.current = session;
+  const [version, setVersion] = useState(0);
+  const [listReloadToken, setListReloadToken] = useState(0);
+  const persistRef = useRef<(scope: MapSession, draft: MapDraft) => void>(() => undefined);
+  const deleteRef = useRef<(scope: MapSession, key: string) => void>(() => undefined);
+  const active = getDraft(session, session.activeMapKey);
 
-  // If the remembered map disappeared (deleted on another device), fall back
-  // to the first one that exists rather than editing a ghost document.
-  useEffect(() => {
-    if (!scoped || mapsLoading || summaries.length === 0) return;
-    if (summaries.some((row) => row.mapKey === activeMapKey)) return;
-    if (pendingNewRef.current?.mapKey === activeMapKey) return;
-    setActiveMapKey(summaries[0].mapKey);
-  }, [scoped, mapsLoading, summaries, activeMapKey]);
+  const notify = useCallback((scope: MapSession) => {
+    if (scopeRef.current === scope && !scope.disposed) setVersion((v) => v + 1);
+  }, []);
 
-  // Remember the open map per module so reopening the tab lands where the
-  // learner left off.
-  useEffect(() => {
-    if (!scoped) return;
-    try {
-      localStorage.setItem(activeKeyStorageKey(String(uid), String(productId), String(moduleId)), activeMapKey);
-    } catch {
-      /* ignore */
-    }
-  }, [scoped, uid, productId, moduleId, activeMapKey]);
+  const scheduleSave = useCallback((scope: MapSession, draft: MapDraft) => {
+    if (!scope.scoped || draft.deleted) return;
+    // Node editors commit their final text during child teardown. Depending
+    // on React cleanup order, this session may already have been disposed.
+    // Flush the captured draft now instead of redirecting it or losing it.
+    if (scope.disposed) { persistRef.current(scope, draft); return; }
+    if (draft.timer) clearTimeout(draft.timer);
+    draft.timer = setTimeout(() => {
+      draft.timer = null;
+      persistRef.current(scope, draft);
+    }, debounceMs);
+  }, [debounceMs]);
 
-  // ── Load: Firestore first, then the device mirror ───────────────────────
-  useEffect(() => {
-    if (!scoped || !docKey) {
-      readyRef.current = false;
-      setLoading(false);
-      setStatus("idle");
-      return undefined;
-    }
+  // This happens at the mutation, NOT at the delayed cloud write. Closing the
+  // tab inside the debounce window still leaves the exact map + outbox locally.
+  const markDirty = useCallback((scope: MapSession, draft: MapDraft, mind: MindMap) => {
+    draft.mind = mind;
+    draft.revision += 1;
+    draft.updatedAt = Math.max(Date.now(), draft.updatedAt + 1);
+    draft.hasLocal = true;
+    draft.status = "saving";
+    draft.errorMessage = null;
+    draft.attempts = 0;
+    if (draft.retry) { clearTimeout(draft.retry); draft.retry = null; }
+    scope.uploads.add(draft.mapKey);
+    writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), mind, draft.updatedAt);
+    persistOutbox(scope);
+    touchSummary(scope, draft);
+    notify(scope);
+  }, [notify]);
 
-    let cancelled = false;
-    // A debounce left over from the map we are LEAVING is written out first.
-    // `persist` is called with the scope captured when that edit was queued
-    // (the render has already moved `scopeRef` on to the new document), and
-    // `mindRef` still holds the outgoing map because the new one loads
-    // asynchronously below. Skipping this is how a branch added seconds
-    // before a lesson switch used to vanish.
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-      persistRef.current(pendingScopeRef.current);
-      pendingScopeRef.current = null;
-    }
-    readyRef.current = false;
-    setLoading(true);
-    setStatus("loading");
-
-    // A map created a moment ago has no document yet — adopt the draft the
-    // creator handed us instead of round-tripping to Firestore for a miss.
-    const pending = pendingNewRef.current;
-    if (pending && pending.mapKey === activeMapKey) {
-      pendingNewRef.current = null;
-      setMindState(pending.mind);
-      setHasStoredMap(false);
-      setStatus("ready");
-      readyRef.current = true;
-      setLoading(false);
-      revisionRef.current += 1;
-      // Write it straight away so the new map exists for every other device.
-      const timer = setTimeout(() => persistRef.current(), 0);
-      return () => clearTimeout(timer);
-    }
-
-    const local = readLocalMindMap(localKey(String(uid), String(productId), String(moduleId), activeMapKey));
-
-    void (async () => {
-      try {
-        const snapshot = await getDoc(doc(db, "users", String(uid), "mindMaps", docKey));
-        if (cancelled) return;
-        if (snapshot.exists()) {
-          const stored = parseMindMap(snapshot.data());
-          setMindState(stored);
-          setHasStoredMap(true);
-          setStatus("ready");
-          const savedAt = (snapshot.data() as { updatedAt?: number }).updatedAt;
-          if (typeof savedAt === "number") setLastSavedAt(savedAt);
-        } else if (local) {
-          // The device has work this account never managed to upload — adopt
-          // it instead of showing a blank canvas, then push it up. The doc is
-          // CONFIRMED missing, so there is no newer cloud copy to clobber;
-          // without this push, work stranded by an earlier failed save would
-          // sit on this device forever while every other device shows a seed.
-          setMindState(local);
-          setStatus("ready");
-          revisionRef.current += 1;
-          scheduleSaveRef.current();
-        } else {
-          setMindState(createMindMap(rootTopic || "Central idea"));
-          setStatus("ready");
-        }
-      } catch (thrown: unknown) {
-        if (cancelled) return;
-        const code = errorCode(thrown);
-        if (typeof console !== "undefined") {
-          console.warn(`[useCourseMindMap] cloud load failed for map "${activeMapKey}" (${code || "unknown error"})`);
-        }
-        if (local) {
-          // Adopted WITHOUT an auto-push: the read failed, so a newer cloud
-          // copy may exist — pushing the device copy now could clobber it.
-          // The learner's next edit saves normally.
-          setMindState(local);
-          setStatus("ready");
-        } else {
-          setStatus("error");
-          setErrorMessage(
-            code === "permission-denied"
-              ? "Cloud se load blocked hai (account ya security rules). Aap draw karna shuru kar sakte hain — map is device par safe rahega."
-              : "Mind map load nahi ho paya. Aap draw karna shuru kar sakte hain — hum dobara save try karenge.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          readyRef.current = true;
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // `rootTopic` is intentionally excluded: re-seeding on every title change
-    // would wipe a map the learner is already editing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docKey, scoped, uid, productId, moduleId, activeMapKey]);
-
-  /** Keep the list row for one map in step with what was just saved. */
-  const touchSummary = useCallback(
-    (mapKey: string, current: MindMap, savedAt: number, scope: { uid: string; productId: string; moduleId: string }) => {
-      setSummaries((rows) => {
-        const key = sanitizeMapKey(mapKey);
-        const existing = rows.find((row) => row.mapKey === key);
-        const row = normalizeSummary({
-          mapKey: key,
-          title: current.title,
-          rootTopic: current.rootTopic,
-          nodeCount: current.nodes.length + 1,
-          updatedAt: savedAt,
-          createdAt: existing?.createdAt || savedAt,
-        });
-        const next = sortSummaries([...rows.filter((item) => item.mapKey !== key), row]);
-        writeLocalIndex(indexKey(scope.uid, scope.productId, scope.moduleId), next);
-        return next;
-      });
-    },
-    [],
-  );
-
-  // ── Save: debounced write, mirrored locally on the way out ──────────────
-  const persist = useCallback((override?: typeof scopeRef.current | null) => {
-    const {
-      uid: currentUid,
-      productId: currentProduct,
-      moduleId: currentModule,
-      docKey: key,
-      scoped: isScoped,
-      mapKey: currentMapKey,
-    } = override ?? scopeRef.current;
-    if (!isScoped || !key) return;
-    // The map is still loading (a slow first read + a fast finger): the edit
-    // is re-queued, not dropped — dropping it here used to strand the
-    // learner's first branches with no error and no retry. The load always
-    // settles `readyRef`, so the re-queue always terminates.
-    if (!readyRef.current) {
-      scheduleSaveRef.current();
+  const persist = useCallback((scope: MapSession, draft: MapDraft) => {
+    if (!scope.scoped || draft.deleted || draft.revision === draft.savedRevision) return;
+    if (draft.timer) { clearTimeout(draft.timer); draft.timer = null; }
+    if (scope.deletes.has(draft.mapKey)) {
+      // A new main map may reuse a just-deleted id. Delete the old document
+      // AFTER its in-flight write and BEFORE saving the replacement.
+      draft.flushWanted = true;
+      deleteRef.current(scope, draft.mapKey);
       return;
     }
+    if (draft.inFlight || (!draft.loaded && !scope.disposed)) { draft.flushWanted = true; return; }
     const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
-    if (!signedInUid || signedInUid !== String(currentUid)) {
-      setStatus("error");
-      // Named, not generic: the map belongs to a different account than the
-      // one signed in (a second phone on another login is the classic case) —
-      // no retry uploads it, so the message says what to do instead.
-      setErrorMessage(
-        "Cloud save ruk gaya — aap jis account se signed in hain vah is map ka owner nahin hai. Map is device par safe hai; sahi account se sign in karke dobara kholein.",
-      );
-      if (typeof console !== "undefined") {
-        console.warn(
-          `[useCourseMindMap] cloud write skipped for map "${currentMapKey}": the signed-in account is not the map owner`,
-        );
-      }
-      const attempt = retryAttemptRef.current + 1;
-      retryAttemptRef.current = attempt;
-      if (attempt <= 8) {
-        if (retryRef.current) clearTimeout(retryRef.current);
-        retryRef.current = setTimeout(() => {
-          retryRef.current = null;
-          persist();
-        }, Math.min(8000, 400 * attempt));
+    if (!signedInUid || signedInUid !== scope.uid) {
+      draft.status = "error";
+      draft.errorMessage = describeMapError({ code: "unauthenticated" });
+      notify(scope);
+      if (!scope.disposed && draft.attempts < 8) {
+        draft.attempts += 1;
+        if (draft.retry) clearTimeout(draft.retry);
+        draft.retry = setTimeout(() => { draft.retry = null; persistRef.current(scope, draft); }, Math.min(8000, 400 * draft.attempts));
       }
       return;
     }
-    const current = mindRef.current;
-
-    // The local mirror is written synchronously and unconditionally: even if
-    // the network write fails, this device keeps the work.
-    writeLocalMindMap(
-      localKey(String(currentUid), String(currentProduct), String(currentModule), currentMapKey),
-      current,
-    );
-    touchSummary(currentMapKey, current, Date.now(), {
-      uid: String(currentUid),
-      productId: String(currentProduct),
-      moduleId: String(currentModule),
+    const key = mindMapDocId(scope.uid, scope.productId, scope.moduleId, draft.mapKey);
+    const revision = draft.revision;
+    const updatedAt = draft.updatedAt;
+    const currentMapKey = draft.mapKey;
+    const payload = toFirestoreMindMap(draft.mind, {
+      uid: signedInUid, productId: scope.productId, moduleId: scope.moduleId,
+      mapKey: currentMapKey, updatedAt,
     });
-
-    setStatus("saving");
-    const revision = revisionRef.current;
-    const payload = JSON.parse(JSON.stringify(toFirestoreMindMap(current, {
-      uid: signedInUid,
-      productId: String(currentProduct),
-      moduleId: String(currentModule),
-      mapKey: currentMapKey,
-      updatedAt: Date.now(),
-    })));
-
-    void setDoc(doc(db, "users", signedInUid, "mindMaps", key), payload)
-      .then(() => {
-        // A newer edit may already be queued; don't downgrade its status.
-        if (revisionRef.current !== revision) return;
-        savedRevisionRef.current = revision;
-        retryAttemptRef.current = 0;
-        setStatus("saved");
-        setErrorMessage(null);
-        setLastSavedAt(Date.now());
-      })
-      .catch((thrown: unknown) => {
-        if (revisionRef.current !== revision) return;
-        const code = errorCode(thrown);
-        if (typeof console !== "undefined") {
-          console.warn(
-            `[useCourseMindMap] cloud save failed for map "${currentMapKey}" (${code || "unknown error"}) — map stays safe on this device`,
-          );
-        }
-        setStatus("error");
-        // A refused write (rules / wrong account) never heals by retrying,
-        // so it names the cause and stops after two attempts; anything else
-        // keeps the old reassuring message and the full retry loop.
-        const blocked = code === "permission-denied";
-        setErrorMessage(
-          blocked
-            ? "Cloud save blocked hai (account ya security rules) — map is device par safe hai. Sahi account se sign in karke, ya thodi der baad, dobara kholein."
-            : "Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.",
-        );
-        const attempt = retryAttemptRef.current + 1;
-        retryAttemptRef.current = attempt;
-        if (blocked ? attempt > 2 : attempt > 8) return;
-        if (retryRef.current) clearTimeout(retryRef.current);
-        const delay = Math.min(20000, 700 * 2 ** Math.min(attempt, 5));
-        retryRef.current = setTimeout(() => {
-          retryRef.current = null;
-          persist();
-        }, delay);
-      });
-  }, [touchSummary]);
-
-  // The load effect adopts a freshly created map and saves it immediately;
-  // it needs `persist` without listing it as a dependency (that would re-run
-  // the whole load on every save-status change).
+    draft.inFlight = true;
+    draft.flushWanted = false;
+    draft.status = "saving";
+    notify(scope);
+    let succeeded = false;
+    void setDoc(doc(db, "users", signedInUid, "mindMaps", key), payload).then(() => {
+      succeeded = true;
+      if (draft.deleted) return;
+      draft.savedRevision = revision;
+      draft.hasStoredMap = true;
+      draft.attempts = 0;
+      if (draft.revision !== revision) return;
+      draft.status = "saved";
+      draft.errorMessage = null;
+      draft.lastSavedAt = updatedAt;
+      // A new mount/tab may have edited the mirror while this old controller
+      // was awaiting the server. Its newer outbox marker must not be cleared.
+      const local = readLocalMindMap(scopeLocalKey(scope, currentMapKey));
+      if (!local || local.updatedAt === updatedAt) {
+        scope.uploads.delete(currentMapKey);
+        const disk = readOutbox(scopeOutboxKey(scope));
+        disk.uploads.delete(currentMapKey);
+        try { localStorage.setItem(scopeOutboxKey(scope), JSON.stringify({ uploads: [...disk.uploads], deletes: [...disk.deletes] })); }
+        catch { /* the acknowledged session remains authoritative in memory */ }
+      }
+      scope.retiredKeys.delete(currentMapKey);
+    }).catch((thrown: unknown) => {
+      if (draft.deleted) return;
+      draft.status = "error";
+      draft.errorMessage = describeMapError(thrown);
+      if (scope.disposed || draft.attempts >= 8) return;
+      draft.attempts += 1;
+      if (draft.retry) clearTimeout(draft.retry);
+      draft.retry = setTimeout(() => {
+        draft.retry = null;
+        if (!scope.disposed) persistRef.current(scope, draft);
+      }, Math.min(20000, 700 * 2 ** Math.min(draft.attempts, 5)));
+    }).finally(() => {
+      draft.inFlight = false;
+      notify(scope);
+      if (draft.deleted) { deleteRef.current(scope, draft.mapKey); return; }
+      if (succeeded && draft.revision !== draft.savedRevision) {
+        if (scope.disposed || draft.flushWanted) persistRef.current(scope, draft);
+        else scheduleSave(scope, draft);
+      }
+    });
+  }, [notify, scheduleSave]);
   persistRef.current = persist;
 
-  /** Queue a write after the learner pauses. */
-  const scheduleSave = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    // Snapshot WHERE this edit belongs now: if the learner switches module or
-    // map inside the debounce window, the write still lands on the map they
-    // were drawing on.
-    pendingScopeRef.current = { ...scopeRef.current };
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      persist(pendingScopeRef.current);
-      pendingScopeRef.current = null;
-    }, debounceMs);
-  }, [debounceMs, persist]);
-
-  // Published for `persist` (not-ready re-queue) and the load effect
-  // (adopted-local push) — see `scheduleSaveRef`.
-  scheduleSaveRef.current = scheduleSave;
-
-  const setMind = useCallback(
-    (updater: MindMap | ((current: MindMap) => MindMap)) => {
-      setMindState((current) => {
-        const next = typeof updater === "function" ? (updater as (value: MindMap) => MindMap)(current) : updater;
-        if (!isMindMap(next) || next === current) return current;
-        revisionRef.current += 1;
-        scheduleSave();
-        return next;
-      });
-    },
-    [scheduleSave],
-  );
-
-  /** Write right now — used when the panel closes so nothing is left pending. */
-  const flush = useCallback(() => {
-    const pending = timerRef.current !== null ? pendingScopeRef.current : null;
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  const flushDelete = useCallback((scope: MapSession, key: string) => {
+    if (!scope.deletes.has(key)) return;
+    let job = scope.deletions.get(key);
+    if (!job) { job = { predecessor: null, inFlight: false, retry: null, attempts: 0 }; scope.deletions.set(key, job); }
+    if (job.inFlight || job.predecessor?.inFlight) return;
+    const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
+    if (!signedInUid || signedInUid !== scope.uid) {
+      scope.listError = describeMapError({ code: "unauthenticated" });
+      notify(scope);
+      return;
     }
-    pendingScopeRef.current = null;
-    persist(pending);
-  }, [persist]);
+    job.inFlight = true;
+    const deletion = job;
+    void deleteDoc(doc(db, "users", signedInUid, "mindMaps", mindMapDocId(scope.uid, scope.productId, scope.moduleId, key))).then(() => {
+      scope.deletes.delete(key);
+      scope.deletions.delete(key);
+      const disk = readOutbox(scopeOutboxKey(scope));
+      disk.deletes.delete(key);
+      try { localStorage.setItem(scopeOutboxKey(scope), JSON.stringify({ uploads: [...disk.uploads], deletes: [...disk.deletes] })); }
+      catch { /* the next mount also reconciles the tombstone */ }
+      scope.listError = null;
+      const replacement = scope.drafts.get(key);
+      if (replacement && !replacement.deleted) persistRef.current(scope, replacement);
+    }).catch((thrown: unknown) => {
+      scope.listError = describeMapError(thrown);
+      if (!scope.disposed && deletion.attempts < 8) {
+        deletion.attempts += 1;
+        deletion.retry = setTimeout(() => {
+          deletion.retry = null;
+          if (!scope.disposed) deleteRef.current(scope, key);
+        }, Math.min(20000, 700 * 2 ** Math.min(deletion.attempts, 5)));
+      }
+    }).finally(() => { deletion.inFlight = false; notify(scope); });
+  }, [notify]);
+  deleteRef.current = flushDelete;
 
-  // A dropped connection outlasts the retry loop: when the browser comes back
-  // online — or the tab comes back into view — anything the cloud never
-  // confirmed is flushed. `savedRevisionRef` keeps this from rewriting an
-  // already-saved map on every reconnect.
+  const loadDraft = useCallback((scope: MapSession, draft: MapDraft): Promise<void> => {
+    if (!scope.scoped || draft.deleted || draft.loaded) return Promise.resolve();
+    if (draft.loadPromise) return draft.loadPromise;
+    const revisionAtRead = draft.revision;
+    const docKey = mindMapDocId(scope.uid, scope.productId, scope.moduleId, draft.mapKey);
+    draft.loadPromise = (async () => {
+      try {
+        const snapshot = await getDoc(doc(db, "users", scope.uid, "mindMaps", docKey));
+        if (draft.deleted || scope.disposed) return;
+        draft.hasStoredMap = snapshot.exists();
+        draft.loadError = false;
+        draft.errorMessage = null;
+        // Neither a slow first read nor an older cloud doc can discard an
+        // early edit or a persisted offline draft (including inactive maps).
+        if (draft.revision !== revisionAtRead || scope.uploads.has(draft.mapKey)) {
+          draft.status = "saving";
+        } else if (snapshot.exists() && !scope.deletes.has(draft.mapKey)) {
+          const data = snapshot.data();
+          draft.mind = parseMindMap(data);
+          draft.updatedAt = typeof data.updatedAt === "number" ? data.updatedAt : 0;
+          draft.lastSavedAt = draft.updatedAt || null;
+          draft.hasLocal = true;
+          draft.status = "ready";
+          draft.errorMessage = null;
+          writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), draft.mind, draft.updatedAt);
+          touchSummary(scope, draft);
+        } else if (draft.hasLocal && !scope.deletes.has(draft.mapKey)) {
+          // Confirmed-missing document: migrate the old device-only copy.
+          markDirty(scope, draft, draft.mind);
+        } else {
+          draft.status = "ready";
+        }
+      } catch (thrown: unknown) {
+        if (draft.deleted || scope.disposed) return;
+        // A cache without an outbox marker is not blindly uploaded after a
+        // failed read: a richer cloud copy may exist. Explicit edits ARE queued.
+        draft.loadError = true;
+        draft.status = "error";
+        draft.errorMessage = describeMapError(thrown);
+      } finally {
+        draft.loadPromise = null;
+        if (!draft.deleted && !scope.disposed) {
+          draft.loaded = true;
+          touchSummary(scope, draft);
+          notify(scope);
+          if (draft.revision !== draft.savedRevision) persistRef.current(scope, draft);
+        }
+      }
+    })();
+    return draft.loadPromise;
+  }, [notify, markDirty]);
+
+  const retryReads = useCallback((scope: MapSession) => {
+    if (scope.disposed || !scope.scoped) return;
+    for (const draft of scope.drafts.values()) {
+      if (draft.loadError && draft.revision === draft.savedRevision) {
+        draft.loaded = false;
+        void loadDraft(scope, draft);
+      }
+    }
+    if (scope.listReadFailed && scopeRef.current === scope) {
+      scope.listAttempts = 0;
+      setListReloadToken((token) => token + 1);
+    }
+  }, [loadDraft]);
+
+  // Module library. Metadata and the canvas use the same document ids as the
+  // Course Player. A failed list read is visible, not just a console warning.
   useEffect(() => {
-    if (!scoped || typeof window === "undefined") return undefined;
+    if (!session.scoped) return undefined;
+    let cancelled = false;
+    session.mapsLoading = true;
+    const list = query(collection(db, "users", uidText, "mindMaps"), where("productId", "==", productText), where("moduleId", "==", moduleText));
+    void getDocs(list).then((snapshot) => {
+      if (cancelled || session.disposed) return;
+      const byKey = new Map(session.summaries.map((row) => [row.mapKey, row]));
+      for (const entry of snapshot.docs) {
+        const data = entry.data();
+        const key = sanitizeMapKey(data.mapKey || entry.id.split("__")[3] || MIND_MAP_DEFAULT_KEY);
+        if (session.retiredKeys.has(key) || session.deletes.has(key)) continue;
+        const row = normalizeSummary({ mapKey: key, title: data.title, rootTopic: data.rootTopic, nodeCount: data.nodeCount, updatedAt: data.updatedAt, createdAt: data.createdAt });
+        const previous = byKey.get(key);
+        if (!previous || row.updatedAt > previous.updatedAt) byKey.set(key, { ...row, createdAt: previous?.createdAt || row.createdAt });
+      }
+      session.summaries = sortSummaries([...byKey.values()]).slice(0, MAX_MAPS_PER_MODULE);
+      persistIndex(session);
+      session.listReadFailed = false;
+      session.listAttempts = 0;
+      if (!session.deletes.size) session.listError = null;
+      if (!session.summaries.some((row) => row.mapKey === session.activeMapKey)) {
+        session.activeMapKey = session.summaries[0]?.mapKey || MIND_MAP_DEFAULT_KEY;
+      }
+    }).catch((thrown: unknown) => {
+      if (cancelled || session.disposed) return;
+      session.listReadFailed = true;
+      session.listError = describeMapError(thrown);
+      if (session.listAttempts < 8) {
+        session.listAttempts += 1;
+        session.listRetry = setTimeout(() => {
+          session.listRetry = null;
+          if (!session.disposed && scopeRef.current === session) setListReloadToken((token) => token + 1);
+        }, Math.min(20000, 1200 * session.listAttempts));
+      }
+    }).finally(() => {
+      if (cancelled || session.disposed) return;
+      session.mapsLoading = false;
+      // An auth/network read failure must not leave an empty canvas frozen
+      // after the library has recovered. Reads cannot upload an empty seed.
+      const visible = session.drafts.get(session.activeMapKey);
+      if (!session.listReadFailed && visible?.loadError && visible.revision === visible.savedRevision) {
+        visible.loaded = false;
+        void loadDraft(session, visible);
+      }
+      // Recover ALL pending maps, not only the one last opened on this device.
+      for (const key of session.uploads) {
+        const draft = getDraft(session, key);
+        void loadDraft(session, draft).then(() => {
+          if (!session.disposed) persistRef.current(session, draft);
+        });
+      }
+      for (const key of session.deletes) deleteRef.current(session, key);
+      notify(session);
+    });
+    return () => {
+      cancelled = true;
+      if (session.listRetry) { clearTimeout(session.listRetry); session.listRetry = null; }
+    };
+  }, [session, uidText, productText, moduleText, listReloadToken, notify, loadDraft]);
+
+  const activeMapKey = session.activeMapKey;
+  useEffect(() => {
+    if (!session.scoped) return;
+    try { localStorage.setItem(activeKeyStorageKey(session.uid, session.productId, session.moduleId), activeMapKey); }
+    catch { /* private mode */ }
+    void loadDraft(session, getDraft(session, activeMapKey));
+  }, [session, activeMapKey, loadDraft]);
+
+  const setMind = useCallback((updater: MindMap | ((current: MindMap) => MindMap)) => {
+    const scope = session;
+    if (!scope.scoped) return;
+    // Bind to the map delivered in this render. Old node-editor cleanups
+    // must not follow a newly selected key or a fresh replacement main map.
+    const draft = active;
+    if (draft.deleted) return;
+    const next = typeof updater === "function" ? updater(draft.mind) : updater;
+    if (!isMindMap(next) || next === draft.mind) return;
+    // Keep refs and the mirror in step synchronously. React 19 may defer or
+    // replay state updaters, so persistence must NOT live inside an updater.
+    markDirty(scope, draft, parseMindMap(next));
+    scheduleSave(scope, draft);
+  }, [session, active, markDirty, scheduleSave]);
+
+  const flush = useCallback(() => {
+    const scope = session;
+    retryReads(scope);
+    for (const draft of scope.drafts.values()) persistRef.current(scope, draft);
+    for (const key of scope.deletes) deleteRef.current(scope, key);
+  }, [session, retryReads]);
+
+  const selectMap = useCallback((mapKey: string) => {
+    const scope = session;
+    const key = sanitizeMapKey(mapKey);
+    if (!scope.scoped || key === scope.activeMapKey || scope.deletes.has(key)) return;
+    flush();
+    scope.activeMapKey = key;
+    notify(scope);
+  }, [session, flush, notify]);
+
+  const createMap = useCallback((title?: string): string | null => {
+    const scope = session;
+    if (!scope.scoped || scope.summaries.length >= MAX_MAPS_PER_MODULE) return null;
+    flush();
+    const rows = scope.summaries;
+    const key = createMapKey([...rows.map((row) => row.mapKey), ...scope.deletes]);
+    const name = String(title || "").trim().slice(0, 120) || `Mind map ${rows.length + 1}`;
+    const draft = getDraft(scope, key);
+    draft.loaded = true;
+    scope.activeMapKey = key;
+    markDirty(scope, draft, createMindMap(name, name));
+    persistRef.current(scope, draft);
+    // Deterministic even when React batches/replays renders; never assigned
+    // from inside setSummaries(updater), which returned null on later creates.
+    return key;
+  }, [session, flush, markDirty]);
+
+  const renameMap = useCallback((mapKey: string, title: string) => {
+    const scope = session;
+    if (!scope.scoped) return;
+    const key = sanitizeMapKey(mapKey);
+    const clean = String(title || "").trim().slice(0, 120);
+    if (!clean || scope.deletes.has(key)) return;
+    const draft = getDraft(scope, key);
+    if (key === scope.activeMapKey) {
+      markDirty(scope, draft, setMindMapTitle(draft.mind, clean));
+      scheduleSave(scope, draft);
+      return;
+    }
+    // Fetch the real inactive map before renaming, never replace its branches
+    // with a new empty seed just because it wasn't on this device yet.
+    void loadDraft(scope, draft).then(() => {
+      if (draft.deleted || (!draft.loaded && !draft.hasLocal) || (draft.loadError && !draft.hasLocal)) return;
+      markDirty(scope, draft, setMindMapTitle(draft.mind, clean));
+      persistRef.current(scope, draft);
+    });
+  }, [session, loadDraft, markDirty, scheduleSave]);
+
+  const deleteMap = useCallback((mapKey: string) => {
+    const scope = session;
+    if (!scope.scoped) return;
+    const key = sanitizeMapKey(mapKey);
+    const draft = getDraft(scope, key);
+    if (draft.deleted || scope.deletes.has(key)) return;
+    if (draft.timer) { clearTimeout(draft.timer); draft.timer = null; }
+    if (draft.retry) { clearTimeout(draft.retry); draft.retry = null; }
+    draft.deleted = true;
+    draft.revision += 1;
+    scope.uploads.delete(key);
+    scope.deletes.add(key);
+    scope.retiredKeys.add(key);
+    scope.deletions.set(key, { predecessor: draft, inFlight: false, retry: null, attempts: 0 });
+    try { localStorage.removeItem(scopeLocalKey(scope, key)); } catch { /* private mode */ }
+    scope.summaries = scope.summaries.filter((row) => row.mapKey !== key);
+    if (!scope.summaries.length) scope.summaries = [seedSummary(scope.rootTopic || "Central idea")];
+    if (scope.activeMapKey === key) {
+      scope.activeMapKey = scope.summaries[0].mapKey;
+      if (scope.activeMapKey === key) {
+        // Fresh main shell. It stays editable, but its write waits for the old
+        // main's deletion, including any old upload still awaiting acknowledgement.
+        scope.drafts.delete(key);
+        const replacement = getDraft(scope, key);
+        replacement.loaded = true;
+        replacement.status = "ready";
+      }
+    }
+    persistIndex(scope);
+    persistOutbox(scope);
+    notify(scope);
+    deleteRef.current(scope, key);
+  }, [session, notify]);
+
+  // Lifecycle belongs to the session. Flush captured outgoing drafts on a
+  // scope switch/unmount/pagehide; retries never attach themselves to a dead hook.
+  useEffect(() => {
+    session.disposed = false;
     const maybeFlush = () => {
-      if (!scopeRef.current.scoped || !readyRef.current) return;
-      if (revisionRef.current === savedRevisionRef.current) return;
-      flush();
+      for (const draft of session.drafts.values()) persistRef.current(session, draft);
+      for (const key of session.deletes) deleteRef.current(session, key);
     };
+    // Both hiding the page and returning to it are flush opportunities.
     const onVisible = () => {
-      if (document.visibilityState === "visible") maybeFlush();
+      if (document.visibilityState === "visible") retryReads(session);
+      maybeFlush();
     };
-    window.addEventListener("online", maybeFlush);
+    const onOnline = () => { retryReads(session); maybeFlush(); };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("pagehide", maybeFlush);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("online", maybeFlush);
+      session.disposed = true;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("pagehide", maybeFlush);
       document.removeEventListener("visibilitychange", onVisible);
+      for (const draft of session.drafts.values()) {
+        if (draft.timer) { clearTimeout(draft.timer); draft.timer = null; }
+        if (draft.retry) { clearTimeout(draft.retry); draft.retry = null; }
+      }
+      for (const job of session.deletions.values()) if (job.retry) clearTimeout(job.retry);
+      maybeFlush();
     };
-  }, [flush, scoped]);
+  }, [session, retryReads]);
 
-  // ── Map list actions ────────────────────────────────────────────────────
-
-  const selectMap = useCallback(
-    (mapKey: string) => {
-      const key = sanitizeMapKey(mapKey);
-      if (key === scopeRef.current.mapKey) return;
-      // Never swap documents with an edit still pending — that edit belongs
-      // to the map being left behind.
-      flush();
-      setActiveMapKey(key);
-    },
-    [flush],
-  );
-
-  const createMap = useCallback(
-    (title?: string) => {
-      if (!scopeRef.current.scoped) return null;
-      let created: string | null = null;
-      setSummaries((rows) => {
-        if (rows.length >= MAX_MAPS_PER_MODULE) return rows;
-        const key = createMapKey(rows.map((row) => row.mapKey));
-        created = key;
-        const now = Date.now();
-        const name = (title || "").trim() || `Mind map ${rows.length + 1}`;
-        const fresh = createMindMap(name, name);
-        pendingNewRef.current = { mapKey: key, mind: fresh };
-        const next = sortSummaries([
-          ...rows,
-          normalizeSummary({
-            mapKey: key,
-            title: name,
-            rootTopic: fresh.rootTopic,
-            nodeCount: 1,
-            updatedAt: now,
-            createdAt: now,
-          }),
-        ]);
-        const { uid: u, productId: p, moduleId: m } = scopeRef.current;
-        writeLocalIndex(indexKey(String(u), String(p), String(m)), next);
-        return next;
-      });
-      if (created) {
-        flush();
-        setActiveMapKey(created);
-      }
-      return created;
-    },
-    [flush],
-  );
-
-  const renameMap = useCallback(
-    (mapKey: string, title: string) => {
-      const key = sanitizeMapKey(mapKey);
-      const clean = String(title || "").trim().slice(0, 120);
-      if (!clean) return;
-      const { uid: u, productId: p, moduleId: m, scoped: isScoped } = scopeRef.current;
-      if (!isScoped) return;
-
-      setSummaries((rows) => {
-        const next = rows.map((row) => (row.mapKey === key ? { ...row, title: clean } : row));
-        writeLocalIndex(indexKey(String(u), String(p), String(m)), next);
-        return next;
-      });
-
-      // The open map renames through the normal edit path (debounced save).
-      if (key === scopeRef.current.mapKey) {
-        setMind((current) => setMindMapTitle(current, clean));
-        return;
-      }
-
-      // A map sitting in the list is patched straight in its own document.
-      void (async () => {
-        const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
-        if (!signedInUid || signedInUid !== String(u)) return;
-        const id = mindMapDocId(String(u), String(p), String(m), key);
-        try {
-          const snapshot = await getDoc(doc(db, "users", signedInUid, "mindMaps", id));
-          const base = snapshot.exists() ? parseMindMap(snapshot.data()) : createMindMap(clean, clean);
-          const renamed = setMindMapTitle(base, clean);
-          writeLocalMindMap(localKey(String(u), String(p), String(m), key), renamed);
-          await setDoc(
-            doc(db, "users", signedInUid, "mindMaps", id),
-            JSON.parse(JSON.stringify(toFirestoreMindMap(renamed, {
-              uid: signedInUid,
-              productId: String(p),
-              moduleId: String(m),
-              mapKey: key,
-              updatedAt: Date.now(),
-            }))),
-          );
-        } catch {
-          /* offline — the device list already shows the new name */
-        }
-      })();
-    },
-    [setMind],
-  );
-
-  const deleteMap = useCallback(
-    (mapKey: string) => {
-      const key = sanitizeMapKey(mapKey);
-      const { uid: u, productId: p, moduleId: m, scoped: isScoped } = scopeRef.current;
-      if (!isScoped) return;
-
-      // Deleting the open map must not let its pending write resurrect it.
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (retryRef.current) {
-        clearTimeout(retryRef.current);
-        retryRef.current = null;
-      }
-      revisionRef.current += 1;
-
-      try {
-        localStorage.removeItem(localKey(String(u), String(p), String(m), key));
-      } catch {
-        /* ignore */
-      }
-
-      let fallback: string = MIND_MAP_DEFAULT_KEY;
-      setSummaries((rows) => {
-        const remaining = rows.filter((row) => row.mapKey !== key);
-        // The list never goes empty: removing the last map leaves a fresh
-        // `main` shell, exactly like a module nobody has drawn in yet.
-        const next = remaining.length ? sortSummaries(remaining) : [seedSummary(rootTopic || "Central idea")];
-        fallback = next[0].mapKey;
-        writeLocalIndex(indexKey(String(u), String(p), String(m)), next);
-        return next;
-      });
-
-      if (key === scopeRef.current.mapKey) {
-        if (fallback === key) {
-          // The last map was deleted: the module falls back to a fresh `main`
-          // shell in place. No document is loaded, so the editor has to be
-          // re-armed here or every later edit would silently refuse to save.
-          setMindState(createMindMap(rootTopic || "Central idea"));
-          setHasStoredMap(false);
-          setLastSavedAt(null);
-          setStatus("ready");
-          readyRef.current = true;
-          setActiveMapKey(MIND_MAP_DEFAULT_KEY);
-        } else {
-          // A different map takes over: its own load effect re-arms the editor.
-          readyRef.current = false;
-          setActiveMapKey(fallback);
-        }
-      }
-
-      void (async () => {
-        const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
-        if (!signedInUid || signedInUid !== String(u)) return;
-        try {
-          await deleteDoc(doc(db, "users", signedInUid, "mindMaps", mindMapDocId(String(u), String(p), String(m), key)));
-        } catch {
-          /* offline — the map is gone from this device; retry happens on the
-             next delete or when the list is next reconciled */
-        }
-      })();
-    },
-    [rootTopic],
-  );
-
-  // Clear any pending timer on unmount. The map is already mirrored locally,
-  // so a pending write that never fires costs at most one sync cycle.
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  // The open map's live title / size beat whatever the index last stored, so
-  // the list never lags a rename or a branch that was just added.
-  const maps = useMemo(() => {
-    const rows = summaries.length ? summaries : [seedSummary(rootTopic || "Central idea")];
-    return rows.map((row) =>
-      row.mapKey === activeMapKey
-        ? {
-            ...row,
-            title: mindMapDisplayTitle(mind, row.title || "Untitled map"),
-            rootTopic: mind.rootTopic,
-            nodeCount: mind.nodes.length + 1,
-          }
-        : { ...row, title: row.title || row.rootTopic || "Untitled map" },
-    );
-  }, [summaries, activeMapKey, mind, rootTopic]);
-
-  return {
-    mind,
-    setMind,
-    status,
-    errorMessage,
-    lastSavedAt,
-    flush,
-    loading,
-    hasStoredMap,
-    maps,
-    activeMapKey,
-    selectMap,
-    createMap,
-    renameMap,
-    deleteMap,
-    mapsLoading,
+  const maps = useMemo(() => session.summaries.map((row) => row.mapKey === session.activeMapKey ? {
+    ...row, title: mindMapDisplayTitle(active.mind, row.title || "Untitled map"),
+    rootTopic: active.mind.rootTopic, nodeCount: active.mind.nodes.length + 1,
+  } : { ...row, title: row.title || row.rootTopic || "Untitled map" }), [session, active.mind, version]);
+  const status = session.listError && (active.status === "ready" || active.status === "idle") ? "error" : active.status;
+  return useMemo(() => ({
+    mind: active.mind, setMind, status, errorMessage: active.errorMessage || session.listError,
+    lastSavedAt: active.lastSavedAt, flush, loading: session.scoped && !active.loaded,
+    hasStoredMap: active.hasStoredMap, maps, activeMapKey: session.activeMapKey,
+    selectMap, createMap, renameMap, deleteMap, mapsLoading: session.mapsLoading,
     atMapLimit: maps.length >= MAX_MAPS_PER_MODULE,
-  };
+  }), [session, active, version, status, maps, setMind, flush, selectMap, createMap, renameMap, deleteMap]);
 }

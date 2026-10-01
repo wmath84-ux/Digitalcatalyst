@@ -24,11 +24,11 @@
 //   notes     → users/{uid}/notes/{noteId}      (one document per note)
 //   mind maps → users/{uid}/mindMaps/{mapId}    (one document per map)
 //
-// Before this, notes were written to localStorage only, so a note taken inside
-// the Sanctuary never reached Firebase and never rendered anywhere else; and
-// the mind-map board was UNSCOPED until the learner opened a resource (the
-// module id was still null), which made `useCourseMindMap` refuse every write —
-// the map looked editable and saved nothing. Both are fixed here.
+// Picking a catalogue course is optional: signed-in learners have a private
+// __sanctuary__/course workspace first. The hooks capture the owner/scope of
+// every edit, mirror it immediately, and flush pending writes on transitions.
+// Signed-out visitors never get an editor that pretends to save to Firebase.
+
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -37,7 +37,6 @@ import NotesPanel from "../../course/NotesPanel";
 import useCourseMindMap from "../../course/useCourseMindMap";
 import useCourseNotes from "../../course/useCourseNotes";
 import { combineHtml } from "../../course/notesStore";
-import type { CoursePlayerNote } from "../../types/course";
 import type { Product } from "../../data/products";
 import ReadingBoard, { BoardFrame } from "./ReadingBoard";
 
@@ -57,6 +56,8 @@ export type BoardSlot = "mindmap" | "reading" | "notes";
  * switches the board to that module's own maps, exactly like the player.
  */
 export const SANCTUARY_COURSE_MAP_SCOPE = "course";
+/** Private scratch space, independent of purchasing/selecting any course. */
+export const SANCTUARY_PERSONAL_SCOPE = "__sanctuary__";
 
 /** Save-state vocabulary shared by the notes and mind-map hooks. */
 type BoardSaveStatus = "idle" | "loading" | "ready" | "saving" | "saved" | "error";
@@ -85,14 +86,6 @@ export function boardSubtitle(
   if (status === "loading") return `${head}Loading…`;
   return title || "";
 }
-
-/**
- * Frozen so the "no course picked" case passes the SAME array identity every
- * render. A fresh `[]` would change props every frame and make NotesPanel
- * rebuild its grid continuously — on a board that is composited in 3D, that
- * is a visible cost.
- */
-const EMPTY_NOTES: CoursePlayerNote[] = [];
 
 export interface BoardHosts {
   mindmap: HTMLElement | null;
@@ -128,13 +121,13 @@ interface BoardPortalsProps {
  * pushed to the cloud the first time the board (or the player) opens.
  */
 function useBoardNotes(uid: string | null, productId: string | null) {
-  const { notes, add, edit, remove, status, errorMessage, lastSavedAt } = useCourseNotes({
+  const { notes, add, edit, remove, flush, status, errorMessage, lastSavedAt } = useCourseNotes({
     uid,
     productId,
   });
 
-  const onAdd = useCallback((html: string) => { add(html); }, [add]);
-  const onEdit = useCallback((id: string, html: string) => { edit(id, html); }, [edit]);
+  const onAdd = useCallback((html: string) => { add(html); flush(); }, [add, flush]);
+  const onEdit = useCallback((id: string, html: string) => { edit(id, html); flush(); }, [edit, flush]);
   // Dropping a note also drops every wire pointing at it — the hook's
   // `removeNoteFromSet` pass does that, so the link layer never draws a line to
   // a card that is not there any more. The delete is committed immediately and
@@ -155,13 +148,9 @@ export default function BoardPortals({
   const mindmapHost = hosts.mindmap;
   // ── NOTHING IS AUTO-SELECTED ─────────────────────────────────────────
   //
-  // This used to be `activeCourse={ownedCourses[0]}` — the first course the
-  // catalogue happened to return. That is why the note and mind-map boards
-  // opened showing somebody's existing notes: the boards were silently
-  // scoped to a course the learner never picked. The learner chooses the
-  // course (and then the module) on the reading board, and until they do,
-  // `selectedCourseId` is null and the side boards are genuinely empty —
-  // just the "+" to create the first one.
+  // Never borrow the first catalogue course. Before an explicit selection,
+  // side boards load this learner's personal workspace (empty on first use,
+  // but correctly restored thereafter); selectedCourseId remains null.
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
@@ -192,7 +181,11 @@ export default function BoardPortals({
     }
   }, [selectedCourseId, activeCourse, openCourseId]);
 
-  const productId = activeCourse?.id ?? null;
+  // Personal boards are fully saveable even without a course selection. They
+  // never borrow the first catalogue course or another learner's namespace.
+  const productId = activeCourse?.id ?? (uid ? SANCTUARY_PERSONAL_SCOPE : null);
+  const scopeTitle = activeCourse?.title || (uid ? "Personal sanctuary" : "Sign in to save your work");
+  const notesSessionKey = `sanctuary.notes.${uid || "guest"}.${productId || "none"}`;
   const notes = useBoardNotes(uid, productId);
 
   // The mind map hook is the player's own, pointed at the same documents, so
@@ -238,18 +231,19 @@ export default function BoardPortals({
         ? createPortal(
             <BoardFrame
               title="Note taking"
-              subtitle={boardSubtitle(activeCourse?.title, notes.status, notes.errorMessage, notes.lastSavedAt)}
+              subtitle={boardSubtitle(scopeTitle, notes.status, notes.errorMessage, notes.lastSavedAt)}
             >
-              {/* The player's panel, untouched — same toolbar, same editor,
-                  same library grid. With no course picked it is handed an
-                  EMPTY list, so the board shows only the circular "+". */}
+              {/* Same editor, but its draft/session is private to this scope.
+                  Course changes cannot save an old editor into the new course. */}
               <div className="h-full w-full">
-                <NotesPanel
-                  notes={activeCourse ? notes.notes : EMPTY_NOTES}
+                {signedIn ? <NotesPanel
+                  key={notesSessionKey}
+                  sessionKey={notesSessionKey}
+                  notes={notes.notes}
                   onAdd={notes.onAdd}
                   onEdit={notes.onEdit}
                   onDelete={notes.onDelete}
-                />
+                /> : <BoardSignIn />}
               </div>
             </BoardFrame>,
             notesHost,
@@ -261,7 +255,7 @@ export default function BoardPortals({
             <BoardFrame
               title="Mind map"
               subtitle={boardSubtitle(
-                activeCourse?.title,
+                scopeTitle,
                 mindMap.status,
                 mindMap.errorMessage,
                 mindMap.lastSavedAt,
@@ -276,7 +270,9 @@ export default function BoardPortals({
               >
                 {/* Again the player's own panel, opening on its map library. */}
                 <div className="h-full w-full">
-                  <MindMapPanel
+                  {signedIn ? <MindMapPanel
+                    key={`${uid}.${productId}.${boardModuleId}`}
+                    sessionKey={`sanctuary.maps.${uid}.${productId}.${boardModuleId}`}
                     mind={mindMap.mind}
                     onMindChange={mindMap.setMind}
                     status={mindMap.status}
@@ -292,7 +288,7 @@ export default function BoardPortals({
                     atMapLimit={mindMap.atMapLimit}
                     landscape
                     open
-                  />
+                  /> : <BoardSignIn />}
                 </div>
               </Suspense>
             </BoardFrame>,
@@ -301,6 +297,12 @@ export default function BoardPortals({
         : null}
     </>
   );
+}
+
+function BoardSignIn() {
+  return <div className="grid h-full place-items-center p-10 text-center text-xl text-white/65">
+    Sign in to create and save your notes and mind maps to Firebase.
+  </div>;
 }
 
 export { combineHtml };

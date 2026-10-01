@@ -138,8 +138,9 @@ test("Firestore rules require all mixed-session parent tombstones to be absent",
     rulesSource.indexOf("match /aiUsage/{documentId}"),
   );
   assert.match(block, /parentTestKeys/);
-  assert.match(block, /parentTestKeys\.all\(k =>/);
-  assert.ok(block.includes("revisionDeletedTests/$(k)"));
+  assert.match(block, /validSessionParents\(uid, request\.resource\.data\.parentTestKeys\)/);
+  assert.ok(rulesSource.includes("revisionDeletedTests/$(parents[index])"));
+  assert.doesNotMatch(rulesSource, /\.all\(|=>/, "Firestore rules do not support JavaScript lambdas");
 });
 
 test("Smart Revision player and result renderers skip orphan questions", () => {

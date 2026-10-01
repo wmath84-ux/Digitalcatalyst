@@ -86,25 +86,20 @@ test("writes are batched, capped and go through one payload builder", () => {
 
 test("localStorage stays as the offline mirror, never as the only copy", () => {
   assert.match(mirror, /Firestore is the source of truth now/);
-  assert.match(hook, /loadLocalNotes,/);
-  assert.match(hook, /persistLocalNotes,\n\} from "\.\/notesStore";/);
-  // The device copy paints first, so the board is never blank while the cloud
-  // read is in flight (and works at all with no network).
-  assert.match(hook, /const mirrored = loadLocalNotes\(uidText, productText\);/);
+  assert.match(hook, /notes: scoped \? byRecency\(loadLocalNotes\(uidText, productText\)\)/);
   assert.match(hook, /persistLocalNotes\(uidText, productText, next\);/);
   assert.match(hook, /persistLocalNotes\(scope\.uid, scope\.productId, sorted\);/);
 });
 
 test("a deleted note leaves a tombstone, so no snapshot can resurrect it", () => {
-  assert.match(mirror, /export const notesDeletedKey = \(uid: string, productId: string\) => `dc\.courseNotesDeleted\.v1\.\$\{uid\}\.\$\{productId\}`;/);
   assert.match(mirror, /export const loadDeletedNoteIds/);
   assert.match(mirror, /export const persistDeletedNoteIds/);
-  assert.match(hook, /deletedRef\.current\.add\(noteId\);/);
-  assert.match(hook, /persistDeletedNoteIds\(scope\.uid, scope\.productId, Array\.from\(deletedRef\.current\)\);/);
-  // The delete is committed immediately, not after the debounce window.
-  assert.match(hook, /if \(scope\.scoped\) flushRef\.current\(\);/);
-  // …and the tombstone is cleared only once Firestore confirms the delete.
+  assert.match(hook, /scope\.deleted\.add\(noteId\);/);
+  assert.match(hook, /persistDeletedNoteIds\(scope\.uid, scope\.productId, Array\.from\(scope\.deleted\)\);/);
+  const remove = hook.slice(hook.indexOf("const remove ="), hook.indexOf("const link ="));
+  assert.match(remove, /flushRef\.current\(scope\);/);
   assert.match(hook, /const remaining = loadDeletedNoteIds\(scope\.uid, scope\.productId\)\.filter\(/);
+  assert.match(hook, /if \(scope\.inFlight\) \{ scope\.flushWanted = true; return; \}/);
 });
 
 // ---------------------------------------------------------------------------
@@ -134,7 +129,7 @@ test("the Sanctuary note board uses the SAME hook, so both write one document", 
   assert.doesNotMatch(boards, /persistLocalNotes\(/);
   // Still the player's own panel, unmodified — the brief never changed.
   assert.match(boards, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
-  assert.match(boards, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
+  assert.match(boards, /notes=\{notes\.notes\}/);
 });
 
 test("an AI-saved note reaches the cloud too, not just the device", () => {
@@ -158,44 +153,29 @@ test("a note left open in the editor when the player closes is rescued to the cl
 // ---------------------------------------------------------------------------
 
 test("anything that exists only on the device is uploaded — old notes migrate", () => {
-  assert.match(hook, /for \(const id of merged\.pendingUploads\) dirtyRef\.current\.add\(id\);/);
-  assert.match(hook, /if \(merged\.pendingUploads\.length \|\| merged\.pendingDeletes\.length\) scheduleRef\.current\?\.\(\);/);
+  assert.match(hook, /for \(const id of merged\.pendingUploads\) if \(!session\.writing\.has\(id\)\) session\.dirty\.add\(id\);/);
+  assert.match(hook, /if \(session\.dirty\.size \|\| session\.deleted\.size\) scheduleFlush\(session\);/);
 });
 
 test("a failed cloud write retries with backoff and says what actually failed", () => {
   assert.match(hook, /const MAX_SYNC_ATTEMPTS = 8;/);
-  assert.match(hook, /const delay = Math\.min\(20000, 700 \* 2 \*\* Math\.min\(attemptRef\.current, 5\)\);/);
-  // The work goes BACK into the queue on failure — never dropped.
-  assert.match(hook, /for \(const note of uploads\) dirtyRef\.current\.add\(note\.id\);/);
-  assert.match(hook, /for \(const id of deletes\) deletedRef\.current\.add\(id\);/);
-  assert.match(cloud, /export const describeNotesError = \(error: unknown\): string =>/);
+  assert.match(hook, /Math\.min\(20000, 700 \* 2 \*\* Math\.min\(scope\.attempts, 5\)\)/);
+  assert.match(hook, /scope\.dirty\.add\(note\.id\)/);
+  assert.match(cloud, /export const describeNotesError/);
   assert.match(cloud, /permission-denied/);
-
-  // A retry may never outlive the hook. The FINAL flush (unmount / tab close /
-  // page hide) marks the controller disposed first, so a failure THERE cannot
-  // re-arm a loop on a board nobody is looking at — that loop is what kept a
-  // dead controller waking itself for ~30s (and pinned the test runner open).
-  // tests/courseNotesCloudSyncRuntime.test.mjs proves the behaviour; this pins
-  // the wiring.
-  assert.match(hook, /const disposedRef = useRef\(false\);/);
-  assert.match(hook, /const scheduleRetry = useCallback\(\(delayMs: number, run: \(\) => void\) => \{\n\s*if \(disposedRef\.current\) return;/);
-  assert.match(hook, /retryRef\.current = setTimeout\(\(\) => \{\n\s*retryRef\.current = null;\n\s*if \(disposedRef\.current\) return;\n\s*run\(\);/);
-  // The three failure paths (no verified owner / write failed / listener
-  // refused) all go through that one guarded scheduler.
+  assert.match(hook, /if \(scope\.disposed\) return;/);
+  assert.match(hook, /if \(!scope\.disposed\) run\(\);/);
   assert.equal(hook.match(/scheduleRetry\(/g)?.length, 3);
-  assert.match(hook, /const scheduleRetry = useCallback/);
-  assert.doesNotMatch(hook, /retryRef\.current = setTimeout\(\(\) => \{\n\s*retryRef\.current = null;\n\s*flushRef\.current\(\);/);
+  assert.match(hook, /scopeRef\.current !== scope \|\| scope\.disposed/);
 });
 
 test("pending notes are flushed when the learner leaves, hides the tab or unmounts", () => {
-  assert.match(hook, /document\.addEventListener\("visibilitychange", onLeave\);/);
+  assert.match(hook, /document\.addEventListener\("visibilitychange", onVisible\);/);
   assert.match(hook, /window\.addEventListener\("pagehide", onLeave\);/);
-  assert.match(hook, /flushRef\.current\(\);\n\s*\};\n\s*\}, \[\]\);/);
-  // Disposed BEFORE that final flush, and cleared on every (re)setup so a
-  // StrictMode remount of the same instance is not left unable to retry.
-  assert.match(hook, /disposedRef\.current = true;\n[\s\S]{0,500}flushRef\.current\(\);/);
-  assert.match(hook, /disposedRef\.current = false;/);
-  assert.ok(hook.indexOf("disposedRef.current = false;") < hook.indexOf("disposedRef.current = true;"));
+  assert.match(hook, /window\.addEventListener\("online", onOnline\);/);
+  assert.match(hook, /session\.disposed = true;[\s\S]{0,800}flushRef\.current\(session\);/);
+  assert.match(hook, /session\.disposed = false;/);
+  assert.match(hook, /scope\.inFlight/);
 });
 
 test("an empty course id is not a scope, so notes can never pool together", () => {

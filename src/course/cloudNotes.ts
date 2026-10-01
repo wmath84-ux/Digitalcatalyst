@@ -92,7 +92,10 @@ export function subscribeCloudNotes(
 ): Unsubscribe {
   const owner = cloudNotesUid(uid);
   if (!owner || !productId) {
-    onData([]);
+    // A restored app user can precede Firebase Auth's session hydration.
+    // Report it so the hook retries instead of installing a permanent no-op
+    // listener and treating an empty local result as a successful cloud read.
+    onError?.(Object.assign(new Error("Firebase sign-in session is not ready"), { code: "unauthenticated" }));
     return () => undefined;
   }
   return onSnapshot(
@@ -126,7 +129,8 @@ export async function uploadCloudNotes(
 ): Promise<void> {
   const owner = cloudNotesUid(uid);
   const product = String(productId || "");
-  if (!owner || !product || !notes.length) return;
+  if (!product || !notes.length) return;
+  if (!owner) throw Object.assign(new Error("Firebase sign-in session is not ready"), { code: "unauthenticated" });
   const rows = notes.slice(0, MAX_NOTES_PER_COURSE);
   for (const group of chunk(rows, WRITE_CHUNK)) {
     const batch = writeBatch(db);
@@ -143,7 +147,8 @@ export async function uploadCloudNotes(
 export async function deleteCloudNotes(uid: string, noteIds: string[]): Promise<void> {
   const owner = cloudNotesUid(uid);
   const ids = Array.from(new Set((noteIds || []).map((id) => sanitizeNoteId(id)).filter(Boolean)));
-  if (!owner || !ids.length) return;
+  if (!ids.length) return;
+  if (!owner) throw Object.assign(new Error("Firebase sign-in session is not ready"), { code: "unauthenticated" });
   for (const group of chunk(ids, WRITE_CHUNK)) {
     const batch = writeBatch(db);
     for (const id of group) batch.delete(doc(db, "users", owner, NOTES_COLLECTION, id));
@@ -155,7 +160,8 @@ export async function deleteCloudNotes(uid: string, noteIds: string[]): Promise<
 export async function deleteCloudNote(uid: string, noteId: string): Promise<void> {
   const owner = cloudNotesUid(uid);
   const id = sanitizeNoteId(noteId);
-  if (!owner || !id) return;
+  if (!id) return;
+  if (!owner) throw Object.assign(new Error("Firebase sign-in session is not ready"), { code: "unauthenticated" });
   await deleteDoc(doc(db, "users", owner, NOTES_COLLECTION, id));
 }
 

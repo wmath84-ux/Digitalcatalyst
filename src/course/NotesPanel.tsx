@@ -17,8 +17,8 @@
 //     the exact formatting: bold, italics, headings, lists, tables, links,
 //     code blocks, colours, highlights, images and emoji.
 //
-// Notes are stored in the user's localStorage (per user + product) so they
-// stay on the device and don't collide with Firestore course progress.
+// The owning hook stores notes in Firestore with a device mirror, per user
+// and course (or the sanctuary personal workspace).
 //
 // ── Session persistence ─────────────────────────────────────────────────
 // The panel's UI state (list vs. the big editor, plus any open draft) lives
@@ -46,6 +46,8 @@ import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
 
 interface NotesPanelProps {
+  /** Isolate sanctuary drafts from the player's session and other courses. */
+  sessionKey?: string;
   notes: CoursePlayerNote[];
   onAdd: (html: string) => void;
   onEdit: (id: string, html: string) => void;
@@ -95,13 +97,14 @@ export default function NotesPanel({
   onDelete,
   onEditorOpenChange,
   composerOpenSignal,
+  sessionKey,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
   // learner who left the editor open (compose or edit) comes straight back
   // into that same editor with the same draft. An edit view whose note no
   // longer exists degrades to the list instead of resurrecting a ghost.
-  const sessionNotes = getCoursePanelSession().notes;
+  const sessionNotes = getCoursePanelSession(sessionKey).notes;
   const restoreEdit =
     sessionNotes.view === "edit" && notes.some((note) => note.id === sessionNotes.noteId);
   const [composing, setComposing] = useState(sessionNotes.view === "compose");
@@ -130,11 +133,11 @@ export default function NotesPanel({
   // exit flush — even if this component unmounts before an effect fires.
   useEffect(() => {
     if (composing) {
-      setNotesSessionView({ view: "compose", draft, title: draftTitle });
+      setNotesSessionView({ view: "compose", draft, title: draftTitle }, sessionKey);
     } else if (editingId) {
-      setNotesSessionView({ view: "edit", noteId: editingId, draft: editDraft, title: editTitle });
+      setNotesSessionView({ view: "edit", noteId: editingId, draft: editDraft, title: editTitle }, sessionKey);
     } else {
-      setNotesSessionView({ view: "list" });
+      setNotesSessionView({ view: "list" }, sessionKey);
     }
   });
 

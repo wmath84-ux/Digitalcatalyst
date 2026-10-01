@@ -139,44 +139,35 @@ test("leaving the mind map tab flushes the pending save exactly once", () => {
 
 test("maps are stored per learner + course + module under users/{uid}", () => {
   assert.equal(mindMapDocId("u1", "7", "m2"), "u1__7__m2");
-  assert.match(hook, /doc\(db, "users", String\(uid\), "mindMaps", docKey\)/);
+  assert.match(hook, /doc\(db, "users", scope\.uid, "mindMaps", docKey\)/);
   assert.match(hook, /doc\(db, "users", signedInUid, "mindMaps", key\)/);
 });
 
 test("a refused or failed cloud write never strands the learner's map", () => {
-  // localStorage mirrors every save, and a load failure falls back to it.
   assert.match(hook, /writeLocalMindMap\(/);
   assert.match(hook, /readLocalMindMap\(/);
-  assert.match(hook, /const local = readLocalMindMap\(/);
-  assert.match(hook, /\.catch\(\((thrown: unknown)?\) => \{/);
-  // An edit that lands while the map is still loading is re-queued, never
-  // dropped: dropping it stranded the learner's first branches silently.
-  assert.match(hook, /if \(!readyRef\.current\) \{\s*scheduleSaveRef\.current\(\);/);
-  // A device copy adopted for a CONFIRMED-missing doc is pushed back up, so
-  // work stranded by an earlier failed save reaches every other device…
-  assert.match(hook, /revisionRef\.current \+= 1;\s*scheduleSaveRef\.current\(\);/);
-  // …while a copy adopted after a FAILED read is not (a newer cloud copy
-  // may exist, and pushing now could clobber it).
-  assert.match(hook, /Adopted WITHOUT an auto-push/);
-  // A dropped connection outlasts the retry loop: reconnects and tab returns
-  // flush whatever the cloud never confirmed.
-  assert.match(hook, /savedRevisionRef\.current = revision;/);
-  assert.match(hook, /window\.addEventListener\("online", maybeFlush\)/);
+  assert.match(hook, /const outboxKey = /);
+  assert.match(hook, /persistOutbox\(scope\)/);
+  assert.match(hook, /draft\.revision !== revisionAtRead \|\| scope\.uploads\.has\(draft\.mapKey\)/);
+  assert.match(hook, /Confirmed-missing document/);
+  assert.match(hook, /failed read/);
+  assert.match(hook, /draft\.savedRevision = revision;/);
+  assert.match(hook, /window\.addEventListener\("online", onOnline\)/);
   assert.match(hook, /document\.addEventListener\("visibilitychange", onVisible\)/);
-  // Failures name their cause (rules / wrong account vs a transient blip)
-  // instead of hiding behind one generic line.
-  assert.match(hook, /const blocked = code === "permission-denied";/);
-  assert.match(hook, /Cloud save blocked hai \(account ya security rules\)/);
-  assert.match(hook, /the signed-in account is not the map owner/);
+  assert.match(hook, /window\.addEventListener\("pagehide", maybeFlush\)/);
+  assert.match(hook, /code === "permission-denied"/);
+  assert.match(hook, /signedInUid !== scope\.uid/);
 });
 
 test("saves are debounced so a burst of taps is one write", () => {
   assert.match(hook, /const DEFAULT_DEBOUNCE_MS = 700;/);
-  assert.match(hook, /timerRef\.current = setTimeout\(/);
+  assert.match(hook, /draft\.timer = setTimeout\(/);
 });
 
 test("an in-flight save cannot clobber a newer edit", () => {
-  assert.match(hook, /if \(revisionRef\.current !== revision\) return;/);
+  assert.match(hook, /if \(draft\.revision !== revision\) return;/);
+  assert.match(hook, /draft\.inFlight \|\| \(!draft\.loaded/);
+  assert.match(hook, /persistRef\.current\(scope, draft\)/);
 });
 
 test("the doc id cannot be forged into another learner's namespace", () => {
