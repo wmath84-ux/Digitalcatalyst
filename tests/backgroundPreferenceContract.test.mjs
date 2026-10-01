@@ -3,24 +3,27 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const main = fs.readFileSync("src/main.tsx", "utf8");
+const preference = fs.readFileSync("src/context/BackgroundPreferenceContext.tsx", "utf8");
 const backdrop = fs.readFileSync("src/components/ui/GlassBackdrop.tsx", "utf8");
+const profile = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
+const profilePreview = fs.readFileSync("src/profile/ProfilePreview.tsx", "utf8");
 const backgroundCss = fs.readFileSync("src/winter-background.css", "utf8");
 
-test("one shared background controller covers learner routes and stays off admin", () => {
-  assert.match(main, /function RouteBackdrop\(\)/);
+test("one shared preference controls learner routes and stays off admin", () => {
+  assert.match(main, /<BackgroundPreferenceProvider>[\s\S]*?<RouteBackdrop \/>[\s\S]*?<DesktopAppHost>/);
   assert.match(main, /if \(hash\.startsWith\(ADMIN_HASH\) \|\| hash\.startsWith\(ADMIN_LOGIN_HASH\)\) return null;\s*return <GlassBackdrop \/>;/);
-  assert.match(main, /<RouteBackdrop \/>\s*<DesktopAppHost>/);
   assert.equal((main.match(/<GlassBackdrop\b/g) || []).length, 1);
+  assert.match(backdrop, /useBackgroundPreference\(\)/);
 });
 
-test("the clean gradient is the default and the continuous snowfall scene is opt-in", () => {
-  assert.match(backdrop, /const STORAGE_KEY = "dc\.background\.mode"/);
-  assert.match(backdrop, /return value === "winter" \? "winter" : "clean"/);
-  assert.match(backdrop, /useState<BackgroundMode>\(readMode\)/);
-  assert.match(backdrop, /\{snowfallEnabled \? \([\s\S]*?<WinterScene \/>[\s\S]*?: \([\s\S]*?className="dc-clean-backdrop"/);
-  assert.match(backdrop, /window\.localStorage\.setItem\(STORAGE_KEY, mode\)/);
-  assert.match(backdrop, /role="switch"[\s\S]*?aria-checked=\{snowfallEnabled\}/);
-  assert.match(backdrop, /aria-label="Snowfall background"/);
+test("the clean gradient is the default and the snowfall scene remains opt-in", () => {
+  assert.match(preference, /const STORAGE_KEY = "dc\.background\.mode"/);
+  assert.match(preference, /return value === "winter" \? "winter" : "clean"/);
+  assert.match(preference, /useState<BackgroundMode>\(readMode\)/);
+  assert.match(preference, /enabled \? "clean" : "winter"/);
+  assert.match(preference, /window\.localStorage\.setItem\(STORAGE_KEY, nextMode\)/);
+  assert.match(backdrop, /if \(mode === "winter"\) return <WinterScene \/>/);
+  assert.match(backdrop, /className="dc-clean-backdrop"/);
 
   const cleanLayer = backgroundCss.match(/\.dc-clean-backdrop\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.match(cleanLayer, /position:\s*fixed/);
@@ -30,9 +33,17 @@ test("the clean gradient is the default and the continuous snowfall scene is opt
   assert.doesNotMatch(cleanLayer, /(?:backdrop-)?filter\s*:|animation\s*:/);
 });
 
-test("the background preference follows hash navigation and syncs across tabs", () => {
-  assert.match(backdrop, /window\.addEventListener\("hashchange", onHashChange\)/);
-  assert.match(backdrop, /window\.addEventListener\("storage", onStorage\)/);
-  assert.match(backdrop, /data-dc-background-toggle/);
-  assert.match(backdrop, /dc-background-toggle--immersive/);
+test("the clean-background switch is on the Profile page, not a floating global control", () => {
+  assert.match(profile, /data-profile-background-preference/);
+  assert.match(profile, /checked=\{cleanBackgroundEnabled\}/);
+  assert.match(profile, /ariaLabel="Clean background"/);
+  assert.match(profilePreview, /useBackgroundPreference\(\)/);
+  assert.match(profilePreview, /cleanBackgroundEnabled=\{cleanBackgroundEnabled\}/);
+  assert.match(profilePreview, /onCleanBackgroundChange=\{setCleanBackgroundEnabled\}/);
+  assert.doesNotMatch(backdrop, /<button|data-dc-background-toggle/);
+  assert.doesNotMatch(backgroundCss, /\.dc-background-toggle/);
+});
+
+test("the saved background preference stays in sync across tabs", () => {
+  assert.match(preference, /window\.addEventListener\("storage", onStorage\)/);
 });

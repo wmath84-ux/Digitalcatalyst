@@ -7,7 +7,7 @@ import "./index.css";
 import "./landing.css";
 // Liquid Glass v2 — shared palette tokens + transparent-shell rules.
 // Imported before glass.css so the component ink rules there win any tie.
-// The background preference itself is owned by GlassBackdrop below.
+// Background mode is shared in context and changed from the Profile page.
 import "./glass-theme.css";
 // Shared learner background modes — a clean gradient by default, with optional snowfall.
 import "./winter-background.css";
@@ -98,6 +98,7 @@ import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { BackgroundPreferenceProvider } from "./context/BackgroundPreferenceContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -520,21 +521,23 @@ function Root() {
   // OfflineGate is an overlay sibling — never an early-return — so the
   // shared background controller and the rest of the tree stay mounted.
   return (
-    <>
-      <RouteBackdrop />
-      <DesktopAppHost>
-        {/* One Suspense boundary for the whole hash router: every route in
-            RootPage is a `lazyRoute()` chunk. The fallback is the app's own
-            session-restore screen, so a route swap looks like the loading
-            state the app already had — never a white flash. The ACTIVE
-            route's chunk is preloaded at boot (see preloadRouteChunk below),
-            so on a warm cache this fallback is normally never painted. */}
-        <Suspense fallback={<RouteChunkFallback />}>
-          <RootPage />
-        </Suspense>
-      </DesktopAppHost>
-      <OfflineGate />
-    </>
+    <BackgroundPreferenceProvider>
+      <>
+        <RouteBackdrop />
+        <DesktopAppHost>
+          {/* One Suspense boundary for the whole hash router: every route in
+              RootPage is a `lazyRoute()` chunk. The fallback is the app's own
+              session-restore screen, so a route swap looks like the loading
+              state the app already had — never a white flash. The ACTIVE
+              route's chunk is preloaded at boot (see preloadRouteChunk below),
+              so on a warm cache this fallback is normally never painted. */}
+          <Suspense fallback={<RouteChunkFallback />}>
+            <RootPage />
+          </Suspense>
+        </DesktopAppHost>
+        <OfflineGate />
+      </>
+    </BackgroundPreferenceProvider>
   );
 }
 
@@ -606,7 +609,7 @@ setRoutePreloader(preloadRouteChunk);
  * behind the shared backdrop — landing, auth, checkout, the course player,
  * loading/guard states and the app pages — without duplicating the layer in
  * individual components. GlassBackdrop defaults to a static clean gradient;
- * its universal Snowfall switch can opt into the original animated scene.
+ * the Clean background switch on Profile can restore the original snow scene.
  *
  * Admin and admin-login keep their own background logic and never mount the
  * learner-facing layer or its control.
