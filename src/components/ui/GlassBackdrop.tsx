@@ -1,57 +1,108 @@
 // src/components/ui/GlassBackdrop.tsx
 //
-// The "Black Ice" backdrop — the one fixed layer the whole v2 design sits on.
+// One route-level background controller for the whole learner-facing app.
+// `RouteBackdrop` in main.tsx is its only mount point, so the same choice is
+// shared by every page and survives hash navigation. Admin and admin-login
+// routes are excluded by RouteBackdrop before this component is mounted.
 //
-// It carries NO paint of its own: every colour, position and falloff lives in
-// `.dc-backdrop` in src/glass-theme.css, so the palette stays
-// reviewable in one place and `scripts/glass-coverage.mjs` can assert the
-// layer's invariants (no filter, no animation, no !important) against real
-// CSS rather than against a component's inline styles.
-//
-// Contract (docs/liquid-glass-v2-brief.md §2 and §4):
-//   · position: fixed, inset: 0, z-index: -1 — behind everything, never in
-//     flow, never its own isolation context
-//   · pointer-events: none — it must never intercept a tap
-//   · no filter, no backdrop-filter, no @keyframes on this layer, ever. The
-//     softness is the gradients' own falloff, not a blur.
-//   · never `background-attachment: fixed` (broken on iOS Safari) — that is
-//     why this is a real fixed element instead.
-//
-// MOUNTING: inside the app shells, never in main.tsx. Admin has its own
-// background logic and must not inherit this layer; main.tsx already forces
-// the admin tier to `off`, and every rule in glass-theme.css is gated on
-// `html[data-glass="on"]`, so `?glass=off` restores the pre-rollout paint.
-//
-// Mount it exactly ONCE per route. `DesktopShell` is only ever rendered by
-// `AppShell` (its single call site), so AppShell mounts the backdrop on the
-// mobile/tablet-portrait branch and DesktopShell mounts it on the desktop
-// branch — one layer either way.
-//
-// 2026-09-04 · owner direction: the v1 dither grain tile is gone — the pinned
-// reference (the websiteglass docs playground backdrop) is smooth gradients
-// plus the hairline grid, which now paints inside .dc-backdrop itself.
-//
-// 2026-09-04 · owner direction: ONE background, no switch. The universal
-// gradient/grid backdrop and the classic/waves preference are gone; the
-// pinned Winter Wonderland scene (src/components/backgrounds/WinterScene.tsx,
-// ported from codepen.io/Raed-Ennab/pen/PwNdKZj) is the default and only
-// background, and its snowfall runs continuously, without pausing.
+// The default is a quiet, static midnight gradient: the low-chroma light pools
+// add depth behind glass cards without competing with them. Snowfall is an
+// optional, persistent mode; WinterScene (and its animation loop) is mounted
+// only while that mode is enabled.
 
+import { useEffect, useState } from "react";
+import { Snowflake } from "lucide-react";
 import WinterScene from "@/components/backgrounds/WinterScene";
 
-interface GlassBackdropProps {
-  /**
-   * Escape hatch for a shell that needs to suppress the layer without
-   * unmounting the tree. Not used today.
-   */
-  hidden?: boolean;
+type BackgroundMode = "clean" | "winter";
+
+const STORAGE_KEY = "dc.background.mode";
+
+function parseMode(value: string | null): BackgroundMode {
+  return value === "winter" ? "winter" : "clean";
 }
 
-export function GlassBackdrop({ hidden = false }: GlassBackdropProps) {
-  if (hidden) return null;
-  // aria-hidden lives on the scene root: a decorative fixed layer must never
-  // enter the a11y tree or the tab order.
-  return <WinterScene />;
+function readMode(): BackgroundMode {
+  if (typeof window === "undefined") return "clean";
+  try {
+    return parseMode(window.localStorage.getItem(STORAGE_KEY));
+  } catch {
+    // Storage can be unavailable in private browsing / embedded webviews.
+    return "clean";
+  }
+}
+
+function persistMode(mode: BackgroundMode): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // The control still works for this session if storage is unavailable.
+  }
+}
+
+function isSanctuaryRoute(): boolean {
+  return typeof window !== "undefined" && window.location.hash.startsWith("#/nature-studio");
+}
+
+export function GlassBackdrop() {
+  const [mode, setMode] = useState<BackgroundMode>(readMode);
+  const [isSanctuary, setIsSanctuary] = useState(isSanctuaryRoute);
+  const snowfallEnabled = mode === "winter";
+
+  // Keep the preference in sync if a learner changes it in another tab.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY && event.key !== null) return;
+      setMode(parseMode(event.key === null ? null : event.newValue));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Nature Studio owns a full-screen canvas at z-index 90. Lift the universal
+  // control above that canvas there; everywhere else it stays below dialogs.
+  useEffect(() => {
+    const onHashChange = () => setIsSanctuary(isSanctuaryRoute());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const toggleSnowfall = () => {
+    const nextMode: BackgroundMode = snowfallEnabled ? "clean" : "winter";
+    setMode(nextMode);
+    persistMode(nextMode);
+  };
+
+  return (
+    <>
+      {snowfallEnabled ? (
+        <WinterScene />
+      ) : (
+        <div className="dc-clean-backdrop" data-dc-clean-background aria-hidden="true" />
+      )}
+
+      <button
+        type="button"
+        role="switch"
+        aria-checked={snowfallEnabled}
+        aria-label="Snowfall background"
+        title={snowfallEnabled ? "Snowfall is on — switch to the clean background" : "Snowfall is off — turn it on"}
+        data-dc-background-toggle
+        data-snowfall-enabled={snowfallEnabled ? "true" : "false"}
+        className={`dc-background-toggle${isSanctuary ? " dc-background-toggle--immersive" : ""}`}
+        onClick={toggleSnowfall}
+      >
+        <Snowflake className="dc-background-toggle__icon" size={16} strokeWidth={2.1} aria-hidden="true" />
+        <span className="dc-background-toggle__label">Snowfall</span>
+        <span className="dc-background-toggle__state" aria-hidden="true">
+          {snowfallEnabled ? "On" : "Off"}
+        </span>
+        <span className="dc-background-toggle__track" aria-hidden="true">
+          <span className="dc-background-toggle__thumb" />
+        </span>
+      </button>
+    </>
+  );
 }
 
 export default GlassBackdrop;

@@ -63,7 +63,7 @@ test("smallest viewport design stays untouched (hero fills the screen, same toke
   assert.match(header, /sm:hidden/);
 });
 
-test("landing uses the app WinterScene backdrop, not a private 3D canvas", () => {
+test("landing uses the shared background controller, not a private 3D canvas", () => {
   assert.equal(hero.includes("HeroScene"), false);
   assert.equal(hero.includes("@react-three"), false);
   assert.equal(hero.includes("absolute inset-0 bg-gradient-to-b"), false);

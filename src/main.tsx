@@ -5,12 +5,11 @@ import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
-// Liquid Glass v2 — the "Black Ice" palette tokens + the fixed backdrop layer.
+// Liquid Glass v2 — shared palette tokens + transparent-shell rules.
 // Imported before glass.css so the component ink rules there win any tie.
-// Inert unless src/lib/glass.ts sets html[data-glass="on"], and admin is forced
-// to `off`, so this never leaks into the admin surface.
+// The background preference itself is owned by GlassBackdrop below.
 import "./glass-theme.css";
-// The one app background — the pinned Winter Wonderland scene (no switch).
+// Shared learner background modes — a clean gradient by default, with optional snowfall.
 import "./winter-background.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
@@ -519,7 +518,7 @@ function Root() {
   // rendered inside each app — the desktop CSS hides it on >= 1024 px.
   // The shell (left rail + top bar) takes over from there.
   // OfflineGate is an overlay sibling — never an early-return — so the
-  // shared WinterScene backdrop and the rest of the tree stay mounted.
+  // shared background controller and the rest of the tree stay mounted.
   return (
     <>
       <RouteBackdrop />
@@ -601,18 +600,16 @@ setRoutePreloader(preloadRouteChunk);
 
 
 /**
- * The ONE Black Ice backdrop for the whole app (Phase A, wave A1).
+ * The one shared background controller for the whole learner-facing app.
  *
- * Before this it was mounted inside AppShell / DesktopShell / MyDayApp /
- * FlowPathApp, which left every route that bypasses the shell — checkout,
- * auth, landing, the course player, the loading and guard screens — sitting
- * on a white or hand-painted canvas. Mounting it once at the routing level
- * means every non-admin route, every breakpoint and every guard state sits
- * on the same fixed gradient, and no route can accidentally stack two.
+ * Mounting it once at the routing level covers every route that can render
+ * behind the shared backdrop — landing, auth, checkout, the course player,
+ * loading/guard states and the app pages — without duplicating the layer in
+ * individual components. GlassBackdrop defaults to a static clean gradient;
+ * its universal Snowfall switch can opt into the original animated scene.
  *
- * Admin keeps its own background logic: main.tsx forces the glass tier to
- * `off` there and `.dc-backdrop` is display:none under `data-glass="off"`,
- * but the layer is skipped outright on admin routes so it never even mounts.
+ * Admin and admin-login keep their own background logic and never mount the
+ * learner-facing layer or its control.
  */
 function RouteBackdrop() {
   const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));

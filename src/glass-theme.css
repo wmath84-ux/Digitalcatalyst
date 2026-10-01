@@ -1,32 +1,15 @@
 /*
- * Liquid Glass v2 — theme tokens + the fixed backdrop.
+ * Liquid Glass v2 — theme tokens + page-surface transparency.
  *
- * This file is the single source of truth for the palette. Everything here is
- * sampled from the owner's pinned reference — the websiteglass.com docs
- * playground backdrop (screenshot 2026-09-04): near-black field, indigo-blue
- * glow upper-left, magenta-purple right, the green/teal glow low-centre, and
- * a faint 44 px grid. The old v1 "Black Ice" densities and its dither grain
- * are gone.
+ * Glass and background preferences are separate: the shared backdrop layers
+ * live in `src/winter-background.css`, with a clean CSS-gradient default and
+ * the optional Winter Wonderland scene. The clean layer is deliberately
+ * static and filter-free so it can add depth without competing with glass
+ * cards; the falling-snow canvas is mounted only when the learner enables it.
  *
- * Three rules govern this file:
- *
- *   1. THE BACKDROP IS THE DESIGN. It is one fixed layer, painted entirely by
- *      gradients (hairline grid + soft radials). Blur comes from the gradients'
- *      own falloff — there is no filter, no backdrop-filter and no @keyframes
- *      on this layer, and `scripts/glass-coverage.mjs` fails the build if one
- *      ever appears.
- *
- *   2. FALLBACK-FIRST. Every enhancement declaration is preceded
- *      by a plain one, so an engine that drops the enhancement degrades to a
- *      solid colour instead of losing the surface. No interpolation keyword
- *      (`in oklab` / `in oklch`) is written by hand anywhere in this file.
- *
- *   3. `background-attachment: fixed` is never used — it is broken on iOS
- *      Safari. The layer is a real fixed-position element instead.
- *
- * Inert unless `html[data-glass="on"]` (see src/lib/glass.ts), so `?glass=off`
- * still renders the pre-rollout paint, and admin — which main.tsx forces to
- * `off` — never sees any of it.
+ * This file keeps the glass palette tokens and allows transparent app shells
+ * to reveal the fixed background layers. It does not choose the background
+ * mode or own the snowfall preference.
  */
 
 :root {
@@ -80,26 +63,11 @@
   --dc-z-toast: 90;         /* always above a dialog that triggered it */
 }
 
-/* ══ THE BACKDROP ══════════════════════════════════════════════════════════════
-   2026-09-04 · owner direction: the universal gradient + grid backdrop
-   (`.dc-backdrop`) and its classic/waves preference switch are REMOVED. The
-   app's single background is now the pinned Winter Wonderland scene — see
-   `src/winter-background.css` and `src/components/backgrounds/WinterScene.tsx`.
-   Nothing paints here any more; the rules below only let that fixed layer
-   through.
-   ══════════════════════════════════════════════════════════════════════ */
-
-/* ══ LETTING THE BACKDROP THROUGH ════════════════════════════════════════════
-   `src/index.css` paints `html, body, #root { background-color: #ffffff }`.
-   The root element's background is propagated to the canvas and painted below
-   everything, so it is harmless — but `body` and `#root` are real boxes, and
-   an in-flow background paints *above* negative z-index content. Left white,
-   they would hide the backdrop completely.
-
-   Both go transparent when glass is on. `html` keeps its white so the canvas
-   behind the backdrop is still opaque (and so `?glass=off` is byte-identical
-   to the pre-rollout paint). Admin never reaches this: main.tsx forces its
-   tier to `off`.
+/* ══ LETTING FIXED BACKGROUND LAYERS THROUGH ════════════════════════════════
+   `src/index.css` gives `html` the same near-black base ink as the backdrop.
+   `body` and `#root` are transparent so they do not paint over the fixed,
+   negative-z-index clean or snowfall layer. Admin skips GlassBackdrop in
+   main.tsx and keeps its separate surface.
    ════════════════════════════════════════════════════════════════════════ */
 
 body,
