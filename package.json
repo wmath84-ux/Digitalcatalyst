@@ -31,6 +31,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "character:reference": "node scripts/fetch-reference-character.mjs",
+    "test:sanctuary:character": "node --test tests/sanctuaryCharacterContract.test.mjs tests/sanctuaryCharacterRuntime.test.mjs tests/sanctuaryCharacterInstall.test.mjs tests/sanctuaryWorldBrowser.test.mjs",
     "test:sanctuary:rules": "npx --yes firebase-tools@13 emulators:exec --only firestore --project demo-digitalcatalyst \"node --test tests/sanctuaryFirestoreRules.emulator.mjs\"",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
     "ensure:google-services": "node scripts/ensure-google-services.mjs",

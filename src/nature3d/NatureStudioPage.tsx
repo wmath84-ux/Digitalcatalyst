@@ -19,16 +19,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import {
   Compass, Eye, EyeOff, Minimize2,
   Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
-  BookOpen, PenLine, Network, Users, Rows3, Settings, Layers3,
+  BookOpen, PenLine, Network, Users, Rows3, Settings, Layers3, Footprints,
 } from "lucide-react";
 import { useMotionValue } from "framer-motion";
 import "./winter.css";
 import { Sanctuary, type ViewPreset } from "./engine/scene";
+import CharacterControls from "./CharacterControls";
+import type { CharacterCameraMode } from "./engine/characterConfig";
+import { FALLBACK_CHARACTER_STATUS, type CharacterAssetStatus } from "./engine/characterManifest";
 import { webglSupported } from "./engine/quality";
 import BoardPortals, { type BoardHosts } from "./boards/StudyBoards";
 import SanctuaryModuleMenu from "./boards/SanctuaryModuleMenu";
 import SanctuarySettings, { type SettingsPage } from "./SanctuarySettings";
-import { sanctuaryModulePlayHash } from "./boards/sanctuaryModules";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { useAuth } from "../context/AuthContext";
 import useOwnedCourses from "./boards/useOwnedCourses";
@@ -125,6 +127,8 @@ export default function NatureStudioPage() {
   // cannot tell which hour the scene decided on. Ticks once a minute.
   const [clockHour, setClockHour] = useState(() => hourForMode("auto"));
   const [autoOrbit, setAutoOrbit] = useState(false);
+  const [characterMode, setCharacterMode] = useState<CharacterCameraMode>("orbit");
+  const [characterStatus, setCharacterStatus] = useState<CharacterAssetStatus>(FALLBACK_CHARACTER_STATUS);
   const [showLesson, setShowLesson] = useState(false);
   // Live fullscreen state for the Scene → Fullscreen row. It tracks EVERY
   // layer the shared controller can use: the native Android immersive bridge
@@ -252,6 +256,11 @@ export default function NatureStudioPage() {
         canvas,
         dom: host,
         onBoardTap: () => setShowLesson(true),
+        onCharacterMode: (mode) => {
+          setCharacterMode(mode);
+          if (mode !== "orbit") { setActiveBoard(null); setActiveView(null); setAutoOrbit(false); }
+        },
+        onCharacterAsset: setCharacterStatus,
         onStats: (s) => {
           // Direct DOM write — no setState, so the loop never triggers React.
           const el = statsRef.current;
@@ -424,8 +433,8 @@ export default function NatureStudioPage() {
   // was being drawn UNDER a floating lesson. Tell the engine to suppress them;
   // it drops opacity and hit targets only, so any playing media survives.
   useEffect(() => {
-    engineRef.current?.setOverlayOpen(menuOpen || moduleMenuOpen);
-  }, [menuOpen, moduleMenuOpen]);
+    engineRef.current?.setOverlayOpen(menuOpen || moduleMenuOpen || showLesson);
+  }, [menuOpen, moduleMenuOpen, showLesson]);
 
   // Re-measure whenever the HUD set changes or the window resizes.
   useEffect(() => {
@@ -477,6 +486,13 @@ export default function NatureStudioPage() {
     setMenuOpen(false);
   }, []);
 
+  const beginCharacterWalk = useCallback(() => {
+    setMenuOpen(false);
+    setModuleMenuOpen(false);
+    setDockOpen(false);
+    engineRef.current?.setCharacterMode("third-person");
+  }, []);
+
   // Dynamic play: inside Sanctuary (3D env) always play ON THE BOARD,
   // not via external Course Player. From My Study Library (StudyLibraryPage)
   // the same course opens via Course Player (myCoursePlayHash) — that route
@@ -520,6 +536,7 @@ export default function NatureStudioPage() {
   // module panel keeps it up (the panel anchors to the dock), and Settings
   // opens its own full overlay.
   const handleDockSelect = useCallback((id: string) => {
+    if (id === "walk") { beginCharacterWalk(); return; }
     if (id === "module") {
       setMenuOpen(false);
       setModuleMenuOpen((v) => {
@@ -547,7 +564,7 @@ export default function NatureStudioPage() {
       focusSceneryView(id as ViewPreset);
       setDockOpen(false);
     }
-  }, [focusStudyView, focusSceneryView]);
+  }, [focusStudyView, focusSceneryView, beginCharacterWalk]);
 
   /**
    * The dock button under a lifted finger — the same elementsFromPoint
@@ -655,9 +672,10 @@ export default function NatureStudioPage() {
     ? "module"
     : menuOpen
       ? "settings"
-      : (activeBoard ?? activeView ?? "world");
+      : characterMode !== "orbit" ? "walk" : (activeBoard ?? activeView ?? "world");
 
   const dockItems: GlassDockItem[] = useMemo(() => [
+    { id: "walk", label: "Walk & run · 6 ft character", icon: Footprints as any, color: "#86EFAC", active: activeDockId === "walk" },
     ...BOARD_VIEWS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#10B981", active: activeDockId === key })),
     ...PRESETS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#38BDF8", active: activeDockId === key })),
     { id: "module", label: "My modules", icon: Layers3 as any, color: "#8B5CF6", active: activeDockId === "module" },
@@ -716,7 +734,7 @@ export default function NatureStudioPage() {
       >
         {/* ── WebGL host. `touch-action:none` so a drag never scrolls the page ── */}
         <div ref={hostRef} className="absolute inset-0" style={{ touchAction: "none", cursor: "grab" }}>
-          <canvas ref={canvasRef} className="block h-full w-full outline-none" />
+          <canvas ref={canvasRef} tabIndex={0} aria-label="Sanctuary 3D world" className="block h-full w-full outline-none" />
         </div>
 
         {/* ── Natural animated loading overlay — shown when sanctuary opens from home until fully loaded ── */}
@@ -777,7 +795,7 @@ export default function NatureStudioPage() {
 
           <span
             ref={statsRef}
-            className="pointer-events-auto rounded-xl border border-white/18 bg-slate-950/45 px-2.5 py-2 font-mono text-[10px] font-bold text-emerald-300 backdrop-blur-xl"
+            className="pointer-events-auto max-w-[40vw] truncate rounded-xl border border-white/18 bg-slate-950/45 px-2.5 py-2 font-mono text-[10px] font-bold text-emerald-300 backdrop-blur-xl"
           >
             — fps
           </span>
@@ -891,6 +909,16 @@ export default function NatureStudioPage() {
           </button>
         </div>
         ) : null}
+
+        <CharacterControls
+          engineRef={engineRef}
+          mode={characterMode}
+          status={characterStatus}
+          hidden={hudHidden || booting}
+          paused={menuOpen || moduleMenuOpen || showLesson}
+          onStart={beginCharacterWalk}
+          onOverview={() => focusSceneryView("world")}
+        />
 
         {/* ── The live board surfaces ───────────────────────────────────
             React owns these trees; the browser's 3D compositor decides where

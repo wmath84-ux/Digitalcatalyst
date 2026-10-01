@@ -105,6 +105,7 @@ export function createWeathering(tex: THREE.Texture, tier: QualityTier): Weather
     patched.add(material);
     const attrib = opts.attrib === undefined ? "aDcWeather" : opts.attrib;
     const hasInstances = attrib !== null;
+    const priorKey = material.customProgramCacheKey();
     const previous = material.onBeforeCompile as unknown as
       | ((shader: ShaderLike, renderer: unknown) => void)
       | undefined;
@@ -250,13 +251,13 @@ export function createWeathering(tex: THREE.Texture, tier: QualityTier): Weather
     };
 
     material.onBeforeCompile = ((shader: ShaderLike, renderer: unknown) => {
-      previous?.(shader, renderer);
+      previous?.call(material, shader, renderer);
       inject(shader);
     }) as unknown as THREE.Material["onBeforeCompile"];
 
-    const prior = material.customProgramCacheKey;
     material.customProgramCacheKey = () =>
-      `${prior ? prior.call(material) : "dc"}-weather-${triplanar ? "tri" : "flat"}-${hasInstances ? "inst" : "single"}`;
+      `${priorKey}-weather-v2-${triplanar ? "tri" : "flat"}-${hasInstances ? attrib : "single"}`;
+    material.needsUpdate = true;
   };
 
   return {

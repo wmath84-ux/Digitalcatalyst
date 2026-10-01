@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "label": "Original Sanctuary guide (web fallback)",
+  "modelUrl": null,
+  "modelForward": "-Z",
+  "licenseConfirmed": false,
+  "animationMap": {},
+  "source": {
+    "repository": "https://github.com/VeryHotShark/RealisticThirdPersonCharacter",
+    "commit": "bf56bcd56c5dd149590d1e5a0dc45575ae2fa95c",
+    "engine": "Unreal Engine 5.1",
+    "status": "Full source downloaded for inspection. Original Katiusza mesh, paid FemaleAnimsetPro animations, Control Rig, ragdoll and cloth are not bundled or executing in this web app. A licensed character-only GLB export is required."
+  }
+}

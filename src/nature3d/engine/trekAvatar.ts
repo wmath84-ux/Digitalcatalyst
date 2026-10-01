@@ -1,58 +1,24 @@
-// src/nature3d/engine/trekAvatar.ts
-//
-// THE WALKING CHARACTER — TerrainTrek's player, upgraded to a premium
-// mobile-shooter feel while keeping its gameplay constants.
-//
-// ROLE TODAY: the figure only ever SITS at the study desk and breathes —
-// the walk mode (locomotion, third-person camera, jump physics) was removed
-// with the first-person feature, and its tuning constants went with it.
-//
-// WHAT STAYS VERBATIM:
-//
-//   seating   hips drop, thighs fold, facing PI (the board side)
-//
-// WHAT WAS UPGRADED (the character-quality bar):
-//
-//   body      the violet stick-human is replaced by an original, fully
-//             procedural trail-guide character: anatomical proportions,
-//             a real 18-joint pivot rig (pelvis → spine → chest → neck →
-//             head, arms with elbows + wrists, legs with knees + ankles),
-//             clothing detail baked into vertex colours, solid-shell hair,
-//             glossy trek shades, and a sprung backpack — 2 materials,
-//             1 procedural texture, ~2k triangles (budget: 8k low-end).
-//   locomotion  the 8-way compass snap is replaced by an analog pipeline:
-//             stick → wish heading + wish speed → accel/decel → turn-rate
-//             limited heading → gait phase locked to distance travelled,
-//             so feet cannot skate by construction. States: idle, start,
-//             walk, jog, run, sprint, dash, stop, turn, jump, fall, land.
-//   feet      analytic two-bone IK plants each foot on the real terrain
-//             (height + slope), staggered at 30 Hz, gated by speed,
-//             camera distance and quality tier. FK stays authoritative in
-//             the air and at dash speed, where IK would be unjudgeable.
-//   camera    the same spherical placement, now damped (no touch jitter),
-//             with a shoulder offset, a sprint FOV kick and a landing dip.
-//
-// ARCHITECTURE (input → render):
-//
-//   the figure is static (seated) — the scene just drives
-//   TrekAvatar.update (breathes the seated rig each frame).
-//
-// Both updates are allocation-free: every temp is hoisted, the frame loop
-// stays clean, and there is no Math.random anywhere (deterministic).
+// Original procedural Sanctuary guide — a working, offline-first fallback.
+// This is NOT the Katiusza mesh / FemaleAnimsetPro from the UE5 reference.
+// A licensed exported character can replace this through characterAsset.ts.
+// CharacterController owns movement; this factory owns only the articulated
+// visual pose, distance-locked gait, foot IK, aim and secondary backpack motion.
 
 import * as THREE from "three";
 import { terrainHeight, terrainNormal } from "./terrain";
 import { damp } from "./controls";
+import { CHARACTER_HEIGHT, CROUCH_HEIGHT, CHARACTER_TUNING } from "./characterConfig";
 
-/** The walk speed the seat-idle pose is scaled against. */
-export const WALK_SPEED = 10;
-/** Visual scale of the seated character (user directive: 3×). */
-export const AVATAR_SCALE = 3;
+/** Pose reference speed in metres/second. */
+export const WALK_SPEED = CHARACTER_TUNING.walkSpeed;
+/** Initial authoring scale; the factory fits actual mesh bounds to six feet. */
+export const AVATAR_SCALE = 1;
 
 /** Locomotion states — gait SELECTION only; the pose itself is continuous. */
 export type LocoState =
   | "idle" | "start" | "walk" | "jog" | "run" | "sprint" | "dash"
-  | "stop" | "turn" | "jump" | "fall" | "land";
+  | "stop" | "turn" | "jump" | "fall" | "land"
+  | "crouch" | "crouch-walk" | "cover" | "cover-walk" | "cover-lean";
 
 // ─────────────────────────────────────────────────────────────────────────
 // The character — an original procedural trail guide
@@ -72,7 +38,7 @@ export interface TrekAvatar {
    * only breathes, standing it runs the full locomotion pose + foot IK.
    */
   update(dt: number, time: number, player: TrekPlayer, camera: THREE.Camera): void;
-  /** Low-end mode: foot IK off, animation rate capped. Never breaks pose. */
+  /** Low-end mode: cap animation rate; keep close-up foot placement safe. */
   setLowEnd(v: boolean): void;
   dispose(): void;
 }
@@ -408,6 +374,14 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
   const ankleR = legBuildR.ankle;
 
   group.add(body);
+  // Use actual boot-to-hair bounds, not a guessed 3× adult/child multiplier.
+  const restBounds = new THREE.Box3().setFromObject(body);
+  const modelScale = CHARACTER_HEIGHT / (restBounds.max.y - restBounds.min.y);
+  const baseOffset = -restBounds.min.y * modelScale;
+  body.scale.setScalar(modelScale);
+  body.position.y = baseOffset;
+  group.userData.characterHeight = CHARACTER_HEIGHT;
+  group.userData.characterSource = "procedural";
 
   // ── Foot-IK scratch (hoisted — the pose loop allocates nothing) ──────
   let lowEnd = false;
@@ -417,76 +391,66 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
   const ikWeightR = { v: 0 };
   const plantL = { x: 0, z: 0, live: false };
   const plantR = { x: 0, z: 0, live: false };
-  const solL = { hip: 0, knee: 0, ankle: 0, drop: 0 };
-  const solR = { hip: 0, knee: 0, ankle: 0, drop: 0 };
+  const solL = { hip: 0, hipY: 0, hipZ: 0, knee: 0, ankle: 0, ankleY: 0, ankleZ: 0, drop: 0 };
+  const solR = { hip: 0, hipY: 0, hipZ: 0, knee: 0, ankle: 0, ankleY: 0, ankleZ: 0, drop: 0 };
   const pelvisDrop = { v: 0 };
   const packSpring = { x: 0, v: 0 };
   const nScratch = new THREE.Vector3();
   const headWorld = new THREE.Vector3();
+  const footWorld = new THREE.Vector3();
+  const hipWorld = new THREE.Vector3();
+  const ikTarget = new THREE.Vector3();
+  const ikDirection = new THREE.Vector3();
+  const ikPole = new THREE.Vector3();
+  const ikKneeDirection = new THREE.Vector3();
+  const ikX = new THREE.Vector3(), ikY = new THREE.Vector3(), ikZ = new THREE.Vector3();
+  const ikParentInverse = new THREE.Matrix4(), ikBasis = new THREE.Matrix4();
+  const ikParentQ = new THREE.Quaternion(), ikFootQ = new THREE.Quaternion();
+  const ikSoleEuler = new THREE.Euler(0, 0, 0, "YXZ");
 
   let seated = false;
 
   /**
-   * Analytic two-bone IK for one leg, in the leg's sagittal plane.
+   * Analytic two-bone IK for one leg, in its actual 3D parent frame.
    *
-   * Writes thigh/knee/ankle X rotations that place the foot at (tx, tz) with
+   * Writes thigh/knee/ankle rotations that place the foot at (tx, tz) with
    * the sole on `soleY` and pitched `solePitch`. Returns the pelvis drop the
    * target demands when it is out of reach (the caller eases the pelvis down
    * by the max of both legs — feet stay planted instead of floating).
    */
   function solveLeg(
-    side: -1 | 1,
-    hip: THREE.Group,
-    knee: THREE.Group,
-    ankle: THREE.Group,
-    heading: number,
-    hipY: number,
-    tx: number,
-    tz: number,
-    soleY: number,
-    solePitch: number,
+    hip: THREE.Group, knee: THREE.Group, ankle: THREE.Group,
+    heading: number, tx: number, tz: number, soleY: number, solePitch: number,
   ): number {
-    // Hip world position, analytically (no matrix reads — deterministic).
-    const s = Math.sin(heading);
-    const c = Math.cos(heading);
-    const hx = group.position.x + side * HIP_X * AVATAR_SCALE * c;
-    const hz = group.position.z - side * HIP_X * AVATAR_SCALE * s;
-    // Target relative to the hip, in the facing frame (fwd = −Z local).
-    // World move dir for heading h is (−sin h, −cos h); lateral is (cos h, −sin h).
-    const dx = tx - hx;
-    const dz = tz - hz;
-    const fwd = dx * -s + dz * -c;
-    // Ankle target: sole on the planted terrain ⇒ ankle ANKLE_H above it.
-    const ankleY = soleY + ANKLE_H * AVATAR_SCALE;
-    const rise = hipY - ankleY;
-    const dist = Math.hypot(fwd, rise);
-    const maxReach = (THIGH_LEN + CALF_LEN - 0.015) * AVATAR_SCALE;
-    const minReach = 0.3 * AVATAR_SCALE;
-    const drop = Math.max(0, dist - maxReach);
-    const D = THREE.MathUtils.clamp(dist, minReach, maxReach);
-    const thigh = THIGH_LEN * AVATAR_SCALE;
-    const calf = CALF_LEN * AVATAR_SCALE;
-    // Knee flexion from the law of cosines (0 = straight, + = bent back).
-    const cosK = THREE.MathUtils.clamp(
-      (thigh * thigh + calf * calf - D * D) / (2 * thigh * calf),
-      -1,
-      1,
-    );
-    const kneeBend = Math.PI - Math.acos(cosK);
-    // Thigh pitch: direction to target, minus the knee's share.
-    const aim = Math.atan2(fwd, rise); // 0 = straight down, + = forward
-    const cosA = THREE.MathUtils.clamp(
-      (thigh * thigh + D * D - calf * calf) / (2 * thigh * D),
-      -1,
-      1,
-    );
-    const thighPitch = aim - Math.acos(cosA);
-    hip.rotation.x = thighPitch;
-    // Knees bend BACKWARD (foot toward +Z local): negative X rotation.
-    knee.rotation.x = -kneeBend;
-    // Ankle: sole matches the slope pitch under the facing frame.
-    ankle.rotation.x = -(thighPitch - kneeBend) + solePitch;
-    return drop;
+    // Work in the real parent frame, including pelvis sway, yaw and model
+    // scale. Separate X/Z angle formulas fail when strafing while crouched.
+    hip.parent!.updateWorldMatrix(true, false);
+    ikParentInverse.copy(hip.parent!.matrixWorld).invert();
+    ikTarget.set(tx, soleY + ANKLE_H * modelScale, tz).applyMatrix4(ikParentInverse).sub(hip.position);
+    const distance = ikTarget.length();
+    const maxReach = THIGH_LEN + CALF_LEN - 0.005;
+    const D = THREE.MathUtils.clamp(distance, Math.abs(THIGH_LEN - CALF_LEN) + 0.015, maxReach);
+    ikDirection.copy(ikTarget).normalize();
+    ikPole.set(-Math.sin(heading), 0, -Math.cos(heading)).transformDirection(ikParentInverse);
+    ikPole.addScaledVector(ikDirection, -ikPole.dot(ikDirection));
+    if (ikPole.lengthSq() < 1e-8) ikPole.set(1, 0, 0).addScaledVector(ikDirection, -ikDirection.x);
+    ikPole.normalize();
+    const along = (THIGH_LEN * THIGH_LEN - CALF_LEN * CALF_LEN + D * D) / (2 * D);
+    const bend = Math.sqrt(Math.max(0, THIGH_LEN * THIGH_LEN - along * along));
+    ikKneeDirection.copy(ikDirection).multiplyScalar(along).addScaledVector(ikPole, bend).normalize();
+    // This basis aligns the upper bone and its hinge plane. The knee can
+    // still bend only backwards; it is not a ball-joint approximation.
+    ikX.crossVectors(ikDirection, ikKneeDirection).normalize();
+    ikY.copy(ikKneeDirection).negate(); ikZ.crossVectors(ikX, ikY).normalize();
+    ikBasis.makeBasis(ikX, ikY, ikZ);
+    hip.quaternion.setFromRotationMatrix(ikBasis);
+    const cosK = THREE.MathUtils.clamp((THIGH_LEN * THIGH_LEN + CALF_LEN * CALF_LEN - D * D) / (2 * THIGH_LEN * CALF_LEN), -1, 1);
+    knee.rotation.set(-(Math.PI - Math.acos(cosK)), 0, 0);
+    ikSoleEuler.set(solePitch, heading, 0, "YXZ");
+    ikFootQ.setFromEuler(ikSoleEuler);
+    hip.parent!.getWorldQuaternion(ikParentQ).invert(); ikFootQ.premultiply(ikParentQ);
+    ankle.quaternion.copy(hip.quaternion).multiply(knee.quaternion).invert().multiply(ikFootQ);
+    return Math.max(0, distance - maxReach);
   }
 
   function resetStandingPose(): void {
@@ -510,7 +474,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     elbowR.rotation.set(0, 0, 0);
     wristL.rotation.set(0, 0, 0);
     wristR.rotation.set(0, 0, 0);
-    body.position.y = 0;
+    body.position.y = baseOffset;
     body.rotation.y = 0;
     plantL.live = false;
     plantR.live = false;
@@ -589,6 +553,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
         return;
       }
 
+      body.position.y = baseOffset;
       // ── Read the locomotion state (never mutated here) ──────────────
       const speed = player.speed;
       const speed01 = THREE.MathUtils.clamp(speed / WALK_SPEED, 0, 1.35);
@@ -599,19 +564,20 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       const turnLean = player.turnLean;
 
       // ── Gait parameters, continuous in speed (states pick, pose blends)
-      const swing = Math.min(0.16 + 0.068 * speed, 1.02);
+      const swing = moving ? Math.min(0.24 + 0.10 * speed, 0.85) : 0;
       const bobAmp = Math.min(0.012 + 0.0042 * speed, 0.055);
       const crouch = Math.min(0.012 + 0.006 * speed, 0.085) + land * 0.09;
+      const crouchDrop = player.crouchAmount * (CHARACTER_HEIGHT - CROUCH_HEIGHT) / modelScale;
       const armSwing = Math.min(0.12 + 0.062 * speed, 0.85);
       const elbowBase = 0.28 + speed01 * 0.7;
       // Forward lean that must stay small enough to read at 15 m: base + the
       // acceleration push (start) / braking brace (stop) + landing absorb.
-      const lean = 0.03 + speed01 * 0.2 + player.accelSm * 0.028 + land * 0.22 +
+      const lean = 0.03 + speed01 * 0.12 + THREE.MathUtils.clamp(player.accelSm, -8, 8) * 0.018 + land * 0.22 + player.crouchAmount * 0.25 +
         (player.state === "dash" ? 0.12 : 0);
 
       // ── Pelvis: bob twice per cycle, sway once, drop into crouch/IK ──
       const bobY = -crouch - bobAmp * Math.abs(Math.cos(phase)) * (moving && !air ? 1 : 0.15);
-      pelvisG.position.y = PELVIS_Y + bobY - pelvisDrop.v;
+      pelvisG.position.y = PELVIS_Y + bobY - pelvisDrop.v - crouchDrop;
       pelvisG.rotation.z = (moving && !air ? Math.min(0.02 + 0.008 * speed, 0.07) : 0.004) *
         Math.sin(phase);
       pelvisG.rotation.y = moving && !air ? 0.05 * Math.sin(phase) * Math.min(speed01 + 0.3, 1) : 0;
@@ -622,14 +588,20 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       spineG.rotation.z = turnLean;
       chestG.rotation.x = -lean * 0.45 + breath;
       chestG.rotation.z = turnLean * 0.7;
-      chestG.rotation.y = turnLean * 0.9;
+      chestG.rotation.y = turnLean * 0.9 + player.lookYaw * 0.28;
+      chestG.rotation.z += player.coverLean * 0.14;
       // Gaze stabilisation: the head counter-pitches half the spine lean and
       // nods once per stride — no aim mode exists, so this is the look layer.
-      headG.rotation.x = lean * 0.5 + (moving && !air ? Math.sin(phase * 2) * 0.02 : breath * 0.6);
-      headG.rotation.y = turnLean * 1.4 + Math.sin(time * 0.4) * 0.03;
+      headG.rotation.x = lean * 0.5 + player.lookPitch * 0.65 + (moving && !air ? Math.sin(phase * 2) * 0.02 : breath * 0.6);
+      headG.rotation.y = turnLean * 1.4 + player.lookYaw * 0.7;
       neckG.rotation.x = -lean * 0.1;
 
+      // Clear the preceding frame's IK roll/yaw before writing an FK pose.
+      legL.rotation.y = legR.rotation.y = 0;
+      kneeL.rotation.y = kneeR.rotation.y = kneeL.rotation.z = kneeR.rotation.z = 0;
+      ankleL.rotation.y = ankleR.rotation.y = 0;
       if (air) {
+        legL.rotation.z = legR.rotation.z = ankleL.rotation.z = ankleR.rotation.z = 0;
         // ── Airborne: split tuck, arms out for balance ────────────────
         const airT = player.airTime;
         const tuck = Math.min(airT * 3, 1);
@@ -653,16 +625,23 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
         // ── Grounded FK gait (IK overrides per foot below) ────────────
         const sL = Math.sin(phase);
         const sR = Math.sin(phase + Math.PI);
-        legL.rotation.x = swing * sL;
-        legR.rotation.x = swing * sR;
+        const crouchHip = player.crouchAmount * 0.95;
+        const forwardSwing = Math.cos(player.strafeAngle);
+        const sideSwing = Math.sin(player.strafeAngle);
+        legL.rotation.x = crouchHip + swing * sL * forwardSwing;
+        legR.rotation.x = crouchHip + swing * sR * forwardSwing;
+        legL.rotation.z = swing * sL * -sideSwing;
+        legR.rotation.z = swing * sR * -sideSwing;
         // Knees bend only backward: stance micro-bend + swing-through fold.
         // Peak fold lands just after the foot passes under the body.
         const foldL = Math.pow(Math.max(0, Math.sin(phase + 2.35)), 1.4);
         const foldR = Math.pow(Math.max(0, Math.sin(phase + Math.PI + 2.35)), 1.4);
-        kneeL.rotation.x = -(0.1 + crouch * 4.2 + swing * 1.5 * foldL + land * 1.0);
-        kneeR.rotation.x = -(0.1 + crouch * 4.2 + swing * 1.5 * foldR + land * 1.0);
+        kneeL.rotation.x = -(0.1 + crouch * 4.2 + swing * 1.5 * foldL + land * 1.0 + player.crouchAmount * 1.8);
+        kneeR.rotation.x = -(0.1 + crouch * 4.2 + swing * 1.5 * foldR + land * 1.0 + player.crouchAmount * 1.8);
         ankleL.rotation.x = -(legL.rotation.x + kneeL.rotation.x) * 0.82;
         ankleR.rotation.x = -(legR.rotation.x + kneeR.rotation.x) * 0.82;
+        ankleL.rotation.z = -legL.rotation.z;
+        ankleR.rotation.z = -legR.rotation.z;
 
         // Arms counter-swing the opposite leg; elbows pump with speed.
         armL.rotation.x = -armSwing * sR - land * 0.35;
@@ -678,7 +657,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
         // Eligible: grounded, readable speed, near camera, tier allows.
         // Sprint+ is FK-only — at 12 u/s a plant lasts 3 frames and the eye
         // cannot judge it; the phase law already prevents skating.
-        const ikAllowed = !lowEnd && speed < 12 && (lod === 0 || (lod === 1 && ikTick % 2 === 0));
+        const ikAllowed = speed < 7 && (lod === 0 || (lod === 1 && ikTick % 2 === 0));
         ikTick += 1;
         updateFoot(
           -1, legL, kneeL, ankleL, sL, player, ikWeightL, plantL, solL, ikAllowed, adt,
@@ -719,9 +698,8 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
    *
    * MOBILE THROTTLING: the two feet solve on ALTERNATE frames (staggered),
    * each blending from its CACHED solution on the frames it skips — so IK
-   * costs one terrain sample + one analytic solve per frame at most, with
-   * zero raycasts anywhere. A held plant is static by definition, so the
-   * cached solution is exact on skip frames, not stale.
+   * caps standing solves; close-up crouching solves both constrained feet
+   * to avoid floor penetration. No raycasts or per-frame allocations.
    */
   function updateFoot(
     side: -1 | 1,
@@ -732,13 +710,46 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     player: TrekPlayer,
     weight: { v: number },
     plant: { x: number; z: number; live: boolean },
-    sol: { hip: number; knee: number; ankle: number; drop: number },
+    sol: { hip: number; hipY: number; hipZ: number; knee: number; ankle: number; ankleY: number; ankleZ: number; drop: number },
     ikAllowed: boolean,
     adt: number,
   ): void {
     // Stance when the leg is back and loaded; swing when coming through.
-    const stanceTarget = ikAllowed ? THREE.MathUtils.smoothstep(-s, -0.3, 0.45) : 0;
+    const stanceTarget = ikAllowed ? (player.speed < 0.15 ? 1 : THREE.MathUtils.smoothstep(-s, -0.3, 0.45)) : 0;
     weight.v += (stanceTarget - weight.v) * damp(14, adt);
+    // Release by gait phase, not by the damped weight. During continuous
+    // walking that weight need not ever reach .001; waiting for it made a
+    // foot stay stuck at its first plant indefinitely.
+    if (stanceTarget < 0.05) plant.live = false;
+    if (ikAllowed && player.crouchAmount > 0.08) {
+      // A deep crouch cannot blend back to a standing leg's FK angles: that
+      // stretches the boot through the floor. Blend TARGETS instead, then
+      // solve the whole two-bone chain, including the lifted swing foot.
+      group.updateMatrixWorld(true);
+      ankle.getWorldPosition(footWorld);
+      if (stanceTarget >= 0.05 && !plant.live) {
+        plant.x = footWorld.x; plant.z = footWorld.z; plant.live = true;
+      }
+      let x = plant.live ? THREE.MathUtils.lerp(footWorld.x, plant.x, weight.v) : footWorld.x;
+      let z = plant.live ? THREE.MathUtils.lerp(footWorld.z, plant.z, weight.v) : footWorld.z;
+      const heading = group.rotation.y;
+      const hs = Math.sin(heading), hc = Math.cos(heading);
+      hip.getWorldPosition(hipWorld);
+      const hx = hipWorld.x, hz = hipWorld.z;
+      const forward = (x - hx) * -hs + (z - hz) * -hc;
+      // Short forward shuffling keeps the knee triangle ABOVE the floor.
+      // A fully crouched hip cannot reach a long backward standing stride
+      // without planting its knee through the ground, even if its boot lands.
+      const safeForward = THREE.MathUtils.clamp(forward, 0.06 * player.crouchAmount, 0.3);
+      x -= hs * (safeForward - forward); z -= hc * (safeForward - forward);
+      const lift = player.speed > 0.15 ? Math.max(0, s) * 0.07 * (1 - weight.v) : 0;
+      const soleY = player.groundAt(x, z) + 0.015 + lift;
+      terrainNormal(x, z, nScratch);
+      const solePitch = Math.atan2(nScratch.x * Math.sin(heading) + nScratch.z * Math.cos(heading), nScratch.y);
+      solveLeg(hip, knee, ankle, heading, x, z, soleY, solePitch);
+      pelvisDrop.v += (0 - pelvisDrop.v) * damp(6, adt);
+      return;
+    }
     if (weight.v < 0.02) {
       if (weight.v < 0.001) plant.live = false;
       return; // FK owns the foot — nothing to solve or blend.
@@ -746,6 +757,10 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     // FK pose was written by the gait block this frame — capture it BEFORE
     // a solve overwrites the joint rotations.
     const fkHip = hip.rotation.x;
+    const fkHipY = hip.rotation.y;
+    const fkAnkleY = ankle.rotation.y;
+    const fkHipZ = hip.rotation.z;
+    const fkAnkleZ = ankle.rotation.z;
     const fkKnee = knee.rotation.x;
     const fkAnkle = ankle.rotation.x;
     // Stagger: this foot solves only on its own ticks.
@@ -757,26 +772,35 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       // Capture the plant once per stance: ahead of the hip by half a stride.
       if (!plant.live) {
         const stride = player.strideLen;
-        const hx = group.position.x + side * HIP_X * AVATAR_SCALE * hc;
-        const hz = group.position.z - side * HIP_X * AVATAR_SCALE * hs;
-        plant.x = hx + -hs * stride * 0.5;
-        plant.z = hz + -hc * stride * 0.5;
+        const hx = group.position.x + side * HIP_X * modelScale * hc;
+        const hz = group.position.z - side * HIP_X * modelScale * hs;
+        const moveHeading = heading + player.strafeAngle;
+        const lead = player.speed > 0.1 ? stride * 0.25 : 0;
+        plant.x = hx - Math.sin(moveHeading) * lead;
+        plant.z = hz - Math.cos(moveHeading) * lead;
         plant.live = true;
       }
       // Solve against the REAL terrain under the held plant. A few centimetres
       // of sole lift stops the boot mesh sinking into the slope.
-      const soleY = terrainHeight(plant.x, plant.z) + 0.04;
+      const soleY = player.groundAt(plant.x, plant.z) + 0.015;
       terrainNormal(plant.x, plant.z, nScratch);
       // Slope pitch in the facing frame: how much the sole must tip.
       const solePitch = Math.atan2(-(nScratch.x * -hs + nScratch.z * -hc), nScratch.y);
-      const hipY = group.position.y + (pelvisG.position.y - HIP_DROP) * AVATAR_SCALE;
-      sol.drop = solveLeg(side, hip, knee, ankle, heading, hipY, plant.x, plant.z, soleY, solePitch);
+      sol.drop = solveLeg(hip, knee, ankle, heading, plant.x, plant.z, soleY, solePitch);
       sol.hip = hip.rotation.x;
+      sol.hipY = hip.rotation.y;
+      sol.ankleY = ankle.rotation.y;
+      sol.hipZ = hip.rotation.z;
+      sol.ankleZ = ankle.rotation.z;
       sol.knee = knee.rotation.x;
       sol.ankle = ankle.rotation.x;
     }
     // Blend the FK pose toward the (possibly cached) solution.
     hip.rotation.x = fkHip + (sol.hip - fkHip) * weight.v;
+    hip.rotation.y = fkHipY + (sol.hipY - fkHipY) * weight.v;
+    ankle.rotation.y = fkAnkleY + (sol.ankleY - fkAnkleY) * weight.v;
+    hip.rotation.z = fkHipZ + (sol.hipZ - fkHipZ) * weight.v;
+    ankle.rotation.z = fkAnkleZ + (sol.ankleZ - fkAnkleZ) * weight.v;
     knee.rotation.x = fkKnee + (sol.knee - fkKnee) * weight.v;
     ankle.rotation.x = fkAnkle + (sol.ankle - fkAnkle) * weight.v;
     // Pelvis eases down when a plant is out of leg reach (downhill plants).
@@ -791,21 +815,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
 // The player state — locomotion, jump physics and the third-person camera
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * TerrainTrek's player state + third-person camera, upgraded.
- *
- * The movement MODEL keeps the source's distinctive contract — the camera's
- * theta IS the heading reference and the stick applies an offset to it — but
- * the offset is now the stick's ANALOG angle instead of an 8-way snap table,
- * speed chases the stick magnitude through accel/decel filters, and the
- * heading turns toward its wish at a speed-dependent rate instead of popping.
- * The camera keeps the source's spherical placement, damped per frame.
- */
-/**
- * The seated figure's pose state. The locomotion/camera machinery left with
- * the walk mode — what remains is only what the breathing-seat pose still
- * reads (gait phase, lean, landing envelopes all parked at idle values).
- */
+/** Shared visual pose state; the live physics/controller is in characterController.ts. */
 export class TrekPlayer {
   position = new THREE.Vector3(0, 0, 0);
   rotation = 0;
@@ -823,6 +833,13 @@ export class TrekPlayer {
   /** Signed turn rate × speed, for turn lean. */
   turnLean = 0;
   grounded = true;
+  /** Web-controller pose layers. All lengths are metres, all angles radians. */
+  crouchAmount = 0;
+  lookYaw = 0;
+  lookPitch = 0;
+  strafeAngle = 0;
+  coverLean = 0;
+  groundAt: (x: number, z: number) => number = terrainHeight;
   /** 0..1 landing-absorb envelope (drives knees/spine/camera dip). */
   landAbsorb = 0;
   /** Seconds since leaving the ground (drives the air tuck). */

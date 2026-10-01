@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "label": "Katiusza (authorized export)",
+  "modelUrl": "/sanctuary/character/character.glb",
+  "modelForward": "-Z",
+  "licenseConfirmed": false,
+  "animationMap": {
+    "idle": "REPLACE with exported idle clip name",
+    "walkForward": "REPLACE with exported walkForward clip name",
+    "walkBack": "REPLACE with exported walkBack clip name",
+    "walkLeft": "REPLACE with exported walkLeft clip name",
+    "walkRight": "REPLACE with exported walkRight clip name",
+    "runForward": "REPLACE with exported runForward clip name",
+    "runBack": "REPLACE with exported runBack clip name",
+    "runLeft": "REPLACE with exported runLeft clip name",
+    "runRight": "REPLACE with exported runRight clip name",
+    "startForward": "REPLACE with exported startForward clip name",
+    "stopForward": "REPLACE with exported stopForward clip name",
+    "turnLeft": "REPLACE with exported turnLeft clip name",
+    "turnRight": "REPLACE with exported turnRight clip name",
+    "jump": "REPLACE with exported jump clip name",
+    "fall": "REPLACE with exported fall clip name",
+    "land": "REPLACE with exported land clip name",
+    "crouchIdle": "REPLACE with exported crouchIdle clip name",
+    "crouchForward": "REPLACE with exported crouchForward clip name",
+    "crouchBack": "REPLACE with exported crouchBack clip name",
+    "crouchLeft": "REPLACE with exported crouchLeft clip name",
+    "crouchRight": "REPLACE with exported crouchRight clip name",
+    "coverIdle": "REPLACE with exported coverIdle clip name",
+    "coverLeft": "REPLACE with exported coverLeft clip name",
+    "coverRight": "REPLACE with exported coverRight clip name",
+    "coverLeanLeft": "REPLACE with exported coverLeanLeft clip name",
+    "coverLeanRight": "REPLACE with exported coverLeanRight clip name"
+  },
+  "boneMap": {
+    "head": "REPLACE with exported head bone name",
+    "chest": "REPLACE with exported chest bone name",
+    "leftHip": "REPLACE with exported leftHip bone name",
+    "leftKnee": "REPLACE with exported leftKnee bone name",
+    "leftFoot": "REPLACE with exported leftFoot bone name",
+    "rightHip": "REPLACE with exported rightHip bone name",
+    "rightKnee": "REPLACE with exported rightKnee bone name",
+    "rightFoot": "REPLACE with exported rightFoot bone name"
+  },
+  "source": {
+    "repository": "https://github.com/VeryHotShark/RealisticThirdPersonCharacter",
+    "commit": "bf56bcd56c5dd149590d1e5a0dc45575ae2fa95c",
+    "engine": "Unreal Engine 5.1",
+    "licenseNote": "Record actual export/deployment rights here; this template grants no rights."
+  }
+}

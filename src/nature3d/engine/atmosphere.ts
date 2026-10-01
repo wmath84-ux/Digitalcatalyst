@@ -299,6 +299,11 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
     patched.add(material);
 
     const foliage = opts.foliage === true;
+    // Capture the VALUE before replacing the hook. Three's default key reads
+    // this.onBeforeCompile.toString(); retaining the function instead made all
+    // wrapped terrain/water/wind materials share the wrapper's key and reuse
+    // incompatible programs (missing uniforms and exploding geometry).
+    const priorKey = material.customProgramCacheKey();
     const previous = material.onBeforeCompile as unknown as CompileFn | undefined;
 
     const inject = (shader: ShaderLike) => {
@@ -338,15 +343,14 @@ export function createAtmosphere(budget: QualityBudget): Atmosphere {
     };
 
     material.onBeforeCompile = ((shader: ShaderLike, renderer: unknown) => {
-      previous?.(shader, renderer);
+      previous?.call(material, shader, renderer);
       inject(shader);
     }) as unknown as THREE.Material["onBeforeCompile"];
 
     // Distinct programs: a foliage material and a rock material must never
     // share a compiled shader even if they started from the same class.
-    const prior = material.customProgramCacheKey;
-    material.customProgramCacheKey = () =>
-      `${prior ? prior.call(material) : "dc"}-atmo-${foliage ? "leaf" : "solid"}`;
+    material.customProgramCacheKey = () => `${priorKey}-atmo-v2-${foliage ? "leaf" : "solid"}`;
+    material.needsUpdate = true;
   };
 
   return {
