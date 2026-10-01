@@ -5,10 +5,8 @@
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { terrainHeight } from "./terrain";
-import { projectBoardMatrix } from "./boardProjection";
-import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
-import { beachHouseSites } from "./beachHouseSite";
 import { treesBlockSight } from "./flora";
+import { projectBoardMatrix } from "./boardProjection";
 import {
   LECTERN_BOARD_HEIGHT,
   LECTERN_BOARD_WIDTH,
@@ -51,10 +49,34 @@ export function studyLetterbox(
   gutter = 8,
   aspect = SCREEN_PX_WIDTH / SCREEN_PX_HEIGHT,
 ): { x: number; y: number; w: number; h: number } {
-  const padT = Math.max(0, hud.top) + gutter;
-  const padB = Math.max(0, hud.bottom) + gutter;
+  let padT = Math.max(0, hud.top) + gutter;
+  let padB = Math.max(0, hud.bottom) + gutter;
   const padL = Math.max(0, hud.left) + gutter;
   const padR = Math.max(0, hud.right) + gutter;
+
+  // ── PHONE LANDSCAPE ────────────────────────────────────────────────────
+  //
+  // A landscape phone is roughly 900x390. The top stats chip (~48 px) and the
+  // bottom dock (~108 px) together claimed ~164 px of the SHORT edge — 42% of
+  // it — and because the page is letterboxed to 16:9 the board then came out
+  // only ~226 px tall, floating small in the middle of a wide view. That is the
+  // "fit zoom landscape mein optimise nahin hai" report.
+  //
+  // The chrome is sized for portrait, where the short edge is the WIDTH and
+  // there is plenty of it to spare; vertically there is room. Landscape flips
+  // that. So cap what the chrome may claim vertically and let the board take
+  // the rest. The board is centred and the dock hugs the bottom edge, so what
+  // the board overlaps is the dock's outer margin, not its buttons.
+  //
+  // Expressed against viewH rather than gated on orientation, so portrait is
+  // untouched by construction: there padT + padB is already well under the cap.
+  const padCap = Math.max(64, viewH * 0.24);
+  const padTotal = padT + padB;
+  if (padTotal > padCap) {
+    const k = padCap / padTotal;
+    padT *= k;
+    padB *= k;
+  }
   const usableW = Math.max(48, viewW - padL - padR);
   const usableH = Math.max(48, viewH - padT - padB);
   let w: number;
@@ -74,105 +96,8 @@ export function studyLetterbox(
   };
 }
 
-/** DOM screens have no shared depth buffer with WebGL. Cull only a fully
- * obstructed face in the open world; a partial leaf/trunk must not blank the
- * whole board. The fitted study surface remains readable regardless of scenery.
- */
-const OCCLUSION_MARGIN = 0.15;
-const OCCLUSION_MIN_DISTANCE = 2;
-
-/** Is the sightline between eye and target blocked by terrain, grass, villa, beach houses, or trees? */
-function terrainBlocksSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
-  const dx = target.x - eye.x;
-  const dy = target.y - eye.y;
-  const dz = target.z - eye.z;
-  const length = Math.hypot(dx, dy, dz);
-  if (length < OCCLUSION_MIN_DISTANCE) return false;
-
-  // 1. Trees and plants (flora + tropical)
-  if (treesBlockSight(eye, target)) return true;
-
-  // 2. Villa obstruction (with sloped gable roof)
-  const lenXZ = Math.hypot(dx, dz);
-  if (lenXZ > 1e-4) {
-    const vSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
-    const vTh = terrainHeight(WAREHOUSE_X, WAREHOUSE_Z);
-    for (let i = 1; i < vSteps; i += 1) {
-      const t = i / vSteps;
-      const px = eye.x + dx * t;
-      const py = eye.y + dy * t;
-      const pz = eye.z + dz * t;
-      const vx = px - WAREHOUSE_X;
-      const vz = pz - WAREHOUSE_Z;
-      if (Math.abs(vx) <= 18.1 && Math.abs(vz) <= 21.4) {
-        const roofY = vTh + 30.4 - (Math.abs(vx) / 18.1) * 18.0;
-        if (py >= vTh && py <= roofY) return true;
-      }
-    }
-  }
-
-  // 3. Beach houses obstruction (all 6 houses with gable roof)
-  const sites = beachHouseSites();
-  if (sites.length > 0) {
-    const hSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
-    for (let i = 1; i < hSteps; i += 1) {
-      const t = i / hSteps;
-      const px = eye.x + dx * t;
-      const py = eye.y + dy * t;
-      const pz = eye.z + dz * t;
-      for (let k = 0; k < sites.length; k += 1) {
-        const s = sites[k];
-        const hx = px - s.x;
-        const hz = pz - s.z;
-        const lx = s.cos * hx - s.sin * hz;
-        const lz = s.sin * hx + s.cos * hz;
-        if (Math.abs(lx) <= s.halfX && Math.abs(lz) <= s.halfZ) {
-          const roofY = s.padY + 30.0 - (Math.abs(lx) / s.halfX) * 18.0;
-          if (py >= s.padY && py <= roofY) return true;
-        }
-      }
-    }
-  }
-
-  // 4. Terrain & Grass raymarch: ~2.5m resolution
-  const steps = Math.min(48, Math.max(8, Math.round(length / 2.5)));
-  for (let i = 1; i < steps; i += 1) {
-    const t = i / steps;
-    const px = eye.x + dx * t;
-    const py = eye.y + dy * t;
-    const pz = eye.z + dz * t;
-    const th = terrainHeight(px, pz);
-    // Grass is ~0.45m tall on the ground
-    const surfaceH = th + 0.45;
-    if (surfaceH - py > OCCLUSION_MARGIN) return true;
-  }
-
-  return false;
-}
-
-// Hoisted samples: no arrays/vectors allocated while the camera moves.
-const OCCLUSION_SAMPLES = [
-  [0, 0], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9],
-  [0, -0.9], [0, 0.9], [-0.9, 0], [0.9, 0],
-] as const;
+/** The two ±1 signs used to walk the four corners of a board face. */
 const CORNER_SIGNS = [-1, 1] as const;
-
-/** Only hide a whole DOM face when ALL sampled sightlines are blocked. */
-function boardIsOccluded(
-  eye: THREE.Vector3, screen: BoardScreen, scale: number, target: THREE.Vector3,
-): boolean {
-  const p = screen.placement;
-  if (eye.distanceToSquared(p.position) < OCCLUSION_MIN_DISTANCE ** 2) return false;
-  const cos = Math.cos(p.yaw);
-  const sin = Math.sin(p.yaw);
-  const halfW = LECTERN_BOARD_WIDTH * scale / 2;
-  const halfH = LECTERN_BOARD_HEIGHT * scale / 2;
-  for (const [x, y] of OCCLUSION_SAMPLES) {
-    target.set(p.position.x + x * halfW * cos, p.position.y + y * halfH, p.position.z - x * halfW * sin);
-    if (!terrainBlocksSight(eye, target)) return false;
-  }
-  return true;
-}
 
 export interface BoardScreen {
   slot: LecternSlot;
@@ -200,6 +125,18 @@ export interface BoardScreensHandle {
   setReadSlot(slot: LecternSlot | null): void;
   /** Frost the perimeter without changing content, hit targets or CSS3D poses. */
   setWinter(enabled: boolean): void;
+  /**
+   * Suppress every board while a full-screen HUD panel (Settings, My modules)
+   * is open.
+   *
+   * The screens live in a DOM layer composited ABOVE the WebGL canvas at
+   * z-index ~1e6, and the settings sheet has no z-index of its own — so an open
+   * panel was being drawn UNDER the boards, and the learner saw a lesson
+   * floating on top of the settings they had just asked for. Content is never
+   * detached here: this only drops opacity and hit targets, so any playing
+   * media survives and resumes where it was.
+   */
+  setOverlayOpen(open: boolean): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
   /**
@@ -232,10 +169,6 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
   // fog: true (default on Standard/Lambert) so distance smoke hits the
   // board shells the same way it hits trees and terrain. BasicMaterial
   // also supports fog — keep it on so the black backing fades into haze.
-  const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35, fog: true });
-  const backing = new THREE.MeshBasicMaterial({ color: 0x05070c, fog: true });
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4, fog: true });
-
   const frameGeo = new THREE.BoxGeometry(W + BEZEL * 2, H + BEZEL * 2, DEPTH);
   const backGeo = new THREE.PlaneGeometry(W, H);
 
@@ -243,6 +176,19 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
     const board = new THREE.Group();
     board.position.copy(p.position);
     board.rotation.y = p.yaw;
+
+    // Per-board materials. The DOM screen is composited ABOVE the canvas and
+    // can never be depth-tested against the world, so the only way a hill can
+    // stand in front of a lesson is for the lesson to fade — and if the DOM
+    // fades while this near-black backing stays opaque, the learner is left
+    // staring at an empty black slab. The two must dim together, which means
+    // each board needs its own copies. Three boards, so this costs three
+    // material sets instead of one: a fair trade for not regressing the black
+    // board.
+    const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35, fog: true, transparent: true });
+    const backing = new THREE.MeshBasicMaterial({ color: 0x05070c, fog: true, transparent: true });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4, fog: true, transparent: true });
+    board.userData.fade = [frame, backing, legMat];
 
     const shell = new THREE.Mesh(frameGeo, frame);
     shell.position.z = -DEPTH / 2 - 0.02;
@@ -399,6 +345,17 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const toCamera = new THREE.Vector3();
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
+  // Last matrix3d written per board, so an unchanged pose skips the DOM write
+  // entirely instead of rebuilding two throwaway strings every frame.
+  const lastTransform = new Map<LecternSlot, Float32Array>();
+  // Smoothed occlusion fraction per board (0 = clear, 1 = fully hidden) and the
+  // last opacity string written, so an unchanged frame does no DOM work.
+  // True while a full-screen HUD panel owns the screen. See setOverlayOpen.
+  let overlayOpen = false;
+  const occlusion = new Map<LecternSlot, number>();
+  const lastOpacity = new Map<LecternSlot, string>();
+  const occEye = new THREE.Vector3();
+  const occAim = new THREE.Vector3();
   const visibility = new Map<LecternSlot, number>();
   const pinCorner = new THREE.Vector3();
   let viewW = 1;
@@ -409,8 +366,78 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let dirty = true;
   const lastProjection = new THREE.Matrix4();
   const screenMatrix = new THREE.Matrix4();
-  const occlusionTarget = new THREE.Vector3();
   let hudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
+
+  /**
+   * Face sample offsets, in units of the half-width / half-height. Centre plus
+   * four inset corners: five points are enough to tell "a ridge crosses the
+   * lower third" from "the whole board is behind the hill", which is exactly
+   * the distinction the old single-ray binary test could not make.
+   */
+  const FACE_SAMPLES: ReadonlyArray<readonly [number, number]> = [
+    [0, 0], [0.86, 0.86], [-0.86, 0.86], [0.86, -0.86], [-0.86, -0.86],
+  ];
+  const OCC_STEPS = 8;
+  /** Boards closer than this cannot have anything between them and the eye. */
+  const OCC_MIN_DISTANCE = 26;
+
+  /** True when terrain or a tree stands between the eye and one face point. */
+  const sightBlocked = (
+    ex: number, ey: number, ez: number,
+    tx: number, ty: number, tz: number,
+  ): boolean => {
+    const dx = tx - ex;
+    const dy = ty - ey;
+    const dz = tz - ez;
+    for (let s = 1; s < OCC_STEPS; s += 1) {
+      const t = s / OCC_STEPS;
+      const wy = ey + dy * t;
+      // The board stands ON this ground, so allow the surface a little height
+      // before calling it an obstruction, or the board occludes itself.
+      if (terrainHeight(ex + dx * t, ez + dz * t) + 0.35 > wy) return true;
+    }
+    occEye.set(ex, ey, ez);
+    occAim.set(tx, ty, tz);
+    return treesBlockSight(occEye, occAim);
+  };
+
+  /**
+   * How much of the board's face the world is standing in front of, 0..1.
+   *
+   * A FRACTION, deliberately. The previous implementation answered a yes/no
+   * question from the last sightline that cleared the ridge, so a camera
+   * orbiting a few centimetres crossed that boundary every frame and the board
+   * snapped on and off. Averaging five face points gives a value that moves
+   * continuously as the camera moves, and the smoothing below removes what is
+   * left of the jitter.
+   */
+  const faceOcclusion = (screen: BoardScreen, camera: THREE.PerspectiveCamera): number => {
+    const p = screen.placement;
+    const yaw = p.yaw;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const rx = Math.cos(yaw);
+    const rz = -Math.sin(yaw);
+    const hw = LECTERN_BOARD_WIDTH * 0.5;
+    const hh = LECTERN_BOARD_HEIGHT * 0.5;
+    const ex = camera.position.x;
+    const ey = camera.position.y;
+    const ez = camera.position.z;
+    if (Math.hypot(p.position.x - ex, p.position.z - ez) < OCC_MIN_DISTANCE) return 0;
+
+    let blocked = 0;
+    for (let i = 0; i < FACE_SAMPLES.length; i += 1) {
+      const u = FACE_SAMPLES[i][0] * hw;
+      const v = FACE_SAMPLES[i][1] * hh;
+      // Nudged a few centimetres along the face normal so the sample sits in
+      // front of the backing panel rather than inside it.
+      const tx = p.position.x + rx * u + fx * 0.06;
+      const ty = p.position.y + v;
+      const tz = p.position.z + rz * u + fz * 0.06;
+      if (sightBlocked(ex, ey, ez, tx, ty, tz)) blocked += 1;
+    }
+    return blocked / FACE_SAMPLES.length;
+  };
 
   /**
    * The face's projected screen rectangle, taken from its four corners.
@@ -501,6 +528,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       dirty = true;
     },
 
+    setOverlayOpen(open) {
+      if (overlayOpen === open) return;
+      overlayOpen = open;
+      // The camera has not moved, so the pose guard at the top of render()
+      // would early-return and the boards would stay on screen behind the
+      // panel. Force one pass through the loop.
+      dirty = true;
+    },
     setWinter(enabled) {
       for (const screen of screens) {
         if (enabled) screen.element.dataset.iceAge = "true";
@@ -577,39 +612,134 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         boardNormal.set(Math.sin(screen.placement.yaw), 0, Math.cos(screen.placement.yaw));
         toCamera.copy(camera.position).sub(screen.placement.position);
         let visible = inView && boardNormal.dot(toCamera) > 0 && projectFace(screen, camera).ok;
-        const fitted = screen.slot === readSlot && pinFace(screen, camera);
+        let fitted = screen.slot === readSlot && pinFace(screen, camera);
         if (fitted) {
           visible = true;
           fittedSlot = screen.slot;
-        } else if (visible) {
-          // A focused study board is readable through scenery. In the open
-          // world only a fully obstructed face is hidden, never one leaf.
-          if (screen.slot !== readSlot && boardIsOccluded(camera.position, screen, faceScale, occlusionTarget)) {
-            visible = false;
-          }
+        }
+        // A full-screen panel outranks a pinned board: the learner opened
+        // Settings, so Settings is what they should see. Both the page and the
+        // WebGL shell go, together — fading one without the other is how the
+        // old black-slab bug happened.
+        if (overlayOpen) {
+          visible = false;
+          fitted = false;
+        }
+
+        // ── Soft occlusion: fade behind the world, never pop ───────────────
+        //
+        // The screen is a DOM layer composited ABOVE the WebGL canvas at
+        // z-index ~1e6, so it can never be depth-tested against the world. Left
+        // alone it floats in front of every hill and tree it should be behind,
+        // which reads as obviously fake. The fix is to fade it by how much of
+        // its face the world is actually covering.
+        //
+        // Two earlier failures define the shape of this code:
+        //
+        //   1. BLACK BOARD. The first attempt hid the DOM content while the 3D
+        //      shell stayed opaque, leaving a near-black slab where the lesson
+        //      had been. So the shell's own materials dim in lockstep below.
+        //   2. FLICKER. That attempt answered a yes/no question from the last
+        //      sightline clearing the ridge, so an orbiting camera crossed the
+        //      boundary every frame. `faceOcclusion` returns a FRACTION over
+        //      five face points instead, and the smoothing here removes the
+        //      rest, so the value moves continuously with the camera.
+        //
+        // A pinned board (`fitted`) is a deliberate full-screen UI mode, not a
+        // world object, so it is exempt: the learner asked for it to fill the
+        // screen and no hill gets a vote.
+        const prevOcc = occlusion.get(screen.slot) ?? 0;
+        let occ: number;
+        if (fitted) {
+          // A pin is a command from the learner, not a change in the world, so
+          // it snaps. Easing a board back out from behind the ridge it was
+          // hidden by would leave the full-screen reading mode half transparent
+          // for a fraction of a second on the very frame it was asked for.
+          occ = 0;
+          occlusion.set(screen.slot, 0);
+        } else {
+          const target = faceOcclusion(screen, camera);
+          // Ease in slightly slower than out: appearing from behind a ridge
+          // should feel like the board coming into the open, while ducking
+          // back behind one should not linger.
+          const eased = prevOcc + (target - prevOcc) * (target > prevOcc ? 0.22 : 0.3);
+          const settled = Math.abs(target - eased) < 0.002;
+          occ = settled ? target : eased;
+          occlusion.set(screen.slot, occ);
+          // Keep converging for a few frames after the camera stops, or a fade
+          // started on the last moving frame would freeze part-way.
+          if (!settled) dirty = true;
         }
 
         if (visible && !fitted) {
           projectBoardMatrix(screen.object, camera, viewW, viewH, SCREEN_PX_WIDTH, SCREEN_PX_HEIGHT, screenMatrix);
-          screen.host.style.transform = `matrix3d(${screenMatrix.elements.join(",")})`;
-          screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
+
+          // ── Write the DOM only when the board actually MOVED ──────────
+          //
+          // This used to rebuild two strings per board per frame — a
+          // `matrix3d(...)` from `elements.join(",")` plus a `String(...)` for
+          // z-index. Across three boards that is ~360 throwaway strings a
+          // second, all of them garbage the collector has to chase, and each
+          // `style.transform` write also asks the compositor to re-transform a
+          // 1920x1080 layer holding a live iframe.
+          //
+          // Both costs are pure waste whenever the camera is still, which in a
+          // study scene is most of the time. So compare the sixteen matrix
+          // elements against the last written set and skip the write entirely
+          // when they agree. This is the same discipline as object pooling —
+          // reuse what you already have instead of manufacturing a new one
+          // every frame — applied to the DOM rather than to game objects.
+          const e = screenMatrix.elements;
+          const prev = lastTransform.get(screen.slot);
+          let moved = true;
+          if (prev !== undefined) {
+            moved = false;
+            for (let k = 0; k < 16; k += 1) {
+              if (prev[k] !== e[k]) {
+                moved = true;
+                break;
+              }
+            }
+            if (moved) prev.set(e);
+          } else {
+            lastTransform.set(screen.slot, new Float32Array(e));
+          }
+          if (moved) {
+            screen.host.style.transform = `matrix3d(${e.join(",")})`;
+            screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
+          }
         }
-        const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0);
+        // A board more than half buried behind the world should not swallow
+        // clicks meant for whatever is actually in front of it.
+        const interactable = visible && occ < 0.5;
+        const alpha = visible ? 1 - occ : 0;
+        const alphaStr = alpha >= 0.999 ? "1" : alpha <= 0.001 ? "0" : alpha.toFixed(3);
+        if (lastOpacity.get(screen.slot) !== alphaStr) {
+          lastOpacity.set(screen.slot, alphaStr);
+          screen.host.style.opacity = alphaStr;
+          // Dim the WebGL shell with the page. Without this the frame and the
+          // near-black backing stay solid behind a faded lesson and the learner
+          // sees an empty black slab — the exact regression this replaces.
+          const fade = shells.children[i]?.userData.fade as THREE.Material[] | undefined;
+          if (fade) for (const m of fade) m.opacity = alpha;
+        }
+
+        const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0) | (interactable ? 4 : 0);
         if (visibility.get(screen.slot) !== shown) {
           visibility.set(screen.slot, shown);
           // Never display:none/detach the reading iframe: camera angle is NOT
-          // a playback command. Opacity zero suppresses paint while keeping
-          // its browsing context and user-started media alive. Non-media
-          // surfaces can also skip paint via visibility, without a remount.
-          screen.host.style.opacity = visible ? "1" : "0";
+          // a playback command, and neither is a hill walking into frame.
+          // Opacity zero suppresses paint while keeping its browsing context
+          // and user-started media alive. Non-media surfaces can also skip
+          // paint via visibility, without a remount.
           screen.host.style.visibility = visible || screen.slot === "reading" ? "visible" : "hidden";
-          screen.host.style.pointerEvents = visible ? "auto" : "none";
-          screen.element.style.pointerEvents = visible ? "auto" : "none";
-          screen.host.inert = !visible;
-          screen.host.setAttribute("aria-hidden", String(!visible));
+          screen.host.style.pointerEvents = interactable ? "auto" : "none";
+          screen.element.style.pointerEvents = interactable ? "auto" : "none";
+          screen.host.inert = !interactable;
+          screen.host.setAttribute("aria-hidden", String(!interactable));
           screen.object.visible = visible;
           const shell = shells.children[i];
-          if (shell) shell.visible = inView || fitted;
+          if (shell) shell.visible = (inView || fitted) && !overlayOpen;
         }
       }
 

@@ -40,7 +40,11 @@ export interface Warehouse {
   dispose(): void;
 }
 
-const MODEL_URL = "/sanctuary/models/rusty_roof_house.glb";
+// Relative, like every other asset URL in this engine. A leading slash
+// resolves against the DOCUMENT ROOT and bypasses Vite's `base`, so on any
+// sub-path deploy (Capacitor's custom scheme, a nested preview) this one file
+// 404s while all fifteen sibling assets load — the house simply never appears.
+const MODEL_URL = "sanctuary/models/rusty_roof_house.glb";
 
 /** How far the floor is buried so the wall meets the dirt, not a gap. */
 const BITE = 0.4;

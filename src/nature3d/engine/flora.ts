@@ -209,6 +209,34 @@ function woodlandMask(x: number, z: number): number {
  *
  * `sways` stays biased near the camera: animating every leaf at 200 m is waste.
  */
+/** One tree's shadow footprint on the ground, for the terrain's baked AO. */
+export interface CanopyShadow {
+  x: number;
+  z: number;
+  r: number;
+}
+
+/**
+ * The ground shadow disc of every tree the layout is going to place.
+ *
+ * `treeLayout` is pure and seeded, so this can be called BEFORE the flora is
+ * built — which matters, because the terrain bakes its vertex colours during
+ * `buildTerrain` and runs first. Reading the tree registry instead would have
+ * returned an empty list and silently baked nothing.
+ *
+ * The terrain consumes this as plain data rather than importing flora: flora
+ * already imports terrain, so an import the other way would be a cycle.
+ */
+export function canopyShadowDiscs(count: number): CanopyShadow[] {
+  return treeLayout(count).map((t) => ({
+    x: t.x,
+    z: t.z,
+    // Crown spread on the ground. A palm throws a tight round shadow; a
+    // broadleaf or acacia spreads wide and irregular, so it gets a larger disc.
+    r: (t.kind === "palm" ? 3.2 : 5.4) * t.scale,
+  }));
+}
+
 function treeLayout(count: number): TreeLayout[] {
   const out: TreeLayout[] = [];
   const treeSite: Site = createSite();
@@ -399,7 +427,10 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
   // temperate bark would undo it.
   const trunkMat = new THREE.MeshLambertMaterial({ map: tex.bark, vertexColors: true });
   const palmTrunkMat = new THREE.MeshLambertMaterial({ map: tex.palmBark, vertexColors: true });
-  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2a8a28, vertexColors: true });
+  // Needle green, desaturated. The old 0x2a8a28 was close to a primary green,
+  // and conifer foliage is the least saturated green in a real landscape: dense
+  // chlorophyll makes it DARK and slightly blue, never vivid.
+  const pineMat = new THREE.MeshLambertMaterial({ color: 0x2f4a2c, vertexColors: true });
 
   // STATIC GEOMETRY IS MERGED, NOT ADDED.
   //
@@ -747,10 +778,12 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
           dummy.updateMatrix();
           palmImpostors.setMatrixAt(palmImpostorIndex, dummy.matrix);
           // A salt-stressed palm is yellower; a sheltered one deeper green.
+          // A leaf is never a saturated green. #2D452B — real canopy — sits at
+          // roughly 0.21 saturation; the old 0.62+ was paint, not foliage.
           color.setHSL(
             0.30 + seededRandom() * 0.03,
-            0.62 + seededRandom() * 0.12,
-            0.34 - t.crowding * 0.04 + seededRandom() * 0.09,
+            0.30 + seededRandom() * 0.08,
+            0.38 - t.crowding * 0.04 + seededRandom() * 0.09,
           );
           palmImpostors.setColorAt(palmImpostorIndex, color);
           palmImpostorIndex += 1;
@@ -796,9 +829,9 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // deeper, then yellow. Hue jitter keeps no two fronds identical.
         const outer = rank / 2;
         color.setHSL(
-          unhealthy ? 0.22 + seededRandom() * 0.03 : 0.30 + outer * 0.014 + seededRandom() * 0.012,
-          unhealthy ? 0.58 : 0.64 + outer * 0.1 + seededRandom() * 0.08,
-          0.34 + outer * 0.12 + seededRandom() * 0.08,
+          unhealthy ? 0.16 + seededRandom() * 0.03 : 0.30 + outer * 0.014 + seededRandom() * 0.012,
+          unhealthy ? 0.34 : 0.30 + outer * 0.07 + seededRandom() * 0.06,
+          0.36 + outer * 0.12 + seededRandom() * 0.08,
         );
         target.setColorAt(slot, color);
         if (t.sways) frondSwayIndex += 1;
@@ -965,8 +998,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         // is in shade), an open one is yellow-green.
         color.setHSL(
           0.30 + seededRandom() * 0.03,
-          0.62 + t.crowding * 0.08,
-          0.34 - t.crowding * 0.06 + seededRandom() * 0.1,
+          0.28 + t.crowding * 0.06,
+          0.38 - t.crowding * 0.06 + seededRandom() * 0.1,
         );
         impostors.setColorAt(impostorIndex, color);
         impostorIndex += 1;
@@ -1004,8 +1037,8 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       const outer = Math.min(1, radial / Math.max(0.001, spread));
       color.setHSL(
         0.30 + outer * 0.025 + seededRandom() * 0.02,
-        0.64 + outer * 0.12 + seededRandom() * 0.08,
-        0.32 + outer * 0.14 - t.crowding * 0.04 + seededRandom() * 0.10,
+        0.28 + outer * 0.09 + seededRandom() * 0.06,
+        0.36 + outer * 0.14 - t.crowding * 0.04 + seededRandom() * 0.10,
       );
       target.setColorAt(slot, color);
       if (t.sways) swayIndex += 1;

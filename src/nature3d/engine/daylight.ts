@@ -253,18 +253,40 @@ function dayState(h: number): DaylightState {
     // orange, and the ground bounce stays GREEN — the old #6a5a32 olive was
     // the single biggest reason a dusk shadow read as mud-black. Night is
     // deliberately a deep green dusk, never a black screen.
-    hemiSky: lerpColor(0xd8f4ff, 0xffe3c4, warm),
-    hemiGround: lerpColor(0x62b032, 0x3d8f2e, warm),
-    hemiIntensity: THREE.MathUtils.lerp(1.95, 1.85, dayFactor),
+    // Sky and haze, de-saturated toward what a real atmosphere does.
+    //
+    // The old zenith #1f7eef was a near-primary blue. A real overhead sky is a
+    // deep, slightly cyan-shifted atmospheric blue (#3B6B9B) — the blue is
+    // there, but it is carrying dust and moisture, not coming out of a swatch
+    // book. The horizon is the same story in reverse: #A4B6C5, a hazy light
+    // greyish-blue, because everything the eye sees low down is being viewed
+    // through the most air.
+    //
+    // The hemisphere ground bounce loses its neon. #62b032 is a lawn-green
+    // light source, and light that saturated tints every shadow in the scene
+    // toward paint. A muted olive keeps the bounce green — which is correct,
+    // shadows outdoors ARE lit by green ground — without announcing itself.
+    // hemiSky restored to near its original brightness. This is the ambient
+    // fill for the WHOLE scene, so dimming it darkened every shadowed surface
+    // at once — that, more than the albedo changes, is what made the world
+    // read as underexposed. The tint is still the muted hazy blue rather than
+    // the old near-white cyan.
+    hemiSky: lerpColor(0xd6e6f0, 0xffe3c4, warm),
+    hemiGround: lerpColor(0x8fa05e, 0x6b7a44, warm),
+    hemiIntensity: THREE.MathUtils.lerp(2.1, 2.0, dayFactor),
     fillIntensity: THREE.MathUtils.lerp(0.8, 1.05, dayFactor),
-    zenith: lerpColor(0x1f7eef, 0x3f5f9e, warm),
-    horizon: lerpColor(0xc8eeff, 0xffc79a, warm),
-    ground: lerpColor(0xdceec0, 0x7d8a55, warm),
-    sunTint: lerpColor(0xfff8e0, 0xffb07a, warm),
-    // Smoke fog colour — cool blue-grey haze by day, warm dust at dusk.
+    zenith: lerpColor(0x3b6b9b, 0x3f5f9e, warm),
+    horizon: lerpColor(0xa4b6c5, 0xffc79a, warm),
+    ground: lerpColor(0xd8e4b8, 0x7d8a55, warm),
+    sunTint: lerpColor(0xfff4dc, 0xffb07a, warm),
+    // Smoke fog colour — a cool bluish-grey haze by day, warm dust at dusk.
+    // #B0B8B9, not white: fog is not the absence of colour, it is air carrying
+    // the sky's own tint. This is also what produces ATMOSPHERIC PERSPECTIVE —
+    // a hill 2-3 km out is not green or brown by the time its light reaches
+    // the eye, it is this haze with a ridge shape in it.
     // Must stay close to the sky horizon so distant land melts into air
     // (three.js rule: fog colour ≈ background / horizon colour).
-    fog: lerpColor(0xb4cce4, 0xe8d0b0, warm),
+    fog: lerpColor(0xb0b8b9, 0xe8d0b0, warm),
     exposure: THREE.MathUtils.lerp(1.02, 1.16, dayFactor),
     dayFactor,
     night: 0,

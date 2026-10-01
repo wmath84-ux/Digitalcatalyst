@@ -66,6 +66,16 @@ export interface HillGrassField {
    * The instance buffers stay allocated; trimming `count` is free.
    */
   setShed(level: number): void;
+  /**
+   * WORLD STREAMING. Hides every cell further than `radius` metres from the
+   * viewer, so resident vertex work is capped at a fixed radius no matter how
+   * large the sward is. Safe visually because the terrain bakes TRUE GREEN
+   * vertex colours (terrain.ts -> groundColorAt/GROUND_PALETTE), so a distant
+   * hill still reads as a green hill with no grass cards on it at all.
+   */
+  stream(x: number, z: number, radius: number): void;
+  /** Undo streaming: make every cell visible again (used on quality changes). */
+  streamAll(): void;
   dispose(): void;
 }
 
@@ -77,7 +87,46 @@ export interface HillGrassField {
  * blend reference keeps its scatter on the plane's own rim.
  */
 const HILL_GRASS_IN = 34;
-const HILL_GRASS_OUT = 1150;
+// Exported so the verification harness can assert against the sward's real
+// world scale instead of a duplicated magic number.
+export const HILL_GRASS_OUT = 1150;
+
+/**
+ * Metres out to the four compass samples the baked ambient occlusion reads.
+ * Deliberately small: a clump is ~1 m wide, so sampling further away would
+ * measure the hillside's overall tilt (which the sun already shades) rather
+ * than the local hollow the clump actually sits in.
+ */
+const AO_RADIUS = 2.4;
+
+/** Deepest the baked term is allowed to darken a clump (0.62x at the floor). */
+const AO_MAX_DARKEN = 0.38;
+
+/**
+ * BAKED AMBIENT OCCLUSION for one clump, solved once at sowing time.
+ *
+ * Reads the four compass points around the clump and measures how much HIGHER
+ * the surrounding ground stands than the clump's own root. Walled-in ground
+ * blocks sky light, so the clump is returned darker; a clump on flat or
+ * convex ground is returned at full strength.
+ *
+ * Exported so the harness can assert the term against real terrain instead of
+ * inferring it from final colours, where the sward's own per-clump random
+ * hue/sat/light jitter makes an isolated measurement impossible.
+ */
+export function hillGrassOcclusion(x: number, z: number, y: number): number {
+  let occ = 0;
+  for (let s = 0; s < 4; s += 1) {
+    const ax = x + Math.cos(s * 1.5707963) * AO_RADIUS;
+    const az = z + Math.sin(s * 1.5707963) * AO_RADIUS;
+    const rise = terrainHeight(ax, az) - y;
+    if (rise > 0) occ += rise;
+  }
+  // A couple of metres of surrounding rise saturates the term, and the cap
+  // keeps a deep gully from going black — which would read as a hole in the
+  // sward, not as shade.
+  return 1 - Math.min(AO_MAX_DARKEN, occ * 0.085);
+}
 
 /**
  * One clump: TWO crossed, bent blade cards (the reference blend's "2-3
@@ -102,6 +151,65 @@ function hillBladeGeometry(): THREE.BufferGeometry {
   const a = bend(new THREE.PlaneGeometry(1, 1, 1, 2));
   const b = bend(new THREE.PlaneGeometry(1, 1, 1, 2));
   b.rotateY(Math.PI / 2); // crossed pair
+  return mergeGeometries([a, b]);
+}
+
+/**
+ * The DISTANT clump: the same crossed pair, but each card is a single quad
+ * instead of two vertical segments — 4 triangles and 8 verts instead of 8 and
+ * 12.
+ *
+ * The second segment exists so the wind shader can BEND a card rather than
+ * just tilt it, which is what makes near grass read as alive. Past ~600 m a
+ * clump is a few pixels of silhouette and the bend is sub-pixel, so the
+ * segment buys literally nothing the eye can see while still costing a full
+ * vertex-shader invocation per vert, every frame.
+ *
+ * This is the LOD half of the win, and it lands hard because of how the
+ * annulus is shaped: the sward is split into 4 radial bands, and by area the
+ * outer two hold ~74 % of every clump in the field (band area grows with
+ * r²). Dropping just those from 12 verts to 8 removes about a quarter of the
+ * sward's entire vertex load with no change to the near ground at all.
+ */
+/**
+ * HIERARCHICAL LOD card. A single flat quad — 2 triangles / 4 vertices, a
+ * third of the near card and half the "far" one.
+ *
+ * This is the coarsest rung of the ladder and it exists for one reason: when
+ * world streaming has switched a sector's detailed cells OFF, the sward would
+ * otherwise vanish at the streaming boundary and pop back in as the camera
+ * closes. Instead the sector keeps drawing ONE coarse stand-on, which reads as
+ * textured green ground at that distance and costs almost nothing.
+ *
+ * Deliberately NOT a crossed pair: a cross only earns its second card when the
+ * silhouette is big enough for the viewer to notice the missing volume, and at
+ * HLOD range it is not.
+ */
+function hillBladeGeometryHlod(): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(1, 1, 1, 1);
+  g.translate(0, 0.5, 0);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i += 1) {
+    const t = pos.getY(i);
+    pos.setX(i, pos.getX(i) * (1 - t * 0.78));
+    pos.setZ(i, pos.getZ(i) + t * t * 0.22);
+  }
+  return g;
+}
+
+function hillBladeGeometryFar(): THREE.BufferGeometry {
+  const bend = (g: THREE.PlaneGeometry): THREE.PlaneGeometry => {
+    const pos = g.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i += 1) {
+      const t = pos.getY(i);
+      pos.setX(i, pos.getX(i) * (1 - t * 0.78));
+      pos.setZ(i, pos.getZ(i) + t * t * 0.22);
+    }
+    return g;
+  };
+  const a = bend(new THREE.PlaneGeometry(1, 1, 1, 1));
+  const b = bend(new THREE.PlaneGeometry(1, 1, 1, 1));
+  b.rotateY(Math.PI / 2);
   return mergeGeometries([a, b]);
 }
 
@@ -140,6 +248,9 @@ export function createHillGrassField(
   tex.needsUpdate = true;
 
   const geo = hillBladeGeometry();
+  // Distant clumps wear the cheaper 4-triangle card. Which cells get it is
+  // decided per cell below, from the cell's radial band.
+  const geoFar = hillBladeGeometryFar();
   // The meadow's proven recipe (see `grass.ts` buildRing): the blade texture
   // supplies the silhouette, alphaTest trims the empty texels with no
   // sorting/overdraw cost, and per-clump tint arrives via `setColorAt`
@@ -212,11 +323,48 @@ export function createHillGrassField(
   material.customProgramCacheKey = () => "dc-hill-grass";
 
   const count = budget.hillGrass;
-  const mesh = new THREE.InstancedMesh(geo, material, count);
-  mesh.frustumCulled = true;
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
-  mesh.name = "hill-grass";
+
+  // ── CHUNKED SWARD — so frustum culling can actually fire ──────────────
+  //
+  // This field used to be ONE InstancedMesh whose bounding sphere was set by
+  // hand to `Sphere(origin, HILL_GRASS_OUT + 12)` — a 2.3 km sphere centred on
+  // the world origin. The comment at the time was honest about it ("the field
+  // spans the whole world — cull it as one sphere"), and that is exactly the
+  // problem: a sphere that large intersects the camera frustum from EVERY
+  // angle, so three.js could never reject it. All 36 000 clumps — 432 000
+  // vertices, 78 % of the scene's entire grass vertex load on the low tier —
+  // went through the vertex shader every single frame no matter where the
+  // learner was looking.
+  //
+  // The fix is the standard one for instanced foliage: split the field into
+  // CELLS and give each cell its own InstancedMesh with a TIGHT bounding
+  // sphere, so three.js' automatic per-object culling does the work for free
+  // on the CPU and the GPU never sees a clump behind the camera.
+  //
+  // The cells are ANGULAR SECTORS × RADIAL BANDS rather than a square grid,
+  // because the sward is an annulus — a grid would waste cells on the empty
+  // middle and give ragged coverage at the rim. 12 sectors × 4 bands = 48
+  // cells maximum. A 60° field of view spans ~2.7 sectors, so roughly 3/4 of
+  // the sward is culled in a typical view: the same grass, the same density,
+  // the same material (ONE shared material, so no extra shader variants and
+  // no extra program switches), about a quarter of the vertex work.
+  const SECTORS = 12;
+  const BANDS = 4;
+  const CELLS = SECTORS * BANDS;
+  const sectorArc = (Math.PI * 2) / SECTORS;
+
+  // Sowing is a single pass into scratch buffers (the placement uses
+  // `Math.random()` throughout, so it cannot be replayed deterministically in
+  // a second pass), then the clumps are bucketed into cells and each cell
+  // allocates EXACTLY the instances it holds. Net memory is lower than
+  // before: the old mesh over-allocated to the full budget even when the
+  // scatter placed fewer, and the scratch buffers are dropped at the end.
+  const matScratch = new Float32Array(count * 16);
+  const colScratch = new Float32Array(count * 3);
+  const cxScratch = new Float32Array(count);
+  const czScratch = new Float32Array(count);
+  const cyScratch = new Float32Array(count);
+  const cellScratch = new Int32Array(count);
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -226,6 +374,8 @@ export function createHillGrassField(
   // hundreds of thousands of times and must not allocate.
   const UP = new THREE.Vector3(0, 1, 0);
   const NORMAL = new THREE.Vector3();
+  // Reused while measuring each cell's bounds — no per-clump allocation.
+  const SCRATCH_POINT = new THREE.Vector3();
 
   const span = HILL_GRASS_OUT - HILL_GRASS_IN;
   // On weak devices the far cards grow BIGGER instead of multiplying —
@@ -280,7 +430,10 @@ export function createHillGrassField(
     const wScale = (0.22 + Math.random() * 0.16) * (1 + grow * 16) * farBoost;
     dummy.scale.set(wScale, hScale, 1);
     dummy.updateMatrix();
-    mesh.setMatrixAt(placed, dummy.matrix);
+    // Scratch write, not `mesh.setMatrixAt`: the clumps are bucketed into
+    // sector×band cells after the sowing finishes, and each cell allocates
+    // exactly the instances it holds. See the CHUNKED SWARD note above.
+    matScratch.set(dummy.matrix.elements, placed * 16);
 
     // Colour: the SAME recipe the meadow's blade field wears (grass.ts —
     // the owner's "natural green" directive: base hue 0.30 ≈ true grass
@@ -292,11 +445,52 @@ export function createHillGrassField(
     groundColorAt(x, z, y, ground, GROUND_PALETTE, 1, 0);
     ground.getHSL(hsl);
     const patch = (Math.sin(x * 0.21) * Math.cos(z * 0.19) + 1) * 0.5;
-    const hue = 0.3 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * 0.03;
-    const sat = 0.66 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
-    const lit = 0.55 + hsl.l * 0.26 + Math.random() * 0.12 - patch * 0.03;
-    color.setHSL(hue, Math.min(0.92, sat), Math.min(0.82, lit));
-    mesh.setColorAt(placed, color);
+    // The hills wear the same rule as the meadow below: an olive, not a
+    // primary. Hue ~0.24, saturation capped near 0.55, lightness kept in the
+    // mid-range so the sun does the brightening. The old recipe allowed
+    // saturation up to 0.92 at lightness 0.82 — a neon lawn, and the reason
+    // the distant hills read as a flat green sheet instead of as land.
+    const hue = 0.24 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * 0.03;
+    const sat = 0.38 + hsl.s * 0.16 + patch * 0.06 + Math.random() * 0.06;
+    const lit = 0.54 + hsl.l * 0.26 + Math.random() * 0.12 - patch * 0.03;
+    // Saturation stays capped low (muted), lightness stays high (bright).
+    // Those are independent: an olive at 0.54 lightness is a sunlit dry hill,
+    // whereas the same hue at 0.36 was the dusk-looking regression.
+    color.setHSL(hue, Math.min(0.55, sat), Math.min(0.80, lit));
+
+    // ── BAKED AMBIENT OCCLUSION ───────────────────────────────────────────
+    //
+    // A clump in a hollow is walled in by higher ground, so less sky reaches
+    // it; a clump on a ridge is lit from every side. Sample four compass
+    // offsets, measure how much HIGHER the surrounding ground stands than the
+    // clump's own root, and darken accordingly.
+    //
+    // This is the lightmap idea in the only form a procedurally sown field can
+    // wear: the light is solved ONCE, here, at sowing time, and frozen into the
+    // instance colour the GPU already uploads. Per frame the card costs exactly
+    // what it cost before — one multiply that now happens never instead of
+    // once per fragment. Nothing is recomputed, and because the term is baked
+    // into the colour the sward still responds to the real sun on top of it.
+    const ao = hillGrassOcclusion(x, z, y);
+
+    const o3 = placed * 3;
+    colScratch[o3] = color.r * ao;
+    colScratch[o3 + 1] = color.g * ao;
+    colScratch[o3 + 2] = color.b * ao;
+
+    // Which cell owns this clump: angular sector × radial band. Radius is
+    // clamped into range because the boulder skirts can plant inside
+    // HILL_GRASS_IN (a rock near the clearing), and `atan2` returns
+    // (-π, π] which must be folded onto [0, 2π) before the sector index.
+    const rr = Math.hypot(x, z);
+    let ang = Math.atan2(z, x);
+    if (ang < 0) ang += Math.PI * 2;
+    const sector = Math.min(SECTORS - 1, (ang / sectorArc) | 0);
+    const band = Math.min(BANDS - 1, Math.max(0, (((rr - HILL_GRASS_IN) / span) * BANDS) | 0));
+    cellScratch[placed] = sector * BANDS + band;
+    cxScratch[placed] = x;
+    cyScratch[placed] = y;
+    czScratch[placed] = z;
     placed += 1;
   };
 
@@ -345,26 +539,166 @@ export function createHillGrassField(
     plant(x, z, y, t);
   }
 
-  mesh.count = placed;
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  // ── Bucket the sown clumps into cells and build one mesh per cell ─────
+  //
+  // Each cell gets an InstancedMesh sized EXACTLY to the clumps it holds, a
+  // TIGHT bounding sphere derived from those clumps (padded for the tallest
+  // card and the wind displacement), and `frustumCulled = true` — which now
+  // actually means something, because the sphere no longer covers the world.
+  const perCell = new Int32Array(CELLS);
+  for (let i = 0; i < placed; i += 1) perCell[cellScratch[i]] += 1;
 
-  // Generous manual bounds: the wind shader displaces vertices, and the
-  // field spans the whole world — cull it as one sphere.
-  geo.computeBoundingSphere();
-  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), HILL_GRASS_OUT + 12);
-  mesh.updateMatrix();
-  mesh.matrixAutoUpdate = false;
-  group.add(mesh);
+  const cellMeshes: THREE.InstancedMesh[] = [];
+  const cellFull: number[] = [];
+  const cellCentre: number[] = [];
+  const cursor = new Int32Array(CELLS);
+  const box = new THREE.Box3();
+  const sphere = new THREE.Sphere();
+  // Rim cards are enormous by design (hScale reaches ~18 m at the island
+  // edge so a far clump still holds enough pixels to survive the alpha test)
+  // and the wind shader displaces vertices on top of that. Pad the bounds by
+  // the worst-case card so a clump is never culled while any part of it is
+  // still on screen — over-culling grass is the visible bug, and a slightly
+  // generous sphere costs nothing.
+  const CARD_PAD = 22;
 
-  const full = placed;
+  for (let c = 0; c < CELLS; c += 1) {
+    const n = perCell[c];
+    if (n === 0) continue;
+
+    // LOD by radial band: the outer two bands (~74 % of all clumps by area)
+    // draw the 4-triangle card, the inner two keep the bendable 8-triangle one.
+    const band = c % BANDS;
+    const cellGeo = band >= BANDS - 2 ? geoFar : geo;
+    const cellMesh = new THREE.InstancedMesh(cellGeo, material, n);
+    cellMesh.frustumCulled = true;
+    cellMesh.castShadow = false;
+    cellMesh.receiveShadow = false;
+    cellMesh.name = `hill-grass-cell-${c}`;
+
+    // `InstancedMesh.instanceColor` stays NULL until the first `setColorAt`
+    // call. The scratch path below writes the colour buffer directly, which
+    // would silently leave it null and render the whole sward untinted — so
+    // allocate it up front, white-filled exactly the way `setColorAt` would.
+    cellMesh.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(n * 3).fill(1),
+      3,
+    );
+
+    box.makeEmpty();
+    let sumX = 0;
+    let sumZ = 0;
+    for (let i = 0; i < placed; i += 1) {
+      if (cellScratch[i] !== c) continue;
+      sumX += cxScratch[i];
+      sumZ += czScratch[i];
+      const k = cursor[c]++;
+      cellMesh.instanceMatrix.array.set(matScratch.subarray(i * 16, i * 16 + 16), k * 16);
+      cellMesh.instanceColor.array.set(colScratch.subarray(i * 3, i * 3 + 3), k * 3);
+      box.expandByPoint(SCRATCH_POINT.set(cxScratch[i], cyScratch[i], czScratch[i]));
+    }
+    cellMesh.count = n;
+    cellMesh.instanceMatrix.needsUpdate = true;
+    cellMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    cellMesh.instanceColor.needsUpdate = true;
+
+    // A clump's own footprint is a point; the card it carries is not. Grow
+    // the box by the card pad on every axis, then take the sphere of THAT.
+    box.expandByScalar(CARD_PAD);
+    box.getBoundingSphere(sphere);
+    cellMesh.boundingSphere = sphere.clone();
+    cellMesh.updateMatrix();
+    cellMesh.matrixAutoUpdate = false;
+
+    group.add(cellMesh);
+    cellMeshes.push(cellMesh);
+    cellFull.push(n);
+    cellCentre.push(sumX / n, sumZ / n);
+  }
+
+  // ── HLOD layer: one coarse stand-in per sector ──────────────────────────────
+  //
+  // Each mesh holds every clump of that sector's two OUTER bands (the bands the
+  // distance LOD already put on the cheap card), collapsed onto a 4-vertex quad.
+  // They live in their own child group so a caller scanning `group.children` for
+  // detail cells does not mistake them for one, and they start hidden — the
+  // detail cells own the screen until streaming retires them.
+  const geoHlod = hillBladeGeometryHlod();
+  const hlodGroup = new THREE.Group();
+  hlodGroup.name = "hill-grass-hlod";
+  group.add(hlodGroup);
+  const hlodMeshes: THREE.InstancedMesh[] = [];
+  const hlodCentre: number[] = [];
+
+  for (let sec = 0; sec < SECTORS; sec += 1) {
+    const outer = [sec * BANDS + (BANDS - 2), sec * BANDS + (BANDS - 1)];
+    let total = 0;
+    for (const c of outer) total += perCell[c];
+    if (total === 0) continue;
+
+    const m = new THREE.InstancedMesh(geoHlod, material, total);
+    m.frustumCulled = true;
+    m.castShadow = false;
+    m.receiveShadow = false;
+    m.visible = false;
+    m.name = `hill-grass-hlod-${sec}`;
+    // Same rule as the detail cells: instanceColor is null until the first
+    // setColorAt, so allocate it white-filled or the stand-in renders untinted.
+    m.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(total * 3).fill(1),
+      3,
+    );
+
+    box.makeEmpty();
+    let k = 0;
+    let sumX = 0;
+    let sumZ = 0;
+    for (const c of outer) {
+      for (let i = 0; i < placed; i += 1) {
+        if (cellScratch[i] !== c) continue;
+        sumX += cxScratch[i];
+        sumZ += czScratch[i];
+        m.instanceMatrix.array.set(matScratch.subarray(i * 16, i * 16 + 16), k * 16);
+        m.instanceColor.array.set(colScratch.subarray(i * 3, i * 3 + 3), k * 3);
+        box.expandByPoint(SCRATCH_POINT.set(cxScratch[i], cyScratch[i], czScratch[i]));
+        k += 1;
+      }
+    }
+    m.count = k;
+    m.instanceMatrix.needsUpdate = true;
+    m.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    m.instanceColor.needsUpdate = true;
+
+    box.expandByScalar(CARD_PAD);
+    box.getBoundingSphere(sphere);
+    m.boundingSphere = sphere.clone();
+    m.updateMatrix();
+    m.matrixAutoUpdate = false;
+
+    hlodGroup.add(m);
+    hlodMeshes.push(m);
+    hlodCentre.push(sumX / k, sumZ / k);
+  }
 
   return {
     group,
     materials: [material],
     setShed(level) {
-      mesh.count = level <= 0 ? full : level === 1 ? Math.floor(full * 0.7) : Math.floor(full * 0.45);
+      // Every cell sheds the SAME proportion, so the sward thins evenly
+      // instead of losing whole compass directions. Trimming `count` is free
+      // — the instance buffers stay allocated, the GPU just draws fewer.
+      //
+      // Five rungs now, not three: the old ladder bottomed out at 45 %, which
+      // still left ~266 k verts/frame on the low tier — roughly 4x a
+      // comfortable mobile budget, so the thermal fail-safe could never
+      // actually rescue a drowning frame. Levels 3 and 4 exist for exactly
+      // that case. Chunked culling (§CHUNKED SWARD) does the heavy lifting in
+      // normal operation; these rungs are the last resort.
+      const k =
+        level <= 0 ? 1 : level === 1 ? 0.7 : level === 2 ? 0.45 : level === 3 ? 0.28 : 0.16;
+      for (let i = 0; i < cellMeshes.length; i += 1) {
+        cellMeshes[i].count = Math.floor(cellFull[i] * k);
+      }
     },
     update(time, windStrength) {
       const shader = material.userData.shader as
@@ -374,11 +708,42 @@ export function createHillGrassField(
       shader.uniforms.uTime.value = time;
       shader.uniforms.uWind.value = windStrength;
     },
+    stream(x, z, radius) {
+      // Half a cell of slack stops a cell straddling the boundary from
+      // blinking as the camera drifts a metre or two.
+      const slack = 60;
+      const r = radius + slack;
+      const r2 = r * r;
+      for (let i = 0; i < cellMeshes.length; i += 1) {
+        const dx = cellCentre[i * 2] - x;
+        const dz = cellCentre[i * 2 + 1] - z;
+        const want = dx * dx + dz * dz <= r2;
+        if (cellMeshes[i].visible !== want) cellMeshes[i].visible = want;
+      }
+      // HLOD is the exact inverse: a sector's coarse stand-in draws only where
+      // its detailed cells have been retired, so the sward never shows a hole
+      // at the streaming boundary.
+      for (let h = 0; h < hlodMeshes.length; h += 1) {
+        const dx = hlodCentre[h * 2] - x;
+        const dz = hlodCentre[h * 2 + 1] - z;
+        const want = dx * dx + dz * dz > r2;
+        if (hlodMeshes[h].visible !== want) hlodMeshes[h].visible = want;
+      }
+    },
+    streamAll() {
+      for (let i = 0; i < cellMeshes.length; i += 1) cellMeshes[i].visible = true;
+      // Every detailed cell is resident again, so no stand-in should show.
+      for (const m of hlodMeshes) m.visible = false;
+    },
     dispose() {
       geo.dispose();
+      geoFar.dispose();
+      geoHlod.dispose();
+      for (const m of hlodMeshes) m.dispose();
+      hlodGroup.clear();
       tex.dispose();
       material.dispose();
-      mesh.dispose();
+      for (const cellMesh of cellMeshes) cellMesh.dispose();
       group.clear();
     },
   };

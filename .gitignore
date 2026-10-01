@@ -56,3 +56,6 @@ android/app/src/main/assets/capacitor.plugins.json
 # Scratch / temporary demo harnesses (never shipped)
 scratch/
 _shader_probe.mjs
+
+# esbuild bundles produced by `npm run test:sanctuary:engine`
+build
