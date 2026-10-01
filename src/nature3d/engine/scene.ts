@@ -71,7 +71,7 @@ import {
   type BoardScreen,
   type BoardScreensHandle,
 } from "./boardScreens";
-import { createTrekAvatar, TrekPlayer, type TrekAvatar } from "./trekAvatar";
+import { TrekPlayer, type TrekAvatar } from "./trekAvatar";
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
 import { cullDistanceForPx } from "./cull";
@@ -243,7 +243,13 @@ export class Sanctuary {
    * are there; the model itself is async and fail-soft.
    */
   private beachHouses: BeachHouses | null = null;
-  private avatar: TrekAvatar;
+  /**
+   * The seated learner figure. Removed on request: only the day bed should sit
+   * in front of the board now. Kept as a nullable field rather than deleted
+   * outright because `trek.ts` and the walk-mode plumbing still reference the
+   * avatar contract; a later pass can drop those too.
+   */
+  private avatar: TrekAvatar | null = null;
   private trek = new TrekPlayer();
   /** The three live course-player boards + their WebGL frames. */
   private screens: BoardScreensHandle;
@@ -861,13 +867,10 @@ export class Sanctuary {
 // The board is scenery now: no controller, no drag, no resize, no
     // persistence. Nothing to restore either — its place is fixed in code.
 
-    // The walking character. It starts seated on the study chair, and stands
-    // up the moment the learner takes control in walk mode.
-    this.avatar = createTrekAvatar(this.budget.shadowMapSize > 0);
-    this.avatar.setLowEnd(this.budget.tier === "low");
-    this.scene.add(this.avatar.group);
+    // No walking character any more — the day bed alone faces the board. The
+    // trek state is still reset so walk mode has a defined start position if
+    // it is ever driven by something other than the avatar.
     this.trek.reset(0, 3.4);
-    this.avatar.setSeated(true, new THREE.Vector3(0, terrainHeight(0, 2.6), 2.6));
 
     // OPENING SHOT: a wide establishing view. You arrive high and far enough
     // back to read the whole valley — the herds, the river, the hills on the
@@ -2270,9 +2273,11 @@ export class Sanctuary {
         this.pendingPinAge = 0;
       }
     }
-    this.avatar.setVisible(true);
-    // Seated: breathing only — the folds stay where setSeated put them.
-    this.avatar.update(dt, time, this.trek, this.camera);
+    if (this.avatar) {
+      this.avatar.setVisible(true);
+      // Seated: breathing only — the folds stay where setSeated put them.
+      this.avatar.update(dt, time, this.trek, this.camera);
+    }
 
     // Underwater: when the camera dips under the waterline the whole view
     // goes saturated blue so it reads as being inside the water, not as a
@@ -2471,7 +2476,7 @@ export class Sanctuary {
     this.detachPointer(this.opts.dom);
     this.screens.dispose();
     disposeGroup(this.desk);
-    this.avatar.dispose();
+    this.avatar?.dispose();
     this.grass.dispose();
     this.hillGrass.dispose();
     this.rocks.dispose();

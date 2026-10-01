@@ -24,10 +24,11 @@
 // without touching anything else (eye height, the desk, the board arc, the
 // trek start are all anchored to him and stay untouched).
 //
-// The bed centre lands at z = 2.9 (the boy sits at 2.6, towards the open
-// end): the bed's front edge then sits at z ≈ 2.33 — clear of the desk's
-// back edge (1.96) and of the boy's dangling feet (z ≈ 2.06–2.28), which
-// hang over the edge in the gap, exactly as they would on a real bed.
+// The seated figure has since been removed, so the bed no longer has to line
+// up with anyone. It is now drawn at 2× the authored size (roughly 5.9 m wide,
+// 2.5 m deep, 3.4 m tall) and stands alone in front of the board; the centre
+// moved to z = 3.6 so the front edge keeps its old z ≈ 2.33 clearance from the
+// desk's back edge at 1.96.
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -45,10 +46,24 @@ export interface DayBed {
 const MODEL_URL = "sanctuary/models/vintage_day_bed.gltf";
 const ARM_URL = "sanctuary/models/textures/vintage_day_bed_arm_1k.jpg";
 
-/** World z of the bed centre (see the header for the clearance math). */
-const BED_Z = 2.9;
-/** 0.82 m (the boy's seat height) / 0.55 m (the authored cushion top). */
-const SCALE = 0.82 / 0.55;
+/**
+ * World z of the bed centre. Moved from 2.9 to 3.6 when the bed was doubled:
+ * at 2× the bed's depth grows 0.855 m → 2.55 m, so the old centre would have
+ * pushed the front edge to z ≈ 1.63 — inside the desk, whose back edge is at
+ * 1.96. At 3.6 the front edge lands at z ≈ 2.33 again, the same clearance the
+ * single-size bed had.
+ */
+const BED_Z = 3.6;
+/**
+ * 0.82 m (the seat height the desk was built around) / 0.55 m (the authored
+ * cushion top). Doubled on request: the bed now stands roughly 1.64 m tall, so
+ * the cushion top sits near a normal adult seat height instead of a child's.
+ *
+ * It is no longer matched to the desk height. That is deliberate — the seated
+ * figure it used to align with is gone, so the bed is sized on its own rather
+ * than being pinned to a prop that is no longer next to it.
+ */
+const SCALE = 2 * (0.82 / 0.55);
 
 export function createDayBed(budget: QualityBudget, anisotropy: number): Promise<DayBed> {
   const shadows = budget.shadowMapSize > 0;
