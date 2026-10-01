@@ -12,10 +12,17 @@ import { characterFixtureJson, encodeGlb, MAPPING } from './fixtures/sanctuaryCh
 
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || chromium.executablePath();
 const enabled = fs.existsSync(executablePath);
-const browserTest = (name, fn) => test(name, { timeout: 180000, skip: enabled ? false : 'Install Chromium to run the real WebGL2/controls regression' }, fn);
+// A headless Chromium that cannot create a WebGL2 context (no GPU and no
+// working SwiftShader) must SKIP with that reason, not time out on a page that
+// can never finish booting the renderer.
+const browserTest = (name, fn) => test(name, { timeout: 180000 }, async (t) => {
+  if (!enabled) return t.skip('Install Chromium to run the real WebGL2/controls regression');
+  if (!webgl) return t.skip('Chromium cannot create a WebGL2 context here; no GPU/SwiftShader in this environment');
+  return fn(t);
+});
 const ROOT = process.cwd();
 const DIR = path.join(ROOT, 'node_modules/.cache/sanctuary-world-browser');
-let browser, server, page, origin;
+let browser, server, page, origin, webgl = false;
 const errors = [];
 
 before(async () => {
@@ -150,6 +157,8 @@ resize(800,500); engine.focus('world'); ui();
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('requestfailed', r => errors.push(`Network: ${r.url()} ${r.failure()?.errorText}`));
+  webgl = await page.evaluate(() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } });
+  if (!webgl) return;
   await page.goto(origin, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.fx && ['grass-tuft-field', 'vintage-day-bed', 'rusty-roof-villa', 'mountain-forest-ring', 'beach-houses'].every(name => window.fx.e.scene.getObjectByName(name)), null, { timeout: 120000 });
 });
@@ -163,7 +172,7 @@ async function screenshot(name) {
 browserTest('low-tier world truly links and paints ground/houses/mountains without invalid instances or magenta spikes', async () => {
   const metadata = await page.evaluate(() => fx.stats());
   for (const name of ['terrain', 'far-range', 'flora', 'beach-houses', 'rusty-roof-villa', 'vintage-day-bed', 'sanctuary-character']) assert.ok(metadata.groups.includes(name), name);
-  assert.deepEqual(metadata.instanceErrors, []); assert.equal(metadata.height, 1.8288000000000002);
+  assert.deepEqual(metadata.instanceErrors, []); assert.ok(Math.abs(metadata.height - 5.4864) < 1e-6, String(metadata.height));
   assert.equal(metadata.sofaScale, metadata.expectedScale);
   assert.ok(!metadata.groups.includes('student') && !metadata.groups.includes('seated-student'));
   const pixels = await page.evaluate(() => fx.render());
@@ -173,7 +182,7 @@ browserTest('low-tier world truly links and paints ground/houses/mountains witho
   await screenshot('sanctuary-world');
 });
 
-browserTest('real keyboard/HUD drives a 6ft player; camera switches preserve input; pause/blur/reset and boards are safe', async () => {
+browserTest('real keyboard/HUD drives an 18ft player; camera switches preserve input; pause/blur/reset and boards are safe', async () => {
   await page.getByRole('button', { name: /Explore on foot/ }).click();
   const start = await page.evaluate(() => fx.snapshot());
   await page.getByRole('button', { name: 'Run toggle' }).click();
@@ -258,10 +267,10 @@ browserTest('mobile sticks and scene drags undo rotated landscape coordinates, c
   assert.deepEqual(errors, []);
 });
 
-browserTest('licensed character-only GLB loader normalizes to 6ft and does not accumulate aim on unanimated bones', async () => {
+browserTest('licensed character-only GLB loader normalizes to 18ft and does not accumulate aim on unanimated bones', async () => {
   const status = await page.evaluate(() => fx.loadTestAvatar()); assert.equal(status.kind, 'imported');
   const loaded = await page.evaluate(() => fx.testAvatarState());
-  assert.equal(loaded.source, 'imported'); assert.ok(Math.abs(loaded.height - 1.8288) < 0.005);
+  assert.equal(loaded.source, 'imported'); assert.ok(Math.abs(loaded.height - 5.4864) < 0.005, String(loaded.height));
   for (let i = 0; i < 4; i++) assert.ok(Math.abs(loaded.before[i] - loaded.after[i]) < 1e-5);
   assert.deepEqual(errors, []);
   assert.equal(await page.evaluate(() => fx.dispose()), 0);

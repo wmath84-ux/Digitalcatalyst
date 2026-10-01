@@ -2,7 +2,7 @@
   "version": 1,
   "label": "Original Katiusza",
   "modelUrl": "/sanctuary/character/character.glb",
-  "modelForward": "-Z",
+  "modelForward": "+Z",
   "licenseConfirmed": true,
   "animationMap": {
     "idle": "InPlace/Idle",
@@ -53,6 +53,7 @@
     "meshSHA256": "da714540cec5b64267ac7430507445b65fe1305638a8413d904784077e14dc56",
     "fullArchiveAnimations": 401,
     "userRightsConfirmation": "User explicitly confirmed export, web deployment and redistribution rights on 2026-10-01.",
+    "facing": "Measured from the deployed mesh: face/eyes point +Z in the GLB node space, so the runtime rotates the model 180 degrees onto the -Z travel axis.",
     "scope": "character-only",
     "sha256": "74bb7b35253f462dc7620448bf955d9559f2272a7d5c920ce1439e9799835d4a",
     "bytes": 43188972,

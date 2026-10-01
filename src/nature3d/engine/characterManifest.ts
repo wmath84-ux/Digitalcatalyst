@@ -23,7 +23,7 @@ export interface CharacterAssetStatus {
 }
 export const FALLBACK_CHARACTER_STATUS: CharacterAssetStatus = Object.freeze({
   kind: "procedural",
-  label: "Sanctuary guide · 6 ft",
+  label: "Sanctuary guide · 18 ft",
   detail: "Original web guide. Exact Unreal character/animations require a licensed GLB export; they are not installed yet.",
 });
 

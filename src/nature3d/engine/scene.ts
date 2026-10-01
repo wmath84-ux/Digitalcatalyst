@@ -74,7 +74,7 @@ import {
 import { createTrekAvatar, type TrekAvatar } from "./trekAvatar";
 import { CharacterController } from "./characterController";
 import { CharacterCollisionWorld, type CharacterCollider } from "./characterCollision";
-import { CHARACTER_HEIGHT, CHARACTER_SPAWN, type CharacterCameraMode } from "./characterConfig";
+import { CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SCALE, CHARACTER_SPAWN, characterEyeHeight, type CharacterCameraMode } from "./characterConfig";
 import { FALLBACK_CHARACTER_STATUS, readCharacterManifest, type CharacterAssetStatus } from "./characterManifest";
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
@@ -1873,9 +1873,14 @@ export class Sanctuary {
 
   /** Pick an OPEN patch from this world, not an imported reference spawn.
    * The original vegetation is 7–20 m tall: spawning inside a random leaf
-   * card made a 6 ft guide disappear even with a correctly working camera.
+   * card made the guide disappear even with a correctly working camera.
+   * Every probe below scales with the body, so an 18 ft character is tested
+   * against the clearance IT needs, not the clearance a 6 ft one needed.
    * This is a one-shot placement query on entry/reset, never a frame loop. */
   private resetCharacterAtClearSpawn() {
+    const S = CHARACTER_SCALE;
+    const probeRadius = CHARACTER_RADIUS + 0.05 * S;
+    const eye = characterEyeHeight();
     const candidates = [
       [CHARACTER_SPAWN.x, CHARACTER_SPAWN.z], [-10, 0], [-12, -6], [-8, -8],
       [0, -10], [8, -8], [12, -6], [10, 0], [-14, 12], [0, 14], [14, 12],
@@ -1884,24 +1889,30 @@ export class Sanctuary {
     let best = -Infinity;
     for (const [x, z] of candidates) {
       const y = this.characterWorld.terrainAt(x, z);
-      // An entry point must also be camera-visible, not on a steep river bank
-      // whose foreground ridge hides the original character's lower half.
+      // Hard requirement: standable, dry and clear of props for the whole
+      // body plus a jump of headroom. Everything else only prefers a spot.
+      if (this.characterWorld.waterAt(x, z) - y > 0.65 * S ||
+          !this.characterWorld.canOccupy(x, y, z, probeRadius, CHARACTER_HEIGHT + 1.5 * S) ||
+          !this.characterWorld.canOccupy(x, y, z - 3.5 * S, probeRadius, CHARACTER_HEIGHT)) continue;
+      // An entry point should also be camera-visible, not on a steep river
+      // bank whose foreground ridge hides the character's lower half.
       const ground = this.characterWorld.terrainAt;
-      const relief = Math.max(Math.abs(ground(x + 0.5, z) - y), Math.abs(ground(x - 0.5, z) - y),
-        Math.abs(ground(x, z + 0.5) - y), Math.abs(ground(x, z - 0.5) - y));
-      if (relief > 0.12 || Math.abs(ground(x + 0.32, z + 4) - y) > 0.4 ||
-          this.characterWorld.waterAt(x, z) - y > 0.65 ||
-          !this.characterWorld.canOccupy(x, y, z, 0.35, CHARACTER_HEIGHT + 1.5) ||
-          !this.characterWorld.canOccupy(x, y, z - 3.5, 0.35, CHARACTER_HEIGHT) ||
-          this.characterWorld.cameraBlocked(x + 0.32, y + 2, z + 4, 0.2)) continue;
+      const relief = Math.max(Math.abs(ground(x + 0.5 * S, z) - y), Math.abs(ground(x - 0.5 * S, z) - y),
+        Math.abs(ground(x, z + 0.5 * S) - y), Math.abs(ground(x, z - 0.5 * S) - y));
+      const visible = relief <= 0.12 * S && Math.abs(ground(x + 0.32 * S, z + 4 * S) - y) <= 0.4 * S &&
+        !this.characterWorld.cameraBlocked(x + 0.32 * S, y + eye, z + 4 * S, 0.2 * S);
       let clearance = Infinity;
       for (const crown of crowns) {
-        if (y + 2 < crown.baseY - 0.5 || y > crown.baseY + crown.height) continue;
-        const margin = crown.radius * 1.5 + 0.75;
+        if (y + eye < crown.baseY - 0.5 * S || y > crown.baseY + crown.height) continue;
+        const margin = crown.radius * 1.5 + CHARACTER_RADIUS * 2.5;
         clearance = Math.min(clearance, Math.hypot(x - crown.x, z - crown.z) - margin,
-          Math.hypot(x + 0.32 - crown.x, z + 4 - crown.z) - margin);
+          Math.hypot(x + 0.32 * S - crown.x, z + 4 * S - crown.z) - margin);
       }
-      if (clearance > best) { best = clearance; this.characterSpawn.set(x, y, z); }
+      // Ranked, not rejected: a visible opening always beats a hidden one, but
+      // an 18 ft body that cannot find a perfect ledge still gets the most open
+      // standable ground instead of silently keeping a buried default.
+      const score = (visible ? 1e4 : 0) + Math.max(clearance, -1e3);
+      if (score > best) { best = score; this.characterSpawn.set(x, y, z); }
     }
     this.character.reset(this.characterSpawn.x, this.characterSpawn.z, CHARACTER_SPAWN.yaw);
   }

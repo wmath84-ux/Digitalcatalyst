@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { terrainHeight, terrainNormal } from "./terrain";
 import { damp } from "./controls";
-import { CHARACTER_HEIGHT, CROUCH_HEIGHT, CHARACTER_TUNING } from "./characterConfig";
+import { CHARACTER_HEIGHT, CHARACTER_SCALE, CROUCH_HEIGHT, CHARACTER_TUNING } from "./characterConfig";
 
 /** Pose reference speed in metres/second. */
 export const WALK_SPEED = CHARACTER_TUNING.walkSpeed;
@@ -556,29 +556,33 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       body.position.y = baseOffset;
       // ── Read the locomotion state (never mutated here) ──────────────
       const speed = player.speed;
+      // Gait amplitudes were authored for a six-foot body. Normalizing metres
+      // per second by the body scale keeps the same swing/bob shape whatever
+      // the character's height is.
+      const gaitSpeed = speed / CHARACTER_SCALE;
       const speed01 = THREE.MathUtils.clamp(speed / WALK_SPEED, 0, 1.35);
       const phase = player.gaitPhase;
-      const moving = speed > 0.25;
+      const moving = speed > 0.25 * CHARACTER_SCALE;
       const air = !player.grounded;
       const land = player.landAbsorb;
       const turnLean = player.turnLean;
 
       // ── Gait parameters, continuous in speed (states pick, pose blends)
-      const swing = moving ? Math.min(0.24 + 0.10 * speed, 0.85) : 0;
-      const bobAmp = Math.min(0.012 + 0.0042 * speed, 0.055);
-      const crouch = Math.min(0.012 + 0.006 * speed, 0.085) + land * 0.09;
+      const swing = moving ? Math.min(0.24 + 0.10 * gaitSpeed, 0.85) : 0;
+      const bobAmp = Math.min(0.012 + 0.0042 * gaitSpeed, 0.055);
+      const crouch = Math.min(0.012 + 0.006 * gaitSpeed, 0.085) + land * 0.09;
       const crouchDrop = player.crouchAmount * (CHARACTER_HEIGHT - CROUCH_HEIGHT) / modelScale;
-      const armSwing = Math.min(0.12 + 0.062 * speed, 0.85);
+      const armSwing = Math.min(0.12 + 0.062 * gaitSpeed, 0.85);
       const elbowBase = 0.28 + speed01 * 0.7;
       // Forward lean that must stay small enough to read at 15 m: base + the
       // acceleration push (start) / braking brace (stop) + landing absorb.
-      const lean = 0.03 + speed01 * 0.12 + THREE.MathUtils.clamp(player.accelSm, -8, 8) * 0.018 + land * 0.22 + player.crouchAmount * 0.25 +
+      const lean = 0.03 + speed01 * 0.12 + THREE.MathUtils.clamp(player.accelSm, -8 * CHARACTER_SCALE, 8 * CHARACTER_SCALE) * 0.018 / CHARACTER_SCALE + land * 0.22 + player.crouchAmount * 0.25 +
         (player.state === "dash" ? 0.12 : 0);
 
       // ── Pelvis: bob twice per cycle, sway once, drop into crouch/IK ──
       const bobY = -crouch - bobAmp * Math.abs(Math.cos(phase)) * (moving && !air ? 1 : 0.15);
       pelvisG.position.y = PELVIS_Y + bobY - pelvisDrop.v - crouchDrop;
-      pelvisG.rotation.z = (moving && !air ? Math.min(0.02 + 0.008 * speed, 0.07) : 0.004) *
+      pelvisG.rotation.z = (moving && !air ? Math.min(0.02 + 0.008 * gaitSpeed, 0.07) : 0.004) *
         Math.sin(phase);
       pelvisG.rotation.y = moving && !air ? 0.05 * Math.sin(phase) * Math.min(speed01 + 0.3, 1) : 0;
 
@@ -657,7 +661,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
         // Eligible: grounded, readable speed, near camera, tier allows.
         // Sprint+ is FK-only — at 12 u/s a plant lasts 3 frames and the eye
         // cannot judge it; the phase law already prevents skating.
-        const ikAllowed = speed < 7 && (lod === 0 || (lod === 1 && ikTick % 2 === 0));
+        const ikAllowed = speed < 7 * CHARACTER_SCALE && (lod === 0 || (lod === 1 && ikTick % 2 === 0));
         ikTick += 1;
         updateFoot(
           -1, legL, kneeL, ankleL, sL, player, ikWeightL, plantL, solL, ikAllowed, adt,
@@ -670,7 +674,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       // ── Backpack secondary motion: one sprung axis, never noisy ─────
       // Driven by acceleration + stride bob; critically damped-ish so it
       // settles instead of oscillating.
-      const drive = -player.accelSm * 0.035 - (moving && !air ? Math.sin(phase * 2) * 0.02 * speed01 : 0);
+      const drive = -player.accelSm * 0.035 / CHARACTER_SCALE - (moving && !air ? Math.sin(phase * 2) * 0.02 * speed01 : 0);
       const stiff = 90;
       const dampC = 14;
       packSpring.v += ((drive - packSpring.x) * stiff - packSpring.v * dampC) * Math.min(adt, 0.05);
@@ -715,7 +719,7 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
     adt: number,
   ): void {
     // Stance when the leg is back and loaded; swing when coming through.
-    const stanceTarget = ikAllowed ? (player.speed < 0.15 ? 1 : THREE.MathUtils.smoothstep(-s, -0.3, 0.45)) : 0;
+    const stanceTarget = ikAllowed ? (player.speed < 0.15 * CHARACTER_SCALE ? 1 : THREE.MathUtils.smoothstep(-s, -0.3, 0.45)) : 0;
     weight.v += (stanceTarget - weight.v) * damp(14, adt);
     // Release by gait phase, not by the damped weight. During continuous
     // walking that weight need not ever reach .001; waiting for it made a
@@ -740,10 +744,10 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
       // Short forward shuffling keeps the knee triangle ABOVE the floor.
       // A fully crouched hip cannot reach a long backward standing stride
       // without planting its knee through the ground, even if its boot lands.
-      const safeForward = THREE.MathUtils.clamp(forward, 0.06 * player.crouchAmount, 0.3);
+      const safeForward = THREE.MathUtils.clamp(forward, 0.06 * CHARACTER_SCALE * player.crouchAmount, 0.3 * CHARACTER_SCALE);
       x -= hs * (safeForward - forward); z -= hc * (safeForward - forward);
-      const lift = player.speed > 0.15 ? Math.max(0, s) * 0.07 * (1 - weight.v) : 0;
-      const soleY = player.groundAt(x, z) + 0.015 + lift;
+      const lift = player.speed > 0.15 * CHARACTER_SCALE ? Math.max(0, s) * 0.07 * CHARACTER_SCALE * (1 - weight.v) : 0;
+      const soleY = player.groundAt(x, z) + 0.015 * CHARACTER_SCALE + lift;
       terrainNormal(x, z, nScratch);
       const solePitch = Math.atan2(nScratch.x * Math.sin(heading) + nScratch.z * Math.cos(heading), nScratch.y);
       solveLeg(hip, knee, ankle, heading, x, z, soleY, solePitch);
@@ -775,14 +779,14 @@ export function createTrekAvatar(shadows: boolean): TrekAvatar {
         const hx = group.position.x + side * HIP_X * modelScale * hc;
         const hz = group.position.z - side * HIP_X * modelScale * hs;
         const moveHeading = heading + player.strafeAngle;
-        const lead = player.speed > 0.1 ? stride * 0.25 : 0;
+        const lead = player.speed > 0.1 * CHARACTER_SCALE ? stride * 0.25 : 0;
         plant.x = hx - Math.sin(moveHeading) * lead;
         plant.z = hz - Math.cos(moveHeading) * lead;
         plant.live = true;
       }
       // Solve against the REAL terrain under the held plant. A few centimetres
       // of sole lift stops the boot mesh sinking into the slope.
-      const soleY = player.groundAt(plant.x, plant.z) + 0.015;
+      const soleY = player.groundAt(plant.x, plant.z) + 0.015 * CHARACTER_SCALE;
       terrainNormal(plant.x, plant.z, nScratch);
       // Slope pitch in the facing frame: how much the sole must tip.
       const solePitch = Math.atan2(-(nScratch.x * -hs + nScratch.z * -hc), nScratch.y);

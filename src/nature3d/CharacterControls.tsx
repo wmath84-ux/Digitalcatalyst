@@ -75,7 +75,7 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
       <div className="sanctuary-character-toolbar">
         {!walking ? (
           <button type="button" className="sanctuary-character-button sanctuary-character-start" onClick={onStart}>
-            <Footprints size={17} aria-hidden="true" /> Explore on foot <span>6 ft</span>
+            <Footprints size={17} aria-hidden="true" /> Explore on foot <span>18 ft</span>
           </button>
         ) : (
           <>
@@ -115,7 +115,7 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
       </div>
 
       <p data-character-asset-status role="status" className="sanctuary-character-source" title={status.detail}>
-        {status.kind === "imported" ? status.label : "Web guide · 6 ft — original UE export pending"}
+        {status.kind === "imported" ? status.label : "Web guide · 18 ft — original UE export pending"}
       </p>
       {walking ? (
         <>

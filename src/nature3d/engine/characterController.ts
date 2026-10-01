@@ -3,8 +3,8 @@ import { damp } from "./controls";
 import { TrekPlayer } from "./trekAvatar";
 import { CharacterCollisionWorld, type CoverContact } from "./characterCollision";
 import {
-  CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SPAWN, CHARACTER_TUNING as T,
-  CROUCH_HEIGHT, type CharacterCameraMode,
+  CAMERA_PIVOT_RATIO, CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SCALE, CHARACTER_SPAWN, CHARACTER_TUNING as T,
+  CROUCH_HEIGHT, characterBodyHeight, characterEyeHeight, type CharacterCameraMode,
 } from "./characterConfig";
 
 export const shortestAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -17,7 +17,7 @@ export class CharacterCameraRig {
   private targetPitch = this.pitch;
   private wantedDistance: number = T.cameraDistance;
   private boom: number = T.cameraDistance;
-  private shoulder = 0.32;
+  private shoulder = 0.32 * CHARACTER_SCALE;
   private target = new THREE.Vector3();
   private desired = new THREE.Vector3();
   private direction = new THREE.Vector3();
@@ -55,10 +55,10 @@ export class CharacterCameraRig {
     const k = this.snap ? 1 : damp(16, dt);
     this.yaw += shortestAngle(this.targetYaw - this.yaw) * k;
     this.pitch += (this.targetPitch - this.pitch) * k;
-    const eyeHeight = THREE.MathUtils.lerp(CHARACTER_HEIGHT - 0.13, CROUCH_HEIGHT - 0.1, player.crouchAmount);
-    const pivotHeight = this.mode === "first-person" ? eyeHeight : eyeHeight * 0.82;
+    const eyeHeight = characterEyeHeight(player.crouchAmount);
+    const pivotHeight = this.mode === "first-person" ? eyeHeight : characterBodyHeight(player.crouchAmount) * CAMERA_PIVOT_RATIO;
     this.desired.copy(player.position);
-    this.desired.y += pivotHeight - player.landAbsorb * 0.055;
+    this.desired.y += pivotHeight - player.landAbsorb * 0.055 * CHARACTER_SCALE;
     this.target.lerp(this.desired, this.snap ? 1 : damp(18, dt));
     if (world.cameraBlocked(this.target.x, this.target.y, this.target.z, 0.04)) this.target.copy(this.desired);
     const cp = Math.cos(this.pitch);
@@ -92,7 +92,7 @@ export class CharacterCameraRig {
       camera.position.copy(this.target).addScaledVector(this.direction, this.boom);
       camera.position.y = Math.max(camera.position.y, world.terrainAt(camera.position.x, camera.position.z) + T.cameraRadius);
       camera.lookAt(this.target);
-      this.bodyVisible = this.boom > 0.65;
+      this.bodyVisible = this.boom > 0.65 * CHARACTER_SCALE;
     }
     const base = this.mode === "first-person" ? 74 : 62;
     let fov = base + THREE.MathUtils.smoothstep(player.speed, T.walkSpeed, T.runSpeed) * 4;
@@ -149,7 +149,7 @@ export class CharacterController extends TrekPlayer {
     this.grounded = true;
     this.state = "idle";
     this.gaitPhase = 0;
-    this.strideLen = 1.4;
+    this.strideLen = 1.4 * CHARACTER_SCALE;
     this.accelSm = this.turnLean = this.landAbsorb = this.airTime = 0;
     this.crouchAmount = this.lookYaw = this.lookPitch = this.strafeAngle = this.coverLean = 0;
     this.cover = null;
@@ -194,7 +194,7 @@ export class CharacterController extends TrekPlayer {
   toggleRun() { this.runLatched = !this.runLatched; }
   toggleCrouch() { this.crouchLatched = !this.crouchLatched; }
   jump() { if (this.enabled) { this.cover = null; this.jumpBuffered = T.jumpBuffer; } }
-  releaseJump() { if (!this.grounded && this.velocity.y > 3) this.velocity.y = 3; }
+  releaseJump() { if (!this.grounded && this.velocity.y > 3 * CHARACTER_SCALE) this.velocity.y = 3 * CHARACTER_SCALE; }
 
   clearInput() {
     this.inputX = this.inputY = this.lookX = this.lookY = 0;
@@ -293,7 +293,7 @@ export class CharacterController extends TrekPlayer {
       const rate = Math.min(1, acceleration * control * dt / Math.max(change, 1e-6));
       this.velocity.x += dx * rate;
       this.velocity.z += dz * rate;
-      if (inputLength < 0.01 && change < 0.02) this.velocity.x = this.velocity.z = 0;
+      if (inputLength < 0.01 && change < 0.02 * CHARACTER_SCALE) this.velocity.x = this.velocity.z = 0;
 
       // Do not climb unwalkable terrain or teleport up an analytic cliff.
       if (this.grounded) {
@@ -310,7 +310,7 @@ export class CharacterController extends TrekPlayer {
       this.position.z += this.velocity.z * dt;
       const terrain = this.world.terrainAt(this.position.x, this.position.z);
       const water = this.world.waterAt(this.position.x, this.position.z);
-      if (this.grounded && (terrain > oldY + T.stepHeight || water - terrain > 0.65)) {
+      if (this.grounded && (terrain > oldY + T.stepHeight || water - terrain > 0.65 * CHARACTER_SCALE)) {
         this.position.x = oldX;
         this.position.z = oldZ;
         this.velocity.x = this.velocity.z = 0;
@@ -339,13 +339,13 @@ export class CharacterController extends TrekPlayer {
         this.velocity.y = 0;
       }
     }
-    let floor = this.world.floorAt(this.position.x, this.position.z, oldY, wasGrounded ? T.stepHeight : 0.015, CHARACTER_RADIUS + 0.001);
+    let floor = this.world.floorAt(this.position.x, this.position.z, oldY, wasGrounded ? T.stepHeight : 0.015 * CHARACTER_SCALE, CHARACTER_RADIUS + 0.001);
     if (this.grounded && floor - this.position.y <= T.stepHeight && this.position.y - floor <= T.stepHeight) this.position.y = floor;
     else if (this.grounded) { this.grounded = false; this.velocity.y = 0; this.airTime = 0; }
     this.world.resolve(this.position, this.velocity, CHARACTER_RADIUS, this.capsuleHeight);
-    floor = this.world.floorAt(this.position.x, this.position.z, oldY, wasGrounded ? T.stepHeight : 0.015, CHARACTER_RADIUS + 0.001);
-    if (this.position.y <= floor + 0.002 && this.velocity.y <= 0) {
-      if (!this.grounded) { this.landAbsorb = Math.min(1, Math.abs(this.velocity.y) / 10); this.landAge = 0; }
+    floor = this.world.floorAt(this.position.x, this.position.z, oldY, wasGrounded ? T.stepHeight : 0.015 * CHARACTER_SCALE, CHARACTER_RADIUS + 0.001);
+    if (this.position.y <= floor + 0.002 * CHARACTER_SCALE && this.velocity.y <= 0) {
+      if (!this.grounded) { this.landAbsorb = Math.min(1, Math.abs(this.velocity.y) / (10 * CHARACTER_SCALE)); this.landAge = 0; }
       this.position.y = floor;
       this.velocity.y = 0;
       this.grounded = true;
@@ -354,8 +354,8 @@ export class CharacterController extends TrekPlayer {
     const travel = Math.hypot(this.position.x - oldX, this.position.z - oldZ);
     this.speed = travel / dt;
     this.accelSm = THREE.MathUtils.lerp(this.accelSm, (this.speed - oldSpeed) / dt, damp(8, dt));
-    this.turnLean = THREE.MathUtils.lerp(this.turnLean, THREE.MathUtils.clamp(shortestAngle(this.rotation - oldRotation) / dt * this.speed * -0.006, -0.14, 0.14), damp(8, dt));
-    this.strideLen = this.crouched ? 0.85 : THREE.MathUtils.lerp(1.4, 2.4, THREE.MathUtils.smoothstep(this.speed, T.walkSpeed, T.runSpeed));
+    this.turnLean = THREE.MathUtils.lerp(this.turnLean, THREE.MathUtils.clamp(shortestAngle(this.rotation - oldRotation) / dt * this.speed * -0.006 / CHARACTER_SCALE, -0.14, 0.14), damp(8, dt));
+    this.strideLen = this.crouched ? 0.85 * CHARACTER_SCALE : THREE.MathUtils.lerp(1.4 * CHARACTER_SCALE, 2.4 * CHARACTER_SCALE, THREE.MathUtils.smoothstep(this.speed, T.walkSpeed, T.runSpeed));
     if (this.grounded) this.gaitPhase = (this.gaitPhase + travel / this.strideLen * Math.PI * 2) % (Math.PI * 2);
     if (this.speed > 0.02) this.strafeAngle = shortestAngle(Math.atan2(-this.velocity.x, -this.velocity.z) - this.rotation);
     this.lookYaw = THREE.MathUtils.clamp(shortestAngle(yaw - this.rotation), -1.05, 1.05);

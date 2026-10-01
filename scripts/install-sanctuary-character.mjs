@@ -13,7 +13,7 @@ let schema;
 async function getSchema() {
   if (schema) return schema;
   const result = await build({
-    stdin: { contents: `export * from './src/nature3d/engine/characterManifest';`, resolveDir: ROOT },
+    stdin: { contents: `export * from './src/nature3d/engine/characterManifest';\nexport { CHARACTER_HEIGHT } from './src/nature3d/engine/characterConfig';`, resolveDir: ROOT },
     bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
   });
   schema = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
@@ -31,8 +31,22 @@ export function readGlbJson(bytes) {
   return json;
 }
 
+/** The BIN chunk, for measurements that must read real vertex data. */
+export function readGlbBinary(bytes) {
+  readGlbJson(bytes);
+  let offset = 20 + bytes.readUInt32LE(12);
+  while (offset + 8 <= bytes.length) {
+    const length = bytes.readUInt32LE(offset);
+    const type = bytes.readUInt32LE(offset + 4);
+    if (type !== 0x004e4942) { offset += 8 + length; continue; }
+    if (length > bytes.length - offset - 8) throw new Error('GLB BIN chunk is truncated.');
+    return bytes.subarray(offset + 8, offset + 8 + length);
+  }
+  throw new Error('GLB has no BIN chunk; geometry cannot be verified.');
+}
+
 export async function validateCharacterExport(bytes, config, { partial = false } = {}) {
-  const { parseCharacterManifest, ANIMATION_KEYS, BONE_ROLES } = await getSchema();
+  const { parseCharacterManifest, ANIMATION_KEYS, BONE_ROLES, CHARACTER_HEIGHT } = await getSchema();
   const manifest = parseCharacterManifest({ ...config, modelUrl: '/sanctuary/character/character.glb' });
   if (!manifest.licenseConfirmed) throw new Error('Deployment rights must be confirmed.');
   const json = readGlbJson(bytes);
@@ -70,7 +84,7 @@ export async function validateCharacterExport(bytes, config, { partial = false }
   for (const role of BONE_ROLES) {
     if (manifest.boneMap?.[role] && !nodes.some((n, i) => n.name === manifest.boneMap[role] && joints.has(i))) throw new Error(`Bone mapping ${role} does not exist as a skeleton joint in the GLB.`);
   }
-  return { manifest, json, missingOptional: ANIMATION_KEYS.filter(k => !manifest.animationMap[k]) };
+  return { manifest, json, binary: readGlbBinary(bytes), missingOptional: ANIMATION_KEYS.filter(k => !manifest.animationMap[k]) };
 }
 
 async function main(args) {
@@ -93,7 +107,8 @@ async function main(args) {
   const bytes = await fs.readFile(modelFile);
   const config = JSON.parse(await fs.readFile(path.resolve(ROOT, options['--manifest']), 'utf8'));
   const { manifest, json, missingOptional } = await validateCharacterExport(bytes, { ...config, licenseConfirmed: true }, { partial: Boolean(options['--allow-partial']) });
-  const summary = `${json.meshes.length} meshes, ${json.skins.length} skins, ${json.animations.length} clips; normalized to 1.8288 m at runtime.`;
+  const { CHARACTER_HEIGHT } = await getSchema();
+  const summary = `${json.meshes.length} meshes, ${json.skins.length} skins, ${json.animations.length} clips; normalized to ${CHARACTER_HEIGHT.toFixed(4)} m at runtime.`;
   if (options['--check-only']) { console.log(`VALID: ${summary}${missingOptional.length ? ` Partial motions: ${missingOptional.join(', ')}` : ''}`); return; }
   const dest = path.resolve(ROOT, options['--dest'] ?? 'public/sanctuary/character');
   const relative = path.relative(ROOT, dest);

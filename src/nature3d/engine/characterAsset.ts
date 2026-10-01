@@ -1,13 +1,23 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { damp } from "./controls";
-import { CHARACTER_HEIGHT } from "./characterConfig";
+import { CHARACTER_HEIGHT, CHARACTER_SCALE } from "./characterConfig";
 import { terrainNormal } from "./terrain";
 import type { TrekAvatar, TrekPlayer } from "./trekAvatar";
 
 import { ANIMATION_KEYS, readCharacterManifest, type AnimationKey, type CharacterManifest, type CharacterAssetStatus } from "./characterManifest";
 export { ANIMATION_KEYS, BONE_ROLES, FALLBACK_CHARACTER_STATUS, parseCharacterManifest } from "./characterManifest";
 export type { AnimationKey, CharacterManifest, CharacterAssetStatus } from "./characterManifest";
+
+/**
+ * Y rotation that turns the model's own forward axis onto the runtime travel
+ * axis. The controller/camera read "forward" as -Z at zero yaw, so a GLB
+ * whose face looks down +Z must be turned half a circle; otherwise the
+ * character walks backwards and every arm swing reads in reverse.
+ */
+export function characterFacingYaw(modelForward: "-Z" | "+Z"): number {
+  return modelForward === "+Z" ? Math.PI : 0;
+}
 
 /** Remove horizontal root translation: physics is authoritative, never double-move. */
 export function inPlaceClip(source: THREE.AnimationClip, rootNames: ReadonlySet<string> = new Set()): THREE.AnimationClip {
@@ -47,8 +57,8 @@ class ExportedFootIK {
     hip.getWorldPosition(this.h); knee.getWorldPosition(this.k); foot.getWorldPosition(this.f);
     foot.getWorldQuaternion(this.footQ);
     const ground = player.groundAt(this.f.x, this.f.z) + soleOffset;
-    const offset = THREE.MathUtils.clamp(ground - this.f.y, -0.2, 0.25);
-    if (Math.abs(offset) < 0.003) return;
+    const offset = THREE.MathUtils.clamp(ground - this.f.y, -0.2 * CHARACTER_SCALE, 0.25 * CHARACTER_SCALE);
+    if (Math.abs(offset) < 0.003 * CHARACTER_SCALE) return;
     this.t.copy(this.f); this.t.y += offset;
     const thigh = this.h.distanceTo(this.k);
     const calf = this.k.distanceTo(this.f);
@@ -139,7 +149,7 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
   }
   const group = new THREE.Group(); group.name = "sanctuary-character";
   const model = gltf.scene;
-  model.rotation.y = manifest.modelForward === "+Z" ? Math.PI : 0;
+  model.rotation.y = characterFacingYaw(manifest.modelForward);
   group.add(model);
   const bounds = new THREE.Box3().setFromObject(model);
   const height = bounds.max.y - bounds.min.y;
@@ -183,7 +193,9 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
   // distance after normalization; forcing an ankle to ground clips the boot.
   group.updateMatrixWorld(true);
   const soleProbe = new THREE.Vector3();
-  const soleOffset = (foot: THREE.Bone | undefined) => foot ? THREE.MathUtils.clamp(foot.getWorldPosition(soleProbe).y, 0.02, 0.28) : 0.035;
+  const soleOffset = (foot: THREE.Bone | undefined) => foot
+    ? THREE.MathUtils.clamp(foot.getWorldPosition(soleProbe).y, 0.02 * CHARACTER_SCALE, 0.28 * CHARACTER_SCALE)
+    : 0.035 * CHARACTER_SCALE;
   const leftSoleOffset = soleOffset(left[2]), rightSoleOffset = soleOffset(right[2]);
   const ik = new ExportedFootIK();
   const aimQ = new THREE.Quaternion(); const parentQ = new THREE.Quaternion(); const worldQ = new THREE.Quaternion();
@@ -252,7 +264,7 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
       group.updateMatrixWorld(true);
       aim(chest, player, 0.25); aim(head, player, 0.7);
       ikClock += dt;
-      if (player.grounded && camera.position.distanceToSquared(group.position) < 900 && ikClock >= (lowEnd ? 1 / 15 : 1 / 30)) {
+      if (player.grounded && camera.position.distanceToSquared(group.position) < (30 * CHARACTER_SCALE) ** 2 && ikClock >= (lowEnd ? 1 / 15 : 1 / 30)) {
         ikClock = 0;
         if (left.every(Boolean)) ik.apply(left[0]!, left[1]!, left[2]!, player, leftSoleOffset);
         if (right.every(Boolean)) ik.apply(right[0]!, right[1]!, right[2]!, player, rightSoleOffset);
@@ -261,5 +273,5 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
     dispose() { mixer.stopAllAction(); mixer.uncacheRoot(model); disposeAssets(); group.removeFromParent(); group.clear(); },
   };
   const missing = ANIMATION_KEYS.filter(key => !manifest.animationMap[key]);
-  return { avatar, status: { kind: "imported", label: `${manifest.label} · 6 ft`, detail: `Licensed character-only GLB; web movement/camera. Native Unreal cloth/ragdoll/Blueprints are not running.${missing.length ? ` Missing optional motions: ${missing.join(", ")}.` : ""}` } };
+  return { avatar, status: { kind: "imported", label: `${manifest.label} · 18 ft`, detail: `Licensed character-only GLB; web movement/camera. Native Unreal cloth/ragdoll/Blueprints are not running.${missing.length ? ` Missing optional motions: ${missing.join(", ")}.` : ""}` } };
 }

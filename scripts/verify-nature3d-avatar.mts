@@ -1,4 +1,4 @@
-// Smoke harness for the REAL six-foot player and visual rig.
+// Smoke harness for the REAL eighteen-foot player and visual rig.
 // Detailed behavior/asset/browser regressions: npm run test:sanctuary:character
 // Run this alongside the existing shader/world harnesses via verify-nature3d.sh.
 import * as THREE from "three";
@@ -14,7 +14,7 @@ function check(name: string, ok: boolean, detail = "") {
 }
 const avatar = createTrekAvatar(false);
 const box = new THREE.Box3().setFromObject(avatar.group);
-check("rig: neutral mesh is exactly six feet", Math.abs(box.getSize(new THREE.Vector3()).y - CHARACTER_HEIGHT) < 1e-6);
+check("rig: neutral mesh is exactly eighteen feet", Math.abs(box.getSize(new THREE.Vector3()).y - CHARACTER_HEIGHT) < 1e-6);
 check("rig: standing, explicitly procedural, never the original Unreal character", !avatar.seated && avatar.group.userData.characterSource === "procedural");
 let triangles = 0, meshes = 0;
 const materials = new Set<THREE.Material>();

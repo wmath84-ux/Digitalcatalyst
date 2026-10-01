@@ -299,11 +299,11 @@ class Export:
                   "triangles": sum(s["triangles"] for s in sections if not s["disabled"]), "materials": len(slots), "bones": len(bones),
                   "originalAnimations": len(self.j["animations"]), "maxSourceInfluences": max_influences, "textures": self.texture_report,
                   "sourceBoundsCm": bounds, "sourceTextureChannels": "BGRA decoded to RGBA; DirectX normals green flipped for glTF",
-                  "sourceDirection": "Original -Y converted to -Z", "environmentImported": False, "clothPhysicsPorted": False, "nativeAnimationGraphsPorted": False}
+                  "sourceDirection": "Original -Y converted to +Z (the runtime rotates +Z models onto its -Z travel axis)", "environmentImported": False, "clothPhysicsPorted": False, "nativeAnimationGraphsPorted": False}
         tag = "full" if self.all else "runtime"
         (self.output / (tag+"-export-report.json")).write_text(json.dumps(report, indent=2)+"\n")
         (self.output / (tag+"-animations.json")).write_text(json.dumps(self.animation_report, indent=2)+"\n")
-        manifest = {"version": 1, "label": "Original Katiusza", "modelUrl": "/sanctuary/character/character.glb", "modelForward": "-Z",
+        manifest = {"version": 1, "label": "Original Katiusza", "modelUrl": "/sanctuary/character/character.glb", "modelForward": "+Z",
                     "licenseConfirmed": False, "animationMap": MOTIONS, "boneMap": BONES,
                     "source": {"repository": "https://github.com/VeryHotShark/RealisticThirdPersonCharacter", "commit": PIN,
                                "engine": "Unreal Engine 5.1", "conversion": "Actual original editor-source mesh/rig/outfit/textures/keys, not a generated likeness",

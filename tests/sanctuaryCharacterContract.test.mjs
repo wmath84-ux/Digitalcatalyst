@@ -86,3 +86,58 @@ test('the installed original GLB is the real source model and passes the install
   }
   assert.ok(json.nodes.some(n => n.name === 'spine_03' && !n.mesh), 'original skeleton retained');
 });
+test('the installed character faces its direction of travel, measured from the real mesh', async () => {
+  const manifest = JSON.parse(read('public/sanctuary/character/manifest.json'));
+  const bytes = readFileSync(new URL('../public/sanctuary/character/character.glb', import.meta.url));
+  const { json, binary } = await validateCharacterExport(bytes, manifest);
+  const parents = new Map();
+  json.nodes.forEach((node, index) => (node.children ?? []).forEach(child => parents.set(child, index)));
+  const meshNode = json.nodes.findIndex(node => node.mesh === 0);
+  assert.ok(meshNode >= 0, 'the export must contain the character mesh node');
+  const chain = [];
+  for (let index = meshNode; index !== undefined; index = parents.get(index)) chain.push(index);
+  const rotate = (v, q) => {
+    const [x, y, z, w] = q;
+    const ix = w * v.x + y * v.z - z * v.y, iy = w * v.y + z * v.x - x * v.z;
+    const iz = w * v.z + x * v.y - y * v.x, iw = -x * v.x - y * v.y - z * v.z;
+    return { x: ix * w + iw * -x + iy * -z - iz * -y,
+             y: iy * w + iw * -y + iz * -x - ix * -z,
+             z: iz * w + iw * -z + ix * -y - iy * -x };
+  };
+  const centroid = (pattern) => {
+    const slot = json.materials.findIndex(material => pattern.test(material.name ?? ''));
+    assert.ok(slot >= 0, `original ${pattern} material slot is missing`);
+    const primitive = json.meshes[0].primitives.find(p => p.material === slot);
+    const accessor = json.accessors[primitive.attributes.POSITION];
+    const view = json.bufferViews[accessor.bufferView];
+    assert.equal(accessor.componentType, 5126, 'positions must be float'); assert.equal(accessor.type, 'VEC3');
+    const stride = view.byteStride ?? 12;
+    const offset = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+    let x = 0, y = 0, z = 0;
+    for (let i = 0; i < accessor.count; i++) {
+      x += binary.readFloatLE(offset + i * stride);
+      y += binary.readFloatLE(offset + i * stride + 4);
+      z += binary.readFloatLE(offset + i * stride + 8);
+    }
+    return { x: x / accessor.count, y: y / accessor.count, z: z / accessor.count };
+  };
+  const toNodeSpace = (v) => {
+    for (const index of chain) { const q = json.nodes[index].rotation; if (q) v = rotate(v, q); }
+    return v;
+  };
+  // MEASURED, not assumed: the eyes lead the skull, and the left boot is on
+  // the character's own left. Both are read from the deployed vertex data.
+  const face = toNodeSpace((({ x, z }) => ({ x, y: 0, z }))(centroid(/eye/i)));
+  const skull = toNodeSpace((({ x, z }) => ({ x, y: 0, z }))(centroid(/^head/i)));
+  const faceAxis = Math.sign((face.x - skull.x) || (face.z - skull.z));
+  const left = toNodeSpace((({ x, z }) => ({ x, y: 0, z }))(centroid(/^ButL/i)));
+  const right = toNodeSpace((({ x, z }) => ({ x, y: 0, z }))(centroid(/^ButR/i)));
+  const leftAxis = Math.sign((left.x - right.x) || (left.z - right.z));
+  assert.equal(faceAxis, 1, `the face must look down the GLB +Z axis (measured ${JSON.stringify(face)})`);
+  assert.equal(leftAxis, 1, `the left boot must sit on +X in the GLB (measured ${JSON.stringify(left)})`);
+  // characterAsset rotates a +Z model by PI; the result must be the -Z axis
+  // the controller calls "forward", and left/right must not be mirrored.
+  const flip = manifest.modelForward === '+Z' ? -1 : 1;
+  assert.equal(faceAxis * flip, -1, 'the face must point along -Z, the direction of travel');
+  assert.equal(leftAxis * flip, -1, 'the character left side must stay on the runtime left (-X)');
+});

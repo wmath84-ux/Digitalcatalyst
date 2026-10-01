@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CHARACTER_HEIGHT, CHARACTER_SCALE, COVER_CROUCH_HEIGHT, COVER_LOW_HEIGHT } from "./characterConfig";
 
 export interface ColliderBase {
   id: string;
@@ -202,12 +203,12 @@ export class CharacterCollisionWorld {
   }
 
   /** An authored box face is a straight cover path (same input semantics as UE). */
-  findCover(position: THREE.Vector3, bodyRadius: number, reach = 1.6): CoverContact | null {
+  findCover(position: THREE.Vector3, bodyRadius: number, reach = 1.6 * CHARACTER_SCALE): CoverContact | null {
     let result: CoverContact | null = null;
     let best = reach;
     for (const item of this.nearby(position.x, position.z)) {
       const c = item.source;
-      if (c.kind !== "box" || !c.cover || c.height < 0.6 || position.y > c.baseY + 0.5) continue;
+      if (c.kind !== "box" || !c.cover || c.height < 0.6 * CHARACTER_SCALE || position.y > c.baseY + 0.5 * CHARACTER_SCALE) continue;
       const dx = position.x - c.x;
       const dz = position.z - c.z;
       const lx = dx * item.cos - dz * item.sin;
@@ -219,20 +220,21 @@ export class CharacterCollisionWorld {
         const alongHalf = xFace ? c.halfZ : c.halfX;
         if (alongHalf <= bodyRadius) continue;
         const along = THREE.MathUtils.clamp(xFace ? lz : lx, -alongHalf + bodyRadius, alongHalf - bodyRadius);
-        const ax = xFace ? sign * (half + bodyRadius + 0.04) : along;
-        const az = xFace ? along : sign * (half + bodyRadius + 0.04);
+        const ax = xFace ? sign * (half + bodyRadius + 0.04 * CHARACTER_SCALE) : along;
+        const az = xFace ? along : sign * (half + bodyRadius + 0.04 * CHARACTER_SCALE);
         const dist = Math.hypot(ax - lx, az - lz);
         if (dist >= best) continue;
         const normalX = xFace ? sign * item.cos : sign * item.sin;
         const normalZ = xFace ? -sign * item.sin : sign * item.cos;
         const tangentX = xFace ? item.sin : item.cos;
         const tangentZ = xFace ? item.cos : -item.sin;
-        const anchorX = c.x + normalX * (half + bodyRadius + 0.04);
-        const anchorZ = c.z + normalZ * (half + bodyRadius + 0.04);
-        if (!this.canOccupy(anchorX + tangentX * along, position.y, anchorZ + tangentZ * along, bodyRadius, c.height < 1.45 ? 1.08 : 1.8288)) continue;
+        const anchorX = c.x + normalX * (half + bodyRadius + 0.04 * CHARACTER_SCALE);
+        const anchorZ = c.z + normalZ * (half + bodyRadius + 0.04 * CHARACTER_SCALE);
+        const coverHeight = c.height < COVER_LOW_HEIGHT ? COVER_CROUCH_HEIGHT : CHARACTER_HEIGHT;
+        if (!this.canOccupy(anchorX + tangentX * along, position.y, anchorZ + tangentZ * along, bodyRadius, coverHeight)) continue;
         best = dist;
         result = { collider: c, normalX, normalZ, tangentX, tangentZ, anchorX, anchorZ,
-          min: -alongHalf + bodyRadius, max: alongHalf - bodyRadius, along, low: c.height < 1.45 };
+          min: -alongHalf + bodyRadius, max: alongHalf - bodyRadius, along, low: c.height < COVER_LOW_HEIGHT };
       }
     }
     return result;

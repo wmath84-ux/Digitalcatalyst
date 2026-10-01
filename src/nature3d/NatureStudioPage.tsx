@@ -675,7 +675,7 @@ export default function NatureStudioPage() {
       : characterMode !== "orbit" ? "walk" : (activeBoard ?? activeView ?? "world");
 
   const dockItems: GlassDockItem[] = useMemo(() => [
-    { id: "walk", label: "Walk & run · 6 ft character", icon: Footprints as any, color: "#86EFAC", active: activeDockId === "walk" },
+    { id: "walk", label: "Walk & run · 18 ft character", icon: Footprints as any, color: "#86EFAC", active: activeDockId === "walk" },
     ...BOARD_VIEWS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#10B981", active: activeDockId === key })),
     ...PRESETS.map(({ key, label, Icon }) => ({ id: key, label, icon: Icon as any, color: "#38BDF8", active: activeDockId === key })),
     { id: "module", label: "My modules", icon: Layers3 as any, color: "#8B5CF6", active: activeDockId === "module" },

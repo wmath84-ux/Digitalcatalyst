@@ -675,11 +675,15 @@ test("Safari is removed from navigation, scene lifecycle and the height field", 
   assert.doesNotMatch(read("src/nature3d/engine/regions.ts"), /SAFARI|id: "safari"/);
 });
 
-test("the playable character uses metre-scale six-foot dimensions and a 4m spring arm", () => {
-  assert.match(CHARACTER_CONFIG, /CHARACTER_HEIGHT = 6 \* 0\.3048/);
-  assert.match(CHARACTER_CONFIG, /walkSpeed: 2\.2/);
-  assert.match(CHARACTER_CONFIG, /runSpeed: 5/);
-  assert.match(CHARACTER_CONFIG, /cameraDistance: 4/);
+test("the playable character uses metre-scale eighteen-foot dimensions and a body-scaled spring arm", () => {
+  assert.match(CHARACTER_CONFIG, /CHARACTER_HEIGHT = 6 \* 0\.3048 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /CHARACTER_SCALE = 3/);
+  assert.match(CHARACTER_CONFIG, /cameraDistance: 3\.4 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /cameraMinDistance: 1\.8 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /cameraMaxDistance: 8 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /walkSpeed: 2\.2 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /runSpeed: 5 \* CHARACTER_SCALE/);
+  assert.match(CHARACTER_CONFIG, /jumpVelocity: 7 \* CHARACTER_SCALE/);
   assert.match(CHARACTER_CONFIG, /simulationStep: 1 \/ 120/);
 });
 
