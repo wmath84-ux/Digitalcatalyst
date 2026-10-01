@@ -7,7 +7,6 @@ import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
-import { useBranding } from "../context/BrandingContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
@@ -87,7 +86,6 @@ const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): 
 
 export default function ProfileApp() {
   const { user, logout, updateAccount } = useAuth();
-  const { appName } = useBranding();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
   // Full product ownership from the canonical entitlements collection.
@@ -303,7 +301,6 @@ export default function ProfileApp() {
             referral={referralCode ? {
               code: referralCode,
               used: referralUsed,
-              appName,
               onCopy: () => void navigator.clipboard?.writeText(referralCode),
             } : null}
             renewal={membership.subscriber && membership.subscription ? {
@@ -322,7 +319,7 @@ export default function ProfileApp() {
                 onSubscribe={openPlans}
               />
             }
-            aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
+            aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} material="home" compact /> : null}
             onOpenStudyLibrary={() => { window.location.hash = "#/study-library"; }}
             library={{
               items: purchasedProducts.map((p) => ({ id: p.id, title: p.title, image: p.image })),

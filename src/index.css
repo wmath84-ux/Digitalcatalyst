@@ -3478,12 +3478,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   width: 100%;
 }
 
-/* The gradient hero should never inherit a card border or a competing
-   shadow — keep it a full-bleed branded banner on every viewport. */
+/* Owner brief 2026-09-30 (owner: "home page ke card ka design … profile ke
+   cards per apply karo"): the hero is a Home card now, so it takes the Home
+   plate's radius (24px, written by ProfileCard) and the plate's own shadow
+   from glass.css. The old indigo glow and the clamp() radius that made the
+   hero a different shape from every other card on the page are gone. */
 [data-profile-hero] {
   border: 0 !important;
-  box-shadow: 0 20px 50px -24px rgba(79, 70, 229, 0.55) !important;
-  border-radius: clamp(1.25rem, 2vw, 1.75rem) !important;
 }
 
 /* ── Tablet portrait (640–959 px) ──────────────────────────────────────
@@ -3537,9 +3538,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
   [data-profile-col="main"] { grid-column: span 7; }
   [data-profile-col="side"] { grid-column: span 5; }
-  [data-profile-layout] :is(section, [data-profile-hero]) {
-    border-radius: 16px;
-  }
+  /* The 16px radius re-skin for `section` / hero at this breakpoint is gone:
+     every Profile card is the Home plate at Home's 24px radius (brief
+     2026-09-30), and a per-breakpoint radius would make the same card change
+     shape when the tablet rotates. */
   [data-profile-page] [data-site-header],
   [data-profile-page] [data-site-footer],
   [data-profile-page] [data-site-footer-nav] {
@@ -3586,9 +3588,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-layout] > [data-profile-stats] {
     grid-column: 1 / -1;
   }
-  [data-profile-layout] > header h1 {
-    font-size: clamp(1.4rem, 1.8vw, 1.75rem) !important;
-  }
+  /* No `h1` size override here any more: the page title wears Home's greeting
+     type (`.dc-profile-title`) at every breakpoint (brief 2026-09-30). */
   [data-profile-col="main"] { grid-column: span 7; }
   [data-profile-col="side"] { grid-column: span 5; }
   [data-profile-page] [data-site-header],
@@ -5031,13 +5032,9 @@ html[data-nature-studio-active="true"] {
     margin-top: 12px !important;
   }
 
-  /* Page header: smaller headline + tagline */
-  [data-profile-layout] > header h1 {
-    font-size: 1.4rem !important;
-  }
-  [data-profile-layout] > header p {
-    font-size: 0.75rem !important;
-  }
+  /* Page header: the title is Home's greeting type (`.dc-profile-title`) on
+     every breakpoint and there is no tagline line left to shrink (brief
+     2026-09-30). */
 
   /* Quick stats → row of square tiles (3-across even in the narrow
      container-query band, where the last tile would otherwise span two

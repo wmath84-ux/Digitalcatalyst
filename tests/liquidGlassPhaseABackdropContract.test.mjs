@@ -249,7 +249,10 @@ test("A3: profile + settings paint no opaque white / gradient surface; cards, ac
   const layout = read("src/profile/ProfileLayout.tsx");
   assert.match(layout, /<ProfileCard data-profile-hero/);
   assert.match(layout, /<ProfileCard data-profile-membership-tier/);
-  assert.match(layout, /<ProfileCard data-renewal-card/);
+  // Brief 2026-09-30: membership + renewal are ONE card now (they said the
+  // same thing twice), so the renewal hooks sit on that same pack surface
+  // instead of a second `<ProfileCard data-renewal-card>` element.
+  assert.match(layout, /data-renewal-card/);
   assert.match(layout, /<GlassButton variant="capsule"/);
   assert.match(layout, /<DialogContent/);
   assert.match(layout, /<GlassSwitch/);

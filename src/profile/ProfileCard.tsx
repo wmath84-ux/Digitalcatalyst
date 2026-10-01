@@ -3,24 +3,34 @@ import { GlassSurface } from "../components/ui/glass";
 import { cn } from "@/lib/utils";
 
 /**
- * The Profile page's one card material — the STORE's light-blue glass lens
- * (owner brief 2026-09-30: "Store page ka design aur specification card
- * design profile page par transfer karo — professional, clean, classic").
+ * The Profile page's one card material — the HOME page's card (owner brief
+ * 2026-09-30: "home page ke card ka design look badhiya lagta hai … vahi
+ * exactly hi look aur design profile ke cards per apply karo").
  *
- * Identical recipe to the store hero + product cards: `.dc-store-glass`
- * (src/store-glass.css — blur 46%, rgb(173,216,255) @ 26%), radius 22, the
- * `.dc-scene-ink` scrim so white copy survives the bright scene, and the
- * `.dc-profile-card` hook for the profile type scale.
+ * Byte-for-byte the surface every Home card paints: `GlassSurface` at the
+ * pinned docs sensitivity the Home tiles / Continue Learning / review cards
+ * use — tint 0.25 · blur 0 · radius 24 — wearing `.dc-scene-plate` (the navy
+ * contrast plate in src/glass.css) plus the Profile type ramp
+ * (src/profile-glass.css).
+ *
+ * No scrim class: `.dc-scene-ink` belongs to the copy that sits on the scene
+ * with no surface under it (Home's section headings). glass.css already lifts
+ * the muted utilities inside a plate, so a Profile card reads exactly like a
+ * Home card without one.
+ *
+ * Padding is the card's own (Home's review cards use p-4), so every call site
+ * gets the same interior rhythm and a card that needs more can still override
+ * with `contentClassName`.
  */
-export function ProfileCard({ className, ...props }: ComponentProps<typeof GlassSurface>) {
+export function ProfileCard({ className, contentClassName, ...props }: ComponentProps<typeof GlassSurface>) {
   return (
     <GlassSurface
-      tint={0.62}
-      tintColor="173,216,255"
+      tint={0.25}
       blur={0}
-      radius={22}
+      radius={24}
       {...props}
-      className={cn("dc-store-glass dc-scene-ink dc-profile-card", className)}
+      className={cn("dc-scene-plate dc-profile-card text-white", className)}
+      contentClassName={cn("p-4", contentClassName)}
     />
   );
 }

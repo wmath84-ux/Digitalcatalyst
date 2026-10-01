@@ -36,29 +36,27 @@ export default function ProfilePreview() {
 
   // Mock slots to represent the account cards that live in the real app.
   const mockMyDayCard = (
-    <ProfileCard className="text-white" contentClassName="p-5">
+    <ProfileCard>
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">My Day</p>
-          <h3 className="mt-0.5 text-base font-bold text-white">3 free creations left today</h3>
-          <p className="mt-0.5 text-xs font-medium text-white/55">Resets at midnight.</p>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
+        <div className="min-w-0">
+          <p className="dc-profile-card-title">My Day</p>
+          <p className="dc-profile-card-meta mt-0.5">3 free creations left today · resets at midnight.</p>
         </div>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/15">
-        <div className="h-full w-1/4 rounded-full bg-emerald-600" />
+      <div className="dc-profile-bar mt-3">
+        <div className="h-full w-1/4 rounded-full bg-emerald-500" />
       </div>
     </ProfileCard>
   );
 
   const mockAiQuotaCard = subscriber ? (
-    <ProfileCard className="text-white" contentClassName="p-5">
+    <ProfileCard>
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">AI quota</p>
-          <h3 className="mt-0.5 text-base font-bold text-white">9 AI questions remaining</h3>
-          <p className="mt-0.5 text-xs font-medium text-white/55">Resets weekly.</p>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
+        <div className="min-w-0">
+          <p className="dc-profile-card-title">AI quota</p>
+          <p className="dc-profile-card-meta mt-0.5">9 AI questions remaining · resets weekly.</p>
         </div>
       </div>
     </ProfileCard>
@@ -126,7 +124,6 @@ export default function ProfilePreview() {
             referral={{
               code: "AARAV24",
               used: false,
-              appName: "Eduvora",
               onCopy: () => undefined,
             }}
             renewal={subscriber && plan ? { tier, subscription: plan, now: Date.now(), onRenew: () => undefined, onToggleReminders: () => undefined } : null}

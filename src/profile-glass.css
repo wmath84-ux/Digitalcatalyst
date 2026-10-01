@@ -1,0 +1,114 @@
+/* ══ THE PROFILE PAGE'S CARDS — HOME'S CARD, HOME'S TYPE ═══════════════════
+   Owner brief, 2026-09-30:
+
+     "Mujhe home page ke card ka design look badhiya lagta hai kya tum vahi
+      exactly hi look aur design card ka profile ke cards per apply kar sakte
+      ho and profile page ki sabhi card ko ekadam badhiya look de sakte ho
+      text design bhi exactly jaisa home page ka hai vaise hi profile page ka
+      ho jaaye and abhi bahut jyada text har profile page per to ekadam clean
+      professional aur classic look do profile page ko."
+
+   So the Profile page stops borrowing the Store's light-blue lens and takes
+   HOME'S card — the material every card on the Home page already wears:
+
+     · material  `.dc-scene-plate` (src/glass.css) — the navy contrast plate
+                 Home's product tiles, "Continue Learning" cards and review
+                 cards paint, at the pinned docs sensitivity the Home cards
+                 use: tint 0.25 · blur 0 · radius 24.
+     · scrim     NONE inside a card. `.dc-scene-ink` (Home's soft text-shadow)
+                 is for the copy that sits on the scene with no surface under
+                 it — Home's section headings, "View All", the counters — and
+                 glass.css lifts the muted utilities inside a plate already.
+                 The Profile keeps that rule: no scrim class on a card.
+     · type      Home's card scale, pinned once here so every Profile card
+                 reads exactly like a Home card (see the ramp below).
+
+   Loaded AFTER glass.css + store-glass.css (see src/main.tsx): it only re-inks
+   and re-sizes Profile copy, it never re-paints the plate.
+
+   `?glass=off` needs no rule of its own: the plate's own fallback in glass.css
+   (the pack tint the surface still carries) keeps the cards readable.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── The page heading ───────────────────────────────────────────────────────
+   Home's greeting (`[data-home-greeting]`, src/home/components/Header.tsx) at
+   its exact numbers. The Profile page title wears the same type — one step
+   below the old clamp(1.7rem, 7vw, 2.5rem) display size, which is what made
+   the page shout before any of its cards were read. */
+.dc-profile-title {
+  font-size: clamp(0.875rem, 4.8vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+/* ── The card type ramp ─────────────────────────────────────────────────────
+   Four steps, copied from the Home page's cards:
+
+     · title   Home card titles are `text-sm font-semibold text-white/85`
+               (Continue Learning, Loved by Learners). Inside a plate glass.css
+               lifts /85 to rgba(255,255,255,.93) — the value pinned here.
+     · meta    Home's `text-xs text-white/55` / tile `text-[11px] text-white/55`
+               line — lifted to rgba(255,255,255,.76) inside a plate.
+     · note    Home's review body `text-[12.5px] leading-relaxed text-white/75`
+               — lifted to rgba(255,255,255,.88).
+     · accent  Home's `text-[11px] font-semibold text-indigo-300`.
+   ─────────────────────────────────────────────────────────────────────────── */
+.dc-profile-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.93);
+}
+
+.dc-profile-card-meta {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.dc-profile-card-note {
+  font-size: 0.78125rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.dc-profile-card-accent {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #a5b4fc;
+}
+
+/* Values (the quick stats, a plan count) are Home's bold card numbers. */
+.dc-profile-card-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+/* ── The progress track ─────────────────────────────────────────────────────
+   Home's "Continue Learning" bar, exactly: a 6px rounded track with a 1px
+   white/15 rim and a solid indigo fill. Used by the membership card and the
+   My Day allowance card so one bar shape appears across the page. */
+.dc-profile-bar {
+  height: 0.375rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dc-profile-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #6366f1; /* indigo-500 — Home's fill */
+  transition: width 0.5s ease;
+}

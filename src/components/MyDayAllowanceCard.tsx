@@ -8,16 +8,20 @@
 // account/allowance cards (membership, renewal, AI allowance) where usage
 // information belongs, using the same server-authoritative snapshot.
 //
-// Material (owner brief 2026-09-29, cart card → profile): the Cart
-// empty-state card's bare <GlassSurface> — radius 32, pack defaults, no
-// re-skin class, no text scrim. This card renders on the Profile page only.
+// Material (owner brief 2026-09-30, Home card → profile): this card imports
+// the Profile page's `ProfileCard`, which IS the Home page's card — the navy
+// `.dc-scene-plate` at the pinned docs sensitivity (tint 0.25 · blur 0 ·
+// radius 24) — so it follows the page automatically. The card's copy wears the
+// same Home card ramp as every other Profile card, and the state paragraphs
+// were cut to one line each (the badge, the bar and the reset line right above
+// them already carried the numbers). This card renders on the Profile page
+// only.
 
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
   CalendarClock,
-  CircleCheck,
   Clock3,
   RefreshCw,
   Sparkles,
@@ -39,15 +43,6 @@ function formatCountdown(ms: number): string {
 function formatResetClock(resetAt: number): string {
   if (!resetAt) return "midnight";
   return new Date(resetAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div className={`rounded-2xl p-3 text-center ring-1 ${tone}`}>
-      <p className="text-[9px] font-black uppercase tracking-wider text-white/55">{label}</p>
-      <p className="mt-1 truncate text-xs font-black text-white">{value}</p>
-    </div>
-  );
 }
 
 type Props = {
@@ -109,13 +104,17 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         ? "Today’s free allowance is used"
         : `${freeRemaining} of ${freeLimit} free creation${freeLimit === 1 ? "" : "s"} left today`;
 
+  // Owner brief 2026-09-30 (Profile page → "ekadam clean professional"): one
+  // short line per state. The old paragraphs repeated the badge, the bar and
+  // the reset line that sit directly above them, and the unlimited state said
+  // the same thing twice (its own panel + this line).
   const description = unlimited
-    ? "Your plan includes unlimited tasks, schedule blocks, reminders and quick notes — create as much as your day needs."
+    ? ""
     : browseOnlyPlan
-      ? "Your pages stay open to read and plan with. Subscribe to start creating tasks, schedule blocks, reminders and notes again."
+      ? "Reading stays open — subscribe to create tasks, notes and reminders again."
       : exhausted
-        ? "Your saved pages stay fully browseable. The allowance refills automatically at the daily reset, or subscribe for unlimited creation."
-        : "Spend it on a task, schedule item, note or reminder. After the daily allowance is used, My Day remains browse-only until reset.";
+        ? "Saved pages stay readable. The allowance refills at the next reset."
+        : "One creation per task, note or reminder. After that, My Day remains browse-only until reset.";
 
   const resetIn = resetAt > now ? formatCountdown(resetAt - now) : "now";
 
@@ -126,15 +125,15 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
       aria-live="polite"
       className="relative"
     >
-      <GlassSurface className="text-white" contentClassName="p-5 lg:p-3.5">
+      <GlassSurface contentClassName="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white lg:h-9 lg:w-9 lg:rounded-xl">
-              {unlimited ? <Zap className="h-6 w-6" /> : <CalendarClock className="h-6 w-6" />}
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white">
+              {unlimited ? <Zap className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300">My Day allowance</p>
-              <h3 data-myday-allowance-headline className="mt-1 text-lg font-bold leading-tight text-white">
+              <p className="dc-profile-card-accent">My Day allowance</p>
+              <h3 data-myday-allowance-headline className="dc-profile-card-title mt-0.5">
                 {resolved ? headline : "Checking today’s allowance…"}
               </h3>
             </div>
@@ -173,64 +172,55 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             )}
           </div>
         ) : unlimited ? (
-          <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-violet-400/30 bg-violet-500/15 p-4">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" />
-            <p className="text-xs font-bold leading-5 text-white/85">
-              Tasks, schedule, reminders and notes all save to your account without a daily cap.
-            </p>
-          </div>
+          <p className="dc-profile-card-meta mt-3 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-300" />
+            No daily cap on tasks, schedule, reminders or notes.
+          </p>
         ) : (
           <>
-            <div className="mt-5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
+            <div className="mt-3">
+              <div className="dc-profile-card-meta flex items-center justify-between">
                 <span>Today · {freeLimit > 0 ? `${freeUsed} / ${freeLimit} used` : "no free creations"}</span>
                 <span className={exhausted || browseOnlyPlan ? "text-amber-200" : "text-indigo-200"}>
                   {browseOnlyPlan ? "Subscribers only" : `${freeRemaining} left`}
                 </span>
               </div>
-              <div className="mt-2 h-2.5 overflow-hidden rounded-full border border-white/15">
+              <div className="dc-profile-bar mt-1.5">
                 <div
                   data-myday-allowance-bar
-                  className={`h-full rounded-full transition-all duration-500 ${browseOnlyPlan ? "bg-white/40" : exhausted ? "bg-amber-500" : "bg-indigo-600"}`}
+                  className={`h-full rounded-full transition-all duration-500 ${browseOnlyPlan ? "bg-white/40" : exhausted ? "bg-amber-500" : "bg-indigo-500"}`}
                   style={{ width: `${Math.max(6, usedPercent)}%` }}
                 />
               </div>
             </div>
 
-            {/* A browse-only plan has nothing to count or reset, so the
-                per-day numbers are replaced by the single fact that matters. */}
+            {/* A browse-only plan has nothing to count or reset, so the reset
+                line is the single fact that matters. */}
             {browseOnlyPlan ? null : (
-              <>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Stat label="Used" value={`${freeUsed}`} tone="ring-white/15" />
-                  <Stat label="Left" value={`${freeRemaining}`} tone="ring-white/15" />
-                  <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="ring-white/15" />
-                </div>
-
-                <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-white/55">
-                  <Clock3 className="h-3.5 w-3.5 shrink-0" /> Fresh allowance in {resetIn} · counted in your own time zone.
-                </p>
-              </>
+              <p className="dc-profile-card-meta mt-2 flex items-center gap-1.5">
+                <Clock3 className="h-3.5 w-3.5 shrink-0" />
+                Resets in {resetIn}{resetAt ? ` · ${formatResetClock(resetAt)}` : ""}
+              </p>
             )}
           </>
         )}
 
-        {resolved ? <p className="mt-4 text-xs leading-5 text-white/75">{description}</p> : null}
+        {resolved && description ? <p className="dc-profile-card-meta mt-2">{description}</p> : null}
 
         {error && resolved ? (
-          <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-amber-500/15 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-200">
+          <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold leading-5 text-amber-200">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Last verified allowance is shown. {error}
           </p>
         ) : null}
 
-        <div className="mt-4 grid gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
             data-myday-allowance-open
             onClick={onOpenMyDay}
-            className="flex items-center justify-center gap-2 rounded-full bg-indigo-600 py-3.5 text-sm font-black text-white transition hover:bg-indigo-500 active:scale-[0.99]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-500 active:scale-[0.99]"
           >
-            Open My Day <ArrowRight className="h-4 w-4" />
+            Open My Day <ArrowRight className="h-3.5 w-3.5" />
           </button>
           {resolved && !unlimited && (
             <GlassButton
@@ -238,9 +228,9 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
               type="button"
               data-myday-allowance-subscribe
               onClick={onSubscribe}
-              className="w-full [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:text-sm [&>span>div]:font-black"
+              className="shrink-0 [&>span>div]:h-9 [&>span>div]:px-4 [&_span]:text-xs [&_span]:font-semibold"
             >
-              <CircleCheck className="h-4 w-4" /> Get unlimited creation
+              Go unlimited
             </GlassButton>
           )}
         </div>
