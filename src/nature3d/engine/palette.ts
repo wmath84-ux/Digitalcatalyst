@@ -166,22 +166,36 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * value instead of a cold one.
  */
 export const GROUND_PALETTE: GroundPalette = {
-  // NATURAL GROUND KEY — not a neon lawn, not a pale farm tile.
-  // Lush hollows are a real meadow green (olive-cast, not RGB-primary).
-  // Dry rises lean dusty yellow-olive so fallow belts read as earth, not
-  // as a lighter green. Paths are packed dirt, never chalk-white gravel.
-  lush: new THREE.Color(0x3d8f28),
-  dry: new THREE.Color(0xa8944e),
-  mud: new THREE.Color(0x455a2e),
-  rock: new THREE.Color(0x7a7566),
-  // Packed dirt path — light brown / beige earth with a warm undertone.
-  // The old #d2c5a0 read as pure white chalk under midday sun.
-  gravel: new THREE.Color(0x9a7a52),
-  sand: new THREE.Color(0xe0d0a4),
-  sandWet: new THREE.Color(0xb89868),
-  sandUnder: new THREE.Color(0x5a9ab0),
-  snow: new THREE.Color(0xe8e4d0),
-  deep: new THREE.Color(0x163a58),
+  // MUTED, NOT SATURATED. The rule that governs every value below: real ground
+  // is never a pure channel. A lawn-green #3d8f28 has green ~2.3x its red and
+  // reads as paint; actual grass carries an olive/brown undertone because it is
+  // growing out of soil. So the greens here sit close to the earth tones rather
+  // than above them, and "bright" is left to the light (daylight.ts), never to
+  // albedo — pushing albedo up clips under the tone mapper and bleaches the
+  // whole frame.
+  //
+  // Grass: shadow #4A5D23 … sunlit #7B9A44. `lush` is the lit middle of that.
+  lush: new THREE.Color(0x5a7330),
+  // Dry dirt — the base layer where grass does not grow. Ashy brown, no
+  // moisture in it, so it stays dull rather than going orange.
+  dry: new THREE.Color(0x5e503f),
+  // Wet mud. Water fills the micro-facets and the ground absorbs instead of
+  // scattering, so wet earth is markedly darker than dry — deep chocolate.
+  mud: new THREE.Color(0x3b2f25),
+  // Stone is never neutral grey: it always carries the dust and soil of
+  // wherever it sits, so this leans faintly warm-green rather than #808080.
+  rock: new THREE.Color(0x737571),
+  // Trodden path. Where feet and wheels pack the soil it goes dusty and
+  // sand-like — light greyish-brown, and never chalk white.
+  gravel: new THREE.Color(0x8c8476),
+  sand: new THREE.Color(0xd8cba6),
+  sandWet: new THREE.Color(0xb0916a),
+  // Shallow shelf: water has no colour of its own, it reflects the bed and the
+  // sky. Sand under the column plus sky gives an earthy cyan, not a pool blue.
+  sandUnder: new THREE.Color(0x4f868e),
+  snow: new THREE.Color(0xe2dcc8),
+  // Deep water absorbs the red end and returns the sky, so it reads dark teal.
+  deep: new THREE.Color(0x1c3b47),
 };
 
 /**
@@ -193,38 +207,52 @@ export const GROUND_PALETTE: GroundPalette = {
  * carrying a cool blue-green cast so shadowed foliage never goes black.
  */
 export const FOLIAGE_PALETTE = {
-  /** Grass blades, root … tip. The tip is where new growth and sunlight meet.
-   *  USER DIRECTIVE (sunny afternoon): true green throughout — the tip is a
-   *  sunlit lime, not straw-yellow, so the field stays grass. */
-  bladeRoot: new THREE.Color(0x1a5a14),
-  bladeMid: new THREE.Color(0x2e8e1e),
-  bladeTip: new THREE.Color(0x5ab830),
-  /** Leaf cards, inner canopy … outer. */
-  leafDeep: new THREE.Color(0x1a5e16),
-  leafLit: new THREE.Color(0x3ea028),
-  /** Transmitted light through a leaf (the cheap subsurface term). */
-  transmittance: new THREE.Color(0x72c838),
-  /** Bark, young … old (older bark is paler, greyer and more fissured). */
-  barkYoung: new THREE.Color(0x6d5941),
-  barkOld: new THREE.Color(0x9b8a70),
-  /** Palm trunk: pale, ringed, sun-bleached — the signature tropical silhouette. */
-  palmTrunk: new THREE.Color(0xa08b6a),
+  /** Grass blades, root … tip. The root sits in its own shadow and in the soil,
+   *  so it is the darkest and most olive; the tip is where new growth meets the
+   *  sun and lifts toward the sunlit grass value #7B9A44. None of these is a
+   *  pure green — chlorophyll reflects broadly, not at one wavelength. */
+  bladeRoot: new THREE.Color(0x3b4a20),
+  bladeMid: new THREE.Color(0x4a5d23),
+  bladeTip: new THREE.Color(0x7b9a44),
+  /** Leaf cards, inner canopy … outer. Leaves are always DARKER and COOLER than
+   *  the grass under them: more chlorophyll per unit area, and the canopy
+   *  shades itself. */
+  leafDeep: new THREE.Color(0x2d452b),
+  leafLit: new THREE.Color(0x3d5c38),
+  /** Transmitted light through a leaf — the cheap subsurface term. This is the
+   *  one place a leaf is allowed to go bright: lit from behind, a blade turns
+   *  translucent and glows yellowish-green. */
+  transmittance: new THREE.Color(0x9cbd55),
+  /** Bark, young … old. Pure brown reads as plastic; real trunks weather toward
+   *  grey, so both ends are desaturated and the old bark goes greyer still. */
+  barkYoung: new THREE.Color(0x4a3c31),
+  barkOld: new THREE.Color(0x6b5b4c),
+  /** Palm trunk: pale, ringed, sun-bleached — but bleached, not white. */
+  palmTrunk: new THREE.Color(0x8c7a62),
   /** Coconut husk. */
-  coconut: new THREE.Color(0x5f4a2e),
-  /** Moss: only ever on the damp, shade-side faces. */
-  moss: new THREE.Color(0x3a9a22),
+  coconut: new THREE.Color(0x5a4630),
+  /** Moss and lichen: the damp shade-side faces. A muted olive, never the
+   *  bright lawn green it is usually painted — this is what makes rock read as
+   *  alive rather than as a grey solid. */
+  moss: new THREE.Color(0x596345),
 };
 
 /** Rock albedo per geological family (research §6, §25) — tropical limestone key. */
 export const ROCK_PALETTE = {
-  /** Warm coral limestone — the island's boulders and outcrops. */
-  sandstone: new THREE.Color(0xa79a7a),
-  /** Cool volcanic — the scree on the highland slopes. */
-  basalt: new THREE.Color(0x767d7a),
-  /** Dust and salt spray settled on up-facing surfaces. */
-  dust: new THREE.Color(0xc4b795),
+  /** Warm coral limestone, dusted down. The island's boulders and outcrops. */
+  sandstone: new THREE.Color(0x8d8471),
+  /** Cool volcanic scree on the highland slopes. */
+  basalt: new THREE.Color(0x565a5c),
+  /** Dust, salt spray and sun-bleaching on up-facing surfaces. A dusty,
+   *  sun-bleached yellowish-green-grey — the colour a hill highlight actually
+   *  takes, rather than a bright green. */
+  dust: new THREE.Color(0x8c9076),
   /** Wet stone at the waterline: darker, because water fills the micro-facets. */
-  wet: new THREE.Color(0x57604f),
+  wet: new THREE.Color(0x4c544f),
+  /** Crevices and cracks. NOT black — a hole punched to #000000 reads as a
+   *  texture error. This dark cool grey is what natural ambient occlusion
+   *  settles to where the sky cannot reach. */
+  crevice: new THREE.Color(0x3a3a3b),
 };
 
 /**
@@ -236,12 +264,21 @@ export const ROCK_PALETTE = {
  * sanctuary's low sun.
  */
 export const ROUGHNESS_RANGE = {
-  ground: [0.88, 0.99] as const,
+  // Bare earth is completely matte: dry soil scatters light in every direction
+  // and has no sheen at all.
+  ground: [0.9, 1.0] as const,
   rock: [0.62, 0.95] as const,
   rockWet: [0.24, 0.5] as const,
-  bark: [0.75, 1.0] as const,
-  leaves: [0.55, 0.85] as const,
-  wetSoil: [0.45, 0.7] as const,
+  // Bark is the roughest organic surface there is — fissured, dry, no oils.
+  bark: [0.9, 1.0] as const,
+  // Leaves and grass are the exception that proves the rule: a waxy cuticle
+  // gives them a faint sheen, which is what separates a living plant from a
+  // painted card under a low sun.
+  leaves: [0.4, 0.6] as const,
+  // Wet ground is where roughness does the most work. A puddle in a wheel rut
+  // is near-mirror; the damp soil around it is not. That contrast is what makes
+  // the ground read as wet at all, far more than its colour does.
+  wetSoil: [0.2, 0.4] as const,
 };
 
 /**

@@ -445,10 +445,15 @@ export function createHillGrassField(
     groundColorAt(x, z, y, ground, GROUND_PALETTE, 1, 0);
     ground.getHSL(hsl);
     const patch = (Math.sin(x * 0.21) * Math.cos(z * 0.19) + 1) * 0.5;
-    const hue = 0.3 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * 0.03;
-    const sat = 0.66 + hsl.s * 0.22 + patch * 0.08 + Math.random() * 0.08;
-    const lit = 0.55 + hsl.l * 0.26 + Math.random() * 0.12 - patch * 0.03;
-    color.setHSL(hue, Math.min(0.92, sat), Math.min(0.82, lit));
+    // The hills wear the same rule as the meadow below: an olive, not a
+    // primary. Hue ~0.24, saturation capped near 0.55, lightness kept in the
+    // mid-range so the sun does the brightening. The old recipe allowed
+    // saturation up to 0.92 at lightness 0.82 — a neon lawn, and the reason
+    // the distant hills read as a flat green sheet instead of as land.
+    const hue = 0.24 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * 0.03;
+    const sat = 0.38 + hsl.s * 0.16 + patch * 0.06 + Math.random() * 0.06;
+    const lit = 0.36 + hsl.l * 0.22 + Math.random() * 0.1 - patch * 0.03;
+    color.setHSL(hue, Math.min(0.55, sat), Math.min(0.56, lit));
 
     // ── BAKED AMBIENT OCCLUSION ───────────────────────────────────────────
     //

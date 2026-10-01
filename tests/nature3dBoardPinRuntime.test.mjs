@@ -119,47 +119,89 @@ test("an oversized/refused fit remains an honest 3D board instead of a black sla
   assertConnected();assertNoStrayPage();world();
 });
 
-// A board is a SCREEN, not a window: whatever module, notes or mind map is
-// running keeps running and keeps painting, no matter what stands between it
-// and the eye. The old occlusion ray-test hid the page whenever the terrain
-// broke the sightline — and because the 3D frame stayed visible while the DOM
-// content went to opacity 0, the learner saw a BLACK BOARD that flickered on
-// and off as the camera orbited the boundary. That behaviour is gone; these
-// two tests now assert its absence.
-test("terrain in front of a board never hides the page — it keeps painting", () => {
+// A board must read as an object IN the world, not a sticker floating over it.
+// The screen is a DOM layer above the canvas and can never be depth-tested, so
+// when a hill or a tree stands between it and the eye it has to fade — but it
+// must fade SOFTLY (a fraction over five face points, smoothed over frames, so
+// an orbiting camera cannot make it snap) and it must NEVER be detached, or the
+// running lesson and its media die. The shell dims with the page, because the
+// original bug was a faded page over a solid near-black backing: a black slab.
+test("terrain in front of a board fades it back instead of letting it float over the hill", () => {
   screens.setReadSlot(null);
   const p=screens.byId("reading").placement.position;
   const stand=(z)=>{camera.position.set(0,fixture.terrainHeight(0,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();};
-  stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
-  // The pose that USED to hide the page: every face sample sits below the
-  // intervening terrain, so the old nine-ray test called it fully obstructed.
+  stand(100-5.4);
+  const clear=state().find(s=>s.slot==="reading");
+  assert.equal(clear.painted,true,"an unobstructed board must be fully opaque");
+
+  // The pose that used to be a hard binary: every face sample sits below the
+  // intervening terrain, so the board is genuinely behind the hill.
   const x=Math.sin(1.2)*450,z=Math.cos(1.2)*450-5.4;
-  camera.position.set(x,fixture.terrainHeight(x,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();
+  camera.position.set(x,fixture.terrainHeight(x,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);
+  // Let the smoothing converge, the same way a real frame loop would.
+  for (let i=0;i<60;i++) render();
   const shown=state().find(s=>s.slot==="reading");
-  assert.equal(shown.painted,true,"terrain obstruction hid the page — boards must never blank");
-  assert.equal(shown.host.style.visibility,"visible");
-  assert.equal(shown.host.inert,false);
-  assert.equal(shown.shellVisible,true);assert.equal(shown.host.isConnected,true);
-  stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
+  const alpha=parseFloat(shown.host.style.opacity);
+  assert.ok(alpha<0.5,`an obstructed board must fade back, got opacity ${alpha}`);
+
+  // The regression that mattered: the WebGL shell must dim WITH the page.
+  const idx=screens.screens.findIndex(s=>s.slot==="reading");
+  const fade=screens.shells.children[idx].userData.fade;
+  assert.ok(Array.isArray(fade)&&fade.length>0,"board shell must expose its fade materials");
+  for (const m of fade) {
+    assert.ok(Math.abs(m.opacity-alpha)<0.02,`shell opacity ${m.opacity} diverged from page ${alpha} — black slab`);
+  }
+
+  // The fade must be a GRADIENT, not a switch. Walk the eye back toward the
+  // board and some stance has to land strictly between clear and hidden, or
+  // this is the old binary test wearing a decimal point.
+  let intermediate=0;
+  for (let d=450; d>=120; d-=15) {
+    const sx=Math.sin(1.2)*d, sz=Math.cos(1.2)*d-5.4;
+    camera.position.set(sx,fixture.terrainHeight(sx,sz)+1.7,sz);camera.lookAt(p);camera.updateMatrixWorld(true);
+    for (let i=0;i<60;i++) render();
+    const a=parseFloat(state().find(s=>s.slot==="reading").host.style.opacity);
+    if (a>0.02 && a<0.98) intermediate+=1;
+  }
+  assert.ok(intermediate>0,`no stance produced a partial fade — the fade is binary (${intermediate} intermediate)`);
+
+  // Faded, but still mounted and still playing: occlusion is not a stop command.
+  assertConnected();
+  assert.equal(shown.host.isConnected,true);
+  assert.equal(shown.shellVisible,true,"the shell must stay in the scene; the depth buffer hides it");
+
+  stand(100-5.4);
+  for (let i=0;i<60;i++) render();
+  const back=state().find(s=>s.slot==="reading");
+  assert.equal(back.painted,true,"the board must return to full opacity once the ridge is gone");
 });
 
-test("neither a leaf/trunk nor a whole tree across the face can blank the board or stop media", () => {
+test("a tree across the face fades the board but never blanks it or stops media", () => {
   screens.setReadSlot(null);frame("reading");
   const p=screens.byId("reading").placement.position;
-  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:1}]);render();
-  assert.equal(state().find(s=>s.slot==="reading").painted,true,"partial obstruction hid the whole board");
-  // A trunk the width of the entire board. This still must not blank it: the
-  // page is a live DOM surface composited ABOVE the canvas, so "hiding" it
-  // never revealed the scenery — it only took the lesson away and left a
-  // black frame behind.
-  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:60}]);render();
+  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:1}]);
+  for (let i=0;i<60;i++) render();
+  const thin=parseFloat(state().find(s=>s.slot==="reading").host.style.opacity);
+  assert.ok(thin>0.5,`a 1 m trunk must not fade the whole board (opacity ${thin})`);
+
+  // A trunk the width of the entire board: now the fade is justified, but it is
+  // still a fade — the page stays mounted and its browsing context survives.
+  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:60}]);
+  for (let i=0;i<60;i++) render();
   const shown=state().find(s=>s.slot==="reading");
-  assert.equal(shown.painted,true,"a full-width obstruction blanked the board");
-  assert.equal(shown.host.style.visibility,"visible");assert.equal(shown.host.inert,false);
+  const alpha=parseFloat(shown.host.style.opacity);
+  assert.ok(alpha<0.5,`a full-width obstruction must fade the board, got ${alpha}`);
+  // A thin trunk proved the gradient; here the point is that even total
+  // obstruction leaves the page MOUNTED — a fade is not a detach, and the
+  // iframe's browsing context and any playing media must survive it.
   assertConnected();
+  assert.equal(shown.host.isConnected,true,"an obstructed board must never be detached");
+
+  // Pinning is a deliberate full-screen UI mode: no hill gets a vote over it.
   screens.setReadSlot("reading");render();
   const fitted=state().find(s=>s.slot==="reading");
-  assert.equal(fitted.painted,true);assert.equal(fitted.host.querySelector(".nature3d-board-fog").style.opacity,"0");
+  assert.equal(fitted.painted,true,"a pinned board must ignore occlusion and fill the screen");
+  assert.equal(fitted.host.querySelector(".nature3d-board-fog").style.opacity,"0");
   fixture.registerTreeObstacles([]);world();
 });
 
@@ -198,6 +240,10 @@ test("resize, projection-only and board-size changes invalidate the pose; idle f
   camera.clearViewOffset();screens.setScale(3);frame("reading",150);screens.setReadSlot("reading");screens.render(camera);
   assertConnected();assertNoStrayPage();
   screens.setScale(1);camera.updateProjectionMatrix();world();
+  // The occlusion fade needs a few frames to converge after the camera stops.
+  // That settling is intentional, so drain it before measuring: what must not
+  // happen is PERPETUAL churn once nothing is moving.
+  for (let i=0;i<80;i++) screens.render(camera);
   const observer=new window.MutationObserver(()=>{});observer.observe(screens.domElement,{attributes:true,subtree:true});
   for (let i=0;i<10000;i++) screens.render(camera);
   assert.equal(observer.takeRecords().length,0,"idle camera wrote styles or performed a pin transition");observer.disconnect();

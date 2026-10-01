@@ -333,11 +333,16 @@ function buildRing(
 
       // Natural green: olive-cast meadow hue, not neon arcade grass.
       // Saturation is restrained; dry ground leans yellower, wet hollows deeper.
-      const hue = 0.28 + hsl.l * 0.015 + patch * 0.018 + (Math.random() - 0.5) * opts.colorJitter
+      // Hue sits at ~0.24 (yellow-green), not 0.30. Real grass is an olive,
+      // not a primary: it reflects broadly rather than at one wavelength, and
+      // the soil underneath pulls the hue toward yellow. The old 0.72
+      // saturation ceiling was the single biggest "this is a video game"
+      // signal in the meadow — a saturation that high only exists in paint.
+      const hue = 0.24 + hsl.l * 0.015 + patch * 0.018 + (Math.random() - 0.5) * opts.colorJitter
         + (1 - density) * 0.02; // sparse/dry tips lean slightly yellower
-      const sat = 0.48 + hsl.s * 0.18 + patch * 0.06 + Math.random() * 0.08 + density * 0.08;
-      const lit = 0.42 + hsl.l * 0.26 + Math.random() * 0.1 - patch * 0.04 + (1 - density) * 0.04;
-      color.setHSL(hue, Math.min(0.72, sat), lit);
+      const sat = 0.34 + hsl.s * 0.14 + patch * 0.05 + Math.random() * 0.06 + density * 0.06;
+      const lit = 0.34 + hsl.l * 0.22 + Math.random() * 0.08 - patch * 0.04 + (1 - density) * 0.04;
+      color.setHSL(hue, Math.min(0.55, sat), lit);
       builder.pushMatrix(dummy.matrix, x, y, z, color);
       placed += 1;
     }
@@ -431,7 +436,9 @@ function plantSkirt(
       const sc = 0.9 + Math.random() * 0.8;
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
-      color.setHSL(0.30 + Math.random() * 0.025, 0.68 + Math.random() * 0.12, 0.46 + Math.random() * 0.12);
+      // The turf ring around a boulder: same muted olive as the rest of the
+      // sward, shaded because it sits in the stone's shadow.
+      color.setHSL(0.24 + Math.random() * 0.02, 0.40 + Math.random() * 0.08, 0.30 + Math.random() * 0.08);
       builder.pushMatrix(dummy.matrix, x, y, z, color);
       placed += 1;
     }

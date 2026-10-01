@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { terrainHeight } from "./terrain";
+import { treesBlockSight } from "./flora";
 import { projectBoardMatrix } from "./boardProjection";
 import {
   LECTERN_BOARD_HEIGHT,
@@ -132,10 +133,6 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
   // fog: true (default on Standard/Lambert) so distance smoke hits the
   // board shells the same way it hits trees and terrain. BasicMaterial
   // also supports fog — keep it on so the black backing fades into haze.
-  const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35, fog: true });
-  const backing = new THREE.MeshBasicMaterial({ color: 0x05070c, fog: true });
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4, fog: true });
-
   const frameGeo = new THREE.BoxGeometry(W + BEZEL * 2, H + BEZEL * 2, DEPTH);
   const backGeo = new THREE.PlaneGeometry(W, H);
 
@@ -143,6 +140,19 @@ function createBoardShells(placements: LecternPlacement[], shadows: boolean): TH
     const board = new THREE.Group();
     board.position.copy(p.position);
     board.rotation.y = p.yaw;
+
+    // Per-board materials. The DOM screen is composited ABOVE the canvas and
+    // can never be depth-tested against the world, so the only way a hill can
+    // stand in front of a lesson is for the lesson to fade — and if the DOM
+    // fades while this near-black backing stays opaque, the learner is left
+    // staring at an empty black slab. The two must dim together, which means
+    // each board needs its own copies. Three boards, so this costs three
+    // material sets instead of one: a fair trade for not regressing the black
+    // board.
+    const frame = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.55, metalness: 0.35, fog: true, transparent: true });
+    const backing = new THREE.MeshBasicMaterial({ color: 0x05070c, fog: true, transparent: true });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x141b26, roughness: 0.6, metalness: 0.4, fog: true, transparent: true });
+    board.userData.fade = [frame, backing, legMat];
 
     const shell = new THREE.Mesh(frameGeo, frame);
     shell.position.z = -DEPTH / 2 - 0.02;
@@ -302,6 +312,12 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   // Last matrix3d written per board, so an unchanged pose skips the DOM write
   // entirely instead of rebuilding two throwaway strings every frame.
   const lastTransform = new Map<LecternSlot, Float32Array>();
+  // Smoothed occlusion fraction per board (0 = clear, 1 = fully hidden) and the
+  // last opacity string written, so an unchanged frame does no DOM work.
+  const occlusion = new Map<LecternSlot, number>();
+  const lastOpacity = new Map<LecternSlot, string>();
+  const occEye = new THREE.Vector3();
+  const occAim = new THREE.Vector3();
   const visibility = new Map<LecternSlot, number>();
   const pinCorner = new THREE.Vector3();
   let viewW = 1;
@@ -313,6 +329,77 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastProjection = new THREE.Matrix4();
   const screenMatrix = new THREE.Matrix4();
   let hudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
+
+  /**
+   * Face sample offsets, in units of the half-width / half-height. Centre plus
+   * four inset corners: five points are enough to tell "a ridge crosses the
+   * lower third" from "the whole board is behind the hill", which is exactly
+   * the distinction the old single-ray binary test could not make.
+   */
+  const FACE_SAMPLES: ReadonlyArray<readonly [number, number]> = [
+    [0, 0], [0.86, 0.86], [-0.86, 0.86], [0.86, -0.86], [-0.86, -0.86],
+  ];
+  const OCC_STEPS = 8;
+  /** Boards closer than this cannot have anything between them and the eye. */
+  const OCC_MIN_DISTANCE = 26;
+
+  /** True when terrain or a tree stands between the eye and one face point. */
+  const sightBlocked = (
+    ex: number, ey: number, ez: number,
+    tx: number, ty: number, tz: number,
+  ): boolean => {
+    const dx = tx - ex;
+    const dy = ty - ey;
+    const dz = tz - ez;
+    for (let s = 1; s < OCC_STEPS; s += 1) {
+      const t = s / OCC_STEPS;
+      const wy = ey + dy * t;
+      // The board stands ON this ground, so allow the surface a little height
+      // before calling it an obstruction, or the board occludes itself.
+      if (terrainHeight(ex + dx * t, ez + dz * t) + 0.35 > wy) return true;
+    }
+    occEye.set(ex, ey, ez);
+    occAim.set(tx, ty, tz);
+    return treesBlockSight(occEye, occAim);
+  };
+
+  /**
+   * How much of the board's face the world is standing in front of, 0..1.
+   *
+   * A FRACTION, deliberately. The previous implementation answered a yes/no
+   * question from the last sightline that cleared the ridge, so a camera
+   * orbiting a few centimetres crossed that boundary every frame and the board
+   * snapped on and off. Averaging five face points gives a value that moves
+   * continuously as the camera moves, and the smoothing below removes what is
+   * left of the jitter.
+   */
+  const faceOcclusion = (screen: BoardScreen, camera: THREE.PerspectiveCamera): number => {
+    const p = screen.placement;
+    const yaw = p.yaw;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const rx = Math.cos(yaw);
+    const rz = -Math.sin(yaw);
+    const hw = LECTERN_BOARD_WIDTH * 0.5;
+    const hh = LECTERN_BOARD_HEIGHT * 0.5;
+    const ex = camera.position.x;
+    const ey = camera.position.y;
+    const ez = camera.position.z;
+    if (Math.hypot(p.position.x - ex, p.position.z - ez) < OCC_MIN_DISTANCE) return 0;
+
+    let blocked = 0;
+    for (let i = 0; i < FACE_SAMPLES.length; i += 1) {
+      const u = FACE_SAMPLES[i][0] * hw;
+      const v = FACE_SAMPLES[i][1] * hh;
+      // Nudged a few centimetres along the face normal so the sample sits in
+      // front of the backing panel rather than inside it.
+      const tx = p.position.x + rx * u + fx * 0.06;
+      const ty = p.position.y + v;
+      const tz = p.position.z + rz * u + fz * 0.06;
+      if (sightBlocked(ex, ey, ez, tx, ty, tz)) blocked += 1;
+    }
+    return blocked / FACE_SAMPLES.length;
+  };
 
   /**
    * The face's projected screen rectangle, taken from its four corners.
@@ -485,32 +572,50 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           fittedSlot = screen.slot;
         }
 
-        // ── No occlusion hiding, ever ───────────────────────────────────
+        // ── Soft occlusion: fade behind the world, never pop ───────────────
         //
-        // The boards used to disappear when the terrain broke the sightline
-        // (`boardIsOccluded`, nine sampled rays against `terrainHeight`). That
-        // was wrong twice over, and it is what produced the reported
-        // flicker-then-black-board bug:
+        // The screen is a DOM layer composited ABOVE the WebGL canvas at
+        // z-index ~1e6, so it can never be depth-tested against the world. Left
+        // alone it floats in front of every hill and tree it should be behind,
+        // which reads as obviously fake. The fix is to fade it by how much of
+        // its face the world is actually covering.
         //
-        //   1. BLACK BOARD. Hiding set `host.opacity = "0"` and
-        //      `visibility = "hidden"`, but the 3D frame mesh stayed visible
-        //      (`shell.visible = inView || fitted`, still true). The learner
-        //      saw an empty black rectangle where the lesson had been.
+        // Two earlier failures define the shape of this code:
         //
-        //   2. FLICKER. The test is a hard binary on the LAST sightline that
-        //      clears the ridge. A camera orbiting a few centimetres crosses
-        //      that boundary every frame, so the face snapped on and off.
+        //   1. BLACK BOARD. The first attempt hid the DOM content while the 3D
+        //      shell stayed opaque, leaving a near-black slab where the lesson
+        //      had been. So the shell's own materials dim in lockstep below.
+        //   2. FLICKER. That attempt answered a yes/no question from the last
+        //      sightline clearing the ridge, so an orbiting camera crossed the
+        //      boundary every frame. `faceOcclusion` returns a FRACTION over
+        //      five face points instead, and the smoothing here removes the
+        //      rest, so the value moves continuously with the camera.
         //
-        // The boards are a DOM overlay composited ABOVE the WebGL canvas at
-        // z-index ~1e6, so scenery in front of them was never actually drawn
-        // over them anyway — hiding the content did not reveal anything, it
-        // only removed the lesson. A board is a screen, not a window: it keeps
-        // playing whatever module, notes or mind map is running, regardless of
-        // what stands between it and the eye. The old ray helpers
-        // (`terrainBlocksSight` / `boardIsOccluded`) were deleted with this
-        // change rather than left dead, because `noUnusedLocals` is on. If a
-        // future effect wants distance behaviour, it should be a SOFT fade
-        // (like the fog veil below), never a binary hide.
+        // A pinned board (`fitted`) is a deliberate full-screen UI mode, not a
+        // world object, so it is exempt: the learner asked for it to fill the
+        // screen and no hill gets a vote.
+        const prevOcc = occlusion.get(screen.slot) ?? 0;
+        let occ: number;
+        if (fitted) {
+          // A pin is a command from the learner, not a change in the world, so
+          // it snaps. Easing a board back out from behind the ridge it was
+          // hidden by would leave the full-screen reading mode half transparent
+          // for a fraction of a second on the very frame it was asked for.
+          occ = 0;
+          occlusion.set(screen.slot, 0);
+        } else {
+          const target = faceOcclusion(screen, camera);
+          // Ease in slightly slower than out: appearing from behind a ridge
+          // should feel like the board coming into the open, while ducking
+          // back behind one should not linger.
+          const eased = prevOcc + (target - prevOcc) * (target > prevOcc ? 0.22 : 0.3);
+          const settled = Math.abs(target - eased) < 0.002;
+          occ = settled ? target : eased;
+          occlusion.set(screen.slot, occ);
+          // Keep converging for a few frames after the camera stops, or a fade
+          // started on the last moving frame would freeze part-way.
+          if (!settled) dirty = true;
+        }
 
         if (visible && !fitted) {
           projectBoardMatrix(screen.object, camera, viewW, viewH, SCREEN_PX_WIDTH, SCREEN_PX_HEIGHT, screenMatrix);
@@ -550,19 +655,34 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
             screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
           }
         }
-        const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0);
+        // A board more than half buried behind the world should not swallow
+        // clicks meant for whatever is actually in front of it.
+        const interactable = visible && occ < 0.5;
+        const alpha = visible ? 1 - occ : 0;
+        const alphaStr = alpha >= 0.999 ? "1" : alpha <= 0.001 ? "0" : alpha.toFixed(3);
+        if (lastOpacity.get(screen.slot) !== alphaStr) {
+          lastOpacity.set(screen.slot, alphaStr);
+          screen.host.style.opacity = alphaStr;
+          // Dim the WebGL shell with the page. Without this the frame and the
+          // near-black backing stay solid behind a faded lesson and the learner
+          // sees an empty black slab — the exact regression this replaces.
+          const fade = shells.children[i]?.userData.fade as THREE.Material[] | undefined;
+          if (fade) for (const m of fade) m.opacity = alpha;
+        }
+
+        const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0) | (interactable ? 4 : 0);
         if (visibility.get(screen.slot) !== shown) {
           visibility.set(screen.slot, shown);
           // Never display:none/detach the reading iframe: camera angle is NOT
-          // a playback command. Opacity zero suppresses paint while keeping
-          // its browsing context and user-started media alive. Non-media
-          // surfaces can also skip paint via visibility, without a remount.
-          screen.host.style.opacity = visible ? "1" : "0";
+          // a playback command, and neither is a hill walking into frame.
+          // Opacity zero suppresses paint while keeping its browsing context
+          // and user-started media alive. Non-media surfaces can also skip
+          // paint via visibility, without a remount.
           screen.host.style.visibility = visible || screen.slot === "reading" ? "visible" : "hidden";
-          screen.host.style.pointerEvents = visible ? "auto" : "none";
-          screen.element.style.pointerEvents = visible ? "auto" : "none";
-          screen.host.inert = !visible;
-          screen.host.setAttribute("aria-hidden", String(!visible));
+          screen.host.style.pointerEvents = interactable ? "auto" : "none";
+          screen.element.style.pointerEvents = interactable ? "auto" : "none";
+          screen.host.inert = !interactable;
+          screen.host.setAttribute("aria-hidden", String(!interactable));
           screen.object.visible = visible;
           const shell = shells.children[i];
           if (shell) shell.visible = inView || fitted;
