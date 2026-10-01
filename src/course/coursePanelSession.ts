@@ -36,14 +36,23 @@ const defaultState = (): CoursePanelSessionState => ({
 
 let session: CoursePanelSessionState = defaultState();
 
-export const getCoursePanelSession = (): CoursePanelSessionState => session;
+// Sanctuary boards have their own account/course/module UI sessions. The
+// default remains the Course Player's tab session for backwards compatibility.
+const scopedSessions = new Map<string, CoursePanelSessionState>();
 
-export const setNotesSessionView = (view: NotesPanelSessionView) => {
-  session.notes = view;
+export const getCoursePanelSession = (sessionKey?: string): CoursePanelSessionState => {
+  if (!sessionKey) return session;
+  let scoped = scopedSessions.get(sessionKey);
+  if (!scoped) { scoped = defaultState(); scopedSessions.set(sessionKey, scoped); }
+  return scoped;
 };
 
-export const setMindMapSessionView = (view: MindMapPanelSessionView) => {
-  session.mindMapView = view;
+export const setNotesSessionView = (view: NotesPanelSessionView, sessionKey?: string) => {
+  getCoursePanelSession(sessionKey).notes = view;
+};
+
+export const setMindMapSessionView = (view: MindMapPanelSessionView, sessionKey?: string) => {
+  getCoursePanelSession(sessionKey).mindMapView = view;
 };
 
 /**

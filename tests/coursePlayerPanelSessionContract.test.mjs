@@ -45,15 +45,15 @@ test("the panel session stores the notes view and the mind map view", () => {
 
 test("NotesPanel restores its editor from the session and syncs it on every render", () => {
   // The mount state comes from the session (view + draft survive tab switches).
-  assert.match(notesPanel, /const sessionNotes = getCoursePanelSession\(\)\.notes/);
+  assert.match(notesPanel, /const sessionNotes = getCoursePanelSession\(sessionKey\)\.notes/);
   assert.match(notesPanel, /useState\(sessionNotes\.view === "compose"\)/);
   assert.match(notesPanel, /sessionNotes\.view === "compose" \? sessionNotes\.draft : ""/);
   assert.match(notesPanel, /restoreEdit/);
   assert.match(notesPanel, /sessionNotes\.noteId/);
   // Every render re-syncs the live view/draft into the session.
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "compose", draft, title: draftTitle \}\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "edit", noteId: editingId, draft: editDraft, title: editTitle \}\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "list" \}\)/);
+  assert.match(notesPanel, /setNotesSessionView\(\{ view: "compose", draft, title: draftTitle \}, sessionKey\)/);
+  assert.match(notesPanel, /setNotesSessionView\(\{ view: "edit", noteId: editingId, draft: editDraft, title: editTitle \}, sessionKey\)/);
+  assert.match(notesPanel, /setNotesSessionView\(\{ view: "list" \}, sessionKey\)/);
   // An edit view whose note was deleted must degrade to the list.
   assert.match(notesPanel, /notes\.some\(\(note\) => note\.id === sessionNotes\.noteId\)/);
 });
@@ -72,11 +72,11 @@ test("tab switches never flush a notes draft — the editor keeps its place", ()
 
 test("the mind map restores library vs canvas from the session", () => {
   // Mount state comes from the session; the live view is written back.
-  assert.match(mindMapPanel, /getCoursePanelSession\(\)\.mindMapView !== "canvas"/);
-  assert.match(mindMapPanel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
+  assert.match(mindMapPanel, /getCoursePanelSession\(sessionKey\)\.mindMapView !== "canvas"/);
+  assert.match(mindMapPanel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas", sessionKey\)/);
   // Reopening the sheet (same-tab toggle) restores the learner's last view
   // instead of force-resetting to the library.
-  assert.match(mindMapPanel, /const resumeCanvas = getCoursePanelSession\(\)\.mindMapView === "canvas";/);
+  assert.match(mindMapPanel, /const resumeCanvas = getCoursePanelSession\(sessionKey\)\.mindMapView === "canvas";/);
   assert.match(mindMapPanel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 

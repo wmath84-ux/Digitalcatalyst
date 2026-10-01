@@ -1,592 +1,203 @@
-// tests/nature3dBoardPinRuntime.test.mjs
-//
-// Runtime contract for the study-board PIN in the 3D Sanctuary
-// (`src/nature3d/engine/boardScreens.ts`) — the "board switch karne ke baad
-// board black / bada board" report (owner, 2026-09-21):
-//
-//   "note board se reading board par jate hi note board black dikhne lagta
-//    hai … aur zoom out karke world me jate hi centre me ek bada board
-//    dikhta hai — vah nahin dikhna chahiye."
-//
-// Both symptoms are one failure. The pin lifts a board's DOM face onto the
-// untransformed layer so its buttons hit-test natively, and the old code
-// CLEARED that element's `transform` on the way back. `CSS3DRenderer` caches
-// the transform string it wrote per object and skips an identical rewrite, so
-// the cleared value was never corrected: the element stayed in the 3D layer
-// with no matrix at all, where its 1920×1080 px are read as world units — a
-// board a kilometre wide, parked in the middle of the world (and, being the
-// panel's own dark page, a black one).
-//
-// A source-shape test cannot see any of that: the strings all look fine. So
-// this file mounts the REAL module (bundled with the repo's own esbuild,
-// exactly like tests/useDragScrollRuntime.test.mjs) over a real DOM in jsdom
-// and checks the invariant that keeps boards honest:
-//
-//   • every board's renderer-owned HOST carries a real 3D matrix while it is
-//     in the layer — after any number of pin / unpin / switch cycles;
-//   • a lifted face sits ON the 2D layer with a screen-pixel scale, and its
-//     host is hidden (never an empty black plate behind the page);
-//   • releasing a pin puts the face back inside its own host, with the host's
-//     matrix untouched by the pin;
-//   • a pin that cannot be projected is REFUSED — the board stays a live 3D
-//     board instead of ending up with its page hidden.
-
-import test from "node:test";
+// Run the real board engine in jsdom. A fit is now a STYLE change on a
+// permanently connected host, not a DOM move. This protects iframe browsing
+// contexts AND the previous black/giant-page regression. Browser-level media
+// and native hit testing live in sanctuaryBoardPlaybackBrowser.test.mjs.
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { buildSync } from "esbuild";
 import { JSDOM } from "jsdom";
 
 const require = createRequire(import.meta.url);
 const ROOT = process.cwd();
-
-/* ── fixture: the real board-screen module ────────────────────────────────── */
-
-const FIXTURE = `
+const CACHE = path.join(ROOT, "node_modules/.cache/nature3d-board-pin");
+fs.mkdirSync(CACHE, { recursive: true });
+buildSync({
+  stdin: { resolveDir: ROOT, loader: "ts", contents: `
 import * as THREE from "three";
-import { createBoardScreens } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/boardScreens.ts"))};
-import { terrainHeight } from ${JSON.stringify(path.join(ROOT, "src/nature3d/engine/terrain.ts"))};
-
-export { terrainHeight };
-
+import { createBoardScreens } from "./src/nature3d/engine/boardScreens";
+import { terrainHeight } from "./src/nature3d/engine/terrain";
+import { registerTreeObstacles } from "./src/nature3d/engine/flora";
+export { THREE, terrainHeight, registerTreeObstacles };
 export function boot(host: HTMLElement) {
-  const screens = createBoardScreens(false);
-  host.appendChild(screens.domElement);
-  screens.setSize(1600, 900);
-  const camera = new THREE.PerspectiveCamera(52, 1600 / 900, 0.1, 4000);
-  return { screens, camera };
+ const screens=createBoardScreens(false);host.appendChild(screens.domElement);screens.setSize(1600,900);
+ return {screens,camera:new THREE.PerspectiveCamera(52,1600/900,.1,4000)};
 }
-
-/** Park the camera square-on one board's face at \`distance\` metres. */
-export function frame(screens: any, camera: any, slot: string, distance = 60) {
-  const p = screens.byId(slot).placement;
-  const normal = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
-  camera.position.copy(p.position).addScaledVector(normal, distance);
-  camera.lookAt(p.position);
-  camera.updateMatrixWorld(true);
+export function frame(screens:any,camera:any,slot:string,distance=60) {
+ const p=screens.byId(slot).placement;
+ camera.position.copy(p.position).addScaledVector(new THREE.Vector3(Math.sin(p.yaw),0,Math.cos(p.yaw)),distance);
+ camera.lookAt(p.position);camera.updateMatrixWorld(true);
 }
-
-/** Every board's host / face / object, for assertions in the test. */
-export function boards(screens: any, THREE_: any) {
-  return screens.screens.map((s: any) => ({
-    slot: s.slot,
-    host: s.host,
-    face: s.element,
-    hostTransform: s.host.style.transform,
-    // The invariant itself, independent of how many elements a board is made
-    // of: whatever element CSS3DRenderer owns must carry a live matrix while
-    // it is attached, or the layer is painting a board-sized page at the
-    // world origin.
-    rendererTransform: s.object.element.style.transform,
-    rendererDisplay: s.object.element.style.display,
-    hostDisplay: s.host.style.display,
-    // The WebGL shell — frame, backing plate and legs. This is the PHYSICAL
-    // board: it must survive every pose the screen cannot (looking at a
-    // board's back, a hill in the way, the eye standing in the face's plane).
-    shellVisible: Boolean(screens.shells.children[screens.screens.indexOf(s)]?.visible),
-    faceTransform: s.element.style.transform,
-    faceDisplay: s.element.style.display,
-    faceInsideHost: s.element.parentElement === s.host,
-    faceInLayer: s.element.parentElement === screens.domElement,
-    // A pinned board's host is deliberately taken out of the document (the
-    // renderer detaches the object it is no longer drawing), so "in the layer"
-    // is asked of the boards that are not framed at the moment.
-    hostConnected: s.host.isConnected,
-    objectInScene: screens.cssScene.children.includes(s.object),
-    objectVisible: s.object.visible,
-  }));
-}
-
-export { THREE };
-`;
-
-const CACHE = path.join(ROOT, "node_modules", ".cache", "nature3d-board-pin");
-
-function buildFixture() {
-  fs.mkdirSync(CACHE, { recursive: true });
-  const entry = path.join(CACHE, "fixture.ts");
-  const out = path.join(CACHE, "fixture.cjs");
-  fs.writeFileSync(entry, FIXTURE);
-  execFileSync(
-    require.resolve("esbuild/bin/esbuild"),
-    [
-      entry,
-      "--bundle",
-      "--format=cjs",
-      "--platform=node",
-      "--target=node20",
-      `--outfile=${out}`,
-      "--log-level=error",
-    ],
-    { cwd: ROOT, stdio: "pipe" },
-  );
-  return out;
-}
-
-/* ── DOM + globals ────────────────────────────────────────────────────────── */
-
-const bundle = buildFixture();
-
-const dom = new JSDOM(`<!doctype html><html><body><div id="page"></div></body></html>`, {
-  pretendToBeVisual: true,
-  url: "http://localhost/",
+` },
+  outfile: path.join(CACHE, "fixture.cjs"), bundle: true, format: "cjs", platform: "node", logLevel: "silent",
 });
+const dom = new JSDOM("<!doctype html><body><div id='page'></div></body>", { pretendToBeVisual: true, url: "http://localhost/" });
 const { window } = dom;
-
-// Node 22 exposes `navigator` as a getter-only global, so the jsdom one has to
-// be defined rather than assigned.
-const define = (key, value) =>
-  Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
-define("window", window);
-define("document", window.document);
-define("navigator", window.navigator);
-for (const key of ["HTMLElement", "Element", "Node", "Event", "MouseEvent", "getComputedStyle"]) {
-  define(key, window[key]);
+for (const key of ["window", "document", "navigator", "HTMLElement", "Element", "Node", "Event", "MouseEvent", "getComputedStyle"]) {
+  Object.defineProperty(globalThis, key, { value: key === "window" ? window : window[key], configurable: true, writable: true });
 }
-
-const fixture = require(bundle);
-const page = window.document.getElementById("page");
-const { screens, camera } = fixture.boot(page);
-
-const boards = () => fixture.boards(screens, fixture.THREE);
-
-/** The old failure, stated as an invariant: a host in the layer needs a pose. */
-function assertHostsArePosed(state, when, pinnedSlot = null) {
-  for (const b of state) {
-    if (b.slot === pinnedSlot) continue;
-    assert.ok(
-      b.hostConnected,
-      `${b.slot}: the host must be back inside the CSS3D layer (${when})`,
-    );
-    assert.match(
-      b.hostTransform,
-      /matrix3d\(/,
-      `${b.slot}: the renderer-owned host lost its 3D matrix (${when}) — ` +
-        `an untransformed 1920×1080 element in the layer is a board-sized page in the middle of the world`,
-    );
-    assert.match(
-      b.rendererTransform,
-      /matrix3d\(/,
-      `${b.slot}: the element CSS3DRenderer owns is in the layer without a matrix (${when})`,
-    );
+const fixture = require(path.join(CACHE, "fixture.cjs"));
+const { screens, camera } = fixture.boot(document.getElementById("page"));
+const originalParents = screens.screens.map(s => [s.host.parentElement, s.element.parentElement]);
+const originalObjects = [...screens.cssScene.children];
+const state = () => screens.screens.map((s, i) => ({
+  ...s, shellVisible: screens.shells.children[i].visible,
+  painted: s.host.style.opacity === "1", fitted: s.host.style.transform.startsWith("translate("),
+}));
+const frame = (slot, distance = 60) => fixture.frame(screens, camera, slot, distance);
+const render = () => screens.render(camera, true);
+const world = () => {
+  screens.setReadSlot(null); camera.position.set(0,30,60);camera.lookAt(0,12,0);camera.updateMatrixWorld(true);render();
+};
+function assertConnected() {
+  assert.deepEqual(screens.cssScene.children, originalObjects, "camera must not remove CSS objects");
+  for (const [i, s] of screens.screens.entries()) {
+    assert.ok(s.host.isConnected, `${s.slot}: live host detached`);
+    assert.equal(s.host.parentElement, originalParents[i][0]);
+    assert.equal(s.element.parentElement, originalParents[i][1]);
+    assert.equal(s.element.style.transform, "", "face must never receive a second projection");
+    assert.equal(s.host.style.display, "", "display:none is not a camera/media control");
   }
 }
-
-/**
- * The stray-board signature, stated directly: a page may only be on the 2D
- * layer while it is a *sized* page — the pin's `scale(w/1920, h/1080)`, and
- * never wider than the pin allows. A face on that layer with no transform, or
- * with one that would paint the panel's full 1920×1080 px as world units, is
- * the board-sized page hanging in the sky.
- */
-function assertNoStrayPage(state, when) {
-  for (const b of state) {
-    if (!b.faceInLayer) continue;
-    const m = /^scale\(([-\d.e]+),\s*([-\d.e]+)\)$/.exec(b.faceTransform);
-    assert.ok(
-      m,
-      `${b.slot}: a face on the 2D layer must carry the pin's screen scale (${when}) — ` +
-        `without one its pixels are read as world units, which is the giant board in the middle`,
-    );
-    const w = Number(m[1]) * 1920;
-    const h = Number(m[2]) * 1080;
-    assert.ok(
-      w <= 1600 * 1.6 + 1 && h <= 900 * 1.6 + 1,
-      `${b.slot}: a lifted face may never exceed the viewport (${when}) — got ${w}×${h} px`,
-    );
-  }
-}
-
-function assertFacesAreHome(state, when) {
-  for (const b of state) {
-    assert.ok(b.faceInsideHost, `${b.slot}: the face must be back inside its host (${when})`);
-    assert.equal(
-      b.faceTransform,
-      "",
-      `${b.slot}: the face must carry no screen-space transform once it is home (${when})`,
-    );
-    assert.equal(b.faceDisplay, "", `${b.slot}: the face must be displayed (${when})`);
-    assert.ok(b.objectInScene, `${b.slot}: the object must be back in the CSS3D scene (${when})`);
-  }
-}
-
-/* ── 1. the world view: everything is a 3D board ──────────────────────────── */
-
-test("with no board framed, all three boards are live 3D boards", () => {
-  camera.position.set(0, 30, 60);
-  camera.lookAt(0, 12, 0);
-  camera.updateMatrixWorld(true);
-  screens.render(camera, true);
-
-  const state = boards();
-  assert.equal(state.length, 3);
-  assertHostsArePosed(state, "no board framed");
-  assertFacesAreHome(state, "no board framed");
-});
-
-/* ── 2. pinning lifts ONE face, and only onto the 2D layer ────────────────── */
-
-test("framing a board lifts its face onto the layer and hides its 3D host", () => {
-  fixture.frame(screens, camera, "reading");
-  screens.render(camera, true);
-  screens.setReadSlot("reading");
-  screens.render(camera, true);
-
-  const state = boards();
-  const reading = state.find((b) => b.slot === "reading");
-  assert.ok(reading.faceInLayer, "the framed face must be lifted onto the untransformed layer");
-  assert.match(
-    reading.faceTransform,
-    /^scale\(/,
-    "the lifted face must be sized in screen pixels",
-  );
-  assert.equal(reading.hostDisplay, "none", "the framed board's 3D host must be hidden");
-
-  // …and the two boards beside it stay in the world. Framing one board used to
-  // put the neighbours away in both layers, which emptied the lectern the
-  // moment the learner opened a board ("kisi bhi board par shift hota hun to
-  // baaki sab boards hide ho jaate hain") — all three boards are meant to be
-  // seen together, at every distance and from every side.
-  for (const b of state.filter((s) => s.slot !== "reading")) {
-    assert.equal(b.faceInsideHost, true, `${b.slot} must not be lifted with the framed board`);
-    assert.equal(b.hostDisplay, "", `${b.slot}'s page must stay up while reading is framed`);
-    assert.ok(b.objectInScene, `${b.slot} must still be in the CSS3D scene while reading is framed`);
-    assert.equal(b.objectVisible, true, `${b.slot} must not be culled while reading is framed`);
-    assert.equal(b.shellVisible, true, `${b.slot}'s board must still stand while reading is framed`);
-  }
-});
-
-/* ── 3. THE REGRESSION: switching boards leaves no transformed-less page ──── */
-
-test("switching board after board never leaves a board without a 3D pose", () => {
-  // The exact report: note board → reading board → … → world.
-  const order = ["notes", "reading", "mindmap", "reading", "notes", null];
-  for (const slot of order) {
-    if (slot) {
-      fixture.frame(screens, camera, slot);
-      screens.render(camera, true);
-    }
-    screens.setReadSlot(slot);
-    // Two frames: the switch itself, and the frame after it (the old bug
-    // only showed up once the renderer had a chance to skip the rewrite).
-    screens.render(camera, true);
-    screens.render(camera, true);
-
-    const state = boards();
-    assertHostsArePosed(state, `after switching to ${slot ?? "the world"}`, slot);
-
-    if (slot) {
-      const framed = state.find((b) => b.slot === slot);
-      assert.ok(framed.faceInLayer, `${slot}: the framed board's face must be pinned`);
-      assert.equal(framed.hostDisplay, "none", `${slot}: the pinned host must be hidden`);
+function assertNoStrayPage() {
+  for (const s of state()) {
+    if (!s.painted) continue;
+    assert.doesNotMatch(s.host.style.transform, /NaN|Infinity/);
+    if (!s.fitted) {
+      assert.match(s.host.style.transform, /^matrix3d\(/, `${s.slot}: world page needs a complete matrix`);
     } else {
-      assertFacesAreHome(state, "after leaving the boards");
+      const match = /scale\(([-\d.e]+),\s*([-\d.e]+)\)/.exec(s.host.style.transform);
+      assert.ok(match, "fit needs a real screen-pixel scale");
+      assert.ok(Number(match[1])*1920 <= 1600*1.6+1);
+      assert.ok(Number(match[2])*1080 <= 900*1.6+1);
     }
   }
+}
+after(() => { dom.window.close(); fs.rmSync(CACHE, { recursive: true, force: true }); });
 
-  // …and the world view really is the world view: every board is a 3D board in
-  // its own place, and nothing of a board is left hanging on the 2D layer.
-  camera.position.set(0, 400, 1200);
-  camera.lookAt(0, 30, 0);
-  camera.updateMatrixWorld(true);
-  for (let i = 0; i < 3; i += 1) screens.render(camera, true);
+test("with no board framed, all three faces have a world matrix in their stable hosts", () => {
+  world(); assertConnected(); assertNoStrayPage();
+  for (const s of state()) { assert.equal(s.painted,true);assert.equal(s.shellVisible,true);assert.equal(s.fitted,false); }
+});
 
-  const state = boards();
-  assertHostsArePosed(state, "world view");
-  assertFacesAreHome(state, "world view");
-  for (const b of state) {
-    assert.equal(b.hostDisplay, "", `${b.slot}: the board must be standing in the world view`);
-    assert.ok(
-      !b.faceInLayer,
-      `${b.slot}: a face is still lifted onto the 2D layer in the world view — ` +
-        `that is the giant board in the middle of the screen`,
-    );
+test("fit changes only the host's transform: content, neighbours and object identities survive", () => {
+  frame("reading");screens.setReadSlot("reading");render();assertConnected();assertNoStrayPage();
+  const reading=state().find(s=>s.slot==="reading");
+  assert.equal(reading.fitted,true);assert.equal(reading.painted,true);assert.equal(reading.shellVisible,true);
+  for (const s of state().filter(s=>s.slot!=="reading")) {
+    assert.equal(s.fitted,false);assert.equal(s.painted,true);assert.equal(s.shellVisible,true);
   }
 });
 
-/* ── 4. zooming out with a board still framed ─────────────────────────────── */
-
-test("zooming out with a board framed leaves no board-sized page in the world", () => {
-  // The owner's second symptom in the order he met it: the reading board is
-  // framed, he pulls back to the world — and a board-sized page is hanging in
-  // the middle of it. The framed board keeps its read slot for the whole
-  // pull-back (nothing in the UI closes it), so the pin has to keep being
-  // honest at every distance on the way out: sized to the board's own place,
-  // or released back into the world — never a full 1920×1080 px page with
-  // nothing scaling it.
-  screens.setReadSlot(null);
-  fixture.frame(screens, camera, "reading");
-  screens.render(camera, true);
-  screens.setReadSlot("reading");
-  screens.render(camera, true);
-  screens.render(camera, true);
-  assert.ok(
-    boards().find((b) => b.slot === "reading").faceInLayer,
-    "precondition: the reading board is framed on the layer",
-  );
-
-  // Pull back in steps, rendering the way the tick does.
-  const steps = [120, 300, 900, 2000];
-  for (const distance of steps) {
-    const p = screens.byId("reading").placement;
-    camera.position.set(p.position.x, 90 + distance * 0.25, p.position.z + distance);
-    camera.lookAt(p.position);
-    camera.updateMatrixWorld(true);
-    for (let i = 0; i < 3; i += 1) screens.render(camera, true);
-
-    const state = boards();
-    const lifted = state.find((b) => b.faceInLayer);
-    assertNoStrayPage(state, `${distance} m out`);
-    assertHostsArePosed(state, `${distance} m out`, lifted ? lifted.slot : null);
+test("repeated board/eye/fit switches never detach a live face or create a giant unposed page", () => {
+  const observer=new window.MutationObserver(()=>{});
+  observer.observe(screens.domElement,{childList:true,subtree:true});
+  for (let i=0;i<10;i++) for (const slot of ["notes","reading","mindmap",null]) {
+    if (slot) frame(slot);screens.setReadSlot(slot);render();render();assertConnected();assertNoStrayPage();
   }
-
-  // And when the frame is let go, the world comes back whole: every board a
-  // live 3D board, nothing at all left on the 2D layer.
-  screens.setReadSlot(null);
-  screens.render(camera, true);
-  screens.render(camera, true);
-
-  const state = boards();
-  assertNoStrayPage(state, "after letting the frame go");
-  assertHostsArePosed(state, "after letting the frame go");
-  assertFacesAreHome(state, "after letting the frame go");
-  for (const b of state) {
-    assert.equal(b.faceInLayer, false, `${b.slot}: a page is still lifted in the world view`);
-    assert.equal(b.hostDisplay, "", `${b.slot}: the board must be standing in the world view`);
-  }
+  assert.equal(observer.takeRecords().length,0,"camera switches must not move any DOM subtree");observer.disconnect();world();
 });
 
-/* ── 5. a refused pin changes nothing ─────────────────────────────────────── */
-
-test("a pin that cannot be projected leaves the board a live 3D board", () => {
-  screens.setReadSlot(null);
-
-  // First a REAL pin at a sane distance: the neighbours are put away while the
-  // reading board is framed (that is the framed mode's own bargain).
-  fixture.frame(screens, camera, "reading");
-  screens.render(camera, true);
-  screens.setReadSlot("reading");
-  screens.render(camera, true);
-  const framed = boards().find((b) => b.slot === "reading");
-  assert.ok(framed.faceInLayer, "precondition: the reading board is framed");
-  for (const b of boards().filter((x) => x.slot !== "reading")) {
-    assert.equal(b.hostDisplay, "", `${b.slot}: the neighbours stay up while a board is framed`);
+test("zooming out of fit and releasing it leaves correctly scaled world faces", () => {
+  frame("reading");screens.setReadSlot("reading");render();
+  for (const distance of [120,300,900,2000]) {
+    const p=screens.byId("reading").placement.position;
+    camera.position.set(p.x,90+distance*.25,p.z+distance);camera.lookAt(p);camera.updateMatrixWorld(true);render();
+    assertConnected();assertNoStrayPage();
   }
-
-  // 10 m out the board is visible (the cull keeps it) but its projected face is
-  // 1.7× the viewport wide, so the pin must be refused rather than half-made:
-  // the page stays where it is instead of being hidden behind a black slab.
-  fixture.frame(screens, camera, "reading", 10);
-  screens.render(camera, true);
-  screens.render(camera, true);
-
-  const state = boards();
-  const reading = state.find((b) => b.slot === "reading");
-  assert.equal(reading.faceInLayer, false, "a refused pin must not lift the face");
-  assert.equal(reading.faceInsideHost, true, "a refused pin must leave the face in its host");
-  assert.equal(reading.faceDisplay, "", "a refused pin must never hide the page (the black slab)");
-  assert.ok(reading.objectInScene, "a refused pin must leave the object in the CSS3D scene");
-  assert.equal(reading.hostDisplay, "", "a refused pin must leave the 3D board standing");
-
-  // …and the neighbours the pin had put away come back with it — the refusal
-  // path must not leave the world two boards short. (They may legitimately be
-  // culled at this camera — 10 m from the reading board — so the check moves
-  // to a viewpoint where the whole trio is on screen.)
-  screens.setReadSlot(null);
-  camera.position.set(0, 30, 60);
-  camera.lookAt(0, 12, 0);
-  camera.updateMatrixWorld(true);
-  for (let i = 0; i < 2; i += 1) screens.render(camera, true);
-
-  const world = boards();
-  assertHostsArePosed(world, "after a refused pin");
-  for (const b of world) {
-    assert.equal(b.hostDisplay, "", `${b.slot}: the board must be standing after a refused pin`);
-    assert.equal(b.objectVisible, true, `${b.slot}: the object must be visible after a refused pin`);
-    assert.equal(b.shellVisible, true, `${b.slot}: the board itself must be standing after a refused pin`);
-  }
+  world();assertConnected();assertNoStrayPage();
+  assert.ok(state().every(s=>!s.fitted));
 });
 
-/* ── 6. the hill between the eye and the board ────────────────────────────── */
-
-test("a hill in the way hides the screen, not the board", () => {
-  // The page is painted by the browser, over the canvas: there is no depth
-  // buffer between the two, so a board behind a hill used to hang on the
-  // hillside ("pahad ke piche se bhi dikhte hain, jaise board pahad par aa
-  // gaye ho"). The engine asks the ground itself — the same height field the
-  // mesh is built from — whether it stands in the way.
-  screens.setReadSlot(null);
-  const reading = () => boards().find((b) => b.slot === "reading");
-  const board = screens.byId("reading").placement.position;
-
-  const standAt = (z) => {
-    // Eye height of the walker, standing on the ground at this azimuth.
-    camera.position.set(0, fixture.terrainHeight(0, z) + 1.7, z);
-    camera.lookAt(board.x, board.y, board.z);
-    camera.updateMatrixWorld(true);
-    screens.render(camera, true);
-    screens.render(camera, true);
-  };
-
-  // Square on, inside the study clearing: nothing can be in the way.
-  standAt(100 - 5.4);
-  assert.equal(reading().hostDisplay, "", "in the clearing the page must be up");
-  assert.equal(reading().shellVisible, true, "the board itself must be up");
-
-  // 460 m out the sanctuary's hill rim stands between the eye and the board
-  // (the analytic clearance there is metres, not centimetres).
-  standAt(460 - 5.4);
-  assert.equal(
-    reading().hostDisplay,
-    "none",
-    "the page must not be painted through the hill standing in front of it",
-  );
-  assert.equal(
-    reading().shellVisible,
-    true,
-    "the WebGL shell is depth-tested by the GPU — it must be left alone",
-  );
-
-  // …and back in the clearing the page returns: the test must not be hiding
-  // boards for good.
-  standAt(100 - 5.4);
-  assert.equal(reading().hostDisplay, "", "the page must come back in the open");
+test("an oversized/refused fit remains an honest 3D board instead of a black slab", () => {
+  frame("reading");screens.setReadSlot("reading");render();assert.equal(state().find(s=>s.slot==="reading").fitted,true);
+  frame("reading",10);render();
+  const reading=state().find(s=>s.slot==="reading");
+  assert.equal(reading.fitted,false);assert.equal(reading.painted,true);assert.equal(reading.object.visible,true);
+  assertConnected();assertNoStrayPage();world();
 });
 
-/* ── 7. the same board, seen from behind ──────────────────────────────────── */
-
-test("walking round to a board's back leaves the board standing", () => {
-  // The screen faces one way: you cannot read it from behind, and hiding it
-  // is right. Hiding the whole BOARD with it was not — the frame, backing
-  // plate and legs disappeared the moment the camera crossed the face, which
-  // is the owner's "board cut ho gaya, pura board dikhta hi nahin piche se".
+test("a full hill obstruction hides only the page, while a fitted study page stays readable", () => {
   screens.setReadSlot(null);
-  const p = screens.byId("notes").placement;
-  const normal = new fixture.THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
-  const notes = () => boards().find((b) => b.slot === "notes");
-
-  camera.position.copy(p.position).addScaledVector(normal, 30);
-  camera.lookAt(p.position);
-  camera.updateMatrixWorld(true);
-  screens.render(camera, true);
-  assert.equal(notes().hostDisplay, "", "in front, the page is up");
-  assert.equal(notes().shellVisible, true, "in front, the board is up");
-
-  camera.position.copy(p.position).addScaledVector(normal, -30);
-  camera.lookAt(p.position);
-  camera.updateMatrixWorld(true);
-  screens.render(camera, true);
-
-  assert.equal(notes().hostDisplay, "none", "from behind, the page must not be painted");
-  assert.equal(notes().objectVisible, false, "from behind, the screen is not touchable");
-  assert.equal(
-    notes().shellVisible,
-    true,
-    "from behind, the BOARD must still be there — a physical board is not hidden by facing away",
-  );
+  const p=screens.byId("reading").placement.position;
+  const stand=(z)=>{camera.position.set(0,fixture.terrainHeight(0,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();};
+  stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
+  // At this side of the hill ALL face samples are below the intervening
+  // terrain. The old z=460 case only obstructed the centre of the board.
+  const x=Math.sin(1.2)*450,z=Math.cos(1.2)*450-5.4;
+  camera.position.set(x,fixture.terrainHeight(x,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();
+  const hidden=state().find(s=>s.slot==="reading");
+  assert.equal(hidden.painted,false);assert.equal(hidden.shellVisible,true);assert.equal(hidden.host.isConnected,true);
+  stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
 });
 
-/* ── 8. a page is never painted with a corner behind the eye ──────────────── */
+test("a leaf/trunk across the centre cannot blank the entire face; a fully obstructed world face can cull without stopping media", () => {
+  screens.setReadSlot(null);frame("reading");
+  const p=screens.byId("reading").placement.position;
+  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:1}]);render();
+  assert.equal(state().find(s=>s.slot==="reading").painted,true,"partial obstruction hid the whole board");
+  fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:60}]);render();
+  const hidden=state().find(s=>s.slot==="reading");
+  assert.equal(hidden.painted,false);assert.equal(hidden.host.style.visibility,"visible");assert.equal(hidden.host.inert,true);
+  assertConnected();
+  screens.setReadSlot("reading");render();
+  const fitted=state().find(s=>s.slot==="reading");
+  assert.equal(fitted.painted,true);assert.equal(fitted.host.querySelector(".nature3d-board-fog").style.opacity,"0");
+  fixture.registerTreeObstacles([]);world();
+});
 
-test("no camera pose paints a page the eye has stepped into", () => {
-  // The board's own plane is the one place a CSS3D page cannot be trusted:
-  // with corners behind the eye, one matrix turns into tens of thousands of
-  // pixels sliced across the view — the "board cut ho gaya / 60 m board"
-  // symptom. The engine now refuses to let CSS3D paint such a face. Swept
-  // here over a full orbit grid: any page that IS up must have all four of
-  // its corners in front of the eye.
+test("a board seen from behind stays physical, but its hidden page is inert and never detached", () => {
   screens.setReadSlot(null);
-  const corner = new fixture.THREE.Vector3();
-  let painted = 0;
+  const p=screens.byId("notes").placement;
+  const normal=new fixture.THREE.Vector3(Math.sin(p.yaw),0,Math.cos(p.yaw));
+  camera.position.copy(p.position).addScaledVector(normal,-30);camera.lookAt(p.position);camera.updateMatrixWorld(true);render();
+  const notes=state().find(s=>s.slot==="notes");
+  assert.equal(notes.painted,false);assert.equal(notes.object.visible,false);assert.equal(notes.shellVisible,true);
+  assert.equal(notes.host.inert,true);assertConnected();world();
+});
 
-  for (const d of [6, 12, 20, 30, 45, 80, 200, 600, 1200]) {
-    for (let deg = 0; deg < 360; deg += 15) {
-      const yaw = (deg * Math.PI) / 180;
-      for (const pitch of [0.12, 0.6, 1.2]) {
-        camera.position.set(
-          Math.sin(yaw) * Math.cos(pitch) * d,
-          12 + Math.sin(pitch) * d,
-          Math.cos(yaw) * Math.cos(pitch) * d - 5.4,
-        );
-        camera.lookAt(0, 12, -5.4);
-        camera.updateMatrixWorld(true);
-        screens.render(camera, true);
-
-        for (const b of boards()) {
-          if (b.hostDisplay === "none") continue;
-          painted += 1;
-          const p = screens.byId(b.slot).placement;
-          const c = Math.cos(p.yaw);
-          const sn = Math.sin(p.yaw);
-          for (const sx of [-1, 1]) {
-            for (const sy of [-1, 1]) {
-              corner
-                .set(p.position.x + sx * 15 * c, p.position.y + sy * 8.4375, p.position.z - sx * 15 * sn)
-                .project(camera);
-              assert.ok(
-                corner.z >= -1.05 && corner.z <= 1.05,
-                `${b.slot} at ${d} m / ${deg} deg / pitch ${pitch}: a page painted with a corner ` +
-                  `behind the eye (ndc z ${corner.z.toFixed(2)}) — that is the sliced, board-sized page`,
-              );
-            }
-          }
-        }
+test("no free-camera pose paints a page with a corner behind the eye", () => {
+  screens.setReadSlot(null);const corner=new fixture.THREE.Vector3();let painted=0;
+  for (const d of [6,12,20,30,45,80,200,600,1200]) for (let deg=0;deg<360;deg+=15) for (const pitch of [.12,.6,1.2]) {
+    const yaw=deg*Math.PI/180;
+    camera.position.set(Math.sin(yaw)*Math.cos(pitch)*d,12+Math.sin(pitch)*d,Math.cos(yaw)*Math.cos(pitch)*d-5.4);
+    camera.lookAt(0,12,-5.4);camera.updateMatrixWorld(true);render();
+    for (const s of state().filter(s=>s.painted)) {
+      painted++;const p=s.placement,c=Math.cos(p.yaw),sn=Math.sin(p.yaw);
+      for (const x of [-1,1]) for (const y of [-1,1]) {
+        corner.set(p.position.x+x*15*c,p.position.y+y*8.4375,p.position.z-x*15*sn).project(camera);
+        assert.ok(corner.z>=-1&&corner.z<=1,`${s.slot} ${d}m/${deg}deg/${pitch}: invalid near/far projection`);
       }
     }
+    assertNoStrayPage();
   }
-
-  assert.ok(painted > 100, `the sweep must actually paint pages (painted ${painted})`);
+  assert.ok(painted>100,"sweep must exercise visible pages");world();
 });
 
-test("board frost survives pin/switch/unpin without obscuring or replacing content", () => {
-  screens.setReadSlot(null);
-  const reading = screens.byId("reading");
-  const content = window.document.createElement("button");
-  content.textContent = "Continue lesson";
-  let clicked = 0;
-  content.addEventListener("click", () => clicked++);
-  reading.element.appendChild(content);
-  const originals = boards().map((b) => b.host.style.transform);
+test("resize, projection-only and board-size changes invalidate the pose; idle frames do no DOM work", () => {
+  world();const before=screens.byId("reading").host.style.transform;
+  camera.setViewOffset(1600,900,40,10,1600,900);screens.render(camera);
+  assert.notEqual(screens.byId("reading").host.style.transform,before);
+  camera.clearViewOffset();screens.setScale(3);frame("reading",150);screens.setReadSlot("reading");screens.render(camera);
+  assertConnected();assertNoStrayPage();
+  screens.setScale(1);camera.updateProjectionMatrix();world();
+  const observer=new window.MutationObserver(()=>{});observer.observe(screens.domElement,{attributes:true,subtree:true});
+  for (let i=0;i<10000;i++) screens.render(camera);
+  assert.equal(observer.takeRecords().length,0,"idle camera wrote styles or performed a pin transition");observer.disconnect();
+});
+
+test("winter frost never blurs/replaces board content or changes its stable parent", () => {
+  const reading=screens.byId("reading");const button=document.createElement("button");button.textContent="Continue";
+  reading.element.appendChild(button);let clicks=0;button.addEventListener("click",()=>clicks++);
   screens.setWinter(true);
-  for (const [i, b] of boards().entries()) {
-    assert.equal(b.face.dataset.iceAge, "true");
-    assert.equal(b.host.style.transform, originals[i], "winter never changes CSS3D's pose");
-  }
-  for (const slot of ["reading", "notes", null]) {
-    if (slot) fixture.frame(screens, camera, slot);
-    screens.setReadSlot(slot);
-    screens.render(camera, true);
-    assert.equal(reading.element.dataset.iceAge, "true");
-    assert.ok(reading.element.contains(content));
-    content.click();
-    assertNoStrayPage(boards(), `winter: ${slot}`);
-  }
-  assert.equal(clicked, 3);
-  screens.setWinter(false);
-  for (const b of boards()) assert.equal(b.face.dataset.iceAge, undefined);
-  assert.equal(reading.element.firstChild, content);
-  const css = fs.readFileSync(path.join(ROOT, "src/nature3d/winter.css"), "utf8");
-  assert.match(css, /pointer-events: none/);
-  assert.doesNotMatch(css, /backdrop-filter|filter:|transform:/, "frost must not blur lessons or alter poses");
-  content.remove();
+  for (const slot of ["reading","notes",null]) {if(slot)frame(slot);screens.setReadSlot(slot);render();assertConnected();assert.ok(reading.element.contains(button));button.click();}
+  assert.equal(clicks,3);screens.setWinter(false);assert.equal(reading.element.dataset.iceAge,undefined);button.remove();
+  const css=fs.readFileSync("src/nature3d/winter.css","utf8");assert.doesNotMatch(css,/backdrop-filter|filter:|transform:/);
 });
 
-/* ── 9. a face is never left behind when the sanctuary unmounts ───────────── */
-
-test("disposal removes every board element, pinned or not", () => {
-  screens.setReadSlot(null);
-  fixture.frame(screens, camera, "notes");
-  screens.render(camera, true);
-  screens.setReadSlot("notes");
-  screens.render(camera, true);
-  assert.ok(boards().some((b) => b.faceInLayer), "precondition: a face is pinned");
-
-  screens.dispose();
-  assert.equal(
-    window.document.querySelectorAll(".nature3d-board-screen").length,
-    0,
-    "no board element may survive disposal",
-  );
+test("disposal removes all faces and hosts, fitted or not", () => {
+  frame("notes");screens.setReadSlot("notes");render();assertConnected();screens.dispose();
+  assert.equal(document.querySelectorAll(".nature3d-board-screen").length,0);
 });

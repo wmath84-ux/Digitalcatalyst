@@ -234,7 +234,8 @@ test("Notes carry both the rich HTML and a plain-text projection", () => {
   assert.match(cloudNotes, /const text = flatten\(source\.text\)\.slice\(0, MAX_NOTE_TEXT_LENGTH\);/);
   assert.match(cloudNotes, /html: safe\.html,\n\s*text: safe\.text,/);
   const notesHook = readSource("src/course/useCourseNotes.ts");
-  assert.match(notesHook, /text: richTextToPlain\(safeHtml\) \|\| note\.text/);
+  assert.match(notesHook, /html: safeHtml, text,/);
+  assert.match(notesHook, /text: richTextToPlain\(safeHtml\)/);
   // Legacy plain-text notes still render.
   assert.match(notesPanel, /note\.html \|\| plainToRichText\(note\.text \|\| ""\)/);
 });

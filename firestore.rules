@@ -3,6 +3,117 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Rules are NOT JavaScript: list.all / arrow functions cannot compile.
+    // Guard each bounded index so empty/short lists never access a missing item.
+    function validNoteLinkAt(links, index) {
+      return links.size() <= index || (links[index] is string && links[index].size() <= 80);
+    }
+    function validNoteLinks(links) {
+      return links is list && links.size() <= 50
+        && (
+        validNoteLinkAt(links, 0)
+        && validNoteLinkAt(links, 1)
+        && validNoteLinkAt(links, 2)
+        && validNoteLinkAt(links, 3)
+        && validNoteLinkAt(links, 4)
+        && validNoteLinkAt(links, 5)
+        && validNoteLinkAt(links, 6)
+        && validNoteLinkAt(links, 7)
+        && validNoteLinkAt(links, 8)
+        && validNoteLinkAt(links, 9)
+        && validNoteLinkAt(links, 10)
+        && validNoteLinkAt(links, 11)
+        && validNoteLinkAt(links, 12)
+        && validNoteLinkAt(links, 13)
+        && validNoteLinkAt(links, 14)
+        && validNoteLinkAt(links, 15)
+        && validNoteLinkAt(links, 16)
+        && validNoteLinkAt(links, 17)
+        && validNoteLinkAt(links, 18)
+        && validNoteLinkAt(links, 19)
+        && validNoteLinkAt(links, 20)
+        && validNoteLinkAt(links, 21)
+        && validNoteLinkAt(links, 22)
+        && validNoteLinkAt(links, 23)
+        && validNoteLinkAt(links, 24)
+        && validNoteLinkAt(links, 25)
+        && validNoteLinkAt(links, 26)
+        && validNoteLinkAt(links, 27)
+        && validNoteLinkAt(links, 28)
+        && validNoteLinkAt(links, 29)
+        && validNoteLinkAt(links, 30)
+        && validNoteLinkAt(links, 31)
+        && validNoteLinkAt(links, 32)
+        && validNoteLinkAt(links, 33)
+        && validNoteLinkAt(links, 34)
+        && validNoteLinkAt(links, 35)
+        && validNoteLinkAt(links, 36)
+        && validNoteLinkAt(links, 37)
+        && validNoteLinkAt(links, 38)
+        && validNoteLinkAt(links, 39)
+        && validNoteLinkAt(links, 40)
+        && validNoteLinkAt(links, 41)
+        && validNoteLinkAt(links, 42)
+        && validNoteLinkAt(links, 43)
+        && validNoteLinkAt(links, 44)
+        && validNoteLinkAt(links, 45)
+        && validNoteLinkAt(links, 46)
+        && validNoteLinkAt(links, 47)
+        && validNoteLinkAt(links, 48)
+        && validNoteLinkAt(links, 49)
+        );
+    }
+    function validSessionParentAt(uid, parents, index) {
+      return parents.size() <= index || (parents[index] is string
+        && parents[index].size() > 0 && parents[index].size() <= 40
+        && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(parents[index])));
+    }
+    function validSessionParents(uid, parents) {
+      return parents is list && parents.size() > 0 && parents.size() <= 40
+        && (
+        validSessionParentAt(uid, parents, 0)
+        && validSessionParentAt(uid, parents, 1)
+        && validSessionParentAt(uid, parents, 2)
+        && validSessionParentAt(uid, parents, 3)
+        && validSessionParentAt(uid, parents, 4)
+        && validSessionParentAt(uid, parents, 5)
+        && validSessionParentAt(uid, parents, 6)
+        && validSessionParentAt(uid, parents, 7)
+        && validSessionParentAt(uid, parents, 8)
+        && validSessionParentAt(uid, parents, 9)
+        && validSessionParentAt(uid, parents, 10)
+        && validSessionParentAt(uid, parents, 11)
+        && validSessionParentAt(uid, parents, 12)
+        && validSessionParentAt(uid, parents, 13)
+        && validSessionParentAt(uid, parents, 14)
+        && validSessionParentAt(uid, parents, 15)
+        && validSessionParentAt(uid, parents, 16)
+        && validSessionParentAt(uid, parents, 17)
+        && validSessionParentAt(uid, parents, 18)
+        && validSessionParentAt(uid, parents, 19)
+        && validSessionParentAt(uid, parents, 20)
+        && validSessionParentAt(uid, parents, 21)
+        && validSessionParentAt(uid, parents, 22)
+        && validSessionParentAt(uid, parents, 23)
+        && validSessionParentAt(uid, parents, 24)
+        && validSessionParentAt(uid, parents, 25)
+        && validSessionParentAt(uid, parents, 26)
+        && validSessionParentAt(uid, parents, 27)
+        && validSessionParentAt(uid, parents, 28)
+        && validSessionParentAt(uid, parents, 29)
+        && validSessionParentAt(uid, parents, 30)
+        && validSessionParentAt(uid, parents, 31)
+        && validSessionParentAt(uid, parents, 32)
+        && validSessionParentAt(uid, parents, 33)
+        && validSessionParentAt(uid, parents, 34)
+        && validSessionParentAt(uid, parents, 35)
+        && validSessionParentAt(uid, parents, 36)
+        && validSessionParentAt(uid, parents, 37)
+        && validSessionParentAt(uid, parents, 38)
+        && validSessionParentAt(uid, parents, 39)
+        );
+    }
     function isAdmin() {
       return signedIn()
         && request.auth.token.email != null
@@ -221,7 +332,8 @@ service cloud.firestore {
       // Sanctuary are the SAME store (`src/course/useCourseNotes.ts` +
       // `src/course/cloudNotes.ts`), scoped by `productId` — `String(product.id)`
       // for a purchased course, `mine-<courseId>` for a course the learner
-      // built, `__library__` for the AI's personal-module notes.
+      // built, `__library__` for AI personal notes, `__sanctuary__` for the
+      // sanctuary's private scratch workspace (no course selection required).
       //
       // Ownership is re-derived from the PATH and the document id must equal
       // the `id` field inside it, so a browser can never read — or write into —
@@ -244,7 +356,7 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 20000
           && request.resource.data.links is list
           && request.resource.data.links.size() <= 50
-          && request.resource.data.links.all(link => link is string && link.size() <= 80)
+          && validNoteLinks(request.resource.data.links)
           && request.resource.data.moduleId is string
           && request.resource.data.resourceId is string
           && request.resource.data.personalModuleId is string
@@ -415,15 +527,7 @@ service cloud.firestore {
           && request.resource.data.testKey.size() <= 40
           && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(request.resource.data.testKey))
           && (!('parentTestKeys' in request.resource.data)
-            || (request.resource.data.parentTestKeys is list
-              && request.resource.data.parentTestKeys.size() > 0
-              && request.resource.data.parentTestKeys.size() <= 40
-              && request.resource.data.parentTestKeys.all(k =>
-                k is string
-                && k.size() > 0
-                && k.size() <= 40
-                && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(k))
-              )))
+            || validSessionParents(uid, request.resource.data.parentTestKeys))
           && request.resource.data.session is map
           && request.resource.data.answers is list
           && request.resource.data.answers.size() <= 100

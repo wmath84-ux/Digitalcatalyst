@@ -31,13 +31,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test:sanctuary:rules": "npx --yes firebase-tools@13 emulators:exec --only firestore --project demo-digitalcatalyst \"node --test tests/sanctuaryFirestoreRules.emulator.mjs\"",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
     "ensure:google-services": "node scripts/ensure-google-services.mjs",
     "android:sync": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android",
     "android:open": "cap open android",
     "android:assemble:debug": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android && cd android && ./gradlew assembleDebug",
     "android:bundle:release": "npm run verify:google-signin && npm run ensure:google-services && npm run build && cap sync android && cd android && ./gradlew bundleRelease",
-    "android:run": "npm run ensure:google-services && cap run android"
+    "android:run": "npm run ensure:google-services && cap run android",
+    "test:sanctuary": "node --test tests/courseNotesCloudSyncContract.test.mjs tests/courseNotesCloudSyncRuntime.test.mjs tests/courseMindMapCloudSyncRuntime.test.mjs tests/coursePlayerMindMapContract.test.mjs tests/coursePlayerMindMapMultiAutoArrangeContract.test.mjs tests/coursePlayerPanelSessionContract.test.mjs tests/sanctuaryMindMapScopeContract.test.mjs tests/nature3dBoardPinRuntime.test.mjs tests/sanctuaryBoardPlaybackBrowser.test.mjs tests/revisionSmartSessionCloudParentContract.test.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^7.5.0",
@@ -81,6 +83,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@google-cloud/firestore": "^7.11.0",
     "@google-cloud/storage": "^7.19.0",
     "@tailwindcss/vite": "4.1.17",

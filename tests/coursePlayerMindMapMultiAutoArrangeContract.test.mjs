@@ -236,29 +236,31 @@ test("the hook exposes the full notes-style set of map actions", () => {
 });
 
 test("switching or creating a map flushes the edit that belongs to the old one", () => {
-  // Without this the debounced write lands in whichever document is open
-  // when the timer fires — i.e. in the wrong map.
   const select = hook.slice(hook.indexOf("const selectMap ="), hook.indexOf("const createMap ="));
   assert.match(select, /flush\(\);/);
-  assert.match(select, /setActiveMapKey\(key\);/);
+  assert.match(select, /scope\.activeMapKey = key;/);
   const create = hook.slice(hook.indexOf("const createMap ="), hook.indexOf("const renameMap ="));
-  assert.match(create, /createMapKey\(rows\.map\(\(row\) => row\.mapKey\)\)/);
+  assert.match(create, /createMapKey\(\[\.\.\.rows\.map\(\(row\) => row\.mapKey\), \.\.\.scope\.deletes\]\)/);
   assert.match(create, /flush\(\);/);
+  assert.doesNotMatch(create, /setSummaries\(\(rows\)/, "create return value must not depend on a deferred React updater");
 });
 
 test("deleting a map removes its document and never leaves an empty list", () => {
-  const remove = hook.slice(hook.indexOf("const deleteMap ="), hook.indexOf("// Clear any pending timer"));
-  assert.match(remove, /deleteDoc\(/);
-  assert.match(remove, /mindMapDocId\(String\(u\), String\(p\), String\(m\), key\)/);
-  // A pending debounce for the deleted map must not resurrect it.
-  assert.match(remove, /clearTimeout\(timerRef\.current\)/);
+  assert.match(hook, /deleteDoc\(/);
+  assert.match(hook, /scope\.deletes\.add\(key\);/);
+  assert.match(hook, /predecessor: draft/);
+  assert.match(hook, /job\.predecessor\?\.inFlight/);
+  const remove = hook.slice(hook.indexOf("const deleteMap ="), hook.indexOf("// Lifecycle belongs"));
+  assert.match(remove, /clearTimeout\(draft\.timer\)/);
   assert.match(remove, /seedSummary\(/);
+  assert.match(remove, /replacement\.loaded = true/);
 });
 
 test("each map is scoped separately in Firestore AND in the device mirror", () => {
-  assert.match(hook, /mindMapDocId\(String\(uid\), String\(productId\), String\(moduleId\), activeMapKey\)/);
+  assert.match(hook, /mindMapDocId\(scope\.uid, scope\.productId, scope\.moduleId, draft\.mapKey\)/);
   assert.match(hook, /const localKey = \(uid: string, productId: string, moduleId: string, mapKey: string\)/);
-  assert.match(hook, /mapKey: currentMapKey,/, "the write must name the map it belongs to");
+  assert.match(hook, /mapKey: currentMapKey,/);
+  assert.match(hook, /Map<string, MapDraft>/);
 });
 
 test("the learner returns to the map they had open in that module", () => {
@@ -284,10 +286,10 @@ test("the panel ships a notes-style card list of the module's maps", () => {
   // visit the learner's last view is restored from the panel session instead
   // (library stays library, canvas stays canvas), so tab switches never yank
   // them back to the picker — leaving the player is what resets it.
-  assert.match(panel, /useState\(\s*\(\) => getCoursePanelSession\(\)\.mindMapView !== "canvas",?\s*\)/);
-  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
+  assert.match(panel, /useState\(\s*\(\) => getCoursePanelSession\(sessionKey\)\.mindMapView !== "canvas",?\s*\)/);
+  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas", sessionKey\)/);
   assert.match(panel, /if \(open && !prevOpenRef\.current\) \{/);
-  assert.match(panel, /const resumeCanvas = getCoursePanelSession\(\)\.mindMapView === "canvas";/);
+  assert.match(panel, /const resumeCanvas = getCoursePanelSession\(sessionKey\)\.mindMapView === "canvas";/);
   assert.match(panel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 

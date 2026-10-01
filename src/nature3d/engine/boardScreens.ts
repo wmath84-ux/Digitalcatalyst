@@ -1,100 +1,11 @@
-// src/nature3d/engine/boardScreens.ts
-//
-// THE THREE LIVE BOARD SCREENS.
-//
-// Each of the lectern's 30 m boards shows a REAL, LIVE web page — the same
-// course-player panels the 2D app renders, not a picture of them. A YouTube
-// embed plays, a PDF scrolls, the mind-map canvas pans, the notes editor takes
-// a caret. That rules out the obvious implementations:
-//
-//   • drawing to a canvas and using it as a texture — a `<canvas>` cannot host
-//     an `<iframe>`, so YouTube and Google Docs are impossible from the start,
-//     and every DOM feature (text selection, scrolling, focus) would have to
-//     be re-implemented by hand;
-//   • html2canvas-style rasterising — one static frame per repaint, no video,
-//     no interaction, and a full re-raster on every keystroke;
-//   • a 4096² render target — even at 4 K a 30 m board is ~7 px per cm, so body
-//     text turns to mush, which is exactly what the brief says must not happen.
-//
-// So the screens are CSS3D. `CSS3DRenderer` applies the camera's projection to
-// a plain DOM element as a CSS `matrix3d`, which means the browser rasterises
-// the page itself, at device resolution, AFTER the transform. Text stays
-// vector-sharp whether the board fills the screen or sits 300 m away, video
-// decodes on the compositor, and every DOM behaviour works because it IS the
-// DOM. This is the only approach that satisfies "chahe jitna bada ya chhota
-// board ho, sab kuchh clearly aur smooth dikhna chahiye".
-//
-// ── How the two renderers are kept in lockstep ─────────────────────────
-//
-// The CSS3D layer sits on top of the WebGL canvas and shares its camera. Both
-// are driven from the same `PerspectiveCamera` every frame, so the DOM boards
-// track the 3D world exactly. In the WebGL scene each board also gets a frame
-// + backing panel (see `createBoardShells`) so the board has physical presence
-// — thickness, an edge, a shadow — with a hole where the DOM shows through.
-//
-// ── WHY A BOARD IS TWO ELEMENTS, NOT ONE ───────────────────────────────
-//
-// `CSS3DRenderer` writes each object's `transform` itself and CACHES the
-// string it wrote per object: if the string it would write is the one it
-// wrote last time, it skips the write entirely (three's `cache.objects`).
-//
-// The pin below has to take a board's surface out of the renderer's hands for
-// a moment — it lifts it onto the untransformed layer and scales it in screen
-// pixels so its buttons hit-test natively — and an element that was handed
-// back with the pin's styles still on it, or with its transform cleared, was
-// therefore NOT corrected by the next render: the cache hit, the write was
-// skipped, and a 1920×1080 element with no matrix at all was left inside the
-// 3D layer. That is a page the size of the world hanging where no board ever
-// stands — the "board switch karne ke baad ek bada board centre me" report —
-// and the same mechanism shows a board's own dark page instead of the board.
-//
-// So the renderer owns `host`, and the ENGINE owns `element`, one level
-// inside it. The pin only ever moves and styles `element`; `host` is written
-// exclusively by the renderer (plus the `display` toggles the renderer itself
-// uses for culled objects). Handing a board back is then a plain DOM move
-// inside `host`, and the 3D pose it returns to has been correct the whole
-// time — there is no cached string to fight.
-//
-// ── The performance rules that keep it free ────────────────────────────
-//
-// BGMI's renderer earns its frame budget by never doing work it can avoid, and
-// the same three ideas apply here:
-//
-//   1. STATE CHANGES ARE THE COST, NOT PIXELS. `CSS3DRenderer` writes a style
-//      string per object per frame. Three objects is nothing, but the layer is
-//      skipped wholesale when the camera has not moved (see `render`), so an
-//      idle scene costs zero style recalcs.
-//   2. DON'T RENDER WHAT YOU CANNOT SEE. Each board is frustum-culled against
-//      the camera by hand and, crucially, back-face culled: a board behind the
-//      viewer has its host element set to `display:none`, which takes its
-//      entire subtree — iframes, video, the mind-map canvas — out of the
-//      browser's layout, paint and compositing work. Looking away from a
-//      board genuinely stops paying for it.
-//
-//      That cull is about the SCREEN. The WebGL SHELL (frame, backing plate,
-//      legs) is a physical object and follows the frustum alone: walk round
-//      the lectern and you must still see three boards standing there. The two
-//      used to share one flag, so crossing a board's face deleted the whole
-//      board from the world — the owner's "board cut ho gaya, pura board dikhta
-//      hi nahin piche se".
-//
-//      A screen is also only ever painted while the WHOLE face projects in
-//      front of the eye (all four corners inside the near/far range). With
-//      only the board's centre tested, a camera standing in the board's own
-//      plane left corners behind the eye, where one CSS3D matrix is a page of
-//      tens of thousands of pixels sliced across the view — the "board cut ho
-//      gaya" the owner met when walking up to a board. And because the DOM
-//      layer has no depth buffer, a hill cannot hide a board by itself: the
-//      sight line is tested against the same height field the ground mesh is
-//      built from (see `terrainBlocksSight`), so boards are not painted on the
-//      hillside when the learner walks behind it.
-//   3. OFF-SCREEN CONTENT IS SUSPENDED, NOT HIDDEN. `visibility:hidden` keeps
-//      a YouTube iframe decoding video forever. `display:none` does not, and
-//      that is the difference between one live video and three.
+// Live sanctuary boards: one permanently connected DOM host per surface.
+// Camera/fit changes only change a CSS matrix, never move a live iframe.
+// WebGL shells still use the world's depth buffer and existing frame budget.
 
 import * as THREE from "three";
-import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
+import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { terrainHeight } from "./terrain";
+import { projectBoardMatrix } from "./boardProjection";
 import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
 import { beachHouseSites } from "./beachHouseSite";
 import { treesBlockSight } from "./flora";
@@ -163,26 +74,9 @@ export function studyLetterbox(
   };
 }
 
-/**
- * ── THE SCREEN HAS NO DEPTH BUFFER, THE WORLD DOES ─────────────────────
- *
- * A board's page is painted by the BROWSER, in a DOM layer that sits over the
- * WebGL canvas. Nothing in that layer knows the world objects are there.
- *
- * OWNER DIRECTIVE (2026-09-24):
- * "boards Jo center mein Hai unke liye rules set Hai ki vah hamesha dikhte
- *  rahenge koi bhi chij uske samne Aaye chahe Koi ped Aaye ya koi villa ya
- *  house ho yah rule hata do jisse agar uske samne Koi ped ya Ghar Ho Too
- *  vahi dikhe bus tumhen uss rule ko hata dena."
- *
- * The old code had a rule: `OCCLUSION_MIN_DISTANCE = 60` and only checked
- * terrain, making boards permanently visible on top of any intervening tree,
- * villa, or house.
- *
- * That rule is REMOVED. The sightline from the camera to the board is now
- * tested against terrain, the villa, beach houses, and trees. When an obstacle
- * stands between the viewer and the board, the board's screen is occluded
- * (`visible = false`), so the tree, villa, or house in front is seen instead.
+/** DOM screens have no shared depth buffer with WebGL. Cull only a fully
+ * obstructed face in the open world; a partial leaf/trunk must not blank the
+ * whole board. The fitted study surface remains readable regardless of scenery.
  */
 const OCCLUSION_MARGIN = 0.15;
 const OCCLUSION_MIN_DISTANCE = 2;
@@ -256,57 +150,35 @@ function terrainBlocksSight(eye: THREE.Vector3, target: THREE.Vector3): boolean 
   return false;
 }
 
-/** Check if the board is occluded from the viewer by testing sightlines across its face. */
-function boardIsOccluded(eye: THREE.Vector3, screen: BoardScreen, scale: number): boolean {
-  const p = screen.placement;
-  const length = eye.distanceTo(p.position);
-  if (length < OCCLUSION_MIN_DISTANCE) return false;
+// Hoisted samples: no arrays/vectors allocated while the camera moves.
+const OCCLUSION_SAMPLES = [
+  [0, 0], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9],
+  [0, -0.9], [0, 0.9], [-0.9, 0], [0.9, 0],
+] as const;
+const CORNER_SIGNS = [-1, 1] as const;
 
+/** Only hide a whole DOM face when ALL sampled sightlines are blocked. */
+function boardIsOccluded(
+  eye: THREE.Vector3, screen: BoardScreen, scale: number, target: THREE.Vector3,
+): boolean {
+  const p = screen.placement;
+  if (eye.distanceToSquared(p.position) < OCCLUSION_MIN_DISTANCE ** 2) return false;
   const cos = Math.cos(p.yaw);
   const sin = Math.sin(p.yaw);
-  const halfW = (LECTERN_BOARD_WIDTH * scale) / 2;
-  const halfH = (LECTERN_BOARD_HEIGHT * scale) / 2;
-
-  // Test center point first
-  if (terrainBlocksSight(eye, p.position)) return true;
-
-  // Test perimeter sample points across the board face:
-  // Bottom-center (tests grass and ground rises), Left, Right, Bottom-Left, Bottom-Right, Top-Center
-  const samples = [
-    new THREE.Vector3(p.position.x, p.position.y - halfH * 0.7, p.position.z),
-    new THREE.Vector3(p.position.x - halfW * 0.65 * cos, p.position.y, p.position.z + halfW * 0.65 * sin),
-    new THREE.Vector3(p.position.x + halfW * 0.65 * cos, p.position.y, p.position.z - halfW * 0.65 * sin),
-    new THREE.Vector3(p.position.x - halfW * 0.6 * cos, p.position.y - halfH * 0.65, p.position.z + halfW * 0.6 * sin),
-    new THREE.Vector3(p.position.x + halfW * 0.6 * cos, p.position.y - halfH * 0.65, p.position.z - halfW * 0.6 * sin),
-    new THREE.Vector3(p.position.x, p.position.y + halfH * 0.65, p.position.z),
-  ];
-
-  let blockedCount = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    if (terrainBlocksSight(eye, samples[i])) {
-      blockedCount += 1;
-      // If at least 2 perimeter points are blocked, the board is occluded
-      if (blockedCount >= 2) return true;
-    }
+  const halfW = LECTERN_BOARD_WIDTH * scale / 2;
+  const halfH = LECTERN_BOARD_HEIGHT * scale / 2;
+  for (const [x, y] of OCCLUSION_SAMPLES) {
+    target.set(p.position.x + x * halfW * cos, p.position.y + y * halfH, p.position.z - x * halfW * sin);
+    if (!terrainBlocksSight(eye, target)) return false;
   }
-
-  return false;
+  return true;
 }
 
 export interface BoardScreen {
   slot: LecternSlot;
-  /**
-   * The renderer-owned wrapper. `CSS3DRenderer` writes THIS element's
-   * `transform` (and its `display`, for culled objects) and caches that
-   * string per object — so nothing in this file may ever write a transform to
-   * it, or the cache would skip the correction and leave the board with no
-   * matrix at all. See the header.
-   */
+  /** Stable viewport-layer host. Only this engine owns its CSS transform. */
   host: HTMLDivElement;
-  /**
-   * The board's panel surface — the element React portals into, the root the
-   * input bridge (scene.ts) walks, and the ONLY element the pin touches.
-   */
+  /** React's portal target. It NEVER leaves its host, even in fit-screen. */
   element: HTMLDivElement;
   object: CSS3DObject;
   placement: LecternPlacement;
@@ -324,7 +196,7 @@ export interface BoardScreensHandle {
   setSize(width: number, height: number): void;
   /** HUD chrome the pin must letterbox inside (CSS px). */
   setHudInsets(insets: { top: number; bottom: number; left: number; right: number }): void;
-  /** Pin one board as a 2D face for native clicks; CSS3D resumes when null. */
+  /** Fit one stable host in 2D for native clicks; world projection resumes at null. */
   setReadSlot(slot: LecternSlot | null): void;
   /** Frost the perimeter without changing content, hit targets or CSS3D poses. */
   setWinter(enabled: boolean): void;
@@ -411,8 +283,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const placements = lecternPlacements();
   const cssScene = new THREE.Scene();
 
-  const renderer = new CSS3DRenderer();
-  const domElement = renderer.domElement;
+  const domElement = document.createElement("div");
+  domElement.className = "nature3d-board-layer";
   domElement.style.position = "absolute";
   domElement.style.inset = "0";
   // The layer itself must never eat pointer events — only the boards do, and
@@ -422,10 +294,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   domElement.style.overflow = "hidden";
 
   const screens: BoardScreen[] = placements.map((placement) => {
-    // The renderer-owned host. Every style on it belongs to CSS3DRenderer —
-    // with ONE exception the engine is allowed: `display`, which is exactly
-    // the property the renderer itself uses to stop a culled board's iframes
-    // and canvases from doing any work.
+    // This host is attached ONCE. No CSS3DRenderer may reparent it, and no
+    // camera transition may detach its iframe's browsing context.
     const host = document.createElement("div");
     host.className = "nature3d-board-screen nature3d-board-host";
     host.style.width = `${SCREEN_PX_WIDTH}px`;
@@ -433,6 +303,15 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     host.style.overflow = "hidden";
     host.style.background = "#070b12";
     host.style.borderRadius = "6px";
+    host.style.position = "absolute";
+    host.style.left = "0px";
+    host.style.top = "0px";
+    host.style.transformOrigin = "0 0";
+    host.style.opacity = "0";
+    host.style.pointerEvents = "none";
+    host.inert = true;
+    host.setAttribute("aria-hidden", "true");
+    domElement.appendChild(host);
 
     const element = document.createElement("div");
     element.className = "nature3d-board-screen";
@@ -455,9 +334,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     // The DOM board is a screen, not a window: nothing inside it should be
     // able to spill past the bezel painted in the WebGL scene.
     element.style.borderRadius = "6px";
-    // Positioned against the host's own origin, which is the board's centre —
-    // so this is where the face sits while the board is a 3D board, and the
-    // pin (see `pinFace`) is a pure override of left/top/transform.
+    // The surface fills a host whose matrix is the complete projection.
     element.style.position = "absolute";
     element.style.left = "0px";
     element.style.top = "0px";
@@ -474,7 +351,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     fogVeil.style.borderRadius = "6px";
     fogVeil.style.opacity = "0";
     fogVeil.style.background = "rgb(180, 204, 228)";
-    fogVeil.style.transition = "opacity 80ms linear";
     fogVeil.style.zIndex = "20";
     host.appendChild(fogVeil);
     (host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil = fogVeil;
@@ -524,14 +400,16 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
   const visibility = new Map<LecternSlot, number>();
-  const occluded = new Map<LecternSlot, boolean>();
   const pinCorner = new THREE.Vector3();
   let viewW = 1;
   let viewH = 1;
   let faceScale = 1;
   let readSlot: LecternSlot | null = null;
-  let liftedSlot: LecternSlot | null = null;
-  let lastCamera: THREE.PerspectiveCamera | null = null;
+  let fittedSlot: LecternSlot | null = null;
+  let dirty = true;
+  const lastProjection = new THREE.Matrix4();
+  const screenMatrix = new THREE.Matrix4();
+  const occlusionTarget = new THREE.Vector3();
   let hudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
 
   /**
@@ -559,10 +437,10 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     let maxX = -Infinity;
     let maxY = -Infinity;
     let ok = true;
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
+    for (const sx of CORNER_SIGNS) {
+      for (const sy of CORNER_SIGNS) {
         pinCorner.set(p.position.x + sx * hw * c, p.position.y + sy * hh, p.position.z - sx * hw * s).project(camera);
-        if (pinCorner.z < -1.05 || pinCorner.z > 1.05) ok = false;
+        if (!Number.isFinite(pinCorner.x + pinCorner.y + pinCorner.z) || pinCorner.z < -1 || pinCorner.z > 1) ok = false;
         const x = (pinCorner.x * 0.5 + 0.5) * viewW;
         const y = (-pinCorner.y * 0.5 + 0.5) * viewH;
         if (x < minX) minX = x;
@@ -579,99 +457,20 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     return faceRect;
   };
 
-  /**
-   * Hand a board's surface home to its renderer-owned host.
-   *
-   * This is a plain DOM move plus the removal of the pin's own styles. It
-   * deliberately does NOT touch the host's transform: the host has carried the
-   * correct 3D matrix since the last time the renderer wrote it, so the board
-   * reappears in exactly the right place with no intermediate frame at the
-   * wrong size (which is what the old `transform = ""` left behind — see the
-   * header for why CSS3D never corrected it).
-   */
-  const clearPin = (screen: BoardScreen) => {
-    const el = screen.element;
-    el.style.left = "0px";
-    el.style.top = "0px";
-    el.style.right = "";
-    el.style.bottom = "";
-    el.style.width = `${SCREEN_PX_WIDTH}px`;
-    el.style.height = `${SCREEN_PX_HEIGHT}px`;
-    el.style.transform = "";
-    el.style.transformOrigin = "";
-    el.style.position = "absolute";
-    el.style.zIndex = "";
-    if (el.parentElement !== screen.host) screen.host.appendChild(el);
-  };
-
-  /**
-   * Lift the face onto the untransformed layer and size it in screen pixels,
-   * so its panels hit-test natively (this is the click guarantee).
-   *
-   * Returns false when the projection is not a sane on-screen rectangle
-   * (mid-flight, edge-on, behind the near plane, a sliver after a resize).
-   * A refusal changes NOTHING — the board simply stays a 3D board and the pin
-   * is retried next frame. The old code removed the board from CSS3D first and
-   * hid its page on a refusal, which left a black slab standing in the meadow.
-   */
-  const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera) => {
-    // Phones (especially landscape) letterbox the live page into the HUD-free
-    // 16:9 stage. Desktop keeps the projected 3D rectangle so the overlay
-    // stays glued to the wooden shell.
+  /** A fit changes styles, never the parent of the face or its live media. */
+  const pinFace = (screen: BoardScreen, camera: THREE.PerspectiveCamera): boolean => {
     const compact = viewW < 960 || viewH < 520;
-    let minX = 0;
-    let minY = 0;
-    let w = 0;
-    let h = 0;
-    if (compact) {
-      const box = studyLetterbox(viewW, viewH, hudInsets);
-      minX = box.x;
-      minY = box.y;
-      w = box.w;
-      h = box.h;
-    }
-    if (!(w > 8 && h > 8)) {
-      const rect = projectFace(screen, camera);
-      if (!rect.ok) return false;
-      minX = rect.minX;
-      minY = rect.minY;
-      w = rect.w;
-      h = rect.h;
-      if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
-    }
-    const el = screen.element;
-    // Lift once onto the untransformed layer so left/top are layer pixels.
-    // Do not do this every frame — moving an iframe reloads it.
-    if (el.parentElement !== domElement) domElement.appendChild(el);
-    el.style.position = "absolute";
-    el.style.left = `${minX}px`;
-    el.style.top = `${minY}px`;
-    el.style.width = `${SCREEN_PX_WIDTH}px`;
-    el.style.height = `${SCREEN_PX_HEIGHT}px`;
-    el.style.transformOrigin = "0 0";
-    el.style.transform = `scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
-    el.style.pointerEvents = "auto";
-    el.style.zIndex = "2";
-    // The board's 3D host is out of the picture for the whole pin: its surface
-    // is the 2D face now, and an empty host would only be a black plate
-    // standing behind the page.
-    screen.host.style.display = "none";
+    const rect = projectFace(screen, camera);
+    if (!rect.ok) return false;
+    const box = compact ? studyLetterbox(viewW, viewH, hudInsets) : null;
+    const x = box ? box.x : rect.minX;
+    const y = box ? box.y : rect.minY;
+    const w = box ? box.w : rect.w;
+    const h = box ? box.h : rect.h;
+    if (!(w > 8 && h > 8) || w > viewW * 1.6 || h > viewH * 1.6) return false;
+    screen.host.style.transform = `translate(${x}px, ${y}px) scale(${w / SCREEN_PX_WIDTH}, ${h / SCREEN_PX_HEIGHT})`;
+    screen.host.style.zIndex = "1000001";
     return true;
-  };
-
-  /**
-   * Put one board back into CSS3D: host visible, object in the scene and
-   * visible, its WebGL shell drawn. Used when a pin is released, and by the
-   * refusal path above when a lifted face stops being projectable.
-   */
-  const releaseBoard = (screen: BoardScreen) => {
-    clearPin(screen);
-    screen.host.style.display = "";
-    if (screen.object.parent !== cssScene) cssScene.add(screen.object);
-    screen.object.visible = true;
-    const shell = shells.children[screens.indexOf(screen)];
-    if (shell) shell.visible = true;
-    visibility.delete(screen.slot);
   };
 
   return {
@@ -687,7 +486,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     setSize(width, height) {
       viewW = width;
       viewH = height;
-      renderer.setSize(width, height);
+      domElement.style.width = `${width}px`;
+      domElement.style.height = `${height}px`;
+      dirty = true;
     },
 
     setHudInsets(insets) {
@@ -697,6 +498,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         left: Math.max(0, insets.left),
         right: Math.max(0, insets.right),
       };
+      dirty = true;
     },
 
     setWinter(enabled) {
@@ -708,21 +510,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
 
     setReadSlot(slot) {
       if (readSlot === slot) return;
-
-      // Every board returns to CSS3D, whole: the framed one through the same
-      // release path the refusal below uses (its surface goes home into its
-      // host, and the host's matrix — the one the renderer has been keeping
-      // all along — is what puts it back in the world), and the other two onto
-      // the pose they never left. Nothing here re-writes a transform, so a
-      // board can never come back from a pin with a stale or missing one: the
-      // "switch ke baad board black / centre me bada board" pair came from
-      // exactly that.
-      for (const screen of screens) releaseBoard(screen);
-      if (lastCamera) renderer.render(cssScene, lastCamera);
-      visibility.clear();
       readSlot = slot;
-      liftedSlot = null;
-      lastCamPos.set(1e9, 1e9, 1e9);
+      dirty = true;
     },
 
     setScale(scale) {
@@ -745,15 +534,21 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         board.scale.setScalar(s);
       });
       sphere.radius = LECTERN_BOARD_WIDTH * s * 0.62;
+      dirty = true;
     },
 
     setFog(near, far, color) {
-      fogNear = Math.max(0.5, near);
-      fogFar = Math.max(fogNear + 1, far);
+      const nextNear = Math.max(0.5, near);
+      const nextFar = Math.max(nextNear + 1, far);
       const r = Math.round(color.r * 255);
       const g = Math.round(color.g * 255);
       const b = Math.round(color.b * 255);
-      fogColorCss = `rgb(${r}, ${g}, ${b})`;
+      const css = `rgb(${r}, ${g}, ${b})`;
+      if (nextNear === fogNear && nextFar === fogFar && css === fogColorCss) return;
+      fogNear = nextNear;
+      fogFar = nextFar;
+      fogColorCss = css;
+      dirty = true;
       for (const screen of screens) {
         const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
         if (veil) veil.style.background = fogColorCss;
@@ -761,160 +556,82 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
     },
 
     render(camera, force = false) {
-      // Rule 1: an idle camera costs nothing. The CSS transforms are already
-      // correct, so re-writing identical style strings would only burn style
-      // recalcs — the single most expensive thing this layer can do.
-      const moved =
-        force ||
+      // Includes projection/view-offset and board-size changes, not just the
+      // eye's pose. An idle world does ZERO DOM writes or occlusion tests.
+      const moved = force || dirty ||
         lastCamPos.distanceToSquared(camera.position) > 1e-8 ||
-        Math.abs(lastCamQuat.dot(camera.quaternion)) < 0.9999999;
-
-      // Rules 2 and 3: cull per board, and cull by REMOVING it from layout.
+        Math.abs(lastCamQuat.dot(camera.quaternion)) < 0.9999999 ||
+        !lastProjection.equals(camera.projectionMatrix);
+      if (!moved) return;
+      dirty = false;
+      camera.updateMatrixWorld();
+      cssScene.updateMatrixWorld();
       projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       frustum.setFromProjectionMatrix(projScreen);
+      fittedSlot = null;
 
-      let changed = false;
-      for (const screen of screens) {
-        // The framed board is lifted onto the 2D layer for the whole pin: its
-        // host is parked `display:none` by the pin itself, and its object is
-        // out of the CSS3D scene, so the cull has no business writing to it.
-        if (screen.slot === liftedSlot) continue;
+      for (let i = 0; i < screens.length; i += 1) {
+        const screen = screens[i];
         sphere.center.copy(screen.placement.position);
-        // Is the board in the frustum at all? This one drives the WebGL SHELL
-        // — frame, backing plate and the legs. The shell is a PHYSICAL object,
-        // so it stays visible from every side: walk round the lectern and you
-        // are looking at the back of three boards. Hiding the shell with the
-        // screen (the two used to share one flag) took the whole board out of
-        // the world the moment the camera crossed its face — the owner's
-        // "board cut ho gaya, pura board dikhta hi nahin piche se".
         const inView = frustum.intersectsSphere(sphere);
-        let visible = inView;
-
-        if (visible) {
-          // Back-face cull of the SCREEN. A board's face normal is +Z rotated
-          // by its yaw; if the camera is behind that plane the learner is
-          // looking at the back of the board and the DOM is pure cost.
-          boardNormal.set(Math.sin(screen.placement.yaw), 0, Math.cos(screen.placement.yaw));
-          toCamera.copy(camera.position).sub(screen.placement.position);
-          visible = boardNormal.dot(toCamera) > 0;
-        }
-        if (visible) {
-          // The WHOLE face has to project inside the near/far range, not just
-          // the board's centre. A camera standing in the board's own plane
-          // leaves corners behind the eye, where one CSS3D matrix turns into a
-          // page of tens of thousands of pixels sliced across the view — the
-          // "board cut ho gaya / 60 m board" the owner kept meeting. A board
-          // the eye has walked into shows its shell instead.
-          visible = projectFace(screen, camera).ok;
-        }
-        if (visible) {
-          // The screen is painted by the browser, over the canvas, with no
-          // depth buffer between them — so trees, houses, grass or a hill
-          // cannot hide a board on their own. Test sightlines across the board's
-          // face against terrain/grass, placed trees, the villa, and beach houses.
-          if (moved) occluded.set(screen.slot, boardIsOccluded(camera.position, screen, faceScale));
-          if (occluded.get(screen.slot) === true) visible = false;
+        boardNormal.set(Math.sin(screen.placement.yaw), 0, Math.cos(screen.placement.yaw));
+        toCamera.copy(camera.position).sub(screen.placement.position);
+        let visible = inView && boardNormal.dot(toCamera) > 0 && projectFace(screen, camera).ok;
+        const fitted = screen.slot === readSlot && pinFace(screen, camera);
+        if (fitted) {
+          visible = true;
+          fittedSlot = screen.slot;
+        } else if (visible) {
+          // A focused study board is readable through scenery. In the open
+          // world only a fully obstructed face is hidden, never one leaf.
+          if (screen.slot !== readSlot && boardIsOccluded(camera.position, screen, faceScale, occlusionTarget)) {
+            visible = false;
+          }
         }
 
-        // One number per board — bit 0 the screen, bit 1 the shell — so an
-        // idle camera still writes nothing (see the early return below).
-        const shown = (visible ? 1 : 0) | (inView ? 2 : 0);
+        if (visible && !fitted) {
+          projectBoardMatrix(screen.object, camera, viewW, viewH, SCREEN_PX_WIDTH, SCREEN_PX_HEIGHT, screenMatrix);
+          screen.host.style.transform = `matrix3d(${screenMatrix.elements.join(",")})`;
+          screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
+        }
+        const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0);
         if (visibility.get(screen.slot) !== shown) {
           visibility.set(screen.slot, shown);
-          // `display:none` (not `visibility:hidden`) — this is what actually
-          // stops an off-screen YouTube iframe from decoding video and the
-          // mind-map canvas from compositing. It goes on the HOST: the host is
-          // the element CSS3DRenderer owns, and hiding it takes the whole
-          // panel subtree out of layout with it.
-          screen.host.style.display = visible ? "" : "none";
+          // Never display:none/detach the reading iframe: camera angle is NOT
+          // a playback command. Opacity zero suppresses paint while keeping
+          // its browsing context and user-started media alive. Non-media
+          // surfaces can also skip paint via visibility, without a remount.
+          screen.host.style.opacity = visible ? "1" : "0";
+          screen.host.style.visibility = visible || screen.slot === "reading" ? "visible" : "hidden";
+          screen.host.style.pointerEvents = visible ? "auto" : "none";
+          screen.element.style.pointerEvents = visible ? "auto" : "none";
+          screen.host.inert = !visible;
+          screen.host.setAttribute("aria-hidden", String(!visible));
           screen.object.visible = visible;
-          const shell = shells.children[screens.indexOf(screen)];
-          if (shell) shell.visible = inView;
-          changed = true;
+          const shell = shells.children[i];
+          if (shell) shell.visible = inView || fitted;
         }
       }
 
-      // Fit-screen clicks need a 2D face (CSS3D drops the centre). Lift ONLY
-      // the framed board's surface out of the CSS3D layer — the board itself,
-      // and the two boards beside it, stay exactly where they are.
-      //
-      // The neighbours used to be put away here ("at this close square-on
-      // camera CSS3D-explode into a 60 m page"), which is why framing one
-      // board made the whole lectern vanish — the owner's "kisi bhi board par
-      // shift hota hun to baaki sab boards hide ho jaate hain". That hiding
-      // was a workaround for the projection bug the cull now owns: a page is
-      // only ever painted while its whole face is in front of the eye (see
-      // `projectFace`), so a neighbour the framed camera cannot describe
-      // honestly puts its own screen away and nothing else has to be touched.
-      lastCamera = camera;
-      if (readSlot) {
-        const live = screens.find((s) => s.slot === readSlot);
-        if (live) {
-          if (pinFace(live, camera)) {
-            if (liftedSlot !== live.slot) {
-              liftedSlot = live.slot;
-              // The surface is on the 2D layer now, so the renderer must stop
-              // owning the host it came out of: take the object out of the
-              // scene (its `removed` listener detaches the host), leaving the
-              // pinned face — and every live iframe inside it — untouched.
-              if (live.object.parent === cssScene) cssScene.remove(live.object);
-            }
-            // The framed board is the one being read: its shell is the frame
-            // around the pinned page, so make sure it is drawn.
-            const shell = shells.children[screens.indexOf(live)];
-            if (shell) shell.visible = true;
-          } else if (liftedSlot === live.slot) {
-            // A face that was lifted stopped being projectable (a resize to a
-            // sliver, the board behind the near plane…). Put the board back
-            // whole rather than leaving a half-pinned one: a live 3D board is
-            // always better than a page hidden behind a black slab. The pin is
-            // retried next frame.
-            releaseBoard(live);
-            liftedSlot = null;
-            // The lifted board's entry was written before the pin took its
-            // object out of the scene, so let the next cull re-decide the
-            // whole trio from scratch.
-            visibility.clear();
-          }
-          lastCamPos.copy(camera.position);
-          lastCamQuat.copy(camera.quaternion);
-        }
-      }
-
-      // Distance smoke on every live CSS3D face (WebGL shells get scene.fog
-      // for free; DOM faces need this overlay). Same smoothstep as THREE.Fog.
       const span = Math.max(1e-3, fogFar - fogNear);
       for (const screen of screens) {
-        if (screen.slot === liftedSlot) {
-          // Framed full-bleed board stays fully readable — no fog veil.
-          const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
-          if (veil) veil.style.opacity = "0";
-          continue;
-        }
-        const dist = camera.position.distanceTo(screen.placement.position);
-        let t = (dist - fogNear) / span;
-        if (t < 0) t = 0;
-        else if (t > 1) t = 1;
-        // smoothstep
-        t = t * t * (3 - 2 * t);
-        // Cap so a far board never fully disappears into a grey slab.
-        t = Math.min(0.82, t);
         const veil = (screen.host as HTMLDivElement & { __fogVeil?: HTMLDivElement }).__fogVeil;
-        if (veil) veil.style.opacity = String(t);
+        if (!veil) continue;
+        let t = screen.slot === fittedSlot ? 0 :
+          Math.max(0, Math.min(1, (camera.position.distanceTo(screen.placement.position) - fogNear) / span));
+        t = Math.min(0.82, t * t * (3 - 2 * t));
+        const opacity = String(t);
+        if (veil.style.opacity !== opacity) veil.style.opacity = opacity;
       }
-
-      if (!moved && !changed) return;
-
       lastCamPos.copy(camera.position);
       lastCamQuat.copy(camera.quaternion);
-      renderer.render(cssScene, camera);
+      lastProjection.copy(camera.projectionMatrix);
     },
 
     dispose() {
       for (const screen of screens) {
         cssScene.remove(screen.object);
-        // A pinned face lives on the 2D layer, outside its host — remove both
-        // so nothing is left behind either way.
+        // Detach live content ONLY when leaving the sanctuary.
         screen.element.remove();
         screen.host.remove();
       }

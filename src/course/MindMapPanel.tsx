@@ -934,6 +934,8 @@ const TEXT_FIT_OPTIONS: { value: MindMapTextFit; label: string; hint: string; Ic
 // ── Panel ─────────────────────────────────────────────────────────────────
 
 export interface MindMapPanelProps {
+  /** Independent library/canvas state for a sanctuary account/module. */
+  sessionKey?: string;
   mind: MindMap;
   onMindChange: (updater: MindMap | ((current: MindMap) => MindMap)) => void;
   status: MindMapSaveStatus;
@@ -994,6 +996,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onDeleteMap,
     mapsLoading = false,
     atMapLimit = false,
+    sessionKey,
   } = props;
   /** The map library sheet (grid of this module's maps) is the HOME screen:
    *  it is open by default (fresh player entry) so the learner picks a map to
@@ -1002,7 +1005,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
    *  the panel session instead, so switching tabs never yanks the learner
    *  back to the library. */
   const [libraryOpen, setLibraryOpen] = useState(
-    () => getCoursePanelSession().mindMapView !== "canvas",
+    () => getCoursePanelSession(sessionKey).mindMapView !== "canvas",
   );
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -1063,8 +1066,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const mindTheme: MindMapTheme = "dark";
 
   useEffect(() => {
-    setMindMapSessionView(libraryOpen ? "library" : "canvas");
-  }, [libraryOpen]);
+    setMindMapSessionView(libraryOpen ? "library" : "canvas", sessionKey);
+  }, [libraryOpen, sessionKey]);
 
   useEffect(() => {
     try {
@@ -1099,7 +1102,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const prevOpenRef = useRef(open);
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      const resumeCanvas = getCoursePanelSession().mindMapView === "canvas";
+      const resumeCanvas = getCoursePanelSession(sessionKey).mindMapView === "canvas";
       setLibraryOpen(!resumeCanvas);
       setRenamingKey(null);
       setRenameDraft("");

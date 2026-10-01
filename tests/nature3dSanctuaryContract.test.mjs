@@ -1274,14 +1274,14 @@ test("board panels keep native vertical scroll on touch", () => {
 
 test("the DOM boards are culled the way BGMI culls the world", () => {
   // 1. An idle camera writes no styles at all.
-  assert.match(SCREENS, /if \(!moved && !changed\) return;/);
+  assert.match(SCREENS, /if \(!moved\) return;/);
   // 2. Frustum + back-face culled per board.
   assert.match(SCREENS, /frustum\.intersectsSphere\(sphere\)/);
   assert.match(SCREENS, /boardNormal\.dot\(toCamera\) > 0/);
-  // 3. display:none, NOT visibility:hidden — only the former stops an
-  //    off-screen YouTube iframe from decoding video.
-  assert.match(SCREENS, /style\.display = visible \? "" : "none"/);
-  assert.ok(!/visibility = "hidden"/.test(SCREENS), "visibility:hidden keeps video decoding");
+  // 3. Camera culling suppresses paint, never detaches/stops a live video.
+  assert.match(SCREENS, /style\.opacity = visible \? "1" : "0"/);
+  assert.match(SCREENS, /visible \|\| screen\.slot === "reading" \? "visible" : "hidden"/);
+  assert.doesNotMatch(SCREENS, /style\.display =/);
 
   // 4. Reading one board drops the ambient world to a quarter rate, the same
   //    trade BGMI makes when the scope opens.
@@ -1482,24 +1482,14 @@ test("course ownership is resolved from every source, not just the legacy one", 
   );
 });
 
-test("nothing is auto-selected, so the side boards open empty", () => {
-  // THE BUG: `activeCourse={ownedCourses[0]}` silently scoped the notes and
-  // mind-map boards to whichever course the catalogue happened to return
-  // first, so they opened showing somebody's existing notes.
-  assert.ok(
-    !/activeCourse=\{ownedCourses\[0\]/.test(PAGE),
-    "the first owned course must not be auto-selected",
-  );
+test("no catalogue course is auto-selected; unpicked boards have a private saveable scope", () => {
+  assert.doesNotMatch(PAGE, /activeCourse=\{ownedCourses\[0\]/);
   assert.match(STUDY_BOARDS, /const \[selectedCourseId, setSelectedCourseId\] = useState<string \| null>\(null\)/);
   assert.match(STUDY_BOARDS, /const \[selectedModuleId, setSelectedModuleId\] = useState<string \| null>\(null\)/);
-
-  // With no course picked the notes panel is handed an empty list — so the
-  // board shows only the circular "+", as asked.
-  assert.match(STUDY_BOARDS, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
-  // Stable identity: a fresh [] every render would rebuild the grid forever.
-  assert.match(STUDY_BOARDS, /const EMPTY_NOTES: CoursePlayerNote\[\] = \[\];/);
-
-  // Losing entitlement to the selected course must clear it.
+  // Empty ONLY on first use: returning learners must see their own saved
+  // personal work. An unscoped editable panel was the original save bug.
+  assert.match(STUDY_BOARDS, /SANCTUARY_PERSONAL_SCOPE = "__sanctuary__"/);
+  assert.match(STUDY_BOARDS, /const productId = activeCourse\?\.id \?\? \(uid \? SANCTUARY_PERSONAL_SCOPE : null\)/);
   assert.match(STUDY_BOARDS, /if \(selectedCourseId && !activeCourse\)/);
 });
 
@@ -1521,7 +1511,7 @@ test("the learner picks the course and then the module themselves", () => {
   assert.match(STUDY_BOARDS, /const boardModuleId = selectedModuleId \?\? \(productId \? SANCTUARY_COURSE_MAP_SCOPE : null\);/);
 });
 
-test("the notes and mind map panels are the player's own, unmodified", () => {
+test("the boards reuse the player panels and cloud hooks, with isolated editor sessions", () => {
   // The brief is explicit that the design must not change: same toolbar, same
   // editor, same library. So they are imported, never re-implemented.
   assert.match(STUDY_BOARDS, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
@@ -1530,7 +1520,10 @@ test("the notes and mind map panels are the player's own, unmodified", () => {
   // The DATA layer is the player's own too — the same cloud hook, so a note
   // written on the board is the same Firestore document the player shows.
   assert.match(STUDY_BOARDS, /import useCourseNotes from "\.\.\/\.\.\/course\/useCourseNotes"/);
-  assert.match(STUDY_BOARDS, /const \{ notes, add, edit, remove, status, errorMessage, lastSavedAt \} = useCourseNotes\(\{/);
+  assert.match(STUDY_BOARDS, /const \{ notes, add, edit, remove, flush, status, errorMessage, lastSavedAt \} = useCourseNotes\(\{/);
+  assert.match(STUDY_BOARDS, /const notes = useBoardNotes\(uid, productId\)/);
+  assert.match(STUDY_BOARDS, /sessionKey=\{notesSessionKey\}/);
+  assert.match(STUDY_BOARDS, /notes=\{notes\.notes\}/);
 });
 
 test("animals standing on the ground are gone, birds are not", () => {
@@ -1625,27 +1618,16 @@ test("the boards render inside the course-player style scope", () => {
   assert.match(read("src/personal-library/StudyLibraryPage.tsx"), /course-player-shell/);
 });
 
-test("the side boards stay empty until the learner picks a course", () => {
-  // Verified separately by rendering the real NotesPanel in jsdom:
-  //   notes=[]           -> 0 cards, only the circular "+"
-  //   notes=[2 notes]    -> 2 cards          (the panel is not simply broken)
-  //   click "+"          -> mode "compose", 13 toolbar buttons
-  // so an empty board is the DATA's doing, which is what these pin.
-  assert.match(STUDY_BOARDS, /notes=\{activeCourse \? notes\.notes : EMPTY_NOTES\}/);
-  assert.match(STUDY_BOARDS, /const EMPTY_NOTES: CoursePlayerNote\[\] = \[\];/);
-  // Notes are keyed per user AND per product, so one course's notes can never
-  // appear under another.
+test("side boards isolate personal/course/account data and require sign-in to edit", () => {
+  assert.match(STUDY_BOARDS, /notes=\{notes\.notes\}/);
   assert.match(STUDY_BOARDS, /useBoardNotes\(uid, productId\)/);
-  assert.match(STUDY_BOARDS, /const productId = activeCourse\?\.id \?\? null;/);
-  assert.match(
-    read("src/course/notesStore.ts"),
-    /`dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/,
-  );
-  // The mind map is scoped the same way and gets NO product until one is
-  // picked — `undefined`, not `""`, because an empty string passes a `!= null`
-  // check and would build a shared `{uid}____{moduleId}` document id.
+  assert.match(STUDY_BOARDS, /const productId = activeCourse\?\.id \?\? \(uid \? SANCTUARY_PERSONAL_SCOPE : null\)/);
+  assert.match(read("src/course/notesStore.ts"), /`dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/);
   assert.match(STUDY_BOARDS, /productId: productId \?\? undefined,/);
   assert.doesNotMatch(STUDY_BOARDS, /productId: productId \?\? ""/);
+  assert.match(STUDY_BOARDS, /signedIn \? <NotesPanel/);
+  assert.match(STUDY_BOARDS, /signedIn \? <MindMapPanel/);
+  assert.match(STUDY_BOARDS, /Sign in to create and save/);
 });
 
 test("the lesson board sits where a seated learner can read it", () => {
