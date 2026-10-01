@@ -20,7 +20,7 @@ test('page wires the real character HUD, lifecycle callbacks, walk dock, overlay
   assert.match(page, /id: "walk"/); assert.match(page, /setCharacterMode\("third-person"\)/);
   assert.match(page, /setOverlayOpen\(menuOpen \|\| moduleMenuOpen \|\| showLesson\)/);
   assert.match(page, /canvas ref=\{canvasRef\} tabIndex=\{0\}/);
-  assert.match(ui, /data-character-asset-status/); assert.match(ui, /original UE export pending/);
+  assert.match(ui, /data-character-asset-status/); assert.match(ui, /\{status\.label\}/);
   assert.match(ui, /data-character-stick/); assert.match(ui, /stageLocalDelta/);
 });
 

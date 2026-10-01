@@ -71,7 +71,7 @@ import {
   type BoardScreen,
   type BoardScreensHandle,
 } from "./boardScreens";
-import { createTrekAvatar, type TrekAvatar } from "./trekAvatar";
+import { createEmptyAvatar, type TrekAvatar } from "./characterPlayer";
 import { CharacterController } from "./characterController";
 import { CharacterCollisionWorld, type CharacterCollider } from "./characterCollision";
 import { CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SCALE, CHARACTER_SPAWN, characterEyeHeight, type CharacterCameraMode } from "./characterConfig";
@@ -892,8 +892,9 @@ export class Sanctuary {
     // persistence. Nothing to restore either — its place is fixed in code.
 
     this.syncStudyColliders();
-    this.avatar = createTrekAvatar(this.budget.shadowMapSize > 0);
-    this.avatar.group.name = "sanctuary-character";
+    // No procedural stand-in. The Sanctuary shows the authorized character
+    // or no character at all — never a substitute that hides a failed import.
+    this.avatar = createEmptyAvatar();
     this.avatar.group.position.copy(this.character.position);
     this.avatar.setLowEnd(this.budget.tier === "low");
     this.scene.add(this.avatar.group);

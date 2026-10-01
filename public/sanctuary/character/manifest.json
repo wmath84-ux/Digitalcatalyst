@@ -55,9 +55,22 @@
     "userRightsConfirmation": "User explicitly confirmed export, web deployment and redistribution rights on 2026-10-01.",
     "facing": "Measured from the deployed mesh: face/eyes point +Z in the GLB node space, so the runtime rotates the model 180 degrees onto the -Z travel axis.",
     "scope": "character-only",
-    "sha256": "74bb7b35253f462dc7620448bf955d9559f2272a7d5c920ce1439e9799835d4a",
-    "bytes": 43188972,
+    "sha256": "b6b54ed733741934a068ead3576f122cba37bab0b7b60bf7c263867678974698",
+    "bytes": 11074284,
     "missingOptional": [],
-    "nativeUnrealFeatures": "Unreal Blueprint/Control Rig, physical-animation ragdoll and skirt cloth do not execute in Three.js."
+    "nativeUnrealFeatures": "Unreal Blueprint/Control Rig, physical-animation ragdoll and skirt cloth do not execute in Three.js.",
+    "webTextureReencode": {
+      "why": "The 43.2 MB export took so long to download that the Sanctuary kept drawing a stand-in figure instead; the stand-in is now deleted and the download is small enough to arrive quickly.",
+      "textures": {
+        "format": "WebP q0.9 (PNG retained when the browser returns JPEG instead)",
+        "baseMaps": "downsampled to <=2048 px",
+        "normalSpecularOcclusionMaps": "downsampled to <=1024 px",
+        "bytesBefore": 34982501,
+        "bytesAfter": 2893324
+      },
+      "unchanged": "Every non-image byte: mesh, 84-bone skeleton, skin weights, materials and all 26 animation clips (all 12013 non-image buffer views verified byte-identical).",
+      "totalBytesBefore": 43188972,
+      "totalBytesAfter": 11074284
+    }
   }
 }

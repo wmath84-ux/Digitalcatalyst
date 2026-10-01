@@ -21,7 +21,7 @@ before(async () => {
       export * from './src/nature3d/engine/characterConfig';
       export * from './src/nature3d/engine/characterManifest';
       export * from './src/nature3d/engine/characterAsset';
-      export * from './src/nature3d/engine/trekAvatar';
+      export * from './src/nature3d/engine/characterPlayer';
       export * from './src/nature3d/engine/dayBed';
       export * from './src/nature3d/engine/quality';
       export * from './src/nature3d/engine/atmosphere';
@@ -49,18 +49,34 @@ function box(id, x, z, halfX, halfZ, height, baseY = 0, yaw = 0, cover = false) 
 function close(a, b, epsilon = 1e-6) { assert.ok(Math.abs(a - b) < epsilon, `${a} != ${b}`); }
 
 
-test('guide neutral bounds measure exactly 18 ft, with feet at the terrain origin', () => {
-  const v = api.createTrekAvatar(false);
-  const b = new THREE.Box3().setFromObject(v.group);
-  close(api.CHARACTER_HEIGHT, 5.4864, 1e-9);
-  close(api.CHARACTER_SCALE, 3);
-  close(api.characterEyeHeight(), api.CHARACTER_HEIGHT * api.EYE_HEIGHT_RATIO);
-  close(b.max.y - b.min.y, api.CHARACTER_HEIGHT);
-  close(b.min.y, 0);
-  assert.equal(v.seated, false);
-  assert.equal(v.group.userData.characterSource, 'procedural');
-  assert.match(api.FALLBACK_CHARACTER_STATUS.detail, /not installed/);
-  v.dispose();
+test('no procedural stand-in: the placeholder body is empty and never seats', () => {
+  const avatar = api.createEmptyAvatar();
+  assert.equal(avatar.group.name, 'sanctuary-character');
+  assert.equal(avatar.group.children.length, 0, 'a substitute figure must never be built');
+  assert.equal(avatar.group.userData.characterHeight, api.CHARACTER_HEIGHT);
+  assert.equal(avatar.group.userData.characterSource, 'none');
+  assert.equal(avatar.seated, false);
+  avatar.setSeated(true);
+  assert.equal(avatar.seated, false, 'there is no stand-in to seat');
+  avatar.setVisible(false); avatar.setLowEnd(true);
+  avatar.update(1 / 60, 0, player(), new THREE.PerspectiveCamera(52, 16 / 9));
+  avatar.dispose();
+});
+
+test('long mixed-input runs keep the controller finite on slopes, in cover and mid-air', () => {
+  const p = player((x, z) => Math.sin(x * 0.3) * 1.4 + Math.cos(z * 0.25) * 1.4, 40);
+  p.world.setGroup('cover', [box('cover', 0, -3, 1.8, 0.2, api.CHARACTER_HEIGHT + 3.5, 0, 0, true)]);
+  const camera = new THREE.PerspectiveCamera(52, 16 / 9);
+  for (let i = 0; i < 900; i++) {
+    const t = i / 60;
+    p.setInput(Math.sin(t * 1.7), Math.cos(t * 2.3), i % 120 < 60, i % 200 < 80);
+    if (i % 150 === 0) p.jump();
+    if (i % 300 === 0) p.toggleCover();
+    p.update(1 / 60, camera);
+    assert.ok(Number.isFinite(p.position.x + p.position.y + p.position.z + p.rotation + p.speed),
+      `non-finite controller state at frame ${i}`);
+  }
+  assert.ok(Number.isFinite(camera.position.length()), 'camera must stay finite');
 });
 
 test('the facing convention puts a +Z model on the -Z travel axis without mirroring it', () => {
@@ -285,23 +301,6 @@ test('leaving character mode mid-jump parks the guide on the ground, never seate
   const p = player(); p.jump(); advance(p, 0.2); assert.ok(p.position.y > 0.5);
   p.setMode('orbit'); advance(p, 1);
   close(p.position.y, 0); assert.equal(p.grounded, true); assert.equal(p.state, 'idle');
-});
-
-test('standing/crouching/running/strafe rig stays finite, with crouched boots and knees above flat ground', () => {
-  for (const [x, y, run, crouch] of [[0, 0, false, true], [0, 1, false, true], [1, 0, false, true], [0, 1, true, false]]) {
-    const v = api.createTrekAvatar(false), p = player(), c = new THREE.PerspectiveCamera(52, 16 / 9);
-    for (let i = 0; i < 180; i++) {
-      p.setInput(x, y, run, crouch); p.update(1 / 60);
-      v.group.position.copy(p.position); v.group.rotation.y = p.rotation;
-      c.position.copy(p.position).add(new THREE.Vector3(0, 2, 4)); v.update(1 / 60, i / 60, p, c);
-      const b = new THREE.Box3().setFromObject(v.group);
-      assert.ok(Number.isFinite(b.max.length() + b.min.length()));
-      if (crouch && i > 60) assert.ok(b.min.y >= -0.05 * api.CHARACTER_SCALE, `crouch foot/knee clipping: ${b.min.y}`);
-      if (crouch && i > 60) assert.ok(b.max.y < api.CROUCH_HEIGHT + 0.04);
-      v.group.traverse(o => { if (o.name === 'kneeL' || o.name === 'kneeR') assert.ok(o.rotation.x <= 0.05); });
-    }
-    v.dispose();
-  }
 });
 
 test('low-tier precision keeps both stages highp without replacing/changing shader hooks or cache keys', () => {

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { damp } from "./controls";
-import { TrekPlayer } from "./trekAvatar";
+import { TrekPlayer } from "./characterPlayer";
 import { CharacterCollisionWorld, type CoverContact } from "./characterCollision";
 import {
   CAMERA_PIVOT_RATIO, CHARACTER_HEIGHT, CHARACTER_RADIUS, CHARACTER_SCALE, CHARACTER_SPAWN, CHARACTER_TUNING as T,

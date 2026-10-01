@@ -1,8 +1,10 @@
-// Smoke harness for the REAL eighteen-foot player and visual rig.
+// Smoke harness for the REAL eighteen-foot player, its placeholder body and
+// the authorized character asset pipeline.
 // Detailed behavior/asset/browser regressions: npm run test:sanctuary:character
 // Run this alongside the existing shader/world harnesses via verify-nature3d.sh.
 import * as THREE from "three";
-import { createTrekAvatar } from "../src/nature3d/engine/trekAvatar";
+import { createEmptyAvatar } from "../src/nature3d/engine/characterPlayer";
+import { FALLBACK_CHARACTER_STATUS } from "../src/nature3d/engine/characterManifest";
 import { CharacterController } from "../src/nature3d/engine/characterController";
 import { CharacterCollisionWorld } from "../src/nature3d/engine/characterCollision";
 import { CHARACTER_HEIGHT, CHARACTER_TUNING } from "../src/nature3d/engine/characterConfig";
@@ -12,20 +14,13 @@ function check(name: string, ok: boolean, detail = "") {
   if (!ok) failures++;
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 }
-const avatar = createTrekAvatar(false);
-const box = new THREE.Box3().setFromObject(avatar.group);
-check("rig: neutral mesh is exactly eighteen feet", Math.abs(box.getSize(new THREE.Vector3()).y - CHARACTER_HEIGHT) < 1e-6);
-check("rig: standing, explicitly procedural, never the original Unreal character", !avatar.seated && avatar.group.userData.characterSource === "procedural");
-let triangles = 0, meshes = 0;
-const materials = new Set<THREE.Material>();
-avatar.group.traverse(o => {
-  const mesh = o as THREE.Mesh;
-  if (!mesh.isMesh) return;
-  meshes++;
-  triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
-  for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) materials.add(m);
-});
-check("rig: low-end geometry/material budget", triangles <= 8000 && materials.size <= 2 && meshes <= 24, `${triangles} tris, ${materials.size} materials, ${meshes} meshes`);
+// The Sanctuary must never draw a stand-in figure: a procedural look-alike
+// used to cover for a character that had not loaded at all.
+const avatar = createEmptyAvatar();
+check("placeholder: no procedural stand-in body", avatar.group.children.length === 0 && avatar.group.userData.characterSource === "none");
+check("placeholder: still reports the eighteen-foot capsule", avatar.group.userData.characterHeight === CHARACTER_HEIGHT && avatar.group.name === "sanctuary-character");
+check("placeholder: status is honest about having no substitute figure",
+  FALLBACK_CHARACTER_STATUS.kind === "loading" && /no substitute figure/.test(FALLBACK_CHARACTER_STATUS.detail));
 const world = new CharacterCollisionWorld(() => 0);
 const player = new CharacterController(world);
 const camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 4000);
@@ -41,11 +36,9 @@ player.setMode("third-person");
 let finite = true;
 for (let i = 0; i < 180; i++) {
   player.setInput(Math.sin(i * 0.02), 1, false, true); player.update(1 / 60, camera);
-  avatar.group.position.copy(player.position); avatar.group.rotation.y = player.rotation;
-  avatar.update(1 / 60, i / 60, player, camera);
-  avatar.group.traverse(o => { if (!Number.isFinite(o.position.lengthSq() + o.quaternion.lengthSq())) finite = false; });
+  if (!Number.isFinite(player.position.lengthSq() + player.rotation + player.speed)) finite = false;
 }
-check("pose: moving/crouched rig remains finite", finite);
+check("pose: mixed-input controller remains finite", finite);
 avatar.dispose(); world.dispose();
 console.log(failures ? `\n${failures} AVATAR CHECK(S) FAILED` : "\nALL AVATAR CHECKS PASSED");
 process.exitCode = failures ? 1 : 0;

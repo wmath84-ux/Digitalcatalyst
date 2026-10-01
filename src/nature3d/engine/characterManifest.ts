@@ -17,14 +17,19 @@ export interface CharacterManifest {
   boneMap?: Partial<Record<typeof BONE_ROLES[number], string>>;
 }
 export interface CharacterAssetStatus {
-  kind: "procedural" | "imported" | "error";
+  kind: "loading" | "imported" | "error";
   label: string;
   detail: string;
 }
+/**
+ * The Sanctuary no longer ships a procedural stand-in figure. Until the
+ * authorized model arrives there is simply no character; a look-alike used to
+ * hide a failed import, which made the real asset impossible to verify.
+ */
 export const FALLBACK_CHARACTER_STATUS: CharacterAssetStatus = Object.freeze({
-  kind: "procedural",
-  label: "Sanctuary guide · 18 ft",
-  detail: "Original web guide. Exact Unreal character/animations require a licensed GLB export; they are not installed yet.",
+  kind: "loading",
+  label: "Original character · loading…",
+  detail: "Fetching the authorized Katiusza model. There is no substitute figure, so the world shows no character until it arrives.",
 });
 
 export function parseCharacterManifest(value: unknown): CharacterManifest {

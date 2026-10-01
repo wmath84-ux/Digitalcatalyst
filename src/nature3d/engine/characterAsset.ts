@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { damp } from "./controls";
 import { CHARACTER_HEIGHT, CHARACTER_SCALE } from "./characterConfig";
 import { terrainNormal } from "./terrain";
-import type { TrekAvatar, TrekPlayer } from "./trekAvatar";
+import type { TrekAvatar, TrekPlayer } from "./characterPlayer";
 
 import { ANIMATION_KEYS, readCharacterManifest, type AnimationKey, type CharacterManifest, type CharacterAssetStatus } from "./characterManifest";
 export { ANIMATION_KEYS, BONE_ROLES, FALLBACK_CHARACTER_STATUS, parseCharacterManifest } from "./characterManifest";

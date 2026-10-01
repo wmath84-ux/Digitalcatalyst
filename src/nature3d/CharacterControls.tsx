@@ -115,7 +115,7 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
       </div>
 
       <p data-character-asset-status role="status" className="sanctuary-character-source" title={status.detail}>
-        {status.kind === "imported" ? status.label : "Web guide · 18 ft — original UE export pending"}
+        {status.label}
       </p>
       {walking ? (
         <>

@@ -695,29 +695,19 @@ test("locomotion has analog normalization, limited turn and distance-driven gait
   assert.match(CHARACTER, /turnInPlaceDelay/);
 });
 
-test("the character is a jointed rig with foot IK, not the stick human", () => {
-  const trek = read("src/nature3d/engine/trekAvatar.ts");
-  // Full joint hierarchy: spine chain, arms with elbows + wrists, legs with
-  // knees + ankles.
-  assert.match(trek, /const pelvisG = joint\(body, 0, PELVIS_Y, 0\)/);
-  assert.match(trek, /const neckG = joint\(chestG, 0, 0\.2, 0\)/);
-  assert.match(trek, /const elbowL = armBuildL\.elbow/);
-  assert.match(trek, /const wristL = armBuildL\.wrist/);
-  assert.match(trek, /const kneeL = legBuildL\.knee/);
-  assert.match(trek, /const ankleL = legBuildL\.ankle/);
-  // Two materials, vertex-coloured, nothing transparent anywhere.
-  assert.match(trek, /vertexColors: true/);
-  assert.ok(!/transparent:\s*true/.test(trek), "the rig must stay fully opaque");
-  // Analytic two-bone foot IK with staggered updates.
-  assert.match(trek, /function solveLeg\(/);
-  assert.match(trek, /function updateFoot\(/);
-  assert.match(trek, /STAGGER/i);
-  // The old monochrome body must be GONE.
-  assert.ok(!/SphereGeometry\(0\.24, 24, 18\)/.test(trek), "stick-human head is back");
-  assert.ok(!/CapsuleGeometry\(0\.22, 0\.75, 6, 18\)/.test(trek), "stick-human torso is back");
-  // Deterministic: no Math.random in the character (seeded PRNG instead).
-  const code = trek.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!/Math\.random\(\)/.test(code), "the character must stay deterministic");
+test("no procedural stand-in figure exists; the placeholder body is empty", () => {
+  // A substitute look-alike used to render whenever the licensed model was
+  // missing or still downloading, which hid failed imports completely.
+  assert.ok(!existsSync(new URL("../src/nature3d/engine/trekAvatar.ts", import.meta.url)),
+    "the procedural guide must stay deleted");
+  const scene = read("src/nature3d/engine/scene.ts").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(scene, /createTrekAvatar/);
+  assert.match(scene, /createEmptyAvatar\(/);
+  const player = read("src/nature3d/engine/characterPlayer.ts");
+  assert.match(player, /group\.name = "sanctuary-character"/);
+  assert.match(player, /characterSource = "none"/);
+  assert.match(player, /setSeated\(\) \{ \/\* No substitute figure to seat\. \*\/ \}/);
+  assert.doesNotMatch(player, /Geometry\(/);
 });
 
 test("jump, collision-tested camera and player pose are wired into the live scene", () => {
