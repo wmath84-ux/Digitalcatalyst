@@ -94,10 +94,10 @@ const ALPHA_URL = "sanctuary/models/textures/grass_medium_02_alpha_1k.png";
  */
 function tuftCounts(budget: QualityBudget): [number, number] {
   switch (budget.tier) {
-    case "low": return [64, 20];
-    case "medium": return [400, 100];
-    case "high": return [700, 180];
-    case "ultra": return [1000, 280];
+    case "low": return [24, 0];
+    case "medium": return [48, 0];
+    case "high": return [72, 0];
+    case "ultra": return [96, 0];
   }
 }
 

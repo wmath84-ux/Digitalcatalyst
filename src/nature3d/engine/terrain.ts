@@ -634,6 +634,71 @@ export function terrainNormal(x: number, z: number, out = new THREE.Vector3()): 
  * UVs from world metres, so every shell wears the texture at one texel
  * density and the seams between shells line up exactly.
  */
+function createGroundDecalTexture(): THREE.DataTexture {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size * 2 - 1;
+      const v = (y + 0.5) / size * 2 - 1;
+      const r = Math.sqrt(u * u * 0.72 + v * v * 1.35);
+      const noise = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      const grain = noise - Math.floor(noise);
+      const a = Math.max(0, 1 - smoothstep(0.18, 1.0, r)) * (0.45 + grain * 0.42);
+      const i = (y * size + x) * 4;
+      data[i] = 58; data[i + 1] = 47; data[i + 2] = 37; data[i + 3] = Math.round(a * 160);
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function createGroundDecals(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "ground-decals";
+  const tex = createGroundDecalTexture();
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity: 0.34, depthWrite: false, fog: true,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+  });
+  const geo = new THREE.PlaneGeometry(1, 1, 1, 1);
+  geo.rotateX(-Math.PI / 2);
+  const count = 44;
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.name = "mud-leaf-track-decals";
+  mesh.frustumCulled = false;
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  const dummy = new THREE.Object3D();
+  let seed = 0xdecafbad;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = 0; i < count; i += 1) {
+    const onTrail = i < 24;
+    const z = onTrail ? -180 + rand() * 360 : -260 + rand() * 520;
+    const x = onTrail ? (rand() - 0.5) * 11 : (rand() - 0.5) * 360;
+    const h = terrainHeight(x, z);
+    dummy.position.set(x, h + 0.055, z);
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+    dummy.scale.set(
+      (onTrail ? 4.5 : 2.4) * (0.65 + rand() * 0.9),
+      1,
+      (onTrail ? 1.4 : 2.0) * (0.55 + rand() * 1.1),
+    );
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  mesh.instanceMatrix.needsUpdate = true;
+  group.add(mesh);
+  group.userData.dispose = () => { geo.dispose(); mat.dispose(); tex.dispose(); };
+  return group;
+}
+
 function buildRadialShell(
   inner: number,
   outer: number,
@@ -869,6 +934,20 @@ export function buildTerrain(
         `,
       )
       .replace(
+        "#include <roughnessmap_fragment>",
+        /* glsl */ `
+        #include <roughnessmap_fragment>
+        // PDF rule: wet mud / tire-worn dark ground is glossy, dry dirt is
+        // matte. Do it analytically from the same macro texture and shoreline
+        // height — no extra texture fetch, no decal pass.
+        float dcRoughShore = vDcWorldPos.y - uDcOceanLevel;
+        float dcRoughWet = 1.0 - smoothstep( 0.15, 3.2, dcRoughShore );
+        float dcRoughBreak = texture2D( map, vMapUv * 0.08 + vec2( 0.17, 0.31 ) ).g;
+        float dcTrackGloss = smoothstep( 0.58, 0.84, dcRoughBreak ) * ( 1.0 - smoothstep( 2.5, 18.0, abs( dcRoughShore ) ) );
+        roughnessFactor = clamp( mix( 0.94, 0.34, max( dcRoughWet, dcTrackGloss * 0.55 ) ), 0.28, 0.96 );
+        `,
+      )
+      .replace(
         "#include <color_fragment>",
         /* glsl */ `
         #include <color_fragment>
@@ -1054,6 +1133,11 @@ export function buildTerrain(
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
   });
+
+  const decals = createGroundDecals();
+  decals.updateMatrix();
+  decals.matrixAutoUpdate = false;
+  group.add(decals);
 
   return group;
 }

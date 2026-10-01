@@ -112,9 +112,31 @@ export class CharacterCollisionWorld {
     return ex * ex + ez * ez < margin * margin || (Math.abs(lx) <= c.halfX && Math.abs(lz) <= c.halfZ);
   }
 
+  /**
+   * Capsule support height: sample under the centre and under the capsule rim.
+   * On steep hills a centre-only sample lets the visual body cut into the uphill
+   * side of the terrain. BGMI-style controllers solve against a simple capsule,
+   * but they still support it from multiple ground probes; this is the cheap
+   * WebGL version (five height samples, no triangle raycasts).
+   */
+  terrainSupportAt(x: number, z: number, supportRadius = 0): number {
+    let h = this.terrainAt(x, z);
+    if (supportRadius <= 0.001) return h;
+    const r = supportRadius * 0.72;
+    const h1 = this.terrainAt(x + r, z);
+    const h2 = this.terrainAt(x - r, z);
+    const h3 = this.terrainAt(x, z + r);
+    const h4 = this.terrainAt(x, z - r);
+    if (h1 > h) h = h1;
+    if (h2 > h) h = h2;
+    if (h3 > h) h = h3;
+    if (h4 > h) h = h4;
+    return h;
+  }
+
   /** Top of a prop is a platform only when approached from above/a small step. */
   floorAt(x: number, z: number, previousFeetY: number, stepHeight: number, supportRadius = 0): number {
-    let floor = this.terrainAt(x, z);
+    let floor = this.terrainSupportAt(x, z, supportRadius);
     for (const item of this.nearby(x, z)) {
       const c = item.source;
       const top = c.baseY + c.height;
@@ -194,7 +216,7 @@ export class CharacterCollisionWorld {
   }
 
   cameraBlocked(x: number, y: number, z: number, radius: number): boolean {
-    if (y < Math.max(this.terrainAt(x, z), this.waterAt(x, z)) + radius) return true;
+    if (y < Math.max(this.terrainSupportAt(x, z, radius), this.waterAt(x, z)) + radius) return true;
     for (const item of this.nearby(x, z)) {
       const c = item.source;
       if (y > c.baseY - radius && y < c.baseY + c.height + radius && this.inside(item, x, z, radius)) return true;

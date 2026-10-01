@@ -46,6 +46,7 @@ import { createRockField, type RockField } from "./rocks";
 import { createWildlife, type Wildlife } from "./wildlife";
 import { createMountainForest, type MountainForest } from "./mountainForest";
 import { createFarRange, type FarRange } from "./farRange";
+import { createFarImpostorForest, type FarImpostorForest } from "./farImpostors";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
@@ -57,8 +58,8 @@ import {
   ensureBeachHouseSites,
   type BeachHouses,
 } from "./beachHouses";
-import { WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
-import { HOUSE_RIDGE, beachHouseSites } from "./beachHouseSite";
+import { WAREHOUSE_HALF_X, WAREHOUSE_HALF_Z, WAREHOUSE_HEIGHT, WAREHOUSE_X, WAREHOUSE_YAW, WAREHOUSE_Z } from "./warehouseSite";
+import { HOUSE_RIDGE, beachHouseSites, type BeachHouseSite } from "./beachHouseSite";
 import { OrbitRig } from "./controls";
 import { stageLocalDelta } from "../stagePointer";
 import { createDesk, disposeGroup, LECTERN_BOARD_HEIGHT, LECTERN_BOARD_WIDTH, type LecternSlot } from "./lectern";
@@ -90,6 +91,11 @@ const BOARD_VIEW_MARGIN = 0.5;
 
 /** The anime skybox panorama (equirect JPEG extracted from the Sketchfab GLB). */
 const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
+
+/** PUBG/BGMI-style fixed noon: one sun angle, one sky grade, no dynamic day/night. */
+const FIXED_PUBG_DAYLIGHT_HOUR = 12.35;
+/** Vegetation is static in the reconstructed mobile world; no wind sway ticks. */
+const STATIC_VEGETATION_WORLD = true;
 
 export type ViewPreset =
   | "sanctuary" | "board" | "student" | "waterfall"
@@ -195,6 +201,8 @@ export class Sanctuary {
    * ~1.4 k-vertex mesh, one draw call); static for the life of the scene.
    */
   private farRange: FarRange | null = null;
+  /** PUBG-style far forest HLOD: static alpha-card buckets at the skyline. */
+  private farImpostors: FarImpostorForest | null = null;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -285,7 +293,7 @@ export class Sanctuary {
   private raf = 0;
   private running = false;
   private visible = true;
-  private wind = 1;
+  private wind = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
   private lastStats = 0;
@@ -483,10 +491,22 @@ export class Sanctuary {
     // terrain bakes them into its vertex colours during the build. `treeLayout`
     // is pure and seeded, so this yields exactly the trees createFlora will
     // place a few lines later.
+    const bakedObjectShadows = [
+      ...canopyShadowDiscs(this.budget.treeCount),
+      ...beachHouseSites().map((site) => ({
+        // Fixed fake shadow/contact grounding for instanced houses. A circular
+        // AO proxy is intentionally cheap; the sun angle is fixed, so this is
+        // the baked-shadow replacement for runtime shadow maps.
+        x: site.x - Math.sin(site.yaw) * site.halfZ * 0.42,
+        z: site.z - Math.cos(site.yaw) * site.halfZ * 0.42,
+        r: Math.max(site.halfX, site.halfZ) * 1.55,
+      })),
+      { x: WAREHOUSE_X - 4, z: WAREHOUSE_Z - 7, r: Math.max(WAREHOUSE_HEIGHT * 0.62, 18) },
+    ];
     const terrain = buildTerrain(
       this.budget,
       this.textures.ground,
-      canopyShadowDiscs(this.budget.treeCount),
+      bakedObjectShadows,
     );
     this.scene.add(terrain);
     // The ground takes the atmosphere pass but NOT the transmission term —
@@ -506,6 +526,11 @@ export class Sanctuary {
     this.scene.add(this.farRange.group);
     this.atmosphere.registerTree(this.farRange.group);
     if (this.budget.halfPrecision) halfPrecisionTree(this.farRange.group);
+
+    this.farImpostors = createFarImpostorForest(this.textures, this.budget);
+    this.scene.add(this.farImpostors.group);
+    this.farImpostors.materials.forEach((m) => this.atmosphere.register(m));
+    if (this.budget.halfPrecision) halfPrecisionTree(this.farImpostors.group);
 
     // ROCKS BEFORE GRASS: the rock kit publishes the base of every boulder it
     // places, and the grass field plants a skirt of blades around each one
@@ -779,7 +804,10 @@ export class Sanctuary {
         }
         this.warehouse = building;
         this.scene.add(building.group);
-        this.installPropCollider("villa", building.group);
+        // PUBG-style explorable villa: proper simple wall hitboxes instead of one
+        // sealed footprint. The front has a doorway gap, so the character can go
+        // inside while still colliding with the outer shell.
+        this.installVillaInteriorColliders();
         building.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(building.group);
         this.winter.registerTree(building.group);
@@ -801,10 +829,10 @@ export class Sanctuary {
         }
         this.beachHouses = district;
         this.scene.add(district.group);
-        this.characterWorld.setGroup("houses", district.sites.map((site, i) => ({
-          id: `house-${i}`, kind: "box", x: site.x, z: site.z, yaw: site.yaw,
-          halfX: site.halfX, halfZ: site.halfZ, baseY: site.padY, height: 18.92 * site.scale, cover: true,
-        })));
+        // PUBG-style explorable homesteads: simple wall hitboxes instead of one
+        // sealed footprint. Each house gets four wall segments with a front door
+        // gap, so the character can enter while walls still feel solid.
+        this.installBeachHouseInteriorColliders(district.sites);
         district.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(district.group);
         this.winter.registerTree(district.group);
@@ -1832,6 +1860,64 @@ export class Sanctuary {
     }]);
   }
 
+  private wallCollider(
+    id: string,
+    cx: number,
+    cz: number,
+    yaw: number,
+    lx: number,
+    lz: number,
+    halfX: number,
+    halfZ: number,
+    baseY: number,
+    height: number,
+  ): CharacterCollider {
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    return {
+      id, kind: "box", yaw,
+      x: cx + cos * lx + sin * lz,
+      z: cz - sin * lx + cos * lz,
+      halfX, halfZ, baseY, height, cover: height > 1.4,
+    };
+  }
+
+  private installVillaInteriorColliders() {
+    const baseY = terrainHeight(WAREHOUSE_X, WAREHOUSE_Z);
+    const t = 0.55;
+    const door = 7.5;
+    const wallH = Math.min(WAREHOUSE_HEIGHT * 0.46, 14);
+    const hx = WAREHOUSE_HALF_X;
+    const hz = WAREHOUSE_HALF_Z;
+    this.characterWorld.setGroup("villa-walls", [
+      this.wallCollider("villa-back", WAREHOUSE_X, WAREHOUSE_Z, WAREHOUSE_YAW, 0, -hz, hx, t, baseY, wallH),
+      this.wallCollider("villa-left", WAREHOUSE_X, WAREHOUSE_Z, WAREHOUSE_YAW, -hx, 0, t, hz, baseY, wallH),
+      this.wallCollider("villa-right", WAREHOUSE_X, WAREHOUSE_Z, WAREHOUSE_YAW, hx, 0, t, hz, baseY, wallH),
+      this.wallCollider("villa-front-l", WAREHOUSE_X, WAREHOUSE_Z, WAREHOUSE_YAW, -(hx + door) * 0.5, hz, Math.max(0.4, (hx - door) * 0.5), t, baseY, wallH),
+      this.wallCollider("villa-front-r", WAREHOUSE_X, WAREHOUSE_Z, WAREHOUSE_YAW, (hx + door) * 0.5, hz, Math.max(0.4, (hx - door) * 0.5), t, baseY, wallH),
+    ]);
+  }
+
+  private installBeachHouseInteriorColliders(sites: readonly BeachHouseSite[]) {
+    const walls: CharacterCollider[] = [];
+    const t = 0.38;
+    for (let i = 0; i < sites.length; i += 1) {
+      const site = sites[i];
+      const hx = Math.max(2, site.halfX * 0.92);
+      const hz = Math.max(2, site.halfZ * 0.92);
+      const door = Math.min(hx * 0.72, 3.8 * site.scale);
+      const wallH = Math.min(HOUSE_RIDGE * site.scale * 0.62, 12);
+      walls.push(
+        this.wallCollider(`house-${i}-back`, site.x, site.z, site.yaw, 0, -hz, hx, t, site.padY, wallH),
+        this.wallCollider(`house-${i}-left`, site.x, site.z, site.yaw, -hx, 0, t, hz, site.padY, wallH),
+        this.wallCollider(`house-${i}-right`, site.x, site.z, site.yaw, hx, 0, t, hz, site.padY, wallH),
+        this.wallCollider(`house-${i}-front-l`, site.x, site.z, site.yaw, -(hx + door) * 0.5, hz, Math.max(0.35, (hx - door) * 0.5), t, site.padY, wallH),
+        this.wallCollider(`house-${i}-front-r`, site.x, site.z, site.yaw, (hx + door) * 0.5, hz, Math.max(0.35, (hx - door) * 0.5), t, site.padY, wallH),
+      );
+    }
+    this.characterWorld.setGroup("houses", walls);
+  }
+
   private installRockColliders() {
     const boxes: CharacterCollider[] = [];
     const matrix = new THREE.Matrix4();
@@ -2025,7 +2111,9 @@ export class Sanctuary {
    * writes, so the glint has already moved by the time this returns.
    */
   private applyDaylight() {
-    const state = daylightAt(hourForMode(this.daylightMode));
+    // Fixed bright noon replaces the dynamic day/night path. This keeps lighting,
+    // water glint, fog and fake/baked shadows stable like a PUBG mobile map.
+    const state = daylightAt(FIXED_PUBG_DAYLIGHT_HOUR);
     if (this.iceAge) winterDaylight(state);
     this.daylight = state;
     this.sky.applyDaylight(state);
@@ -2662,13 +2750,15 @@ export class Sanctuary {
     if (runAmbient) {
       const adt = this.ambientClock;
       this.ambientClock = 0;
-      this.grass.update(time, this.wind);
-      this.hillGrass.update(time, this.wind);
-      this.flora.update(time, this.wind);
-      this.sorrel?.update(time, this.wind);
-      this.grassTufts?.update(time, this.wind);
-      this.mossBank?.update(time, this.wind);
-      this.tropical?.update(time, this.wind);
+      if (!STATIC_VEGETATION_WORLD) {
+        this.grass.update(time, this.wind);
+        this.hillGrass.update(time, this.wind);
+        this.flora.update(time, this.wind);
+        this.sorrel?.update(time, this.wind);
+        this.grassTufts?.update(time, this.wind);
+        this.mossBank?.update(time, this.wind);
+        this.tropical?.update(time, this.wind);
+      }
       // The camera position lets the water cull its plunge-pool debris when
       // the learner is nowhere near it (interest management, see water.ts).
       this.water.update(adt, time, this.camera.position);
@@ -2679,7 +2769,8 @@ export class Sanctuary {
       // and an off-screen one is nothing.
       this.warehouse?.update(this.camera.position);
       // The homesteads are static; the call exists so the loop reads alike.
-      this.beachHouses?.update();
+      this.beachHouses?.update(this.camera.position);
+      this.farImpostors?.update(this.camera.position);
     }
 
     this.aiClock += dt;
@@ -2690,7 +2781,9 @@ export class Sanctuary {
       const fov = this.camera.fov;
       const viewH = this.viewH;
       const herdCull = cullDistanceForPx(1.1, 3.2, fov, viewH);
-      this.wildlife.update(this.aiClock, time, this.camera.position, herdCull * herdCull);
+      if (this.budget.animalCount > 0 || this.budget.perchedBirds > 0 || this.budget.flyingBirds > 0) {
+        this.wildlife.update(this.aiClock, time, this.camera.position, herdCull * herdCull);
+      }
       this.aiClock = 0;
     }
 
@@ -2698,7 +2791,10 @@ export class Sanctuary {
     // 12.5 hours, so that is under a tenth of a degree per step — far below
     // what the eye can catch, while still costing nothing: one date read and a
     // handful of colour lerps, three times a minute.
-    if (this.daylightMode === "auto") {
+    // Dynamic day/night is disabled in the PUBG-style world; fixed noon stays
+    // valid until the scene is rebuilt. The HUD may still expose labels, but
+    // the render path does not chase the wall clock.
+    if (false && this.daylightMode === "auto") {
       this.daylightClock += dt;
       if (this.daylightClock >= 20) {
         this.daylightClock = 0;
@@ -2771,7 +2867,7 @@ export class Sanctuary {
     }
 
 
-    this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
+    this.winter.update(dt, this.camera, 0, true);
     this.renderer.render(this.scene, this.camera);
     // The DOM boards share this camera. The call is a no-op unless the camera
     // actually moved or a board crossed a cull boundary, so a still frame
@@ -2832,6 +2928,7 @@ export class Sanctuary {
     this.wildlife.dispose();
     this.mountainForest?.dispose();
     this.farRange?.dispose();
+    this.farImpostors?.dispose();
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();

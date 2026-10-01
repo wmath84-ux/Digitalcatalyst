@@ -218,10 +218,10 @@ type Ring = "near" | "mid" | "far";
  */
 function tropicalCounts(budget: QualityBudget): [number, number, number] {
   switch (budget.tier) {
-    case "low": return [80, 130, 100];
-    case "medium": return [170, 230, 170];
-    case "high": return [270, 330, 250];
-    case "ultra": return [370, 440, 320];
+    case "low": return [0, 0, 0];
+    case "medium": return [24, 16, 0];
+    case "high": return [34, 22, 0];
+    case "ultra": return [44, 30, 0];
   }
 }
 
