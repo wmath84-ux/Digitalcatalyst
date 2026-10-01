@@ -52,6 +52,7 @@ import {
 } from "../utils/fullscreen";
 
 const WIND_STEPS = [
+  { label: "Off", mult: 0 },
   { label: "Calm", mult: 0.45 },
   { label: "Breeze", mult: 1 },
   { label: "Gusty", mult: 2.2 },
@@ -119,8 +120,8 @@ export default function NatureStudioPage() {
   // are downgraded (see winter.css) — backdrop-filter is a fullscreen
   // sample+blur per chrome element per frame, the costliest UI effect on a
   // tile GPU (the research's UI-overdraw rule applied to the HUD itself).
-  const [liteFx, setLiteFx] = useState(false);
-  const [windIdx, setWindIdx] = useState(1);
+  const [liteFx, setLiteFx] = useState(true);
+  const [windIdx, setWindIdx] = useState(0);
   const [iceAge, setIceAge] = useState(false);
   // Anime sky is OFF by default — procedural dome is the opening sky.
   // Toggle still lives in the Scene menu for turning the panorama on.
@@ -280,7 +281,7 @@ export default function NatureStudioPage() {
         },
       });
       // The tier is fixed for the session, so this fires once (not per frame).
-      setLiteFx(engine.budget.tier === "low");
+      setLiteFx(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The 3D scene could not start on this device.");
       return undefined;

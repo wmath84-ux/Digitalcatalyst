@@ -121,10 +121,10 @@ const MODEL_HEIGHT = 0.058;
  */
 function sorrelCounts(budget: QualityBudget): [number, number] {
   switch (budget.tier) {
-    case "low": return [40, 14];
-    case "medium": return [320, 90];
-    case "high": return [600, 150];
-    case "ultra": return [900, 220];
+    case "low": return [0, 0];
+    case "medium": return [28, 0];
+    case "high": return [44, 0];
+    case "ultra": return [64, 0];
   }
 }
 

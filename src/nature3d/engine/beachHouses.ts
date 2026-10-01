@@ -128,7 +128,7 @@ export interface BeachHouses {
   /** The placed sites, for the HUD and the tests. */
   sites: readonly BeachHouseSite[];
   /** Frame hook, kept so the loop reads like every other district. Static. */
-  update(): void;
+  update(cameraPos?: THREE.Vector3): void;
   dispose(): void;
 }
 
@@ -154,14 +154,29 @@ export const RIDGE_TARGET = HOUSE_HEIGHT_TARGET;
 /** How far the floor is buried, so the wall meets the dirt, not a gap. */
 const BITE = 0.32;
 
+/**
+ * Static HLOD split. Near homesteads keep the authored bungalow geometry; far
+ * homesteads become a two-piece proxy (wall block + roof wedge). This is the
+ * PUBG/Pochinki rule from the supplied notes: far settlements read as a single
+ * simple shape, not as every plank, post and roof face.
+ */
+function detailedHouseRadius(budget: QualityBudget): number {
+  switch (budget.tier) {
+    case "low": return 420;
+    case "medium": return 540;
+    case "high": return 660;
+    case "ultra": return 780;
+  }
+}
+
 // ── Site search ─────────────────────────────────────────────────────────
 
-/** How many houses stand. "panch se chhah" — six, the far end of the range. */
-export const BEACH_HOUSE_COUNT = 6;
+/** How many houses stand. "panch se chhah" — twenty-six: the old six plus twenty PUBG-style homesteads. */
+export const BEACH_HOUSE_COUNT = 26;
 /** Candidate grid step, in metres. */
 const GRID_STEP = 14;
 /** Inside this radius the study zone (chair, boards, desk) owns the ground. */
-const R_MIN = 130;
+const R_MIN = 105;
 /**
  * The outer edge of the sanctuary's own FIELDS.
  *
@@ -171,9 +186,9 @@ const R_MIN = 130;
  * inner relief ramps from 150 m out to 44 m of hills), and a levelled pad
  * carved into a hillside reads as a building site, not a homestead.
  */
-const R_MAX = 520;
+const R_MAX = 980;
 /** Metres of clear air required between two houses. */
-const MIN_SEPARATION = 170;
+const MIN_SEPARATION = 78;
 /** Nothing is built closer than this to the river channel's centre line. */
 const RIVER_CLEAR = RIVER_HALF_WIDTH + 14;
 /** The villa's apron is 34 m; this keeps a house's pad well outside it. */
@@ -187,7 +202,7 @@ const ALT_MIN = 1.6;
 /** Above this the ground is the foothill ramp, where a levelled pad would scar. */
 const ALT_MAX = 46;
 /** Natural height variation allowed across the pad, in metres. */
-const RELIEF_MAX = 3.2;
+const RELIEF_MAX = 4.8;
 /** `pathWeight` above this means a trail runs through the spot. */
 const TRAIL_CLEAR = 0.02;
 
@@ -384,7 +399,7 @@ function loadGltf(url: string): Promise<GLTF> {
 }
 
 /**
- * Build the district. Async, fail-soft, one model, six placements.
+ * Build the district. Async, fail-soft, one model, twenty-six placements with far HLOD proxies.
  */
 export function createBeachHouses(
   budget: QualityBudget,
@@ -398,6 +413,9 @@ export function createBeachHouses(
 ): Promise<BeachHouses> {
   void anisotropy;
   const sites = ensureBeachHouseSites();
+  const detailRadius = detailedHouseRadius(budget);
+  const detailedSites = sites.filter((site) => Math.hypot(site.x, site.z) <= detailRadius);
+  const proxySites = sites.filter((site) => Math.hypot(site.x, site.z) > detailRadius);
   const shadows = budget.shadowMapSize > 0;
 
   return loadGltf(MODEL_URL).then((gltf) => {
@@ -415,6 +433,51 @@ export function createBeachHouses(
     const materials: THREE.Material[] = [];
     const geometries: THREE.BufferGeometry[] = [];
     const dummy = new THREE.Object3D();
+    const detailedMeshes: THREE.InstancedMesh[] = [];
+    const proxyMeshes: THREE.InstancedMesh[] = [];
+    let streamedState = true;
+
+    // ── Far-house HLOD proxies ─────────────────────────────────────────
+    // Two instanced meshes keep the twenty added distant houses cheap. They
+    // share one wall material and one roof material, cast no shadows, and are
+    // static forever. The proxy deliberately has no doors/windows: from far
+    // range those details are below a few pixels and should be texture/shape,
+    // not geometry.
+    if (proxySites.length > 0) {
+      const wallMat = new THREE.MeshLambertMaterial({ color: 0xd1c7b7 });
+      const roofMat = new THREE.MeshLambertMaterial({ color: 0x684c3f });
+      const wallGeo = new THREE.BoxGeometry(14.19, 8.8, 14.04);
+      wallGeo.translate(0, 4.4 - BITE, 0);
+      const roofGeo = new THREE.ConeGeometry(11.4, 5.4, 4);
+      roofGeo.rotateY(Math.PI / 4);
+      roofGeo.scale(1.25, 1, 0.95);
+      roofGeo.translate(0, 11.5 - BITE, 0);
+      const wall = new THREE.InstancedMesh(wallGeo, wallMat, proxySites.length);
+      const roof = new THREE.InstancedMesh(roofGeo, roofMat, proxySites.length);
+      wall.name = "beach-house-hlod-walls";
+      roof.name = "beach-house-hlod-roofs";
+      for (let i = 0; i < proxySites.length; i += 1) {
+        const site = proxySites[i];
+        dummy.position.set(site.x, terrainHeight(site.x, site.z), site.z);
+        dummy.rotation.set(0, site.yaw, 0);
+        dummy.scale.setScalar(site.scale);
+        dummy.updateMatrix();
+        wall.setMatrixAt(i, dummy.matrix);
+        roof.setMatrixAt(i, dummy.matrix);
+      }
+      for (const m of [wall, roof]) {
+        m.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        m.instanceMatrix.needsUpdate = true;
+        m.frustumCulled = false;
+        m.castShadow = false;
+        m.receiveShadow = false;
+        m.updateMatrix();
+        group.add(m);
+        proxyMeshes.push(m);
+      }
+      materials.push(wallMat, roofMat);
+      geometries.push(wallGeo, roofGeo);
+    }
 
     for (const src of sources) {
       const geometry = src.geometry;
@@ -449,26 +512,29 @@ export function createBeachHouses(
       if (geometry.attributes.uv1) geometry.deleteAttribute("uv1");
       geometry.computeBoundingSphere();
 
-      const instanced = new THREE.InstancedMesh(geometry, material, sites.length);
-      instanced.name = `beach-house-${src.name || group.children.length}`;
-      // The six instances span the whole sanctuary, so three's single-sphere
-      // frustum test would cull houses that are on screen. Three draw calls
-      // are not worth that bug.
-      instanced.frustumCulled = false;
-      instanced.castShadow = false;
-      instanced.receiveShadow = shadows;
-      for (let i = 0; i < sites.length; i += 1) {
-        const s = sites[i];
-        dummy.position.set(s.x, terrainHeight(s.x, s.z) - BITE, s.z);
-        dummy.rotation.set(0, s.yaw, 0);
-        dummy.scale.setScalar(s.scale);
-        dummy.updateMatrix();
-        instanced.setMatrixAt(i, dummy.matrix);
+      if (detailedSites.length > 0) {
+        const instanced = new THREE.InstancedMesh(geometry, material, detailedSites.length);
+        instanced.name = `beach-house-${src.name || group.children.length}`;
+        // Detailed buckets are now limited to the near/mid settlement band; far
+        // houses are HLOD proxies above. Keeping this bucket static preserves
+        // one draw call per source material without drawing all detail at 1 km.
+        instanced.frustumCulled = false;
+        instanced.castShadow = false;
+        instanced.receiveShadow = shadows;
+        for (let i = 0; i < detailedSites.length; i += 1) {
+          const s = detailedSites[i];
+          dummy.position.set(s.x, terrainHeight(s.x, s.z) - BITE, s.z);
+          dummy.rotation.set(0, s.yaw, 0);
+          dummy.scale.setScalar(s.scale);
+          dummy.updateMatrix();
+          instanced.setMatrixAt(i, dummy.matrix);
+        }
+        instanced.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        instanced.instanceMatrix.needsUpdate = true;
+        instanced.updateMatrix();
+        group.add(instanced);
+        detailedMeshes.push(instanced);
       }
-      instanced.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-      instanced.instanceMatrix.needsUpdate = true;
-      instanced.updateMatrix();
-      group.add(instanced);
       materials.push(material);
       geometries.push(geometry);
     }
@@ -482,8 +548,18 @@ export function createBeachHouses(
       materials,
       count: sites.length,
       sites,
-      update() {
-        // Static by design: the matrices are written once and frozen.
+      update(cameraPos?: THREE.Vector3) {
+        // Coarse chunk streaming: detailed near-settlement buckets sleep when
+        // the camera is nowhere near the study/village band; far HLOD proxies
+        // remain as the silhouette. One boolean flip, throttled by the scene's
+        // ambient cadence, no allocations and no matrix uploads.
+        if (!cameraPos) return;
+        const r = Math.hypot(cameraPos.x, cameraPos.z);
+        const wantDetail = r < detailRadius + 180;
+        if (wantDetail === streamedState) return;
+        streamedState = wantDetail;
+        for (const mesh of detailedMeshes) mesh.visible = wantDetail;
+        for (const mesh of proxyMeshes) mesh.visible = true;
       },
       dispose() {
         for (let i = 0; i < geometries.length; i += 1) geometries[i].dispose();

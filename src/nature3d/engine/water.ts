@@ -412,6 +412,43 @@ export function createWater(
   fall.position.set(RIVER_CENTER_X, 5.4, -37.4);
   group.add(fall);
 
+  // ── PUBG-style foam/mist cards: texture illusion, not particles ─────
+  const foamTex = tex.cloud.clone();
+  foamTex.needsUpdate = true;
+  foamTex.wrapS = THREE.RepeatWrapping;
+  foamTex.wrapT = THREE.RepeatWrapping;
+  foamTex.repeat.set(1, 38);
+  const bankFoamMat = new THREE.MeshBasicMaterial({
+    map: foamTex, color: 0xdff7ff, transparent: true, opacity: 0.26,
+    depthWrite: false, fog: true, side: THREE.DoubleSide,
+  });
+  const bankFoamGeo = new THREE.PlaneGeometry(1.2, RIVER_LENGTH, 1, 1);
+  bankFoamGeo.rotateX(-Math.PI / 2);
+  const leftFoam = new THREE.Mesh(bankFoamGeo, bankFoamMat);
+  const rightFoam = new THREE.Mesh(bankFoamGeo, bankFoamMat);
+  leftFoam.position.set(RIVER_CENTER_X - 6.05, WATER_LEVEL + 0.045, 0);
+  rightFoam.position.set(RIVER_CENTER_X + 6.05, WATER_LEVEL + 0.045, 0);
+  group.add(leftFoam, rightFoam);
+
+  const plungeFoamMat = new THREE.MeshBasicMaterial({
+    map: tex.cloud, color: 0xf4fbff, transparent: true, opacity: 0.45,
+    depthWrite: false, fog: true, side: THREE.DoubleSide,
+  });
+  const plungeFoam = new THREE.Mesh(new THREE.CircleGeometry(4.8, 28), plungeFoamMat);
+  plungeFoam.rotation.x = -Math.PI / 2;
+  plungeFoam.scale.set(1.25, 0.62, 1);
+  plungeFoam.position.set(RIVER_CENTER_X, WATER_LEVEL + 0.07, -36.2);
+  group.add(plungeFoam);
+
+  const mist = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex.cloud, color: 0xffffff, transparent: true, opacity: 0.23,
+    depthWrite: false, fog: true, sizeAttenuation: true,
+  }));
+  mist.name = "waterfall-mist-card";
+  mist.position.set(RIVER_CENTER_X, WATER_LEVEL + 2.4, -35.6);
+  mist.scale.set(9.5, 5.4, 1);
+  group.add(mist);
+
   // ── Spray ────────────────────────────────────────────────────────────
   //
   // The old cloud drifted straight up and teleported back down, which reads
@@ -463,7 +500,8 @@ export function createWater(
     }),
   );
   spray.frustumCulled = false;
-  group.add(spray);
+  spray.visible = count > 0;
+  if (count > 0) group.add(spray);
 
   const attr = pGeo.attributes.position as THREE.BufferAttribute;
 
@@ -744,11 +782,12 @@ export function createWater(
     group,
     // NOTE: the ocean materials are APPENDED. The shader harness addresses
     // the river/fall/spray by index ([0]/[3]/[4]) — keep them stable.
-    materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, spray.material as THREE.Material, oceanMat],
+    materials: [riverMat, bed.material as THREE.Material, cliff.material as THREE.Material, fallMat, bankFoamMat, plungeFoamMat, mist.material as THREE.Material, spray.material as THREE.Material, oceanMat],
     iceMaterials: [riverMat, fallMat, oceanMat],
     setFrozen(value) {
       frozen = value;
-      spray.visible = !value;
+      spray.visible = !value && count > 0;
+      leftFoam.visible = rightFoam.visible = plungeFoam.visible = mist.visible = !value;
     },
     setPhotos(photos) {
       waterPhotos = photos;
@@ -785,6 +824,11 @@ export function createWater(
       fallTex.offset.y = (-time * 1.35) % 1;
       const fallShader = fallMat.userData.shader as { uniforms: Record<string, { value: number }> } | undefined;
       if (fallShader) fallShader.uniforms.uTime.value = time;
+
+      // PUBG-style water: the waterfall sheet, scrolling foam and normal maps
+      // carry the motion. If the tier budget sets particles to zero, no spray
+      // Points object is resident and no typed-array integration runs.
+      if (count <= 0) return;
 
       // INTEREST MANAGEMENT for the plunge-pool debris. Past ~90 m the spray
       // is a few pixels and per-particle integration is pure waste — the
@@ -835,6 +879,7 @@ export function createWater(
       });
       flowTex.dispose();
       fallTex.dispose();
+      foamTex.dispose();
       if (waterPhotos) {
         waterPhotos.caustics.dispose();
         waterPhotos.roughness.dispose();

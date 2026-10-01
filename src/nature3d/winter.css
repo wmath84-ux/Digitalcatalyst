@@ -28,8 +28,11 @@
    from the --tw-backdrop-blur variable, so overriding the variable keeps
    every other backdrop term (brightness etc.) intact. */
 .sanctuary-lite .backdrop-blur-xl,
-.sanctuary-lite .backdrop-blur-md {
-  --tw-backdrop-blur: blur(2px);
+.sanctuary-lite .backdrop-blur-md,
+.sanctuary-lite .backdrop-blur {
+  --tw-backdrop-blur: blur(0px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* The spinnner-on-glass boot veil and the lesson modal dim use the same
