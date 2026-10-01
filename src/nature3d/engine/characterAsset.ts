@@ -207,11 +207,20 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
     const layer = byKey[key] ?? byKey[fallback];
     if (layer) layer.target += weight;
   }
-  function aim(bone: THREE.Bone | undefined, player: TrekPlayer, amount: number) {
+  // Aim is a head-and-eyes cue, NOT a torso twist. `spine_03` carries the
+  // shoulders, the shirt and both arms, so anything generous there swings the
+  // whole upper body — and the eyes, which hang off `head`, go with it. The
+  // clamps mirror the controller's own look limits so a wild camera drag can
+  // never fold the rig in half.
+  const AIM_LIMIT_YAW = 1.05;    // CharacterCameraRig / controller lookYaw clamp
+  const AIM_LIMIT_PITCH = 1.35;  // third-person camera pitch clamp
+  function aim(bone: THREE.Bone | undefined, player: TrekPlayer, yawAmount: number, pitchAmount: number) {
     if (!bone?.parent) return;
-    aimQ.setFromAxisAngle(aimUp, player.lookYaw * amount);
+    const yaw = THREE.MathUtils.clamp(player.lookYaw, -AIM_LIMIT_YAW, AIM_LIMIT_YAW);
+    const pitch = THREE.MathUtils.clamp(player.lookPitch, -AIM_LIMIT_PITCH, AIM_LIMIT_PITCH);
+    aimQ.setFromAxisAngle(aimUp, yaw * yawAmount);
     aimRight.set(Math.cos(player.rotation), 0, -Math.sin(player.rotation));
-    pitchQ.setFromAxisAngle(aimRight, player.lookPitch * amount * 0.7);
+    pitchQ.setFromAxisAngle(aimRight, pitch * pitchAmount);
     bone.getWorldQuaternion(worldQ); worldQ.premultiply(aimQ.multiply(pitchQ));
     bone.parent.getWorldQuaternion(parentQ).invert();
     bone.quaternion.copy(parentQ.multiply(worldQ)); bone.updateMatrixWorld(true);
@@ -262,7 +271,9 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
       }
       mixer.update(dt);
       group.updateMatrixWorld(true);
-      aim(chest, player, 0.25); aim(head, player, 0.7);
+      // ≈ ±12° head / ±3.6° chest of yaw and ±7.7° head / ±2.3° chest of pitch
+      // at the extremes: the head reads the look, the torso barely moves.
+      aim(chest, player, 0.06, 0.03); aim(head, player, 0.2, 0.1);
       ikClock += dt;
       if (player.grounded && camera.position.distanceToSquared(group.position) < (30 * CHARACTER_SCALE) ** 2 && ikClock >= (lowEnd ? 1 / 15 : 1 / 30)) {
         ikClock = 0;

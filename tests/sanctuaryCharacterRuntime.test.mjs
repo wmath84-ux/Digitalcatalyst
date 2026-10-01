@@ -22,6 +22,7 @@ before(async () => {
       export * from './src/nature3d/engine/characterManifest';
       export * from './src/nature3d/engine/characterAsset';
       export * from './src/nature3d/engine/characterPlayer';
+      export * from './src/nature3d/characterLayout';
       export * from './src/nature3d/engine/dayBed';
       export * from './src/nature3d/engine/quality';
       export * from './src/nature3d/engine/atmosphere';
@@ -342,4 +343,69 @@ test('first person looks almost vertically up/down without gimbal flip; switchin
   p.setMode('first-person'); p.rotateCamera(0,-10); advance(p,0.5,60,cam); cam.getWorldDirection(dir);
   assert.ok(dir.y > 0.999); p.rotateCamera(0,20); advance(p,0.5,60,cam); cam.getWorldDirection(dir); assert.ok(dir.y < -0.999);
   p.setMode('third-person'); advance(p,0.2,60,cam); assert.ok(p.cameraRig.pitch <= 1.35 && p.cameraRig.pitch >= -1.25);
+});
+
+test('every HUD control has a default placement on screen and a name in the editor', () => {
+  const ids = api.HUD_CONTROL_IDS;
+  assert.ok(ids.length >= 12, `every control must be placeable, got ${ids.length}`);
+  for (const id of ids) {
+    const p = api.DEFAULT_HUD_LAYOUT[id];
+    assert.ok(p, `missing default for ${id}`);
+    assert.ok(p.x >= 0 && p.x <= 100 && p.y >= 0 && p.y <= 100, `${id} is off screen: ${p.x},${p.y}`);
+    assert.ok(p.scale >= api.SCALE_MIN && p.scale <= api.SCALE_MAX, `${id} scale ${p.scale}`);
+    assert.ok(p.opacity >= api.OPACITY_MIN && p.opacity <= 1, `${id} opacity ${p.opacity}`);
+    assert.ok(api.HUD_CONTROL_LABELS[id], `the editor must name ${id}`);
+  }
+  // The FPP/TPP switch is part of the pad, so it can be moved like any button.
+  assert.ok(ids.includes('camera') && ids.includes('move') && ids.includes('look'));
+});
+
+test('the factory layout does not stack two controls on top of each other', () => {
+  const ids = api.HUD_CONTROL_IDS;
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const a = api.DEFAULT_HUD_LAYOUT[ids[i]], b = api.DEFAULT_HUD_LAYOUT[ids[j]];
+      // Percentages of a landscape stage: 1% of height is ~2.3% of width.
+      const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y) * 2.3;
+      assert.ok(Math.hypot(dx, dy) > 8, `${ids[i]} and ${ids[j]} start on top of each other`);
+    }
+  }
+});
+
+test('a stored layout is sanitized: off-screen, huge, invisible or broken entries fall back', () => {
+  const clamped = api.clampPlacement({ x: -40, y: 180, scale: 9, opacity: -2 });
+  assert.deepEqual(clamped, { x: 0, y: 100, scale: api.SCALE_MAX, opacity: api.OPACITY_MIN });
+  const sane = api.clampPlacement({ x: 42, y: 63, scale: 1.2, opacity: 0.7 });
+  assert.deepEqual(sane, { x: 42, y: 63, scale: 1.2, opacity: 0.7 });
+  for (const junk of [null, 7, 'x', {}]) {
+    const out = api.clampPlacement({ ...api.DEFAULT_HUD_LAYOUT.jump, x: junk });
+    assert.ok(typeof out.x === 'number' && out.x >= 0 && out.x <= 100, `x=${junk} must fall back`);
+  }
+});
+
+test('the layout survives a reload and a corrupt store, and Defaults wipes it', () => {
+  const store = new Map();
+  globalThis.window = { localStorage: {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k),
+  } };
+  try {
+    const moved = { ...api.defaultHudLayout(), jump: { x: 12, y: 34, scale: 1.4, opacity: 0.5 } };
+    api.saveHudLayout(moved);
+    const back = api.loadHudLayout();
+    assert.deepEqual(back.jump, moved.jump, 'the saved position must come back');
+    assert.equal(back.run.x, api.DEFAULT_HUD_LAYOUT.run.x, 'untouched buttons keep the default');
+    store.set('sanctuary.characterLayout.v1', '{not json');
+    assert.deepEqual(api.loadHudLayout(), api.defaultHudLayout(), 'a corrupt store is ignored');
+    store.set('sanctuary.characterLayout.v1', JSON.stringify({ jump: { x: 'left' }, ghost: 1 }));
+    const partial = api.loadHudLayout();
+    assert.deepEqual(partial.jump, api.DEFAULT_HUD_LAYOUT.jump);
+    assert.ok(!('ghost' in partial), 'unknown controls are dropped');
+    api.clearHudLayout();
+    assert.equal(store.size, 0, 'Defaults clears the saved layout');
+    assert.deepEqual(api.loadHudLayout(), api.defaultHudLayout());
+  } finally {
+    delete globalThis.window;
+  }
 });

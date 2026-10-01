@@ -710,6 +710,60 @@ test("no procedural stand-in figure exists; the placeholder body is empty", () =
   assert.doesNotMatch(player, /Geometry\(/);
 });
 
+test("aim is a head cue, never a torso twist", () => {
+  // `spine_03` carries the shoulders, the shirt and both arms, and the eyes
+  // hang off `head`: generous amounts there swung the whole upper body.
+  const src = read("src/nature3d/engine/characterAsset.ts");
+  assert.match(src, /aim\(chest, player, 0\.06, 0\.03\); aim\(head, player, 0\.2, 0\.1\);/);
+  assert.match(src, /AIM_LIMIT_YAW = 1\.05/);
+  assert.match(src, /AIM_LIMIT_PITCH = 1\.35/);
+  assert.match(src, /clamp\(player\.lookYaw, -AIM_LIMIT_YAW, AIM_LIMIT_YAW\)/);
+  assert.match(src, /clamp\(player\.lookPitch, -AIM_LIMIT_PITCH, AIM_LIMIT_PITCH\)/);
+  assert.doesNotMatch(src, /aim\(chest, player, 0\.25\)/);
+  assert.doesNotMatch(src, /aim\(head, player, 0\.7\)/);
+});
+
+test("every character button is a circle placed by the saved layout", () => {
+  const css = read("src/nature3d/characterControls.css");
+  assert.match(css, /\.sanctuary-character-button \{[\s\S]*?border-radius: 50%/);
+  assert.match(css, /width: 44px;\s*\n\s*height: 44px/);
+  assert.match(css, /\.sanctuary-character-item \{[\s\S]*?position: absolute/);
+  // While arranging, a drag must not fire the button underneath.
+  assert.match(css, /is-editing > \* \{ pointer-events: none; \}/);
+  const ui = read("src/nature3d/CharacterControls.tsx");
+  assert.match(ui, /data-hud-item=\{id\}/);
+  assert.match(ui, /sanctuary-character-layout-editor/);
+  assert.match(ui, /beginDrag\(id\)/);
+  assert.match(ui, /stageLocalDelta\(stage, e\.clientX - active\.px/);
+  // Size and transparency, the two things PUBG lets you tune per button.
+  assert.match(ui, /aria-label=\{`\$\{HUD_CONTROL_LABELS\[selected\]\} size`\}/);
+  assert.match(ui, /aria-label=\{`\$\{HUD_CONTROL_LABELS\[selected\]\} transparency`\}/);
+});
+
+test("the settings tray is a wide single-row list with a Controls page", () => {
+  const settings = read("src/nature3d/SanctuarySettings.tsx");
+  assert.match(settings, /data-settings-rail/);
+  assert.match(settings, /w-\[10\.75rem\]/);
+  assert.doesNotMatch(settings, /w-\[4\.25rem\]/);
+  // One row per page, name written out; the old 68px strip stacked a 9px
+  // label under an icon and read as a minimised panel.
+  assert.match(settings, /h-11 w-full shrink-0 items-center/);
+  assert.doesNotMatch(settings, /h-\[4\.6rem\] w-14 flex-col/);
+  for (const label of ["Light", "Scene", "Dock", "Controls"]) {
+    assert.match(settings, new RegExp(`label="${label}"`));
+  }
+  assert.match(settings, /onCustomiseLayout/);
+  assert.match(settings, /label="Customise layout"/);
+});
+
+test("the HUD layout is a device-local store, never cloud state", () => {
+  const layout = read("src/nature3d/characterLayout.ts");
+  assert.match(layout, /sanctuary\.characterLayout\.v1/);
+  assert.match(layout, /localStorage/);
+  assert.doesNotMatch(layout, /firestore|getFirestore|addDoc|setDoc|onSnapshot/);
+  assert.match(layout, /clampPlacement/);
+});
+
 test("jump, collision-tested camera and player pose are wired into the live scene", () => {
   assert.match(CHARACTER, /jumpBuffered/); assert.match(CHARACTER, /coyote/);
   assert.match(CHARACTER, /world\.cameraBlocked/);

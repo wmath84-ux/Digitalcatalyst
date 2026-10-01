@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from "react";
+import {
+  useCallback, useEffect, useRef, useState,
+  type CSSProperties, type PointerEvent, type ReactNode, type RefObject,
+} from "react";
 import { ArrowUp, Camera, Footprints, Gauge, Globe2, Info, MousePointer2, RotateCcw, Shield, ChevronsDown } from "lucide-react";
 import type { Sanctuary } from "./engine/scene";
 import type { CharacterCameraMode } from "./engine/characterConfig";
 import type { CharacterAssetStatus } from "./engine/characterManifest";
 import { stageLocalDelta } from "./stagePointer";
+import {
+  HUD_CONTROL_LABELS, OPACITY_MIN, SCALE_MAX, SCALE_MIN, clearHudLayout, clampPlacement,
+  defaultHudLayout, loadHudLayout, saveHudLayout,
+  type HudControlId, type HudLayout, type HudPlacement,
+} from "./characterLayout";
 import "./characterControls.css";
 
 interface Props {
@@ -14,15 +22,32 @@ interface Props {
   paused: boolean;
   onStart: () => void;
   onOverview: () => void;
+  /** PUBG-style layout editor: every control becomes draggable and sizeable. */
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
 }
 
+const itemStyle = (p: HudPlacement): CSSProperties => ({
+  left: `${p.x}%`,
+  top: `${p.y}%`,
+  transform: `translate(-50%, -50%) scale(${p.scale})`,
+  opacity: p.opacity,
+});
+
 /** Controls only; pointer moves write refs/Three input, never React state. */
-export default function CharacterControls({ engineRef, mode, status, hidden, paused, onStart, onOverview }: Props) {
+export default function CharacterControls({
+  engineRef, mode, status, hidden, paused, onStart, onOverview, editing, onEditingChange,
+}: Props) {
   const [running, setRunning] = useState(false);
   const [crouching, setCrouching] = useState(false);
   const [hint, setHint] = useState("");
+  const [layout, setLayout] = useState<HudLayout>(loadHudLayout);
+  const [selected, setSelected] = useState<HudControlId | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: HudControlId; px: number; py: number; ox: number; oy: number } | null>(null);
   const walking = mode !== "orbit";
+
   const move = useCallback((x: number, y: number) => engineRef.current?.setCharacterMove(x, -y), [engineRef]);
   const look = useCallback((x: number, y: number) => engineRef.current?.setCharacterLook(x, y), [engineRef]);
   const syncFlags = useCallback(() => {
@@ -30,10 +55,29 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
     setRunning(snapshot?.runLatched ?? false); setCrouching(snapshot?.crouchLatched ?? false);
   }, [engineRef]);
 
+  // The layout is stored, but not on every drag frame.
+  useEffect(() => {
+    const timer = setTimeout(() => saveHudLayout(layout), 200);
+    return () => clearTimeout(timer);
+  }, [layout]);
+
+  const patch = useCallback((id: HudControlId, next: Partial<HudPlacement>) => {
+    setLayout(previous => ({ ...previous, [id]: clampPlacement({ ...previous[id], ...next }) }));
+  }, []);
+
+  const finishEditing = useCallback(() => {
+    saveHudLayout(layout);
+    setSelected(null);
+    onEditingChange(false);
+  }, [layout, onEditingChange]);
+
   // Scene keyboard/blur handlers run first. Mirror their discrete resets,
   // not each animation frame, so a highlighted Run button never lies after R.
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.code === "KeyR" || e.code === "Escape") syncFlags(); };
+    const key = (e: KeyboardEvent) => {
+      if (e.code === "Escape" && editing) { e.stopPropagation(); finishEditing(); return; }
+      if (e.code === "KeyR" || e.code === "Escape") syncFlags();
+    };
     const hidden = () => { if (document.hidden) syncFlags(); };
     window.addEventListener("blur", syncFlags); window.addEventListener("keydown", key);
     document.addEventListener("visibilitychange", hidden); document.addEventListener("pointerlockchange", syncFlags);
@@ -41,15 +85,15 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
       window.removeEventListener("blur", syncFlags); window.removeEventListener("keydown", key);
       document.removeEventListener("visibilitychange", hidden); document.removeEventListener("pointerlockchange", syncFlags);
     };
-  }, [syncFlags]);
+  }, [syncFlags, editing, finishEditing]);
 
   useEffect(() => {
-    if (!walking || paused || hidden) {
+    if (!walking || paused || hidden || editing) {
       engineRef.current?.setCharacterMove(0, 0);
       engineRef.current?.setCharacterLook(0, 0);
     }
     if (!walking || paused) { setRunning(false); setCrouching(false); }
-  }, [walking, paused, hidden, engineRef]);
+  }, [walking, paused, hidden, editing, engineRef]);
   useEffect(() => () => {
     if (hintTimer.current) clearTimeout(hintTimer.current);
     engineRef.current?.setCharacterMove(0, 0);
@@ -68,33 +112,95 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
       hintTimer.current = setTimeout(() => setHint(""), 3000);
     }
   };
-  if (hidden || paused) return null;
+
+  const beginDrag = (id: HudControlId) => (e: PointerEvent<HTMLDivElement>) => {
+    if (!editing) return;
+    e.preventDefault();
+    setSelected(id);
+    drag.current = { id, px: e.clientX, py: e.clientY, ox: layout[id].x, oy: layout[id].y };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* cancelled or synthetic pointer */ }
+  };
+  // Percentages, so the layout survives rotation and a resized window; the
+  // delta is un-rotated first because the stage itself may be turned.
+  const moveDrag = (e: PointerEvent<HTMLDivElement>) => {
+    const active = drag.current; const stage = stageRef.current;
+    if (!active || !stage) return;
+    const local = stageLocalDelta(stage, e.clientX - active.px, e.clientY - active.py, { x: 0, y: 0 });
+    setLayout(previous => ({
+      ...previous,
+      [active.id]: clampPlacement({
+        ...previous[active.id],
+        x: active.ox + (local.x / Math.max(1, stage.clientWidth)) * 100,
+        y: active.oy + (local.y / Math.max(1, stage.clientHeight)) * 100,
+      }),
+    }));
+  };
+  const endDrag = () => { drag.current = null; };
+
+  const item = (id: HudControlId, content: ReactNode, extra?: string) => (
+    <div
+      key={id}
+      data-hud-item={id}
+      className={`sanctuary-character-item${editing ? " is-editing" : ""}${editing && selected === id ? " is-selected" : ""}${extra ? ` ${extra}` : ""}`}
+      style={itemStyle(layout[id])}
+      onPointerDown={beginDrag(id)}
+      onPointerMove={moveDrag}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
+    >
+      {content}
+    </div>
+  );
+
+  if ((hidden || paused) && !editing) return null;
+  // The editor shows every control at once, so nothing is hidden while the
+  // player arranges them.
+  const showStart = editing || !walking;
+  const showWalking = editing || walking;
+
+  const active = selected ? layout[selected] : null;
 
   return (
-    <div data-character-controls className="sanctuary-character-controls" role="region" aria-label="Character controls">
-      <div className="sanctuary-character-toolbar">
-        {!walking ? (
-          <button type="button" className="sanctuary-character-button sanctuary-character-start" onClick={onStart}>
-            <Footprints size={17} aria-hidden="true" /> Explore on foot <span>18 ft</span>
-          </button>
-        ) : (
-          <>
-            <button type="button" className="sanctuary-character-button" onClick={onOverview} title="Return to world overview">
-              <Globe2 size={16} aria-hidden="true" /><span>Overview</span>
-            </button>
-            <button type="button" className="sanctuary-character-button" onClick={() => engineRef.current?.toggleCharacterCamera()} title="V · Switch first/third-person camera" aria-label="Switch character camera">
-              <Camera size={16} aria-hidden="true" /><span>{mode === "first-person" ? "FPP" : "TPP"}</span>
-            </button>
-            <button type="button" className="sanctuary-character-button" onClick={() => action("reset")} title="R · Return to safe spawn" aria-label="Respawn character">
-              <RotateCcw size={16} aria-hidden="true" /><span>Reset</span>
-            </button>
-            <button type="button" className="sanctuary-character-button sanctuary-character-mouse" onClick={() => engineRef.current?.captureCharacterMouse()} title="Capture mouse · Esc releases it. Drag the world if capture is unavailable.">
-              <MousePointer2 size={16} aria-hidden="true" /><span>Mouse</span>
-            </button>
-          </>
-        )}
+    <div data-character-controls className="sanctuary-character-controls" role="region" aria-label="Character controls" ref={stageRef}>
+      {showStart ? item("start", (
+        <button type="button" className="sanctuary-character-button sanctuary-character-start" onClick={onStart}
+          title="Explore on foot · 18 ft" aria-label="Explore on foot, eighteen foot character">
+          <Footprints size={20} aria-hidden="true" /><span>18 ft</span>
+        </button>
+      )) : null}
+
+      {showWalking ? item("overview", (
+        <button type="button" className="sanctuary-character-button" onClick={onOverview} title="Overview" aria-label="Return to world overview">
+          <Globe2 size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("camera", (
+        <button type="button" className="sanctuary-character-button" onClick={() => engineRef.current?.toggleCharacterCamera()}
+          title={mode === "first-person" ? "Third-person camera · V" : "First-person camera · V"} aria-label="Switch character camera">
+          <Camera size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("reset", (
+        <button type="button" className="sanctuary-character-button" onClick={() => action("reset")} title="Reset · R" aria-label="Respawn character">
+          <RotateCcw size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("mouse", (
+        <button type="button" className="sanctuary-character-button" onClick={() => engineRef.current?.captureCharacterMouse()}
+          title="Capture mouse · Esc releases it" aria-label="Capture mouse">
+          <MousePointer2 size={17} aria-hidden="true" />
+        </button>
+      ), "sanctuary-character-mouse") : null}
+
+      {item("help", (
         <details data-character-help className="sanctuary-character-help">
-          <summary className="sanctuary-character-button" aria-label="Character controls and asset information" title="Controls and character information"><Info size={17} aria-hidden="true" /></summary>
+          <summary className="sanctuary-character-button" aria-label="Character controls and asset information" title="Controls and character information">
+            <Info size={17} aria-hidden="true" />
+          </summary>
           <div className="sanctuary-character-help-panel">
             <strong>{status.label}</strong>
             <p>{status.detail}</p>
@@ -112,37 +218,83 @@ export default function CharacterControls({ engineRef, mode, status, hidden, pau
             <p>Choose a study board to leave character mode. The sofa stays empty.</p>
           </div>
         </details>
-      </div>
+      ))}
 
       <p data-character-asset-status role="status" className="sanctuary-character-source" title={status.detail}>
         {status.label}
       </p>
-      {walking ? (
-        <>
-          <div className="sanctuary-character-left-stick"><Joystick label="Move character" onVector={move} /></div>
-          <div className="sanctuary-character-right-stick"><Joystick label="Look around" onVector={look} /></div>
-          <div className="sanctuary-character-actions">
-            <button type="button" className="sanctuary-character-button" aria-label="Jump" title="Space · Jump"
-              onPointerDown={e => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* touch cancellation / WebView */ } engineRef.current?.characterAction("jump"); }}
-              onPointerUp={() => engineRef.current?.characterAction("jump-release")}
-              onPointerCancel={() => engineRef.current?.characterAction("jump-release")}
-              onLostPointerCapture={() => engineRef.current?.characterAction("jump-release")}
-              onClick={e => { if (e.detail === 0) engineRef.current?.characterAction("jump"); }}>
-              <ArrowUp size={17} aria-hidden="true" /><span>Jump</span>
+
+      {showWalking ? item("move", <Joystick label="Move character" onVector={move} />) : null}
+      {showWalking ? item("look", <Joystick label="Look around" onVector={look} />) : null}
+
+      {showWalking ? item("jump", (
+        <button type="button" className="sanctuary-character-button" aria-label="Jump" title="Jump · Space"
+          onPointerDown={e => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* touch cancellation / WebView */ } engineRef.current?.characterAction("jump"); }}
+          onPointerUp={() => engineRef.current?.characterAction("jump-release")}
+          onPointerCancel={() => engineRef.current?.characterAction("jump-release")}
+          onLostPointerCapture={() => engineRef.current?.characterAction("jump-release")}
+          onClick={e => { if (e.detail === 0) engineRef.current?.characterAction("jump"); }}>
+          <ArrowUp size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("run", (
+        <button type="button" className="sanctuary-character-button" aria-label="Run toggle" aria-pressed={running} onClick={() => action("run")} title="Run · Shift">
+          <Gauge size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("crouch", (
+        <button type="button" className="sanctuary-character-button" aria-label="Crouch toggle" aria-pressed={crouching} onClick={() => action("crouch")} title="Crouch · Ctrl">
+          <ChevronsDown size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {showWalking ? item("cover", (
+        <button type="button" className="sanctuary-character-button" aria-label="Enter or exit cover" onClick={() => action("cover")} title="Cover · E">
+          <Shield size={17} aria-hidden="true" />
+        </button>
+      )) : null}
+
+      {walking && !editing ? <p className="sanctuary-character-key-hint">WASD move · Shift run · Space jump · Ctrl crouch · E cover · V camera</p> : null}
+      {hint && !editing ? <p className="sanctuary-character-feedback" role="status">{hint}</p> : null}
+
+      {editing ? (
+        <div data-layout-editor className="sanctuary-character-layout-editor" role="group" aria-label="Customise layout">
+          <div className="sanctuary-character-layout-head">
+            <strong>Customise layout</strong>
+            <span>{selected ? HUD_CONTROL_LABELS[selected] : "Drag any button · tap to select it"}</span>
+          </div>
+          {selected && active ? (
+            <div className="sanctuary-character-layout-sliders">
+              <label>
+                <span>Size</span>
+                <input type="range" min={SCALE_MIN} max={SCALE_MAX} step={0.02} value={active.scale}
+                  aria-label={`${HUD_CONTROL_LABELS[selected]} size`}
+                  onChange={e => patch(selected, { scale: Number(e.currentTarget.value) })} />
+                <b>{Math.round(active.scale * 100)}%</b>
+              </label>
+              <label>
+                <span>Transparency</span>
+                <input type="range" min={OPACITY_MIN} max={1} step={0.02} value={active.opacity}
+                  aria-label={`${HUD_CONTROL_LABELS[selected]} transparency`}
+                  onChange={e => patch(selected, { opacity: Number(e.currentTarget.value) })} />
+                <b>{Math.round(active.opacity * 100)}%</b>
+              </label>
+              <button type="button" className="sanctuary-character-layout-mini" onClick={() => patch(selected, defaultHudLayout()[selected])}>
+                Reset this button
+              </button>
+            </div>
+          ) : null}
+          <div className="sanctuary-character-layout-actions">
+            <button type="button" className="sanctuary-character-layout-mini" onClick={() => { setLayout(clearHudLayout()); setSelected(null); }}>
+              Defaults
             </button>
-            <button type="button" className="sanctuary-character-button" aria-label="Run toggle" aria-pressed={running} onClick={() => action("run")} title="Shift · Run">
-              <Gauge size={17} aria-hidden="true" /><span>Run</span>
-            </button>
-            <button type="button" className="sanctuary-character-button" aria-label="Crouch toggle" aria-pressed={crouching} onClick={() => action("crouch")} title="Ctrl · Crouch">
-              <ChevronsDown size={17} aria-hidden="true" /><span>Crouch</span>
-            </button>
-            <button type="button" className="sanctuary-character-button" aria-label="Enter or exit cover" onClick={() => action("cover")} title="E · Enter/exit cover">
-              <Shield size={17} aria-hidden="true" /><span>Cover</span>
+            <button type="button" className="sanctuary-character-layout-mini sanctuary-character-layout-save" onClick={finishEditing}>
+              Save
             </button>
           </div>
-          <p className="sanctuary-character-key-hint">WASD move · Shift run · Space jump · Ctrl crouch · E cover · V camera</p>
-          {hint ? <p className="sanctuary-character-feedback" role="status">{hint}</p> : null}
-        </>
+        </div>
       ) : null}
     </div>
   );

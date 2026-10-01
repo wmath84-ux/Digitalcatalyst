@@ -65,6 +65,37 @@ Choose **Explore on foot** (or Walk in the dock) to enter TPP. The opening world
 
 Keyboard events from editor fields/boards are ignored. Space/Enter on a focused HUD button retains accessible button activation. Sticks are refs, not frame-by-frame React state. Both sticks and scene drags undo the CSS 90° landscape fallback. Blur, hidden tab, overlays, pointer cancellation and disposal clear input; camera switches preserve held input. Camera capture is optional and falls back to drag if a WebView/preview denies it. First person can look almost vertically up/down without crossing the gimbal pole. Entry/reset chooses an open, jump-clear patch from the existing vegetation registry so the eighteen-foot figure does not spawn inside a giant leaf card; every probe scales with the body. No plants are removed or rescaled.
 
+## Customise layout (PUBG-style HUD editor)
+
+**Settings → Controls → Customise layout** opens an editor over the live world.
+Every character control becomes draggable — move stick, look stick, jump, run,
+crouch, cover, overview, reset, mouse capture, help and the **FPP / TPP camera
+switch**:
+
+- **Drag** a button anywhere on the screen.
+- Tap it to select, then set **Size** (60%–170%) and **Transparency** (25%–100%).
+- **Reset this button** returns one control; **Defaults** wipes the whole layout.
+- **Save** (or Esc) closes the editor. The layout is stored on the device
+  (`localStorage`, key `sanctuary.characterLayout.v1`) as percentages of the
+  stage, so it survives a rotation, a resize and a reload, and it is never sent
+  to the cloud.
+
+Every button is a circle. While the editor is open the buttons cannot fire — a
+drag is not a jump — and the editor shows every control at once, including the
+ones the current mode would hide.
+
+The settings tray on the right used to be a 68px icon strip, which read as a
+minimised panel. It is now a 172px single-row list with each page's name written
+out: **Light, Scene, Dock, Controls**.
+
+## Aim: the head looks, the torso does not
+
+Skeleton aim is deliberately small. `spine_03` carries the shoulders, the shirt
+and both arms, and the eyes hang off `head`, so generous amounts swung the whole
+upper body with the camera. The rig now applies about **±12° of head yaw and
+±8° of head pitch** at the extremes, with roughly a third of that on the chest,
+and clamps both to the controller's own look limits.
+
 Colliders come from **this Sanctuary's** rock transforms, narrow tree trunks, house footprints, villa/sofa/desk bounds and resized study-board placements. Terrain, steep slopes, steps, head clearance, deep water, ice support and world boundary are handled without triangle-casting the vegetation. These are conservative solid footprints, not a triangle-accurate navigable house-interior mesh.
 
 ## 1. Reproduce/verify the full reference download
@@ -156,6 +187,6 @@ The installed original GLB is validated in-repo by the **same installer validato
 
 Character runtime tests exercise actual geometry height, sofa ratio, fixed-step/frame-rate travel, analog/diagonal movement, gait, jump/buffer/coyote, steps, rotated walls/trees/sliding, crouch/head clearance, water/slope/boundary, cover/lean/exit, camera obstruction/FPP, delayed turn, input cleanup, pose IK, manifests and root motion. Installer tests use an **original tiny owned test fixture**, never an upstream model.
 
-`tests/sanctuaryWorldBrowser.test.mjs` uses real Three.js/WebGL2 and the real React controls: low-tier shader **linking and pixel readback**, instance bounds/no magenta corruption, keyboard/HUD/camera/pause, persistent board iframe, rotated mobile sticks/drag, gamepad and the actual GLB loader/aim-reset/disposal. It skips explicitly if Chromium is not installed. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to use a custom binary. `SANCTUARY_SCREENSHOT_DIR` optionally saves ignored diagnostic screenshots. The character collection is **41 tests: 37 passing, 4 skipped, 0 failing**. The four WebGL2/React/GLB browser regressions skip — they do not silently pass — when headless Chromium cannot create a WebGL2 context (no GPU and no working SwiftShader, as in some sandboxes); they were last recorded at **38/38 passing, zero skips** on a machine with working WebGL2 Chromium/SwiftShader. Three of the node-runnable tests are new guards for this change: the deployed GLB's face/left axes measured from real vertex data and reconciled with `manifest.modelForward`, the loader's facing convention (no mirroring), and a camera-framing assertion that the whole eighteen-foot body sits centred and in shot at the default boom. The existing adaptive-resolution/hill-grass engine collection is **17/17 passing**, the production Vite build passes, and the working typecheck retains the seven baseline errors listed below. These are not screenshot-only/source-regex assertions.
+`tests/sanctuaryWorldBrowser.test.mjs` uses real Three.js/WebGL2 and the real React controls: low-tier shader **linking and pixel readback**, instance bounds/no magenta corruption, keyboard/HUD/camera/pause, persistent board iframe, rotated mobile sticks/drag, gamepad and the actual GLB loader/aim-reset/disposal. It skips explicitly if Chromium is not installed. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to use a custom binary. `SANCTUARY_SCREENSHOT_DIR` optionally saves ignored diagnostic screenshots. The character collection is **45 tests: 41 passing, 4 skipped, 0 failing** — the four new guards cover the HUD layout store (defaults on screen and not stacked, sanitized placement, save/reload/corrupt-store/Defaults) and the editor's wiring. The four WebGL2/React/GLB browser regressions skip — they do not silently pass — when headless Chromium cannot create a WebGL2 context (no GPU and no working SwiftShader, as in some sandboxes); they were last recorded at **38/38 passing, zero skips** on a machine with working WebGL2 Chromium/SwiftShader. Four of the node-runnable tests are new guards for this change, and four more are source-contract guards for the circular buttons, the widened settings tray and the head-only aim: the deployed GLB's face/left axes measured from real vertex data and reconciled with `manifest.modelForward`, the loader's facing convention (no mirroring), and a camera-framing assertion that the whole eighteen-foot body sits centred and in shot at the default boom. The existing adaptive-resolution/hill-grass engine collection is **17/17 passing**, the production Vite build passes, and the working typecheck retains the seven baseline errors listed below. These are not screenshot-only/source-regex assertions.
 
 The existing broader repository validation has unrelated debt: baseline typechecking has eight errors (seven remain after removing an unused page import), including the ReadingBoard `CourseBrainPanel.onComplete` prop and unused imports elsewhere. The original broad `nature3d*.test.mjs` collection already had 30 stale/legacy failures. After updating the character-specific/removal contracts (not unrelated environment expectations), the broader collection is **178 tests / 158 pass / 20 existing failures / 0 skips**, versus the original 147 pass / 30 fail / 1 skip. The shader/world smoke harnesses each retain the **same five failures reproduced from the original commit**; the updated avatar smoke harness passes. Do not treat a successful Vite build as a claim that every repository test/type check is clean.

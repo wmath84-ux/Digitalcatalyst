@@ -111,6 +111,9 @@ export default function NatureStudioPage() {
   const [booting, setBooting] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("light");
+  // PUBG-style HUD layout editor: opened from Settings · Controls, it lays
+  // the character pad over the live world so buttons are arranged in place.
+  const [layoutEditing, setLayoutEditing] = useState(false);
   // Low-tier UI diet: the engine's budget decides once at boot. When true,
   // the root gets `sanctuary-lite` and the wallpaper-grade backdrop blurs
   // are downgraded (see winter.css) — backdrop-filter is a fullscreen
@@ -918,6 +921,8 @@ export default function NatureStudioPage() {
           paused={menuOpen || moduleMenuOpen || showLesson}
           onStart={beginCharacterWalk}
           onOverview={() => focusSceneryView("world")}
+          editing={layoutEditing}
+          onEditingChange={setLayoutEditing}
         />
 
         {/* ── The live board surfaces ───────────────────────────────────
@@ -969,6 +974,11 @@ export default function NatureStudioPage() {
           onOrbit={toggleOrbit}
           dockAutoHide={dockAutoHide}
           onDockAutoHide={toggleDockAutoHide}
+          onCustomiseLayout={() => {
+            setMenuOpen(false);
+            setSettingsPage("controls");
+            setLayoutEditing(true);
+          }}
           immersive={immersive}
           onFullscreen={() => {
             toggleFullscreen();

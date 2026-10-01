@@ -17,13 +17,13 @@
 
 import type { ComponentType } from "react";
 import {
-  Clock, LogOut, Maximize2, Minimize2, Moon, RotateCw, Rows3, Settings,
+  Clock, Gamepad2, LogOut, Maximize2, Minimize2, Moon, RotateCw, Rows3, Settings,
   Snowflake, Sparkles, Sun, Sunrise, Sunset, Trees, Wind, X,
   MoveHorizontal, PanelBottom,
 } from "lucide-react";
 import type { DaylightMode } from "./engine/daylight";
 
-export type SettingsPage = "light" | "scene" | "dock";
+export type SettingsPage = "light" | "scene" | "dock" | "controls";
 
 const DAYLIGHT_MODES: Array<{
   key: DaylightMode;
@@ -59,6 +59,8 @@ interface SanctuarySettingsProps {
   immersive: boolean;
   onFullscreen: () => void;
   onHideTray: () => void;
+  /** Opens the PUBG-style HUD layout editor over the world. */
+  onCustomiseLayout: () => void;
   onExit: () => void;
 }
 
@@ -66,6 +68,7 @@ const PAGE_META: Record<SettingsPage, { title: string; index: string }> = {
   light: { title: "Light", index: "01" },
   scene: { title: "Scene", index: "02" },
   dock: { title: "Dock", index: "03" },
+  controls: { title: "Controls", index: "04" },
 };
 
 export default function SanctuarySettings({
@@ -74,7 +77,7 @@ export default function SanctuarySettings({
   iceAge, onIceAge, animeSky, onAnimeSky,
   windLabel, onWind, autoOrbit, onOrbit,
   dockAutoHide, onDockAutoHide,
-  immersive, onFullscreen, onHideTray, onExit,
+  immersive, onFullscreen, onHideTray, onCustomiseLayout, onExit,
 }: SanctuarySettingsProps) {
   if (!open) return null;
 
@@ -114,7 +117,7 @@ export default function SanctuarySettings({
             <h1 className="text-[17px] font-black tracking-tight">{meta.title}</h1>
           </div>
           <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-[10px] font-bold text-white/45 sm:inline">
-            {meta.index} / 03
+            {meta.index} / 04
           </span>
         </header>
 
@@ -202,7 +205,7 @@ export default function SanctuarySettings({
                 onClick={onFullscreen}
               />
             </section>
-          ) : (
+          ) : page === "dock" ? (
             <section data-settings-page="dock" className="mx-auto max-w-2xl">
               <p className="mb-1 text-[12px] font-medium leading-5 text-white/50">
                 Advanced — how the bottom dock behaves.
@@ -230,7 +233,33 @@ export default function SanctuarySettings({
                 />
               </div>
             </section>
-          )}
+          ) : page === "controls" ? (
+            <section data-settings-page="controls" className="mx-auto max-w-2xl">
+              <p className="mb-1 text-[12px] font-medium leading-5 text-white/50">
+                Advanced — the on-screen character pad.
+              </p>
+              <div className="mt-3 space-y-2">
+                <SceneRow
+                  Icon={Gamepad2}
+                  label="Customise layout"
+                  right="Edit"
+                  onClick={onCustomiseLayout}
+                />
+                <p className="px-1 pb-1 text-[11px] font-medium leading-5 text-white/40">
+                  Drag every character button anywhere on the screen — move stick, look
+                  stick, jump, run, crouch, cover, the FPP / TPP camera switch and the
+                  rest — then set its size and transparency. It is saved on this device,
+                  so the pad comes back exactly where you left it.
+                </p>
+                <SceneRow
+                  Icon={PanelBottom}
+                  label="Bottom dock"
+                  right="Hide"
+                  onClick={onHideTray}
+                />
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <footer className="shrink-0 border-t border-white/10 p-3">
@@ -245,13 +274,16 @@ export default function SanctuarySettings({
         </footer>
       </div>
 
-      {/* ── RIGHT: vertical page tray — Light, Scene, Dock ────────────── */}
+      {/* ── RIGHT: page tray — Light, Scene, Dock, Controls ────────────────
+          One row per page with its name written out. It used to be a 68px
+          icon strip, which read as a minimised panel instead of a tray. ── */}
       <aside
         data-settings-rail
-        className="flex w-[4.25rem] shrink-0 flex-col items-center gap-2 border-l border-white/10 bg-black/35 py-4"
+        className="flex w-[10.75rem] shrink-0 flex-col gap-2 border-l border-white/10 bg-black/35 px-2.5 py-4 max-[640px]:w-[8.75rem]"
       >
-        <span className="mb-1 grid h-9 w-9 place-items-center rounded-lg border border-amber-300/30 bg-amber-400/15 text-amber-200">
-          <Settings className="h-4 w-4" />
+        <span className="mb-1 flex h-9 shrink-0 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-400/15 px-2.5 text-amber-200">
+          <Settings className="h-4 w-4 shrink-0" />
+          <span className="truncate text-[11px] font-black uppercase tracking-[0.12em]">Settings</span>
         </span>
         <RailTab
           label="Light"
@@ -271,6 +303,12 @@ export default function SanctuarySettings({
           active={page === "dock"}
           onClick={() => onPage("dock")}
         />
+        <RailTab
+          label="Controls"
+          Icon={Gamepad2}
+          active={page === "controls"}
+          onClick={() => onPage("controls")}
+        />
       </aside>
     </div>
   );
@@ -288,9 +326,8 @@ function RailTab({
     <button
       type="button"
       aria-pressed={active}
-      aria-label={label}
       onClick={onClick}
-      className={`relative flex h-[4.6rem] w-14 flex-col items-center justify-center gap-1 rounded-xl border text-[9px] font-black uppercase tracking-[0.12em] transition ${
+      className={`relative flex h-11 w-full shrink-0 items-center gap-2.5 rounded-xl border px-3 text-left text-[12px] font-extrabold transition ${
         active
           ? "border-amber-300/60 bg-amber-400/20 text-white shadow-[0_0_18px_rgba(251,191,36,0.25)]"
           : "border-white/10 bg-white/[0.04] text-white/55 hover:border-white/20 hover:text-white/85"
@@ -299,8 +336,8 @@ function RailTab({
       {active ? (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-amber-300" />
       ) : null}
-      <Icon className="h-5 w-5" />
-      {label}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{label}</span>
     </button>
   );
 }
