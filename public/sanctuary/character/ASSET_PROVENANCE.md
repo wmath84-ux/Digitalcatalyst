@@ -10,11 +10,15 @@ project-level LICENSE or portable character GLB/FBX export. A public source
 checkout and the reference plugin's third-party licenses do not themselves
 establish rights to redistribute/deploy these character packs.
 
-**No original Katiusza mesh or paid animation assets are currently distributed
-here.** `manifest.json` deliberately has `modelUrl: null` and
-`licenseConfirmed: false`. The live six-foot figure is the original procedural
-Sanctuary web guide, not Katiusza. No upstream map, land, sky, houses or native
-plugins are imported into the Sanctuary environment.
+**This folder now contains the original Katiusza character-only model**, converted
+directly from those pinned UE 5.1 editor-source assets: original mesh, complete
+outfit, source textures (downsampled to 2K for web), the 84-bone rig and original
+animation clips. The user explicitly confirmed export, web-deployment and
+redistribution rights on 2026-10-01; `manifest.json` therefore carries
+`licenseConfirmed: true`, and `SOURCE.json` records the acknowledgement, source
+commit, mesh SHA-256 and GLB SHA-256. No upstream map, land, sky, houses or
+native plugins are imported into the Sanctuary environment. Native Unreal cloth,
+ragdoll, Control Rig and Blueprint/AnimGraph behaviour are NOT included.
 
 For an authorized character-only GLB, use the explicit `--license-confirmed`
 installer and retain its SHA-256/rights acknowledgement in `SOURCE.json`.

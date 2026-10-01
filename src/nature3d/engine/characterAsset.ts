@@ -43,10 +43,10 @@ class ExportedFootIK {
   private footQ = new THREE.Quaternion();
   private up = new THREE.Vector3(0, 1, 0);
 
-  apply(hip: THREE.Bone, knee: THREE.Bone, foot: THREE.Bone, player: TrekPlayer) {
+  apply(hip: THREE.Bone, knee: THREE.Bone, foot: THREE.Bone, player: TrekPlayer, soleOffset: number) {
     hip.getWorldPosition(this.h); knee.getWorldPosition(this.k); foot.getWorldPosition(this.f);
     foot.getWorldQuaternion(this.footQ);
-    const ground = player.groundAt(this.f.x, this.f.z) + 0.035;
+    const ground = player.groundAt(this.f.x, this.f.z) + soleOffset;
     const offset = THREE.MathUtils.clamp(ground - this.f.y, -0.2, 0.25);
     if (Math.abs(offset) < 0.003) return;
     this.t.copy(this.f); this.t.y += offset;
@@ -179,6 +179,12 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
   // omit constant head/leg channels; without this, unanimated bones accumulate
   // the added rotations and eventually twist/spin instead of following camera.
   const boneRest = bones.map(bone => ({ bone, position: bone.position.clone(), quaternion: bone.quaternion.clone(), scale: bone.scale.clone() }));
+  // Original foot joints are ANKLES, above the boot sole. Calibrate that
+  // distance after normalization; forcing an ankle to ground clips the boot.
+  group.updateMatrixWorld(true);
+  const soleProbe = new THREE.Vector3();
+  const soleOffset = (foot: THREE.Bone | undefined) => foot ? THREE.MathUtils.clamp(foot.getWorldPosition(soleProbe).y, 0.02, 0.28) : 0.035;
+  const leftSoleOffset = soleOffset(left[2]), rightSoleOffset = soleOffset(right[2]);
   const ik = new ExportedFootIK();
   const aimQ = new THREE.Quaternion(); const parentQ = new THREE.Quaternion(); const worldQ = new THREE.Quaternion();
   const aimUp = new THREE.Vector3(0, 1, 0); const aimRight = new THREE.Vector3(); const pitchQ = new THREE.Quaternion();
@@ -248,8 +254,8 @@ export async function loadCharacterAvatar(shadows: boolean, installedManifest?: 
       ikClock += dt;
       if (player.grounded && camera.position.distanceToSquared(group.position) < 900 && ikClock >= (lowEnd ? 1 / 15 : 1 / 30)) {
         ikClock = 0;
-        if (left.every(Boolean)) ik.apply(left[0]!, left[1]!, left[2]!, player);
-        if (right.every(Boolean)) ik.apply(right[0]!, right[1]!, right[2]!, player);
+        if (left.every(Boolean)) ik.apply(left[0]!, left[1]!, left[2]!, player, leftSoleOffset);
+        if (right.every(Boolean)) ik.apply(right[0]!, right[1]!, right[2]!, player, rightSoleOffset);
       }
     },
     dispose() { mixer.stopAllAction(); mixer.uncacheRoot(model); disposeAssets(); group.removeFromParent(); group.clear(); },

@@ -133,6 +133,9 @@ resize(800,500); engine.focus('world'); ui();
       res.setHeader('Content-Type', 'text/html');
       res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#081519;font-family:system-ui}#world,#controls{position:absolute;inset:0}#controls{pointer-events:none}canvas{display:block;width:100%;height:100%}#world{touch-action:none}</style></head><body><div id="stage" data-sanctuary-root><div id="world"><canvas tabindex="0"></canvas></div><div id="controls"></div></div><script>window.testMapping=${JSON.stringify(mapping)}</script><script src="/fixture.js"></script></body></html>`); return;
     }
+    // Keep synthetic/guide regressions independent of deployed paid assets.
+    // Original asset import is exercised in sanctuaryOriginalCharacter.test.mjs.
+    if (url.pathname === '/sanctuary/character/manifest.json') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...MAPPING, modelUrl: null, licenseConfirmed: false })); return; }
     if (url.pathname === '/sanctuary/character/character.glb') { res.setHeader('Content-Type', 'model/gltf-binary'); res.end(testGlb); return; }
     if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
     const filename = url.pathname === '/fixture.js' || url.pathname === '/fixture.css' ? path.join(DIR, url.pathname.slice(1)) : path.resolve(ROOT, 'public', '.' + url.pathname);

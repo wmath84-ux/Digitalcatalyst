@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/VeryHotShark/RealisticThirdPersonCharacter",
+  "commit": "bf56bcd56c5dd149590d1e5a0dc45575ae2fa95c",
+  "engine": "Unreal Engine 5.1",
+  "conversion": "Actual original editor-source mesh/rig/outfit/textures/keys, not a generated likeness",
+  "textureMaxDimension": 2048,
+  "nativePhysics": "Unreal cloth/ragdoll/Blueprint graphs do not execute in GLB",
+  "licenseAcknowledgement": "Installer was explicitly invoked with --license-confirmed. The operator is responsible for export, deployment and distribution rights.",
+  "meshSHA256": "da714540cec5b64267ac7430507445b65fe1305638a8413d904784077e14dc56",
+  "fullArchiveAnimations": 401,
+  "userRightsConfirmation": "User explicitly confirmed export, web deployment and redistribution rights on 2026-10-01.",
+  "scope": "character-only",
+  "sha256": "74bb7b35253f462dc7620448bf955d9559f2272a7d5c920ce1439e9799835d4a",
+  "bytes": 43188972,
+  "missingOptional": [],
+  "nativeUnrealFeatures": "Unreal Blueprint/Control Rig, physical-animation ragdoll and skirt cloth do not execute in Three.js."
+}

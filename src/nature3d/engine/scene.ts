@@ -1884,7 +1884,13 @@ export class Sanctuary {
     let best = -Infinity;
     for (const [x, z] of candidates) {
       const y = this.characterWorld.terrainAt(x, z);
-      if (this.characterWorld.waterAt(x, z) - y > 0.65 ||
+      // An entry point must also be camera-visible, not on a steep river bank
+      // whose foreground ridge hides the original character's lower half.
+      const ground = this.characterWorld.terrainAt;
+      const relief = Math.max(Math.abs(ground(x + 0.5, z) - y), Math.abs(ground(x - 0.5, z) - y),
+        Math.abs(ground(x, z + 0.5) - y), Math.abs(ground(x, z - 0.5) - y));
+      if (relief > 0.12 || Math.abs(ground(x + 0.32, z + 4) - y) > 0.4 ||
+          this.characterWorld.waterAt(x, z) - y > 0.65 ||
           !this.characterWorld.canOccupy(x, y, z, 0.35, CHARACTER_HEIGHT + 1.5) ||
           !this.characterWorld.canOccupy(x, y, z - 3.5, 0.35, CHARACTER_HEIGHT) ||
           this.characterWorld.cameraBlocked(x + 0.32, y + 2, z + 4, 0.2)) continue;

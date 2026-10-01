@@ -1,0 +1,15 @@
+{
+  "sourceCommit": "bf56bcd56c5dd149590d1e5a0dc45575ae2fa95c",
+  "meshSHA256": "da714540cec5b64267ac7430507445b65fe1305638a8413d904784077e14dc56",
+  "glbSHA256": "1c698a311b3f4464976266205b70ece957b50b438683a66ebacf1b3fae42081d",
+  "bytes": 316230156,
+  "sourceVertices": 20376,
+  "exportedVertices": 18633,
+  "triangles": 32954,
+  "materials": 8,
+  "bones": 84,
+  "originalAnimations": 401,
+  "environmentImported": false,
+  "clothPhysicsPorted": false,
+  "nativeAnimationGraphsPorted": false
+}
