@@ -17,10 +17,10 @@ fs.mkdirSync(CACHE, { recursive: true });
 buildSync({
   stdin: { resolveDir: ROOT, loader: "ts", contents: `
 import * as THREE from "three";
-import { createBoardScreens } from "./src/nature3d/engine/boardScreens";
+import { createBoardScreens, studyLetterbox } from "./src/nature3d/engine/boardScreens";
 import { terrainHeight } from "./src/nature3d/engine/terrain";
 import { registerTreeObstacles } from "./src/nature3d/engine/flora";
-export { THREE, terrainHeight, registerTreeObstacles };
+export { THREE, terrainHeight, registerTreeObstacles, studyLetterbox };
 export function boot(host: HTMLElement) {
  const screens=createBoardScreens(false);host.appendChild(screens.domElement);screens.setSize(1600,900);
  return {screens,camera:new THREE.PerspectiveCamera(52,1600/900,.1,4000)};
@@ -231,6 +231,31 @@ test("no free-camera pose paints a page with a corner behind the eye", () => {
     assertNoStrayPage();
   }
   assert.ok(painted>100,"sweep must exercise visible pages");world();
+});
+
+test("phone landscape frames the board large; portrait is untouched", () => {
+  const { studyLetterbox } = fixture;
+  const hud = { top: 48, bottom: 100, left: 10, right: 10 };
+
+  // A landscape phone is ~900x390. The top stats chip and the bottom dock used
+  // to claim ~164 px of the 390 px SHORT edge (42%), and because the page is
+  // letterboxed to 16:9 the board came out only ~226 px tall — a small floating
+  // page in a wide view. The vertical cap must give most of the height back.
+  const land = studyLetterbox(900, 390, hud);
+  assert.ok(land.h >= 280, `landscape board is only ${land.h.toFixed(0)} px tall — fit not optimised`);
+  assert.ok(land.h / 390 >= 0.7, `landscape board fills only ${(land.h / 390 * 100).toFixed(0)}% of the short edge`);
+  // Still 16:9, and still fully inside the viewport.
+  assert.ok(Math.abs(land.w / land.h - 16 / 9) < 0.01, `landscape lost its 16:9 aspect (${land.w}x${land.h})`);
+  assert.ok(
+    land.x >= 0 && land.y >= 0 && land.x + land.w <= 900 && land.y + land.h <= 390,
+    "landscape board overflows the viewport",
+  );
+
+  // Portrait must be untouched by the cap: there padT + padB is already well
+  // under it, so a portrait board stays width-limited exactly as before.
+  const port = studyLetterbox(390, 900, hud);
+  assert.ok(Math.abs(port.w - (390 - 2 * (10 + 8))) < 1, `portrait width changed unexpectedly: ${port.w}`);
+  assert.ok(port.h < port.w, "portrait board should be width-limited, not height-limited");
 });
 
 test("resize, projection-only and board-size changes invalidate the pose; idle frames do no DOM work", () => {

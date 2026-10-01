@@ -452,8 +452,11 @@ export function createHillGrassField(
     // the distant hills read as a flat green sheet instead of as land.
     const hue = 0.24 + hsl.l * 0.02 + patch * 0.012 + (Math.random() - 0.5) * 0.03;
     const sat = 0.38 + hsl.s * 0.16 + patch * 0.06 + Math.random() * 0.06;
-    const lit = 0.36 + hsl.l * 0.22 + Math.random() * 0.1 - patch * 0.03;
-    color.setHSL(hue, Math.min(0.55, sat), Math.min(0.56, lit));
+    const lit = 0.54 + hsl.l * 0.26 + Math.random() * 0.12 - patch * 0.03;
+    // Saturation stays capped low (muted), lightness stays high (bright).
+    // Those are independent: an olive at 0.54 lightness is a sunlit dry hill,
+    // whereas the same hue at 0.36 was the dusk-looking regression.
+    color.setHSL(hue, Math.min(0.55, sat), Math.min(0.80, lit));
 
     // ── BAKED AMBIENT OCCLUSION ───────────────────────────────────────────
     //

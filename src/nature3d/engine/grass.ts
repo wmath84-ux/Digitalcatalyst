@@ -341,7 +341,11 @@ function buildRing(
       const hue = 0.24 + hsl.l * 0.015 + patch * 0.018 + (Math.random() - 0.5) * opts.colorJitter
         + (1 - density) * 0.02; // sparse/dry tips lean slightly yellower
       const sat = 0.34 + hsl.s * 0.14 + patch * 0.05 + Math.random() * 0.06 + density * 0.06;
-      const lit = 0.34 + hsl.l * 0.22 + Math.random() * 0.08 - patch * 0.04 + (1 - density) * 0.04;
+      // Lightness restored to the pre-muting value. Saturation is what carries
+      // the "real vs painted" signal, not brightness — cutting both was my
+      // error: the field went dim instead of muted, and a dim meadow reads as
+      // dusk no matter what the sun is doing.
+      const lit = 0.44 + hsl.l * 0.26 + Math.random() * 0.1 - patch * 0.04 + (1 - density) * 0.04;
       color.setHSL(hue, Math.min(0.55, sat), lit);
       builder.pushMatrix(dummy.matrix, x, y, z, color);
       placed += 1;

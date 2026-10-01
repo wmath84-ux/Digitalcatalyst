@@ -49,10 +49,34 @@ export function studyLetterbox(
   gutter = 8,
   aspect = SCREEN_PX_WIDTH / SCREEN_PX_HEIGHT,
 ): { x: number; y: number; w: number; h: number } {
-  const padT = Math.max(0, hud.top) + gutter;
-  const padB = Math.max(0, hud.bottom) + gutter;
+  let padT = Math.max(0, hud.top) + gutter;
+  let padB = Math.max(0, hud.bottom) + gutter;
   const padL = Math.max(0, hud.left) + gutter;
   const padR = Math.max(0, hud.right) + gutter;
+
+  // ── PHONE LANDSCAPE ────────────────────────────────────────────────────
+  //
+  // A landscape phone is roughly 900x390. The top stats chip (~48 px) and the
+  // bottom dock (~108 px) together claimed ~164 px of the SHORT edge — 42% of
+  // it — and because the page is letterboxed to 16:9 the board then came out
+  // only ~226 px tall, floating small in the middle of a wide view. That is the
+  // "fit zoom landscape mein optimise nahin hai" report.
+  //
+  // The chrome is sized for portrait, where the short edge is the WIDTH and
+  // there is plenty of it to spare; vertically there is room. Landscape flips
+  // that. So cap what the chrome may claim vertically and let the board take
+  // the rest. The board is centred and the dock hugs the bottom edge, so what
+  // the board overlaps is the dock's outer margin, not its buttons.
+  //
+  // Expressed against viewH rather than gated on orientation, so portrait is
+  // untouched by construction: there padT + padB is already well under the cap.
+  const padCap = Math.max(64, viewH * 0.24);
+  const padTotal = padT + padB;
+  if (padTotal > padCap) {
+    const k = padCap / padTotal;
+    padT *= k;
+    padB *= k;
+  }
   const usableW = Math.max(48, viewW - padL - padR);
   const usableH = Math.max(48, viewH - padT - padB);
   let w: number;
@@ -101,6 +125,18 @@ export interface BoardScreensHandle {
   setReadSlot(slot: LecternSlot | null): void;
   /** Frost the perimeter without changing content, hit targets or CSS3D poses. */
   setWinter(enabled: boolean): void;
+  /**
+   * Suppress every board while a full-screen HUD panel (Settings, My modules)
+   * is open.
+   *
+   * The screens live in a DOM layer composited ABOVE the WebGL canvas at
+   * z-index ~1e6, and the settings sheet has no z-index of its own — so an open
+   * panel was being drawn UNDER the boards, and the learner saw a lesson
+   * floating on top of the settings they had just asked for. Content is never
+   * detached here: this only drops opacity and hit targets, so any playing
+   * media survives and resumes where it was.
+   */
+  setOverlayOpen(open: boolean): void;
   /** Relayout the trio at `scale` × the pinned 30 m face. */
   setScale(scale: number): void;
   /**
@@ -314,6 +350,8 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const lastTransform = new Map<LecternSlot, Float32Array>();
   // Smoothed occlusion fraction per board (0 = clear, 1 = fully hidden) and the
   // last opacity string written, so an unchanged frame does no DOM work.
+  // True while a full-screen HUD panel owns the screen. See setOverlayOpen.
+  let overlayOpen = false;
   const occlusion = new Map<LecternSlot, number>();
   const lastOpacity = new Map<LecternSlot, string>();
   const occEye = new THREE.Vector3();
@@ -490,6 +528,14 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
       dirty = true;
     },
 
+    setOverlayOpen(open) {
+      if (overlayOpen === open) return;
+      overlayOpen = open;
+      // The camera has not moved, so the pose guard at the top of render()
+      // would early-return and the boards would stay on screen behind the
+      // panel. Force one pass through the loop.
+      dirty = true;
+    },
     setWinter(enabled) {
       for (const screen of screens) {
         if (enabled) screen.element.dataset.iceAge = "true";
@@ -566,10 +612,18 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         boardNormal.set(Math.sin(screen.placement.yaw), 0, Math.cos(screen.placement.yaw));
         toCamera.copy(camera.position).sub(screen.placement.position);
         let visible = inView && boardNormal.dot(toCamera) > 0 && projectFace(screen, camera).ok;
-        const fitted = screen.slot === readSlot && pinFace(screen, camera);
+        let fitted = screen.slot === readSlot && pinFace(screen, camera);
         if (fitted) {
           visible = true;
           fittedSlot = screen.slot;
+        }
+        // A full-screen panel outranks a pinned board: the learner opened
+        // Settings, so Settings is what they should see. Both the page and the
+        // WebGL shell go, together — fading one without the other is how the
+        // old black-slab bug happened.
+        if (overlayOpen) {
+          visible = false;
+          fitted = false;
         }
 
         // ── Soft occlusion: fade behind the world, never pop ───────────────
@@ -685,7 +739,7 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
           screen.host.setAttribute("aria-hidden", String(!interactable));
           screen.object.visible = visible;
           const shell = shells.children[i];
-          if (shell) shell.visible = inView || fitted;
+          if (shell) shell.visible = (inView || fitted) && !overlayOpen;
         }
       }
 

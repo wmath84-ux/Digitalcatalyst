@@ -266,13 +266,18 @@ function dayState(h: number): DaylightState {
     // light source, and light that saturated tints every shadow in the scene
     // toward paint. A muted olive keeps the bounce green — which is correct,
     // shadows outdoors ARE lit by green ground — without announcing itself.
-    hemiSky: lerpColor(0xbccdd8, 0xffe3c4, warm),
-    hemiGround: lerpColor(0x7d8a55, 0x5c6b3c, warm),
-    hemiIntensity: THREE.MathUtils.lerp(1.95, 1.85, dayFactor),
+    // hemiSky restored to near its original brightness. This is the ambient
+    // fill for the WHOLE scene, so dimming it darkened every shadowed surface
+    // at once — that, more than the albedo changes, is what made the world
+    // read as underexposed. The tint is still the muted hazy blue rather than
+    // the old near-white cyan.
+    hemiSky: lerpColor(0xd6e6f0, 0xffe3c4, warm),
+    hemiGround: lerpColor(0x8fa05e, 0x6b7a44, warm),
+    hemiIntensity: THREE.MathUtils.lerp(2.1, 2.0, dayFactor),
     fillIntensity: THREE.MathUtils.lerp(0.8, 1.05, dayFactor),
     zenith: lerpColor(0x3b6b9b, 0x3f5f9e, warm),
     horizon: lerpColor(0xa4b6c5, 0xffc79a, warm),
-    ground: lerpColor(0xc4c8a8, 0x7d8a55, warm),
+    ground: lerpColor(0xd8e4b8, 0x7d8a55, warm),
     sunTint: lerpColor(0xfff4dc, 0xffb07a, warm),
     // Smoke fog colour — a cool bluish-grey haze by day, warm dust at dusk.
     // #B0B8B9, not white: fog is not the absence of colour, it is air carrying

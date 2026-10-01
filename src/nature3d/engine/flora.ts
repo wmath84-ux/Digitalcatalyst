@@ -755,7 +755,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
           color.setHSL(
             0.30 + seededRandom() * 0.03,
             0.30 + seededRandom() * 0.08,
-            0.28 - t.crowding * 0.04 + seededRandom() * 0.08,
+            0.38 - t.crowding * 0.04 + seededRandom() * 0.09,
           );
           palmImpostors.setColorAt(palmImpostorIndex, color);
           palmImpostorIndex += 1;
@@ -803,7 +803,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         color.setHSL(
           unhealthy ? 0.16 + seededRandom() * 0.03 : 0.30 + outer * 0.014 + seededRandom() * 0.012,
           unhealthy ? 0.34 : 0.30 + outer * 0.07 + seededRandom() * 0.06,
-          0.28 + outer * 0.11 + seededRandom() * 0.07,
+          0.36 + outer * 0.12 + seededRandom() * 0.08,
         );
         target.setColorAt(slot, color);
         if (t.sways) frondSwayIndex += 1;
@@ -971,7 +971,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
         color.setHSL(
           0.30 + seededRandom() * 0.03,
           0.28 + t.crowding * 0.06,
-          0.28 - t.crowding * 0.06 + seededRandom() * 0.09,
+          0.38 - t.crowding * 0.06 + seededRandom() * 0.1,
         );
         impostors.setColorAt(impostorIndex, color);
         impostorIndex += 1;
@@ -1010,7 +1010,7 @@ export function createFlora(tex: TextureSet, budget: QualityBudget): Flora {
       color.setHSL(
         0.30 + outer * 0.025 + seededRandom() * 0.02,
         0.28 + outer * 0.09 + seededRandom() * 0.06,
-        0.26 + outer * 0.13 - t.crowding * 0.04 + seededRandom() * 0.09,
+        0.36 + outer * 0.14 - t.crowding * 0.04 + seededRandom() * 0.10,
       );
       target.setColorAt(slot, color);
       if (t.sways) swayIndex += 1;

@@ -1910,6 +1910,15 @@ export class Sanctuary {
    * scale together; the camera must be re-framed by the caller (`focus`)
    * so a 3× board still fits the desk view with no crop.
    */
+  /**
+   * Hide the study boards while a full-screen HUD panel (Settings, My modules)
+   * owns the screen. The boards are a DOM layer above the canvas, so without
+   * this they draw over the panel the learner just opened.
+   */
+  setOverlayOpen(open: boolean) {
+    this.screens.setOverlayOpen(open);
+  }
+
   setBoardScale(scale: number) {
     const s = scale < 1.25 ? 1 : scale < 1.75 ? 1.5 : scale < 2.5 ? 2 : 3;
     if (s === this.boardScale) return;

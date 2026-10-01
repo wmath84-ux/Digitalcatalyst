@@ -150,7 +150,14 @@ const BASE: Record<QualityTier, QualityBudget> = {
     waterfallParticles: 100,
     flowers: 135,
     rocks: 105,
-    shadowMapSize: 0,
+    // Shadows were OFF entirely on this tier, which is the single biggest
+    // reason a phone frame reads as flat: with no cast shadow nothing is
+    // visually anchored to the ground, and the scene loses its sense of scale.
+    // A 512 map is a quarter of the medium tier's texels but still resolves a
+    // tree or a board shadow, and because the map is STATIC (scene.ts sets
+    // shadowMap.autoUpdate = false and only re-renders it on demand) the cost
+    // is paid once, not per frame.
+    shadowMapSize: 512,
     richBoardMaterial: false,
     antialias: false,
     // 0.85 DPR made texturing and foliage visibly soft even when the GPU had

@@ -418,6 +418,15 @@ export default function NatureStudioPage() {
     eng.setHudInsets({ top, bottom, left: 10, right: 10 });
   }, [appImmersive, hudHidden, trayVisible, dockOpen]);
 
+  // A full-screen panel (Settings, My modules) outranks the study boards. The
+  // boards live in a DOM layer composited ABOVE the WebGL canvas at z-index
+  // ~1e6 and the panels have no z-index of their own, so an open Settings sheet
+  // was being drawn UNDER a floating lesson. Tell the engine to suppress them;
+  // it drops opacity and hit targets only, so any playing media survives.
+  useEffect(() => {
+    engineRef.current?.setOverlayOpen(menuOpen || moduleMenuOpen);
+  }, [menuOpen, moduleMenuOpen]);
+
   // Re-measure whenever the HUD set changes or the window resizes.
   useEffect(() => {
     refreshInsets();
