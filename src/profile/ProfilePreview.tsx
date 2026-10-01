@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
 import { ProfileCard } from "./ProfileCard";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
@@ -10,10 +11,10 @@ import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
  * behaviour can be reviewed across phone / tablet / desktop without any
  * Firebase auth or Firestore. Reachable at `#/dev/profile-preview`.
  *
- * It is intentionally wiring-free: no Header / BottomNav / contexts, so
- * resizing the browser window is the only thing needed to see every
- * breakpoint. The toolbar at the top lets you flip between the free and
- * subscriber states.
+ * It stays isolated from auth and Firestore; the shared background context
+ * lets its Profile switch preview the same app-wide preference as the real
+ * page. Resizing the browser window is enough to see every breakpoint. The
+ * toolbar at the top lets you flip between free and subscriber states.
  */
 
 type Scenario = "free" | "premium" | "expired";
@@ -28,6 +29,7 @@ const TIERS: Record<Scenario, MembershipTier> = {
 };
 
 export default function ProfilePreview() {
+  const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const [scenario, setScenario] = useState<Scenario>("premium");
   const tier = TIERS[scenario];
   const subscriber = scenario !== "free";
@@ -140,6 +142,8 @@ export default function ProfilePreview() {
               onOpenCourse: () => undefined,
               onOpenPurchases: () => undefined,
             }}
+            cleanBackgroundEnabled={cleanBackgroundEnabled}
+            onCleanBackgroundChange={setCleanBackgroundEnabled}
             onOpenSettings={() => undefined}
             saving={false}
             onLogout={() => undefined}

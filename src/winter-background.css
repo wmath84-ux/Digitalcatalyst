@@ -1,12 +1,37 @@
-/* ══ THE WINTER BACKGROUND ═══════════════════════════════════════════════════
-   The app's ONE background, ported from the owner's pinned reference pen
-   (codepen.io/Raed-Ennab/pen/PwNdKZj). Every value below is the pen's own —
-   only the selectors are namespaced (`.dc-winter__*`) and the layer is made
-   fixed / non-interactive so it can sit behind the whole app.
-
-   There is no preference and no switch: this is the default and the only
-   background. See src/components/backgrounds/WinterScene.tsx.
+/* ══ SHARED BACKGROUND MODES ════════════════════════════════════════════════
+   The route-level GlassBackdrop controller mounts exactly one of these layers
+   across every non-admin page. The default is a calm, static midnight field
+   tuned for depth behind glass cards. The original Winter Wonderland scene is
+   still available as an optional snowfall mode.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* Clean default: a deep, low-chroma navy base, softly lit at the edges by
+   indigo, violet and teal. The gentle vignette adds depth, while the broad
+   gradient falloffs leave glass cards as the visual focus. No texture, motion
+   or live filter competes with page content. */
+.dc-clean-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: #080d16;
+  background-image:
+    radial-gradient(70rem 48rem at 12% 0%, rgba(74, 103, 182, 0.27) 0%, transparent 65%),
+    radial-gradient(58rem 44rem at 104% 18%, rgba(112, 72, 153, 0.18) 0%, transparent 66%),
+    radial-gradient(70rem 48rem at 52% 112%, rgba(20, 112, 105, 0.16) 0%, transparent 66%),
+    linear-gradient(145deg, #111a2b 0%, #0b101b 53%, #070b12 100%);
+}
+
+.dc-clean-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 42%, rgba(2, 5, 12, 0.3) 100%),
+    linear-gradient(180deg, rgba(2, 5, 12, 0.04) 0%, transparent 28%, rgba(2, 5, 12, 0.2) 100%);
+}
 
 :root {
   --dc-winter-bg-top: #0a1224;

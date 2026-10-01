@@ -145,9 +145,8 @@ body,
   height: 100%;
   width: 100%;
   margin: 0;
-  /* Phase A: the canvas is the Black Ice base ink, never white. The fixed
-     The fixed .dc-winter scene paints the background; body/#root stay transparent so it
-     shows through on every route (iOS overscroll shows this ink, not white). */
+  /* The canvas keeps the same near-black base ink as the shared clean/snow
+     background layers, including during iOS overscroll. */
   background-color: #0a0c12;
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
@@ -2344,9 +2343,9 @@ body.eduvora-razorpay-open .razorpay-container iframe {
      NOT create a scroll container, so body scrolling and sticky headers
      inside the shell keep working exactly as before. */
   overflow: clip;
-  /* Phase A: the shell paints nothing. The single fixed Black Ice backdrop
-     (src/glass-theme.css) is the page background on every breakpoint; the
-     old indigo/sky wash and the two aurora orbs are gone at the source. */
+  /* The shell paints nothing so the shared clean/snow background behind it
+     remains visible on every breakpoint; the old page wash and aurora orbs
+     stay removed at the source. */
   background: transparent;
 }
 
