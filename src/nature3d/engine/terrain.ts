@@ -705,9 +705,69 @@ function buildRadialShell(
  * and a hill on the horizon is the same hill when you finally walk up it.
  * Total: 4 draw calls for the whole world.
  */
-export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture): THREE.Group {
+export function buildTerrain(
+  budget: QualityBudget,
+  groundTexture: THREE.Texture,
+  /**
+   * Tree shadow discs, used to bake canopy occlusion into the vertex colours.
+   * Passed in rather than imported: flora imports terrain, so terrain importing
+   * flora back would be a cycle. Plain data keeps the dependency one-way.
+   */
+  canopy: ReadonlyArray<{ x: number; z: number; r: number }> = [],
+): THREE.Group {
   const group = new THREE.Group();
   group.name = "terrain";
+
+  // ── Baked canopy occlusion ──────────────────────────────────────────────
+  //
+  // Several foliage modules (chunking, grassTufts, sorrel) switch their own
+  // cast shadows OFF with the comment that "the ground's baked AO gradient
+  // sells the contact". Until now that gradient did not exist: `groundColorAt`
+  // has no occlusion term at all. So those props had NO shadow of any kind,
+  // which is why the ground read as flat and nothing felt anchored to it.
+  //
+  // This is the missing term, solved ONCE at build time and frozen into the
+  // vertex colours the GPU already uploads — zero per-frame cost, which is the
+  // whole point of a bake. A uniform grid keeps it cheap: 150 000 terrain
+  // vertices would otherwise each test every tree in the world.
+  const AO_CELL = 12;
+  const AO_KEY_OFFSET = 2048; // world reach is ~1 180 m, so +/-100 cells
+  const aoGrid = new Map<number, number[]>();
+  for (let i = 0; i < canopy.length; i += 1) {
+    const c = canopy[i];
+    const cx = Math.floor(c.x / AO_CELL);
+    const cz = Math.floor(c.z / AO_CELL);
+    const span = Math.ceil(c.r / AO_CELL);
+    for (let gx = cx - span; gx <= cx + span; gx += 1) {
+      for (let gz = cz - span; gz <= cz + span; gz += 1) {
+        const key = (gx + AO_KEY_OFFSET) * 4096 + (gz + AO_KEY_OFFSET);
+        const bucket = aoGrid.get(key);
+        if (bucket) bucket.push(i);
+        else aoGrid.set(key, [i]);
+      }
+    }
+  }
+  /** 0 under open sky … 1 directly under a trunk. */
+  const canopyOcclusionAt = (x: number, z: number): number => {
+    if (aoGrid.size === 0) return 0;
+    const gx = Math.floor(x / AO_CELL);
+    const gz = Math.floor(z / AO_CELL);
+    const bucket = aoGrid.get((gx + AO_KEY_OFFSET) * 4096 + (gz + AO_KEY_OFFSET));
+    if (!bucket) return 0;
+    let occ = 0;
+    for (let b = 0; b < bucket.length; b += 1) {
+      const c = canopy[bucket[b]];
+      const dx = x - c.x;
+      const dz = z - c.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= c.r * c.r) continue;
+      // Smooth falloff, so the shadow edge is a gradient rather than a disc
+      // outline the eye can trace.
+      const t = 1 - Math.sqrt(d2) / c.r;
+      if (t > occ) occ = t;
+    }
+    return occ;
+  };
 
   // The altitude anchors stay explicit: they are also READ by the props (the
   // rock kit refuses to place above the bleached crest line, the grass uses
@@ -940,6 +1000,17 @@ export function buildTerrain(budget: QualityBudget, groundTexture: THREE.Texture
       if (h > 52) tmp.lerp(snow, Math.min(1, (h - 52) / 26) * shelf * 0.5);
       // Below the waterline-ish floor (the island edge) the ground goes dark.
       if (h < -6) tmp.lerp(deep, Math.min(1, (-6 - h) / 14));
+
+      // Canopy shadow: darken the ground under a crown. Applied before the
+      // albedo clamp so a deep shadow can never fall through the floor and read
+      // as a hole.
+      const occ = canopyOcclusionAt(x, z);
+      if (occ > 0) {
+        const shade = 1 - Math.min(0.46, occ * 0.62);
+        tmp.r *= shade;
+        tmp.g *= shade;
+        tmp.b *= shade;
+      }
 
       // Art direction: no albedo leaves the physical range. Paths are packed
       // dirt (warm brown), never chalk-white — the gravel lerp is softer and

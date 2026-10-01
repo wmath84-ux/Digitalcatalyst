@@ -209,6 +209,34 @@ function woodlandMask(x: number, z: number): number {
  *
  * `sways` stays biased near the camera: animating every leaf at 200 m is waste.
  */
+/** One tree's shadow footprint on the ground, for the terrain's baked AO. */
+export interface CanopyShadow {
+  x: number;
+  z: number;
+  r: number;
+}
+
+/**
+ * The ground shadow disc of every tree the layout is going to place.
+ *
+ * `treeLayout` is pure and seeded, so this can be called BEFORE the flora is
+ * built — which matters, because the terrain bakes its vertex colours during
+ * `buildTerrain` and runs first. Reading the tree registry instead would have
+ * returned an empty list and silently baked nothing.
+ *
+ * The terrain consumes this as plain data rather than importing flora: flora
+ * already imports terrain, so an import the other way would be a cycle.
+ */
+export function canopyShadowDiscs(count: number): CanopyShadow[] {
+  return treeLayout(count).map((t) => ({
+    x: t.x,
+    z: t.z,
+    // Crown spread on the ground. A palm throws a tight round shadow; a
+    // broadleaf or acacia spreads wide and irregular, so it gets a larger disc.
+    r: (t.kind === "palm" ? 3.2 : 5.4) * t.scale,
+  }));
+}
+
 function treeLayout(count: number): TreeLayout[] {
   const out: TreeLayout[] = [];
   const treeSite: Site = createSite();

@@ -34,7 +34,7 @@ import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GRO
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createHillGrassField, type HillGrassField } from "./hillGrass";
-import { createFlora, type Flora } from "./flora";
+import { canopyShadowDiscs, createFlora, type Flora } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
 import { createMossBank, type MossBank } from "./moss";
@@ -455,7 +455,15 @@ export class Sanctuary {
     // fp16 candidates on the diet tier.
     if (this.budget.halfPrecision) halfPrecisionTree(this.sky.group);
 
-    const terrain = buildTerrain(this.budget, this.textures.ground);
+    // Tree shadow discs are computed here, BEFORE the terrain, because the
+    // terrain bakes them into its vertex colours during the build. `treeLayout`
+    // is pure and seeded, so this yields exactly the trees createFlora will
+    // place a few lines later.
+    const terrain = buildTerrain(
+      this.budget,
+      this.textures.ground,
+      canopyShadowDiscs(this.budget.treeCount),
+    );
     this.scene.add(terrain);
     // The ground takes the atmosphere pass but NOT the transmission term —
     // soil does not translucently glow when the sun is behind it.
