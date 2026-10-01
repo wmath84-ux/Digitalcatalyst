@@ -1,14 +1,12 @@
-// Phase A — wave A1 "Foundation" contract.
+// Phase A — shared app-surface foundation contract.
 //
-// Owner direction (2026-09-02): the blurred Black Ice backdrop is the ONLY
-// page background. Every white page and every gradient page wash is removed
-// at the source — mobile, tablet and desktop alike — before the 22 pack
-// components are adopted everywhere.
+// The app has one route-level background controller for every learner-facing
+// page. It defaults to a clean gradient, with snowfall available as a saved
+// opt-in mode; admin keeps its own surface. Page roots remain transparent so
+// glass cards can sit over either background without duplicated page washes.
 //
-// This file pins the foundation so a later change cannot quietly bring a
-// painted page back:
-//   1. the backdrop mounts exactly once, at the routing level, for every
-//      non-admin route (checkout / auth / landing / course player included)
+// This file also pins the existing surface cleanup:
+//   1. the shared backdrop controller mounts once for every non-admin route
 //   2. no page root paints white / a light wash / a navy plate
 //   3. no `data-app-frame` paints the old "phone card" (white + shadow + border)
 //   4. the CSS-file page paint (shell gradient, aurora orbs, frame wash,
@@ -41,7 +39,7 @@ const appFiles = walk(srcRoot)
   .filter((p) => !FROZEN.some((f) => p.startsWith(f)))
   .filter((p) => !p.startsWith("src/components/ui/"));
 
-test("the Black Ice backdrop mounts once, at the routing level, for every non-admin route", () => {
+test("the shared background controller mounts once at the routing level for non-admin routes", () => {
   assert.match(main, /import \{ GlassBackdrop \} from "\.\/components\/ui\/GlassBackdrop"/);
   assert.match(main, /function RouteBackdrop\(\)/);
   assert.match(main, /if \(hash\.startsWith\(ADMIN_HASH\) \|\| hash\.startsWith\(ADMIN_LOGIN_HASH\)\) return null;\s*return <GlassBackdrop \/>;/);

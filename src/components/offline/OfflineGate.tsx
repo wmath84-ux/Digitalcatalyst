@@ -7,8 +7,8 @@ import OfflineScreen from "./OfflineScreen";
 
 /**
  * Overlay gate — never unmounts the app tree. Catalog, auth and the shared
- * WinterScene backdrop keep running underneath so the energy-field animation
- * is not a render blocker.
+ * background controller stay mounted underneath, so an offline check never
+ * remounts a page or resets the learner's background choice.
  *
  * v4: `offline` is flag-only (browser/OS connectivity down for 8 s straight),
  * so this overlay can no longer be triggered by a flaky fetch. Recovery is

@@ -5,12 +5,11 @@ import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
-// Liquid Glass v2 — the "Black Ice" palette tokens + the fixed backdrop layer.
+// Liquid Glass v2 — shared palette tokens + transparent-shell rules.
 // Imported before glass.css so the component ink rules there win any tie.
-// Inert unless src/lib/glass.ts sets html[data-glass="on"], and admin is forced
-// to `off`, so this never leaks into the admin surface.
+// Background mode is shared in context and changed from the Profile page.
 import "./glass-theme.css";
-// The one app background — the pinned Winter Wonderland scene (no switch).
+// Shared learner background modes — a clean gradient by default, with optional snowfall.
 import "./winter-background.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
@@ -99,6 +98,7 @@ import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { BackgroundPreferenceProvider } from "./context/BackgroundPreferenceContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -519,23 +519,25 @@ function Root() {
   // rendered inside each app — the desktop CSS hides it on >= 1024 px.
   // The shell (left rail + top bar) takes over from there.
   // OfflineGate is an overlay sibling — never an early-return — so the
-  // shared WinterScene backdrop and the rest of the tree stay mounted.
+  // shared background controller and the rest of the tree stay mounted.
   return (
-    <>
-      <RouteBackdrop />
-      <DesktopAppHost>
-        {/* One Suspense boundary for the whole hash router: every route in
-            RootPage is a `lazyRoute()` chunk. The fallback is the app's own
-            session-restore screen, so a route swap looks like the loading
-            state the app already had — never a white flash. The ACTIVE
-            route's chunk is preloaded at boot (see preloadRouteChunk below),
-            so on a warm cache this fallback is normally never painted. */}
-        <Suspense fallback={<RouteChunkFallback />}>
-          <RootPage />
-        </Suspense>
-      </DesktopAppHost>
-      <OfflineGate />
-    </>
+    <BackgroundPreferenceProvider>
+      <>
+        <RouteBackdrop />
+        <DesktopAppHost>
+          {/* One Suspense boundary for the whole hash router: every route in
+              RootPage is a `lazyRoute()` chunk. The fallback is the app's own
+              session-restore screen, so a route swap looks like the loading
+              state the app already had — never a white flash. The ACTIVE
+              route's chunk is preloaded at boot (see preloadRouteChunk below),
+              so on a warm cache this fallback is normally never painted. */}
+          <Suspense fallback={<RouteChunkFallback />}>
+            <RootPage />
+          </Suspense>
+        </DesktopAppHost>
+        <OfflineGate />
+      </>
+    </BackgroundPreferenceProvider>
   );
 }
 
@@ -601,18 +603,16 @@ setRoutePreloader(preloadRouteChunk);
 
 
 /**
- * The ONE Black Ice backdrop for the whole app (Phase A, wave A1).
+ * The one shared background controller for the whole learner-facing app.
  *
- * Before this it was mounted inside AppShell / DesktopShell / MyDayApp /
- * FlowPathApp, which left every route that bypasses the shell — checkout,
- * auth, landing, the course player, the loading and guard screens — sitting
- * on a white or hand-painted canvas. Mounting it once at the routing level
- * means every non-admin route, every breakpoint and every guard state sits
- * on the same fixed gradient, and no route can accidentally stack two.
+ * Mounting it once at the routing level covers every route that can render
+ * behind the shared backdrop — landing, auth, checkout, the course player,
+ * loading/guard states and the app pages — without duplicating the layer in
+ * individual components. GlassBackdrop defaults to a static clean gradient;
+ * the Clean background switch on Profile can restore the original snow scene.
  *
- * Admin keeps its own background logic: main.tsx forces the glass tier to
- * `off` there and `.dc-backdrop` is display:none under `data-glass="off"`,
- * but the layer is skipped outright on admin routes so it never even mounts.
+ * Admin and admin-login keep their own background logic and never mount the
+ * learner-facing layer or its control.
  */
 function RouteBackdrop() {
   const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Crown,
   Heart,
+  Layers,
   LoaderCircle,
   LogOut,
   Pencil,
@@ -169,6 +170,8 @@ export type ProfileLayoutProps = {
     onOpenPurchases: () => void;
   };
 
+  cleanBackgroundEnabled: boolean;
+  onCleanBackgroundChange: (enabled: boolean) => void;
   onOpenSettings: () => void;
   saving: boolean;
   message?: string;
@@ -197,6 +200,8 @@ export default function ProfileLayout({
   aiQuotaCard,
   onOpenStudyLibrary,
   library,
+  cleanBackgroundEnabled,
+  onCleanBackgroundChange,
   onOpenSettings,
   saving,
   message,
@@ -262,6 +267,27 @@ export default function ProfileLayout({
           onClick={stats.onOpenCart}
         />
       </div>
+
+      <ProfileCard className="col-span-full" data-profile-background-preference>
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">
+            <Layers size={16} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="dc-profile-card-title block">Clean background</span>
+            <span className="dc-profile-card-meta block">
+              {cleanBackgroundEnabled ? "On · snowfall off" : "Off · snowfall on"}
+            </span>
+          </span>
+          <GlassSwitch
+            checked={cleanBackgroundEnabled}
+            onCheckedChange={onCleanBackgroundChange}
+            ariaLabel="Clean background"
+            data-on={cleanBackgroundEnabled ? "true" : "false"}
+            className="dc-switch shrink-0"
+          />
+        </div>
+      </ProfileCard>
 
       {/* ── Primary column: membership + allowances ── */}
       <div data-profile-col="main">

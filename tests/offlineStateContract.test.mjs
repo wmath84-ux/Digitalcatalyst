@@ -22,7 +22,7 @@ test("offline overlay is a Root sibling and does not remount GlassBackdrop", () 
   assert.match(main, /<OfflineGate \/>/);
   assert.match(main, /<RouteBackdrop \/>/);
   assert.match(main, /return <GlassBackdrop \/>/);
-  // Overlay, not an early-return that would unmount the winter scene.
+  // Overlay, not an early-return that would unmount the shared background preference.
   assert.match(gate, /never unmounts the app tree/);
   assert.match(gate, /if \(!offline\) return null/);
   assert.equal((main.match(/createRoot\(/g) || []).length, 1);

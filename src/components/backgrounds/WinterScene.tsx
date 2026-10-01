@@ -1,25 +1,22 @@
 'use client'
 
 /**
- * WinterScene — THE app background.
+ * WinterScene — optional snowfall background mode.
  *
- * Ported line-for-line from the owner's pinned reference pen
+ * Ported from the owner's pinned reference pen
  * (https://codepen.io/Raed-Ennab/pen/PwNdKZj — "Winter Wonderland: Snowfall &
- * Frozen Lake Scene"): the aurora sky, the three mountains with their snow
- * caps, the snow ground, the frozen lake and the snowman are the pen's CSS
- * art (src/winter-background.css), and the snowfall below is the pen's canvas
- * loop, constant for constant.
+ * Frozen Lake Scene"): the aurora sky, mountains, snow ground, frozen lake and
+ * snowman are the pen's CSS art (src/winter-background.css), and the snowfall
+ * is the pen's canvas loop. The shared GlassBackdrop mounts this scene only
+ * while the learner's universal Snowfall switch is enabled; the clean gradient
+ * is the default and remains the lightweight option.
  *
- * 2026-09-04 · owner direction: there is no longer a "universal background"
- * with a classic/waves switch — this scene is the one and only background,
- * mounted by GlassBackdrop, with NO preference, NO toggle and NO opt-out.
+ * While mounted, the animation runs continuously for the lifetime of the
+ * scene. It is not gated on hover, focus, visibility or reduced-motion
+ * preferences, so choosing snowfall keeps the original uninterrupted effect.
  *
- * The animation NEVER stops: a single requestAnimationFrame loop that runs for
- * the lifetime of the mount. It is not gated on hover, focus, visibility or
- * reduced-motion preferences — "lagataar chalta rahe, bina ruke".
- *
- * The only adaptation vs. the pen is mounting: the pen's demo copy (badge,
- * heading, chips, buttons) is NOT part of a background, so it is not ported.
+ * The pen's demo copy (badge, heading, chips and buttons) is not part of the
+ * background and is intentionally not ported.
  */
 
 import { useEffect, useRef } from "react";
