@@ -191,3 +191,21 @@ Still not full-native-engine level:
 - Real ASTC/KTX2 compressed asset pipeline still pending.
 - True occlusion queries / Unreal-style occlusion culling are not practical in this WebGL path; HLOD, culling, DRS and streaming are the replacement strategy.
 - Full authored interiors/furniture for every house remain asset/design work.
+
+## Native-engine-level closure pass
+
+Applied in this pass:
+
+- **Authored lightweight interiors/furniture.**
+  Added `interiors.ts`: shared instanced beds, tables, benches and crates are placed inside every beach house and the villa. They use simple box colliders for gameplay, matching the simplified-hitbox rule, without loading heavy interior GLBs.
+
+- **Interior prop streaming.**
+  Interior furniture sleeps as one group when the camera is outside the settlement/world interaction range.
+
+- **Texture compression capability pipeline.**
+  Added `compression.ts` to detect ASTC/ETC/S3TC/PVRTC support at runtime and publish the KTX2/Basis path expected by a real compressed texture pipeline. Browser canvas textures cannot be converted to ASTC at runtime; actual GPU-compressed textures require offline `.ktx2` assets, but the engine-side detection/wiring is now present.
+
+Remaining constraints by platform:
+
+- True ASTC/KTX2 savings require authored `.ktx2` files in `public/` and an offline asset conversion step.
+- True Unreal-style occlusion queries are not exposed in this WebGL architecture as a safe universal mobile path; the implemented replacement is HLOD + impostors + distance/cell visibility + DRS.

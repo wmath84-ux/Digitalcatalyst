@@ -47,6 +47,7 @@ import { createWildlife, type Wildlife } from "./wildlife";
 import { createMountainForest, type MountainForest } from "./mountainForest";
 import { createFarRange, type FarRange } from "./farRange";
 import { createFarImpostorForest, type FarImpostorForest } from "./farImpostors";
+import { createSanctuaryInteriors, type SanctuaryInteriors } from "./interiors";
 import { createWater, type WaterSystem } from "./water";
 import { createSky, type SkySystem } from "./sky";
 import { daylightAt, hourForMode, type DaylightMode, type DaylightState } from "./daylight";
@@ -80,6 +81,7 @@ import { FALLBACK_CHARACTER_STATUS, readCharacterManifest, type CharacterAssetSt
 import { createStructures, type Structures } from "./structures";
 import { TREK } from "./regions";
 import { cullDistanceForPx } from "./cull";
+import { logTextureCompressionSupport, type TextureCompressionSupport } from "./compression";
 
 /**
  * Air left around a board when it is framed on its own, in metres. The brief
@@ -177,6 +179,7 @@ export class Sanctuary {
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   readonly budget: QualityBudget;
+  readonly compression: TextureCompressionSupport;
 
   private textures: TextureSet;
   private grass: GrassField;
@@ -203,6 +206,8 @@ export class Sanctuary {
   private farRange: FarRange | null = null;
   /** PUBG-style far forest HLOD: static alpha-card buckets at the skyline. */
   private farImpostors: FarImpostorForest | null = null;
+  /** Shared cheap furniture/interior props for enterable houses and villa. */
+  private interiors: SanctuaryInteriors | null = null;
   /**
    * The sorrel field (the meadow's real 3D ground plants). Its asset is
    * loaded asynchronously — it is the only world piece that is — so this
@@ -416,6 +421,7 @@ export class Sanctuary {
 
     this.adaptive = new AdaptiveResolution(this.budget, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.adaptive.pixelRatio);
+    this.compression = logTextureCompressionSupport(this.renderer);
 
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, this.budget.farPlane);
     this.camera.position.set(-6, 5.2, 12);
@@ -833,6 +839,13 @@ export class Sanctuary {
         // sealed footprint. Each house gets four wall segments with a front door
         // gap, so the character can enter while walls still feel solid.
         this.installBeachHouseInteriorColliders(district.sites);
+        if (!this.interiors) {
+          this.interiors = createSanctuaryInteriors(district.sites, this.budget);
+          this.scene.add(this.interiors.group);
+          this.characterWorld.setGroup("interior-props", this.interiors.colliders);
+          this.atmosphere.registerTree(this.interiors.group);
+          if (this.budget.halfPrecision) halfPrecisionTree(this.interiors.group);
+        }
         district.group.updateMatrixWorld(true);
         this.atmosphere.registerTree(district.group);
         this.winter.registerTree(district.group);
@@ -2771,6 +2784,7 @@ export class Sanctuary {
       // The homesteads are static; the call exists so the loop reads alike.
       this.beachHouses?.update(this.camera.position);
       this.farImpostors?.update(this.camera.position);
+      this.interiors?.update(this.camera.position);
     }
 
     this.aiClock += dt;
@@ -2929,6 +2943,7 @@ export class Sanctuary {
     this.mountainForest?.dispose();
     this.farRange?.dispose();
     this.farImpostors?.dispose();
+    this.interiors?.dispose();
     this.water.dispose();
     this.structures.dispose();
     this.sky.dispose();
