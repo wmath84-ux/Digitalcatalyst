@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   Compass, Eye, EyeOff, Minimize2,
-  PawPrint, Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
+  Trees, Sparkles, Waves, X, Globe2, Mountain, Home,
   BookOpen, PenLine, Network, Users, Rows3, Settings, Layers3,
 } from "lucide-react";
 import { useMotionValue } from "framer-motion";
@@ -65,7 +65,6 @@ const PRESETS: Array<{ key: ViewPreset; label: string; short: string; Icon: type
   { key: "houses", label: "Beach Houses", short: "Beach", Icon: Trees },
   { key: "board", label: "Board", short: "Board", Icon: Rows3 },
   { key: "waterfall", label: "Waterfall", short: "Fall", Icon: Waves },
-  { key: "wildlife", label: "Wildlife", short: "Wild", Icon: PawPrint },
 ];
 
 /**
@@ -256,7 +255,16 @@ export default function NatureStudioPage() {
         onStats: (s) => {
           // Direct DOM write — no setState, so the loop never triggers React.
           const el = statsRef.current;
-          if (el) el.textContent = `${Math.round(s.fps)} fps · ${s.tier} · ${s.draws} draws`;
+          // `cadence` and `shed` are the diagnostic pair: if fps sits AT the
+          // cadence the engine is pacing (headroom left, or it settled to 30
+          // on purpose); if it sits well BELOW, the GPU is the wall. A shed
+          // rung above 0 means the thermal fail-safe had to thin the sward.
+          if (el) {
+            el.textContent =
+              `${Math.round(s.fps)} fps · ${s.cadence}hz · ${s.tier}` +
+              ` · ${s.draws} draws · ${(s.triangles / 1000).toFixed(0)}k tris` +
+              (s.shed > 0 ? ` · shed ${s.shed}` : "");
+          }
         },
       });
       // The tier is fixed for the session, so this fires once (not per frame).

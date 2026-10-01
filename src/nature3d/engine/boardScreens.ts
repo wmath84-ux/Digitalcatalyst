@@ -6,9 +6,6 @@ import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { terrainHeight } from "./terrain";
 import { projectBoardMatrix } from "./boardProjection";
-import { WAREHOUSE_X, WAREHOUSE_Z } from "./warehouseSite";
-import { beachHouseSites } from "./beachHouseSite";
-import { treesBlockSight } from "./flora";
 import {
   LECTERN_BOARD_HEIGHT,
   LECTERN_BOARD_WIDTH,
@@ -74,105 +71,8 @@ export function studyLetterbox(
   };
 }
 
-/** DOM screens have no shared depth buffer with WebGL. Cull only a fully
- * obstructed face in the open world; a partial leaf/trunk must not blank the
- * whole board. The fitted study surface remains readable regardless of scenery.
- */
-const OCCLUSION_MARGIN = 0.15;
-const OCCLUSION_MIN_DISTANCE = 2;
-
-/** Is the sightline between eye and target blocked by terrain, grass, villa, beach houses, or trees? */
-function terrainBlocksSight(eye: THREE.Vector3, target: THREE.Vector3): boolean {
-  const dx = target.x - eye.x;
-  const dy = target.y - eye.y;
-  const dz = target.z - eye.z;
-  const length = Math.hypot(dx, dy, dz);
-  if (length < OCCLUSION_MIN_DISTANCE) return false;
-
-  // 1. Trees and plants (flora + tropical)
-  if (treesBlockSight(eye, target)) return true;
-
-  // 2. Villa obstruction (with sloped gable roof)
-  const lenXZ = Math.hypot(dx, dz);
-  if (lenXZ > 1e-4) {
-    const vSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
-    const vTh = terrainHeight(WAREHOUSE_X, WAREHOUSE_Z);
-    for (let i = 1; i < vSteps; i += 1) {
-      const t = i / vSteps;
-      const px = eye.x + dx * t;
-      const py = eye.y + dy * t;
-      const pz = eye.z + dz * t;
-      const vx = px - WAREHOUSE_X;
-      const vz = pz - WAREHOUSE_Z;
-      if (Math.abs(vx) <= 18.1 && Math.abs(vz) <= 21.4) {
-        const roofY = vTh + 30.4 - (Math.abs(vx) / 18.1) * 18.0;
-        if (py >= vTh && py <= roofY) return true;
-      }
-    }
-  }
-
-  // 3. Beach houses obstruction (all 6 houses with gable roof)
-  const sites = beachHouseSites();
-  if (sites.length > 0) {
-    const hSteps = Math.min(32, Math.max(6, Math.round(length / 2.0)));
-    for (let i = 1; i < hSteps; i += 1) {
-      const t = i / hSteps;
-      const px = eye.x + dx * t;
-      const py = eye.y + dy * t;
-      const pz = eye.z + dz * t;
-      for (let k = 0; k < sites.length; k += 1) {
-        const s = sites[k];
-        const hx = px - s.x;
-        const hz = pz - s.z;
-        const lx = s.cos * hx - s.sin * hz;
-        const lz = s.sin * hx + s.cos * hz;
-        if (Math.abs(lx) <= s.halfX && Math.abs(lz) <= s.halfZ) {
-          const roofY = s.padY + 30.0 - (Math.abs(lx) / s.halfX) * 18.0;
-          if (py >= s.padY && py <= roofY) return true;
-        }
-      }
-    }
-  }
-
-  // 4. Terrain & Grass raymarch: ~2.5m resolution
-  const steps = Math.min(48, Math.max(8, Math.round(length / 2.5)));
-  for (let i = 1; i < steps; i += 1) {
-    const t = i / steps;
-    const px = eye.x + dx * t;
-    const py = eye.y + dy * t;
-    const pz = eye.z + dz * t;
-    const th = terrainHeight(px, pz);
-    // Grass is ~0.45m tall on the ground
-    const surfaceH = th + 0.45;
-    if (surfaceH - py > OCCLUSION_MARGIN) return true;
-  }
-
-  return false;
-}
-
-// Hoisted samples: no arrays/vectors allocated while the camera moves.
-const OCCLUSION_SAMPLES = [
-  [0, 0], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9],
-  [0, -0.9], [0, 0.9], [-0.9, 0], [0.9, 0],
-] as const;
+/** The two ±1 signs used to walk the four corners of a board face. */
 const CORNER_SIGNS = [-1, 1] as const;
-
-/** Only hide a whole DOM face when ALL sampled sightlines are blocked. */
-function boardIsOccluded(
-  eye: THREE.Vector3, screen: BoardScreen, scale: number, target: THREE.Vector3,
-): boolean {
-  const p = screen.placement;
-  if (eye.distanceToSquared(p.position) < OCCLUSION_MIN_DISTANCE ** 2) return false;
-  const cos = Math.cos(p.yaw);
-  const sin = Math.sin(p.yaw);
-  const halfW = LECTERN_BOARD_WIDTH * scale / 2;
-  const halfH = LECTERN_BOARD_HEIGHT * scale / 2;
-  for (const [x, y] of OCCLUSION_SAMPLES) {
-    target.set(p.position.x + x * halfW * cos, p.position.y + y * halfH, p.position.z - x * halfW * sin);
-    if (!terrainBlocksSight(eye, target)) return false;
-  }
-  return true;
-}
 
 export interface BoardScreen {
   slot: LecternSlot;
@@ -399,6 +299,9 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   const toCamera = new THREE.Vector3();
   const lastCamPos = new THREE.Vector3(1e9, 1e9, 1e9);
   const lastCamQuat = new THREE.Quaternion(2, 2, 2, 2);
+  // Last matrix3d written per board, so an unchanged pose skips the DOM write
+  // entirely instead of rebuilding two throwaway strings every frame.
+  const lastTransform = new Map<LecternSlot, Float32Array>();
   const visibility = new Map<LecternSlot, number>();
   const pinCorner = new THREE.Vector3();
   let viewW = 1;
@@ -409,7 +312,6 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
   let dirty = true;
   const lastProjection = new THREE.Matrix4();
   const screenMatrix = new THREE.Matrix4();
-  const occlusionTarget = new THREE.Vector3();
   let hudInsets = { top: 48, bottom: 80, left: 12, right: 12 };
 
   /**
@@ -581,18 +483,72 @@ export function createBoardScreens(shadows: boolean): BoardScreensHandle {
         if (fitted) {
           visible = true;
           fittedSlot = screen.slot;
-        } else if (visible) {
-          // A focused study board is readable through scenery. In the open
-          // world only a fully obstructed face is hidden, never one leaf.
-          if (screen.slot !== readSlot && boardIsOccluded(camera.position, screen, faceScale, occlusionTarget)) {
-            visible = false;
-          }
         }
+
+        // ── No occlusion hiding, ever ───────────────────────────────────
+        //
+        // The boards used to disappear when the terrain broke the sightline
+        // (`boardIsOccluded`, nine sampled rays against `terrainHeight`). That
+        // was wrong twice over, and it is what produced the reported
+        // flicker-then-black-board bug:
+        //
+        //   1. BLACK BOARD. Hiding set `host.opacity = "0"` and
+        //      `visibility = "hidden"`, but the 3D frame mesh stayed visible
+        //      (`shell.visible = inView || fitted`, still true). The learner
+        //      saw an empty black rectangle where the lesson had been.
+        //
+        //   2. FLICKER. The test is a hard binary on the LAST sightline that
+        //      clears the ridge. A camera orbiting a few centimetres crosses
+        //      that boundary every frame, so the face snapped on and off.
+        //
+        // The boards are a DOM overlay composited ABOVE the WebGL canvas at
+        // z-index ~1e6, so scenery in front of them was never actually drawn
+        // over them anyway — hiding the content did not reveal anything, it
+        // only removed the lesson. A board is a screen, not a window: it keeps
+        // playing whatever module, notes or mind map is running, regardless of
+        // what stands between it and the eye. The old ray helpers
+        // (`terrainBlocksSight` / `boardIsOccluded`) were deleted with this
+        // change rather than left dead, because `noUnusedLocals` is on. If a
+        // future effect wants distance behaviour, it should be a SOFT fade
+        // (like the fog veil below), never a binary hide.
 
         if (visible && !fitted) {
           projectBoardMatrix(screen.object, camera, viewW, viewH, SCREEN_PX_WIDTH, SCREEN_PX_HEIGHT, screenMatrix);
-          screen.host.style.transform = `matrix3d(${screenMatrix.elements.join(",")})`;
-          screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
+
+          // ── Write the DOM only when the board actually MOVED ──────────
+          //
+          // This used to rebuild two strings per board per frame — a
+          // `matrix3d(...)` from `elements.join(",")` plus a `String(...)` for
+          // z-index. Across three boards that is ~360 throwaway strings a
+          // second, all of them garbage the collector has to chase, and each
+          // `style.transform` write also asks the compositor to re-transform a
+          // 1920x1080 layer holding a live iframe.
+          //
+          // Both costs are pure waste whenever the camera is still, which in a
+          // study scene is most of the time. So compare the sixteen matrix
+          // elements against the last written set and skip the write entirely
+          // when they agree. This is the same discipline as object pooling —
+          // reuse what you already have instead of manufacturing a new one
+          // every frame — applied to the DOM rather than to game objects.
+          const e = screenMatrix.elements;
+          const prev = lastTransform.get(screen.slot);
+          let moved = true;
+          if (prev !== undefined) {
+            moved = false;
+            for (let k = 0; k < 16; k += 1) {
+              if (prev[k] !== e[k]) {
+                moved = true;
+                break;
+              }
+            }
+            if (moved) prev.set(e);
+          } else {
+            lastTransform.set(screen.slot, new Float32Array(e));
+          }
+          if (moved) {
+            screen.host.style.transform = `matrix3d(${e.join(",")})`;
+            screen.host.style.zIndex = String(Math.max(0, 1000000 - Math.round(toCamera.length() * 10)));
+          }
         }
         const shown = (visible ? 1 : 0) | ((inView || fitted) ? 2 : 0);
         if (visibility.get(screen.slot) !== shown) {

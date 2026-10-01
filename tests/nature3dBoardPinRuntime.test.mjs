@@ -119,28 +119,43 @@ test("an oversized/refused fit remains an honest 3D board instead of a black sla
   assertConnected();assertNoStrayPage();world();
 });
 
-test("a full hill obstruction hides only the page, while a fitted study page stays readable", () => {
+// A board is a SCREEN, not a window: whatever module, notes or mind map is
+// running keeps running and keeps painting, no matter what stands between it
+// and the eye. The old occlusion ray-test hid the page whenever the terrain
+// broke the sightline — and because the 3D frame stayed visible while the DOM
+// content went to opacity 0, the learner saw a BLACK BOARD that flickered on
+// and off as the camera orbited the boundary. That behaviour is gone; these
+// two tests now assert its absence.
+test("terrain in front of a board never hides the page — it keeps painting", () => {
   screens.setReadSlot(null);
   const p=screens.byId("reading").placement.position;
   const stand=(z)=>{camera.position.set(0,fixture.terrainHeight(0,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();};
   stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
-  // At this side of the hill ALL face samples are below the intervening
-  // terrain. The old z=460 case only obstructed the centre of the board.
+  // The pose that USED to hide the page: every face sample sits below the
+  // intervening terrain, so the old nine-ray test called it fully obstructed.
   const x=Math.sin(1.2)*450,z=Math.cos(1.2)*450-5.4;
   camera.position.set(x,fixture.terrainHeight(x,z)+1.7,z);camera.lookAt(p);camera.updateMatrixWorld(true);render();
-  const hidden=state().find(s=>s.slot==="reading");
-  assert.equal(hidden.painted,false);assert.equal(hidden.shellVisible,true);assert.equal(hidden.host.isConnected,true);
+  const shown=state().find(s=>s.slot==="reading");
+  assert.equal(shown.painted,true,"terrain obstruction hid the page — boards must never blank");
+  assert.equal(shown.host.style.visibility,"visible");
+  assert.equal(shown.host.inert,false);
+  assert.equal(shown.shellVisible,true);assert.equal(shown.host.isConnected,true);
   stand(100-5.4);assert.equal(state().find(s=>s.slot==="reading").painted,true);
 });
 
-test("a leaf/trunk across the centre cannot blank the entire face; a fully obstructed world face can cull without stopping media", () => {
+test("neither a leaf/trunk nor a whole tree across the face can blank the board or stop media", () => {
   screens.setReadSlot(null);frame("reading");
   const p=screens.byId("reading").placement.position;
   fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:1}]);render();
   assert.equal(state().find(s=>s.slot==="reading").painted,true,"partial obstruction hid the whole board");
+  // A trunk the width of the entire board. This still must not blank it: the
+  // page is a live DOM surface composited ABOVE the canvas, so "hiding" it
+  // never revealed the scenery — it only took the lesson away and left a
+  // black frame behind.
   fixture.registerTreeObstacles([{x:p.x,z:(p.z+camera.position.z)/2,baseY:-10,height:60,radius:60}]);render();
-  const hidden=state().find(s=>s.slot==="reading");
-  assert.equal(hidden.painted,false);assert.equal(hidden.host.style.visibility,"visible");assert.equal(hidden.host.inert,true);
+  const shown=state().find(s=>s.slot==="reading");
+  assert.equal(shown.painted,true,"a full-width obstruction blanked the board");
+  assert.equal(shown.host.style.visibility,"visible");assert.equal(shown.host.inert,false);
   assertConnected();
   screens.setReadSlot("reading");render();
   const fitted=state().find(s=>s.slot==="reading");

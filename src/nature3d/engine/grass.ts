@@ -47,6 +47,12 @@ import { insideWarehouse } from "./warehouseSite";
 import { insideBeachHouse } from "./beachHouseSite";
 import { GROUND_PALETTE } from "./palette";
 import { dryCover, flowWetness, grassDensityAt, groundColorAt, pathWeight } from "./environment";
+import {
+  cellSizeForRadius,
+  createChunkBuilder,
+  type ChunkBuilder,
+  type ChunkedField,
+} from "./chunking";
 
 export interface GrassField {
   group: THREE.Group;
@@ -65,6 +71,13 @@ export interface GrassField {
    *   0 = full field · 1 = far ring 60 % · 2 = far 40 % + near 85 %
    */
   setDetail(level: number): void;
+  /**
+   * WORLD STREAMING. Hides every cell of both rings further than `radius`
+   * metres from the viewer. Frustum culling handles the view cone; this caps
+   * resident work by DISTANCE, which is what stops the field's size from
+   * mattering at all.
+   */
+  stream(x: number, z: number, radius: number): void;
   dispose(): void;
 }
 
@@ -119,7 +132,7 @@ function buildRing(
   bladeTex: THREE.Texture,
   opts: RingOptions,
   budget: QualityBudget,
-): { mesh: THREE.InstancedMesh; material: THREE.MeshLambertMaterial } {
+): { field: ChunkedField; material: THREE.MeshLambertMaterial; geometry: THREE.BufferGeometry } {
   const geo = bladeGeometry(opts.segments, opts.width, opts.height);
 
   const material = new THREE.MeshLambertMaterial({
@@ -199,10 +212,25 @@ function buildRing(
   // Distinct cache key per ring so the two rings do not share a compiled program.
   material.customProgramCacheKey = () => `dc-grass-${opts.segments}-${opts.height}`;
 
-  const mesh = new THREE.InstancedMesh(geo, material, opts.count);
-  mesh.frustumCulled = true;
-  mesh.castShadow = false; // grass shadows are pure cost, the AO gradient sells it
-  mesh.receiveShadow = budget.shadowMapSize > 0;
+  // Chunked, not one InstancedMesh for the whole ring. A single mesh carrying
+  // 17 000 blades over a 340 m meadow has ONE bounding sphere enclosing the
+  // whole meadow, so it intersects the frustum from every angle and three.js
+  // can never cull it — every blade ran through the vertex shader every frame,
+  // including the ~2/3 behind the camera. See `chunking.ts`.
+  const builder = createChunkBuilder({
+    geometry: geo,
+    material,
+    cellSize: cellSizeForRadius(opts.outerRadius),
+    // Blades are short but the wind shader bends them; a couple of metres of
+    // slack keeps an edge blade from popping out as the camera pans.
+    pad: 3,
+    name: opts.windSway ? "grass-near" : "grass-far",
+    capacity: opts.count,
+    // Grass never CASTS (pure cost; the AO gradient sells the contact) but it
+    // does RECEIVE on tiers that have a shadow map at all — same rule the
+    // single-mesh ring used to apply.
+    receiveShadow: budget.shadowMapSize > 0,
+  });
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -302,7 +330,6 @@ function buildRing(
       );
       dummy.scale.set((0.75 + Math.random() * 0.55) * gain * widthMul, scale, 1);
       dummy.updateMatrix();
-      mesh.setMatrixAt(placed, dummy.matrix);
 
       // Natural green: olive-cast meadow hue, not neon arcade grass.
       // Saturation is restrained; dry ground leans yellower, wet hollows deeper.
@@ -311,7 +338,7 @@ function buildRing(
       const sat = 0.48 + hsl.s * 0.18 + patch * 0.06 + Math.random() * 0.08 + density * 0.08;
       const lit = 0.42 + hsl.l * 0.26 + Math.random() * 0.1 - patch * 0.04 + (1 - density) * 0.04;
       color.setHSL(hue, Math.min(0.72, sat), lit);
-      mesh.setColorAt(placed, color);
+      builder.pushMatrix(dummy.matrix, x, y, z, color);
       placed += 1;
     }
   };
@@ -320,7 +347,7 @@ function buildRing(
   // prop skirts take the first slots and the scenic scatter continues from
   // wherever they left off. Planting them last would overwrite real blades.
   if (opts.skirt && opts.skirt.length > 0) {
-    placed = plantSkirt(mesh, opts.skirt, placed, Math.round(opts.count * 0.08));
+    placed = plantSkirt(builder, opts.skirt, placed, Math.round(opts.count * 0.08));
   }
 
   while (placed < opts.count && guard < opts.count * 10) {
@@ -354,17 +381,12 @@ function buildRing(
     plantClump(x, z, y, blades, gain, fade);
   }
 
-  mesh.count = placed;
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  // Build the cells. The old world-sized bounding sphere is gone: each cell
+  // now carries tight bounds measured from the blades it actually holds, plus
+  // the builder's pad for wind displacement.
+  const field = builder.build();
 
-  // A generous manual bounding sphere: the shader displaces vertices, so the
-  // auto-computed bounds would clip blades at the screen edge.
-  geo.computeBoundingSphere();
-  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), opts.outerRadius + 4);
-
-  return { mesh, material };
+  return { field, material, geometry: geo };
 }
 
 /**
@@ -380,7 +402,7 @@ function buildRing(
  * own scatter simply continues from there — no slot is ever overwritten.
  */
 function plantSkirt(
-  mesh: THREE.InstancedMesh,
+  builder: ChunkBuilder,
   skirt: Float32Array,
   startIndex: number,
   limit: number,
@@ -409,9 +431,8 @@ function plantSkirt(
       const sc = 0.9 + Math.random() * 0.8;
       dummy.scale.set(1.05, sc, 1);
       dummy.updateMatrix();
-      mesh.setMatrixAt(placed, dummy.matrix);
       color.setHSL(0.30 + Math.random() * 0.025, 0.68 + Math.random() * 0.12, 0.46 + Math.random() * 0.12);
-      mesh.setColorAt(placed, color);
+      builder.pushMatrix(dummy.matrix, x, y, z, color);
       placed += 1;
     }
   }
@@ -476,28 +497,34 @@ export function createGrassField(
     budget,
   );
 
-  group.add(near.mesh, far.mesh);
+  for (const mesh of near.field.meshes) group.add(mesh);
+  for (const mesh of far.field.meshes) group.add(mesh);
 
   const materials = [near.material, far.material];
-  // The counts the rings ended up with after the scatter — the fail-safe
-  // ladder trims from these, never from the (larger) buffer capacity.
-  const fullNear = near.mesh.count;
-  const fullFar = far.mesh.count;
+  // One geometry per ring, shared by all of that ring's cell meshes.
+  const nearGeo = near.geometry;
+  const farGeo = far.geometry;
 
   return {
     group,
     materials,
     setDetail(level) {
-      if (level <= 0) {
-        near.mesh.count = fullNear;
-        far.mesh.count = fullFar;
-      } else if (level === 1) {
-        near.mesh.count = fullNear;
-        far.mesh.count = Math.floor(fullFar * 0.6);
-      } else {
-        near.mesh.count = Math.floor(fullNear * 0.85);
-        far.mesh.count = Math.floor(fullFar * 0.4);
-      }
+      // Rungs 3 and 4 continue the same curve the first three established —
+      // the FAR ring is always cut hardest, because those blades are the
+      // smallest on screen and the cheapest to lose. The near ring keeps
+      // enough blades that the meadow under the chair never reads as bare
+      // dirt, which is the one place a learner actually looks down.
+      //
+      // `setShed` trims EVERY cell of a ring by the same fraction, so the
+      // meadow thins evenly instead of emptying whole grid cells.
+      const [nearK, farK] =
+        level <= 0 ? [1, 1]
+        : level === 1 ? [1, 0.6]
+        : level === 2 ? [0.85, 0.4]
+        : level === 3 ? [0.7, 0.25]
+        : [0.55, 0.15];
+      near.field.setShed(nearK);
+      far.field.setShed(farK);
     },
     update(time, windStrength) {
       for (const mat of materials) {
@@ -509,12 +536,19 @@ export function createGrassField(
         shader.uniforms.uWind.value = windStrength;
       }
     },
+    stream(x, z, radius) {
+      near.field.stream(x, z, radius);
+      far.field.stream(x, z, radius);
+    },
     dispose() {
-      for (const mesh of [near.mesh, far.mesh]) {
-        mesh.geometry.dispose();
-        (mesh.material as THREE.Material).dispose();
-        mesh.dispose();
-      }
+      // Geometry and material are SHARED by every cell mesh within a ring, so
+      // each is disposed exactly once here — once per ring, not once per cell.
+      // `field.dispose()` releases the per-cell instance buffers only.
+      near.field.dispose();
+      far.field.dispose();
+      nearGeo.dispose();
+      farGeo.dispose();
+      for (const mat of materials) mat.dispose();
     },
   };
 }

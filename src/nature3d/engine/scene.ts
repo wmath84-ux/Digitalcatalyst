@@ -34,7 +34,7 @@ import { createTextures, halveTextureSet, patchGroundPhoto, loadWaterPhotos, GRO
 import { buildTerrain, coastWeight, insideRiver, OCEAN_LEVEL, terrainHeight, WATER_LEVEL, WORLD_HALF } from "./terrain";
 import { createGrassField, type GrassField } from "./grass";
 import { createHillGrassField, type HillGrassField } from "./hillGrass";
-import { createFlora, createBirds, type Flora, type BirdColony } from "./flora";
+import { createFlora, type Flora } from "./flora";
 import { createSorrelField, type SorrelField } from "./sorrel";
 import { createGrassTuftField, type GrassTuftField } from "./grassTufts";
 import { createMossBank, type MossBank } from "./moss";
@@ -88,7 +88,7 @@ const BOARD_VIEW_MARGIN = 0.5;
 const ANIME_SKY_URL = "sanctuary/skybox_anime_sky.jpg";
 
 export type ViewPreset =
-  | "sanctuary" | "board" | "student" | "waterfall" | "wildlife"
+  | "sanctuary" | "board" | "student" | "waterfall"
   | "trek" | "world" | "warehouse" | "houses"
   // The three study boards. Each frames ONE board edge-to-edge.
   | "reading" | "notes" | "mindmap";
@@ -99,6 +99,15 @@ export interface SceneStats {
   pixelRatio: number;
   draws: number;
   triangles: number;
+  /**
+   * The frame cadence the pacer is currently holding (60 or the tier's
+   * fallback, 30 on low). Surfaced so a device stuck at 30 can be told apart
+   * from one that is simply GPU-bound below both: if `fps` sits near
+   * `cadence`, the engine is pacing; if it sits well below, the GPU is.
+   */
+  cadence: number;
+  /** Thermal shed rung, 0…4. Anything above 0 means the GPU was drowning. */
+  shed: number;
 }
 
 /**
@@ -216,7 +225,6 @@ export class Sanctuary {
   private animeSkyTexture: Promise<THREE.Texture | null> | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private rocks: RockField;
-  private birds: BirdColony;
   private wildlife: Wildlife;
   private water: WaterSystem;
   private sky: SkySystem;
@@ -277,6 +285,8 @@ export class Sanctuary {
     pixelRatio: 1,
     draws: 0,
     triangles: 0,
+    cadence: 60,
+    shed: 0,
   };
   private aiClock = 0;
   private skyClock = 0;
@@ -298,6 +308,8 @@ export class Sanctuary {
   // Hoisted scratch — the loop never allocates.
   private tmpV = new THREE.Vector3();
   private lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
+  /** Seconds since the world-streaming radii were last re-evaluated. */
+  private streamClock = 0;
   /** The sunny-afternoon brightness push applied on top of the per-hour curve. */
   private gradeExposure = 1.52;
   /** True while the camera (or the walker) is under the water line. */
@@ -630,20 +642,21 @@ export class Sanctuary {
       console.warn("[sanctuary] tropical jungle failed", err);
     });
 
-    this.birds = createBirds(this.flora.perches, this.textures, this.budget);
-    this.scene.add(this.birds.group);
-
-    // ── The grazing herd is not built ────────────────────────────────
+    // ── No wildlife at all ─────────────────────────────────────────────
     //
-    // Every animal that stood on the meadow floor — the buffalo, cows, deer,
-    // sheep and goats — is gone at the owner's request. Birds stay: they are
-    // in the trees and in the air, not on the ground.
+    // Every animal is gone at the owner's request: the buffalo, cows, deer,
+    // sheep and goats that stood on the meadow floor, AND the birds that
+    // perched in the canopies and circled overhead. None of them read as
+    // anything but noise at the scale they were drawn, and together they cost
+    // ~30 draw calls plus a per-frame matrix update for every body, wing and
+    // leg pivot — real frame time spent on silhouettes nobody could make out.
     //
-    // The system is still CONSTRUCTED, with a zero animal budget, rather than
-    // deleted. `createWildlife` owns the fur material and the shared species
-    // geometry banks, and `Sanctuary` calls `update`/`dispose` on it in three
-    // places; keeping the object means those paths stay honest and re-enabling
-    // the herd later is a one-line budget change instead of a re-import.
+    // The grazing herd is still CONSTRUCTED with a zero animal budget rather
+    // than deleted: `createWildlife` builds its species geometry and fur
+    // material LAZILY (both are Maps, filled on first `pieceSet` call), so at
+    // `animalCount: 0` it allocates nothing and its `update` walks an empty
+    // array. Keeping the object means `Sanctuary`'s update/dispose paths stay
+    // honest and re-enabling the herd later is a one-line budget change.
     this.wildlife = createWildlife({ ...this.budget, animalCount: 0 }, this.textures.fur);
     this.scene.add(this.wildlife.group);
 
@@ -1823,10 +1836,6 @@ export class Sanctuary {
       case "world":
         this.orbit.panTo(this.tmpV.set(0, 30, 0), 1500, -0.30, 0.34);
         break;
-      case "wildlife": {
-        this.orbit.panTo(this.tmpV.set(-14, 1.6, -8), 15, 1.1, 0.16);
-        break;
-      }
       case "houses": {
         // The homestead row, from above the meadow: whichever house the site
         // solve put nearest the study clearing is the one in frame.
@@ -2145,14 +2154,21 @@ export class Sanctuary {
   }
 
   private shedOneLevel() {
-    if (this.shedLevel >= 2) return;
+    // Four rungs, not two. The old ladder stopped at level 2 (45 % of the
+    // sward), which still submitted ~266 k verts/frame on the low tier —
+    // about 4x a comfortable mobile budget — so a genuinely drowning device
+    // hit the bottom of the ladder and stayed stuck at 20 fps with nowhere
+    // left to go. Levels 3 and 4 keep thinning (28 %, then 16 %) so the
+    // fail-safe can actually rescue the frame.
+    if (this.shedLevel >= 4) return;
     this.shedLevel += 1;
     this.applyShed();
     // Loud in the console on purpose: if a QA device reports a "sparse"
     // meadow, this line says why (hot GPU, not a content bug).
     console.info(
-      `[sanctuary] thermal fail-safe: shedding environment detail to level ${this.shedLevel}/2 ` +
-        `(far rings ${this.shedLevel >= 1 ? "hidden" : "shown"}, near rings ${this.shedLevel >= 2 ? "trimmed" : "full"})`,
+      `[sanctuary] thermal fail-safe: shedding environment detail to level ${this.shedLevel}/4 ` +
+        `(far rings ${this.shedLevel >= 1 ? "hidden" : "shown"}, near rings ${this.shedLevel >= 2 ? "trimmed" : "full"}, ` +
+        `sward ${this.shedLevel >= 3 ? "sparse" : "full"})`,
     );
   }
 
@@ -2202,9 +2218,15 @@ export class Sanctuary {
     // than a jagged 38–50 fps oscillation (this is why the consoles and
     // Swappy pace instead of free-running), and it halves the thermal load
     // that triggers Android's sustained-performance throttle.
-    if (this.budget.fpsCap > 0) {
+    // The interval now comes from the adaptive scaler, which starts every
+    // tier at 60 and only falls back to the tier's cadence (30 on low) once
+    // two 36-frame windows have proven 60 is unreachable — then climbs back
+    // as soon as there is headroom again. Reading `budget.fpsCap` directly
+    // here is what used to make 60 impossible on a phone.
+    const paceMs = this.adaptive.paceIntervalMs;
+    if (paceMs > 0) {
       if (frameStart < this.paceNext) return;
-      this.paceNext = Math.max(frameStart, this.paceNext) + 1000 / this.budget.fpsCap;
+      this.paceNext = Math.max(frameStart, this.paceNext) + paceMs;
     }
 
     // The DRS signal is the WALL-CLOCK span since the last rendered frame,
@@ -2302,9 +2324,7 @@ export class Sanctuary {
       const fov = this.camera.fov;
       const viewH = this.viewH;
       const herdCull = cullDistanceForPx(1.1, 3.2, fov, viewH);
-      const flyerCull = cullDistanceForPx(0.3, 3.5, fov, viewH);
       this.wildlife.update(this.aiClock, time, this.camera.position, herdCull * herdCull);
-      this.birds.update(this.aiClock, time, this.wind, this.camera.position, flyerCull * flyerCull);
       this.student.update(time);
       this.aiClock = 0;
     }
@@ -2350,6 +2370,41 @@ export class Sanctuary {
       }
     }
 
+    // ── World streaming ─────────────────────────────────────────────────
+    //
+    // The "load only the grids around you" half of spatial partitioning.
+    // Frustum culling already drops what is outside the view cone; this drops
+    // what is inside the cone but too far to be worth resident vertex work.
+    // It is what makes the SIZE of the world stop mattering — resident cost is
+    // capped at a fixed radius whether the sward spans 1 km or 8 km.
+    //
+    // Throttled to ~8 Hz: the camera would have to move several metres inside
+    // one frame to outrun it, and every cell already carries half a cell of
+    // slack so nothing blinks at the boundary. The call itself is a boolean
+    // flip with no allocation and no GPU upload.
+    //
+    // Radii are tiered so a weak phone streams tighter. Distant hills stay
+    // green regardless, because the terrain bakes true-green vertex colours
+    // (terrain.ts -> groundColorAt) — the grass cards past the radius were
+    // contributing sub-pixel detail over an already-green hill.
+    this.streamClock += dt;
+    if (this.streamClock >= 0.125) {
+      this.streamClock = 0;
+      const cx = this.camera.position.x;
+      const cz = this.camera.position.z;
+      const hillR =
+        this.budget.tier === "low" ? 520
+        : this.budget.tier === "medium" ? 700
+        : this.budget.tier === "high" ? 900
+        : 1150;
+      const meadowR =
+        this.budget.tier === "low" ? 200
+        : this.budget.tier === "medium" ? 260
+        : 340;
+      this.hillGrass.stream(cx, cz, hillR);
+      this.grass.stream(cx, cz, meadowR);
+    }
+
 
     this.winter.update(dt, this.camera, this.wind, this.reducedMotion);
     this.renderer.render(this.scene, this.camera);
@@ -2360,7 +2415,11 @@ export class Sanctuary {
 
     // ── Adaptive resolution + thermal fail-safe + stats ───────────────
     const frameMs = performance.now() - frameStart;
-    const newRatio = this.adaptive.sample(wallMs > 0 ? wallMs : frameMs, frameStart);
+    // The wall-clock span drives RESOLUTION (it is the honest "is the GPU
+    // keeping up" signal); the tick's own production time drives the CADENCE,
+    // because at a paced 30 fps the wall gap is ~33 ms by construction and
+    // can never report whether 60 was actually within reach.
+    const newRatio = this.adaptive.sample(wallMs > 0 ? wallMs : frameMs, frameStart, frameMs);
     if (newRatio !== null) {
       this.renderer.setPixelRatio(newRatio);
       this.requestShadowRefresh();
@@ -2380,6 +2439,8 @@ export class Sanctuary {
       s.pixelRatio = Math.round(this.adaptive.pixelRatio * 100) / 100;
       s.draws = this.renderer.info.render.calls;
       s.triangles = this.renderer.info.render.triangles;
+      s.cadence = this.adaptive.cadence;
+      s.shed = this.shedLevel;
       this.opts.onStats(s);
       this.fpsAccum = 0;
       this.fpsFrames = 0;
@@ -2402,7 +2463,6 @@ export class Sanctuary {
     this.grassTufts?.dispose();
     this.mossBank?.dispose();
     this.tropical?.dispose();
-    this.birds.dispose();
     this.wildlife.dispose();
     this.mountainForest?.dispose();
     this.farRange?.dispose();

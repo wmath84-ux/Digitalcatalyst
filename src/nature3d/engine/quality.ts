@@ -367,20 +367,68 @@ export function budgetFor(tier: QualityTier): QualityBudget {
  */
 export class AdaptiveResolution {
   private samples: number[] = [];
+  /** Per-frame PRODUCTION time, kept alongside the wall-clock samples. */
+  private workSamples: number[] = [];
   private scale: number;
   private lastChange = 0;
   private readonly min: number;
   private readonly max: number;
-  /** Frame budget in ms (30 fps tier → 33.3). */
-  private readonly targetMs: number;
+  /**
+   * Frame budget in ms, and it is no longer a constant. It follows
+   * `cadenceFps`, which starts at 60 on every tier and only steps DOWN to the
+   * tier's fallback cadence when a sustained overrun proves 60 is genuinely
+   * unreachable — see `cadenceFps` below.
+   */
+  private targetMs: number;
   /** Consecutive trims that bottomed out at the floor. */
   private floorTrims = 0;
+  /**
+   * DYNAMIC FRAME CADENCE.
+   *
+   * The low tier used to hard-cap at 30 fps: the render loop threw away every
+   * other rAF tick outright. That was a sensible default for a scene that
+   * could not hold 60, but it made 60 **architecturally impossible** — no
+   * amount of geometry work could get past the cap, because the engine was
+   * discarding the frames it did manage to produce.
+   *
+   * It now starts at 60 everywhere and only falls back to the tier's cadence
+   * (`fpsCap`, 30 on low) after TWO consecutive 36-frame windows have proven
+   * 60 is out of reach, then climbs straight back as soon as two windows come
+   * in comfortably under budget. A fixed 30 Hz cadence really is smoother
+   * than a stuttering 45 — that part of the original reasoning was right —
+   * but it should be a *fallback*, not a ceiling.
+   *
+   * 0 means uncapped (desktop tiers), which is unchanged behaviour: the
+   * browser vsync-paces a free-running loop for us.
+   */
+  private cadenceFps: number;
+  /** The tier's fallback cadence; 0 = never pace (desktop). */
+  private readonly fallbackFps: number;
+  /** Consecutive 36-frame windows that missed / beat the current cadence. */
+  private slowWindows = 0;
+  private fastWindows = 0;
 
   constructor(budget: QualityBudget, deviceRatio: number) {
     this.max = Math.min(deviceRatio || 1, budget.maxPixelRatio);
     this.min = Math.min(this.max, budget.minPixelRatio);
     this.scale = this.max;
-    this.targetMs = budget.fpsCap > 0 ? 1000 / budget.fpsCap : 1000 / 60;
+    this.fallbackFps = budget.fpsCap > 0 ? budget.fpsCap : 0;
+    this.cadenceFps = this.fallbackFps > 0 ? 60 : 0;
+    this.targetMs = this.cadenceFps > 0 ? 1000 / this.cadenceFps : 1000 / 60;
+  }
+
+  /**
+   * Milliseconds between rendered frames for the loop's pacer. 0 = do not
+   * pace (desktop). The loop reads this every tick, so a cadence change
+   * takes effect on the very next frame.
+   */
+  get paceIntervalMs(): number {
+    return this.cadenceFps > 0 ? 1000 / this.cadenceFps : 0;
+  }
+
+  /** The cadence currently in force, for the stats HUD. */
+  get cadence(): number {
+    return this.cadenceFps;
   }
 
   get pixelRatio(): number {
@@ -396,6 +444,42 @@ export class AdaptiveResolution {
    * floor-level trims without a recovery). The caller consumes the signal by
    * shedding one content level; the counter then re-arms.
    */
+  /**
+   * Move the frame cadence between 60 and the tier's fallback, with
+   * hysteresis on BOTH directions so it can never oscillate frame-to-frame.
+   *
+   * Downgrade: two consecutive 36-frame windows whose production time exceeds
+   * 20.8 ms (i.e. genuinely worse than ~48 fps) mean 60 is not happening;
+   * settle on the fallback cadence rather than stuttering at 45.
+   *
+   * Upgrade: while paced at the fallback, two consecutive windows whose
+   * production time comes in under 18.3 ms mean there is real headroom for
+   * 60 — hand the frames back instead of sitting at 30 forever.
+   */
+  private stepCadence(avgWorkMs: number): void {
+    if (this.fallbackFps <= 0) return; // desktop: never paced
+    const sixty = 1000 / 60;
+    if (this.cadenceFps === 60) {
+      this.fastWindows = 0;
+      if (avgWorkMs > sixty * 1.25) this.slowWindows += 1;
+      else this.slowWindows = 0;
+      if (this.slowWindows >= 2) {
+        this.slowWindows = 0;
+        this.cadenceFps = this.fallbackFps;
+        this.targetMs = 1000 / this.cadenceFps;
+      }
+      return;
+    }
+    this.slowWindows = 0;
+    if (avgWorkMs < sixty * 1.1) this.fastWindows += 1;
+    else this.fastWindows = 0;
+    if (this.fastWindows >= 2) {
+      this.fastWindows = 0;
+      this.cadenceFps = 60;
+      this.targetMs = sixty;
+    }
+  }
+
   consumeThermalHot(): boolean {
     if (this.floorTrims < 3) return false;
     this.floorTrims = 0;
@@ -405,14 +489,30 @@ export class AdaptiveResolution {
   /**
    * Feed one rendered frame's wall-clock span (ms). Returns the new pixel
    * ratio when it changed.
+   *
+   * `workMs` is how long PRODUCING the frame actually took (the tick's own
+   * CPU+submit span), as opposed to the wall-clock gap between rendered
+   * frames. They differ whenever the pacer is skipping ticks — at a 30 fps
+   * cadence the wall gap is ~33 ms *by construction*, so it can never tell
+   * us whether 60 was reachable. Cadence decisions therefore read `workMs`;
+   * resolution decisions keep reading the wall-clock span, which is the
+   * honest signal for "is the GPU keeping up".
    */
-  sample(frameMs: number, now: number): number | null {
+  sample(frameMs: number, now: number, workMs = frameMs): number | null {
     // Ignore absurd deltas (tab restore, debugger pause, first frames).
     if (frameMs > 0 && frameMs < 500) this.samples.push(frameMs);
+    if (workMs > 0 && workMs < 500) this.workSamples.push(workMs);
     if (this.samples.length < 36) return null;
 
     const avg = this.samples.reduce((a, b) => a + b, 0) / this.samples.length;
     this.samples.length = 0;
+    const avgWork = this.workSamples.length
+      ? this.workSamples.reduce((a, b) => a + b, 0) / this.workSamples.length
+      : avg;
+    this.workSamples.length = 0;
+
+    this.stepCadence(avgWork);
+
     if (now - this.lastChange < 900) return null;
 
     // Frame overruns: a sustained ~60 % overrun gets a hard chop (−15 %), a
