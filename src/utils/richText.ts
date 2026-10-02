@@ -25,7 +25,10 @@ const TAG_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "target", "rel"]),
   img: new Set(["src", "alt", "width", "height"]),
   ol: new Set(["start", "type"]),
-  li: new Set(["value"]),
+  // `data-checked` is the checklist state the note editor stores on its task
+  // items (see src/course/noteEditor/editorSerialization.ts). It is the ONLY
+  // data attribute allowed, and its value is restricted to true / false below.
+  li: new Set(["value", "data-checked"]),
   td: new Set(["colspan", "rowspan"]),
   th: new Set(["colspan", "rowspan", "scope"]),
   col: new Set(["span"]),
@@ -91,6 +94,12 @@ const scrub = (node: Element) => {
       else node.removeAttribute("style");
       continue;
     }
+    if (name === "data-checked") {
+      const checked = attribute.value.trim().toLowerCase();
+      if (checked === "true" || checked === "false") node.setAttribute("data-checked", checked);
+      else node.removeAttribute(attribute.name);
+      continue;
+    }
     if (name === "href" && !SAFE_URL.test(attribute.value.trim())) node.removeAttribute("href");
     if (name === "src" && !SAFE_IMAGE_URL.test(attribute.value.trim())) node.removeAttribute("src");
   }
@@ -134,9 +143,14 @@ export const richTextToPlain = (html: string): string => {
   }
   const parsed = new window.DOMParser().parseFromString(`<body>${input}</body>`, "text/html");
   parsed.body.querySelectorAll(BLOCK_TAGS).forEach((node) => {
-    // A trailing marker keeps words from different blocks apart once the
-    // whole tree is flattened to `textContent`.
+    // A marker on BOTH sides keeps words from different blocks apart once the
+    // whole tree is flattened to `textContent` — after the block (a heading and
+    // the paragraph below it) and before it (a list item's own text and the
+    // nested list or paragraph that follows it: "one" + <ul>… must not read
+    // "oneone"). Runs of whitespace are collapsed below, so this only ever
+    // separates words that were glued.
     node.append(parsed.createTextNode(" "));
+    node.prepend(parsed.createTextNode(" "));
   });
   return (parsed.body.textContent || "").replace(/\s+/g, " ").trim();
 };

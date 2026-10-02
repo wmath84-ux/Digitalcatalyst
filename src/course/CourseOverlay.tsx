@@ -297,6 +297,8 @@ interface CourseOverlayProps {
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
   onLinkNote: (id: string, links: string[]) => void;
+  /** The notes hook's live state — drives the editor's Saving… / Synced chip. */
+  notesSync?: { status: "idle" | "loading" | "ready" | "saving" | "saved" | "error"; synced: boolean };
   // Mind map wiring. The panel itself is owned by the parent (it holds the
   // Firestore hook), so the pane only hosts it — this keeps the overlay
   // presentational and lets the map survive tab switches.
@@ -801,6 +803,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onAdd={props.onAddNote}
           onEdit={props.onEditNote}
           onDelete={props.onDeleteNote}
+          syncState={props.notesSync}
         />
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}

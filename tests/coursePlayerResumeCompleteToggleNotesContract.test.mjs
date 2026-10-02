@@ -174,11 +174,20 @@ test("Un-completing plays the remove cue and keeps progress honest", () => {
 // ---------------------------------------------------------------------------
 
 test("The notes editor is a large rich-text surface", () => {
+  // The writing surface is the block-document NoteEditor (BlockNote), loaded as
+  // its own chunk; the previous editor stays in the bundle ONLY as the
+  // fallback for a chunk that cannot load (and for My Day's quick notes).
+  assert.match(notesPanel, /const NoteEditor = lazy\(loadNoteEditor\);/);
+  assert.match(notesPanel, /<NoteEditor\b/);
   assert.match(notesPanel, /<RichTextEditor/);
+  assert.match(notesPanel, /<EditorBoundary/);
   assert.match(notesPanel, /data-course-notes-mode=\{editing \? "edit" : "compose"\}/);
   // The composer takes over the whole panel.
   assert.match(notesPanel, /if \(editorOpen\) \{/);
-  assert.match(notesPanel, /className="flex min-h-0 flex-1 flex-col p-3"/);
+  // …as ONE white page: no padded card around it any more (the old
+  // `flex-col p-3` composer box is gone) — a slim bar, then the page.
+  assert.match(notesPanel, /className="flex min-h-0 flex-1 flex-col" data-course-notes-composer/);
+  assert.doesNotMatch(notesPanel, /flex-col p-3/);
   // …and the study pane gives it every pixel: the pane carries no header at
   // all, so the writing surface always fills the pane.
   assert.doesNotMatch(overlay, /chromeRow/);
