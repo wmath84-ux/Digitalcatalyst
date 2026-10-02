@@ -71,6 +71,7 @@ test("app keys stay stable for Revision and My Day, follow id for product and co
   assert.equal(pageEnterAppKey("#/product/abc?section=reviews"), "#/product/abc");
   assert.equal(pageEnterAppKey("#/subscription?renew=1"), "#/subscription");
   assert.equal(pageEnterAppKey("#/profile"), "#/profile");
+  assert.equal(pageEnterAppKey("#/usage-limits"), "#/usage-limits");
   assert.equal(pageEnterAppKey("#/profile/subscriber-experience"), null);
   assert.equal(pageEnterAppKey("#/cart"), "#/cart");
   assert.equal(pageEnterAppKey("#/favorites"), null);
@@ -96,6 +97,7 @@ test("RootPage wraps only the listed apps in PageEnter", () => {
   assert.match(main, /<PdpWithOwnership/);
   assert.match(main, /<SubscriptionApp/);
   assert.match(main, /<ProfileApp/);
+  assert.match(main, /<UsageLimitsPage/);
   assert.match(main, /<CartWishlistApp/);
   assert.match(main, /<CourseRouteGuard/);
   assert.match(main, /<MyDayApp/);

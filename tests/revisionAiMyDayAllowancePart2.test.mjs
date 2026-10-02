@@ -204,17 +204,21 @@ test("profile uses the authenticated status response and exposes live reset info
   assert.match(card, /Provider failure, incomplete output and your own API key do not use this allowance/);
 });
 
-test("AI allowance card is imported, rendered and reachable from both profile routes", () => {
+test("the AI allowance card has one destination on Usage Limits, not Revision Profile", () => {
   const main = read("src/main.tsx");
   const profile = read("src/profile/App.tsx");
+  const usagePage = read("src/usage/UsageLimitsPage.tsx");
   const revisionApp = read("src/revision/RevisionApp.tsx");
   const revisionProfile = read("src/revision/pages/RevisionProfilePage.tsx");
   assert.match(main, /hash\.startsWith\(PROFILE_HASH\)[\s\S]*?<ProfileApp/);
-  assert.match(profile, /import AiQuotaCard/);
-  assert.match(profile, /membership\.subscriber \? <AiQuotaCard uid=\{user\.id\}/);
+  assert.doesNotMatch(profile, /AiQuotaCard/);
+  assert.match(usagePage, /import AiQuotaCard/);
+  assert.match(usagePage, /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
+  assert.match(usagePage, /data-school-ai-visible="true"/);
   assert.match(revisionApp, /path\.startsWith\("#\/revision\/profile"\)[\s\S]*?<RevisionProfilePage/);
-  assert.match(revisionProfile, /import AiQuotaCard/);
-  assert.match(revisionProfile, /<AiQuotaCard uid=\{uid\} \/>/);
+  assert.doesNotMatch(revisionProfile, /AiQuotaCard/);
+  assert.match(revisionProfile, /data-revision-usage-limits-link/);
+  assert.match(revisionProfile, /navigate\("#\/usage-limits"\)/);
 });
 
 test("provider metadata supports actual usage with an estimate fallback", () => {
@@ -242,9 +246,10 @@ test("My Day free creation is Admin-configurable, daily-reset and server-authori
   assert.match(rules, /allow create, update, delete: if isAdmin\(\)/);
 });
 
-test("the My Day free-allowance summary lives on Profile, never on the My Day dashboard", () => {
+test("the My Day free-allowance summary lives on Usage Limits, never on Profile or the My Day dashboard", () => {
   const app = read("src/MyDayApp.tsx");
   const profile = read("src/profile/App.tsx");
+  const usagePage = read("src/usage/UsageLimitsPage.tsx");
   const card = read("src/components/MyDayAllowanceCard.tsx");
 
   // The old banner strip must not come back to the My Day page.
@@ -253,9 +258,12 @@ test("the My Day free-allowance summary lives on Profile, never on the My Day da
   assert.doesNotMatch(app, /available today/);
   assert.doesNotMatch(app, /free creation allowance has been used/);
 
-  // Profile renders the redesigned card and wires both CTAs.
-  assert.match(profile, /import MyDayAllowanceCard from "\.\.\/components\/MyDayAllowanceCard"/);
-  assert.match(profile, /<MyDayAllowanceCard[\s\S]*?onOpenMyDay=\{\(\) => \{ window\.location\.hash = "#\/my-day"; \}\}[\s\S]*?onSubscribe=\{openPlans\}/);
+  // The dedicated page renders the same card and wires both CTAs; Profile
+  // keeps only a shortcut to this route, not the allowance details.
+  assert.doesNotMatch(profile, /MyDayAllowanceCard|AiQuotaCard/);
+  assert.match(profile, /onOpenUsageLimits=\{\(\) => \{ window\.location\.hash = "#\/usage-limits"; \}\}/);
+  assert.match(usagePage, /import MyDayAllowanceCard from "\.\.\/components\/MyDayAllowanceCard"/);
+  assert.match(usagePage, /<MyDayAllowanceCard[\s\S]*?onOpenMyDay=\{\(\) => \{ window\.location\.hash = "#\/my-day"; \}\}[\s\S]*?onSubscribe=\{\(\) => \{ window\.location\.hash = "#\/subscription"; \}\}/);
 
   // The card is server-authoritative: same hook, no local entitlement math.
   assert.match(card, /useMyDayAccess/);

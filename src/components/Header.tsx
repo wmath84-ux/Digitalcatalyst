@@ -1,11 +1,13 @@
 import type { ComponentType, ReactNode } from "react";
-import { HelpCircle } from "lucide-react";
+import { Gauge, HelpCircle } from "lucide-react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { useBranding } from "@/context/BrandingContext";
+import { useViewportBand } from "../utils/responsive";
 import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
+import MobileHeaderMenu from "./MobileHeaderMenu";
 
 type HeaderProps = {
   cartCount: number;
@@ -105,6 +107,8 @@ export default function Header({
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
+  const viewportBand = useViewportBand();
+  const isPhoneLayout = viewportBand === "compact-mobile" || viewportBand === "large-mobile";
   const LogoIcon = icon ?? BookIcon;
   const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
@@ -181,7 +185,9 @@ export default function Header({
         ? "cart"
         : hash.startsWith("#/subscription")
           ? "subscription"
-          : null;
+          : hash.startsWith("#/usage-limits")
+            ? "usage-limits"
+            : null;
 
   const handleSelect = (id: string) => {
     if (id === "search") onToggleSearch?.();
@@ -189,8 +195,26 @@ export default function Header({
     else if (id === "cart") onNavigateToCart();
     else if (id === "notifications") onNavigateToNotifications();
     else if (id === "subscription") onNavigateToSubscription();
+    else if (id === "usage-limits") window.location.hash = "#/usage-limits";
     else if (id === "help") onHelpClick?.();
   };
+
+  const mobileMenuItems = [
+    ...visibleTabItems.map((item) => ({
+      id: item.id,
+      label: item.label,
+      ariaLabel: item.ariaLabel,
+      icon: item.icon,
+      badge: item.badge,
+    })),
+    {
+      id: "usage-limits",
+      label: "Usage Limits",
+      ariaLabel: "Usage Limits",
+      icon: <Gauge className="h-5 w-5" />,
+      color: "#8B7CF6",
+    },
+  ];
 
   return (
     <header
@@ -239,13 +263,25 @@ export default function Header({
         )}
 
         <div className="flex shrink-0 items-center gap-2">
-          <ExpandingTabs
-            items={visibleTabItems}
-            activeId={activeId}
-            onSelect={handleSelect}
-            ariaLabel="Header actions"
-          />
-          {action}
+          {isPhoneLayout ? (
+            <MobileHeaderMenu
+              items={mobileMenuItems}
+              activeId={activeId}
+              onSelect={handleSelect}
+              extraContent={action}
+              ariaLabel="Header actions"
+            />
+          ) : (
+            <div className="flex items-center gap-2" data-header-actions-inline>
+              <ExpandingTabs
+                items={visibleTabItems}
+                activeId={activeId}
+                onSelect={handleSelect}
+                ariaLabel="Header actions"
+              />
+              {action}
+            </div>
+          )}
         </div>
       </div>
       {children}

@@ -68,6 +68,17 @@ service firebase.storage {
       allow delete: if isPrivateChatParticipant(chatId);
     }
 
+    // Profile photos are public avatar assets; only their owner can upload,
+    // and uploads are restricted to small, browser-safe raster images.
+    match /userProfilePhotos/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if signedIn()
+        && request.auth.uid == uid
+        && request.resource != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
     match /community/{allPaths=**} {
       allow read, write: if signedIn();
     }

@@ -3999,11 +3999,17 @@ html[data-nature-studio-active="true"] {
   padding: 0;
 }
 
-/* Profile renders its own page wrapper instead of `.dc-app-shell`, so the
-   same release is spelled out for it. */
-.dc-desktop-shell [data-profile-page] {
+/* Profile and Usage Limits render their own page wrappers instead of
+   `.dc-app-shell`, so the same release is spelled out for them. */
+.dc-desktop-shell [data-profile-page],
+.dc-desktop-shell [data-usage-limits-page] {
   min-height: 0;
   padding: 0;
+}
+.dc-desktop-shell [data-usage-limits-content] {
+  min-height: 0;
+  overflow: visible !important;
+  max-height: none !important;
 }
 
 /* Release the per-page clipping inside the shell. `sm:overflow-hidden` and the

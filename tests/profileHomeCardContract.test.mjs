@@ -98,27 +98,27 @@ test("the copy diet: the profile page's walls of text are gone", () => {
   // One trust line survives (pinned by subscriptionRenewalContract).
   assert.match(layout, /Renewal is manual and secure/);
 
-  // The Profile-only My Day card: one line per state, no three-chip stat row.
+  // The Usage Limits My Day card: one line per state, no three-chip stat row.
   const myDay = read("src/components/MyDayAllowanceCard.tsx");
   assert.match(myDay, /My Day remains browse-only until reset/);
   assert.doesNotMatch(myDay, /grid-cols-3 gap-2/);
   assert.doesNotMatch(myDay, /counted in your own time zone/);
 });
 
-test("the profile instances of the shared cards take the same material", () => {
-  // Profile-only My Day card: it renders ProfileCard itself, so it follows.
+test("the Usage Limits instances of the shared cards take the same material", () => {
+  // My Day card: it renders ProfileCard itself, so it follows.
   const myDay = read("src/components/MyDayAllowanceCard.tsx");
   assert.match(myDay, /import \{ ProfileCard as GlassSurface \} from "\.\.\/profile\/ProfileCard"/);
   assert.match(myDay, /dc-profile-card-title/);
 
-  // AI quota card: an opt-in `home` material + a compact copy mode, so the
-  // Revision Profile page's card stays byte-identical while the Profile page
-  // gets the Home look and drops the explanation paragraph.
+  // AI quota card: the dedicated page uses the `home` material; Revision
+  // keeps its default card unchanged.
   const ai = read("src/components/AiQuotaCard.tsx");
   assert.match(ai, /material\?: "store" \| "cart" \| "home"/);
   assert.match(ai, /"dc-scene-plate dc-profile-card relative text-white"/);
   assert.match(ai, /compact\?: boolean/);
-  assert.match(read("src/profile/App.tsx"), /<AiQuotaCard uid=\{user\.id\} material="home" compact \/>/);
+  assert.match(read("src/usage/UsageLimitsPage.tsx"), /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
+  assert.doesNotMatch(read("src/profile/App.tsx"), /AiQuotaCard|MyDayAllowanceCard/);
   // Revision keeps the default store material.
   assert.doesNotMatch(read("src/revision/pages/RevisionProfilePage.tsx"), /<AiQuotaCard[^>]*material=/);
 });
@@ -131,7 +131,7 @@ test("the shared material still comes from ONE module — ui/glass", () => {
   assert.match(engine, /tint = 0\.5/, "default tint");
   assert.match(engine, /blur = 14/, "default blur");
   assert.match(engine, /saturation = 1\.6/, "default saturation");
-  for (const file of [...PROFILE_FILES, "src/components/MyDayAllowanceCard.tsx", "src/components/AiQuotaCard.tsx"]) {
+  for (const file of [PROFILE_FILES[0], "src/components/MyDayAllowanceCard.tsx", "src/components/AiQuotaCard.tsx"]) {
     assert.match(read(file), /from "\.\.\/components\/ui\/glass"|from "\.\/ui\/glass"|ProfileCard"/, `${file} imports the pack surface`);
   }
 });

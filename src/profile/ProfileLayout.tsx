@@ -1,5 +1,6 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
 import { ProfileCard } from "./ProfileCard";
+import { profilePhotoSrc } from "../utils/profilePhoto";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -9,8 +10,10 @@ import {
   Bell,
   Boxes,
   CalendarDays,
+  Camera,
   ChevronRight,
   Crown,
+  Gauge,
   Heart,
   Layers,
   LoaderCircle,
@@ -24,17 +27,6 @@ import {
   X,
   Zap,
 } from "lucide-react";
-
-/** Google avatars 403 in the APK WebView when a localhost Referer is sent. */
-function profilePhotoSrc(url?: string): string {
-  const src = String(url || "").trim();
-  if (!src) return "";
-  if (/googleusercontent\.com/i.test(src)) {
-    if (/=s\d+/.test(src)) return src.replace(/=s\d+(-c)?/, "=s256-c");
-    return `${src}${src.includes("?") ? "" : "=s256-c"}`;
-  }
-  return src;
-}
 
 /* ── Shared types ───────────────────────────────────────────────────── */
 export type MembershipTier = "normal" | "basic" | "premium" | "pro";
@@ -129,6 +121,9 @@ export type ProfileLayoutProps = {
   initials: string;
   memberSince: string;
   onEdit: () => void;
+  onChoosePhoto?: () => void;
+  photoUploading?: boolean;
+  photoError?: string;
 
   membership: ProfileLayoutMembership;
   membershipBadge?: ReactNode;
@@ -158,9 +153,8 @@ export type ProfileLayoutProps = {
     onToggleReminders: (next: boolean) => void;
   } | null;
 
-  myDayCard: ReactNode;
-  aiQuotaCard: ReactNode;
-
+  /** Opens the dedicated page that owns the personal allowance cards. */
+  onOpenUsageLimits: () => void;
   onOpenStudyLibrary: () => void;
 
   library: {
@@ -189,6 +183,9 @@ export default function ProfileLayout({
   initials,
   memberSince,
   onEdit,
+  onChoosePhoto,
+  photoUploading = false,
+  photoError,
   membership,
   membershipBadge,
   onOpenPlans,
@@ -196,8 +193,7 @@ export default function ProfileLayout({
   stats,
   referral,
   renewal,
-  myDayCard,
-  aiQuotaCard,
+  onOpenUsageLimits,
   onOpenStudyLibrary,
   library,
   cleanBackgroundEnabled,
@@ -241,6 +237,9 @@ export default function ProfileLayout({
         memberSince={memberSince}
         planLabel={membership.subscriber ? membership.planLabel : PLAN_LABELS.normal}
         onEdit={onEdit}
+        onChoosePhoto={onChoosePhoto}
+        photoUploading={photoUploading}
+        photoError={photoError}
       />
 
       {/* ── Full-width quick stats ── */}
@@ -289,7 +288,7 @@ export default function ProfileLayout({
         </div>
       </ProfileCard>
 
-      {/* ── Primary column: membership + allowances ── */}
+      {/* ── Primary column: membership + a link to personal usage ── */}
       <div data-profile-col="main">
         {membership.subscriber ? (
           <MembershipCard
@@ -305,9 +304,22 @@ export default function ProfileLayout({
           <UpgradeCard onOpenPlans={onOpenPlans} onOpenSubscriberExperience={onOpenSubscriberExperience} />
         )}
 
-        {myDayCard}
-
-        {aiQuotaCard}
+        <ProfileCard data-profile-usage-limits-link contentClassName="p-0">
+          <button
+            type="button"
+            onClick={onOpenUsageLimits}
+            className="flex w-full items-center gap-3 rounded-[inherit] p-4 text-left transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-300"
+          >
+            <span className={`${ICON_CHIP} bg-indigo-500/15 text-indigo-200 ring-indigo-400/30`}>
+              <Gauge size={17} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="dc-profile-card-title block">Usage limits</span>
+              <span className="dc-profile-card-meta mt-0.5 block">View personal usage and reset details</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-white/55" aria-hidden="true" />
+          </button>
+        </ProfileCard>
       </div>
 
       {/* ── Side column: library + preferences + account actions ── */}
@@ -369,6 +381,9 @@ function ProfileHero({
   memberSince,
   planLabel,
   onEdit,
+  onChoosePhoto,
+  photoUploading,
+  photoError,
 }: {
   name: string;
   email: string;
@@ -378,6 +393,9 @@ function ProfileHero({
   memberSince: string;
   planLabel: string;
   onEdit: () => void;
+  onChoosePhoto?: () => void;
+  photoUploading: boolean;
+  photoError?: string;
 }) {
   const src = profilePhotoSrc(photoURL);
   const [brokenPhoto, setBrokenPhoto] = useState("");
@@ -385,25 +403,45 @@ function ProfileHero({
   return (
     <ProfileCard data-profile-hero className="relative overflow-hidden">
       <div className="flex items-center gap-3">
-        <div className="shrink-0 rounded-full p-[2px] ring-2 ring-white/25">
-          {showPhoto ? (
-            <img
-              src={src}
-              alt=""
-              decoding="async"
-              width={64}
-              height={64}
-              className="h-14 w-14 rounded-full object-cover md:h-16 md:w-16"
-              referrerPolicy="no-referrer"
-              draggable={false}
-              data-profile-photo
-              onError={() => setBrokenPhoto(src)}
-            />
-          ) : (
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-indigo-600 text-lg font-bold text-white md:h-16 md:w-16 md:text-xl" data-profile-photo-fallback>
-              {initials}
-            </div>
-          )}
+        <div className="shrink-0 text-center">
+          <button
+            type="button"
+            onClick={onChoosePhoto}
+            disabled={!onChoosePhoto || photoUploading}
+            aria-label={photoURL ? "Change profile photo" : "Add profile photo"}
+            title={photoURL ? "Change profile photo" : "Add profile photo"}
+            className="group relative block rounded-full p-[2px] ring-2 ring-white/25 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-200 disabled:cursor-default"
+            data-profile-photo-upload
+          >
+            {showPhoto ? (
+              <img
+                src={src}
+                alt=""
+                decoding="async"
+                width={64}
+                height={64}
+                className="h-14 w-14 rounded-full object-cover md:h-16 md:w-16"
+                referrerPolicy="no-referrer"
+                draggable={false}
+                data-profile-photo
+                onError={() => setBrokenPhoto(src)}
+              />
+            ) : (
+              <span className="grid h-14 w-14 place-items-center rounded-full bg-indigo-600 text-lg font-bold text-white md:h-16 md:w-16 md:text-xl" data-profile-photo-fallback>
+                {initials}
+              </span>
+            )}
+            {onChoosePhoto ? (
+              <span aria-hidden="true" className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-slate-950 bg-indigo-500 text-white shadow-lg transition group-hover:bg-indigo-400">
+                {photoUploading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+              </span>
+            ) : null}
+          </button>
+          {onChoosePhoto ? (
+            <span className="mt-1 block text-[9px] font-semibold text-white/55">
+              {photoUploading ? "Uploading…" : photoURL ? "Change photo" : "Add photo"}
+            </span>
+          ) : null}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -425,6 +463,11 @@ function ProfileHero({
         </GlassButton>
       </div>
 
+      {photoError ? (
+        <p role="alert" data-profile-photo-error className="mt-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-[11px] font-semibold text-rose-200">
+          {photoError}
+        </p>
+      ) : null}
       {bio ? <p className="dc-profile-card-note mt-3 line-clamp-2">{bio}</p> : null}
     </ProfileCard>
   );

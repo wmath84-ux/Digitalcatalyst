@@ -1529,7 +1529,7 @@ export default function SubscriptionsPage() {
 
               <div className="mt-3 space-y-2">
                 <p className="text-[11px] font-semibold text-slate-700">User limit (per billing cycle)</p>
-                <p className="text-[10px] text-slate-500">Subscriber ke liye is feature ka cap. -1 = unlimited. Profile page par dikhega.</p>
+                <p className="text-[10px] text-slate-500">Subscriber ke liye is feature ka cap. -1 = unlimited. Usage Limits page par dikhega.</p>
                 <p className="text-[10px] text-slate-500" data-admin-feature-ai-cap-note>
                   Value save hoti hai. AI ka asli cap plan ki daily token budget / daily generation
                   limit (Step C) aur catalog ke <code className="mx-1">aiSettings</code> se lagta hai.

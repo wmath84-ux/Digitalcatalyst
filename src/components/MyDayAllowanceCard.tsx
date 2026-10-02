@@ -1,20 +1,20 @@
 // src/components/MyDayAllowanceCard.tsx
 //
-// My Day free-creation allowance, presented as a premium Profile card.
+// My Day free-creation allowance, presented as a premium Usage Limits card.
 //
 // The allowance used to be a plain strip pinned to the top of the My Day
 // dashboard, which pushed the actual day planning below the fold and shouted
-// "you are limited" on every visit. It now lives in Profile next to the other
-// account/allowance cards (membership, renewal, AI allowance) where usage
-// information belongs, using the same server-authoritative snapshot.
+// "you are limited" on every visit. It now lives on the dedicated Usage Limits
+// page beside the School AI allowance, using the same server-authoritative
+// snapshot.
 //
 // Material (owner brief 2026-09-30, Home card → profile): this card imports
 // the Profile page's `ProfileCard`, which IS the Home page's card — the navy
 // `.dc-scene-plate` at the pinned docs sensitivity (tint 0.25 · blur 0 ·
 // radius 24) — so it follows the page automatically. The card's copy wears the
-// same Home card ramp as every other Profile card, and the state paragraphs
+// same Home card ramp as the other account cards, and the state paragraphs
 // were cut to one line each (the badge, the bar and the reset line right above
-// them already carried the numbers). This card renders on the Profile page
+// them already carried the numbers). This card renders on the Usage Limits page
 // only.
 
 import { useEffect, useMemo, useState } from "react";
@@ -104,7 +104,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         ? "Today’s free allowance is used"
         : `${freeRemaining} of ${freeLimit} free creation${freeLimit === 1 ? "" : "s"} left today`;
 
-  // Owner brief 2026-09-30 (Profile page → "ekadam clean professional"): one
+  // Owner brief 2026-09-30 (account allowance card → "ekadam clean professional"): one
   // short line per state. The old paragraphs repeated the badge, the bar and
   // the reset line that sit directly above them, and the unlimited state said
   // the same thing twice (its own panel + this line).

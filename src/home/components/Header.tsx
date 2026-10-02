@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
-import ExpandingTabs from "../../components/ui/ExpandingTabs";
+import { Bell, Gauge, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
+import ExpandingTabs, { type ExpandingTabItem } from "../../components/ui/ExpandingTabs";
+import MobileHeaderMenu from "../../components/MobileHeaderMenu";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassInput } from "../../components/ui/glass-input";
@@ -11,6 +12,7 @@ import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCou
 import BrandMark from "../../components/BrandMark";
 import { useBranding } from "../../context/BrandingContext";
 import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
+import { useViewportBand } from "../../utils/responsive";
 
 interface HeaderProps {
   userName: string;
@@ -69,6 +71,8 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
+  const viewportBand = useViewportBand();
+  const isPhoneLayout = viewportBand === "compact-mobile" || viewportBand === "large-mobile";
   // Which header action wears the expanded pill. On Home none of the
   // shortcuts is "the current page", so the bar starts collapsed and the
   // tapped action expands on its way out (route pages remount the header).
@@ -155,6 +159,55 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     };
   }, []);
 
+  const allHomeActionItems: ExpandingTabItem[] = [
+    { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
+    { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
+    {
+      id: "notifications",
+      label: "Alerts",
+      ariaLabel: "Notifications",
+      icon: <Bell size={17} strokeWidth={2.4} />,
+      badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
+      badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
+      badgeTone: "rose",
+    },
+    {
+      id: "favorites",
+      label: "Favorites",
+      ariaLabel: "Favorites",
+      icon: <Heart size={17} strokeWidth={2.4} fill="currentColor" />,
+      badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
+      badgeTone: "rose",
+    },
+    ...(onOpenSettings
+      ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={17} strokeWidth={2.4} /> }]
+      : []),
+  ];
+  const homeActionItems = headerVariant === "flow"
+    ? allHomeActionItems.filter((item) => item.id === "profile" || item.id === "notifications" || item.id === "settings")
+    : allHomeActionItems;
+  // Usage Limits belongs in the phone drawer and the persistent rail only.
+  // Keep the tablet inline action cluster exactly as it was.
+  const phoneMenuItems = [
+    ...homeActionItems,
+    { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={17} strokeWidth={2.4} /> },
+  ];
+
+  const handleHomeAction = (id: string) => {
+    // The gear is momentary (opens the page's settings surface), never an
+    // active/expanded destination.
+    if (id === "settings") {
+      onOpenSettings?.();
+      return;
+    }
+    setHomeActiveAction(id);
+    if (id === "usage-limits") window.location.hash = "#/usage-limits";
+    else if (id === "leaderboard") window.location.hash = "#/leaderboard";
+    else if (id === "profile") window.location.hash = "#/profile";
+    else if (id === "notifications") onOpenNotifications?.();
+    else if (id === "favorites") onOpenFavorites?.();
+  };
+
   return (
     <header
       ref={headerRef}
@@ -202,63 +255,23 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
-          {/* aicanvas.me Expanding Tabs — the action cluster is the same
-              monochrome icon-circle bar the app-wide header wears; the tapped
-              action expands into an icon-and-label pill on its way out. */}
-          <ExpandingTabs
-            ariaLabel="Home actions"
-            activeId={homeActiveAction}
-            onSelect={(id) => {
-              // The gear is a momentary action (opens the page's settings
-              // surface), never the expanded pill.
-              if (id === "settings") {
-                onOpenSettings?.();
-                return;
-              }
-              setHomeActiveAction(id);
-              if (id === "leaderboard") window.location.hash = "#/leaderboard";
-              else if (id === "profile") window.location.hash = "#/profile";
-              else if (id === "notifications") onOpenNotifications?.();
-              else if (id === "favorites") onOpenFavorites?.();
-            }}
-            items={(() => {
-              const all = [
-                { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
-                { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
-                {
-                  id: "notifications",
-                  label: "Alerts",
-                  ariaLabel: "Notifications",
-                  icon: <Bell size={17} strokeWidth={2.4} />,
-                  badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
-                  badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
-                  badgeTone: "rose" as const,
-                },
-                {
-                  id: "favorites",
-                  label: "Favorites",
-                  ariaLabel: "Favorites",
-                  icon: <Heart size={17} strokeWidth={2.4} fill="currentColor" />,
-                  badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
-                  badgeTone: "rose" as const,
-                },
-                // Flow-page-only gear (same icon system / size as the other
-                // header actions): rendered just when the page passes the
-                // callback, so no other header ever shows it.
-                ...(onOpenSettings
-                  ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={17} strokeWidth={2.4} /> }]
-                  : []),
-              ];
-              // Flow variant: only profile, notifications, gear to prevent greeting shrink
-              if (headerVariant === 'flow') {
-                return all.filter((it) => it.id === 'profile' || it.id === 'notifications' || it.id === 'settings');
-              }
-              return all;
-            })()}
-          />
-          {/* The "Dark mode" GlassSwitch moved off the header — appearance now
-              lives with the rest of the account preferences (Profile →
-              Preferences modal and the #/settings page). */}
+          {isPhoneLayout ? (
+            <MobileHeaderMenu
+              items={phoneMenuItems}
+              activeId={homeActiveAction}
+              onSelect={handleHomeAction}
+              ariaLabel="Home actions"
+            />
+          ) : (
+            <div className="flex items-center gap-1 min-[390px]:gap-2" data-home-actions-inline>
+              <ExpandingTabs
+                ariaLabel="Home actions"
+                activeId={homeActiveAction}
+                onSelect={handleHomeAction}
+                items={homeActionItems}
+              />
+            </div>
+          )}
         </div>
       </div>
 

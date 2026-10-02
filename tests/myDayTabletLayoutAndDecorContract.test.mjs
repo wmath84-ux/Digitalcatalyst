@@ -58,18 +58,18 @@ function pageColumn(viewport) {
     assert.ok(value !== undefined, `unknown spacing token: ${token}`);
     return value;
   };
-  // data-myday-content: gap-6 px-4 sm:px-6 md:gap-4 lg:gap-5 lg:px-8 xl:gap-8 xl:px-10
+  // data-myday-content: gap-6 px-4 sm:px-6 md:gap-4 lg:gap-4 lg:px-6 xl:gap-6 xl:px-6
   let gap = p("gap-6");
   let pad = p("px-4");
   if (viewport >= 640) pad = p("px-6");
   if (viewport >= 768) gap = p("gap-4");
   if (viewport >= 1024) {
-    gap = p("gap-5");
-    pad = p("px-8");
+    gap = p("gap-4");
+    pad = p("px-6");
   }
   if (viewport >= 1280) {
-    gap = p("gap-8");
-    pad = p("px-10");
+    gap = p("gap-6");
+    pad = p("px-6");
   }
   // SideNav: hidden below 768, compact 68px to 1279, full 240px from 1280.
   const rail = viewport < 768 ? 0 : viewport < 1280 ? 68 : 240;
@@ -116,11 +116,16 @@ test("the side rail is a compact icon column until the column can afford the ful
   assert.match(sideNav, /mb-3 hidden px-1 pt-0\.5 xl:block/);
   assert.match(sideNav, /className="mt-4 hidden xl:block"/);
   assert.match(sideNav, /myday-quote-card mt-4 hidden xl:block/);
-  // The shell gutter steps DOWN (never up) as the rail grows.
+  // Keep the shell padding compact as the rail expands; the content column grows at desktop widths.
   const shellLine = appSource.split("\n").find((line) => line.includes("data-myday-content"));
   assert.ok(shellLine, "the My Day content shell renders");
-  assert.match(shellLine, /gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-5 lg:px-8 xl:gap-8 xl:px-10/);
+  assert.match(shellLine, /max-w-none flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-4 lg:px-6 xl:gap-6 xl:px-6/);
   assert.doesNotMatch(shellLine, /md:gap-8|md:px-8/);
+});
+
+test("the Overview and Tasks pages fill their desktop work column", () => {
+  assert.match(appSource, /data-myday-content className="mx-auto flex w-full max-w-none/);
+  assert.match(overviewCss, /\.myday-scope \[data-page-enter-panel\] > section,[\s\S]*?\.myday-scope \[data-page-enter-panel\] > \.myday-tasks \{\s*width: 100%;\s*max-width: none;/);
 });
 
 test("the compact rail keeps every section reachable", () => {
