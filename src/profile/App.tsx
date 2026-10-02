@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { Bell, Lock, Sparkles, UserRound } from "lucide-react";
-import { db } from "../../firebase";
+import { db, getFirebaseStorage } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
@@ -11,8 +11,6 @@ import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
-import AiQuotaCard from "../components/AiQuotaCard";
-import MyDayAllowanceCard from "../components/MyDayAllowanceCard";
 import ProfileLayout, {
   BaseModal,
   EditModal,
@@ -25,6 +23,22 @@ import ProfileLayout, {
 } from "./ProfileLayout";
 
 type Modal = "edit" | "settings" | null;
+
+const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const PROFILE_PHOTO_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+function profilePhotoContentType(file: File): string | null {
+  const mimeType = String(file.type || "").toLowerCase();
+  if (["image/jpeg", "image/png", "image/webp"].includes(mimeType)) return mimeType;
+  if (mimeType && mimeType !== "application/octet-stream") return null;
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  return PROFILE_PHOTO_TYPES[extension] || null;
+}
 
 /** Notification + privacy switches stored on `users/{uid}.preferences`.
  *  Exported so the dedicated Settings page (`#/settings`) reads and writes
@@ -86,7 +100,7 @@ const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): 
   subscription.status === "active" && subscription.expiresAt > now;
 
 export default function ProfileApp() {
-  const { user, logout, updateAccount } = useAuth();
+  const { user, logout, updateAccount, setUser } = useAuth();
   const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
@@ -105,7 +119,10 @@ export default function ProfileApp() {
   const [profileSubscription, setProfileSubscription] = useState<SubscriptionSnapshot | null>(null);
   const [membershipLoaded, setMembershipLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const mainRef = useRef<HTMLElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -211,6 +228,44 @@ export default function ProfileApp() {
     }
   };
 
+  const handleProfilePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0] || null;
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    if (file.size > PROFILE_PHOTO_MAX_BYTES) {
+      setPhotoError("Choose a profile photo under 5 MB.");
+      return;
+    }
+    const contentType = profilePhotoContentType(file);
+    if (!contentType) {
+      setPhotoError("Choose a JPG, PNG, or WebP image.");
+      return;
+    }
+
+    setPhotoError("");
+    setPhotoUploading(true);
+    try {
+      const storage = await getFirebaseStorage();
+      const { getDownloadURL, ref, uploadBytes } = await import("firebase/storage");
+      const photoRef = ref(storage, `userProfilePhotos/${user.id}/avatar`);
+      const uploaded = await uploadBytes(photoRef, file, {
+        contentType,
+        cacheControl: "public,max-age=3600",
+      });
+      const photoUrl = new URL(await getDownloadURL(uploaded.ref));
+      photoUrl.searchParams.set("v", String(Date.now()));
+      const photoURL = photoUrl.toString();
+      await setDoc(doc(db, "users", user.id), { photoURL, updatedAt: serverTimestamp() }, { merge: true });
+      setUser({ ...user, photoURL });
+    } catch (error) {
+      console.error("Profile photo upload failed", error);
+      setPhotoError("Could not upload the photo. Check your connection and try again.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   // The Push notifications switch must actually register/remove this device,
   // otherwise the preference is cosmetic and system notifications never arrive.
   const handlePushToggle = async (checked: boolean) => {
@@ -280,6 +335,15 @@ export default function ProfileApp() {
         />
 
         <main ref={mainRef} data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-4 pt-3 pb-6 md:px-6 lg:px-6 xl:px-8">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            aria-label="Choose a profile photo"
+            data-profile-photo-input
+            onChange={handleProfilePhotoChange}
+          />
           <ProfileLayout
             name={user.name}
             email={user.email}
@@ -288,6 +352,12 @@ export default function ProfileApp() {
             initials={initials}
             memberSince={memberSince}
             onEdit={() => setModal("edit")}
+            onChoosePhoto={() => {
+              setPhotoError("");
+              photoInputRef.current?.click();
+            }}
+            photoUploading={photoUploading}
+            photoError={photoError}
             membership={membershipPayload}
             membershipBadge={membershipBadge}
             onOpenPlans={openPlans}
@@ -315,13 +385,7 @@ export default function ProfileApp() {
                 void updateDoc(doc(db, "users", user.id, "subscription", "current"), { renewalReminderOptOut: next }).catch(() => undefined);
               },
             } : null}
-            myDayCard={
-              <MyDayAllowanceCard
-                onOpenMyDay={() => { window.location.hash = "#/my-day"; }}
-                onSubscribe={openPlans}
-              />
-            }
-            aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} material="home" compact /> : null}
+            onOpenUsageLimits={() => { window.location.hash = "#/usage-limits"; }}
             onOpenStudyLibrary={() => { window.location.hash = "#/study-library"; }}
             library={{
               items: purchasedProducts.map((p) => ({ id: p.id, title: p.title, image: p.image })),

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
-import { ProfileCard } from "./ProfileCard";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
@@ -35,34 +34,6 @@ export default function ProfilePreview() {
   const subscriber = scenario !== "free";
   const active = scenario === "premium";
   const plan = subscriber ? { status: "active", expiresAt: active ? PREMIUM_AT : EXPIRED_AT, cycle: active ? "yearly" : "monthly", planId: "premium", reminderOptOut: false } : null;
-
-  // Mock slots to represent the account cards that live in the real app.
-  const mockMyDayCard = (
-    <ProfileCard>
-      <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
-        <div className="min-w-0">
-          <p className="dc-profile-card-title">My Day</p>
-          <p className="dc-profile-card-meta mt-0.5">3 free creations left today · resets at midnight.</p>
-        </div>
-      </div>
-      <div className="dc-profile-bar mt-3">
-        <div className="h-full w-1/4 rounded-full bg-emerald-500" />
-      </div>
-    </ProfileCard>
-  );
-
-  const mockAiQuotaCard = subscriber ? (
-    <ProfileCard>
-      <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
-        <div className="min-w-0">
-          <p className="dc-profile-card-title">AI quota</p>
-          <p className="dc-profile-card-meta mt-0.5">9 AI questions remaining · resets weekly.</p>
-        </div>
-      </div>
-    </ProfileCard>
-  ) : null;
 
   const tierLabel = tier === "normal" ? "Free learner" : tier === "premium" ? "Premium" : "Premium";
   const planLabel = tier === "normal" ? "Free plan" : "Premium Plan";
@@ -129,8 +100,7 @@ export default function ProfilePreview() {
               onCopy: () => undefined,
             }}
             renewal={subscriber && plan ? { tier, subscription: plan, now: Date.now(), onRenew: () => undefined, onToggleReminders: () => undefined } : null}
-            myDayCard={mockMyDayCard}
-            aiQuotaCard={mockAiQuotaCard}
+            onOpenUsageLimits={() => undefined}
             onOpenStudyLibrary={() => undefined}
             library={{
               items: [

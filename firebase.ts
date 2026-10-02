@@ -105,10 +105,10 @@ export const db = getDb();
  * `firebase/storage` used to be imported (and `getStorage()` called) at module
  * scope, which put the whole Storage SDK in the boot bundle for every learner
  * — including the ones who never upload anything. Nothing in the app reads a
- * top-level `storage` export: the only consumer, `utils/productFirestoreDoc.js`
- * (admin media upload), already does its own `await import('firebase/storage')`.
- * Keeping the accessor async means the SDK is fetched the first time a file is
- * actually uploaded, and never on a cold start.
+ * top-level `storage` export: profile-photo and learner-course image uploads
+ * call this accessor only after the user selects a file, while the separate
+ * admin media uploader imports the SDK in its own upload path. Keeping the
+ * accessor async means Storage is loaded only when an upload actually starts.
  */
 export async function getFirebaseStorage() {
   if (!app) return {} as any;

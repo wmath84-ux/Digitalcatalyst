@@ -37,6 +37,7 @@ import {
   Bell,
   CalendarDays,
   Crown,
+  Gauge,
   Heart,
   Home,
   Library,
@@ -92,6 +93,7 @@ export type DesktopRailKey =
   | "study"
   | "nature3d"
   | "profile"
+  | "usage-limits"
   | "settings";
 
 interface RailEntry {
@@ -167,6 +169,7 @@ const WORKSPACE_RAIL: RailEntry[] = [
   { key: "nature3d", label: "3D Sanctuary", description: "Immersive nature study world", Icon: Trees, hash: "#/nature-studio", group: "workspace" },
   { key: "favorites", label: "Favorites", description: "Saved for later", Icon: Heart, hash: "#/favorites", group: "workspace" },
   { key: "profile", label: "Profile", description: "Account & plan", Icon: UserRound, hash: "#/profile", group: "workspace" },
+  { key: "usage-limits", label: "Usage Limits", description: "Your personal usage", Icon: Gauge, hash: "#/usage-limits", group: "workspace" },
   // Settings is its own page (`#/settings`) — it used to deep-link into the
   // Profile page, which made the rail's "Settings" entry open the wrong screen.
   { key: "settings", label: "Settings", description: "Preferences & privacy", Icon: Settings, hash: "#/settings", group: "workspace" },
@@ -186,6 +189,7 @@ const RAIL_COLORS: Record<DesktopRailKey, string> = {
   nature3d: "#4ADE80",
   favorites: "#FF5C8A",
   profile: "#FF7B54",
+  "usage-limits": "#8B7CF6",
   settings: "#9AA5B1",
 };
 
@@ -235,6 +239,7 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   // The Settings page is its own route; without this the rail falls back to
   // "home" and no entry lights up while the learner is on it.
   if (hash.startsWith("#/settings")) return "settings";
+  if (hash.startsWith("#/usage-limits")) return "usage-limits";
   if (hash.startsWith("#/profile")) return "profile";
   if (hash.startsWith("#/checkout") || hash.startsWith("#/subscription")) return "store";
   return "home";

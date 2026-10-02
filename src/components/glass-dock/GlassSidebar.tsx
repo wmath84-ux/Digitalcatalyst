@@ -37,7 +37,7 @@
  *      expanding takes it — no blank area either way.
  */
 
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { AnimatePresence, motion, useSpring } from 'framer-motion'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import {
@@ -78,10 +78,14 @@ export function persistOpen(open: boolean): void {
 export type GlassSidebarItem = {
   id: string
   label: string
+  ariaLabel?: string
   color: string
-  Icon: ComponentType<{ size?: number; className?: string }>
+  /** Desktop/tablet navigation uses an icon component. */
+  Icon?: ComponentType<{ size?: number; className?: string }>
+  /** Header-action drawers can pass a pre-sized icon node. */
+  icon?: ReactNode
   active?: boolean
-  badge?: number
+  badge?: number | string
 }
 
 function SidebarRow({
@@ -103,6 +107,9 @@ function SidebarRow({
   }, [isOpen])
 
   const { Icon, color, active } = item
+  const badgeLabel = typeof item.badge === 'number'
+    ? item.badge > 9 ? '9+' : String(item.badge)
+    : item.badge
 
   return (
     <motion.button
@@ -112,7 +119,7 @@ function SidebarRow({
       onHoverEnd={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
-      aria-label={item.label}
+      aria-label={item.ariaLabel ?? item.label}
       aria-current={active ? 'page' : undefined}
       animate={{
         scale: hovered ? (isOpen ? 1.08 : 1.15) : 1,
@@ -133,10 +140,10 @@ function SidebarRow({
           border: `1px solid ${active ? `${color}44` : `${color}22`}`,
         }}
       >
-        <Icon size={20} />
-        {!!item.badge && item.badge > 0 && (
+        {item.icon ?? (Icon ? <Icon size={20} /> : null)}
+        {badgeLabel && badgeLabel !== '0' && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
-            {item.badge > 9 ? '9+' : item.badge}
+            {badgeLabel}
           </span>
         )}
       </span>
@@ -190,18 +197,21 @@ export default function GlassSidebar({
   open,
   onOpenChange,
   remember = true,
+  showToggle = true,
 }: {
   items: GlassSidebarItem[]
   onSelect: (id: string) => void
   /** Optional brand block, shown only while expanded. */
-  header?: React.ReactNode
+  header?: ReactNode
   /** Optional footer block (profile / logout), shown only while expanded. */
-  footer?: React.ReactNode
+  footer?: ReactNode
   /** Controlled open state; omit for the component's own state. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /** Persist the learner's own expand/collapse choice. Default true. */
   remember?: boolean
+  /** Hide the collapse control when this rail is used as an overlay drawer. */
+  showToggle?: boolean
 }) {
   // EXPANDED on boot. The reference starts collapsed; that is the state the
   // owner reported as "it never expands" on a tablet.
@@ -244,7 +254,7 @@ export default function GlassSidebar({
           border: DOCK_PANEL_BORDER,
           boxShadow: DOCK_PANEL_SHADOW,
         }}
-        className="absolute inset-y-0 left-0 z-40 isolate flex flex-col gap-1 overflow-hidden rounded-3xl px-2.5 py-3"
+        className="absolute inset-y-0 left-0 z-40 isolate flex flex-col gap-1 overflow-hidden rounded-3xl px-2.5 py-3 text-white"
         aria-label="Primary"
         data-glass-sidebar
       >
@@ -301,42 +311,46 @@ export default function GlassSidebar({
           </AnimatePresence>
         ) : null}
 
-        {/* Divider */}
-        <div className="h-[1px] w-full shrink-0" style={{ background: 'rgba(255,255,255,0.1)' }} aria-hidden />
+        {showToggle ? (
+          <>
+            {/* Divider */}
+            <div className="h-[1px] w-full shrink-0" style={{ background: 'rgba(255,255,255,0.1)' }} aria-hidden />
 
-        {/* Toggle */}
-        <div className={`flex shrink-0 ${isOpen ? 'justify-start px-1' : 'justify-center'}`}>
-          <motion.button
-            type="button"
-            onClick={() => setOpen(!isOpen)}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-expanded={isOpen}
-            className="grid place-items-center rounded-2xl text-white/70"
-            style={{
-              width: ICON_TILE_SIZE,
-              height: TOGGLE_BUTTON_HEIGHT,
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
-            }}
-            data-glass-sidebar-toggle
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={isOpen ? 'left' : 'right'}
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.18 }}
-                className="grid place-items-center"
+            {/* Toggle */}
+            <div className={`flex shrink-0 ${isOpen ? 'justify-start px-1' : 'justify-center'}`}>
+              <motion.button
+                type="button"
+                onClick={() => setOpen(!isOpen)}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                aria-expanded={isOpen}
+                className="grid place-items-center rounded-2xl text-white/70"
+                style={{
+                  width: ICON_TILE_SIZE,
+                  height: TOGGLE_BUTTON_HEIGHT,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+                data-glass-sidebar-toggle
               >
-                {isOpen ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
-              </motion.span>
-            </AnimatePresence>
-          </motion.button>
-        </div>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={isOpen ? 'left' : 'right'}
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="grid place-items-center"
+                  >
+                    {isOpen ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
+            </div>
+          </>
+        ) : null}
       </motion.aside>
     </motion.div>
   )

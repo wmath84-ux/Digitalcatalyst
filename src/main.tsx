@@ -63,6 +63,7 @@ const LeaderboardApp = lazyRoute(() => import("./LeaderboardApp"));
 const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
 const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
+const UsageLimitsPage = lazyRoute(() => import("./usage/UsageLimitsPage"));
 const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
 // My Study Library's creation surfaces: the builder ("+" → new course / edit
 // course) and the Course Player host for a course the learner authored. Both
@@ -192,6 +193,7 @@ const REVISION_HASH = "#/revision";
 const PROFILE_HASH = "#/profile";
 // Dedicated Settings / Preferences page (the desktop rail's Settings entry).
 const SETTINGS_HASH = "#/settings";
+const USAGE_LIMITS_HASH = "#/usage-limits";
 const STUDY_LIBRARY_HASH = "#/study-library";
 /** Learner-authored courses: `#/my-course/new`, `#/my-course/<id>`, `#/my-course/<id>/edit`. */
 const MY_COURSE_HASH = "#/my-course/";
@@ -284,6 +286,11 @@ const PAGE_SKELETON_BLOCKS: Record<string, PageSkeletonBlock[]> = {
     { width: "100%", height: 72 },
     { width: "100%", height: 72 },
   ],
+  usageLimits: [
+    { width: "62%", height: 24 },
+    { width: "100%", height: 112, radius: 24 },
+    { width: "100%", height: 192, radius: 24 },
+  ],
   flowpath: [
     { width: "76%", height: 22 },
     { width: "100%", height: 96 },
@@ -324,6 +331,7 @@ const PAGE_SKELETON_FOOTER = new Set([
   "revision",
   "subscription",
   "profile",
+  "usageLimits",
   "flowpath",
   "notifications",
   "search",
@@ -343,6 +351,7 @@ const pageSkeletonVariant = (hash: string) => {
   if (hash.startsWith(REVISION_HASH)) return "revision";
   if (hash.startsWith(SUBSCRIPTION_HASH)) return "subscription";
   if (hash.startsWith(PROFILE_HASH)) return "profile";
+  if (hash.startsWith(USAGE_LIMITS_HASH)) return "usageLimits";
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return "library";
   if (hash.startsWith(FLOWPATH_HASH)) return "flowpath";
   if (hash.startsWith(NOTIFICATIONS_HASH)) return "notifications";
@@ -577,6 +586,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(SEARCH_HASH)) return SearchPage;
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
+  if (hash.startsWith(USAGE_LIMITS_HASH)) return UsageLimitsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
   if (hash.startsWith(MY_COURSE_HASH)) return isMyCourseEditorRoute(hash) ? MyCourseEditorPage : MyCoursePlayerPage;
   if (hash.startsWith(NATURE_STUDIO_HASH)) return NatureStudioPage;
@@ -723,8 +733,10 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
               ? "Product details"
               : hash.startsWith(STUDY_LIBRARY_HASH)
                 ? "My Study Library"
-                : hash.startsWith(NATURE_STUDIO_HASH)
-                  ? "3D Study Sanctuary"
+                : hash.startsWith(USAGE_LIMITS_HASH)
+                  ? "Usage Limits"
+                  : hash.startsWith(NATURE_STUDIO_HASH)
+                    ? "3D Study Sanctuary"
                   : undefined
       }
       pageSubtitle={
@@ -736,9 +748,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
               ? "Everything about this resource, before you buy"
               : hash.startsWith(STUDY_LIBRARY_HASH)
                 ? "Modules, saved resources and recent learning"
-                : hash.startsWith(NATURE_STUDIO_HASH)
-                  ? "Walk the meadow, place the board, study with the herd"
-                  : undefined
+                : hash.startsWith(USAGE_LIMITS_HASH)
+                  ? "Your personal learning allowances"
+                  : hash.startsWith(NATURE_STUDIO_HASH)
+                    ? "Walk the meadow, place the board, study with the herd"
+                    : undefined
       }
     >
       {children}
@@ -1756,6 +1770,7 @@ function RootPage(): ReactNode {
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
+  if (hash.startsWith(USAGE_LIMITS_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><UsageLimitsPage /></PageEnter>;
   if (hash.startsWith(NATURE_STUDIO_HASH)) {
     // The boundary keeps a Sanctuary render crash contained to this route:
     // instead of the whole app unmounting to a black canvas (and the learner

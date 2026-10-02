@@ -21,7 +21,7 @@ test("AI cards are the pack's glass surfaces (Phase A4)", () => {
   // gradient anywhere) and nothing hand-rolls a backdrop-blur any more.
   assert.match(page, /dc-glass-hero/);
   assert.match(page, /<GlassSurface className="dc-glass-hero/);
-  assert.match(page, /Generate Questions with AI/);
+  assert.match(page, /Generate with AI/);
   assert.match(page, /<GlassCard/);
   assert.match(page, /bg-indigo-600 text-white/);
   assert.doesNotMatch(page, /from-indigo-500 to-violet-600|from-sky-50 to-indigo-50/);
@@ -31,6 +31,6 @@ test("AI cards are the pack's glass surfaces (Phase A4)", () => {
 test("snapshot cards below Import use the stable rev-card surface (no glitch)", () => {
   // The Import section's cards were `dc-glass` (backdrop-filter) which caused
   // a white-flash glitch while scrolling; they now use the opaque rev-card.
-  assert.match(page, /className="rev-card dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3/);
+  assert.match(page, /className="rev-card dc-rev-glass text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3/);
   assert.doesNotMatch(page, /dc-glass flex flex-col items-center gap-1 rounded-2xl py-3/);
 });

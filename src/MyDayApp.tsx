@@ -712,18 +712,18 @@ export default function App() {
             without stranding any page. */}
 
         {/* Shell gutter. The column below (the section page) is what must
-            never be squeezed: with the compact rail at md/lg the page keeps
-            ~636px at 768px and ~872px at 1024px — the old `md:px-8 md:gap-8`
-            plus the 224px panel left only ~448px there, i.e. narrower than a
-            phone, which is the shrink that was reported on small tablets. */}
-        <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-5 lg:px-8 xl:gap-8 xl:px-10">
+            never be squeezed: with the compact rail the page keeps ~636px at
+            768px and ~892px at 1024px; the full rail still leaves ~968px at
+            1280px. The old `md:px-8 md:gap-8` plus a 224px panel left only
+            ~448px at 768px, narrower than a phone. */}
+        <div data-myday-content className="mx-auto flex w-full max-w-none flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-4 lg:px-6 xl:gap-6 xl:px-6">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
           {/* P3-13: MyDay overview — data hook + hover lift for quick actions (lens budget intact) */}
           <main ref={contentColumnRef} className="min-w-0 flex-1 pb-6">
             {/* The free-creation allowance summary is deliberately NOT rendered
                 here. It is account/usage information, so it lives on the
-                Profile page inside MyDayAllowanceCard. My Day itself stays a
+                Usage Limits page inside MyDayAllowanceCard. My Day itself stays a
                 clean planning surface; the PremiumGate below still explains
                 the allowance at the exact moment a creation is blocked. */}
             {/* Cloud-sync / device-saving status. This is the one line of My

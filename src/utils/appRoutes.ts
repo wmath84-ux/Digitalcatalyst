@@ -19,6 +19,7 @@ export const AUTH_REQUIRED_PREFIXES = [
   "#/checkout",
   "#/my-day",
   "#/profile",
+  "#/usage-limits",
   "#/study-library",
   MY_COURSE_PREFIX,
   "#/course/",

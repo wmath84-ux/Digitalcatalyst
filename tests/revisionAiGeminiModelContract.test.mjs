@@ -162,8 +162,11 @@ test("admin can publish daily and rolling-window AI limits for every user", () =
   assert.match(revisionPage, /Usage limits for every user/);
   assert.match(revisionPage, /dailyLimit/);
   assert.match(revisionPage, /windowHours/);
-  const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
-  assert.match(profile, /AiQuotaCard/);
+  const usagePage = fs.readFileSync("src/usage/UsageLimitsPage.tsx", "utf8");
+  assert.match(usagePage, /AiQuotaCard/);
+  assert.match(usagePage, /data-school-ai-visible="true"/);
+  const revisionProfile = fs.readFileSync("src/revision/pages/RevisionProfilePage.tsx", "utf8");
+  assert.doesNotMatch(revisionProfile, /AiQuotaCard/);
   const usage = fs.readFileSync("src/revision/engine/aiUsage.ts", "utf8");
   assert.match(usage, /consumeAiGeneration/);
   assert.match(usage, /users.*aiUsage/);

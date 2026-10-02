@@ -625,7 +625,10 @@ function PremiumProductContent({
                   />
                   {onOpenCourse ? (
                     <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
-                      <PlayCircle className="h-4 w-4" /> Open course in library
+                      <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                        <PlayCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span>Open course in library</span>
+                      </span>
                     </GlassButton>
                   ) : null}
                 </GlassSurface>

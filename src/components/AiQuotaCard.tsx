@@ -56,19 +56,17 @@ export default function AiQuotaCard({
   uid: string;
   /** `store` = the Revision Profile page's card (unchanged default);
    *  `cart` = the Cart empty-state card's bare surface (radius 32);
-   *  `home` = the Home page's card — the navy contrast plate at the pinned
-   *  docs sensitivity, the material every Profile card now wears. */
+   *  `home` = the navy Home/account contrast plate at the pinned docs
+   *  sensitivity, used by the Usage Limits page. */
   material?: "store" | "cart" | "home";
-  /** Profile-only: drops the long explanation paragraph and the last-request
-   *  detail lines so the card is the numbers, not the essay (owner brief
-   *  2026-09-30 — "bahut jyada text … ekadam clean professional"). */
+  /** Compact summary mode: drops the long explanation paragraph and the
+   *  last-request detail lines so the card is the numbers, not the essay. */
   compact?: boolean;
 }) {
   // `store` (default) keeps the Revision Profile page's card byte-identical
   // (pack surface at tint 0.62 · light blue · blur 0 + the store hooks); the
-  // Profile page passes `home` (home card + home type, brief 2026-09-30) or
-  // `cart` for the Cart empty-state card's bare <GlassSurface> (brief
-  // 2026-09-29).
+  // Usage Limits page passes `home` (Home card + type) and the Cart empty
+  // state passes `cart` for its bare <GlassSurface>.
   const cartGlass = material === "cart";
   const homeGlass = material === "home";
   const [settings, setSettings] = useState<CatalogAiSettings>(defaultCatalogAiSettings);

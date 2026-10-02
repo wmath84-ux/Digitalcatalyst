@@ -20,10 +20,9 @@ import {
   SparklesIcon,
   TrophyIcon,
 } from "../components/icons";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, Gauge, Sparkles } from "lucide-react";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getRevisionOverview } from "../engine/statsService";
-import AiQuotaCard from "../../components/AiQuotaCard";
 
 export default function RevisionProfilePage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
   const { navigate } = useExitGuard();
@@ -135,9 +134,27 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
           </section>
         </div>
 
-        {/* MIDDLE COL: AI allowance */}
+        {/* MIDDLE COL: the dedicated Usage Limits destination + dashboard */}
         <div className="space-y-4 lg:col-span-5 lg:space-y-3" data-rev-col="middle">
-          <AiQuotaCard uid={uid} />
+          <GlassCard
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate("#/usage-limits")}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") navigate("#/usage-limits"); }}
+            className="group w-full cursor-pointer text-left transition active:scale-[0.98] [&>div:last-child]:p-4 lg:[&>div:last-child]:p-3"
+            data-revision-usage-limits-link
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/30">
+                <Gauge className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-white">Usage Limits</span>
+                <span className="mt-0.5 block text-[10px] leading-relaxed text-white/60">View your School AI allowance and reset details</span>
+              </span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-white/55 transition group-active:translate-x-0.5" />
+            </div>
+          </GlassCard>
           <PrimaryButton onClick={() => navigate("#/revision")} className="lg:min-h-[40px] lg:text-[13px] lg:rounded-xl">Go to Revision Dashboard</PrimaryButton>
         </div>
 
