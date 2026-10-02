@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- Test fixture for tests/peekDockRevealBrowser.test.mjs: the REAL
+     DesktopShell (src/components/DesktopShell.tsx) with its real CSS, so the
+     peek dock can be driven on the exact chrome production renders. The app's
+     Firebase-backed contexts are stubbed (stubs/*) — never shipped. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Desktop shell harness</title>
+  </head>
+  <body style="margin:0;background:#05070d">
+    <div id="root"></div>
+    <script type="module" src="./shellHarness.tsx"></script>
+  </body>
+</html>
