@@ -3,19 +3,20 @@
 // Course Player notes panel.
 //
 //   - The single "+" button (a small circular button floating at the
-//     grid's bottom-right) opens a LARGE rich-text editor that fills the
-//     notes pane, so long notes are comfortable to read while writing.
-//     The panel renders no header rows at all — while the writing box is
-//     open the pane is exactly toolbar on top, the writing surface in the
-//     middle and Save / Cancel on the bottom for maximum writing space.
+//     grid's bottom-right) opens the note editor — a white block-document
+//     page (BlockNote, see ./NoteEditor) that fills the notes pane, so long
+//     notes are comfortable to read while writing. The panel renders no header
+//     rows in the list; while the editor is open the pane is a slim bar
+//     (status · Cancel · Save), then the page, so the writing surface gets
+//     every other pixel.
 //   - "Save" collapses the note back into a square card in a grid — the
 //     big surface is an editing affordance only, it never changes how a
 //     saved note looks in the list.
 //   - The edit icon reopens that same large editor inline.
 //   - Delete removes the note.
-//   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) keeps
-//     the exact formatting: bold, italics, headings, lists, tables, links,
-//     code blocks, colours, highlights, images and emoji.
+//   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) is
+//     sanitised and imported as blocks; what the editor cannot hold (tables,
+//     images, …) is preserved verbatim, never dropped.
 //
 // The owning hook stores notes in Firestore with a device mirror, per user
 // and course (or the sanctuary personal workspace).
@@ -34,7 +35,7 @@
 // session — the next visit starts on the notes list, exactly like the mind
 // map restarts on its library.
 
-import { useEffect, useState } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassCard } from "../components/ui/GlassCard";
@@ -44,6 +45,16 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
+import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
+import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
+
+// The editor (BlockNote + its stylesheet) is a separate chunk: the player and
+// the notes LIST never pay for it. It is requested the moment the Notes panel
+// mounts — before the learner taps "+" — so the chunk is already in the
+// service-worker cache for offline use. (Code only: no editor instance exists
+// until a note is opened.)
+const loadNoteEditor = () => import("./NoteEditor");
+const NoteEditor = lazy(loadNoteEditor);
 
 interface NotesPanelProps {
   /** Isolate sanctuary drafts from the player's session and other courses. */
@@ -59,6 +70,12 @@ interface NotesPanelProps {
    * fresh composer. The panel's own circular "+" is the primary trigger.
    */
   composerOpenSignal?: number;
+  /**
+   * The persistence hook's live state (`useCourseNotes`), shown as the subtle
+   * Saving… / Synced indicator while a note is open. Optional: without it the
+   * indicator only distinguishes Unsaved from Saved.
+   */
+  syncState?: { status: "idle" | "loading" | "ready" | "saving" | "saved" | "error"; synced: boolean };
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -90,6 +107,74 @@ function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
   );
 }
 
+/**
+ * The editor chunk failed to load (a first-ever visit made while offline, in a
+ * browser that has not cached it). The pane must never go blank and a learner
+ * must never be unable to write: fall back to the previous editor — which is
+ * still in the player bundle — bound to the same draft.
+ */
+class EditorBoundary extends Component<
+  { fallback: ReactNode; onFail: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFail();
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/** The slim status line: Unsaved · Saving… · Saved · Synced (never loud). */
+function NoteStatus({
+  editing,
+  dirty,
+  tooLong,
+  sync,
+}: {
+  editing: boolean;
+  dirty: boolean;
+  tooLong: boolean;
+  sync: NotesPanelProps["syncState"];
+}) {
+  let label = "New note";
+  let tone = "muted";
+  if (tooLong) {
+    label = "Too long to save";
+    tone = "danger";
+  } else if (dirty) {
+    label = "Unsaved";
+    tone = "warn";
+  } else if (editing) {
+    tone = "ok";
+    if (sync?.status === "error") { label = "Saved on this device"; tone = "muted"; }
+    else if (sync && (sync.status === "saving" || !sync.synced)) { label = "Saving…"; tone = "muted"; }
+    else if (sync) label = "Synced";
+    else label = "Saved";
+  }
+  const dot =
+    tone === "danger" ? "bg-rose-500" : tone === "warn" ? "bg-amber-500" : tone === "ok" ? "bg-emerald-500" : "bg-slate-300";
+  const text = tone === "danger" ? "text-rose-600" : tone === "warn" ? "text-amber-600" : "text-slate-500";
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      data-course-notes-status={tone}
+      className={`flex min-w-0 items-center gap-1.5 truncate text-[12px] font-semibold ${text}`}
+    >
+      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
 export default function NotesPanel({
   notes,
   onAdd,
@@ -98,6 +183,7 @@ export default function NotesPanel({
   onEditorOpenChange,
   composerOpenSignal,
   sessionKey,
+  syncState,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
@@ -117,6 +203,25 @@ export default function NotesPanel({
   );
   const [editDraft, setEditDraft] = useState(restoreEdit ? sessionNotes.draft : "");
   const [editTitle, setEditTitle] = useState(restoreEdit ? sessionNotes.title : "");
+
+  // The editor is UNCONTROLLED: it is opened once from this seed (restored
+  // from the session, or the stored note, or blank) and owns its content from
+  // then on — typing never re-renders this panel. `key` is the note's identity,
+  // so switching notes disposes the old editor and its undo history.
+  const [seed, setSeed] = useState(() => ({
+    key: restoreEdit ? `edit:${sessionNotes.noteId}` : "compose:0",
+    title: composing ? draftTitle : editTitle,
+    body: composing ? draft : editDraft,
+  }));
+  const composeCount = useRef(0);
+  const editorRef = useRef<NoteEditorHandle | null>(null);
+  // Set the moment Save / Cancel closes the editor, so the editor's final
+  // flush on unmount can never write a closed draft back into the session.
+  const discardingRef = useRef(false);
+  const [editorEmpty, setEditorEmpty] = useState(() => isEmptyRichText(combineHtml(seed.title, seed.body)));
+  const [dirty, setDirty] = useState(false);
+  const [tooLong, setTooLong] = useState(false);
+  const [legacyFallback, setLegacyFallback] = useState(false);
 
   // Deletion is a two-step act: the red trash opens a confirmation overlay
   // and the note is removed ONLY after the learner taps the red confirm
@@ -141,6 +246,27 @@ export default function NotesPanel({
     }
   });
 
+  // The editor reports a BATCHED draft (≤ one per 250 ms of typing, and one
+  // last one as it unmounts). It lands in the panel state AND, synchronously,
+  // in the session — so a tab switch or the player closing a moment after the
+  // last keystroke still finds the latest words there.
+  const handleDraftChange = useCallback(
+    (next: NoteDraft) => {
+      if (discardingRef.current) return;
+      setTooLong(combineHtml(next.title, next.bodyHtml).length > MAX_NOTE_HTML_LENGTH);
+      if (editingId) {
+        setEditDraft(next.bodyHtml);
+        setEditTitle(next.title);
+        setNotesSessionView({ view: "edit", noteId: editingId, draft: next.bodyHtml, title: next.title }, sessionKey);
+      } else {
+        setDraft(next.bodyHtml);
+        setDraftTitle(next.title);
+        setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title }, sessionKey);
+      }
+    },
+    [editingId, sessionKey],
+  );
+
   // The overlay expands the notes sheet while the editor is open so the
   // writing surface gets the full notes area.
   //
@@ -155,18 +281,32 @@ export default function NotesPanel({
   useEffect(() => { onEditorOpenChange?.(editorOpen); });
   useEffect(() => () => { onEditorOpenChange?.(false); }, [onEditorOpenChange]);
 
-  // A note counts as non-empty when EITHER its title or its body has
-  // content — a heading-only note is a perfectly valid note.
-  const draftEmpty = isEmptyRichText(combineHtml(draftTitle, draft));
-  const editDraftEmpty = isEmptyRichText(combineHtml(editTitle, editDraft));
+  // Warm the editor chunk while the learner is still looking at the list — in
+  // idle time, so it never competes with the first paint (code only; no editor
+  // instance exists until a note is opened).
+  useEffect(() => {
+    const warm = () => { void loadNoteEditor().catch(() => undefined); };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(warm, 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const openComposer = () => {
+    discardingRef.current = false;
+    composeCount.current += 1;
     setEditingId(null);
     setEditDraft("");
     setEditTitle("");
     setComposing(true);
     setDraft("");
     setDraftTitle("");
+    setSeed({ key: `compose:${composeCount.current}`, title: "", body: "" });
+    setEditorEmpty(true);
+    setDirty(false);
+    setTooLong(false);
   };
 
   // An external signal (when provided) asks for a fresh composer.
@@ -176,9 +316,20 @@ export default function NotesPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composerOpenSignal]);
 
+  // What Save writes: the editor's latest content, flushed first (never the
+  // debounced copy), through the same `combineHtml` the stored note always used.
+  const currentHtml = (fallbackTitle: string, fallbackBody: string) => {
+    const live = editorRef.current?.read();
+    return combineHtml(live ? live.title : fallbackTitle, live ? live.bodyHtml : fallbackBody);
+  };
+
   const submitAdd = () => {
-    const html = combineHtml(draftTitle, draft);
+    const html = currentHtml(draftTitle, draft);
     if (isEmptyRichText(html)) return;
+    // The stored note is capped (utils/courseNotes). Never truncate silently:
+    // keep the draft open and say so.
+    if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return; }
+    discardingRef.current = true;
     onAdd(html);
     setDraft("");
     setDraftTitle("");
@@ -186,6 +337,7 @@ export default function NotesPanel({
   };
 
   const startEdit = (note: CoursePlayerNote) => {
+    discardingRef.current = false;
     setComposing(false);
     setDraft("");
     setDraftTitle("");
@@ -195,11 +347,19 @@ export default function NotesPanel({
     setEditingId(note.id);
     setEditTitle(heading);
     setEditDraft(body);
+    setSeed({ key: `edit:${note.id}`, title: heading, body });
+    setEditorEmpty(isEmptyRichText(combineHtml(heading, body)));
+    setDirty(false);
+    setTooLong(false);
   };
 
   const submitEdit = () => {
-    const html = combineHtml(editTitle, editDraft);
-    if (editingId && !isEmptyRichText(html)) onEdit(editingId, html);
+    const html = currentHtml(editTitle, editDraft);
+    if (editingId && !isEmptyRichText(html)) {
+      if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return; }
+      discardingRef.current = true;
+      onEdit(editingId, html);
+    }
     setEditingId(null);
     setEditDraft("");
     setEditTitle("");
@@ -211,49 +371,81 @@ export default function NotesPanel({
     const editing = Boolean(editingId);
     const value = editing ? editDraft : draft;
     const titleValue = editing ? editTitle : draftTitle;
-    const empty = editing ? editDraftEmpty : draftEmpty;
     const cancel = () => {
       // Cancel discards the draft without saving (the session sync effect
       // records the cleared state on the next render).
+      discardingRef.current = true;
       if (editing) { setEditingId(null); setEditDraft(""); setEditTitle(""); }
       else { setComposing(false); setDraft(""); setDraftTitle(""); }
     };
+    const empty = legacyFallback ? isEmptyRichText(combineHtml(titleValue, value)) : editorEmpty;
     return (
-      <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode={editing ? "edit" : "compose"}>
-        {/* No header here: with the overlay's main header hidden in writing
-            mode, the sheet is exactly toolbar (top) / heading + divider
-            / writing surface (middle) / Save + Cancel (bottom) — maximum
-            writing space. */}
-        <div className="flex min-h-0 flex-1 flex-col p-3" data-course-notes-composer>
-          <RichTextEditor
-            value={value}
-            onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
-            heading={titleValue}
-            onHeadingChange={editing ? (html) => setEditTitle(html) : (html) => setDraftTitle(html)}
-            headingAutoFocus={!editing}
-            autoFocus={editing}
-            surfaceClassName="min-h-0"
-            ariaLabel={editing ? "Edit note" : "New note"}
-            dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
-          />
-          <div className="mt-2 flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={editing ? submitEdit : submitAdd}
-              disabled={empty}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-indigo-600 py-2 text-[11px] font-black text-white transition hover:bg-indigo-500 disabled:opacity-40"
-              {...(editing ? { "data-course-note-edit-save": true } : { "data-course-notes-save": true })}
+      <div className="flex h-full flex-col overflow-hidden bg-white" data-course-notes-panel data-course-notes-mode={editing ? "edit" : "compose"}>
+        {/* The pane is exactly: a slim bar (status · Cancel · Save), then the
+            white page. No card, no frame — the page IS the pane. */}
+        <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
+          <div
+            className="flex shrink-0 items-center justify-between gap-2 bg-white py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
+            data-course-notes-bar
+          >
+            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} />
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={cancel}
+                className="flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
+              >
+                <X size={15} /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={editing ? submitEdit : submitAdd}
+                disabled={empty || tooLong}
+                className="flex h-10 items-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                {...(editing ? { "data-course-note-edit-save": true } : { "data-course-notes-save": true })}
+              >
+                <Check size={15} /> Save
+              </button>
+            </div>
+          </div>
+          <div className="relative min-h-0 flex-1">
+            <EditorBoundary
+              onFail={() => setLegacyFallback(true)}
+              fallback={
+                <div className="flex h-full min-h-0 flex-col bg-slate-950 p-3">
+                  <RichTextEditor
+                    value={value}
+                    onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
+                    heading={titleValue}
+                    onHeadingChange={editing ? (html) => setEditTitle(html) : (html) => setDraftTitle(html)}
+                    headingAutoFocus={!editing}
+                    autoFocus={editing}
+                    surfaceClassName="min-h-0"
+                    ariaLabel={editing ? "Edit note" : "New note"}
+                    dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
+                  />
+                </div>
+              }
             >
-              <Check size={13} /> Save
-            </button>
-            <GlassButton
-              variant="capsule"
-              onClick={cancel}
-              className="flex-1 text-[11px] font-black [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:px-4"
-              {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
-            >
-              <span className="flex items-center justify-center gap-1.5"><X size={13} /> Cancel</span>
-            </GlassButton>
+              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-course-notes-editor-loading />}>
+                <NoteEditor
+                  key={seed.key}
+                  ref={editorRef}
+                  initialTitle={seed.title}
+                  initialBodyHtml={seed.body}
+                  // A fresh note lands in the title; a note that already has words
+                  // (an edit, or a draft restored from the session) in the body.
+                  autoFocus={editing || seed.title || seed.body ? "body" : "title"}
+                  ariaLabel={editing ? "Edit note" : "New note"}
+                  dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
+                  onDraftChange={handleDraftChange}
+                  onEmptyChange={setEditorEmpty}
+                  onDirtyChange={setDirty}
+                  onSaveShortcut={editing ? submitEdit : submitAdd}
+                />
+              </Suspense>
+            </EditorBoundary>
           </div>
         </div>
       </div>

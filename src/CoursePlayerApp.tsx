@@ -1558,6 +1558,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
       onLinkNote={(id, links) => linkNote(id, links)}
+      notesSync={{ status: notesCtl.status, synced: notesCtl.synced }}
       // The mind map editor is owned here (not inside the overlay) so its
       // Firestore hook and canvas state survive the pane being collapsed and
       // reopened — the learner never loses an unsaved branch to a tab switch.

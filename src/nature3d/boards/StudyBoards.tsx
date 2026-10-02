@@ -243,6 +243,8 @@ export default function BoardPortals({
                   onAdd={notes.onAdd}
                   onEdit={notes.onEdit}
                   onDelete={notes.onDelete}
+                  // The board only needs the chip's two facts: is a write in flight / failed?
+                  syncState={{ status: notes.status, synced: notes.status !== "saving" && notes.status !== "error" && notes.status !== "loading" }}
                 /> : <BoardSignIn />}
               </div>
             </BoardFrame>,
