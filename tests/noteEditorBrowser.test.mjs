@@ -274,6 +274,51 @@ browserTest("undo / redo and a clean history boundary per note", async () => {
   await context.close();
 });
 
+browserTest("every slash command creates its block: paragraph, headings 1–3, bullet, numbered, checklist, quote, divider, code", async () => {
+  const { page, press, editorReady, context } = await open();
+  await press("[data-course-notes-add]");
+  await editorReady();
+  await page.keyboard.press("Enter"); // title → body
+  // [what is typed, the block type it must create, the heading level (BlockNote omits data-level for H1)]
+  const commands = [
+    ["/paragraph", "paragraph", null],
+    ["/heading", "heading", null],
+    ["/h2", "heading", "2"],
+    ["/h3", "heading", "3"],
+    ["/bullet", "bulletListItem", null],
+    ["/numbered", "numberedListItem", null],
+    ["/checklist", "checkListItem", null],
+    ["/quote", "quote", null],
+    ["/divider", "divider", null],
+    ["/code", "codeBlock", null], // last: a code block swallows Enter and "/" as code text
+  ];
+  for (const [index, [query, type]] of commands.entries()) {
+    // Every command but the first starts on a fresh line. After a divider the caret is
+    // already on the blank paragraph BlockNote opens below it.
+    if (index > 0 && commands[index - 1][1] !== "divider") await page.keyboard.press("Enter");
+    await page.keyboard.type(query);
+    await page.waitForSelector(".bn-ak-menu[role='listbox'] .bn-ak-menu-item");
+    await page.keyboard.press("Enter");
+    if (type !== "divider") await page.keyboard.type(`${type} text`);
+    await page.waitForTimeout(80);
+  }
+  await page.waitForTimeout(350);
+  const blocks = await page.$$eval(".bn-block-content", (n) => n.map((b) => ({ type: b.getAttribute("data-content-type"), level: b.getAttribute("data-level") })));
+  assert.deepEqual(
+    blocks.map((b) => [b.type, b.level]),
+    commands.map(([, type, level]) => [type, level]),
+    `blocks created: ${JSON.stringify(blocks)}`,
+  );
+  // …and every one of them reaches the stored note: no block type is lost on the way out.
+  await page.click("[data-course-notes-save]");
+  await page.waitForFunction(() => window.__log.includes("add"));
+  const stored = await page.evaluate(() => window.__notes[0].html);
+  for (const fragment of ["<p>paragraph text</p>", "<h1>heading text</h1>", "<h2>heading text</h2>", "<h3>heading text</h3>", "<ul><li>bulletListItem text</li></ul>", "<ol><li>numberedListItem text</li></ol>", '<ul><li data-checked="false">checkListItem text</li></ul>', "<blockquote>quote text</blockquote>", "<hr>", "<pre><code>codeBlock text</code></pre>"]) {
+    assert.ok(stored.includes(fragment), `${fragment} missing from: ${stored}`);
+  }
+  await context.close();
+});
+
 browserTest("typing is batched and nothing is persisted per keystroke", async () => {
   const { page, press, editorReady, context } = await open();
   await press("[data-course-notes-add]");
