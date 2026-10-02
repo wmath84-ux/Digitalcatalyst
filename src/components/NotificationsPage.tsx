@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   BellRing,
+  CloudOff,
   BookOpen,
   CalendarClock,
   CheckSquare,
@@ -15,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { collection, deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { subscribeShared } from "../lib/sharedSnapshot";
 import { notificationsKey } from "../hooks/useUnreadNotificationCount";
 import { db } from "../../firebase";
@@ -101,6 +102,51 @@ function ExactAlarmCard() {
       <p className="mt-2 text-[10px] leading-relaxed text-white/35">Tap Allow → system Settings opens → toggle Eduvora → Allow setting exact alarms. No extra permission is stored by us.</p>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Cloud document → the app's notification record. Shared by the live listener
+// and the "Retry" one-shot read below, so both paths can never disagree about
+// how a document is interpreted.
+// ---------------------------------------------------------------------------
+const VALID_NOTIFICATION_CATEGORIES = new Set<SiteNotificationCategory>([
+  "store", "reading", "course", "unlock", "community", "announcement", "mayday", "subscription",
+]);
+
+function mapCloudNotification(id: string, data: Record<string, unknown>): SiteNotification | null {
+  const createdAt =
+    data.createdAt && typeof (data.createdAt as { toMillis?: unknown }).toMillis === "function"
+      ? (data.createdAt as { toMillis: () => number }).toMillis()
+      : Number(data.createdAt || Date.now());
+  const rawCategory = String(data.category || "");
+  const category = (VALID_NOTIFICATION_CATEGORIES.has(rawCategory as SiteNotificationCategory) ? rawCategory : "subscription") as SiteNotificationCategory;
+  const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
+    ? data.target
+    : { type: "subscription" };
+  // `expired` drives the renewal deep link (#/subscription?renew=1), so it must
+  // survive the cloud → local mapping.
+  const notification: SiteNotification = {
+    id,
+    title: String(data.title || "Notification"),
+    body: String(data.body || ""),
+    category,
+    createdAt,
+    read: Boolean(data.read),
+    source: "system",
+    target: rawTarget as SiteNotification["target"],
+    remoteNotificationId: id,
+    expired: data.expired === true,
+  };
+  return isNewsOrBlogNotification(notification) ? null : notification;
+}
+
+/** Firestore's own text says nothing about WHAT failed; name the real cause. */
+function describeNotificationCloudError(error: unknown): string {
+  const code = String((error as { code?: string } | null)?.code || "");
+  if (code === "permission-denied") return "Firestore rules ne is device ko alerts padhne se roka (permission-denied). System notifications phir bhi aate rahenge.";
+  if (code === "unavailable") return "Network/Firestore abhi unavailable hai. Device par mile alerts dikh rahe hain — connection aate hi sync ho jayega.";
+  if (code === "unauthenticated") return "Sign-in session expire ho gaya — dobara login karte hi alerts load ho jayenge.";
+  return "Cloud alerts load nahi ho sake. Device par mile alerts dikh rahe hain.";
 }
 
 type NotificationsPageProps = {
@@ -326,6 +372,37 @@ export default function NotificationsPage({
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">(() =>
     typeof window !== "undefined" && isWebPushSupported() ? window.Notification.permission : "unsupported"
   );
+  // The cloud listener can be refused (rules not deployed, offline, quota).
+  // Silence about that was how "Android notification aa rahe hain lekin alerts
+  // page per dikh nahi rahe" turned into a dead end: the page showed the
+  // device mirror and looked simply empty. Name the failure and offer a
+  // one-shot re-read instead.
+  const [cloudError, setCloudError] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const retryCloud = async () => {
+    if (!user || reloading) return;
+    setReloading(true);
+    try {
+      const snapshot = await getDocs(collection(db, "users", user.id, "notifications"));
+      const cloud = snapshot.docs.map((item) => mapCloudNotification(item.id, item.data())).filter(Boolean) as SiteNotification[];
+      setItems((current) => mergeSiteNotifications(current, cloud));
+      setCloudError(false);
+      toast({
+        title: cloud.length ? "Alerts reloaded" : "Alerts are up to date",
+        description: cloud.length ? `${cloud.length} alert${cloud.length === 1 ? "" : "s"} checked against the cloud.` : "No cloud alerts were found for this account yet.",
+        variant: "success",
+      });
+    } catch (error) {
+      setCloudError(true);
+      toast({
+        title: "Cloud alerts unavailable",
+        description: describeNotificationCloudError(error),
+        variant: "warning",
+      });
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const filterCounts = useMemo(() => {
     const counts: Record<NotificationFilterKey, number> = { all: items.length, product: 0, mayday: 0, subscription: 0, updates: 0 };
@@ -390,23 +467,17 @@ export default function NotificationsPage({
   // My Day reminder doesn't masquerade as a subscription alert.
   useEffect(() => {
     if (!user) return undefined;
-    const validCategories = new Set<SiteNotificationCategory>(["store", "reading", "course", "unlock", "community", "announcement", "mayday", "subscription"]);
     // Shares the bell badge's listener (src/lib/sharedSnapshot.ts) instead of
     // opening a second one on the same collection.
     return subscribeShared(notificationsKey(user.id), () => collection(db, "users", user.id, "notifications"), (snapshotDocs, error) => {
-      if (error) return;
-      const cloud: SiteNotification[] = snapshotDocs.map((item) => {
-        const data = item.data || {};
-        const createdAt = data.createdAt && typeof data.createdAt.toMillis === "function" ? data.createdAt.toMillis() : Number(data.createdAt || Date.now());
-        const rawCategory = String(data.category || "");
-        const category = (validCategories.has(rawCategory as SiteNotificationCategory) ? rawCategory : "subscription") as SiteNotificationCategory;
-        const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
-          ? data.target
-          : { type: "subscription" };
-        // `expired` drives the renewal deep link (#/subscription?renew=1),
-        // so it must survive the cloud → local mapping.
-        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system" as const, target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id, expired: data.expired === true };
-      }).filter((item) => !isNewsOrBlogNotification(item));
+      if (error) {
+        setCloudError(true);
+        return;
+      }
+      setCloudError(false);
+      const cloud = snapshotDocs
+        .map((item) => mapCloudNotification(item.id, item.data || {}))
+        .filter(Boolean) as SiteNotification[];
       setItems((current) => mergeSiteNotifications(current, cloud));
     });
   }, [user]);
@@ -460,10 +531,17 @@ export default function NotificationsPage({
     if (user) {
       restored.forEach((item) => {
         if (!item.remoteNotificationId) return;
+        // Re-creating a dismissed card makes the document a DEVICE alert again
+        // (the original may have been a server doc that the dismiss deleted),
+        // so it carries the validator's required id + source and the same caps
+        // the rules enforce. Without this the write was silently refused and
+        // the card vanished again on the next snapshot.
         void setDoc(doc(db, "users", user.id, "notifications", item.remoteNotificationId), {
-          title: item.title,
-          body: item.body,
+          id: item.remoteNotificationId,
+          title: String(item.title || "Notification").slice(0, 160),
+          body: String(item.body || "").slice(0, 600),
           category: item.category,
+          source: "device",
           target: item.target || { type: "subscription" },
           createdAt: item.createdAt,
           read: Boolean(item.read),
@@ -523,6 +601,26 @@ export default function NotificationsPage({
             <div className="mx-4 mt-1 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4">
               <p className="text-sm font-bold text-amber-100">Notifications are blocked</p>
               <p className="mt-0.5 text-xs text-amber-200/80">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
+            </div>
+          )}
+
+          {cloudError && (
+            <div data-notifications-cloud-error className="mx-4 mt-2 flex items-start gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4">
+              <CloudOff size={16} aria-hidden className="mt-px flex-none text-amber-200" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-amber-100">Cloud alerts couldn't be loaded</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-200/80">
+                  Alerts delivered on this device are still listed below. Retry to pull the full history from your account.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void retryCloud()}
+                disabled={reloading}
+                className="shrink-0 rounded-full bg-amber-400/90 px-3 py-1.5 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-60"
+              >
+                {reloading ? "Retrying…" : "Retry"}
+              </button>
             </div>
           )}
 

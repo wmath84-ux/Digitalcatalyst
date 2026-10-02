@@ -11,6 +11,7 @@ const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const subscriptionPage = read("src/subscription/components/SubscriptionPage.tsx");
 const subscriptionApp = read("src/subscription/App.tsx");
+const subscriptionCss = read("src/subscription/subscription.css");
 const main = read("src/main.tsx");
 const header = read("src/components/Header.tsx");
 const footer = read("src/components/BottomNav.tsx");
@@ -37,7 +38,7 @@ test("subscription loading and catalog-error states keep the header and footer",
   // cannot leak a horizontal scrollbar onto the whole page.
   assert.match(
     subscriptionPage,
-    /<main ref=\{contentColumnRef\} className="flex-1 overflow-x-hidden overflow-y-auto">/,
+    /<main ref=\{contentColumnRef\} data-subscription-page className="flex-1 overflow-x-hidden overflow-y-auto">/,
   );
   assert.match(subscriptionPage, /<OverlayBoundsProvider value=\{contentColumnRef\}>/);
 });
@@ -52,4 +53,26 @@ test("subscription route wires the same navigation destinations as other pages",
   assert.match(subscriptionApp, /onNavigateToCart/);
   assert.match(subscriptionApp, /onNavigateToNotifications/);
   assert.match(subscriptionApp, /onNavigateFooter/);
+});
+
+test("subscription page owns a responsive design system (phone / tablet / desktop)", () => {
+  // The design system is a real stylesheet, loaded by the route component so
+  // it sits after the app theme and can win the layout back from the legacy
+  // container-query block in src/index.css.
+  assert.match(subscriptionApp, /import "\.\/subscription\.css"/);
+  // Phone → tablet → desktop widths, then the two-column workspace with the
+  // sticky review rail (the Store page's model: one column that knows its
+  // width, then a real workspace).
+  assert.match(subscriptionCss, /\[data-subscription-shell\]/);
+  assert.match(subscriptionCss, /\[data-subscription-workspace\]/);
+  assert.match(subscriptionCss, /grid-template-columns: minmax\(0, 1fr\) minmax\(320px, var\(--sub-rail-w\)\)/);
+  assert.match(subscriptionCss, /position: sticky !important/);
+  assert.match(subscriptionPage, /data-subscription-workspace/);
+  assert.match(subscriptionPage, /data-subscription-shell/);
+  // The user's rule: a MIX of materials, never all-glass. Content the buyer
+  // must read is a solid plate; glass survives only where it is the point
+  // (the swipe deck, the sticky buy bar, the modals).
+  assert.match(subscriptionCss, /\[data-subscription-step\] \.dc-glass-card/);
+  assert.match(subscriptionCss, /backdrop-filter: none !important/);
+  assert.match(subscriptionCss, /\[data-subscription-step\] > \.dc-sub-step-body/);
 });

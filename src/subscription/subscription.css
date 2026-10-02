@@ -1,0 +1,378 @@
+/* src/subscription/subscription.css
+   ══════════════════════════════════════════════════════════════════════════
+   THE SUBSCRIPTION WORKSPACE — one design for phones, tablets and desktops.
+
+   The page used to be a single 448 px phone column of glass cards on every
+   screen: on a tablet it stretched into a thin ribbon, on a desktop the rail
+   floated in dead space, and every surface was frosted glass on frosted glass,
+   so nothing led the eye. This file gives the page its own responsive system,
+   built the way the Store page is built:
+
+     · MATERIAL IS MEANING — solid plates for content that must be READ
+       (the numbered steps, the comparison table, the order summary), glass
+       only where it earns its keep (the swipe deck, the sticky buy bar, the
+       modals). A mix, not a single material everywhere.
+     · ONE COLUMN THAT KNOWS ITS WIDTH — 16 px gutters and full-bleed cards on
+       a phone, a centred ~760 px reading column on a tablet, and a real
+       two-column workspace (configuration + sticky review rail) on a desktop.
+     · TYPE THAT SCALES ONCE — every size below is set here, so the same page
+       reads correctly at 360 px and at 1600 px without per-component tweaks.
+
+   Loaded by src/subscription/App.tsx, after the app theme, so its rules win
+   where the legacy container-query layout in src/index.css still applies.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+[data-subscription-page] {
+  /* Solid content plate — readable, calm, professional. */
+  --sub-surface: rgba(13, 19, 37, 0.95);
+  --sub-surface-soft: rgba(19, 26, 48, 0.92);
+  --sub-surface-raised: rgba(22, 30, 55, 0.96);
+  --sub-border: rgba(255, 255, 255, 0.1);
+  --sub-border-strong: rgba(255, 255, 255, 0.18);
+  --sub-shadow: 0 18px 40px -24px rgba(2, 6, 16, 0.9), 0 2px 10px -6px rgba(2, 6, 16, 0.7);
+  --sub-ink-1: rgba(255, 255, 255, 0.96);
+  --sub-ink-2: rgba(255, 255, 255, 0.78);
+  --sub-ink-3: rgba(255, 255, 255, 0.56);
+  --sub-accent: #6366f1;
+  --sub-accent-soft: rgba(99, 102, 241, 0.16);
+  --sub-violet: #8b5cf6;
+  --sub-emerald: #10b981;
+  --sub-radius: 20px;
+  --sub-radius-lg: 26px;
+  --sub-gutter: 16px;
+  --sub-rail-w: 360px;
+}
+
+/* ── 1 · THE SHELL: one column that widens, then splits ─────────────────── */
+[data-subscription-shell] {
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  padding-inline: var(--sub-gutter);
+  padding-bottom: 8px;
+}
+@media (min-width: 640px) {
+  [data-subscription-page] { --sub-gutter: 24px; }
+  [data-subscription-shell] { max-width: 780px; }
+}
+@media (min-width: 1024px) {
+  [data-subscription-page] { --sub-gutter: 28px; }
+  [data-subscription-shell] { max-width: 1080px; }
+}
+@media (min-width: 1280px) {
+  [data-subscription-shell] { max-width: 1240px; }
+}
+
+[data-subscription-workspace] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+@media (min-width: 1024px) {
+  [data-subscription-workspace] {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, var(--sub-rail-w));
+    gap: clamp(20px, 2vw, 32px);
+  }
+  /* The review rail follows the buyer while they edit the plan above it. Every
+     legacy `position: static !important` rule for this attribute is outranked
+     below (same property, higher specificity, later stylesheet). */
+  [data-subscription-page] [data-subscription-rail],
+  .dc-desktop-shell [data-subscription-page] [data-subscription-rail] {
+    position: sticky !important;
+    top: 12px !important;
+    align-self: start !important;
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    padding-bottom: 4px !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  }
+  .dc-desktop-shell [data-subscription-page] [data-subscription-rail]::-webkit-scrollbar { width: 6px; }
+  .dc-desktop-shell [data-subscription-page] [data-subscription-rail]::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  [data-subscription-page] { --sub-rail-w: 330px; }
+}
+
+/* ── 2 · HERO: what this page is, in one glance ─────────────────────────── */
+[data-subscription-hero] {
+  position: relative;
+  overflow: hidden;
+  margin-top: 16px;
+  border: 1px solid var(--sub-border);
+  border-radius: var(--sub-radius-lg);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(139, 92, 246, 0.22) 0%, transparent 58%),
+    linear-gradient(165deg, var(--sub-surface-raised) 0%, var(--sub-surface) 100%);
+  box-shadow: var(--sub-shadow);
+  padding: 20px var(--sub-gutter) 18px;
+}
+@media (min-width: 640px) { [data-subscription-hero] { padding: 26px 26px 22px; } }
+[data-subscription-hero] .dc-sub-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--sub-border-strong);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sub-ink-2);
+}
+[data-subscription-hero] h1 {
+  margin-top: 12px;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--sub-ink-1);
+}
+@media (min-width: 640px) { [data-subscription-hero] h1 { font-size: 27px; } }
+@media (min-width: 1024px) { [data-subscription-hero] h1 { font-size: 30px; max-width: 22ch; } }
+[data-subscription-hero] p.dc-sub-lede {
+  margin-top: 8px;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sub-ink-3);
+}
+@media (min-width: 640px) { [data-subscription-hero] p.dc-sub-lede { font-size: 13.5px; } }
+[data-subscription-hero] .dc-sub-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+[data-subscription-hero] .dc-sub-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--sub-border);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--sub-ink-2);
+}
+[data-subscription-hero] .dc-sub-trust svg { color: #a5b4fc; }
+
+/* ── 3 · STEP CARDS: solid plates, numbered headers ─────────────────────── */
+[data-subscription-step] {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--sub-border);
+  border-radius: var(--sub-radius-lg);
+  background: linear-gradient(180deg, var(--sub-surface-raised) 0%, var(--sub-surface) 100%);
+  box-shadow: var(--sub-shadow);
+}
+[data-subscription-step] > .dc-sub-step-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--sub-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  padding: 14px 18px 12px;
+}
+@media (min-width: 640px) { [data-subscription-step] > .dc-sub-step-head { padding: 16px 22px 14px; } }
+[data-subscription-step] .dc-sub-step-num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: var(--sub-accent-soft);
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #c7d2fe;
+}
+[data-subscription-step] .dc-sub-step-num.is-done {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+}
+[data-subscription-step] .dc-sub-step-title {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--sub-ink-1);
+}
+@media (min-width: 640px) { [data-subscription-step] .dc-sub-step-title { font-size: 16px; } }
+[data-subscription-step] .dc-sub-step-hint {
+  margin-top: 3px;
+  max-width: 68ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sub-ink-3);
+}
+[data-subscription-step] > .dc-sub-step-body { padding: 16px 0 20px; }
+@media (min-width: 640px) { [data-subscription-step] > .dc-sub-step-body { padding: 18px 0 22px; } }
+/* Children keep their own 20 px gutters; on wider screens they follow the
+   card's larger padding so nothing hugs the frame. */
+@media (min-width: 640px) {
+  /* The step body itself is padding-less: each block below keeps its own
+     `px-5` gutter, widened here to follow the card's 22 px frame. Blocks that
+     deliberately have no gutter (a full-bleed row) are left untouched. */
+  [data-subscription-step] .px-5 { padding-inline: 22px; }
+}
+
+/* ── 4 · DECK (swipe showcase): the one glass surface of the buy flow ────── */
+[data-subscription-page] .dc-sub-deck-wrap {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 440px;
+}
+@media (min-width: 640px) { [data-subscription-page] .dc-sub-deck-wrap { max-width: 560px; } }
+@media (min-width: 1024px) { [data-subscription-page] .dc-sub-deck-wrap { max-width: 640px; } }
+
+/* ── 5 · COMPARISON TABLE: a real table at every width ──────────────────── */
+[data-subscription-page] .dc-compare-scroll {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid var(--sub-border);
+  background: rgba(8, 13, 27, 0.72);
+  -webkit-overflow-scrolling: touch;
+}
+[data-subscription-page] .dc-compare-table { min-width: max-content; }
+[data-subscription-page] .dc-compare-rowhead {
+  background: rgba(10, 16, 32, 0.98) !important;
+  backdrop-filter: blur(6px);
+}
+[data-subscription-page] .dc-compare-table th,
+[data-subscription-page] .dc-compare-table td {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* ── 6 · SOLID PLATES INSIDE THE STEPS ───────────────────────────────────
+   Material is meaning: a surface the buyer must READ (the plan card, the
+   comparison cells, the live selection, the order summary) is a solid plate,
+   not another sheet of frosted glass over frosted glass. Every legacy glass
+   card that lives inside a numbered step is re-skinned here, so the mix is
+   decided in ONE place instead of drifting component by component.
+   Glass survives where it is the point: the swipe deck, the sticky buy bar
+   and the modals (rendered outside this scope). */
+[data-subscription-page] [data-subscription-step] .dc-glass-card {
+  border: 1px solid var(--sub-border) !important;
+  border-radius: var(--sub-radius) !important;
+  background: linear-gradient(180deg, rgba(23, 30, 56, 0.94) 0%, rgba(13, 19, 37, 0.96) 100%) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+[data-subscription-page] [data-subscription-step] .dc-glass-card > div[aria-hidden] { opacity: 0; }
+/* The first row of a step starts flush with the card frame. */
+[data-subscription-page] [data-subscription-step] > .dc-sub-step-body > :first-child {
+  padding-top: 0 !important;
+}
+
+/* ── 6b · SELECTION + SUMMARY ───────────────────────────────────────────── */
+[data-subscription-page] [data-subscription-live-card] {
+  border: 1px solid var(--sub-border-strong);
+  border-radius: var(--sub-radius);
+  background: linear-gradient(180deg, rgba(28, 36, 66, 0.96) 0%, rgba(15, 21, 41, 0.96) 100%);
+  box-shadow: var(--sub-shadow);
+}
+[data-subscription-page] [data-subscription-price-summary] { padding-inline: 0 !important; padding-top: 12px !important; }
+[data-subscription-page] [data-subscription-price-summary] { padding-bottom: 4px !important; }
+
+/* The rail's own cards space themselves; the wrapper owns the gutter. */
+[data-subscription-rail] > [data-subscription-step] { margin-top: 16px; }
+[data-subscription-rail] > [data-subscription-step]:first-child { margin-top: 0; }
+
+/* ── 7 · OWNED-PLAN / MEMBER DASHBOARD ───────────────────────────────────
+   Both components ship their own page-level padding (they were built to BE a
+   page). Inside the shell they are content: the shell owns the gutter, and a
+   single top margin keeps them aligned with the hero and the step cards. The
+   components' internal 12-column grids still do the responsive work. */
+[data-subscription-page] [data-subscription-member-view],
+[data-subscription-page] [data-subscription-owned-plan] {
+  padding-inline: 0 !important;
+  padding-top: 0 !important;
+  margin-top: 16px;
+}
+
+/* ── 7b · PLAN / CYCLE PICKERS: never clip, always reachable ─────────────
+   The segmented control is a single inline row; with several plans on a
+   360 px phone the last pill would sit off-screen. It scrolls instead, with
+   the glass bar's own rounded ends kept. */
+[data-subscription-page] [data-subscription-plan-overview] [aria-label="Choose a plan"],
+[data-subscription-page] [data-subscription-plan-overview] [aria-label="Billing cycle"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+[data-subscription-page] [data-subscription-plan-overview] [aria-label="Choose a plan"]::-webkit-scrollbar,
+[data-subscription-page] [data-subscription-plan-overview] [aria-label="Billing cycle"]::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── 8 · STICKY BUY BAR: glass here is deliberate (it floats over content) */
+[data-subscription-subscribe-bar] {
+  margin-top: 18px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  [data-subscription-subscribe-bar] { margin-top: 22px; }
+}
+
+/* ── 8b · BUY BAR ON A WIDE SCREEN ──────────────────────────────────────
+   On a phone the bar is one stacked column (total → promises → CTA), which is
+   the right order at thumb distance. On a desktop that becomes a 1200 px
+   green ribbon, so the bar turns into two columns: everything that explains
+   the purchase on the left, the CTA pinned right at a readable width. */
+@media (min-width: 1024px) {
+  [data-subscription-page] [data-subscription-subscribe-bar] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    align-items: center;
+    column-gap: 24px;
+    row-gap: 6px;
+    padding-inline: 28px;
+    border-radius: 22px;
+    border: 1px solid var(--sub-border);
+  }
+  [data-subscription-page] [data-subscription-subscribe-bar] > *:not(:last-child) {
+    grid-column: 1;
+    margin-bottom: 0;
+  }
+  [data-subscription-page] [data-subscription-subscribe-bar] > *:last-child {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: center;
+  }
+  [data-subscription-page] [data-subscription-subscribe-bar] > ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+  }
+}
+
+/* ── 9 · LEGACY LAYOUT NEUTRALISER ───────────────────────────────────────
+   src/index.css still carries a container-query grid for the old
+   `[data-subscription-layout]` flex column (and its `position: static
+   !important` rail). The workspace above owns the layout now; these rules
+   keep the leftover block from fighting it on desktop shells. */
+@media (min-width: 860px) {
+  [data-subscription-workspace][data-subscription-layout] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @container dc-shell (min-width: 1024px) {
+    [data-subscription-workspace][data-subscription-layout] {
+      grid-template-columns: minmax(0, 1fr) minmax(320px, var(--sub-rail-w)) !important;
+    }
+  }
+}

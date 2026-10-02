@@ -64,6 +64,71 @@ service cloud.firestore {
         && validNoteLinkAt(links, 49)
         );
     }
+    // ── Course Player AI chat messages (users/{uid}/aiChats) ──────────────
+    // Same guarded-index pattern as validNoteLinkAt: rules are not JavaScript,
+    // so a bounded list is validated by sampling the first entries and by the
+    // list size. The real caps live in utils/lumenChats.js and are asserted
+    // against this file by tests/lumenChatCloudSyncContract.test.mjs.
+    function validLumenMessageAt(messages, index) {
+      return messages.size() <= index || (
+        messages[index] is map
+        && messages[index].id is string
+        && messages[index].id.size() > 0
+        && messages[index].id.size() <= 80
+        && messages[index].role in ['user', 'assistant']
+        && messages[index].content is string
+        && messages[index].content.size() <= 20000
+        && messages[index].createdAt is number
+        && messages[index].status in ['complete', 'error']
+      );
+    }
+    function validLumenMessages(messages) {
+      return messages is list && messages.size() <= 120
+        && validLumenMessageAt(messages, 0)
+        && validLumenMessageAt(messages, 1)
+        && validLumenMessageAt(messages, 2)
+        && validLumenMessageAt(messages, 3)
+        && validLumenMessageAt(messages, 4)
+        && validLumenMessageAt(messages, 5)
+        && validLumenMessageAt(messages, 6)
+        && validLumenMessageAt(messages, 7);
+    }
+    // ── Device-delivered alerts (users/{uid}/notifications) ───────────────
+    // A notification the app itself showed on the device (the My Day /
+    // FlowPath foreground clocks and the exact-time local alarms) must also
+    // exist on the in-app alerts page — that was the reported "Android
+    // notification aa rahe hain lekin alerts page per dikh nahi rahe".
+    //
+    // The client may therefore create ONLY alerts marked `source == 'device'`,
+    // and every field is validated against the same caps
+    // utils/deviceNotifications.js applies. `id == notificationId` keeps a
+    // document from masquerading as a different alert; the id the client uses
+    // is the id the SERVER would have used for the same event, so a locally
+    // delivered alert and its server-pushed twin are ONE document. Server
+    // documents (source 'system') can never be created or overwritten here.
+    function validDeviceNotification(notificationId) {
+      return request.resource.data.source == 'device'
+        && request.resource.data.id == notificationId
+        && request.resource.data.id is string
+        && request.resource.data.id.size() > 0
+        && request.resource.data.id.size() <= 200
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 160
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 600
+        && request.resource.data.category in ['store', 'reading', 'course', 'unlock', 'community', 'announcement', 'mayday', 'subscription']
+        && request.resource.data.read is bool
+        && (request.resource.data.createdAt is number || request.resource.data.createdAt is timestamp)
+        && request.resource.data.target is map
+        && request.resource.data.target.type is string
+        && request.resource.data.target.type in ['product', 'reading', 'announcement', 'course', 'purchases', 'community', 'mayday', 'subscription', 'flowpath']
+        && (!('itemId' in request.resource.data.target)
+          || (request.resource.data.target.itemId is string && request.resource.data.target.itemId.size() <= 120))
+        && (!('section' in request.resource.data.target)
+          || (request.resource.data.target.section is string && request.resource.data.target.section.size() <= 40))
+        && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier', 'email', 'phone', 'apiKey', 'authorization', 'secret']);
+    }
     function validSessionParentAt(uid, parents, index) {
       return parents.size() <= index || (parents[index] is string
         && parents[index].size() > 0 && parents[index].size() <= 40
@@ -301,11 +366,26 @@ service cloud.firestore {
         allow delete: if sessionId == 'current' && isOwner(uid);
       }
 
+      // ── Alerts (the bell badge + the in-app Notifications page) ──────────
+      // Server-generated alerts (renewals, My Day pushes, FlowPath jobs,
+      // product announcements — `source == 'system'`) stay admin-only, exactly
+      // as before. The owner may additionally create the alerts the DEVICE
+      // itself delivered, marked `source == 'device'` and validated by
+      // validDeviceNotification above; that is what makes a system
+      // notification visible on the in-app alerts page too. Marking anything
+      // (server or device) read remains an owner action.
       match /notifications/{notificationId} {
         allow read: if isOwner(uid) || isAdmin();
-        allow update: if isOwner(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
-        allow create, delete: if isAdmin();
+        allow update: if isOwner(uid) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt'])
+          || (resource.data.source == 'device' && validDeviceNotification(notificationId))
+        );
+        allow create: if isAdmin() || (isOwner(uid) && validDeviceNotification(notificationId));
+        // Dismissing a card is a USER action on their OWN alert list: the page
+        // deletes the mirrored doc so the swipe-to-dismiss sticks across
+        // snapshots and devices (the server never reading it again is fine —
+        // every alert is also delivered as a push).
+        allow delete: if isAdmin() || isOwner(uid);
       }
 
       // Per-student Google Drive personal copies. One doc per master file
@@ -367,6 +447,50 @@ service cloud.firestore {
           && (!('aiGenerated' in request.resource.data) || request.resource.data.aiGenerated is bool)
           && (!('aiKind' in request.resource.data)
             || request.resource.data.aiKind in ['answer', 'summary', 'explanation', 'question', 'flashcard', 'plan'])
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier', 'email', 'phone', 'apiKey', 'authorization', 'secret']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      // ── Course Player AI CHAT (Lumen) ────────────────────────────────────
+      // ONE document per conversation, exactly like `notes` above: the
+      // learner's own questions and answers, private to them, written straight
+      // from the client so Firestore's offline queue protects a chat typed on
+      // a flaky connection and so the same history opens on every device.
+      //
+      // Before this block existed the whole conversation lived in React state
+      // inside src/lumen/App.tsx and disappeared the moment the player
+      // unmounted ("course player ke andar jo AI chats hote hain vah save nahin
+      // ho rahe"). The caps mirror utils/lumenChats.js exactly, so a payload
+      // the client built can never be rejected here.
+      //
+      // Inline `data:` image bytes are NEVER written (the client strips them
+      // before the write): a screenshot-heavy chat would otherwise march
+      // straight into Firestore's 1 MB document limit and every later save
+      // would fail.
+      match /aiChats/{chatId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.id == chatId
+          && request.resource.data.id is string
+          && request.resource.data.id.size() > 0
+          && request.resource.data.id.size() <= 80
+          && request.resource.data.productId is string
+          && request.resource.data.productId.size() > 0
+          && request.resource.data.productId.size() <= 120
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 120
+          && request.resource.data.course is string
+          && request.resource.data.course.size() <= 160
+          && request.resource.data.courseShort is string
+          && request.resource.data.courseShort.size() <= 160
+          && request.resource.data.pinned is bool
+          && request.resource.data.modelId is string
+          && request.resource.data.modelId.size() <= 80
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number
+          && request.resource.data.schemaVersion is int
+          && validLumenMessages(request.resource.data.messages)
           && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier', 'email', 'phone', 'apiKey', 'authorization', 'secret']);
         allow delete: if isOwner(uid) || isAdmin();
       }

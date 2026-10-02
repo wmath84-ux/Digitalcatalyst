@@ -36,6 +36,7 @@ on:
       - firebase.json
       - tests/sanctuaryFirestoreRules.emulator.mjs
       - utils/courseNotes.js
+      - utils/deviceNotifications.js
       - utils/mindMapTree.js
       - package.json
       - package-lock.json

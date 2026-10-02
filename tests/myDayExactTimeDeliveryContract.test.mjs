@@ -133,15 +133,23 @@ test("each due item gets its own notification instead of collapsing", () => {
   assert.equal(new Set(due.map((item) => item.key)).size, 3);
 
   // ...and the push tag must be derived from the key, not the kind.
-  assert.match(cron, /tag: `myday-\$\{item\.key\}`/);
+  assert.match(cron, /tag: `myday-\$\{item\.key\}-\$\{item\.section\}`/);
   assert.doesNotMatch(cron, /tag: `myday-\$\{item\.kind\}`/);
 });
 
 test("the foreground and server paths agree on the notification tag", () => {
   // Same tag means the OS replaces rather than duplicates when a push
-  // lands while the app is open.
-  assert.match(read("src/main.tsx"), /`myday-\$\{item\.key\}`/);
-  assert.match(cron, /`myday-\$\{item\.key\}`/);
+  // lands while the app is open. The tag carries the SECTION too (a task and
+  // a reminder that share a kind must stay two tray entries), so all three
+  // delivery paths — the Android local alarm, the foreground web alert and
+  // the server push — must build the identical string.
+  assert.match(read("src/main.tsx"), /`myday-\$\{item\.key\}-\$\{item\.section\}`/);
+  assert.match(cron, /`myday-\$\{item\.key\}-\$\{item\.section\}`/);
+  // The FlowPath twin: the server tags by ACTIVITY id, so the foreground
+  // alarm/alert must too (the per-day scheduler key would create a second,
+  // identical-looking tray entry for the same reminder).
+  assert.match(read("src/main.tsx"), /`flowpath-\$\{item\.itemId\}-\$\{item\.kind\}`/);
+  assert.match(read("api/_lib/flowpathControl.ts"), /`flowpath-\$\{activity\.id\}-\$\{activityKind\}`/);
 });
 
 test("a minute-level scheduler workflow is committed and active", () => {

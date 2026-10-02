@@ -132,8 +132,25 @@ import { attachOpeningSplash, useOpeningSplashVisible } from "./utils/openingSpl
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
+import {
+  deviceNotificationCategory,
+  deviceNotificationDocId,
+  deviceNotificationTarget,
+} from "../utils/deviceNotifications";
+import { recordDeviceNotification } from "./lib/deviceNotificationInbox";
 import { collectDueMyDayItems, collectUpcomingMyDayItems, MYDAY_UPCOMING_HORIZON_MS, type MyDayDocData } from "../utils/pushScheduler";
 import { collectDueFlowPathItems, collectUpcomingFlowPathItems, FLOWPATH_UPCOMING_HORIZON_MS, type FlowPathSchedulableItem } from "../utils/flowPathScheduler";
+
+// A device alert older than this was delivered while the app was CLOSED: the
+// OS (an exact-time local alarm) or another device showed it, and nothing ran
+// here to mirror it into the in-app bell. Those are recorded with their
+// original due time and are NEVER re-shown or re-armed — re-delivering a
+// reminder that already happened would buzz the learner at open time. The
+// lookback only widens how far back the mirror reaches (My Day is bounded to
+// the current local day by its own collector; FlowPath carries absolute
+// times, and its per-day doc id makes a late mirror idempotent).
+const FOREGROUND_DELIVERY_WINDOW_MS = 15 * 60 * 1000;
+const FOREGROUND_CATCHUP_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 import { flowpathControl } from "./flowpath/lib/flowpathControlClient";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 import {
@@ -946,6 +963,17 @@ function RootPage(): ReactNode {
     const readShown = (): Record<string, number> => {
       try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
     };
+    // Record an alert the device delivered while this app was not running —
+    // same document id the server uses, so it can never duplicate a push.
+    const mirrorDeliveredAlert = (
+      itemKey: string,
+      input: Parameters<typeof recordDeviceNotification>[1],
+    ) => {
+      recordDeviceNotification(user.id, input);
+      const latest = readShown();
+      latest[itemKey] = Date.now();
+      try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
+    };
     // Hash the item key into a stable 31-bit alarm id. Android limits
     // notification ids to 32-bit signed; SHA-1 mod 2^31 keeps the value
     // in range and stable across re-renders of the same item.
@@ -958,9 +986,23 @@ function RootPage(): ReactNode {
       if (!current) return;
       const now = Date.now();
       const shown = readShown();
-      const due = collectDueMyDayItems(current, now, tzOffset());
+      const due = collectDueMyDayItems(current, now, tzOffset(), FOREGROUND_CATCHUP_LOOKBACK_MS);
       for (const item of due) {
         if (shown[item.key] || pending.has(item.key)) continue;
+        // Already past its minute when this run started: the device showed it
+        // while the app was closed, so mirror it into the bell and stop —
+        // no second tray alert, no re-armed alarm.
+        if (now - item.dueAt > FOREGROUND_DELIVERY_WINDOW_MS) {
+          mirrorDeliveredAlert(item.key, {
+            id: deviceNotificationDocId("myday", item),
+            title: item.title,
+            body: item.body,
+            category: deviceNotificationCategory("myday", item),
+            target: deviceNotificationTarget("myday", item),
+            createdAtMs: item.dueAt,
+          });
+          continue;
+        }
         pending.add(item.key);
         // Deep-link the system alert to the exact My Day tab + item so the
         // tap lands on the task/schedule/reminder that fired, not the overview.
@@ -968,23 +1010,41 @@ function RootPage(): ReactNode {
         // On the TWA the local alarm is the source of truth — the
         // FCM payload that woke us is a bonus, not the only path.
         // Left small icon always app logo, right large icon contextual per section (task/schedule/reminder)
-        if (isAndroidNative()) {
-          const alarm: LocalAlarmItem = {
-            id: alarmId(item.key),
-            at: item.dueAt,
-            title: item.title,
-            body: item.body,
-            url: itemUrl,
-            tag: `myday-${item.key}-${item.section}`,
-            largeIcon: getAndroidLargeIconForCategory("mayday", item.section),
-          };
-          void scheduleLocalAlarm(alarm);
-        }
-        void showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}`)
-          .then((displayed) => {
+        // On the TWA the exact-time local alarm is the delivery path; on the
+        // web `showLocalSystemNotification` renders the same alert. Either one
+        // counts as "the learner saw it" — see the bell entry below.
+        const alarmArmed = isAndroidNative()
+          ? scheduleLocalAlarm({
+              id: alarmId(item.key),
+              at: item.dueAt,
+              title: item.title,
+              body: item.body,
+              url: itemUrl,
+              tag: `myday-${item.key}-${item.section}`,
+              largeIcon: getAndroidLargeIconForCategory("mayday", item.section),
+            } as LocalAlarmItem)
+          : Promise.resolve(false);
+        void Promise.all([
+          showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}-${item.section}`),
+          alarmArmed,
+        ])
+          .then(([displayed, armed]) => {
             // Do not dedupe a failed display (for example before permission is
             // granted); the next tick must be allowed to retry it.
-            if (!displayed) return;
+            if (!displayed && !armed) return;
+            // The tray alert existed while the in-app alerts page stayed empty
+            // ("Android notification aa rahe hain lekin alerts page per dikh
+            // nahi rahe"). Mirror it into the bell with the SAME document id
+            // the server scheduler uses for this item, so the two can never
+            // duplicate each other.
+            recordDeviceNotification(user.id, {
+              id: deviceNotificationDocId("myday", item),
+              title: item.title,
+              body: item.body,
+              category: deviceNotificationCategory("myday", item),
+              target: deviceNotificationTarget("myday", item),
+              createdAtMs: item.dueAt,
+            });
             const latest = readShown();
             latest[item.key] = Date.now();
             try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
@@ -1100,30 +1160,69 @@ function RootPage(): ReactNode {
     // My Day there is no per-doc saved offset to prefer — the device offset
     // only scopes the "HH:mm" fallbacks and the per-day dedupe keys.
     const tzOffset = () => new Date().getTimezoneOffset();
+    // Twin of the My Day helper above (the two clocks deliberately share
+    // nothing at runtime except the device-inbox contract).
+    const mirrorDeliveredAlert = (
+      itemKey: string,
+      input: Parameters<typeof recordDeviceNotification>[1],
+    ) => {
+      recordDeviceNotification(user.id, input);
+      const latest = readShown();
+      latest[itemKey] = Date.now();
+      try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
+    };
     const checkDue = () => {
       if (current.length === 0) return;
       const now = Date.now();
       const shown = readShown();
-      const due = collectDueFlowPathItems(current, now, tzOffset(), shown);
+      const due = collectDueFlowPathItems(current, now, tzOffset(), shown, FOREGROUND_CATCHUP_LOOKBACK_MS);
       for (const item of due) {
         if (shown[item.key] || pending.has(item.key)) continue;
-        pending.add(item.key);
-        const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
-        if (isAndroidNative()) {
-          const alarm: LocalAlarmItem = {
-            id: flowAlarmId(item.key),
-            at: item.dueAt,
+        // Same rule as My Day: a FlowPath reminder that came due while the app
+        // was closed was already delivered by its local alarm — only the bell
+        // is missing. Mirror it; never re-show or re-arm it.
+        if (now - item.dueAt > FOREGROUND_DELIVERY_WINDOW_MS) {
+          mirrorDeliveredAlert(item.key, {
+            id: deviceNotificationDocId("flowpath", item),
             title: item.title,
             body: item.body,
-            url: itemUrl,
-            tag: `flowpath-${item.key}-${item.kind}`,
-            largeIcon: getAndroidLargeIconForCategory(item.kind),
-          };
-          void scheduleLocalAlarm(alarm);
+            category: deviceNotificationCategory("flowpath", item),
+            target: deviceNotificationTarget("flowpath", item),
+            createdAtMs: item.dueAt,
+          });
+          continue;
         }
-        void showLocalSystemNotification(item.title, item.body, itemUrl, `flowpath-${item.key}`)
-          .then((displayed) => {
-            if (!displayed) return;
+        pending.add(item.key);
+        const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
+        const alarmArmed = isAndroidNative()
+          ? scheduleLocalAlarm({
+              id: flowAlarmId(item.key),
+              at: item.dueAt,
+              title: item.title,
+              body: item.body,
+              url: itemUrl,
+              tag: `flowpath-${item.itemId}-${item.kind}`,
+              largeIcon: getAndroidLargeIconForCategory(item.kind),
+            } as LocalAlarmItem)
+          : Promise.resolve(false);
+        void Promise.all([
+          showLocalSystemNotification(item.title, item.body, itemUrl, `flowpath-${item.itemId}-${item.kind}`),
+          alarmArmed,
+        ])
+          .then(([displayed, armed]) => {
+            if (!displayed && !armed) return;
+            // Same contract as the My Day block above: a FlowPath alert the
+            // device delivered must also exist in the in-app alerts page, with
+            // the id the server uses for the same activity so the two merge
+            // into one document instead of duplicating.
+            recordDeviceNotification(user.id, {
+              id: deviceNotificationDocId("flowpath", item),
+              title: item.title,
+              body: item.body,
+              category: deviceNotificationCategory("flowpath", item),
+              target: deviceNotificationTarget("flowpath", item),
+              createdAtMs: item.dueAt,
+            });
             const latest = readShown();
             latest[item.key] = Date.now();
             try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
@@ -1151,7 +1250,7 @@ function RootPage(): ReactNode {
           title: item.title,
           body: item.body,
           url: itemUrl,
-          tag: `flowpath-${item.key}-${item.kind}`,
+          tag: `flowpath-${item.itemId}-${item.kind}`,
           largeIcon: getAndroidLargeIconForCategory(item.kind),
         });
       }

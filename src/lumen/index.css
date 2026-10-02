@@ -694,6 +694,8 @@ html.kb-open .lumen-root .composer-disclaimer {
 .anim-fade-up { animation: fade-up 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }
 .anim-fade-in { animation: fade-in 0.2s ease backwards; }
 .anim-drawer { animation: drawer-in 0.2s cubic-bezier(0.2, 0.8, 0.3, 1); }
+/* Tiny spinner used by the cloud-save badge in the chat header. */
+.anim-spin { animation: spin 0.9s linear infinite; }
 
 /* staggered message entrance */
 .stagger > * { animation: fade-up 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }

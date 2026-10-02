@@ -26,6 +26,10 @@ export type SiteNotificationTarget =
   // My Day deep link: section is the tab the item lives in (tasks /
   // schedule / reminders) and itemId is the exact item that fired.
   | { type: 'mayday'; section?: 'tasks' | 'schedule' | 'reminders'; itemId?: string }
+  // FlowPath items deep-link to the FlowPath page with the item highlighted.
+  // Device-delivered alerts (src/lib/deviceNotificationInbox.ts) carry this
+  // target so tapping one lands on the activity that fired.
+  | { type: 'flowpath'; itemId?: string }
   | { type: 'subscription' };
 
 export interface SiteNotification {
@@ -204,6 +208,9 @@ export const getNotificationDeepLink = (notification: SiteNotification): string 
       return `#/my-day?section=${target.section}&item=${encodeURIComponent(String(target.itemId))}`;
     }
     return '#/my-day';
+  }
+  if (target.type === 'flowpath') {
+    return target.itemId ? `#/flowpath?item=${encodeURIComponent(String(target.itemId))}` : '#/flowpath';
   }
   if (target.type === 'subscription') {
     return notification.expired ? '#/subscription?renew=1' : '#/subscription';
