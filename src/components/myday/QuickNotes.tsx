@@ -1,20 +1,40 @@
 // src/components/myday/QuickNotes.tsx
 //
-// My Day quick notes — redesigned to match the course player's NotesPanel.
+// My Day quick notes — the SAME note editor as the course player's.
 //
 // Layout:
 //   - Square cards in a responsive grid (2-col phone, 3-col tablet+).
 //   - A single circular "+" floats at the bottom-right of the grid.
-//   - Tapping a card opens the same RichTextEditor the course player uses,
-//     with heading + body, toolbar, and full formatting support.
-//   - The editor REPLACES the grid while open; saving collapses back.
+//   - Tapping the pencil opens the note editor and it REPLACES the grid;
+//     saving collapses back to the square card.
+//
+// ── The editor ─────────────────────────────────────────────────────────────
+// It is literally the course player's editor — `src/course/NoteEditor.tsx`,
+// the BlockNote block-document page — imported from there, not copied. So My
+// Day gets, unchanged and for free: the white page with its serif title, the
+// slash menu, the block side menu, the toolbar that follows the CURSOR (up the
+// instant a text field has a caret, on a phone, a desktop, a big tablet in
+// desktop view or a floating window), paste from Docs / Notion / an IDE
+// sanitised into blocks with nothing dropped, undo history per note, and the
+// batched draft reporting that keeps typing off React's render path.
+//
+// It is wired exactly as `src/course/NotesPanel.tsx` wires it:
+//   · the editor is its own lazy chunk, warmed while the grid is on screen;
+//   · it is UNCONTROLLED — opened once from a seed and keyed by the note's
+//     identity, so typing never re-renders this panel and switching notes
+//     disposes the old instance and its undo history;
+//   · Save reads through the handle (flushing the editor first), so it never
+//     writes the debounced copy and never loses the last words;
+//   · the previous `RichTextEditor` stays as the emergency fallback for the
+//     one case the block editor cannot cover — the chunk failing to load on a
+//     first-ever visit made offline — bound to the same draft.
 //
 // Backward compatibility:
 //   Older notes were stored as plain text in `QuickNote.text`.  New notes
 //   also store rich HTML in `QuickNote.html`.  The preview and editor
 //   degrade gracefully: no `html` → `text` is used everywhere.
 
-import { useState } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";
 import type { QuickNote } from "../../types";
 import { GlassCard } from "../ui/GlassCard";
@@ -30,6 +50,15 @@ import {
   richTextToPlain,
   splitFirstHeading,
 } from "../../utils/richText";
+import { MAX_NOTE_HTML_LENGTH } from "../../../utils/courseNotes";
+import type { NoteDraft, NoteEditorHandle } from "../../course/noteEditor/editorTypes";
+
+// The editor (BlockNote + its stylesheet) is a separate chunk: the My Day page
+// and the notes GRID never pay for it. It is requested the moment this panel
+// mounts — before the learner taps "+" — and it is the SAME chunk the course
+// player loads, so a learner who has opened a course note already has it.
+const loadNoteEditor = () => import("../../course/NoteEditor");
+const NoteEditor = lazy(loadNoteEditor);
 
 interface QuickNotesProps {
   notes: QuickNote[];
@@ -72,6 +101,61 @@ function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
   );
 }
 
+/**
+ * The editor chunk failed to load (a first-ever visit made while offline, in a
+ * browser that has not cached it). The card must never go blank and a learner
+ * must never be unable to write: fall back to the previous editor — which is
+ * still in the My Day bundle — bound to the same draft.
+ */
+class EditorBoundary extends Component<
+  { fallback: ReactNode; onFail: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFail();
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/** The slim status line: New note · Unsaved · Saved (never loud). */
+function NoteStatus({ editing, dirty, tooLong }: { editing: boolean; dirty: boolean; tooLong: boolean }) {
+  let label = "New note";
+  let tone = "muted";
+  if (tooLong) {
+    label = "Too long to save";
+    tone = "danger";
+  } else if (dirty) {
+    label = "Unsaved";
+    tone = "warn";
+  } else if (editing) {
+    label = "Saved";
+    tone = "ok";
+  }
+  const dot =
+    tone === "danger" ? "bg-rose-500" : tone === "warn" ? "bg-amber-500" : tone === "ok" ? "bg-emerald-500" : "bg-slate-300";
+  const text = tone === "danger" ? "text-rose-600" : tone === "warn" ? "text-amber-600" : tone === "ok" ? "text-slate-500" : "text-slate-400";
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      data-myday-notes-status={tone}
+      className={`flex min-w-0 items-center gap-1.5 truncate text-[12px] font-semibold ${text}`}
+    >
+      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
 export default function QuickNotes({
   notes,
   onAdd,
@@ -81,15 +165,29 @@ export default function QuickNotes({
   onRequireAccess,
 }: QuickNotesProps) {
   // ── Editor state ────────────────────────────────────────────────────────
-  // The panel has two views: the note GRID (list) and the full-screen EDITOR
-  // (compose or edit).  The editor uses the same RichTextEditor the course
-  // player ships, with a heading + body split and the full formatting toolbar.
+  // The panel has two views: the note GRID (list) and the EDITOR (compose or
+  // edit), which replaces it. The editor is the course player's block document.
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editTitle, setEditTitle] = useState("");
+
+  // The editor is UNCONTROLLED: it is opened once from this seed and owns its
+  // content from then on — typing never re-renders this panel. `key` is the
+  // note's identity, so switching notes disposes the old editor and its undo
+  // history (the only clean history boundary ProseMirror offers).
+  const [seed, setSeed] = useState({ key: "compose:0", title: "", body: "" });
+  const composeCount = useRef(0);
+  const editorRef = useRef<NoteEditorHandle | null>(null);
+  // Set the moment Save / Cancel closes the editor, so the editor's final
+  // flush on unmount can never write a closed draft back into state.
+  const discardingRef = useRef(false);
+  const [editorEmpty, setEditorEmpty] = useState(true);
+  const [dirty, setDirty] = useState(false);
+  const [tooLong, setTooLong] = useState(false);
+  const [legacyFallback, setLegacyFallback] = useState(false);
 
   // Two-step delete (same pattern as the course player).
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -99,22 +197,66 @@ export default function QuickNotes({
 
   const editorOpen = composing || Boolean(editingId);
 
-  const draftEmpty = isEmptyRichText(combineHtml(draftTitle, draft));
-  const editDraftEmpty = isEmptyRichText(combineHtml(editTitle, editDraft));
+  // The editor reports a BATCHED draft (≤ one per 250 ms of typing, and one
+  // last one as it unmounts), never one per keystroke.
+  const handleDraftChange = useCallback(
+    (next: NoteDraft) => {
+      if (discardingRef.current) return;
+      setTooLong(combineHtml(next.title, next.bodyHtml).length > MAX_NOTE_HTML_LENGTH);
+      if (editingId) {
+        setEditDraft(next.bodyHtml);
+        setEditTitle(next.title);
+      } else {
+        setDraft(next.bodyHtml);
+        setDraftTitle(next.title);
+      }
+    },
+    [editingId],
+  );
+
+  // Warm the editor chunk while the learner is still looking at the grid — in
+  // idle time, so it never competes with the first paint (code only; no editor
+  // instance exists until a note is opened).
+  useEffect(() => {
+    const warm = () => { void loadNoteEditor().catch(() => undefined); };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(warm, 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const openComposer = () => {
     if (onRequireAccess && !onRequireAccess()) return;
+    discardingRef.current = false;
+    composeCount.current += 1;
     setEditingId(null);
     setEditDraft("");
     setEditTitle("");
     setComposing(true);
     setDraft("");
     setDraftTitle("");
+    setSeed({ key: `compose:${composeCount.current}`, title: "", body: "" });
+    setEditorEmpty(true);
+    setDirty(false);
+    setTooLong(false);
+  };
+
+  // What Save writes: the editor's latest content, flushed first (never the
+  // debounced copy), through the same `combineHtml` the stored note always used.
+  const currentHtml = (fallbackTitle: string, fallbackBody: string) => {
+    const live = editorRef.current?.read();
+    return combineHtml(live ? live.title : fallbackTitle, live ? live.bodyHtml : fallbackBody);
   };
 
   const submitAdd = () => {
-    const html = combineHtml(draftTitle, draft);
+    const html = currentHtml(draftTitle, draft);
     if (isEmptyRichText(html)) return;
+    // The stored note is capped (utils/courseNotes). Never truncate silently:
+    // keep the draft open and say so.
+    if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return; }
+    discardingRef.current = true;
     onAdd(html);
     setDraft("");
     setDraftTitle("");
@@ -122,18 +264,29 @@ export default function QuickNotes({
   };
 
   const startEdit = (note: QuickNote) => {
+    discardingRef.current = false;
     setComposing(false);
     setDraft("");
     setDraftTitle("");
+    // The stored note's leading heading becomes the title field; the rest
+    // (minus the divider that separated them) stays in the body.
     const { heading, body } = splitFirstHeading(noteHtml(note));
     setEditingId(note.id);
     setEditTitle(heading);
     setEditDraft(body);
+    setSeed({ key: `edit:${note.id}`, title: heading, body });
+    setEditorEmpty(isEmptyRichText(combineHtml(heading, body)));
+    setDirty(false);
+    setTooLong(false);
   };
 
   const submitEdit = () => {
-    const html = combineHtml(editTitle, editDraft);
-    if (editingId && !isEmptyRichText(html)) onEdit(editingId, html);
+    const html = currentHtml(editTitle, editDraft);
+    if (editingId && !isEmptyRichText(html)) {
+      if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return; }
+      discardingRef.current = true;
+      onEdit(editingId, html);
+    }
     setEditingId(null);
     setEditDraft("");
     setEditTitle("");
@@ -146,54 +299,92 @@ export default function QuickNotes({
     : notes;
 
   // ── EDITOR VIEW ─────────────────────────────────────────────────────────
-  // Takes over the whole notes area while composing or editing.
+  // Takes over the whole notes area while composing or editing: a slim bar
+  // (status · Cancel · Save), then the white page. No card inside a card — the
+  // page IS the surface, exactly as it is in the course player.
   if (editorOpen) {
     const editing = Boolean(editingId);
     const value = editing ? editDraft : draft;
     const titleValue = editing ? editTitle : draftTitle;
-    const empty = editing ? editDraftEmpty : draftEmpty;
     const cancel = () => {
+      // Cancel discards the draft without saving.
+      discardingRef.current = true;
       if (editing) { setEditingId(null); setEditDraft(""); setEditTitle(""); }
       else { setComposing(false); setDraft(""); setDraftTitle(""); }
     };
+    const empty = legacyFallback ? isEmptyRichText(combineHtml(titleValue, value)) : editorEmpty;
 
     return (
       <GlassCard
-        className="flex max-h-[min(72dvh,680px)] flex-col overflow-hidden sm:max-h-[min(75dvh,720px)]"
+        className="flex h-[min(72dvh,680px)] flex-col overflow-hidden sm:h-[min(75dvh,720px)]"
         contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
         data-myday-notes-editor
         data-myday-notes-mode={editing ? "edit" : "compose"}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3" data-myday-notes-composer>
-          <RichTextEditor
-            value={value}
-            onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
-            heading={titleValue}
-            onHeadingChange={editing ? (html) => setEditTitle(html) : (html) => setDraftTitle(html)}
-            headingAutoFocus={!editing}
-            autoFocus={editing}
-            surfaceClassName="min-h-0 flex-1"
-            ariaLabel={editing ? "Edit note" : "New note"}
-            dataAttribute={editing ? "data-myday-note-edit-input" : "data-myday-notes-input"}
-          />
-          <div className="mt-2 flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={editing ? submitEdit : submitAdd}
-              disabled={empty}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-indigo-600 py-2 text-[11px] font-black text-white transition hover:bg-indigo-500 disabled:opacity-40"
-              data-myday-note-save
+        <div className="flex min-h-0 flex-1 flex-col bg-white" data-myday-notes-composer>
+          <div
+            className="flex shrink-0 items-center justify-between gap-2 bg-white py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
+            data-myday-notes-bar
+          >
+            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} />
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={cancel}
+                className="flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                data-myday-note-cancel
+              >
+                <X size={15} /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={editing ? submitEdit : submitAdd}
+                disabled={empty || tooLong}
+                className="flex h-10 items-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                aria-label="Save note"
+                data-myday-note-save
+              >
+                <Check size={15} /> Save
+              </button>
+            </div>
+          </div>
+          <div className="relative min-h-0 flex-1">
+            <EditorBoundary
+              onFail={() => setLegacyFallback(true)}
+              fallback={
+                <div className="flex h-full min-h-0 flex-col bg-slate-950 p-3">
+                  <RichTextEditor
+                    value={value}
+                    onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
+                    heading={titleValue}
+                    onHeadingChange={editing ? (html) => setEditTitle(html) : (html) => setDraftTitle(html)}
+                    headingAutoFocus={!editing}
+                    autoFocus={editing}
+                    surfaceClassName="min-h-0"
+                    ariaLabel={editing ? "Edit note" : "New note"}
+                    dataAttribute={editing ? "data-myday-note-edit-input" : "data-myday-notes-input"}
+                  />
+                </div>
+              }
             >
-              <Check size={13} /> Save
-            </button>
-            <GlassButton
-              variant="capsule"
-              onClick={cancel}
-              className="flex-1 text-[11px] font-black [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:px-4"
-              data-myday-note-cancel
-            >
-              <span className="flex items-center justify-center gap-1.5"><X size={13} /> Cancel</span>
-            </GlassButton>
+              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-myday-notes-editor-loading />}>
+                <NoteEditor
+                  key={seed.key}
+                  ref={editorRef}
+                  initialTitle={seed.title}
+                  initialBodyHtml={seed.body}
+                  // A fresh note lands in the title; a note that already has
+                  // words (an edit) in the body.
+                  autoFocus={editing || seed.title || seed.body ? "body" : "title"}
+                  ariaLabel={editing ? "Edit note" : "New note"}
+                  dataAttribute={editing ? "data-myday-note-edit-input" : "data-myday-notes-input"}
+                  onDraftChange={handleDraftChange}
+                  onEmptyChange={setEditorEmpty}
+                  onDirtyChange={setDirty}
+                  onSaveShortcut={editing ? submitEdit : submitAdd}
+                />
+              </Suspense>
+            </EditorBoundary>
           </div>
         </div>
       </GlassCard>
@@ -279,7 +470,7 @@ export default function QuickNotes({
           <div className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden rounded-3xl border border-white/15 bg-[#1a1a2e] p-5 text-white shadow-2xl">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2.6 2.6 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
               </span>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-black leading-snug">Delete this note?</h3>
