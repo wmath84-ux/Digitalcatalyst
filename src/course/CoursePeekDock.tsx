@@ -19,9 +19,20 @@
 // hides. Touch has no hover, so a tap TOGGLES the dock open/closed and it
 // stays open while the learner swipes it. Selecting a tab always closes.
 //
-// The old always-visible in-pane dock is still one Player-settings row away:
-// the "Always-visible footer dock" preference (Player tab → Player settings)
-// turns this peek dock off and restores the study pane's dock.
+// ── ONE INTERACTION AREA, NOT TWO HOVER TARGETS (owner brief 2026-10-02) ──
+//
+//   "Footer navigation tabhi hide ho jab user actual interaction area se bahar
+//    chala jaaye."
+//
+// The line (the hit strip) and the dock are one gesture path, so a pointer
+// travelling from the line to the buttons must never hide the dock — even when
+// no enter ever reaches the panel (a touch/pen drag has no hover events at all,
+// a pointer capture suppresses enter/leave everywhere else, and a fractional
+// device-pixel ratio can open a hairline seam between the strip's top edge and
+// the panel's bottom edge). `hide()` therefore schedules the close and then
+// asks the shared AREA rule (src/components/glass-dock/peekDockArea) instead of
+// the event: while the pointer's last known position is inside the line + panel
+// union, the dock stays exactly where it is.
 //
 // ── The ONE keyboard rule ────────────────────────────────────────────────
 // While the soft keyboard is open the footer navigation is HIDDEN — in both
@@ -40,15 +51,19 @@
 
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useMotionValue, type MotionValue } from 'framer-motion'
 import GlassDock, { type GlassDockItem } from '../components/glass-dock/GlassDock'
 import GlassMaterial from '../components/glass-dock/GlassMaterial'
+import { isInsidePeekDockArea, peekDockAreaOf } from '../components/glass-dock/peekDockArea'
 import { buildDockItems, type DockTab } from './CourseOverlay'
 import { useCourseKeyboard } from './useCourseKeyboard'
 
 /** Horizontal travel (px) below which a press counts as a tap, not a drag. */
 const DRAG_SELECT_THRESHOLD = 12
+
+/** The element-level grace before a leave commits: long enough to cross a gap. */
+const CLOSE_GRACE_MS = 80
 
 export default function CoursePeekDock({
   tab,
@@ -69,16 +84,44 @@ export default function CoursePeekDock({
   const [pinned, setPinned] = useState(false)
   const closeTimerRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const lineRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const draggingRef = useRef(false)
   const startXRef = useRef(0)
   const startYRef = useRef(0)
-  const wasOpenRef = useRef(false)
+  // Whether the dock was PINNED when the contact started. Deliberately not the
+  // `open` flag: a touch fires a synthetic enter before its pointerdown, so the
+  // dock is already open by then — reading that would turn the first tap into a
+  // close.
+  const wasPinnedRef = useRef(false)
   const pointerTypeRef = useRef('mouse')
+  // The pointer's last known position, so the close below can be decided by
+  // GEOMETRY (the line + panel area) instead of by whichever enter/leave the
+  // browser happened to deliver.
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  // Read inside the close timer: it must see the CURRENT pin, not the one the
+  // callback was created with.
+  const pinnedRef = useRef(false)
+  pinnedRef.current = pinned
   // The magnification wave's pointer X — the dock follows it. Shared so the
   // LINE's hold-drag drives the same wave the dock's own pointer moves do.
   const pointerX: MotionValue<number> = useMotionValue(-200)
 
   const open = hover || pinned
+
+  const rememberPointer = useCallback((x: number, y: number) => {
+    pointerRef.current = { x, y }
+  }, [])
+
+  /** Is the pointer still inside the line (hit strip) + panel area? */
+  const pointerInArea = useCallback(() => {
+    const point = pointerRef.current
+    if (!point) return false
+    return isInsidePeekDockArea(point.x, point.y, [
+      peekDockAreaOf(lineRef.current),
+      peekDockAreaOf(panelRef.current),
+    ])
+  }, [])
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current !== null) {
@@ -87,18 +130,30 @@ export default function CoursePeekDock({
     }
   }, [])
 
-  const show = useCallback(() => {
-    cancelClose()
-    setHover(true)
-  }, [cancelClose])
+  const show = useCallback(
+    (event?: ReactPointerEvent<HTMLElement>) => {
+      if (event) rememberPointer(event.clientX, event.clientY)
+      cancelClose()
+      setHover(true)
+    },
+    [cancelClose, rememberPointer],
+  )
 
-  const hide = useCallback(() => {
-    cancelClose()
-    closeTimerRef.current = window.setTimeout(() => {
-      setHover(false)
-      closeTimerRef.current = null
-    }, 80)
-  }, [cancelClose])
+  const hide = useCallback(
+    (event?: ReactPointerEvent<HTMLElement>) => {
+      if (event) rememberPointer(event.clientX, event.clientY)
+      cancelClose()
+      closeTimerRef.current = window.setTimeout(() => {
+        closeTimerRef.current = null
+        // Pinned = touch/pen: the outside tap (or a selection) owns the close.
+        if (pinnedRef.current) return
+        // A pointer between the line and the buttons is still in the area.
+        if (pointerInArea()) return
+        setHover(false)
+      }, CLOSE_GRACE_MS)
+    },
+    [cancelClose, pointerInArea, rememberPointer],
+  )
 
   // A pinned (touch) dock closes when the learner taps anywhere outside it —
   // the content tap still lands, so a module row can be opened in one go.
@@ -120,6 +175,33 @@ export default function CoursePeekDock({
     },
     [],
   )
+
+  // While the dock is live, keep the pointer's position current — the close
+  // timer reads it. Window-level, so the wave's finger is tracked even when a
+  // pointer capture has retargeted its moves.
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return undefined
+    const onMove = (event: PointerEvent) => rememberPointer(event.clientX, event.clientY)
+    // A mouse leaving the document is out of the area by definition; a touch /
+    // pen release must NOT be (its leave fires on the very point tapped).
+    const onDocumentLeave = (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return
+      // Only a real exit from the WINDOW counts: `pointerout` fires for every
+      // element-to-element move and bubbles here, and nulling the tracked
+      // position on one of those would re-create the very bug this rule fixes.
+      if (event.relatedTarget) return
+      pointerRef.current = null
+      hide()
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('pointerleave', onDocumentLeave)
+    document.addEventListener('pointerout', onDocumentLeave)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerleave', onDocumentLeave)
+      document.removeEventListener('pointerout', onDocumentLeave)
+    }
+  }, [open, hide, rememberPointer])
 
   const items: GlassDockItem[] = buildDockItems(tab, hiddenTabs)
 
@@ -171,6 +253,7 @@ export default function CoursePeekDock({
       className={`fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center ${keyboardVisible ? 'hidden' : ''}`}
     >
       <div
+        ref={panelRef}
         data-course-peek-panel=""
         aria-hidden={!open}
         inert={!open}
@@ -185,6 +268,7 @@ export default function CoursePeekDock({
           strip that centres the pill at its bottom. The pill itself is pure
           paint — same look, much more clickable. */}
       <div
+        ref={lineRef}
         data-course-peek-line-hit=""
         role="button"
         tabIndex={0}
@@ -194,10 +278,11 @@ export default function CoursePeekDock({
         onPointerLeave={hide}
         onPointerDown={(event) => {
           pointerTypeRef.current = event.pointerType
-          wasOpenRef.current = open
+          wasPinnedRef.current = pinned
           draggingRef.current = true
           startXRef.current = event.clientX
           startYRef.current = event.clientY
+          rememberPointer(event.clientX, event.clientY)
           // Open immediately so the dock is visible under the finger while it
           // drags — the wave follows `pointerX` from here on.
           cancelClose()
@@ -212,6 +297,7 @@ export default function CoursePeekDock({
         }}
         onPointerMove={(event) => {
           if (!draggingRef.current) return
+          rememberPointer(event.clientX, event.clientY)
           pointerX.set(event.clientX)
         }}
         onPointerUp={(event) => {
@@ -228,7 +314,10 @@ export default function CoursePeekDock({
           if (isTap) {
             // Touch has no hover: a tap toggles the dock open/closed. Mouse
             // hover already covers the pointer case (the desktop behaviour).
-            if (pointerTypeRef.current !== 'mouse') setPinned(!wasOpenRef.current)
+            if (pointerTypeRef.current !== 'mouse') {
+              if (wasPinnedRef.current) close()
+              else setPinned(true)
+            }
             return
           }
           // A drag only SELECTS when it is dominantly horizontal — a mostly
