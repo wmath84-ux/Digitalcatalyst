@@ -43,6 +43,29 @@ function KeyboardProbe() {
   return null;
 }
 
+// The player's footer navigation, opt-in (`?footer=peek` or `?footer=pane`), so
+// the note toolbar's "ends just above the footer" rule can be driven in a real
+// browser. Both homes are reproduced with the geometry src/index.css gives the
+// real ones: the peek dock's 30px hit strip + 8px line + 10px of padding, and
+// the always-visible dock as the study pane's last child. Without the param the
+// harness DOM is exactly what it always was — no footer at all.
+const footerMode = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("footer");
+
+const PeekFooter = () => (
+  <div
+    data-course-peek-dock=""
+    className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center"
+    style={{ paddingBottom: 10 }}
+  >
+    <div
+      data-course-peek-line-hit=""
+      style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", width: "min(26rem, 92%)", padding: "30px 24px 0" }}
+    >
+      <div data-course-peek-line="" style={{ width: "min(22rem, 68%)", height: 8, borderRadius: 9999, background: "rgba(255,255,255,0.55)" }} />
+    </div>
+  </div>
+);
+
 function Harness() {
   const [notes, setNotes] = useState<CoursePlayerNote[]>(seed);
   const [panel, setPanel] = useState(true);
@@ -71,15 +94,29 @@ function Harness() {
             lesson={<div style={{ background: "#12203a", color: "#9fb4d9", display: "grid", placeItems: "center", height: "100%" }}>LESSON PANE</div>}
             study={
               panel ? (
-                <Profiler id="notes" onRender={() => { window.__notesRenders += 1; }}>
-                  <NotesPanel notes={notes} syncState={{ status: "saved", synced: true }} {...handlers} />
-                </Profiler>
+                footerMode === "pane" ? (
+                  // The "Always-visible footer dock" home: the dock is the
+                  // study pane's LAST CHILD, in flow below the notes panel.
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <Profiler id="notes" onRender={() => { window.__notesRenders += 1; }}>
+                        <NotesPanel notes={notes} syncState={{ status: "saved", synced: true }} {...handlers} />
+                      </Profiler>
+                    </div>
+                    <div data-course-dock="" className="shrink-0" style={{ height: 64, background: "#101a2e" }} />
+                  </div>
+                ) : (
+                  <Profiler id="notes" onRender={() => { window.__notesRenders += 1; }}>
+                    <NotesPanel notes={notes} syncState={{ status: "saved", synced: true }} {...handlers} />
+                  </Profiler>
+                )
               ) : null
             }
             keyboardExpandEnabled
             solid
           />
         </div>
+        {footerMode === "peek" ? <PeekFooter /> : null}
       </div>
     </CourseKeyboardProvider>
   );

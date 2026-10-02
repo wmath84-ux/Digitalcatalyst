@@ -11,8 +11,11 @@
 //      save / delete behaviour and talks to the editor only through one handle;
 //   3. one editor instance, batched change handling, no React state or storage
 //      write per keystroke, a flush that cannot lose the last words;
-//   4. the player's ONE keyboard state is reused — no second keyboard system, no
-//      hard-coded keyboard heights, the docked toolbar sits in normal flow;
+//   4. the toolbar follows the CARET — it is on screen from the moment a text
+//      field of the note has a cursor in it, on any device, with a soft
+//      keyboard or without one — and it ends just above the player's footer
+//      navigation, measured rather than assumed; all without a second keyboard
+//      system, hard-coded keyboard heights, or a toolbar out of normal flow;
 //   5. the visual brief: a white continuous page, a serif title that is part of
 //      the page, no card, safe areas, nothing that can overflow;
 //   6. nothing that still has consumers was removed.
@@ -35,6 +38,8 @@ const toolbar = read("src/course/NoteEditorToolbar.tsx");
 const factory = read("src/course/noteEditor/editorFactory.ts");
 const commands = read("src/course/noteEditor/editorCommands.ts");
 const css = read("src/course/noteEditor/noteEditor.css");
+const footerMath = read("src/course/courseFooterInset.ts");
+const footerHook = read("src/course/useCourseFooterInset.ts");
 const overlay = read("src/course/CourseOverlay.tsx");
 const player = read("src/CoursePlayerApp.tsx");
 const boards = read("src/nature3d/boards/StudyBoards.tsx");
@@ -186,11 +191,27 @@ test("read-only goes through the same renderer", () => {
   assert.match(editor, /setReadOnly: \(value\) =>/);
 });
 
-// ── 4. The player's one keyboard state ─────────────────────────────────────
+// ── 4. The toolbar follows the caret, and the player's keyboard state stays single ──
 
-test("the editor reuses the player's keyboard state and adds no second keyboard system", () => {
-  assert.match(editor, /import \{ useCourseKeyboard \} from "\.\/useCourseKeyboard";/);
-  assert.match(editor, /const \{ keyboardVisible \} = useCourseKeyboard\(\);/);
+test("the toolbar is gated on the CARET, not on the soft keyboard", () => {
+  // A caret in any of the note's text fields is the whole condition. Gating it
+  // on an open soft keyboard as well meant "no toolbar at all" on a desktop, on
+  // a big tablet running the player in desktop view and in a floating window —
+  // none of those ever opens a keyboard.
+  assert.match(editor, /const docked = !readOnly && \(focused \|\| caretWithin \|\| dockFocused\);/);
+  assert.doesNotMatch(editor, /keyboardVisible/);
+  assert.doesNotMatch(editor, /useCourseKeyboard/);
+  // The caret in the TITLE field counts too — the shell's own focus events see
+  // it, and they are tracked on the shell so the caret moving title → body
+  // never passes through a "no caret" frame that remounts the toolbar.
+  assert.match(editor, /const focused = useEditorFocus\(\{ includeEditorUI: true \}\);/);
+  assert.match(editor, /onFocus=\{\(\) => setCaretWithin\(true\)\}/);
+  assert.match(editor, /if \(!event\.currentTarget\.contains\(event\.relatedTarget as Node \| null\)\) setCaretWithin\(false\);/);
+  // Read-only still gets no toolbar at all.
+  assert.match(editor, /const docked = !readOnly &&/);
+});
+
+test("the editor adds no second keyboard system", () => {
   for (const source of [editor, toolbar, factory, commands]) {
     assert.doesNotMatch(source, /addEventListener\("(resize|orientationchange|focusin|focusout|scroll)"/);
     assert.doesNotMatch(source, /visualViewport(\?|!)?\.(addEventListener|removeEventListener)/);
@@ -199,6 +220,19 @@ test("the editor reuses the player's keyboard state and adds no second keyboard 
   }
   // The visual viewport is only MEASURED (to clamp menus), never listened to.
   assert.match(editor, /window\.visualViewport/);
+  // The one subscription the editor's own modules do make measures a DOM box
+  // (the footer navigation), never a keyboard: it computes no keyboard state,
+  // so the player's single keyboard rule stays single. It may WATCH the
+  // attribute that rule is published on — that is how it notices the footer
+  // hiding — but it never reads the state itself.
+  assert.match(footerHook, /window\.addEventListener\("resize", schedule\);/);
+  // Prose may name the player's keyboard rule (it is the reason a footer can
+  // vanish); the CODE must never read or compute it.
+  const codeOnly = (source) => source.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const source of [footerHook, footerMath]) {
+    assert.doesNotMatch(codeOnly(source), /keyboardVisible|COURSE_KEYBOARD_MIN_INSET|resolveCourseKeyboardState|measureKeyboardCoverage|useCourseKeyboard|--course-kb-inset/);
+  }
+  assert.match(footerHook, /"data-course-keyboard"\]/);
 });
 
 test("no hard-coded keyboard heights or bottom offsets; the docked toolbar is in normal flow", () => {
@@ -208,10 +242,43 @@ test("no hard-coded keyboard heights or bottom offsets; the docked toolbar is in
   assert.doesNotMatch(css, /position:\s*fixed/);
   assert.doesNotMatch(css, /(^|[^-])bottom:\s*-?\d+(\.\d+)?(px|rem)/m);
   assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: relative;/);
-  assert.match(editor, /const docked = !readOnly && keyboardVisible && \(focused \|\| dockFocused\);/);
   // Taps on the toolbar never move focus out of the writing surface.
   assert.match(toolbar, /preventFocusOnTap/);
   assert.match(toolbar, /<UIModeContext\.Provider value="mobile">/);
+});
+
+test("the toolbar ends just above the footer navigation — measured, never assumed", () => {
+  // Both homes of the player's footer navigation, in one selector.
+  assert.match(footerMath, /export const COURSE_FOOTER_SELECTOR = "\[data-course-peek-dock\], \[data-course-dock\]";/);
+  // The lift is the px of the writing surface's bottom edge the footer covers,
+  // so the overlaying peek dock is cleared and the in-flow dock needs nothing.
+  assert.match(footerMath, /const covered = Math\.min\(surface\.bottom, footer\.bottom\) - footer\.top;/);
+  assert.match(footerMath, /if \(covered < COURSE_FOOTER_MIN_INSET\) return 0;/);
+  // A footer that is not on screen — hidden by the keyboard rule, or absent
+  // from the player entirely — lifts nothing: no phantom gap above nothing.
+  assert.match(footerMath, /if \(footer\.height <= 0\) return 0;/);
+  assert.match(footerMath, /if \(!surface \|\| !footer\) return 0;/);
+  // Published as a custom property, applied as a MARGIN (the bar's own paper
+  // stops where the footer begins), and never as a fixed offset or a constant.
+  assert.match(footerMath, /export const COURSE_FOOTER_INSET_PROPERTY = "--dc-note-footer-inset";/);
+  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*margin-bottom: var\(--dc-note-footer-inset, 0px\);/);
+  assert.match(editor, /const footerInset = useCourseFooterInset\(docked, shellRef\);/);
+  assert.match(editor, /shell\.style\.setProperty\(COURSE_FOOTER_INSET_PROPERTY, `\$\{footerInset\}px`\);/);
+  assert.match(editor, /shell\.style\.removeProperty\(COURSE_FOOTER_INSET_PROPERTY\);/);
+  // Measured in a LAYOUT effect, so the first frame the toolbar appears it is
+  // already clear of the footer — the learner never sees it jump.
+  assert.match(footerHook, /useLayoutEffect\(\(\) => \{/);
+  // It only runs while there is a toolbar to place.
+  assert.match(footerHook, /export const useCourseFooterInset = \(active: boolean, surfaceRef: RefObject<Element \| null>\): number =>/);
+  assert.match(footerHook, /if \(!active\) \{\s*setInset\(0\);/);
+  // A footer that is swapped for its other home (the player's footer-dock
+  // setting) or hidden by the keyboard rule is picked up without a remount.
+  assert.match(footerHook, /new MutationObserver\(\(records\) => \{/);
+  assert.match(footerHook, /attributeFilter: \["class", "style", "hidden", "data-open", "data-course-keyboard"\]/);
+  assert.match(footerHook, /observer = new ResizeObserver\(schedule\);/);
+  // One read per frame, and a read that answers the same number re-renders nothing.
+  assert.match(footerHook, /frame = window\.requestAnimationFrame\(read\);/);
+  assert.match(footerHook, /setInset\(\(current\) => \(current === next \? current : next\)\);/);
 });
 
 test("menus portal to <body> (never clipped by the player) and clamp to the visible area", () => {
