@@ -132,7 +132,10 @@ test("expired subscription reminders deep-link into the renewal flow", () => {
 test("foreground local notifications use the same deep links", () => {
   // My Day foreground system alerts deep-link to the exact tab + item.
   assert.match(main, /const itemUrl = `\/\$\{getMyDayItemDeepLink\(item\.section, item\.itemId\)\}`/);
-  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}`\)/);
+  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`\)/);
+  // FlowPath: the same call carries the server-agreed tag (activity id +
+  // kind) so the tray entry and the FCM push collapse instead of stacking.
+  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `flowpath-\$\{item\.itemId\}-\$\{item\.kind\}`\)/);
   // Content notifications (new product / unlock / course update) are
   // SERVER-generated now — the client must not run its own baseline diff
   // (that was the repeating "Product unlocked" bug).

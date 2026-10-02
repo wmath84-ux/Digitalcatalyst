@@ -111,14 +111,16 @@ test("FlowPath dedupe keys survive Firestore dot-path restrictions", () => {
 
 test("main.tsx wires FlowPath through the existing reminder channel + alarm APIs", () => {
   const main = read("src/main.tsx");
-  assert.match(main, /collectDueFlowPathItems\(current, now, tzOffset\(\), shown\)/);
+  assert.match(main, /collectDueFlowPathItems\(current, now, tzOffset\(\), shown, FOREGROUND_CATCHUP_LOOKBACK_MS\)/);
   assert.match(main, /collectUpcomingFlowPathItems\(current, now, tzOffset\(\), shown, FLOWPATH_UPCOMING_HORIZON_MS\)/);
   assert.match(main, /from "\.\.\/utils\/flowPathScheduler"/);
   // Same data source the dashboard hook uses (flowpath.list), same delivery
   // APIs as My Day, same channel (no new channel), FlowPath-scoped tags and
   // orphan cleanup.
   assert.match(main, /action: "flowpath\.list"/);
-  assert.match(main, /tag: `flowpath-\$\{item\.key\}`/);
+  // The tag must match the SERVER's (flowpathControl tags by activity id +
+  // kind) so the FCM push and the local alarm collapse into one tray entry.
+  assert.match(main, /tag: `flowpath-\$\{item\.itemId\}-\$\{item\.kind\}`/);
   assert.match(main, /`\/\#\/flowpath\?item=\$\{encodeURIComponent\(item\.itemId\)\}`/);
   assert.match(main, /eduvora\.flowPathAlarmIds\.v1/);
   assert.match(main, /eduvora\.flowPathSystemNotifications\.v1/);
@@ -127,7 +129,7 @@ test("main.tsx wires FlowPath through the existing reminder channel + alarm APIs
 
 test("My Day scheduling code is untouched", () => {
   const main = read("src/main.tsx");
-  assert.match(main, /collectDueMyDayItems\(current, now, tzOffset\(\)\)/);
+  assert.match(main, /collectDueMyDayItems\(current, now, tzOffset\(\), FOREGROUND_CATCHUP_LOOKBACK_MS\)/);
   assert.match(main, /collectUpcomingMyDayItems\(current, now, tzOffset\(\), MYDAY_UPCOMING_HORIZON_MS\)/);
   assert.match(main, /eduvora\.myDaySystemNotifications\.v1/);
   assert.match(main, /eduvora\.myDayAlarmIds\.v1/);

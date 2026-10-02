@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
-import { LoaderCircle } from "lucide-react";
+import { BadgeCheck, BookOpen, CalendarClock, CreditCard, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
 import Header from "../../components/Header";
 import BottomNav, { type TabKey } from "../../components/BottomNav";
 import StackedCards from "./StackedCards";
@@ -1014,8 +1014,8 @@ export default function SubscriptionPage({
           onHelpClick={() => setHelpOpen(true)}
         />
 
-        <main ref={contentColumnRef} className="flex-1 overflow-x-hidden overflow-y-auto">
-          <div className="flex min-h-full w-full flex-col">
+        <main ref={contentColumnRef} data-subscription-page className="flex-1 overflow-x-hidden overflow-y-auto">
+          <div data-subscription-shell className="flex min-h-full w-full flex-col">
             {catalogLoading ? (
               <div data-subscription-loading className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/55">
                 <LoaderCircle className="h-6 w-6 animate-spin text-violet-300" />
@@ -1042,10 +1042,58 @@ export default function SubscriptionPage({
           lives on the main app Header above (onHelpClick) so it is visible on
           every subscription page state. */}
 
+      {/* ── HERO ────────────────────────────────────────────────────────────
+          One panel that says what this page is and what is true for THIS
+          visitor (member or buyer). It replaces the old unlabelled stack of
+          cards: a tablet/desktop visitor now lands on a titled, bounded
+          workspace instead of a phone column floating in empty space. */}
+      <section data-subscription-hero aria-labelledby="subscription-hero-title">
+        <span className="dc-sub-eyebrow">
+          {showMemberView ? (
+            <>
+              <BadgeCheck className="h-3 w-3" aria-hidden="true" /> Active membership
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3 w-3" aria-hidden="true" /> Eduvora plans
+            </>
+          )}
+        </span>
+        <h1 id="subscription-hero-title">
+          {showMemberView
+            ? `${plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || "Your plan"} membership`
+            : plan
+              ? `${plan.name} — choose your duration`
+              : "Choose the plan that fits how you study"}
+        </h1>
+        <p className="dc-sub-lede">
+          {showMemberView
+            ? `Everything you unlocked stays active until ${formatExpiryDate(subscriptionExpiresAtMs)}. Renew, add more, or move to a higher plan whenever you want — nothing changes without your confirmation.`
+            : "One plan, plus only the courses and features you actually want. Every price is re-checked on the server before any payment, and we remind you before the cycle ends."}
+        </p>
+        <div className="dc-sub-trust">
+          {showMemberView ? (
+            <>
+              <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Active until {formatExpiryDate(subscriptionExpiresAtMs)}</span>
+              <span><BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> {memberFeatures.length} feature{memberFeatures.length === 1 ? "" : "s"} unlocked</span>
+              {memberProductTitles.length > 0 ? (
+                <span><BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> {memberProductTitles.length} bonus course{memberProductTitles.length === 1 ? "" : "s"}</span>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <span><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Server-verified pricing</span>
+              <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Reminder before the cycle ends</span>
+              <span><CreditCard className="h-3.5 w-3.5" aria-hidden="true" /> One payment per cycle</span>
+            </>
+          )}
+        </div>
+      </section>
+
       {/* An active member gets the membership dashboard, not the buy flow. */}
       {showMemberView ? (
         <div className="flex-1">
-          <div className="mx-5 mt-4">
+          <div className="mt-4">
             <SubscriberActiveBadge
               planLabel={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || null}
               expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
@@ -1087,7 +1135,7 @@ export default function SubscriptionPage({
               to upgrade. Tapping it opens the buy flow on the next
               higher plan. */}
           {upgradePlans.length > 0 ? (
-            <div className="mx-5 mt-5 mb-4 flex flex-col items-stretch gap-2">
+            <div className="mt-5 mb-4 flex flex-col items-stretch gap-2">
               {/* Upgrade CTA — the app-wide payment button, so the path into a
                   higher plan looks and behaves like every other purchase entry
                   point. Same handler, same plan pick, same manage-mode
@@ -1118,7 +1166,7 @@ export default function SubscriptionPage({
             was removed on request; only the Cancel control remains so the
             member can exit the buy flow back to their membership dashboard. */}
         {isActiveMember && manageMode ? (
-          <div className="mx-5 mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end">
             <GlassButton
               variant="capsule"
               type="button"
@@ -1157,9 +1205,14 @@ export default function SubscriptionPage({
               onAddMore={() => setAddOnIntent(true)}
             />
         ) : (
-        <div data-subscription-layout className="flex min-w-0 flex-col">
+        <div data-subscription-layout data-subscription-workspace>
           <div data-subscription-main className="min-w-0">
-            <StackedCards cards={SHOWCASE_CARDS} />
+            {/* The swipeable plan deck is the ONE deliberately glassy surface
+                of the buy flow (it is a stack of cards by design); the steps
+                below it are solid plates, which is the mix this page runs on. */}
+            <div className="dc-sub-deck-wrap">
+              <StackedCards cards={SHOWCASE_CARDS} />
+            </div>
 
             {/* ── STEP 1 — plan + billing duration ─────────────────────────────
                 Everything downstream (feature prices, course prices, the live
@@ -1168,7 +1221,7 @@ export default function SubscriptionPage({
             {usingFallback ? (
               <p
                 data-subscription-fallback-note
-                className="mx-5 mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-2.5 text-[11px] font-semibold text-amber-100"
+                className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-2.5 text-[11px] font-semibold text-amber-100"
               >
                 Showing the built-in plan list — the live catalog could not be reached. Prices are re-checked by the server before any payment.
               </p>
@@ -1393,8 +1446,8 @@ export default function SubscriptionPage({
 
         {/* Bottom instructions — moved from top per user request: carry-over, current plan, add-on notes should be at bottom, not top */}
         {isActiveMember && manageMode ? (
-          <div className="mx-4 mt-6 flex flex-col gap-2.5 pb-2 sm:mx-5 md:mx-6 lg:mx-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0">
-            <div className="flex flex-col gap-2.5 lg:col-span-12">
+          <div className="mt-6 flex flex-col gap-2.5 pb-2">
+            <div className="flex flex-col gap-2.5">
               {isAddOnUpgrade ? (
                 <div
                   data-subscription-addon-upgrade-note
@@ -1445,7 +1498,7 @@ export default function SubscriptionPage({
           <p
             role="alert"
             data-subscription-submit-error
-            className="mx-5 mt-3 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-center text-xs font-semibold text-rose-200"
+            className="mt-3 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-center text-xs font-semibold text-rose-200"
           >
             {submitError}
           </p>
@@ -1615,22 +1668,17 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <section data-subscription-step={index} className="pt-6">
-      <div className="mb-2 flex items-start gap-2.5 px-5">
-        <span
-          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black ${
-            done ? "bg-emerald-500/25 text-emerald-200" : "bg-indigo-500/25 text-indigo-200"
-          }`}
-          aria-hidden="true"
-        >
+    <section data-subscription-step={index}>
+      <header className="dc-sub-step-head">
+        <span className={`dc-sub-step-num ${done ? "is-done" : ""}`} aria-hidden="true">
           {done ? "\u2713" : index}
         </span>
         <div className="min-w-0">
-          <h2 className="text-[15px] font-black leading-tight dc-ink-1">{title}</h2>
-          {hint ? <p className="mt-0.5 text-[11.5px] leading-snug dc-ink-3">{hint}</p> : null}
+          <h2 className="dc-sub-step-title">{title}</h2>
+          {hint ? <p className="dc-sub-step-hint">{hint}</p> : null}
         </div>
-      </div>
-      {children}
+      </header>
+      <div className="dc-sub-step-body">{children}</div>
     </section>
   );
 }

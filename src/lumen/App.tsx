@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, X } from "lucide-react";
+import { Camera, CloudOff, X } from "lucide-react";
 import "./index.css";
 import Composer from "./components/Composer";
 import Header from "./components/Header";
@@ -9,6 +9,7 @@ import MessageList from "./components/MessageList";
 import ScreenshotOverlay, { type ShotRect } from "./components/ScreenshotOverlay";
 import Sidebar from "./components/Sidebar";
 import { useRevisionAi } from "./useRevisionAi";
+import useLumenChats from "./useLumenChats";
 import { PersonalAiApiError } from "../ai/personalAiClient";
 import { formatAnswerSheet, type GenerationSpec } from "./lib/engine";
 import { tierOf, useElementWidth } from "./lib/tier";
@@ -101,18 +102,27 @@ function LumenChatInner({
 }: LumenChatProps) {
   const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
-  const initialIdRef = useRef(uid());
-  const [chats, setChats] = useState<Chat[]>(() => [
-    {
-      id: initialIdRef.current,
-      title: "New chat",
-      course: courseTitle,
-      courseShort: shortLabel,
-      modelId: "default",
-      messages: [],
-    },
-  ]);
-  const [activeId, setActiveId] = useState(initialIdRef.current);
+  // Cloud-backed chat history. Before this hook the whole conversation list
+  // lived in React state and vanished the moment the player unmounted — the
+  // reported "course player ke andar jo AI chats hote hain vah save nahin ho
+  // rahe". `useLumenChats` keeps Firestore as the source of truth
+  // (users/{uid}/aiChats), mirrors every change to localStorage, and merges
+  // the live cloud copy so the same chats open on every device.
+  const {
+    chats,
+    activeId,
+    setChats,
+    setActiveId,
+    status: chatSyncStatus,
+    errorMessage: chatSyncError,
+    flush: flushChats,
+    reload: reloadChats,
+  } = useLumenChats({
+    uid: learnerUid,
+    productId,
+    courseTitle,
+    courseShort: shortLabel,
+  });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -692,7 +702,26 @@ function LumenChatInner({
             selectedSource={revisionAi.source}
             modelDisabled={generating}
             onSelectModel={revisionAi.select}
+            syncState={chatSyncStatus}
+            syncError={chatSyncError}
+            onRetrySync={() => { flushChats(); reloadChats(); }}
           />
+
+          {/* A failed cloud save must never be a silent state: say what
+              happened and offer the one action that retries it. */}
+          {chatSyncError && (
+            <div className="flex flex-none items-start gap-2 border-b border-[--border] bg-[--surface] px-3 py-2 text-[12px] leading-snug text-[--ink-2]" role="status">
+              <CloudOff size={14} aria-hidden="true" className="mt-px flex-none text-[#b4392f]" />
+              <span className="min-w-0 flex-1">{chatSyncError}</span>
+              <button
+                type="button"
+                onClick={() => { reloadChats(); flushChats(); }}
+                className="focus-ring flex-none rounded-full px-2 py-0.5 text-[11.5px] font-semibold text-[--accent-ink] hover:bg-[--hover]"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <MessageList
             chat={chat}

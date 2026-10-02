@@ -1,10 +1,62 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
+import { Cloud, CloudOff, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
 import { tierLte } from "../lib/tier";
 import type { AIModel, Chat, Tier } from "../lib/types";
 import { cn } from "../utils/cn";
 import Dropdown from "./Dropdown";
 import ModelSelector from "./ModelSelector";
+
+/** Cloud-save state of the chat, shown next to the subtitle (and as a small
+ *  icon on the narrowest tiers) so "save ho raha hai ya nahi" is never a
+ *  question the learner has to guess at. */
+export type LumenChatSyncState = "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+
+function SyncBadge({
+  state,
+  compact,
+  onRetry,
+}: {
+  state: LumenChatSyncState;
+  compact: boolean;
+  onRetry?: () => void;
+}) {
+  if (state === "idle") return null;
+  const label =
+    state === "error" ? "Not saved"
+      : state === "saving" ? "Saving…"
+        : state === "saved" ? "Saved to cloud"
+          : state === "loading" ? "Loading…"
+            : "Saved to cloud";
+  const tone =
+    state === "error" ? "text-[#b4392f]"
+      : state === "saving" || state === "loading" ? "text-[--ink-3]"
+        : "text-[#2f7d54]";
+  const Icon = state === "error" ? CloudOff : state === "saving" || state === "loading" ? LoaderCircle : Cloud;
+  const titleText = state === "error" ? "Cloud save failed — tap to retry" : label;
+  const className = cn(
+    "inline-flex flex-none items-center gap-1 rounded-full px-1.5 py-[1px] text-[10.5px] font-semibold transition-colors",
+    tone,
+    onRetry && "focus-ring hover:bg-[--hover]",
+  );
+  const inner = (
+    <>
+      <Icon size={11.5} aria-hidden="true" className={cn((state === "saving" || state === "loading") && "anim-spin")} />
+      {!compact && <span>{label}</span>}
+    </>
+  );
+  if (onRetry) {
+    return (
+      <button type="button" onClick={onRetry} title={titleText} aria-label={titleText} className={className}>
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <span className={className} title={titleText} aria-label={titleText}>
+      {inner}
+    </span>
+  );
+}
 
 function Header({
   chat,
@@ -14,6 +66,9 @@ function Header({
   onTogglePin,
   onRename,
   onSelectModel, models, selectedSource, modelDisabled,
+  syncState = "idle",
+  syncError = null,
+  onRetrySync,
 }: {
   models: AIModel[];
   selectedSource: string;
@@ -25,6 +80,10 @@ function Header({
   onTogglePin: () => void;
   onRename: (title: string) => void;
   onSelectModel: (id: string) => void;
+  /** Cloud-save state of the conversation (see useLumenChats). */
+  syncState?: LumenChatSyncState;
+  syncError?: string | null;
+  onRetrySync?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(chat.title);
@@ -109,10 +168,25 @@ function Header({
                 {chat.title}
                 {chat.pinned && <span className="sr-only"> (pinned)</span>}
               </div>
-              {showSubtitle && <div className="mt-px truncate text-[11.5px] leading-tight text-[--ink-3]">{chat.course}</div>}
+              {showSubtitle && (
+                <div className="mt-px flex items-center gap-1.5 text-[11.5px] leading-tight text-[--ink-3]">
+                  <span className="truncate">{chat.course}</span>
+                  {syncError
+                    ? <SyncBadge state="error" compact={false} onRetry={onRetrySync} />
+                    : <SyncBadge state={syncState} compact={false} onRetry={syncState === "error" ? onRetrySync : undefined} />}
+                </div>
+              )}
             </button>
           )}
         </div>
+
+        {!showSubtitle && (
+          <SyncBadge
+            state={syncError ? "error" : syncState}
+            compact
+            onRetry={syncError ? onRetrySync : syncState === "error" ? onRetrySync : undefined}
+          />
+        )}
 
         <ModelSelector models={models} disabled={modelDisabled} modelId={selectedSource} tier={tier} onSelect={onSelectModel} />
 
@@ -200,5 +274,7 @@ export default memo(
     a.chat.modelId === b.chat.modelId &&
     a.selectedSource === b.selectedSource &&
     a.modelDisabled === b.modelDisabled &&
-    a.models === b.models
+    a.models === b.models &&
+    a.syncState === b.syncState &&
+    a.syncError === b.syncError
 );
