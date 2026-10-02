@@ -319,6 +319,53 @@ browserTest("every slash command creates its block: paragraph, headings 1–3, b
   await context.close();
 });
 
+browserTest("an older Android WebView (no findLast / toReversed): typing, copy, the slash menu and Save all still work", async () => {
+  // Removed BEFORE any page script runs — exactly as in a Chrome 96–109 WebView (the app's
+  // browserslist floor; an Android 6 phone, minSdk 23, is stuck on 106). Measured without the editor
+  // factory's stand-ins: findLast is called on every transaction, so every keystroke throws, the
+  // "/" menu never opens and copy is empty; toReversed is called to serialise a selection, so
+  // copy / cut come out empty too. The typed text itself still lands — a silent failure.
+  const init = () => {
+    for (const name of ["findLast", "findLastIndex", "toReversed"]) delete Array.prototype[name];
+    window.__copied = [];
+    document.addEventListener("copy", (event) => window.__copied.push(event.clipboardData ? event.clipboardData.getData("text/plain") : null));
+  };
+  const present = (page) => page.evaluate(() => ["findLast", "findLastIndex", "toReversed"].map((name) => typeof Array.prototype[name]));
+  const { page, press, editorReady, problems, context } = await open({ init });
+  assert.deepEqual(await present(page), ["undefined", "undefined", "undefined"], "the page really starts without them");
+  await press("[data-course-notes-add]");
+  await editorReady();
+  assert.deepEqual(await present(page), ["function", "function", "function"], "the editor factory put them back");
+  assert.deepEqual(await page.evaluate(() => { const keys = []; for (const key in [1]) keys.push(key); return keys; }), ["0"], "…not enumerable");
+  await page.keyboard.type("Floor");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("typed on an older WebView");
+  await page.waitForTimeout(250);
+  // Copy: BlockNote serialises the selection through toReversed. The pauses let the DOM selection reach the editor state.
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Control+KeyC");
+  await page.waitForTimeout(200);
+  const copied = await page.evaluate(() => window.__copied);
+  assert.equal(copied.length, 1, "one copy event");
+  assert.equal(String(copied[0]).trim(), "typed on an older WebView", "copy puts the selection on the clipboard");
+  // The slash menu: opened by a transaction that goes through findLast.
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/quote");
+  await page.waitForSelector(".bn-ak-menu[role='listbox'] .bn-ak-menu-item", { timeout: 5000 });
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("quoted");
+  await page.waitForTimeout(450);
+  assert.equal(await status(page), "Unsaved");
+  await page.click("[data-course-notes-save]");
+  await page.waitForFunction(() => window.__log.includes("add"));
+  const stored = await page.evaluate(() => window.__notes[0].html);
+  assert.ok(stored.includes("<h1>Floor</h1>") && stored.includes("<p>typed on an older WebView</p><blockquote>quoted</blockquote>"), stored);
+  assert.deepEqual(problems, [], "no page errors on that runtime");
+  await context.close();
+});
+
 browserTest("typing is batched and nothing is persisted per keystroke", async () => {
   const { page, press, editorReady, context } = await open();
   await press("[data-course-notes-add]");

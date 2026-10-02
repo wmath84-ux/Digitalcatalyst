@@ -34,6 +34,7 @@ import {
 } from "@blocknote/core";
 import { en } from "@blocknote/core/locales";
 import { sanitizeRichText } from "../../utils/richText";
+import { installRuntimeCompat } from "./editorRuntime";
 import type { NotePartialBlock } from "./editorTypes";
 
 /** Link schemes the player's sanitiser allows — the editor allows exactly these. */
@@ -174,6 +175,9 @@ export interface CreateNoteEditorOptions {
  * animations (no layout shift while typing on a phone), Tab always indents.
  */
 export function createNoteEditor(options: CreateNoteEditorOptions = {}): NoteEditorInstance {
+  // The engine calls two array methods an older Android WebView lacks (see
+  // ./editorRuntime); they must exist before the first transaction can.
+  installRuntimeCompat();
   const { initialContent, pasteHtml, pastePlain, editableAttributes } = options;
   return BlockNoteEditor.create({
     schema: noteSchema,

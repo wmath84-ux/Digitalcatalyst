@@ -26,7 +26,10 @@
 //   5. the title/body split the panel and the player's exit rescue use
 //      (`splitFirstHeading` / `combineHtml`) round-trips through the editor;
 //   6. editor HTML survives the local mirror and the Firestore payload byte for
-//      byte, and the 60 000-character cap is a hard boundary the panel checks.
+//      byte, and the 60 000-character cap is a hard boundary the panel checks;
+//   7. the engine's runtime floor: the three array methods BlockNote calls
+//      unguarded that an older Android WebView lacks are installed — only when
+//      absent — with the natives' exact semantics, before any editor exists.
 //
 // The interactive behaviour (typing, slash menu, undo/redo, keyboard, widths)
 // is in tests/noteEditorBrowser.test.mjs; the source-level promises are in
@@ -69,6 +72,7 @@ export * from "./src/course/noteEditor/editorFactory";
 export * from "./src/course/noteEditor/editorMigration";
 export * from "./src/course/noteEditor/editorSerialization";
 export * from "./src/course/noteEditor/editorCommands";
+export * from "./src/course/noteEditor/editorRuntime";
 export { sanitizeRichText, plainToRichText, splitFirstHeading, isEmptyRichText, richTextToPlain } from "./src/utils/richText";
 export { combineHtml, loadLocalNotes, persistLocalNotes } from "./src/course/notesStore";
 export { normalizeNote, toFirestoreNote, parseCloudNote, mergeNoteSets, MAX_NOTE_HTML_LENGTH } from "./utils/courseNotes.js";
@@ -337,4 +341,110 @@ test("the schema is exactly the documented blocks, styles and inline content", (
   assert.equal(m.isNoteLinkAllowed("mailto:a@b.c"), true);
   assert.equal(m.isNoteLinkAllowed("javascript:alert(1)"), false);
   assert.equal(m.isNoteLinkAllowed("data:text/html,x"), false);
+});
+
+// ── 7. The runtime floor (an older Android WebView) ────────────────────────
+//
+// The stand-ins are installed on a BARE object — never on this suite's own
+// Array.prototype — and called with `.call`, so each is compared with the real
+// native of the Node running the suite on identical inputs.
+
+const FLOOR_METHODS = ["findLast", "findLastIndex", "toReversed"];
+const nativeOf = (name) => Array.prototype[name];
+
+function standIns() {
+  const bare = Object.create(null);
+  assert.deepEqual(m.installRuntimeCompat(bare), FLOOR_METHODS, "a bare target gets all three");
+  return bare;
+}
+
+test("runtime floor: the stand-ins behave exactly like the natives — arrays, holes, array-likes, strings", () => {
+  for (const name of FLOOR_METHODS) assert.equal(typeof nativeOf(name), "function", `${name}: the suite compares against the natives of the Node that runs it`);
+  const shim = standIns();
+  const inputs = [
+    [], [1], [1, 2, 3, 4, 5], ["a", undefined, "c"], [3, , 1], // eslint-disable-line no-sparse-arrays
+    { length: 3, 0: "x", 1: "y", 2: "z" }, "abc", { length: -4 }, { length: "2", 0: 1, 1: 2 }, { length: Number.NaN, 0: "never read" },
+  ];
+  const predicates = [(v) => v === 1, (v) => v > 2, () => false, () => true, (_v, i) => i === 1, (v) => v === undefined];
+  for (const input of inputs) {
+    assert.deepEqual(shim.toReversed.call(input), nativeOf("toReversed").call(input), `toReversed ${JSON.stringify(input)}`);
+    for (const test of predicates) {
+      assert.equal(shim.findLast.call(input, test), nativeOf("findLast").call(input, test), `findLast ${JSON.stringify(input)}`);
+      assert.equal(shim.findLastIndex.call(input, test), nativeOf("findLastIndex").call(input, test), `findLastIndex ${JSON.stringify(input)}`);
+    }
+  }
+  // Visiting order, the arguments the callback receives and `thisArg` — against the native, step for step.
+  const trace = (find) => {
+    const source = ["a", "b", "c"];
+    const context = { tag: "ctx" };
+    const seen = [];
+    find.call(source, function (value, index, whole) { seen.push([value, index, whole === source, this === context]); return false; }, context);
+    return seen;
+  };
+  assert.deepEqual(trace(shim.findLast), [["c", 2, true, true], ["b", 1, true, true], ["a", 0, true, true]]);
+  for (const name of ["findLast", "findLastIndex"]) assert.deepEqual(trace(shim[name]), trace(nativeOf(name)), name);
+  // The result of toReversed is a NEW, dense array; the receiver is untouched.
+  const sparse = [1, , 3]; // eslint-disable-line no-sparse-arrays
+  const reversed = shim.toReversed.call(sparse);
+  assert.deepEqual(reversed, [3, undefined, 1]);
+  assert.equal(1 in reversed, true, "a hole becomes a real undefined, as in the native");
+  assert.notEqual(reversed, sparse);
+  assert.equal(1 in sparse, false);
+  // Declared arity and name match the natives.
+  for (const name of FLOOR_METHODS) {
+    assert.equal(shim[name].length, nativeOf(name).length, `${name}.length`);
+    assert.equal(shim[name].name, name);
+  }
+});
+
+test("runtime floor: a null receiver, a missing callback and an impossible length throw the native errors", () => {
+  const shim = standIns();
+  for (const name of ["findLast", "findLastIndex"]) {
+    assert.throws(() => shim[name].call([1], undefined), TypeError, `${name}: no callback`);
+    assert.throws(() => shim[name].call([1], "not a function"), TypeError, `${name}: not callable`);
+    assert.throws(() => shim[name].call(null, () => true), TypeError, `${name}: null receiver`);
+    assert.throws(() => shim[name].call(undefined, () => true), TypeError, `${name}: undefined receiver`);
+    // …and the native agrees on every one of those, so a caller cannot tell them apart.
+    assert.throws(() => nativeOf(name).call([1], undefined), TypeError);
+  }
+  assert.throws(() => shim.toReversed.call(null), TypeError);
+  assert.throws(() => shim.toReversed.call({ length: 2 ** 40 }), RangeError, "up front, not an endless loop");
+  assert.throws(() => nativeOf("toReversed").call({ length: 2 ** 40 }), RangeError);
+});
+
+test("runtime floor: idempotent, never replaces a native, installed like a native (not enumerable)", () => {
+  const target = Object.create(null);
+  assert.deepEqual(m.installRuntimeCompat(target), FLOOR_METHODS);
+  assert.deepEqual(m.installRuntimeCompat(target), [], "a second call has nothing left to add");
+  for (const name of FLOOR_METHODS) {
+    const d = Object.getOwnPropertyDescriptor(target, name);
+    assert.deepEqual({ writable: d.writable, configurable: d.configurable, enumerable: d.enumerable }, { writable: true, configurable: true, enumerable: false }, name);
+  }
+  assert.deepEqual(Object.keys(target), [], "a `for…in` over an array must never see them");
+  const native = () => "native";
+  const partly = { findLast: native, toReversed: native };
+  assert.deepEqual(m.installRuntimeCompat(partly), ["findLastIndex"], "only what is missing");
+  assert.equal(partly.findLast, native);
+  assert.equal(partly.toReversed, native);
+  assert.deepEqual(m.installRuntimeCompat(), [], "on the real Array.prototype of a current runtime it is a no-op");
+});
+
+test("runtime floor: the editor factory restores them before the first editor exists", () => {
+  const originals = FLOOR_METHODS.map((name) => [name, Object.getOwnPropertyDescriptor(Array.prototype, name)]);
+  try {
+    for (const name of FLOOR_METHODS) delete Array.prototype[name]; // an older WebView
+    assert.deepEqual(FLOOR_METHODS.map((name) => typeof Array.prototype[name]), ["undefined", "undefined", "undefined"]);
+    const editor = m.createNoteEditor();
+    assert.deepEqual(FLOOR_METHODS.map((name) => typeof Array.prototype[name]), ["function", "function", "function"], "createNoteEditor installed them");
+    assert.deepEqual(Object.keys(Array.prototype), [], "none of them enumerable");
+    // …and a real document still round-trips on that runtime.
+    m.loadNoteBody(editor, "<p>older <strong>WebView</strong></p><ol><li>one</li></ol>");
+    assert.equal(m.readNoteBody(editor), "<p>older <strong>WebView</strong></p><ol><li>one</li></ol>");
+  } finally {
+    for (const [name, descriptor] of originals) {
+      delete Array.prototype[name];
+      Object.defineProperty(Array.prototype, name, descriptor);
+    }
+  }
+  assert.deepEqual(FLOOR_METHODS.map((name) => Array.prototype[name] === nativeOf(name)), [true, true, true]);
 });

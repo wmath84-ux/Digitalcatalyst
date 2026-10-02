@@ -156,6 +156,19 @@ test("the last words can never be lost: flush on hide, on page leave and — bef
   assert.match(notesPanel, /discardingRef\.current = true;/);
 });
 
+test("the engine's runtime floor: BlockNote's unguarded ES2023 array calls are covered before any editor exists", () => {
+  const runtime = read("src/course/noteEditor/editorRuntime.ts");
+  // The app promises Chrome 96+ and minSdk 23; TipTap 3 calls findLast (Chrome 97) on every
+  // transaction and toReversed (Chrome 110) on copy / cut / drag, unguarded.
+  assert.doesNotMatch(runtime, /^import\s/m, "self-contained — nothing for the player's other chunks to pull in");
+  for (const method of ["findLast", "findLastIndex", "toReversed"]) assert.match(runtime, new RegExp(`\\["${method}",`), method);
+  assert.match(runtime, /enumerable: false/, "installed like a native: a for…in over an array must not see them");
+  assert.match(runtime, /typeof \(target as Record<string, unknown>\)\[name\] === "function"\) continue/, "only when absent — a native is never replaced");
+  assert.match(factory, /import \{ installRuntimeCompat \} from "\.\/editorRuntime";/);
+  assert.match(factory, /export function createNoteEditor[\s\S]*?installRuntimeCompat\(\);[\s\S]*?BlockNoteEditor\.create\(/, "installed before the first transaction can exist");
+  assert.doesNotMatch(notesPanel + overlay + player, /installRuntimeCompat|editorRuntime/, "the player's other chunks never import it");
+});
+
 test("the schema, links and paste are the player's: allow-listed links, literal plain text, one importer", () => {
   assert.match(factory, /const SAFE_LINK = \/\^\(https\?:\|mailto:\|tel:\)\/i;/);
   assert.match(factory, /isValidLink: isNoteLinkAllowed/);
