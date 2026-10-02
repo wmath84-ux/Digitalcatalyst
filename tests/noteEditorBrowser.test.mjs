@@ -37,7 +37,8 @@ import { chromium } from "playwright";
 const ROOT = process.cwd();
 const FIXTURE = path.join(ROOT, "tests/fixtures/noteEditorHarness/harness.html");
 const HANDLE_FIXTURE = path.join(ROOT, "tests/fixtures/noteEditorHarness/handle.html");
-const OUT = path.join(ROOT, "node_modules/.cache/note-editor-browser");
+// One build directory per process: two runs at once (CI shards, a watch loop) must not clobber each other.
+const OUT = path.join(ROOT, `node_modules/.cache/note-editor-browser-${process.pid}`);
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || chromium.executablePath();
 const enabled = fs.existsSync(executablePath);
 
@@ -340,17 +341,21 @@ browserTest("an older Android WebView (no findLast / toReversed): typing, copy, 
   await page.keyboard.type("Floor");
   await page.keyboard.press("Enter");
   await page.keyboard.type("typed on an older WebView");
-  await page.waitForTimeout(250);
-  // Copy: BlockNote serialises the selection through toReversed. The pauses let the DOM selection reach the editor state.
+  // Copy: BlockNote serialises the selection through toReversed. A browser reports a moved
+  // selection to the editor in a later task, so each selection key waits until the page shows it
+  // (automation presses keys back to back; a person never does) — otherwise a slow machine
+  // would let the next key act on the PREVIOUS selection and replace the line.
   await page.keyboard.press("Shift+Home");
+  await page.waitForFunction(() => String(getSelection()) === "typed on an older WebView");
   await page.waitForTimeout(150);
   await page.keyboard.press("Control+KeyC");
-  await page.waitForTimeout(200);
+  await page.waitForFunction(() => window.__copied.length === 1);
   const copied = await page.evaluate(() => window.__copied);
-  assert.equal(copied.length, 1, "one copy event");
   assert.equal(String(copied[0]).trim(), "typed on an older WebView", "copy puts the selection on the clipboard");
   // The slash menu: opened by a transaction that goes through findLast.
   await page.keyboard.press("End");
+  await page.waitForFunction(() => getSelection().isCollapsed);
+  await page.waitForTimeout(150);
   await page.keyboard.press("Enter");
   await page.keyboard.type("/quote");
   await page.waitForSelector(".bn-ak-menu[role='listbox'] .bn-ak-menu-item", { timeout: 5000 });
