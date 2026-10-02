@@ -24,10 +24,18 @@
 //     into ONE `onDraftChange`. Booleans (empty / dirty) only notify on a flip.
 //   · The panel talks to the editor through `NoteEditorHandle` only — load,
 //     read (flushes first), focus title / body, reset, read-only, undo, redo.
-//   · The soft keyboard is the player's: `useCourseKeyboard()`. The docked
-//     toolbar is laid out in flow beneath the scroll area, so it rides exactly
-//     as high as the pane (which the deck already sizes to the visible area):
-//     no hard-coded heights, no second viewport listener, no double inset.
+//   · The toolbar follows the CARET, not the soft keyboard: it is on screen
+//     from the instant a text field of the note has a cursor in it, on every
+//     device — a phone that pops a keyboard, a big tablet running the player
+//     in desktop view, a desktop browser, a floating window — and it is gone
+//     the moment the cursor leaves the note. It is laid out in flow beneath
+//     the scroll area, so it rides exactly as high as the pane (which the deck
+//     already sizes to the visible area when a keyboard IS open): no
+//     hard-coded heights, no second viewport listener, no double inset.
+//   · Where the toolbar ends is measured, never assumed: it stops just above
+//     the player's footer navigation when there is one on screen, and at the
+//     very bottom edge when the footer is hidden (the keyboard rule) or absent
+//     — see ./courseFooterInset.ts and ./useCourseFooterInset.ts.
 //   · Floating UI (selection toolbar, slash menu, block controls) portals to
 //     <body>, so the player's overflow-hidden panes can never clip it — and it
 //     still lands correctly on the Sanctuary's 3D board, because positions come
@@ -60,7 +68,8 @@ import {
 import { flushSync } from "react-dom";
 import { autoPlacement, flip, offset, shift, size, type Middleware } from "@floating-ui/react";
 import { plainToRichText, sanitizeRichText } from "../utils/richText";
-import { useCourseKeyboard } from "./useCourseKeyboard";
+import { COURSE_FOOTER_INSET_PROPERTY } from "./courseFooterInset";
+import { useCourseFooterInset } from "./useCourseFooterInset";
 import { NoteDockedToolbar, NoteFormattingToolbar, NoteSideMenu, useNoteSlashItems } from "./NoteEditorToolbar";
 import { createNoteEditor, type NoteEditorInstance } from "./noteEditor/editorFactory";
 import { importLegacyHtml } from "./noteEditor/editorMigration";
@@ -246,18 +255,71 @@ function NoteEditorChrome({
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onBodyKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }) {
-  const { keyboardVisible } = useCourseKeyboard();
-  // Body focus, including BlockNote's own popovers (the link field): the dock
-  // must not vanish — and take the link popover with it — while a URL is typed.
+  // ── THE TOOLBAR RULE: the caret decides, not the soft keyboard ──────────
+  //
+  // A cursor in ANY of the note's text fields puts the toolbar on screen, and
+  // the cursor leaving the note takes it away — on every device. The old rule
+  // also demanded an open soft keyboard, which silently meant "no toolbar at
+  // all" on a desktop, on a big tablet running the player in desktop view, and
+  // in a floating window: none of those ever opens a keyboard, so a learner
+  // who clicked into a text field and saw a cursor still got no toolbar.
+  //
+  //   · `focused`     — BlockNote's own focus, including its popovers (the
+  //                     link field), which are portalled outside this tree, so
+  //                     the toolbar must not vanish — and take the link
+  //                     popover with it — while a URL is typed.
+  //   · `caretWithin` — focus anywhere in the shell, which is what sees the
+  //                     TITLE field. Tracked on the shell (React's focus
+  //                     events bubble) rather than per field, so the caret
+  //                     moving title → body never passes through a "no caret"
+  //                     frame that would unmount the toolbar and remount it.
+  //   · `dockFocused` — focus that lands ON a toolbar control (a screen
+  //                     reader's click, a hardware Tab) must not unmount the
+  //                     very control being used.
   const focused = useEditorFocus({ includeEditorUI: true });
-  // …and focus that lands ON a dock button (a screen reader's click, a hardware
-  // Tab) must not unmount the dock under the very control being used.
+  const [caretWithin, setCaretWithin] = useState(false);
   const [dockFocused, setDockFocused] = useState(false);
-  const docked = !readOnly && keyboardVisible && (focused || dockFocused);
+  const docked = !readOnly && (focused || caretWithin || dockFocused);
+  // A finger as the primary pointer: there the toolbar REPLACES the floating
+  // selection toolbar (one set of tools, and no bubble under a thumb). With a
+  // fine pointer both exist — the dock is always reachable at the bottom, and
+  // the floating toolbar still follows the words being formatted.
+  const coarse = useCoarsePointer();
+  const floatingToolbar = !docked || !coarse;
+
+  // ── Where the toolbar ends: just above the footer navigation ────────────
+  // Measured (see ./courseFooterInset.ts): the px of this shell's bottom edge
+  // the player's footer navigation covers. The bottom-centre peek dock is
+  // `position: fixed`, so it overlays the writing surface and the toolbar has
+  // to be lifted clear of it; the legacy always-visible dock sits in flow
+  // below the notes panel, where the toolbar already ends exactly at it and
+  // the lift is 0; and a footer that is hidden (the keyboard rule) or absent
+  // lifts nothing at all, so the toolbar drops back to the bottom edge with
+  // no phantom gap.
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const footerInset = useCourseFooterInset(docked, shellRef);
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    if (footerInset > 0) shell.style.setProperty(COURSE_FOOTER_INSET_PROPERTY, `${footerInset}px`);
+    else shell.style.removeProperty(COURSE_FOOTER_INSET_PROPERTY);
+  }, [footerInset]);
+
   const slashItems = useNoteSlashItems(editor);
 
   return (
-    <div className="dc-note-shell" data-note-docked={docked ? "true" : "false"}>
+    <div
+      className="dc-note-shell"
+      ref={shellRef}
+      data-note-docked={docked ? "true" : "false"}
+      data-note-footer-inset={footerInset > 0 ? footerInset : undefined}
+      onFocus={() => setCaretWithin(true)}
+      onBlur={(event) => {
+        // Focus moving between the title, the body and the toolbar is still
+        // "a caret in the note".
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCaretWithin(false);
+      }}
+    >
       <div className="dc-note-scroll" data-note-scroll="">
         <div className="dc-note-page">
           <textarea
@@ -278,12 +340,12 @@ function NoteEditorChrome({
             <BlockNoteViewEditor>
               {readOnly ? null : (
                 <>
-                  {docked ? null : (
+                  {floatingToolbar ? (
                     <DesktopFormattingToolbarController
                       formattingToolbar={NoteFormattingToolbar}
                       floatingUIOptions={SELECTION_FLOATING}
                     />
-                  )}
+                  ) : null}
                   <SideMenuController sideMenu={NoteSideMenu} floatingUIOptions={SIDE_FLOATING} />
                   <SuggestionMenuController
                     triggerCharacter="/"

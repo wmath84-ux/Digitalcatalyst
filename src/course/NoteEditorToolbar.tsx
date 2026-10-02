@@ -5,12 +5,18 @@
 // skinned by ./noteEditor/noteEditor.css:
 //
 //   · NoteFormattingToolbar — the compact floating toolbar that follows a text
-//     selection (desktop / hardware keyboard): block type · B I U S · code · link.
-//   · NoteDockedToolbar     — the same actions as ONE slim bar sitting directly
-//     above the soft keyboard on touch (plus undo / redo / insert). It is laid
-//     out in normal flow at the bottom of the editor, so it rides exactly as
-//     high as the pane does — the player's own keyboard state already sizes the
-//     pane to the visible area. No fixed offsets, no second keyboard listener.
+//     selection with a fine pointer (desktop / hardware keyboard): block type
+//     · B I U S · code · link.
+//   · NoteDockedToolbar     — the same actions as ONE slim bar docked at the
+//     bottom of the note (plus undo / redo / insert). It is the note's toolbar
+//     wherever a finger is the primary pointer, and it is on screen on EVERY
+//     device from the moment the note has a cursor in it — with a soft
+//     keyboard open it rides directly above it, and where there is no keyboard
+//     (a desktop, a big tablet in desktop view, a floating window) it sits
+//     directly above the player's footer navigation. It is laid out in normal
+//     flow at the bottom of the editor, so it rides exactly as high as the
+//     pane does — the player's own keyboard state already sizes the pane to
+//     the visible area. No fixed offsets, no second keyboard listener.
 //   · NoteSideMenu          — the subtle per-block controls (insert / handle).
 //   · useNoteSlashItems     — the slash menu's items.
 //
@@ -144,9 +150,17 @@ function HistoryButton({ direction }: { direction: "undo" | "redo" }) {
       icon={<Icon size={16} />}
       isDisabled={!can}
       onClick={() => {
+        // The toolbar is up for a cursor in the TITLE field too (see
+        // NoteEditor). History acts on the body, but it must not drag the
+        // cursor out of the title the learner is still writing in:
+        // `preventFocusOnTap` kept it there on the way in, so it stays there
+        // on the way out — only a caret that is already in the body is
+        // refocused there.
+        const caret = document.activeElement;
+        const inTitle = caret instanceof HTMLElement && caret.hasAttribute("data-course-note-heading-input");
         if (direction === "undo") editor.undo();
         else editor.redo();
-        editor.focus();
+        if (!inTitle) editor.focus();
       }}
     />
   );
@@ -179,7 +193,9 @@ function InsertButton() {
 }
 
 /**
- * The docked touch toolbar. Rendered inside the editor's React tree (it needs
+ * The docked toolbar — the note's ONE toolbar on touch, and its always-reachable
+ * one everywhere else: it is mounted whenever the note has a cursor in it, on
+ * any device (see NoteEditor). Rendered inside the editor's React tree (it needs
  * BlockNote's contexts) but laid out in flow beneath the scroll area — see the
  * file header. The "mobile" UI mode keeps BlockNote's dropdowns from taking
  * focus, which would blur the editor and dismiss the keyboard.

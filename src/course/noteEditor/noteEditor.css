@@ -486,12 +486,30 @@
   .dc-note .bn-side-menu .bn-ak-button::after { content: ""; position: absolute; inset: -0.4rem -0.15rem; }
 }
 
-/* ── The docked touch toolbar: directly above the soft keyboard ───────────── */
+/* ── The docked toolbar: above the keyboard, or above the footer ────────────
+   It is the note's ONE toolbar, and it is on screen whenever the note has a
+   cursor in it — with a soft keyboard open (where it rides the pane the deck
+   has already sized to the visible area) and without one (a desktop, a big
+   tablet in desktop view, a floating window), where the thing at the bottom
+   of the player is the footer navigation instead.
+
+   `--dc-note-footer-inset` is the measured px of this pane's bottom edge that
+   the player's footer navigation covers, published on the shell by
+   src/course/useCourseFooterInset.ts: the bottom-centre peek dock is pinned to
+   the bottom of the player and so overlays the writing surface, which means
+   the toolbar has to be lifted clear of it (line, hit strip and open panel
+   alike); the legacy always-visible dock is in flow below the notes panel,
+   where the toolbar already ends at it, so the lift is 0; and a footer that is
+   hidden by the keyboard rule — or absent altogether — lifts nothing, so the
+   toolbar sits flush with the bottom edge instead of floating over a gap. A
+   MARGIN, not padding: the bar's own paper stops where the footer begins, and
+   what is between them is the pane's own background, exactly as it already is. */
 
 .dc-note .dc-note-dock {
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
+  margin-bottom: var(--dc-note-footer-inset, 0px);
   padding: 0.25rem var(--dc-note-gutter-end) max(0.25rem, env(safe-area-inset-bottom)) var(--dc-note-gutter);
   border-top: 1px solid var(--dc-note-rule);
   background: var(--dc-note-paper);

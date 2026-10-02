@@ -12,6 +12,9 @@
 //   · legacy notes open with their tables, checklists, quotes and code intact;
 //   · slash menu (filter + apply), shortcuts, undo / redo, paste, links;
 //   · the selection toolbar floats over a selection and never steals it;
+//   · the toolbar follows the CARET — it is up the moment a text field has a
+//     cursor, with no soft keyboard anywhere — and it ends just above the
+//     player's footer navigation, dropping flush when the footer is off;
 //   · the SOFT KEYBOARD, in BOTH engines the player supports — a layout viewport
 //     that resizes (Android WebView `adjustResize`, i.e. the Capacitor shell) and
 //     an overlay keyboard where only the visual viewport shrinks (mobile Chrome):
@@ -459,8 +462,8 @@ browserTest("links: created from the selection toolbar with safe attributes; cli
   await page.keyboard.down("Shift");
   for (let i = 0; i < 8; i += 1) await page.keyboard.press("ArrowLeft");
   await page.keyboard.up("Shift");
-  await page.waitForSelector('.bn-toolbar .bn-ak-button[aria-label="Create link"]');
-  await page.click('.bn-toolbar .bn-ak-button[aria-label="Create link"]');
+  await page.waitForSelector('.bn-formatting-toolbar .bn-ak-button[aria-label="Create link"]');
+  await page.click('.bn-formatting-toolbar .bn-ak-button[aria-label="Create link"]');
   await page.waitForSelector(".bn-ak-popover input");
   await page.keyboard.type("https://example.com/docs");
   await page.keyboard.press("Enter");
@@ -484,13 +487,18 @@ browserTest("desktop: the selection toolbar floats ABOVE the words, never steals
   await page.mouse.down();
   await page.mouse.move(box.x + 40, box.y + box.h / 2, { steps: 4 });
   await page.mouse.up();
-  await page.waitForSelector(".bn-toolbar");
+  await page.waitForSelector(".bn-formatting-toolbar");
   const selected = await page.evaluate(() => window.getSelection().toString());
   const selectionRect = await page.evaluate(() => { const r = window.getSelection().getRangeAt(0).getBoundingClientRect(); return { top: r.top }; });
-  const toolbar = await firstVisibleRect(page, ".bn-toolbar");
+  const toolbar = await firstVisibleRect(page, ".bn-formatting-toolbar");
   assert.ok(toolbar.bottom <= selectionRect.top + 1, "above the selection");
-  assert.deepEqual(await page.$$eval(".bn-toolbar .bn-ak-button", (n) => n.map((b) => (b.getAttribute("aria-label") || b.textContent.trim()))), ["Quote", "Bold", "Italic", "Underline", "Strike", "Code", "Create link"]);
-  await page.click('.bn-toolbar .bn-ak-button[aria-label="Bold"]');
+  assert.deepEqual(await page.$$eval(".bn-formatting-toolbar .bn-ak-button", (n) => n.map((b) => (b.getAttribute("aria-label") || b.textContent.trim()))), ["Quote", "Bold", "Italic", "Underline", "Strike", "Code", "Create link"]);
+  // With a fine pointer the docked toolbar shares the screen: it came up the
+  // moment the caret landed in the note, and the floating one follows the words.
+  const dockedBar = await firstVisibleRect(page, "[data-note-dock]");
+  assert.ok(dockedBar, "the docked toolbar is up for the caret as well");
+  assert.ok(dockedBar.top >= toolbar.bottom, "and the two never overlap");
+  await page.click('.bn-formatting-toolbar .bn-ak-button[aria-label="Bold"]');
   assert.equal(await page.evaluate(() => window.getSelection().toString()), selected, "the selection survives the click");
   assert.equal(await page.evaluate(() => document.activeElement?.classList.contains("bn-editor")), true);
   assert.ok((await page.$$eval('[data-content-type="quote"] strong', (n) => n.length)) >= 1);
@@ -603,7 +611,14 @@ for (const engine of ["resize", "overlay"]) {
     await page.keyboard.type("Keyboard test");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Some body text that we will format on a phone with a docked toolbar");
-    assert.equal(await page.locator("[data-note-dock]").count(), 0, "no dock while the keyboard is closed");
+    // THE CARET RULE: the toolbar is already up, with no keyboard anywhere —
+    // the caret in the body is the whole condition. (It used to wait for the
+    // soft keyboard, which is why a desktop, a big tablet in desktop view or a
+    // floating window never saw it at all.)
+    assert.equal(await page.locator("[data-note-dock]").count(), 1, "the toolbar is up for the caret alone");
+    const beforeKeyboard = await firstVisibleRect(page, "[data-note-dock]");
+    assert.ok(Math.abs(beforeKeyboard.bottom - (await visible()).bottom) <= 1.5, "flush with the bottom while nothing else is down there");
+    assert.equal(await page.evaluate(() => window.__kb.visible), false, "and no keyboard is open");
 
     await keyboard(320);
     const deck = await page.$eval("[data-course-split-deck]", (d) => ({ takeover: d.getAttribute("data-keyboard-takeover"), pad: getComputedStyle(d).paddingBottom }));
@@ -660,12 +675,74 @@ for (const engine of ["resize", "overlay"]) {
     await page.keyboard.press("Escape");
 
     await keyboard(0);
-    assert.equal(await page.locator("[data-note-dock]").count(), 0, "the dock goes with the keyboard");
+    assert.equal(await page.locator("[data-note-dock]").count(), 1, "the toolbar stays: the caret never left the note");
     assert.equal(await page.$eval("[data-course-split-deck]", (d) => d.getAttribute("data-keyboard-takeover")), null, "the lesson pane is back");
+    // It is the CARET leaving that takes the toolbar away, not the keyboard.
+    await page.evaluate(() => document.activeElement?.blur?.());
+    await page.waitForFunction(() => document.querySelector("[data-note-dock]") === null, null, { timeout: 8000 });
     assert.deepEqual(problems, []);
     await context.close();
   });
 }
+
+// ── The toolbar vs the player's FOOTER NAVIGATION ──────────────────────────
+//
+// With no soft keyboard — a desktop, a big tablet in desktop view, a floating
+// window — the thing at the bottom of the player is the footer navigation, and
+// the toolbar must end exactly where it begins. The harness reproduces both of
+// the footer's homes (`?footer=peek` / `?footer=pane`).
+
+browserTest("peek footer: the toolbar sits just above it, and drops flush when the footer is off", async () => {
+  const { page, context, press, editorReady, problems } = await open({ width: 390, height: 844, touch: true, pagePath: `${PAGE_PATH}?footer=peek` });
+  await press("[data-course-notes-add]");
+  await editorReady();
+  assert.equal(await page.evaluate(() => window.__kb.visible), false, "no keyboard is open — the caret alone brought the toolbar up");
+  const footer = await firstVisibleRect(page, "[data-course-peek-dock]");
+  assert.ok(footer && footer.height > 0, "the footer navigation is on screen");
+  const dock = await firstVisibleRect(page, "[data-note-dock]");
+  assert.ok(dock, "the toolbar is up");
+  assert.equal(
+    await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")),
+    String(Math.round(footer.height)),
+    "lifted by exactly what the footer covers",
+  );
+  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the toolbar ends where the footer begins (dock ${dock.bottom}, footer ${footer.top})`);
+
+  // Footer navigation OFF — this is exactly what the player's ONE keyboard rule
+  // does to it (`display: none`). The toolbar must drop flush to the bottom,
+  // not keep a gap above nothing.
+  await page.evaluate(() => { const f = document.querySelector("[data-course-peek-dock]"); if (f) f.style.display = "none"; });
+  await page.waitForFunction(() => document.querySelector(".dc-note-shell")?.getAttribute("data-note-footer-inset") === null, null, { timeout: 8000 });
+  const dropped = await firstVisibleRect(page, "[data-note-dock]");
+  const bottom = await page.evaluate(() => window.innerHeight);
+  assert.ok(dropped, "the toolbar is still there — the caret never left");
+  assert.ok(Math.abs(dropped.bottom - bottom) <= 1.5, `flush with the bottom (dock ${dropped.bottom}, bottom ${bottom})`);
+
+  // …and it comes back with the footer.
+  await page.evaluate(() => { const f = document.querySelector("[data-course-peek-dock]"); if (f) f.style.display = ""; });
+  await page.waitForFunction(() => document.querySelector(".dc-note-shell")?.getAttribute("data-note-footer-inset") !== null, null, { timeout: 8000 });
+  assert.ok(Math.abs((await firstVisibleRect(page, "[data-note-dock]")).bottom - (await firstVisibleRect(page, "[data-course-peek-dock]")).top) <= 1.5, "above the footer again");
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+browserTest("always-visible footer dock: the toolbar already ends at it, so no lift and no gap", async () => {
+  const { page, context, press, editorReady, problems } = await open({ width: 390, height: 844, touch: true, pagePath: `${PAGE_PATH}?footer=pane` });
+  await press("[data-course-notes-add]");
+  await editorReady();
+  const footer = await firstVisibleRect(page, "[data-course-dock]");
+  const dock = await firstVisibleRect(page, "[data-note-dock]");
+  assert.ok(footer && footer.height > 0, "the in-flow footer dock is on screen");
+  assert.ok(dock, "the toolbar is up for the caret");
+  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the toolbar ends where the footer begins (dock ${dock.bottom}, footer ${footer.top})`);
+  assert.equal(
+    await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")),
+    null,
+    "no lift for an in-flow footer — and so no empty strip above it",
+  );
+  assert.deepEqual(problems, []);
+  await context.close();
+});
 
 // ── Responsive ─────────────────────────────────────────────────────────────
 
