@@ -87,6 +87,7 @@ const UserQueriesPage = lazyRoute(() => import("./components/UserQueriesPage"));
 const SearchPage = lazyRoute(() => import("./components/SearchPage"));
 const RenewalPreviewPage = lazyRoute(() => import("./components/subscription/RenewalPreviewPage"));
 const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/OpeningAnimationPreview"));
+const BrainDeckPreview = lazyRoute(() => import("./components/dev/BrainDeckPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import { StudyLibraryErrorBoundary } from "./personal-library/StudyLibraryErrorBoundary";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
@@ -235,6 +236,10 @@ const GLASS_PREVIEW_HASH = "#/dev/glass-preview";
 // clips, replay the real boot sequence, and read the decision the app
 // made on THIS device. See src/components/dev/OpeningAnimationPreview.
 const OPENING_PREVIEW_HASH = "#/dev/opening";
+// Developer sandbox for the Course Player's Brain practice deck: the real
+// panel, the demo course's real practice set, on a box you can size by hand.
+// See src/components/dev/BrainDeckPreview.tsx.
+const BRAIN_DECK_PREVIEW_HASH = "#/dev/brain-deck";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -1820,6 +1825,7 @@ function RootPage(): ReactNode {
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
   if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
   if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;
+  if (hash.startsWith(BRAIN_DECK_PREVIEW_HASH)) return <BrainDeckPreview />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     // The catalog for this deep link is still streaming in: show the course

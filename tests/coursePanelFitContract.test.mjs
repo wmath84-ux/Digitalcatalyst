@@ -20,8 +20,14 @@
 //      box shrinks it to a floor that still clears a 44 px touch target, the
 //      music card always fits inside its box and never leaves its own range;
 //   2. the Brain panel measures ITSELF (every screen root carries the one
-//      measuring ref), keeps its docked Previous / Next bar docked, and keeps
-//      the revision design's `calc(px * var(--brain-scale))` language;
+//      measuring ref), and the practice DECK it renders is solved from the same
+//      box — the reference Product Card Deck's own proportions (72% of the box,
+//      never past the reference cap, never taller than the pane can hold) — so
+//      the question, its answers and the review bar are readable in whatever
+//      pane the Split Deck divider leaves. The panel keeps the
+//      `calc(px * var(--brain-scale))` language and the review screen's action
+//      bar stays docked (the question screen has no bar any more: the deck's
+//      cards are the controls);
 //   3. the music player measures its stage, scales the whole card as one
 //      artwork (frame + scaler), and still declares its `data-course-audio-*`
 //      contract attributes and the reference 320 px card;
@@ -53,6 +59,15 @@ fs.writeFileSync(
   ENTRY,
   `export {
   brainFitScale,
+  brainDeckSize,
+  BRAIN_DECK_REFERENCE_WIDTH,
+  BRAIN_DECK_MIN_WIDTH,
+  BRAIN_DECK_MAX_WIDTH,
+  BRAIN_DECK_MAX_HEIGHT,
+  BRAIN_DECK_EXTRA_HEIGHT,
+  BRAIN_DECK_STACK_PEEK,
+  BRAIN_DECK_HINT_HEIGHT,
+  BRAIN_DECK_GUTTER,
   audioFitScale,
   paddingOf,
   BRAIN_FIT_FLOOR,
@@ -83,7 +98,12 @@ execFileSync(
 );
 const fit = require(OUT);
 
+/** The source with its comments removed — a header may name what the code must not do. */
+const code = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 const brainPanel = read("src/course/CourseBrainPanel.tsx");
+const brainDeck = read("src/course/BrainQuestionDeck.tsx");
+const brainCards = read("src/course/BrainCards.tsx");
 const audioPlayer = read("src/course/AudioPlayer.tsx");
 const panelFit = read("src/course/panelFit.ts");
 const indexCss = read("src/index.css");
@@ -193,6 +213,75 @@ test("the music card follows both axes and both ends of its range", () => {
 });
 
 /* --------------------------------------------------------------------------- */
+/* 2b. The deck the question screen renders is solved from the SAME box      */
+/* --------------------------------------------------------------------------- */
+
+test("the practice deck takes 72% of the pane, like the reference's 72vw", () => {
+  // A phone-sized pane reproduces the reference card: 72% of the box (its own
+  // `clamp(220px, 72vw, 300px)`), plus the reference's 56 px strip.
+  const phone = fit.brainDeckSize(390, 640);
+  assert.equal(phone.width, Math.round(390 * 0.72), "the card is 72% of the pane, like 72vw");
+  assert.equal(phone.height, Math.round(390 * 0.72 + fit.BRAIN_DECK_EXTRA_HEIGHT), "…plus the reference strip");
+  assert.ok(phone.width >= 220 && phone.width <= 300, `the reference card's own band (${phone.width})`);
+  // A big pane grows the card — but it stays a card, never a poster.
+  assert.deepEqual(fit.brainDeckSize(1400, 900), {
+    width: fit.BRAIN_DECK_MAX_WIDTH,
+    height: fit.BRAIN_DECK_MAX_WIDTH + fit.BRAIN_DECK_EXTRA_HEIGHT,
+  });
+  // A SHORT pane gives HEIGHT back, not width: 900 × 300 still solves the
+  // reference's 72% card (capped), squeezed to the height the pane can afford —
+  // a wide-but-short pane gets a short card, never a postage stamp. What the
+  // question and its answers do inside that box is the deck's business
+  // (src/course/BrainQuestionDeck.tsx: one shared content scale, then scroll).
+  const short = fit.brainDeckSize(900, 300);
+  assert.equal(short.width, fit.BRAIN_DECK_MAX_WIDTH, "the width follows the pane's width");
+  assert.equal(short.height, 300 - fit.BRAIN_DECK_GUTTER - fit.BRAIN_DECK_HINT_HEIGHT - fit.BRAIN_DECK_STACK_PEEK);
+  assert.ok(short.height < 300, "the card never overflows the pane it was solved for");
+  // A tiny pane bottoms out at the minimum width and never overflows.
+  const tiny = fit.brainDeckSize(220, 220);
+  assert.ok(tiny.width >= fit.BRAIN_DECK_MIN_WIDTH, "the card never collapses into a stamp");
+  assert.ok(tiny.height <= 220, "…and never overflows a tiny pane");
+  // An unmeasured pane is the reference card exactly.
+  assert.deepEqual(fit.brainDeckSize(0, 0), {
+    width: fit.BRAIN_DECK_REFERENCE_WIDTH,
+    height: fit.BRAIN_DECK_REFERENCE_WIDTH + fit.BRAIN_DECK_EXTRA_HEIGHT,
+  });
+  assert.deepEqual(fit.brainDeckSize(Number.NaN, 400), fit.brainDeckSize(0, 0));
+});
+
+test("the deck reads that box from the pane it is given, every frame", () => {
+  // The deck measures its own host (the study pane), not the window — the same
+  // signal the Split Deck divider produces.
+  assert.match(brainDeck, /const \{ size: pane, attach \} = usePaneSize\(\);/);
+  assert.match(brainDeck, /setSize\(\{ width: node\.clientWidth, height: node\.clientHeight \}\);/);
+  assert.match(brainDeck, /const box = useMemo\(\(\) => brainDeckSize\(pane\.width, pane\.height\), \[pane\.width, pane\.height\]\);/);
+  assert.match(brainDeck, /ref=\{attach\}/);
+  // A card whose content is taller than the pane may grow — up to the pane's
+  // own height, and no further (a longer question is scaled, never cut).
+  // The stage reserves the stack's peek strip BELOW the top card (the
+  // reference's own SLOT_Y), so the hint line never ends up under a card.
+  assert.match(brainDeck, /style=\{\{ width: box\.width, height: cardHeight \+ BRAIN_DECK_STACK_PEEK \}\}/);
+  // The tallest measurement wins, and a measurement that cannot be real (a card
+  // that is hidden, or jsdom's zero) is refused rather than trusted.
+  assert.match(brainDeck, /if \(!Number\.isFinite\(value\) \|\| value < 120\) return;/);
+  assert.match(brainDeck, /const heightCap = Math\.min\(\s*\n\s*BRAIN_DECK_MAX_HEIGHT,/);
+  // ONE scale for the whole deck (a card never resizes as it comes forward) …
+  assert.match(brainDeck, /const contentFit = tallest > heightCap \? Math\.max\(CONTENT_FLOOR, heightCap \/ tallest\) : 1;/);
+  // …applied ONCE, as the transform: the metrics keep the reference's own px ×
+  // the card's width scale, which is what makes the measurement stable (a fit
+  // multiplied into the metrics as well would feed its own input).
+  assert.match(brainDeck, /const unitNum = \(px: number\) => px \* scale;/);
+  assert.match(brainDeck, /const unit = \(px: number\) => `\$\{unitNum\(px\)\}px`;/);
+  assert.match(brainDeck, /transform: `scale\(\$\{fit\}\)`,/);
+  // Content that even the floor cannot fit scrolls inside the card, and the card
+  // gives up the pane's vertical pan to it (horizontal swipes still flick).
+  assert.match(brainDeck, /const scrolls = need > 0 && fit \* need > heightCap \+ 1;/);
+  assert.match(brainDeck, /alignContent: scrolls \? "start" : "safe center",/);
+  assert.match(brainDeck, /overflowY: scrolls \? "auto" : "visible",/);
+  assert.match(brainDeck, /touchAction: isTop \? \(scrolls \? "pan-y" : "none"\) : "auto",/);
+});
+
+/* --------------------------------------------------------------------------- */
 /* 3. The Brain panel measures ITSELF                                        */
 /* --------------------------------------------------------------------------- */
 
@@ -216,15 +305,24 @@ test("every Brain screen measures its own box and publishes the scale", () => {
   assert.equal((brainPanel.match(/ref=\{fitRef\}/g) ?? []).length, 5, "…and all five measure themselves");
 });
 
-test("the Brain page's fixed rows and its action bar are docked, never squeezed", () => {
-  // The bar carrying Previous / Next (and the review screen's Submit bar) can
-  // never be compressed by the question above it — the question scrolls, the
-  // buttons do not.
-  const bars = brainPanel.match(/dc-scene-plate dc-scene-plate--bar flex shrink-0[^`"]*/g) ?? [];
-  assert.equal(bars.length, 2, `both action bars are shrink-0 (found ${bars.length})`);
+test("the Brain question screen is the deck, and the review bar stays docked", () => {
+  // The question screen owns NO action bar of its own any more: there is no
+  // Previous / Next / Skip to dock. The deck's cards are the whole control
+  // surface (see tests/courseBrainPracticeContract.test.mjs).
+  assert.ok(!/Previous|Next|Skip this question/.test(code(brainDeck)), "the deck carries no navigation button");
+  assert.match(brainPanel, /<BrainQuestionDeck\s*\n\s*items=\{deck\}/);
+  // The header row that stays put is shrink-0…
   assert.match(brainPanel, /<div className="flex shrink-0 items-center" style=\{\{ padding: `\$\{S\(12\)\} \$\{S\(16\)\} 0`/);
-  assert.match(brainPanel, /<div className="shrink-0" style=\{\{ padding: `\$\{S\(12\)\} \$\{S\(16\)\} 0` \}\}>/);
-  // …and no fixed numeric font size can bypass the scale.
+  // …and the REVIEW screen's bar is still DOCKED: `flex shrink-0` (plus the
+  // grid above owning the only `flex-1`) is what guarantees Back / Submit
+  // Practice are on screen at every pane height. It is a solid plate now — the
+  // #E8E8DF page of the reference deck, not the glass chrome strip.
+  assert.match(brainPanel, /className="flex shrink-0"\s*\n\s*data-brain-action-bar=""/);
+  assert.match(brainPanel, /background: BRAIN\.page,/);
+  assert.match(brainPanel, /boxShadow: "0 -14px 30px rgba\(0,0,0,0\.22\)",/);
+  assert.ok(!code(brainPanel).includes("dc-scene-plate"), "the Brain bar is no longer a glass plate");
+  // …and no fixed numeric font size can bypass the scale (the deck derives its
+  // own metrics from the card's width; see the deck's own test).
   assert.ok(!/fontSize: \d+/.test(brainPanel), "every metric still goes through S()");
 });
 

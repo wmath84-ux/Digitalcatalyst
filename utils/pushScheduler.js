@@ -21,7 +21,15 @@ export const MYDAY_LOOKBACK_MS = 15 * 60 * 1000;
 // Vercel function (e.g. widen to 6h while recovering from a long pinger
 // outage so same-day reminders are swept up instead of skipped).
 export const MYDAY_MAX_CATCHUP_MS = (() => {
-  const envHours = Number(process.env.MYDAY_MAX_CATCHUP_HOURS);
+  // `process` only exists on the server. This module is ALSO imported by the
+  // app (src/main.tsx reads the collectors below), where a bare `process.env`
+  // is a ReferenceError thrown while the module is still evaluating — which
+  // takes the whole import chain down with it and leaves the app unmounted
+  // (the production bundle tree-shakes this constant away, so it only ever bit
+  // the dev server). The override simply does not exist in the browser, which
+  // is the same as not setting it.
+  const raw = typeof process === "undefined" ? undefined : process.env?.MYDAY_MAX_CATCHUP_HOURS;
+  const envHours = Number(raw);
   if (Number.isFinite(envHours) && envHours > 0) {
     return Math.round(envHours * 60 * 60 * 1000);
   }

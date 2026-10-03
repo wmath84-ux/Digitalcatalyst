@@ -3,62 +3,80 @@
 // The Course Player's BRAIN tab — practice sets imported by the admin on the
 // Product / Course-content page (resource type "Brain · practice set").
 //
-// The design is the revision test-taking page, exactly
-// (src/revision/pages/TestPlayerPage.tsx):
+// ── THE QUESTION SCREEN IS THE "PRODUCT CARD DECK" (owner brief, 2026-10-03) ─
 //
-//   · the top ProgressBar,
-//   · the question Card with the difficulty Badge and the
-//     "{subjectIcon} {subjectName} · {topicName}" chip,
-//   · the GlassTile answer options (indigo-600 letter circle + indigo ink on
-//     the chosen one, "Skip this question" underneath),
-//   · the swipeable scroller (60px threshold, same as revision),
-//   · the `dc-scene-plate dc-scene-plate--bar` footer with Previous / Next,
-//   · the 5-column review grid with its indigo/amber legend + "Submit …",
-//   · the submit confirmation dialog (same glass card, same copy, same
-//     buttons) — scoped to this panel instead of the revision page column,
-//   · and the result / answer-review screens in the same revision language
-//     (score card, correct/wrong/skipped chips, accuracy bar, topic
-//     breakdown, per-question review with explanations).
+//   "Course Player ke andar Mind/Brain page par jo Test/MCQ cards hain, unka
+//    current design completely replace karo … reference ke card design,
+//    stacked-card appearance aur animation ko exactly follow karo … Glass
+//    design bilkul use nahi karna hai … user jis option per click kare vahi
+//    submit ho jaaye aur card out ho slide hokar next per jaaye … user kisi
+//    bhi direction mein swipe kar sake … top-right corner mein ek small
+//    circular box jisme current question ka count show ho (1/10, 2/10)."
 //
-// One difference: this page lives INSIDE the player's study pane, so it fills
-// the pane instead of a page, and its type + cards scale with `--brain-scale`
-// (1 on a phone — the revision page's own pixel sizes — up to 1.24). Every
-// scaled metric is written as `calc(<the revision px> * var(--brain-scale))`,
-// so the design is the revision design at 1× and simply grows with the box.
+// The reference is https://aicanvas.me/components/product-card-deck, and the
+// deck under the question screen is that component, ported card for card
+// (stack geometry, drag-tilt, spring, flick thresholds, fly-off and all — see
+// src/course/BrainQuestionDeck.tsx). What this panel owns is the practice
+// itself:
+//
+//   · QUESTION   the deck. The top card carries the question, its answers and
+//                the round `3/10` counter in its top-right corner. There is
+//                NO button on the card: not Previous, not Next, not Skip and
+//                not an extra action. Tapping an answer records it and the
+//                card flicks itself away; flicking the card in ANY direction
+//                (left / right / up / down / diagonal) skips the question.
+//                Either way the question behind rises into the top slot and
+//                the next question is simply there — nothing to press.
+//   · REVIEW     when the last card has flown the practice moves on by
+//                itself: the review grid (tap a question to go back to it),
+//                the unanswered legend and the docked Submit Practice bar,
+//                kept from the revision flow.
+//   · SUBMIT     the same confirmation dialog as before, and the same
+//                scoring — a pass (BRAIN_PASS_SCORE) still marks the module's
+//                Brain resource complete exactly once per attempt.
+//   · RESULT     score, correct / wrong / skipped, accuracy, topic breakdown,
+//                then Review Answers / Practice again / All practice sets.
+//   · ANSWERS    every question with the learner's answer, the correct one and
+//                the explanation.
+//
+// ── NO GLASS ────────────────────────────────────────────────────────────────
+//
+// The question screen used to be the revision test-taking page: GlassSurface
+// cards, GlassTile answers, a `dc-scene-plate` bar. All of it is gone from the
+// Brain tab — every surface is now painted with the reference's own solid
+// palette (rounded-22 #D3DDEE cards, #111111 ink, the #141312 / #F5F1E8 pill,
+// the two reference shadows) through src/course/BrainCards.tsx, with no
+// backdrop filter anywhere. The revision Test Player itself is untouched.
 //
 // ── THE SCALE FOLLOWS THE PANE, NOT THE SCREEN (owner brief, 2026-09-28) ───
+//
 //   "Course player ke andar jo Brain page ka design hai, itna flexible banao
 //    ki vah screen size / jaise area ke according question, option aur jo bhi
-//    button hai sab kuchh properly visible ho jaaye … jaise split mode mein
-//    ham donon hisson ko jitna man kahe utna khinchkar upar niche kar sakte
-//    hain, to uske according yah Brain page utna hi flexible ho."
+//    button hai sab kuchh properly visible ho jaaye."
 //
 // The Study pane's size is not the screen's: the learner drags the Split Deck
 // divider and the pane becomes any height and width, on any device. So the
 // panel MEASURES ITSELF (`useFitTarget` + `brainFitScale`, src/course/
-// panelFit.ts) and publishes `--brain-scale` on whichever screen is mounted:
-// a wide pane grows the design to 1.24, a short pane shrinks it (floor 0.8,
-// where the answer tiles still clear a 44 px touch target) so the question,
-// its options and the docked Previous / Next bar stay visible instead of being
-// cut. The `@media` ladder in src/index.css is only the pre-measure fallback —
-// the measured value is written inline and always wins.
+// panelFit.ts) and publishes `--brain-scale` on whichever screen is mounted,
+// and the deck measures its own box too (`brainDeckSize`) and scales the cards
+// with it. A wide pane grows the design; a short one shrinks it (floor 0.8,
+// where an answer tile still clears a 44 px touch target) so the question, its
+// options and the action bar stay visible instead of being cut.
 //
 // What the learner sees comes straight off the course tree: a `brain` file
 // carries `practiceQuestions` (see utils/practiceSet.js). Nothing is fetched
 // separately, and nothing is written to the revision engine — practice sets
 // belong to their module, not to the revision Test Bank.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent as ReactTouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Brain, RotateCcw } from "lucide-react";
-import { GlassSurface } from "../components/ui/glass";
-import { GlassTile } from "../components/ui/glass-tile";
-import { Badge, Card, PrimaryButton, ProgressBar, SecondaryButton } from "../revision/components/ui";
-import { CheckIcon, ChevronRightIcon, MinusIcon, XIcon } from "../revision/components/icons";
+import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
+import { BRAIN, BrainBadge, BrainPill, BrainProgress, BrainSurface } from "./BrainCards";
+import BrainQuestionDeck, { type BrainDeckItem } from "./BrainQuestionDeck";
 import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
-const SWIPE_THRESHOLD = 60;
 /** The score that marks the module's Brain resource complete in the player. */
 export const BRAIN_PASS_SCORE = 60;
 
@@ -136,22 +154,31 @@ function ModuleChip({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const base = "inline-flex shrink-0 items-center gap-1.5 rounded-full border font-semibold transition";
   return (
     <button
       type="button"
       data-brain-module-chip=""
       data-brain-module-chip-active={active ? "true" : undefined}
       onClick={onClick}
-      className={`${base} ${
-        active
-          ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-100"
-          : "border-white/15 bg-white/5 text-white/70 hover:text-white"
-      }`}
-      style={{ fontSize: S(11), padding: `${S(5)} ${S(11)}` }}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition"
+      style={{
+        fontSize: S(11),
+        padding: `${S(5)} ${S(11)}`,
+        border: active ? "none" : "1px solid rgba(255,255,255,0.22)",
+        background: active ? BRAIN.pill : "transparent",
+        color: active ? BRAIN.pillInk : BRAIN.hint,
+        cursor: "pointer",
+      }}
     >
       <span className="max-w-[9rem] truncate">{label}</span>
-      <span className={`rounded-full px-1.5 ${active ? "bg-emerald-400/25" : "bg-white/10"}`} style={{ fontSize: S(10) }}>
+      <span
+        className="rounded-full px-1.5"
+        style={{
+          fontSize: S(10),
+          background: active ? "rgba(245,241,232,0.22)" : "rgba(255,255,255,0.10)",
+          color: active ? BRAIN.pillInk : BRAIN.hint,
+        }}
+      >
         {count}
       </span>
     </button>
@@ -172,17 +199,23 @@ export default function CourseBrainPanel({
   const [scores, setScores] = useState<Record<string, BrainPracticeScore>>(() => loadScores(productId));
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"question" | "review" | "result" | "answers">("question");
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [selections, setSelections] = useState<Record<number, number>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [passedNow, setPassedNow] = useState(false);
+  /**
+   * The deck: the questions still to show, in order. `[0]` is the card on top.
+   * `key` is unique per deal (see the token below) so a question that comes
+   * back after the learner jumps to it from the review grid mounts as a new
+   * card instead of reusing the DOM of the one that flew away.
+   */
+  const [deck, setDeck] = useState<BrainDeckItem[]>([]);
+  const dealRef = useRef(0);
   /**
    * The module whose practice is on screen. It FOLLOWS the lesson the learner
    * is watching; picking another module in the chip row pins it until the
    * lesson changes again (which clears the pin below).
    */
   const [moduleOverride, setModuleOverride] = useState<string | null>(null);
-  const touchStartXRef = useRef<number | null>(null);
   const scoredRef = useRef<string | null>(null);
 
   /**
@@ -190,10 +223,10 @@ export default function CourseBrainPanel({
    * and publishes `--brain-scale` on the mounted screen's root. This is what
    * makes the page follow the Split Deck divider: the study pane's size IS the
    * panel root's size, so dragging the divider re-solves the scale and the
-   * question, its options and the Previous / Next bar re-fit instead of being
-   * cut. It is written straight to the DOM (no state, no re-render per frame)
-   * and synchronously on attach, so the first paint is already the right size;
-   * the `@media` ladder in src/index.css only covers the frames before that.
+   * question, its options and the action bar re-fit instead of being cut. It
+   * is written straight to the DOM (no state, no re-render per frame) and
+   * synchronously on attach, so the first paint is already the right size; the
+   * `@media` ladder in src/index.css only covers the frames before that.
    */
   const publishBrainFit = useCallback((node: HTMLElement | null) => {
     if (!node) return;
@@ -211,8 +244,8 @@ export default function CourseBrainPanel({
     setModuleOverride(null);
     setActiveSetId(null);
     setMode("question");
-    setCurrentIndex(0);
     setSelections({});
+    setDeck([]);
     setShowSubmitConfirm(false);
     setPassedNow(false);
   }, [activeModuleId]);
@@ -239,15 +272,55 @@ export default function CourseBrainPanel({
     return sets.filter((set) => set.moduleId === target);
   }, [sets, moduleOverride, activeModuleId]);
 
+  const activeSet = useMemo(() => sets.find((set) => set.id === activeSetId) ?? null, [sets, activeSetId]);
+  const questions = activeSet?.questions ?? [];
+  const total = questions.length;
+  const unansweredCount = total - questions.filter((_, index) => selections[index] !== undefined).length;
+
+  /** Deal a fresh deck from `from` to the end of the set. */
+  const openDeck = useCallback(
+    (from = 0) => {
+      dealRef.current += 1;
+      const deal = dealRef.current;
+      const setId = activeSetId ?? "set";
+      setDeck(
+        questions.slice(from).map((_, offset) => {
+          const index = from + offset;
+          return { key: `${setId}:${deal}:${index}`, index };
+        }),
+      );
+      setMode("question");
+    },
+    [questions, activeSetId],
+  );
+
+  /**
+   * Back into the deck from the review grid — at the first question that has no
+   * answer yet, not at the top of the set. A learner who comes back to finish
+   * what they skipped lands straight on it instead of flicking through the
+   * questions they already answered (every answered card leaves the deck for
+   * good, so a card cannot be re-visited by flicking back anyway).
+   */
+  const resumeDeck = useCallback(() => {
+    const firstUnanswered = questions.findIndex((_, index) => selections[index] === undefined);
+    openDeck(firstUnanswered < 0 ? 0 : firstUnanswered);
+  }, [questions, selections, openDeck]);
+
   /** Every state change that starts a set from scratch, in one place. */
-  const openSet = useCallback((setId: string) => {
-    setActiveSetId(setId);
-    setMode("question");
-    setCurrentIndex(0);
-    setSelections({});
-    setShowSubmitConfirm(false);
-    setPassedNow(false);
-  }, []);
+  const openSet = useCallback(
+    (setId: string) => {
+      setActiveSetId(setId);
+      setMode("question");
+      setSelections({});
+      setShowSubmitConfirm(false);
+      setPassedNow(false);
+      dealRef.current += 1;
+      const deal = dealRef.current;
+      const target = sets.find((set) => set.id === setId);
+      setDeck((target?.questions ?? []).map((_, index) => ({ key: `${setId}:${deal}:${index}`, index })));
+    },
+    [sets],
+  );
 
   /**
    * A Brain resource tapped in the Modules list (or a deep link) opens its set.
@@ -265,12 +338,6 @@ export default function CourseBrainPanel({
     // set must happen once per pin, not on every re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSetId]);
-
-  const activeSet = useMemo(() => sets.find((set) => set.id === activeSetId) ?? null, [sets, activeSetId]);
-  const questions = activeSet?.questions ?? [];
-  const total = questions.length;
-  const question = total ? questions[Math.min(currentIndex, total - 1)] : null;
-  const unansweredCount = total - questions.filter((_, index) => selections[index] !== undefined).length;
 
   const stats = useMemo(() => {
     if (!total) return { correct: 0, wrong: 0, skipped: 0, score: 0, byTopic: [] as Array<{ topic: string; correct: number; total: number; accuracy: number }> };
@@ -313,25 +380,30 @@ export default function CourseBrainPanel({
   function backToLibrary() {
     setActiveSetId(null);
     setMode("question");
-    setCurrentIndex(0);
     setSelections({});
+    setDeck([]);
     setShowSubmitConfirm(false);
     setPassedNow(false);
   }
 
-  function selectOption(optionIndex: number) {
-    if (!question) return;
-    setSelections((previous) => ({ ...previous, [currentIndex]: optionIndex }));
-  }
+  /** An answer tapped on the top card. Recorded at once — the card then leaves. */
+  const answerQuestion = useCallback((questionIndex: number, optionIndex: number) => {
+    setSelections((previous) => ({ ...previous, [questionIndex]: optionIndex }));
+  }, []);
 
-  function goNext() {
-    if (currentIndex < total - 1) setCurrentIndex(currentIndex + 1);
-    else setMode("review");
-  }
+  /** The top card left the deck (answered or swiped): the next one rises. */
+  const dismissTopCard = useCallback(() => {
+    setDeck((previous) => previous.slice(1));
+  }, []);
 
-  function goPrev() {
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-  }
+  /**
+   * The LAST card finished its fly-off. The practice continues on its own —
+   * the review grid, then Submit Practice, then the result — so a learner who
+   * flicks the final question away still lands in the existing submit flow.
+   */
+  const finishDeck = useCallback(() => {
+    setMode("review");
+  }, []);
 
   function handleSubmit() {
     if (!activeSet) return;
@@ -351,20 +423,6 @@ export default function CourseBrainPanel({
     } else {
       setPassedNow(false);
     }
-  }
-
-  function onTouchStart(event: ReactTouchEvent) {
-    touchStartXRef.current = event.touches[0]?.clientX ?? null;
-  }
-
-  function onTouchEnd(event: ReactTouchEvent) {
-    if (touchStartXRef.current === null) return;
-    const delta = (event.changedTouches[0]?.clientX ?? 0) - touchStartXRef.current;
-    touchStartXRef.current = null;
-    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
-    if (mode !== "question") return;
-    if (delta > 0) goPrev();
-    else goNext();
   }
 
   /* ── library — every practice set the admin imported for this course ─── */
@@ -410,134 +468,181 @@ export default function CourseBrainPanel({
           </div>
         ) : null}
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ marginTop: practiceModules.length > 0 ? S(10) : 0 }}>
-        {moduleSets.length === 0 ? (
-          <Card className="brain-card" style={{ padding: S(16) } as CSSProperties}>
-            <div className="flex flex-col items-center gap-2 py-6 text-center" data-brain-empty>
-              <span className="flex items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-300" style={{ height: S(56), width: S(56) }}>
-                <Brain style={{ height: S(26), width: S(26) }} />
-              </span>
-              <p className="font-black text-white" style={{ fontSize: S(14) }}>Brain</p>
-              <p className="font-semibold text-white/55" style={{ fontSize: S(11) }}>
-                {sets.length === 0
-                  ? "Practice sets for this course will appear here as soon as your teacher adds them."
-                  : "No practice sets in this module yet. Open another module, or browse everything your teacher has added."}
-              </p>
-              {sets.length > 0 ? (
-                <div style={{ marginTop: S(8) }}>
-                  <SecondaryButton
-                    onClick={() => {
-                      setModuleOverride(ALL_MODULES);
-                      setActiveSetId(null);
-                    }}
-                  >
-                    Show all practice sets
-                  </SecondaryButton>
-                </div>
-              ) : null}
-            </div>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {moduleSets.map((set) => {
-              const record = scores[set.id];
-              const done = completedFileIds?.has(set.id) ?? false;
-              return (
-                <Card key={set.id} className="brain-card" data-brain-set={set.id} style={{ padding: S(16) } as CSSProperties}>
-                  <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: S(8) }}>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/15 font-semibold text-white/85" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                      {set.moduleTitle}
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-emerald-500/20 font-semibold text-emerald-200" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                      {set.questions.length} question{set.questions.length === 1 ? "" : "s"}
-                    </span>
-                    {done ? (
-                      <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-600 font-bold text-white" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                        <CheckIcon style={{ height: S(12), width: S(12) }} /> Done
-                      </span>
-                    ) : null}
-                  </div>
-                  <h2 className="font-semibold leading-snug text-white" style={{ fontSize: S(19) }}>{set.title}</h2>
-                  {record ? (
-                    <div className="flex items-center gap-2" style={{ marginTop: S(8) }}>
-                      <ProgressBar value={record.best} />
-                      <span className="shrink-0 font-bold text-indigo-200" style={{ fontSize: S(12) }}>Best {record.best}%</span>
-                    </div>
-                  ) : (
-                    <p className="font-medium text-white/55" style={{ marginTop: S(6), fontSize: S(12) }}>
-                      Not attempted yet.
-                    </p>
-                  )}
-                  {record ? (
-                    <p className="font-medium text-white/45" style={{ marginTop: S(6), fontSize: S(11) }}>
-                      {record.attempts} attempt{record.attempts === 1 ? "" : "s"} · last {record.last}%
-                    </p>
-                  ) : null}
+          {moduleSets.length === 0 ? (
+            <BrainSurface data-brain-empty="" style={{ padding: S(16) }}>
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span
+                  className="flex items-center justify-center rounded-full"
+                  style={{ height: S(56), width: S(56), background: BRAIN.pill, color: BRAIN.pillInk }}
+                >
+                  <Brain style={{ height: S(26), width: S(26) }} />
+                </span>
+                <p className="font-bold" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                  Brain
+                </p>
+                <p className="font-semibold" style={{ fontSize: S(11), color: BRAIN.inkSoft }}>
+                  {sets.length === 0
+                    ? "Practice sets for this course will appear here as soon as your teacher adds them."
+                    : "No practice sets in this module yet. Open another module, or browse everything your teacher has added."}
+                </p>
+                {sets.length > 0 ? (
                   <div style={{ marginTop: S(12) }}>
-                    <PrimaryButton onClick={() => startSet(set.id)}>
-                      {record ? "Practice again" : "Start practice"}
-                      <ChevronRightIcon style={{ height: S(16), width: S(16) }} />
-                    </PrimaryButton>
+                    <BrainPill
+                      onClick={() => {
+                        setModuleOverride(ALL_MODULES);
+                        setActiveSetId(null);
+                      }}
+                      style={{ fontSize: S(13), padding: `${S(9)} ${S(18)}` }}
+                    >
+                      Show all practice sets
+                    </BrainPill>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                ) : null}
+              </div>
+            </BrainSurface>
+          ) : (
+            <div className="space-y-3">
+              {moduleSets.map((set) => {
+                const record = scores[set.id];
+                const done = completedFileIds?.has(set.id) ?? false;
+                return (
+                  <BrainSurface key={set.id} data-brain-set={set.id} style={{ padding: S(16) }}>
+                    <div className="flex flex-wrap items-center" style={{ gap: S(8), marginBottom: S(10) }}>
+                      <BrainBadge tone="module">{set.moduleTitle}</BrainBadge>
+                      <BrainBadge tone="count">
+                        {set.questions.length} question{set.questions.length === 1 ? "" : "s"}
+                      </BrainBadge>
+                      {done ? (
+                        <span className="ml-auto inline-flex">
+                          <BrainBadge tone="done">
+                            <CheckIcon style={{ height: S(12), width: S(12) }} /> Done
+                          </BrainBadge>
+                        </span>
+                      ) : null}
+                    </div>
+                    <h2 className="font-semibold leading-snug" style={{ fontSize: S(19), color: BRAIN.ink }}>
+                      {set.title}
+                    </h2>
+                    {record ? (
+                      <div className="flex items-center" style={{ gap: S(10), marginTop: S(10) }}>
+                        <BrainProgress value={record.best} style={{ flex: 1 }} />
+                        <span className="shrink-0 font-bold" style={{ fontSize: S(12), color: BRAIN.ink }}>
+                          Best {record.best}%
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="font-medium" style={{ marginTop: S(6), fontSize: S(12), color: BRAIN.inkSoft }}>
+                        Not attempted yet.
+                      </p>
+                    )}
+                    {record ? (
+                      <p className="font-medium" style={{ marginTop: S(6), fontSize: S(11), color: BRAIN.inkFaint }}>
+                        {record.attempts} attempt{record.attempts === 1 ? "" : "s"} · last {record.last}%
+                      </p>
+                    ) : null}
+                    <div style={{ marginTop: S(14) }}>
+                      <BrainPill
+                        onClick={() => startSet(set.id)}
+                        style={{ fontSize: S(13), padding: `${S(9)} ${S(18)}` }}
+                      >
+                        {record ? "Practice again" : "Start practice"}
+                      </BrainPill>
+                    </div>
+                  </BrainSurface>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  /* ── review — the revision review grid, exactly ──────────────────────── */
+  /* ── review — the submit step: the grid, the legend, the docked bar ──── */
 
   if (mode === "review") {
     return (
       <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="review" style={{ fontSize: S(16) }}>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-          <Card className="brain-card" style={{ padding: S(16) } as CSSProperties}>
-            <p className="text-white/75" style={{ fontSize: S(14), marginBottom: S(16) }}>
+          <BrainSurface style={{ padding: S(16) }}>
+            <p style={{ fontSize: S(14), color: BRAIN.inkSoft, marginBottom: S(16) }}>
               Tap any question to jump back and change your answer before you submit.
             </p>
             <div className="grid grid-cols-5" style={{ gap: S(10) }}>
               {questions.map((item, index) => {
                 const answered = selections[index] !== undefined;
                 return (
-                  <GlassTile
+                  <button
                     key={`${item.id}-${index}`}
-                    onClick={() => {
-                      setCurrentIndex(index);
-                      setMode("question");
+                    type="button"
+                    data-brain-review-tile={index + 1}
+                    onClick={() => openDeck(index)}
+                    className="font-bold"
+                    style={{
+                      height: S(48),
+                      borderRadius: S(14),
+                      fontSize: S(14),
+                      cursor: "pointer",
+                      border: answered ? "none" : `1px solid ${BRAIN.line}`,
+                      background: answered ? BRAIN.pill : BRAIN.plate,
+                      color: answered ? BRAIN.pillInk : BRAIN.ink,
                     }}
-                    className={`dc-tile aspect-auto rounded-xl font-bold ${
-                      answered ? "ring-1 ring-indigo-400/50 text-indigo-200" : "ring-1 ring-amber-400/50 text-amber-200"
-                    }`}
-                    style={{ height: S(48), fontSize: S(14) }}
                   >
                     {index + 1}
-                  </GlassTile>
+                  </button>
                 );
               })}
             </div>
-            <div className="flex items-center gap-4 font-medium text-white/75" style={{ marginTop: S(20), fontSize: S(12) }}>
-              <span className="flex items-center gap-1.5">
-                <span className="rounded-full bg-indigo-400" style={{ height: S(10), width: S(10) }} /> Answered
+            <div className="flex items-center font-medium" style={{ marginTop: S(20), gap: S(16), fontSize: S(12), color: BRAIN.inkSoft }}>
+              <span className="flex items-center" style={{ gap: S(6) }}>
+                <span style={{ height: S(10), width: S(10), borderRadius: 9999, background: BRAIN.pill }} /> Answered
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="rounded-full bg-amber-400" style={{ height: S(10), width: S(10) }} /> Unanswered
+              <span className="flex items-center" style={{ gap: S(6) }}>
+                <span
+                  style={{
+                    height: S(10),
+                    width: S(10),
+                    borderRadius: 9999,
+                    background: BRAIN.plate,
+                    border: `1px solid ${BRAIN.line}`,
+                  }}
+                />{" "}
+                Unanswered
               </span>
             </div>
-          </Card>
+          </BrainSurface>
         </div>
+        {/* The bar is DOCKED: `shrink-0` (plus the scroller above owning the
+            only `flex-1`) is what guarantees Back / Submit Practice are on
+            screen at every pane height — the grid scrolls, the buttons never
+            do. It is a solid plate, not a glass strip. */}
         <div
-          className="dc-scene-plate dc-scene-plate--bar flex shrink-0 border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
-          style={{ gap: S(12), padding: `${S(12)} ${S(16)} calc(env(safe-area-inset-bottom) + ${S(12)})` }}
+          className="flex shrink-0"
+          data-brain-action-bar=""
+          style={{
+            gap: S(12),
+            padding: `${S(12)} ${S(16)} calc(env(safe-area-inset-bottom) + ${S(12)})`,
+            background: BRAIN.page,
+            borderTopLeftRadius: BRAIN.radius,
+            borderTopRightRadius: BRAIN.radius,
+            boxShadow: "0 -14px 30px rgba(0,0,0,0.22)",
+          }}
         >
-          <SecondaryButton onClick={() => setMode("question")} className="flex-1 min-w-0">
+          <BrainPill
+            tone="outline"
+            onClick={resumeDeck}
+            className="min-w-0"
+            style={{ flex: 1, fontSize: S(14), minHeight: S(46), padding: `${S(10)} ${S(16)}` }}
+          >
             Back
-          </SecondaryButton>
-          <PrimaryButton onClick={() => setShowSubmitConfirm(true)} className="flex-1 min-w-0">
+          </BrainPill>
+          <BrainPill
+            onClick={() => setShowSubmitConfirm(true)}
+            className="min-w-0"
+            style={{ flex: 1.4, fontSize: S(14), minHeight: S(46), padding: `${S(10)} ${S(16)}` }}
+          >
             Submit Practice
-          </PrimaryButton>
+          </BrainPill>
         </div>
         {showSubmitConfirm ? (
           <BrainSubmitDialog
@@ -552,7 +657,7 @@ export default function CourseBrainPanel({
     );
   }
 
-  /* ── result — the revision result page, exactly ──────────────────────── */
+  /* ── result — score, breakdown, and the way on ───────────────────────── */
 
   if (mode === "result") {
     const message =
@@ -560,76 +665,118 @@ export default function CourseBrainPanel({
     return (
       <div ref={fitRef} className="h-full overflow-y-auto px-3 py-3" data-course-brain-panel="" data-brain-screen="result" style={{ fontSize: S(16) }}>
         <div className="space-y-4">
-          <Card className="brain-card bg-indigo-600 text-center text-white" data-brain-score-card style={{ padding: S(16) } as CSSProperties}>
-            <p className="font-semibold text-indigo-100" style={{ fontSize: S(12) }}>
+          <BrainSurface tone="dark" data-brain-score-card="" style={{ padding: S(16), textAlign: "center" }}>
+            <p className="font-semibold" style={{ fontSize: S(12), color: "rgba(245,241,232,0.75)" }}>
               {activeSet.title}
             </p>
-            <p className="font-bold uppercase text-indigo-200" style={{ fontSize: S(10), letterSpacing: "0.16em", marginTop: S(4) }}>
+            <p className="font-bold uppercase" style={{ fontSize: S(10), letterSpacing: "0.16em", marginTop: S(4), color: "rgba(245,241,232,0.6)" }}>
               {activeSet.moduleTitle}
             </p>
-            <p className="font-semibold uppercase text-indigo-100" style={{ fontSize: S(12), marginTop: S(8) }}>
+            <p className="font-semibold uppercase" style={{ fontSize: S(12), marginTop: S(10), color: "rgba(245,241,232,0.75)" }}>
               Your Score
             </p>
-            <p className="font-extrabold" style={{ fontSize: S(48), marginTop: S(4) }}>{stats.score}%</p>
-            <p className="text-indigo-100" style={{ fontSize: S(14), marginTop: S(4) }}>{message}</p>
+            <p className="font-extrabold" style={{ fontSize: S(48), marginTop: S(4), color: BRAIN.pillInk }}>
+              {stats.score}%
+            </p>
+            <p style={{ fontSize: S(14), marginTop: S(4), color: "rgba(245,241,232,0.85)" }}>{message}</p>
             {passedNow ? (
-              <p className="mx-auto flex w-max items-center gap-1.5 rounded-full bg-white/20 font-bold text-white" style={{ fontSize: S(11), marginTop: S(10), padding: `${S(4)} ${S(12)}` }} data-brain-passed>
+              <p
+                data-brain-passed=""
+                className="mx-auto flex w-max items-center font-bold"
+                style={{
+                  gap: S(6),
+                  fontSize: S(11),
+                  marginTop: S(12),
+                  padding: `${S(5)} ${S(12)}`,
+                  borderRadius: 9999,
+                  background: "#1F7A54",
+                  color: BRAIN.pillInk,
+                }}
+              >
                 <CheckIcon style={{ height: S(13), width: S(13) }} /> Module marked complete
               </p>
             ) : null}
-          </Card>
+          </BrainSurface>
 
-          <Card className="brain-card" style={{ padding: S(12) } as CSSProperties}>
+          <BrainSurface style={{ padding: S(12) }}>
             <div className="grid grid-cols-3" style={{ gap: S(12) }} data-brain-result-grid>
-              <ResultChip icon={<CheckIcon className="text-emerald-300" style={{ height: S(20), width: S(20) }} />} label="Correct" value={stats.correct} tone="bg-emerald-500/20" />
-              <ResultChip icon={<XIcon className="text-rose-300" style={{ height: S(20), width: S(20) }} />} label="Wrong" value={stats.wrong} tone="bg-rose-500/20" />
-              <ResultChip icon={<MinusIcon className="text-white/55" style={{ height: S(20), width: S(20) }} />} label="Skipped" value={stats.skipped} tone="border border-white/15" />
+              <ResultChip icon={<CheckIcon style={{ height: S(20), width: S(20) }} />} label="Correct" value={stats.correct} tone="correct" />
+              <ResultChip icon={<XIcon style={{ height: S(20), width: S(20) }} />} label="Wrong" value={stats.wrong} tone="wrong" />
+              <ResultChip icon={<MinusIcon style={{ height: S(20), width: S(20) }} />} label="Skipped" value={stats.skipped} tone="skipped" />
             </div>
-          </Card>
+          </BrainSurface>
 
-          <Card className="brain-card" style={{ padding: S(16) } as CSSProperties}>
+          <BrainSurface style={{ padding: S(16) }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-white" style={{ fontSize: S(15) }}>Accuracy</h2>
-              <span className="font-bold text-indigo-300" style={{ fontSize: S(14) }}>{stats.score}%</span>
+              <h2 className="font-bold" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                Accuracy
+              </h2>
+              <span className="font-bold" style={{ fontSize: S(14), color: BRAIN.ink }}>
+                {stats.score}%
+              </span>
             </div>
-            <div style={{ marginTop: S(8) }}>
-              <ProgressBar value={stats.score} />
+            <div style={{ marginTop: S(10) }}>
+              <BrainProgress value={stats.score} />
             </div>
-            <p className="font-medium text-white/55" style={{ fontSize: S(12), marginTop: S(8) }}>
+            <p className="font-medium" style={{ fontSize: S(12), marginTop: S(8), color: BRAIN.inkSoft }}>
               {stats.correct} correct out of {total} questions
             </p>
-          </Card>
+          </BrainSurface>
 
           {stats.byTopic.length > 1 ? (
-            <Card className="brain-card" style={{ padding: S(16) } as CSSProperties}>
-              <h2 className="font-bold text-white" style={{ fontSize: S(15), marginBottom: S(12) }}>Topic Breakdown</h2>
+            <BrainSurface style={{ padding: S(16) }}>
+              <h2 className="font-bold" style={{ fontSize: S(15), marginBottom: S(12), color: BRAIN.ink }}>
+                Topic Breakdown
+              </h2>
               <div style={{ display: "grid", gap: S(12) }}>
                 {[...stats.byTopic].sort((a, b) => a.accuracy - b.accuracy).map((topic) => (
                   <div key={topic.topic} className="flex items-center" style={{ gap: S(12) }}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="truncate font-medium text-white/85" style={{ fontSize: S(14) }}>{topic.topic}</p>
-                        <span className="font-semibold text-white/75" style={{ fontSize: S(12), marginLeft: S(8) }}>
+                        <p className="truncate font-medium" style={{ fontSize: S(14), color: BRAIN.ink }}>
+                          {topic.topic}
+                        </p>
+                        <span className="font-semibold" style={{ fontSize: S(12), marginLeft: S(8), color: BRAIN.inkSoft }}>
                           {topic.correct}/{topic.total} · {topic.accuracy}%
                         </span>
                       </div>
                       <div style={{ marginTop: S(6) }}>
-                        <ProgressBar value={topic.accuracy} />
+                        <BrainProgress value={topic.accuracy} height={6} />
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </BrainSurface>
           ) : null}
 
           <div className="space-y-3">
-            <PrimaryButton onClick={() => setMode("answers")}>Review Answers</PrimaryButton>
+            <BrainPill
+              onClick={() => setMode("answers")}
+              className="w-full"
+              style={{ fontSize: S(14), minHeight: S(48), padding: `${S(11)} ${S(16)}` }}
+            >
+              Review Answers
+            </BrainPill>
             <div className="grid grid-cols-2" style={{ gap: S(8) }}>
-              <SecondaryButton onClick={() => startSet(activeSet.id)}>
-                <RotateCcw style={{ height: S(16), width: S(16) }} /> Practice again
-              </SecondaryButton>
-              <SecondaryButton onClick={backToLibrary}>All practice sets</SecondaryButton>
+              <BrainPill
+                tone="outline"
+                onClick={() => startSet(activeSet.id)}
+                className="min-w-0"
+                style={{ fontSize: S(13), minHeight: S(46), padding: `${S(10)} ${S(12)}` }}
+              >
+                <span className="inline-flex items-center justify-center" style={{ gap: S(6) }}>
+                  <RotateCcw style={{ height: S(16), width: S(16) }} /> Practice again
+                </span>
+              </BrainPill>
+              <BrainPill
+                tone="outline"
+                onClick={backToLibrary}
+                className="min-w-0"
+                style={{ fontSize: S(13), minHeight: S(46), padding: `${S(10)} ${S(12)}` }}
+              >
+                All practice sets
+              </BrainPill>
             </div>
           </div>
         </div>
@@ -637,7 +784,7 @@ export default function CourseBrainPanel({
     );
   }
 
-  /* ── answers — the revision answer-review page, exactly ──────────────── */
+  /* ── answers — every question, the learner's pick and the explanation ── */
 
   if (mode === "answers") {
     return (
@@ -646,67 +793,108 @@ export default function CourseBrainPanel({
           {questions.map((item, index) => {
             const picked = selections[index];
             const status = picked === undefined ? "skipped" : picked === item.correctIndex ? "correct" : "wrong";
-            const ring = status === "correct" ? "ring-1 ring-emerald-400/40" : status === "wrong" ? "ring-1 ring-rose-400/40" : "";
             return (
-              <Card key={`${item.id}-${index}`} className={`brain-card ${ring}`} style={{ padding: S(16) } as CSSProperties}>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-white/55" style={{ fontSize: S(12) }}>Q{index + 1}</span>
-                  <Badge tone={item.difficulty}>{item.difficulty}</Badge>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/15 font-semibold text-white/85" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                    {item.topic || activeSet.moduleTitle}
+              <BrainSurface key={`${item.id}-${index}`} style={{ padding: S(16) }}>
+                <div className="mb-2 flex flex-wrap items-center" style={{ gap: S(8) }}>
+                  <span className="font-bold" style={{ fontSize: S(12), color: BRAIN.inkFaint }}>
+                    Q{index + 1}
                   </span>
-                  {status === "correct" ? (
-                    <span className="ml-auto flex items-center gap-1 rounded-full bg-emerald-600 font-bold text-white" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                      <CheckIcon style={{ height: S(12), width: S(12) }} /> Correct
-                    </span>
-                  ) : status === "wrong" ? (
-                    <span className="ml-auto flex items-center gap-1 rounded-full bg-rose-600 font-bold text-white" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                      <XIcon style={{ height: S(12), width: S(12) }} /> Incorrect
-                    </span>
-                  ) : (
-                    <span className="ml-auto flex items-center gap-1 rounded-full border border-white/20 font-bold text-white/85" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                      <MinusIcon style={{ height: S(12), width: S(12) }} /> Skipped
-                    </span>
-                  )}
+                  <BrainBadge tone={item.difficulty}>{item.difficulty}</BrainBadge>
+                  <BrainBadge tone="module">{item.topic || activeSet.moduleTitle}</BrainBadge>
+                  <span className="ml-auto inline-flex">
+                    {status === "correct" ? (
+                      <BrainBadge tone="correct">
+                        <CheckIcon style={{ height: S(12), width: S(12) }} /> Correct
+                      </BrainBadge>
+                    ) : status === "wrong" ? (
+                      <BrainBadge tone="wrong">
+                        <XIcon style={{ height: S(12), width: S(12) }} /> Incorrect
+                      </BrainBadge>
+                    ) : (
+                      <BrainBadge tone="skipped">
+                        <MinusIcon style={{ height: S(12), width: S(12) }} /> Skipped
+                      </BrainBadge>
+                    )}
+                  </span>
                 </div>
-                <p className="font-semibold leading-snug text-white" style={{ fontSize: S(15) }}>{item.prompt}</p>
+                <p className="font-semibold leading-snug" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                  {item.prompt}
+                </p>
                 <div style={{ marginTop: S(12), display: "grid", gap: S(8) }}>
                   {item.options.map((option, optionIndex) => {
                     const isCorrect = optionIndex === item.correctIndex;
                     const isPicked = optionIndex === picked;
-                    const tone = isCorrect
-                      ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
+                    const paint = isCorrect
+                      ? { background: "rgba(31, 122, 84, 0.16)", border: "1px solid rgba(31, 122, 84, 0.45)", color: "#12543A" }
                       : isPicked
-                        ? "border-rose-400/30 bg-rose-500/20 text-rose-200"
-                        : "border-white/15 text-white/85";
+                        ? { background: "rgba(178, 58, 72, 0.14)", border: "1px solid rgba(178, 58, 72, 0.42)", color: "#7C2431" }
+                        : { background: BRAIN.plate, border: `1px solid ${BRAIN.line}`, color: BRAIN.ink };
                     return (
-                      <div key={optionIndex} className={`flex items-center rounded-xl border px-3 py-2.5 font-medium ${tone}`} style={{ gap: S(10), fontSize: S(14) }}>
-                        <span className="flex shrink-0 items-center justify-center rounded-full border border-current/30 font-bold" style={{ height: S(24), width: S(24), fontSize: S(11) }}>
+                      <div
+                        key={optionIndex}
+                        className="flex items-center rounded-xl font-medium"
+                        style={{ gap: S(10), fontSize: S(14), padding: `${S(10)} ${S(12)}`, borderRadius: S(14), ...paint }}
+                      >
+                        <span
+                          className="flex shrink-0 items-center justify-center rounded-full font-bold"
+                          style={{ height: S(24), width: S(24), fontSize: S(11), border: "1px solid currentColor" }}
+                        >
                           {OPTION_LETTERS[optionIndex]}
                         </span>
                         <span className="flex-1">{option}</span>
-                        {isCorrect ? <CheckIcon className="shrink-0 text-emerald-300" style={{ height: S(16), width: S(16) }} /> : null}
-                        {isPicked && !isCorrect ? <XIcon className="shrink-0 text-rose-300" style={{ height: S(16), width: S(16) }} /> : null}
+                        {isCorrect ? <CheckIcon className="shrink-0" style={{ height: S(16), width: S(16) }} /> : null}
+                        {isPicked && !isCorrect ? <XIcon className="shrink-0" style={{ height: S(16), width: S(16) }} /> : null}
                       </div>
                     );
                   })}
                 </div>
                 {item.explanation ? (
-                  <div className="rounded-xl border border-white/10" style={{ marginTop: S(12), padding: S(12) }}>
-                    <p className="font-bold text-white/75" style={{ fontSize: S(12) }}>Explanation</p>
-                    <p className="leading-relaxed text-white/85" style={{ fontSize: S(14), marginTop: S(4) }}>{item.explanation}</p>
+                  <div
+                    style={{
+                      marginTop: S(12),
+                      padding: S(12),
+                      borderRadius: S(14),
+                      background: "rgba(20, 19, 18, 0.07)",
+                    }}
+                  >
+                    <p className="font-bold" style={{ fontSize: S(12), color: BRAIN.inkSoft }}>
+                      Explanation
+                    </p>
+                    <p className="leading-relaxed" style={{ fontSize: S(14), marginTop: S(4), color: BRAIN.ink }}>
+                      {item.explanation}
+                    </p>
                   </div>
                 ) : null}
-              </Card>
+              </BrainSurface>
             );
           })}
           <div className="space-y-3">
-            <PrimaryButton onClick={() => setMode("result")}>Back to result</PrimaryButton>
+            <BrainPill
+              onClick={() => setMode("result")}
+              className="w-full"
+              style={{ fontSize: S(14), minHeight: S(48), padding: `${S(11)} ${S(16)}` }}
+            >
+              Back to result
+            </BrainPill>
             <div className="grid grid-cols-2" style={{ gap: S(8) }}>
-              <SecondaryButton onClick={() => startSet(activeSet.id)}>
-                <RotateCcw style={{ height: S(16), width: S(16) }} /> Practice again
-              </SecondaryButton>
-              <SecondaryButton onClick={backToLibrary}>All practice sets</SecondaryButton>
+              <BrainPill
+                tone="outline"
+                onClick={() => startSet(activeSet.id)}
+                className="min-w-0"
+                style={{ fontSize: S(13), minHeight: S(46), padding: `${S(10)} ${S(12)}` }}
+              >
+                <span className="inline-flex items-center justify-center" style={{ gap: S(6) }}>
+                  <RotateCcw style={{ height: S(16), width: S(16) }} /> Practice again
+                </span>
+              </BrainPill>
+              <BrainPill
+                tone="outline"
+                onClick={backToLibrary}
+                className="min-w-0"
+                style={{ fontSize: S(13), minHeight: S(46), padding: `${S(10)} ${S(12)}` }}
+              >
+                All practice sets
+              </BrainPill>
             </div>
           </div>
         </div>
@@ -714,7 +902,7 @@ export default function CourseBrainPanel({
     );
   }
 
-  /* ── question — the revision test-taking page, exactly ───────────────── */
+  /* ── question — the practice deck: the reference card, card for card ─── */
 
   return (
     <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="question" style={{ fontSize: S(16) }}>
@@ -722,104 +910,65 @@ export default function CourseBrainPanel({
         <button
           type="button"
           onClick={backToLibrary}
-          className="shrink-0 rounded-full border border-white/15 font-semibold text-white/75 active:text-white"
-          style={{ fontSize: S(11), padding: `${S(5)} ${S(10)}` }}
-          data-brain-back
+          data-brain-back=""
+          className="shrink-0 rounded-full font-semibold"
+          style={{
+            fontSize: S(11),
+            padding: `${S(5)} ${S(10)}`,
+            border: "1px solid rgba(255,255,255,0.22)",
+            background: "transparent",
+            color: BRAIN.hint,
+            cursor: "pointer",
+          }}
         >
           All sets
         </button>
-        <p className="min-w-0 flex-1 truncate font-semibold text-white/60" style={{ fontSize: S(11) }}>
+        <p className="min-w-0 flex-1 truncate font-semibold" style={{ fontSize: S(11), color: BRAIN.hint }}>
           {activeSet.title}
         </p>
       </div>
-      <div className="shrink-0" style={{ padding: `${S(12)} ${S(16)} 0` }}>
-        <ProgressBar value={total ? ((currentIndex + 1) / total) * 100 : 0} />
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: `${S(20)} ${S(16)}` }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {question ? (
-          <Card key={currentIndex} className="brain-card animate-fade-in" style={{ padding: S(16) } as CSSProperties} data-brain-question={currentIndex}>
-            <div className="flex flex-wrap items-center" style={{ gap: S(8), marginBottom: S(12) }}>
-              <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/15 font-semibold text-white/85" style={{ fontSize: S(11), padding: `${S(4)} ${S(10)}` }}>
-                {question.topic || activeSet.moduleTitle} · Question {currentIndex + 1} of {total}
-              </span>
-            </div>
-            <h2 className="font-semibold leading-snug text-white" style={{ fontSize: S(19) }}>{question.prompt}</h2>
 
-            <div style={{ marginTop: S(20), display: "grid", gap: S(12) }}>
-              {question.options.map((option, optionIndex) => {
-                const selected = selections[currentIndex] === optionIndex;
-                return (
-                  <GlassTile
-                    key={optionIndex}
-                    onClick={() => selectOption(optionIndex)}
-                    selected={selected}
-                    className={`dc-tile aspect-auto w-full text-left font-medium [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
-                      selected ? "text-indigo-200" : "text-white/85"
-                    }`}
-                    style={{ minHeight: S(56), fontSize: S(15), padding: `${S(12)} ${S(16)}` }}
-                  >
-                    <span
-                      className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
-                        selected ? "bg-indigo-600 text-white" : "border border-white/20 text-white/75"
-                      }`}
-                      style={{ height: S(28), width: S(28), fontSize: S(12) }}
-                    >
-                      {OPTION_LETTERS[optionIndex]}
-                    </span>
-                    <span className="flex-1">{option}</span>
-                  </GlassTile>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              onClick={goNext}
-              className="flex w-full items-center justify-center font-semibold text-white/55 active:text-white/75"
-              style={{ marginTop: S(16), minHeight: S(44), fontSize: S(14) }}
-            >
-              Skip this question
-            </button>
-          </Card>
-        ) : null}
-      </div>
-
-      {/* The bar is DOCKED: `shrink-0` (plus the scroller above owning the
-          only `flex-1`) is what guarantees Previous / Next are on screen at
-          every pane height — the question scrolls, the buttons never do. */}
-      <div
-        className="dc-scene-plate dc-scene-plate--bar flex shrink-0 border-t border-white/10 bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
-        style={{ gap: S(12), padding: `${S(12)} ${S(16)} calc(env(safe-area-inset-bottom) + ${S(12)})` }}
-      >
-        <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="min-w-0 flex-[1]">
-          Previous
-        </SecondaryButton>
-        <PrimaryButton onClick={goNext} className="min-w-0 flex-[1.4]">
-          {currentIndex === total - 1 ? "Review & Submit" : "Next"}
-          <ChevronRightIcon style={{ height: S(16), width: S(16) }} />
-        </PrimaryButton>
-      </div>
+      {/* The deck owns the rest of the pane: no action bar, no Next, no Skip —
+          the answers ARE the controls, and the swipe IS the skip. */}
+      <BrainQuestionDeck
+        items={deck}
+        questions={questions}
+        total={total}
+        selections={selections}
+        onAnswer={answerQuestion}
+        onFlick={dismissTopCard}
+        onEmpty={finishDeck}
+      />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Result chip — the revision result page's own chip                    */
+/* Result chip — solid tones on the light card                          */
 /* ------------------------------------------------------------------ */
 
-function ResultChip({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: string }) {
+function ResultChip({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: "correct" | "wrong" | "skipped" }) {
+  const paint =
+    tone === "correct"
+      ? { background: "rgba(31, 122, 84, 0.16)", color: "#12543A" }
+      : tone === "wrong"
+        ? { background: "rgba(178, 58, 72, 0.14)", color: "#7C2431" }
+        : { background: "rgba(17, 17, 17, 0.10)", color: BRAIN.ink };
   return (
-    <div className={`flex flex-col items-center rounded-2xl ${tone}`} style={{ gap: S(4), padding: `${S(12)} 0` }}>
+    <div className="flex flex-col items-center" style={{ ...paint, borderRadius: S(16), gap: S(4), padding: `${S(12)} 0` }}>
       {icon}
-      <span className="font-bold text-white" style={{ fontSize: S(18) }}>{value}</span>
-      <span className="font-medium text-white/55" style={{ fontSize: S(10) }}>{label}</span>
+      <span className="font-bold" style={{ fontSize: S(18) }}>
+        {value}
+      </span>
+      <span className="font-medium" style={{ fontSize: S(10), opacity: 0.8 }}>
+        {label}
+      </span>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Submit dialog — the revision SubmitConfirmModal, scoped to the pane  */
+/* Submit dialog — the same confirmation, on the reference's plate      */
 /* ------------------------------------------------------------------ */
 
 function BrainSubmitDialog({
@@ -837,42 +986,54 @@ function BrainSubmitDialog({
 }) {
   return (
     <div className="absolute inset-0 z-[90] flex items-end justify-center sm:items-center" data-brain-submit-overlay>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onCancel} aria-hidden="true" />
-      <GlassSurface
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} aria-hidden="true" />
+      <BrainSurface
+        tone="plate"
         role="dialog"
         aria-modal="true"
         aria-labelledby="brain-submit-title"
-        data-brain-submit-dialog
-        tint={0.5}
-        radius={24}
-        className="dc-scene-plate custom-scrollbar relative w-full max-w-[min(100%,26rem)] overflow-hidden text-white"
-        contentClassName="flex flex-col p-5 sm:p-6"
-        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+        data-brain-submit-dialog=""
+        className="relative w-full max-w-[min(100%,26rem)] overflow-hidden"
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))", padding: "1.25rem" }}
       >
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/30 sm:hidden" />
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-300">
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full sm:hidden" style={{ background: BRAIN.line }} />
+        <div
+          className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+          style={{ background: BRAIN.pill, color: BRAIN.pillInk }}
+        >
           <CheckIcon className="h-7 w-7" />
         </div>
-        <h3 id="brain-submit-title" className="text-center text-base font-semibold text-white sm:text-lg">{title}</h3>
+        <h3 id="brain-submit-title" className="text-center text-base font-semibold sm:text-lg" style={{ color: BRAIN.ink }}>
+          {title}
+        </h3>
         {unansweredCount > 0 ? (
-          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
-            You have <span className="font-semibold text-amber-300">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
+          <p className="mt-2 text-center text-sm leading-relaxed" style={{ color: BRAIN.inkSoft }}>
+            You have <span className="font-semibold" style={{ color: "#B23A48" }}>{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
             that will be marked as skipped. This can&apos;t be undone.
           </p>
         ) : (
-          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
+          <p className="mt-2 text-center text-sm leading-relaxed" style={{ color: BRAIN.inkSoft }}>
             All questions are answered. Once submitted, you can&apos;t change your answers.
           </p>
         )}
         <div className="mt-5 flex min-w-0 gap-3">
-          <SecondaryButton onClick={onCancel} className="min-w-0 flex-1">
+          <BrainPill
+            tone="outline"
+            onClick={onCancel}
+            className="min-w-0"
+            style={{ flex: 1, fontSize: S(14), minHeight: S(48), padding: `${S(10)} ${S(16)}` }}
+          >
             Keep Reviewing
-          </SecondaryButton>
-          <PrimaryButton onClick={onConfirm} className="min-w-0 flex-1">
+          </BrainPill>
+          <BrainPill
+            onClick={onConfirm}
+            className="min-w-0"
+            style={{ flex: 1, fontSize: S(14), minHeight: S(48), padding: `${S(10)} ${S(16)}` }}
+          >
             {confirmLabel}
-          </PrimaryButton>
+          </BrainPill>
         </div>
-      </GlassSurface>
+      </BrainSurface>
     </div>
   );
 }
