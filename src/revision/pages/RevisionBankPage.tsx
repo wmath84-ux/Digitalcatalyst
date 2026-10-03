@@ -118,6 +118,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
   }, [uid, dataVersion]);
 
   const savedTests = useMemo(() => listCustomTests(uid), [uid, dataVersion]);
+
   const visibleTests = useMemo(() => {
     const query = testSearch.trim().toLowerCase();
     if (!query) return savedTests;
@@ -187,8 +188,6 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
   };
 
   const handleStartSession = () => {
-    // Smart Revision operates on already-owned learner data, so it remains
-    // available after expiry/downgrade just like saved-test retakes.
     setStartingSession(true);
     setActionError(null);
     try {
@@ -211,27 +210,8 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
   return (
     <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`} mergeIntoMainHeader>
-      {/* The Test Bank header row.
-          `data-rev-bank-header` is the hook the flush-seat rules in
-          `src/index.css` key off. This row is the FIRST child of the page
-          scroller (`main[data-revision-page-main]`), and a sticky inset is
-          resolved against that scroller's CONTENT box — so the band paddings
-          it used to carry (12 px tablet landscape, clamp(12–20 px) inside the
-          desktop shell) plus the old `lg:mt-2` here parked the whole Test Bank
-          header a few px BELOW the website header instead of flush against it,
-          and the search row below could never rise to the true top while
-          sticking. Both offsets are gone: the header now starts glued to the
-          main header, and `sticky top-0` inside the scroller means "the very
-          top", not "the top plus padding". The row keeps its own `py-3`, so
-          the breathing room lives inside the glass bar instead of above it. */}
+      {/* Test Bank Header Seat Row */}
       <div data-rev-bank-header className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar border-b border-white/10 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
-        {/* Wave 4: the two hand-rolled boxes became the registry
-            `glass-toggle-group`. One droplet slides between the views instead
-            of two backgrounds flickering, and the active state is now the same
-            material as the store's sort/segment controls. The
-            `data-rev-bank-view-switch` hook stays on the wrapper so the
-            responsive contract keeps finding it; `data-stretch` asks the pack
-            surface to fill the toolbar row (see src/glass.css). */}
         <div data-rev-bank-view-switch>
           <GlassToggleGroup
             className="dc-segment dc-scene-plate flex w-full rounded-2xl p-1"
@@ -292,7 +272,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
       )}
 
       {actionError && (
-        <div className="fixed inset-x-0 bottom-20 z-50 mx-auto w-full max-w-[440px] px-4">
+        <div className="fixed inset-x-0 bottom-24 z-50 mx-auto w-full max-w-[440px] px-4">
           <GlassSurface radius={20} className="dc-scene-plate text-white ring-1 ring-rose-400/30" contentClassName="flex items-center gap-2 px-4 py-3 text-sm">
             <span className="flex-1">{actionError}</span>
             <GlassButton onClick={() => setActionError(null)} aria-label="Dismiss" className="[&_.size-12]:size-8"><XIcon className="h-4 w-4" /></GlassButton>
@@ -368,27 +348,28 @@ function SavedTestsView({
   const percentage = limit == null || limit < 0 ? 0 : Math.min(100, limit === 0 ? 100 : (used / limit) * 100);
 
   return (
-    /* The root wrapper must not grow a top padding of its own on any band:
-       the sticky search row below is constrained by this element's content
-       box, so any padding here would leave that row hanging the same number of
-       px under the main header instead of flush (`index.css` zeroes it for the
-       Test Bank). */
-    <div className="animate-fade-in pb-24">
+    <div className="animate-fade-in pb-28 sm:pb-32 lg:pb-16">
       <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
         <div className="relative">
           <GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="dc-scene-field w-full" />
           {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}
         </div>
         {bankStatus && limit !== -1 && (
-          <div className="rounded-xl bg-indigo-500/20 px-3 py-2.5">
-            <div className="flex items-center justify-between text-[11px] font-bold text-indigo-200">
-              <span>{bankStatus.planName} Test Bank</span><span>{used}/{limit}</span>
+          <div className="rounded-xl border border-white/[0.08] bg-[#0c1220]/90 px-3.5 py-2.5 shadow-sm">
+            <div className="flex items-center justify-between text-[11px] font-bold text-white/80">
+              <span className="flex items-center gap-1.5 text-indigo-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                {bankStatus.planName} Test Bank
+              </span>
+              <span className="font-mono text-white/90">{used} / {limit}</span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-white/15"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${percentage}%` }} /></div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full border border-white/10 bg-white/[0.05]">
+              <div className="h-full rounded-full bg-indigo-500 transition-all duration-300" style={{ width: `${percentage}%` }} />
+            </div>
           </div>
         )}
         {bankStatus && allCount > bankStatus.used && (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-200">
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-200">
             {allCount - bankStatus.used} older test{allCount - bankStatus.used === 1 ? " is" : "s are"} pending cloud sync. They remain safely available on this device while automatic migration retries when eligible.
           </div>
         )}
@@ -407,12 +388,6 @@ function SavedTestsView({
           ) : <SecondaryButton className="mt-2 w-auto" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
         />
       ) : (
-        /* `items-start` matters as much as the column count: with the grid's
-           default `align-items: stretch` every card in a row is forced to the
-           height of the tallest one (a completed test shows a 4-up result-metrics
-           row, a "ready to start" one does not), and the leftover opened up in the
-           MIDDLE of the shorter cards — the "cards bahut vertically stretched /
-           bich mein white space" report on every tablet width. */
         <div className="grid grid-cols-1 items-start gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:px-0 lg:gap-3 lg:max-w-[1200px] lg:mx-auto" data-saved-tests-grid>
           {tests.map((test) => (
             <SavedTestCard
@@ -429,10 +404,6 @@ function SavedTestsView({
               onDelete={() => onDelete(test)}
             />
           ))}
-          {/* Trailing create actions. `data-saved-tests-actions` lets the
-              compact-band CSS pin this tile to a full row: its `sm:col-span-2
-              lg:col-span-3` spans would otherwise invent an implicit second
-              column inside the one-card-per-row grid and squeeze the buttons. */}
           <div className="grid grid-cols-2 gap-2 pt-1 sm:col-span-2 lg:col-span-3" data-saved-tests-actions>
             <SecondaryButton onClick={onCreateAi}><SparklesIcon className="h-4 w-4" /> Generate</SecondaryButton>
             <SecondaryButton onClick={onImport}><BookOpenCheck className="h-4 w-4" /> Import</SecondaryButton>
@@ -471,40 +442,53 @@ function SavedTestCard({
   const progress = test.status === "in_progress" ? Math.min(100, ((test.currentIndex + 1) / progressTotal) * 100) : 0;
 
   return (
-    /* No `aspect-square`: a card is as tall as its content, on every band. The
-       square was only ever safe in a narrow single-column layout (and the
-       compact-band CSS in `src/index.css` had to switch it back to `auto` for
-       exactly that reason) — as soon as the column was wide enough for a square
-       of 260-330 px, the content was shorter than the box and the leftover
-       space opened a white gap in the middle of every card. `overflow-hidden`
-       stays: it is what contains the expanded attempt-history overlay. */
     <Card className="relative overflow-hidden p-0" data-saved-test-card>
-      <div className="flex h-full flex-col p-3.5">
+      <div className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-[#0c1220]/90 p-4 shadow-md backdrop-blur-xl">
         <div className="flex items-start gap-2.5">
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-500/15 text-amber-300" : "bg-violet-500/15 text-violet-300"}`}>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/25" : "bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/25"}`}>
             {test.source === "bulk" ? <BookOpenCheck className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-1.5"><h3 className="min-w-0 flex-1 text-[13px] font-black leading-snug text-white line-clamp-2">{test.title}</h3><Badge tone={test.status === "completed" ? "mastered" : test.status === "in_progress" ? "learning" : "neutral"}>{test.status === "in_progress" ? "in progress" : test.status}</Badge></div>
-            <p className="mt-0.5 text-[10px] font-medium text-white/55">{sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min</p>
+            <div className="flex items-start gap-1.5">
+              <h3 className="min-w-0 flex-1 text-[13px] font-extrabold leading-snug text-white line-clamp-2">{test.title}</h3>
+              <Badge tone={test.status === "completed" ? "mastered" : test.status === "in_progress" ? "learning" : "neutral"}>
+                {test.status === "in_progress" ? "in progress" : test.status}
+              </Badge>
+            </div>
+            <p className="mt-0.5 text-[10px] font-semibold text-white/55">
+              {sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min
+            </p>
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1">
-          {labels.map((label) => <span key={label} className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold text-white/75">{label}</span>)}
-          <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold text-indigo-300">{questionModeLabel(test.planDetails.questionMode)}</span>
-          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold capitalize text-white/75">{test.planDetails.difficulty}</span>
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {labels.map((label) => (
+            <span key={label} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold text-white/75">
+              {label}
+            </span>
+          ))}
+          <span className="rounded-full border border-indigo-400/25 bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold text-indigo-300">
+            {questionModeLabel(test.planDetails.questionMode)}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold capitalize text-white/75">
+            {test.planDetails.difficulty}
+          </span>
         </div>
 
         {test.status === "in_progress" && (
-          <div className="mt-2 rounded-xl bg-indigo-500/20 px-2.5 py-2">
-            <div className="flex justify-between text-[10px] font-bold text-indigo-200"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-white/15"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
+          <div className="mt-2.5 rounded-xl border border-indigo-400/20 bg-indigo-500/15 px-2.5 py-2">
+            <div className="flex justify-between text-[10px] font-bold text-indigo-200">
+              <span>Attempt in progress</span>
+              <span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-white/15 bg-white/10">
+              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${progress}%` }} />
+            </div>
           </div>
         )}
 
         {test.status === "completed" && (
-          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-2 text-center">
+          <div data-rev-result-metrics className="mt-2.5 grid grid-cols-4 gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
             <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-300" />
             <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-300" />
@@ -512,38 +496,48 @@ function SavedTestCard({
           </div>
         )}
 
-        {/* Used to be a `min-h-0 flex-1` spacer that pushed the actions to the
-            bottom of a square card. With content-driven heights it had nothing
-            to absorb EXCEPT the slack from a stretched grid row — i.e. it WAS
-            the white band in the middle of the card. Gone. */}
         <div className="mt-2 flex items-center justify-between text-[10px] text-white/55">
-          <span className="flex items-center gap-1"><History className="h-3 w-3" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}</span>
+          <span className="flex items-center gap-1">
+            <History className="h-3 w-3" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}
+          </span>
           <span>{relativeDate(test.completedAt)}</span>
         </div>
 
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div className="mt-2.5 flex flex-col gap-1.5">
           {test.status === "available" ? (
-            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onStart}><Play className="h-3.5 w-3.5" /> Start Test</PrimaryButton>
+            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onStart}>
+              <Play className="h-3.5 w-3.5" /> Start Test
+            </PrimaryButton>
           ) : test.status === "in_progress" && test.attemptId ? (
-            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={() => onOpenAttempt(test.attemptId!)}><Play className="h-3.5 w-3.5" /> Continue Attempt</PrimaryButton>
+            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={() => onOpenAttempt(test.attemptId!)}>
+              <Play className="h-3.5 w-3.5" /> Continue Attempt
+            </PrimaryButton>
           ) : (
             <>
-              <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onReviseAgain}><RotateCcw className="h-3.5 w-3.5" /> Revise Again</PrimaryButton>
+              <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onReviseAgain}>
+                <RotateCcw className="h-3.5 w-3.5" /> Revise Again
+              </PrimaryButton>
               <div className="grid grid-cols-2 gap-1.5">
-                <SecondaryButton size="sm" className="w-full" disabled={test.skippedCount === 0} onClick={onReviseSkipped}><ListRestart className="h-3 w-3" /> Revise Skipped</SecondaryButton>
+                <SecondaryButton size="sm" className="w-full" disabled={test.skippedCount === 0} onClick={onReviseSkipped}>
+                  <ListRestart className="h-3 w-3" /> Revise Skipped
+                </SecondaryButton>
                 {test.attemptId ? (
-                  <SecondaryButton size="sm" className="w-full" onClick={() => onOpenResult(test.attemptId!)}><BarChart3 className="h-3 w-3" /> Result</SecondaryButton>
+                  <SecondaryButton size="sm" className="w-full" onClick={() => onOpenResult(test.attemptId!)}>
+                    <BarChart3 className="h-3 w-3" /> Result
+                  </SecondaryButton>
                 ) : null}
               </div>
             </>
           )}
         </div>
 
-        <div className="mt-1.5 flex items-center gap-1 border-t border-white/10 pt-1.5">
-          <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-white/75 hover:text-white">
+        <div className="mt-2 flex items-center gap-1 border-t border-white/[0.08] pt-2">
+          <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-white/75 hover:text-white transition">
             <History className="h-3.5 w-3.5" /> Attempt history {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
-          <GlassButton onClick={onDelete} className="[&_.size-12]:size-8 [&_svg]:text-rose-300" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></GlassButton>
+          <GlassButton onClick={onDelete} className="[&_.size-12]:size-8 [&_svg]:text-rose-300" aria-label={`Delete ${test.title}`}>
+            <Trash2 className="h-4 w-4" />
+          </GlassButton>
         </div>
       </div>
 
@@ -600,28 +594,62 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
   onStart: () => void;
   onClear: () => void;
 }) {
-  // The Due / Learning / Improving / Mastered / All strip is a horizontal rail
-  // with a hidden scrollbar — a mouse gets the same press-drag-release gesture
-  // a thumb gets (src/hooks/useDragScroll.ts), exactly like the store's filter
-  // row and My Day's task filters.
   const statusRail = useDragScroll<HTMLDivElement>();
   return (
-    /* Same seat as the Saved Tests view: a sticky row directly under a wrapper
-       with no top padding, so `top-0` really is the top of the page. */
-    <div className="animate-fade-in pb-28">
+    <div className="animate-fade-in pb-32">
       <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
         <div className="flex gap-2">
-          <div className="relative min-w-0 flex-1"><GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="dc-scene-field w-full" />{search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
-          <GlassButton onClick={onFilters} aria-label="Filter and sort" className="relative shrink-0 [&_.size-12]:size-11"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 z-10 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</GlassButton>
+          <div className="relative min-w-0 flex-1">
+            <GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="dc-scene-field w-full" />
+            {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}
+          </div>
+          <GlassButton onClick={onFilters} aria-label="Filter and sort" className="relative shrink-0 [&_.size-12]:size-11">
+            <FilterIcon className="h-5 w-5" />
+            {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 z-10 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}
+          </GlassButton>
         </div>
-        <div ref={statusRail.ref} onPointerDown={statusRail.onPointerDown} className="no-scrollbar flex gap-2 overflow-x-auto"><GlassToggleGroup className="dc-segment dc-scene-plate shrink-0" value={statusTab} onValueChange={(next) => onStatus(next as StatusTab)} aria-label="Question status">{STATUS_TABS.map((tab) => <GlassToggleItem key={tab.key} value={tab.key} className="min-h-[36px] whitespace-nowrap px-3.5 text-xs font-semibold">{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</GlassToggleItem>)}</GlassToggleGroup></div>
+        <div ref={statusRail.ref} onPointerDown={statusRail.onPointerDown} className="no-scrollbar flex gap-2 overflow-x-auto">
+          <GlassToggleGroup className="dc-segment dc-scene-plate shrink-0" value={statusTab} onValueChange={(next) => onStatus(next as StatusTab)} aria-label="Question status">
+            {STATUS_TABS.map((tab) => (
+              <GlassToggleItem key={tab.key} value={tab.key} className="min-h-[36px] whitespace-nowrap px-3.5 text-xs font-semibold">
+                {tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}
+              </GlassToggleItem>
+            ))}
+          </GlassToggleGroup>
+        </div>
       </div>
       {bankData.length === 0 ? (
-        <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
+        <EmptyState
+          icon={<BankIcon className="h-8 w-8" />}
+          title={summary.total === 0 ? "No weak questions yet" : "No matching questions"}
+          description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."}
+          action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto" onClick={onClear}>Clear filters</SecondaryButton> : undefined}
+        />
       ) : (
-        <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-white/55">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-white/75"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
+        <div className="space-y-3 px-4 py-4 lg:px-0 lg:max-w-[1200px] lg:mx-auto">
+          {bankData.map((item) => (
+            <Card key={item.id} className="rounded-2xl border border-white/[0.08] bg-[#0c1220]/85 p-4 shadow-md backdrop-blur-xl">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <Badge tone={item.status}>{item.status}</Badge>
+                <Badge tone={item.difficulty}>{item.difficulty}</Badge>
+                <span className="ml-auto text-[11px] text-white/55">{relativeDate(item.lastRevisedAt)}</span>
+              </div>
+              <p className="line-clamp-2 text-[14px] font-bold leading-snug text-white">{item.prompt}</p>
+              <div className="mt-2.5 flex justify-between text-xs text-white/70">
+                <span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span>
+                <span className="font-semibold text-rose-300">Missed {item.timesWrong}×</span>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
-      {bankData.length > 0 && <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar fixed inset-x-0 bottom-[var(--dc-footer-nav-h,56px)] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
+      {bankData.length > 0 && (
+        <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar fixed inset-x-0 bottom-[var(--dc-footer-nav-h,56px)] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3">
+          <PrimaryButton onClick={onStart} disabled={startingSession}>
+            <SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}
+          </PrimaryButton>
+        </div>
+      )}
     </div>
   );
 }
@@ -665,7 +693,5 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
 }
 
 function FilterChoice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  /* Wave 13: filter chips are the pack GlassTile (pill radius); the pack's
-     selected ring marks the active choice. */
   return <GlassTile onClick={onClick} selected={active} className={`dc-tile aspect-auto rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${active ? "text-white" : "text-white/85"}`}>{label}</GlassTile>;
 }
