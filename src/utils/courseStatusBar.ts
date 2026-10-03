@@ -32,7 +32,7 @@
 // The bar is restored the moment the player leaves landscape/immersive or
 // unmounts.
 
-import { setThemeColor } from "./themeColor";
+import { setThemeColor, syncSystemThemeColor } from "./themeColor";
 import {
   enterFullscreen,
   exitFullscreen,
@@ -215,6 +215,7 @@ export const restoreStatusBarFromCoursePlayer = (): void => {
       void exitFullscreen().finally(() => notifyFullscreenChange());
     }
     if (originalThemeColor !== null) setThemeColor(originalThemeColor);
+    else syncSystemThemeColor();
     const styleMeta = document.querySelector<HTMLMetaElement>(STATUS_BAR_STYLE_SELECTOR);
     if (styleMeta && originalStatusBarStyle !== null) styleMeta.content = originalStatusBarStyle;
   }

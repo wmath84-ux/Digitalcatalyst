@@ -5,7 +5,6 @@ import { db, getFirebaseStorage } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
-import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
@@ -101,7 +100,6 @@ const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): 
 
 export default function ProfileApp() {
   const { user, logout, updateAccount, setUser } = useAuth();
-  const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
   // Full product ownership from the canonical entitlements collection.
@@ -325,7 +323,7 @@ export default function ProfileApp() {
 
   return (
     <div data-profile-page className="min-h-screen text-white sm:py-0 lg:py-0">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full lg:rounded-none lg:border-0">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 md:max-w-4xl lg:max-w-6xl xl:max-w-7xl lg:rounded-none lg:border-0">
         <Header
           cartCount={cartIds.size}
           notifCount={0}
@@ -334,7 +332,7 @@ export default function ProfileApp() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        <main ref={mainRef} data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-4 pt-3 pb-6 md:px-6 lg:px-6 xl:px-8">
+        <main ref={mainRef} data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-3.5 sm:px-6 md:px-8 lg:px-10 pt-3 pb-32 sm:pb-36 md:pb-12">
           <input
             ref={photoInputRef}
             type="file"
@@ -393,8 +391,6 @@ export default function ProfileApp() {
               onOpenCourse: (id) => { window.location.hash = `#/course/${encodeURIComponent(id)}`; },
               onOpenPurchases: () => { window.location.hash = "#/store/purchases"; },
             }}
-            cleanBackgroundEnabled={cleanBackgroundEnabled}
-            onCleanBackgroundChange={setCleanBackgroundEnabled}
             onOpenSettings={() => setModal("settings")}
             saving={preferencesSaving}
             message={message}

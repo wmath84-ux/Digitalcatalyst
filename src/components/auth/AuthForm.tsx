@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import BrandMark from "@/components/BrandMark";
-import { GlassSurface } from "@/components/ui/glass";
-import { GlassButton } from "@/components/ui/glass-button";
-import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
 import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView, warmNativeGoogleAuth } from "@/utils/nativeRuntime";
 import { resolveAuthSuccessDestination } from "@/utils/appRoutes";
 
@@ -188,266 +185,325 @@ export default function AuthForm() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="mx-auto w-full max-w-md"
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="mx-auto w-full max-w-[430px]"
     >
-      {/* Auth card wears the HOME social card's exact material:
-          store lens (src/store-glass.css) — blur 46% → 18.4px,
-          light-blue rgb(173,216,255) @ 26%, quiet sheen + white rim.
-          Same invocation as SocialProfileCard (src/home/components/
-          SocialProfileCard.tsx): tint 0.62 over the light blue, blur 0
-          because store-glass.css owns the 46% frost via
-          --dc-store-glass-blur. Radius stays 24 (layout/shape untouched,
-          only the look is synced). */}
-      <GlassSurface
-        radius={24}
-        tint={0.62}
-        tintColor="173,216,255"
-        blur={0}
-        className="dc-store-glass dc-scene-ink text-white"
-        contentClassName="p-6 sm:p-8"
-      >
-      <div className="mb-6 flex items-center gap-3">
-        <BrandMark className="h-10 w-10 rounded-xl" fallbackLetter />
-        <div>
-          <span className="block text-lg font-bold text-white">{appName}</span>
-          <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-            <ShieldCheck size={12} /> Secured by Firebase
+      {/* Balanced Card Container: Solid slate backdrop + subtle glass rim */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/[0.12] bg-[#0c111e]/90 p-5 shadow-2xl backdrop-blur-xl sm:p-7">
+        {/* Subtle decorative ambient lights */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        {/* Brand header on mobile/tablet */}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <BrandMark className="h-9 w-9 rounded-xl" fallbackLetter />
+            <div>
+              <span className="block text-base font-bold text-white leading-tight">{appName}</span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider text-emerald-300">
+                <ShieldCheck size={12} /> Secured by Firebase
+              </span>
+            </div>
+          </div>
+          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-white/60">
+            {mode === "login" ? "Sign In" : "Register"}
           </span>
         </div>
-      </div>
 
-      <GlassToggleGroup
-        className="dc-segment mb-6 flex w-full"
-        data-stretch
-        value={mode}
-        onValueChange={(next) => { if (!busy) changeMode(next as Mode); }}
-        aria-label="Log in or sign up"
-      >
-        {(["login", "signup"] as Mode[]).map((item) => (
-          <GlassToggleItem
-            key={item}
-            value={item}
-            disabled={busy}
-            className="flex-1 justify-center py-2 text-sm font-semibold capitalize disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {item === "signup" ? "Sign Up" : item}
-          </GlassToggleItem>
-        ))}
-      </GlassToggleGroup>
-
-      <h1 className="text-2xl font-black text-white">
-        {mode === "login" ? "Welcome back" : "Create your account"}
-      </h1>
-      <p className="mt-1 text-sm text-white/55">
-        {mode === "login"
-          ? `Log in securely and continue your ${appName} journey.`
-          : "Create your Firebase-secured learner account."}
-      </p>
-
-      <GlassButton
-        variant="capsule"
-        type="button"
-        onClick={handleGoogleLogin}
-        disabled={busy || googleBlocked}
-        aria-disabled={googleBlocked}
-        className="mt-6 w-full [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:font-bold disabled:cursor-not-allowed disabled:opacity-60"
-        style={highlightGoogle ? { boxShadow: "0 0 0 2px rgba(66,133,244,0.85), 0 0 26px rgba(66,133,244,0.55)", borderRadius: 999 } : undefined}
-      >
-        <span className="flex items-center justify-center gap-3">
-        {googleBusy ? (
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-        ) : (
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.31v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.09Z" />
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.29-2.66l-3.57-2.77c-.99.66-2.24 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-            <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.43.35-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.83Z" />
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.6 10.6 0 0 0 12 1a11 11 0 0 0-9.82 6.07L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38Z" />
-          </svg>
-        )}
-        {googleBusy
-          ? restoringSession
-            ? "Google session wapas aa रहा है…"
-            : "Google से connect हो रहा है…"
-          : "Continue with Google"}
-        </span>
-      </GlassButton>
-
-      {googleNotice && !googleBusy && (
+        {/* Segmented Mode Switcher */}
         <div
-          role="status"
-          className="mt-3 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-100"
+          className="mb-5 flex rounded-xl border border-white/[0.08] bg-black/40 p-1"
+          role="tablist"
+          aria-label="Log in or sign up"
         >
-          <p>{googleNotice}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white underline-offset-2 transition hover:bg-white/25"
-            >
-              Google से फिर कोशिश करें
-            </button>
-            <button
-              type="button"
-              onClick={dismissGoogleNotice}
-              className="rounded-full px-3 py-1.5 text-[11px] font-bold text-amber-100/70 underline underline-offset-2 transition hover:text-amber-50"
-            >
-              ठीक है
-            </button>
-          </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "login"}
+            disabled={busy}
+            onClick={() => { if (!busy) changeMode("login"); }}
+            className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all sm:text-sm ${
+              mode === "login"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-white/60 hover:text-white"
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            Log In
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "signup"}
+            disabled={busy}
+            onClick={() => { if (!busy) changeMode("signup"); }}
+            className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all sm:text-sm ${
+              mode === "signup"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-white/60 hover:text-white"
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            Sign Up
+          </button>
         </div>
-      )}
 
-      {googleBlocked && (
-        <p className="mt-2 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-100">
-          यह in-app browser Google sign-in block करता है। ऊपर ⋮ menu से “Open in Chrome” चुनें, या नीचे email + password इस्तेमाल करें।
-        </p>
-      )}
+        {/* Title */}
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-white sm:text-2xl">
+            {mode === "login" ? "Welcome back" : "Create your account"}
+          </h2>
+          <p className="mt-1 text-xs text-white/55 sm:text-sm">
+            {mode === "login"
+              ? "Sign in to access your courses, quizzes, and synced notes."
+              : "Create your free learner account to get started."}
+          </p>
+        </div>
 
-      <div className="my-5 flex items-center gap-3">
-        <span className="h-px flex-1 bg-white/10" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/55">or continue with email</span>
-        <span className="h-px flex-1 bg-white/10" />
-      </div>
+        {/* Google Authentication Button */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={busy || googleBlocked}
+          aria-disabled={googleBlocked}
+          className="group relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/20 bg-white px-4 py-2.5 font-bold text-slate-900 shadow-sm transition hover:bg-slate-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:py-3"
+          style={highlightGoogle ? { boxShadow: "0 0 0 2px rgba(66,133,244,0.85), 0 0 26px rgba(66,133,244,0.55)", borderRadius: 12 } : undefined}
+        >
+          {googleBusy ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-slate-900" />
+          ) : (
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 sm:h-5 sm:w-5">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.31v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.09Z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.29-2.66l-3.57-2.77c-.99.66-2.24 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
+              <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.43.35-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.83Z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.6 10.6 0 0 0 12 1a11 11 0 0 0-9.82 6.07L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38Z" />
+            </svg>
+          )}
+          <span className="text-xs font-bold text-slate-800 sm:text-sm">
+            {googleBusy
+              ? restoringSession
+                ? "Google session wapas aa रहा है…"
+                : "Google से connect हो रहा है…"
+              : "Continue with Google"}
+          </span>
+        </button>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <AnimatePresence initial={false} mode="popLayout">
-          {mode === "signup" && (
-            <motion.div
-              key="signup-fields"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="space-y-4 overflow-hidden"
-            >
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Full Name</label>
-                <input
-                  required
-                  autoComplete="name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Your full name"
-                  className="dc-field w-full rounded-full px-4 py-3 text-white placeholder:text-white/45 outline-none"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Mobile Number</label>
-                <div className="dc-field flex overflow-hidden rounded-full">
-                  <span className="grid place-items-center border-r border-white/10 px-3 text-sm font-semibold text-white/55">+91</span>
+        {googleNotice && !googleBusy && (
+          <div
+            role="status"
+            className="mt-3 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3.5 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-100"
+          >
+            <p>{googleNotice}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white underline-offset-2 transition hover:bg-white/25"
+              >
+                Google से फिर कोशिश करें
+              </button>
+              <button
+                type="button"
+                onClick={dismissGoogleNotice}
+                className="rounded-full px-3 py-1.5 text-[11px] font-bold text-amber-100/70 underline underline-offset-2 transition hover:text-amber-50"
+              >
+                ठीक है
+              </button>
+            </div>
+          </div>
+        )}
+
+        {googleBlocked && (
+          <p className="mt-2 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-100">
+            यह in-app browser Google sign-in block करता है। ऊपर ⋮ menu से “Open in Chrome” चुनें, या नीचे email + password इस्तेमाल करें।
+          </p>
+        )}
+
+        {/* Divider */}
+        <div className="my-4 flex items-center gap-3">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">or continue with email</span>
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+
+        {/* Form fields */}
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <AnimatePresence initial={false} mode="popLayout">
+            {mode === "signup" && (
+              <motion.div
+                key="signup-fields"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-3.5 overflow-hidden"
+              >
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
+                    <User className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Full Name</span>
+                  </label>
                   <input
                     required
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    value={mobile}
-                    onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 10))}
-                    placeholder="10 digit number"
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white placeholder:text-white/45 outline-none"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Your full name"
+                    className="dc-field w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-indigo-400/80 focus:bg-white/[0.08] focus:ring-2 focus:ring-indigo-500/20"
                   />
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
+                    <Phone className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Mobile Number</span>
+                  </label>
+                  <div className="dc-field flex overflow-hidden rounded-xl border border-white/10 bg-white/[0.05] transition focus-within:border-indigo-400/80 focus-within:bg-white/[0.08] focus-within:ring-2 focus-within:ring-indigo-500/20">
+                    <span className="grid place-items-center border-r border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-white/60">+91</span>
+                    <input
+                      required
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      value={mobile}
+                      onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="10 digit number"
+                      className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Email</label>
-          <input
-            required
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
-            className="dc-field w-full rounded-full px-4 py-3 text-white placeholder:text-white/45 outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Password</label>
-          <div className="relative">
+          <div>
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
+              <Mail className="h-3.5 w-3.5 text-indigo-400" />
+              <span>Email</span>
+            </label>
             <input
               required
-              type={showPassword ? "text" : "password"}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Minimum 6 characters"
-              minLength={6}
-              className="dc-field w-full rounded-full px-4 py-3 pr-14 text-white placeholder:text-white/45 outline-none"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              className="dc-field w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-indigo-400/80 focus:bg-white/[0.08] focus:ring-2 focus:ring-indigo-500/20"
             />
-            <GlassButton
-              type="button"
-              onClick={() => setShowPassword((visible) => !visible)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-8 [&_svg]:text-white/70"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </GlassButton>
           </div>
-        </div>
 
-        {mode !== "signup" && (
-          <div className="text-right">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={busy}
-              className="text-xs font-semibold text-cyan-300 underline underline-offset-2 transition hover:text-cyan-200 disabled:opacity-60"
-            >
-              {submitting ? "Reset link भेजा जा रहा है…" : "Forgot password? Reset link भेजें"}
-            </button>
+          <div>
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-white/70">
+              <Lock className="h-3.5 w-3.5 text-indigo-400" />
+              <span>Password</span>
+            </label>
+            <div className="relative">
+              <input
+                required
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Minimum 6 characters"
+                minLength={6}
+                className="dc-field w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 pr-11 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-indigo-400/80 focus:bg-white/[0.08] focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
-        )}
 
-        {error && (
-          <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            <p>{error}</p>
-            {mode === "login" && (
-              <button type="button" onClick={() => { setMode("signup"); setPassword(""); setError(null); setSignupNotice("नए user हैं? पहले Sign Up करके अपना account बनाएं।"); }} className="mt-2 font-black text-white underline underline-offset-2">New user? Sign Up करें</button>
+          {mode !== "signup" && (
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={busy}
+                className="text-xs font-semibold text-indigo-400 underline underline-offset-2 transition hover:text-indigo-300 disabled:opacity-60"
+              >
+                {submitting ? "Reset link भेजा जा रहा है…" : "Forgot password? Reset link भेजें"}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-200">
+              <p>{error}</p>
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setPassword("");
+                    setError(null);
+                    setSignupNotice("नए user हैं? पहले Sign Up करके अपना account बनाएं।");
+                  }}
+                  className="mt-2 block font-black text-white underline underline-offset-2"
+                >
+                  New user? Sign Up करें
+                </button>
+              )}
+            </div>
+          )}
+
+          {signupNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              role="status"
+              className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3.5 py-2.5 text-xs font-semibold leading-5 text-cyan-100"
+            >
+              {signupNotice}
+            </motion.div>
+          )}
+
+          {success && (
+            <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-200">
+              {success}
+            </div>
+          )}
+
+          <motion.button
+            whileHover={{ scale: busy ? 1 : 1.01 }}
+            whileTap={{ scale: busy ? 1 : 0.99 }}
+            type="submit"
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
+          >
+            {submitting ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <span>Please wait…</span>
+              </>
+            ) : mode === "login" ? (
+              "Log In"
+            ) : (
+              "Create Account"
             )}
-          </div>
-        )}
-        {signupNotice && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} role="status" className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold leading-5 text-cyan-100">
-            {signupNotice}
-          </motion.div>
-        )}
-        {success && (
-          <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            {success}
-          </div>
-        )}
+          </motion.button>
+        </form>
 
-        <motion.button
-          whileHover={{ scale: busy ? 1 : 1.02 }}
-          whileTap={{ scale: busy ? 1 : 0.98 }}
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-full bg-indigo-600 py-3.5 text-base font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {submitting ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
-        </motion.button>
-      </form>
-
-      <p className="mt-6 text-center text-xs leading-5 text-white/55">
-        Firebase securely manages your credentials and persistent login session. Your password is never stored in this app.
-      </p>
-
-      <p className="mt-4 text-center text-[11px] leading-5 text-white/55">
-        By continuing you agree to our{" "}
-        <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-          Terms of Service
-        </a>{" "}
-        and{" "}
-        <a href="/privacy-policy.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-          Privacy Policy
-        </a>
-        .
-      </p>
-      </GlassSurface>
+        {/* Security & Legal Footnote */}
+        <div className="mt-5 space-y-2 border-t border-white/[0.08] pt-4 text-center">
+          <p className="text-[11px] leading-relaxed text-white/50">
+            Firebase securely manages your credentials and persistent login session. Your password is never stored in this app.
+          </p>
+          <p className="text-[11px] leading-relaxed text-white/50">
+            By continuing you agree to our{" "}
+            <a href="/terms-of-service.html" className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200">
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="/privacy-policy.html" className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200">
+              Privacy Policy
+            </a>
+            .
+          </p>
+        </div>
+      </div>
     </motion.div>
   );
 }

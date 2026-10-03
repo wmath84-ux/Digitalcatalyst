@@ -3605,6 +3605,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    we keep the footer rule here as a belt-and-braces guard. */
 @media (min-width: 960px) {
   .dc-desktop-shell [data-profile-page] {
+    min-height: 0;
+    padding: 0;
     background: transparent !important;
   }
   .dc-desktop-shell [data-profile-page] [data-app-frame] {
@@ -3878,7 +3880,8 @@ html[data-nature-studio-active="true"] {
      or the 3D nature studio) is open — the learner has to be able to drag
      and pinch the world in landscape, so the freeze keys off BOTH
      `data-*` attributes that appOrientation sets. */
-  html[data-phone-device="true"]:not([data-course-player-active="true"]):not([data-nature-studio-active="true"]) body {
+  html[data-phone-device="true"]:not([data-course-player-active="true"]):not([data-nature-studio-active="true"]) body,
+  html[data-phone-device="true"]:not([data-course-player-active="true"]) body {
     /* Prevent content from being interactive in landscape - overlay handles it */
     touch-action: none;
   }
@@ -5015,9 +5018,9 @@ html[data-nature-studio-active="true"] {
    smaller buttons/icon chips and square quick-stat tiles. 768 px+ keeps the
    existing two-column / desktop layout untouched. */
 @media (max-width: 767px) {
-  /* Tighter page gutter */
+  /* Tighter page gutter with bottom clearance for floating footer dock */
   [data-profile-page] [data-profile-content] {
-    padding: 12px 14px 22px;
+    padding: 12px 14px 120px;
   }
 
   /* One card under another: override the tablet-portrait two-column split

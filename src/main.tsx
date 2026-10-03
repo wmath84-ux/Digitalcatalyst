@@ -119,7 +119,7 @@ import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlis
 import type { PaidCourseUpdate } from "./types/course";
 import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
-import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
+import { setThemeColor, syncSystemThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { isMyCourseEditorRoute, isMyCoursePlayerRoute, readMyCourseId, requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
@@ -1560,20 +1560,11 @@ function RootPage(): ReactNode {
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
 
   // Keep the mobile status bar / browser chrome colour in sync with the
-  // screen on display. Only the dark brand screens (boot splash, landing,
-  // auth and admin login) get the dark bar; every light app screen switches
-  // the bar to the page background so it never shows black over light UI.
+  // device's system theme (light mode -> white, dark mode -> dark).
+  // Runtime theme switches are handled automatically by the system theme listener in themeColor.ts.
   useEffect(() => {
-    const splashVisible = openingVisible;
-    const darkScreen =
-      splashVisible
-      || protectedRoutePending
-      || !hash
-      || hash.startsWith(LANDING_HASH)
-      || hash.startsWith(AUTH_HASH)
-      || hash.startsWith(ADMIN_LOGIN_HASH);
-    setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, protectedRoutePending, openingVisible]);
+    syncSystemThemeColor();
+  }, []);
 
   // Installed mobile PWA cold start: the hash is normalised to #/home on
   // the first effect, but on the VERY first render the URL is still empty.

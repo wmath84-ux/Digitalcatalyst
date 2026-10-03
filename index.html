@@ -3,9 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Dark by default so it matches the boot splash; the app switches it to
-         light as soon as a light screen renders (see src/utils/themeColor.ts). -->
-    <meta name="theme-color" content="#05060f" />
+    <!-- System-theme based status bar chrome: light mode = white (#ffffff), dark mode = dark (#000000).
+         Evaluated immediately by browser on cold start before JavaScript executes. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <meta name="theme-color" content="#000000" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
@@ -28,7 +27,6 @@ const TIERS: Record<Scenario, MembershipTier> = {
 };
 
 export default function ProfilePreview() {
-  const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const [scenario, setScenario] = useState<Scenario>("premium");
   const tier = TIERS[scenario];
   const subscriber = scenario !== "free";
@@ -57,8 +55,8 @@ export default function ProfilePreview() {
         </div>
       </div>
 
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full lg:rounded-none lg:border-0">
-        <main data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-4 pt-6 pb-10 md:px-6 lg:px-6 xl:px-8">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 md:max-w-4xl lg:max-w-6xl xl:max-w-7xl lg:rounded-none lg:border-0">
+        <main data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-3.5 sm:px-6 md:px-8 lg:px-10 pt-4 pb-32 sm:pb-36 md:pb-12">
           <ProfileLayout
             name="Aarav Sharma"
             email="aarav.sharma@eduvora.app"
@@ -112,8 +110,6 @@ export default function ProfilePreview() {
               onOpenCourse: () => undefined,
               onOpenPurchases: () => undefined,
             }}
-            cleanBackgroundEnabled={cleanBackgroundEnabled}
-            onCleanBackgroundChange={setCleanBackgroundEnabled}
             onOpenSettings={() => undefined}
             saving={false}
             onLogout={() => undefined}

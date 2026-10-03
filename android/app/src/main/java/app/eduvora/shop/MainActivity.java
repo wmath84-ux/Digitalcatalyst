@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
         // WebChromeClient custom-view contract).
         registerPlugin(AppOrientationPlugin.class);
         registerPlugin(AppFullscreenPlugin.class);
+        registerPlugin(AppStatusBarPlugin.class);
         super.onCreate(savedInstanceState);
         // HARD RULE (PHONES ONLY): Default to portrait for all screens except
         // the course player. The JS layer (appOrientation.ts) unlocks to
@@ -49,6 +50,7 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {}
 
         installFullscreenWebChromeClient();
+        syncStatusBarThemeWithSystem();
     }
 
     /**
@@ -118,6 +120,13 @@ public class MainActivity extends BridgeActivity {
         // Coming back from the background, Android may have restored the system
         // bars; re-assert the app-level fullscreen flag.
         AppFullscreenPlugin.reapply(this);
+        syncStatusBarThemeWithSystem();
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        syncStatusBarThemeWithSystem();
     }
 
     @Override
@@ -161,5 +170,25 @@ public class MainActivity extends BridgeActivity {
         try {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Synchronize the native status bar appearance and icon contrast directly
+     * with the device's system theme (light mode -> white bar with dark icons,
+     * dark mode -> black bar with light icons).
+     */
+    public void syncStatusBarThemeWithSystem() {
+        if (AppFullscreenPlugin.isImmersiveActive()) {
+            return;
+        }
+        runOnUiThread(() -> {
+            try {
+                int nightModeFlags = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                boolean isNight = (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES);
+                int statusBarColor = isNight ? 0xFF000000 : 0xFFFFFFFF;
+                boolean darkIcons = !isNight;
+                AppStatusBarPlugin.applyStatusBar(this, statusBarColor, darkIcons);
+            } catch (Exception ignored) {}
+        });
     }
 }
