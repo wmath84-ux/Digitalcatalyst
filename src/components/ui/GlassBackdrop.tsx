@@ -1,17 +1,12 @@
 // src/components/ui/GlassBackdrop.tsx
 //
-// One route-level background layer for the learner-facing app. Its preference
-// is owned by BackgroundPreferenceContext and changed from the Profile page;
-// mounting here applies that one saved choice behind every learner route.
-// Admin and admin-login are skipped by RouteBackdrop in main.tsx.
+// The permanent Clean Board background layer for the learner-facing app.
+// Mounted behind every learner route in main.tsx; admin routes are skipped.
 
 import { useBackgroundPreference } from "@/context/BackgroundPreferenceContext";
-import WinterScene from "@/components/backgrounds/WinterScene";
 
 export function GlassBackdrop() {
-  const { mode } = useBackgroundPreference();
-
-  if (mode === "winter") return <WinterScene />;
+  useBackgroundPreference();
   return <div className="dc-clean-backdrop" data-dc-clean-background aria-hidden="true" />;
 }
 

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
@@ -28,7 +27,6 @@ const TIERS: Record<Scenario, MembershipTier> = {
 };
 
 export default function ProfilePreview() {
-  const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const [scenario, setScenario] = useState<Scenario>("premium");
   const tier = TIERS[scenario];
   const subscriber = scenario !== "free";
@@ -112,8 +110,6 @@ export default function ProfilePreview() {
               onOpenCourse: () => undefined,
               onOpenPurchases: () => undefined,
             }}
-            cleanBackgroundEnabled={cleanBackgroundEnabled}
-            onCleanBackgroundChange={setCleanBackgroundEnabled}
             onOpenSettings={() => undefined}
             saving={false}
             onLogout={() => undefined}

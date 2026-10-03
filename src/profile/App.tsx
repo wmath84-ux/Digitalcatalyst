@@ -5,7 +5,6 @@ import { db, getFirebaseStorage } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
-import { useBackgroundPreference } from "../context/BackgroundPreferenceContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
@@ -101,7 +100,6 @@ const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): 
 
 export default function ProfileApp() {
   const { user, logout, updateAccount, setUser } = useAuth();
-  const { cleanBackgroundEnabled, setCleanBackgroundEnabled } = useBackgroundPreference();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
   // Full product ownership from the canonical entitlements collection.
@@ -393,8 +391,6 @@ export default function ProfileApp() {
               onOpenCourse: (id) => { window.location.hash = `#/course/${encodeURIComponent(id)}`; },
               onOpenPurchases: () => { window.location.hash = "#/store/purchases"; },
             }}
-            cleanBackgroundEnabled={cleanBackgroundEnabled}
-            onCleanBackgroundChange={setCleanBackgroundEnabled}
             onOpenSettings={() => setModal("settings")}
             saving={preferencesSaving}
             message={message}

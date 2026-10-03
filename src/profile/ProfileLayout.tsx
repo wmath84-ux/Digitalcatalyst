@@ -14,7 +14,6 @@ import {
   Crown,
   Gauge,
   Heart,
-  Layers,
   LoaderCircle,
   LogOut,
   Pencil,
@@ -157,8 +156,6 @@ export type ProfileLayoutProps = {
     onOpenPurchases: () => void;
   };
 
-  cleanBackgroundEnabled: boolean;
-  onCleanBackgroundChange: (enabled: boolean) => void;
   onOpenSettings: () => void;
   saving: boolean;
   message?: string;
@@ -189,8 +186,6 @@ export default function ProfileLayout({
   onOpenUsageLimits,
   onOpenStudyLibrary,
   library,
-  cleanBackgroundEnabled,
-  onCleanBackgroundChange,
   onOpenSettings,
   saving,
   message,
@@ -267,8 +262,6 @@ export default function ProfileLayout({
         {/* ── Side Column: Preferences, Referral & Account (col-span-5) ── */}
         <div data-profile-col="side" className="space-y-4 lg:col-span-5">
           <PreferencesHubCard
-            cleanBackgroundEnabled={cleanBackgroundEnabled}
-            onCleanBackgroundChange={onCleanBackgroundChange}
             onOpenSettings={onOpenSettings}
             referral={referral}
           />
@@ -741,41 +734,15 @@ function LearningCard({
 
 /* ── Preferences, Referral & Settings Hub ───────────────────────────── */
 function PreferencesHubCard({
-  cleanBackgroundEnabled,
-  onCleanBackgroundChange,
   onOpenSettings,
   referral,
 }: {
-  cleanBackgroundEnabled: boolean;
-  onCleanBackgroundChange: (enabled: boolean) => void;
   onOpenSettings: () => void;
   referral: ProfileLayoutProps["referral"];
 }) {
   return (
     <ProfileCard className="relative overflow-hidden border border-white/10">
-      {/* Clean Background Toggle */}
-      <div data-profile-background-preference className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">
-          <Layers size={16} aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="dc-profile-card-title block font-semibold text-white">Clean background</span>
-          <span className="dc-profile-card-meta block text-white/70">
-            {cleanBackgroundEnabled ? "On · snowfall off" : "Off · snowfall on"}
-          </span>
-        </span>
-        <GlassSwitch
-          checked={cleanBackgroundEnabled}
-          onCheckedChange={onCleanBackgroundChange}
-          ariaLabel="Clean background"
-          data-on={cleanBackgroundEnabled ? "true" : "false"}
-          className="dc-switch shrink-0"
-        />
-      </div>
-
       {/* Notifications & Privacy */}
-      <div className="my-3.5 border-t border-white/[0.08]" />
-
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">
