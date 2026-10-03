@@ -57,6 +57,10 @@ public class AppFullscreenPlugin extends Plugin {
      */
     private static boolean customViewFullscreen = false;
 
+    public static boolean isImmersiveActive() {
+        return immersive || customViewFullscreen;
+    }
+
     @PluginMethod
     public void enter(PluginCall call) {
         immersive = true;
