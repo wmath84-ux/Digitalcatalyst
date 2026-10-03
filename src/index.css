@@ -2014,12 +2014,16 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   display: none !important;
 }
 
-/* ── Course Player BRAIN tab: the revision test-taking design, scaled ─────
-   The Brain tab renders the revision test-taking page exactly
-   (src/revision/pages/TestPlayerPage.tsx) inside the player's study pane
-   (src/course/CourseBrainPanel.tsx). Every metric that page fixes in px is
-   written as `calc(<that px> * var(--brain-scale))`, so the design is the
-   revision design at 1× and stays proportional at every other size.
+/* ── Course Player BRAIN tab: the practice deck, scaled ──────────────────
+   The Brain tab (src/course/CourseBrainPanel.tsx) renders the practice card
+   deck — the AI Canvas "Product Card Deck" the owner picked as the reference
+   (https://aicanvas.me/components/product-card-deck), ported in
+   src/course/BrainQuestionDeck.tsx on the reference's own SOLID palette
+   (src/course/BrainCards.tsx — no glass anywhere on this tab). Every metric
+   the other Brain screens fix in px is written as
+   `calc(<that px> * var(--brain-scale))`; the deck's cards derive their own
+   metrics from the card's width (BRAIN_DECK_REFERENCE_WIDTH), and the deck
+   measures its box too (panelFit.ts → `brainDeckSize`).
 
    The ladder below is only the PRE-MEASURE fallback. The scale is really
    decided by the panel itself, which measures the box it has been given and
@@ -2029,8 +2033,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    next. A viewport-based ladder cannot see that; the measured value wins over
    these rules the moment the panel mounts (inline custom properties outrank
    any stylesheet), and it also shrinks the design on a SHORT pane — floor
-   0.8, where the 56 px answer tile is still above a 44 px touch target — so
-   the question, its options and the docked Previous / Next bar stay visible
+   0.8 — so the header, the review grid and the submit bar stay visible
    instead of being cut. What these rules cover is the frame before that
    measurement and any engine that never runs it. */
 [data-course-brain-panel] {

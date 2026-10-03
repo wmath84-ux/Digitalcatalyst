@@ -49,24 +49,24 @@ import { useCallback, useEffect, useRef } from "react";
 /* ── Brain ──────────────────────────────────────────────────────────────── */
 
 /**
- * The height the question screen needs at scale 1: the top row + progress +
- * the card (prompt, three 56 px options, the skip row) + the docked
- * Previous / Next bar. A pane with less than this shrinks the design instead
- * of cutting the question off.
+ * The height the question screen needs at scale 1: the top row + the card + the
+ * review screen's docked bar. A pane with less than this shrinks the design
+ * instead of cutting the question off.
  */
 export const BRAIN_FIT_REFERENCE_HEIGHT = 620;
 /**
- * Legibility + touch floor: at 0.8 the 19 px prompt is 15.2 px, the 15 px
- * option text is 12 px and the 56 px answer tile is 44.8 px — still a real
- * touch target even though the buttons themselves never scale (the revision
- * design's own 50 px buttons). Below this the pane simply scrolls.
+ * Legibility + touch floor: at 0.8 the panel's own type (11–19 px) lands at
+ * 8.8–15.2 px, and the deck's cards fit themselves inside the box this scale
+ * leaves them (BrainQuestionDeck scales the card's content down, never below
+ * its own 0.62 floor, and scrolls after that). Below this the pane simply
+ * scrolls.
  */
 export const BRAIN_FIT_FLOOR = 0.8;
 /** The cap the viewport ladder used to reach at 1200 px — kept, as the width cap. */
 export const BRAIN_FIT_CEIL = 1.24;
-/** The width the revision page is drawn for — its own phone. */
+/** The width the practice design was drawn for — the reference's own phone. */
 export const BRAIN_FIT_PHONE_WIDTH = 320;
-/** A pane narrower than this keeps the phone design exactly (the revision page's home). */
+/** A pane narrower than this keeps the phone design exactly (its home size). */
 export const BRAIN_FIT_GROW_FROM = 560;
 /** …and this is where the design reaches its cap. */
 export const BRAIN_FIT_GROW_TO = 1200;
@@ -109,6 +109,69 @@ export function brainFitScale(width: number, height: number): number {
         );
   const byHeight = Math.min(BRAIN_FIT_CEIL, Math.max(BRAIN_FIT_FLOOR, height / BRAIN_FIT_REFERENCE_HEIGHT));
   return quantize(Math.min(byWidth, byHeight));
+}
+
+/* ── The Brain practice deck (the Product Card Deck port) ───────────────── */
+
+/**
+ * The deck the Brain question screen is built on is the AI Canvas
+ * "Product Card Deck" (https://aicanvas.me/components/product-card-deck),
+ * whose stage is `clamp(220px, 72vw, 300px)` wide and 56 px taller than it is
+ * wide. Those three numbers are kept — as the reference width, the reference
+ * extra height (its caption strip) and the 72% of the box the card is allowed
+ * to take — so the deck reads like the reference at every pane size while
+ * still being solved from the PANE, not the viewport (the learner drags the
+ * Split Deck divider; see the header of this file).
+ */
+export const BRAIN_DECK_REFERENCE_WIDTH = 300;
+/** `SLOT_Y[3]` of the reference deck — how far the deepest card peeks out. */
+export const BRAIN_DECK_STACK_PEEK = 36;
+/** The hint line under the deck ("tap an answer … flick the card away"). */
+export const BRAIN_DECK_HINT_HEIGHT = 26;
+/** The deck's breathing room inside the pane (its own padding + the shadow). */
+export const BRAIN_DECK_GUTTER = 28;
+/** Below this the card stops being readable; the pane scrolls instead. */
+export const BRAIN_DECK_MIN_WIDTH = 200;
+/** A big pane may enlarge the card — but it stays a card, never a poster. */
+export const BRAIN_DECK_MAX_WIDTH = 360;
+/** …and never taller than this before its content is scaled to fit. */
+export const BRAIN_DECK_MAX_HEIGHT = 560;
+/** The reference silhouette: the card is this much taller than it is wide. */
+export const BRAIN_DECK_EXTRA_HEIGHT = 56;
+/** The absolute floor under a card's height (a pane shorter than a card). */
+export const BRAIN_DECK_MIN_CONTENT_HEIGHT = 180;
+
+/**
+ * The card box for the pane the deck has been given.
+ *
+ * There is deliberately no third dimension: the reference card is a square
+ * plus a 56 px strip, and a practice card that has to hold a long question and
+ * six options grows downwards at runtime (the card measures its own content;
+ * see src/course/BrainQuestionDeck.tsx). What this function decides is the box
+ * the deck is DRAWN in — 72% of the pane's width like the reference's `72vw`,
+ * never wider than the reference cap, never taller than the pane can hold
+ * (with the stack's peek and the hint line reserved), and never so small that
+ * an option stops being a touch target. It is a pure function of the box, and
+ * an unmeasured box returns the reference card exactly.
+ */
+export function brainDeckSize(width: number, height: number): { width: number; height: number } {
+  const reference = { width: BRAIN_DECK_REFERENCE_WIDTH, height: BRAIN_DECK_REFERENCE_WIDTH + BRAIN_DECK_EXTRA_HEIGHT };
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return reference;
+  const availableWidth = Math.max(BRAIN_DECK_MIN_WIDTH, width - BRAIN_DECK_GUTTER);
+  const availableHeight = Math.max(
+    BRAIN_DECK_EXTRA_HEIGHT + 100,
+    height - BRAIN_DECK_GUTTER - BRAIN_DECK_HINT_HEIGHT - BRAIN_DECK_STACK_PEEK,
+  );
+  const maxWidth = Math.min(BRAIN_DECK_MAX_WIDTH, availableWidth);
+  const maxHeight = Math.min(BRAIN_DECK_MAX_HEIGHT, availableHeight);
+  // WIDTH comes from the pane's width (the reference's own 72%), and a pane too
+  // short to afford the reference silhouette takes it out of the HEIGHT instead
+  // — a wide-but-short pane gets a short card, never a postage stamp. (The
+  // question and its answers re-fit inside whatever box this returns; see
+  // src/course/BrainQuestionDeck.tsx.)
+  const cardWidth = Math.max(BRAIN_DECK_MIN_WIDTH, Math.min(width * 0.72, maxWidth));
+  const cardHeight = Math.max(1, Math.min(cardWidth + BRAIN_DECK_EXTRA_HEIGHT, maxHeight));
+  return { width: Math.round(cardWidth), height: Math.round(cardHeight) };
 }
 
 /* ── The glass music player ─────────────────────────────────────────────── */

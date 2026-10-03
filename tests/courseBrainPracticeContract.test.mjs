@@ -18,9 +18,13 @@
 //      paid module can never leak its practice set);
 //   4. the admin surface: the Brain option in the resource-type list, the
 //      importer, the publish rules;
-//   5. the player surface: the panel, its wiring, and DESIGN PARITY with
-//      src/revision/pages/TestPlayerPage.tsx (the same markup language, the
-//      same copy, the same bar) plus the viewport scaling ladder;
+//   5. the player surface: the panel, its wiring, and THE QUESTION CARD as the
+//      owner's reference deck (https://aicanvas.me/components/product-card-deck)
+//      — the reference's stack geometry, drag-tilt, flick thresholds and
+//      fly-off, ANY-direction swipe, the answer-tap flow with no buttons on the
+//      card at all, the round `3/10` counter in its top-right corner, the
+//      no-glass palette, and the scaling language that keeps it readable in
+//      whatever box the Split Deck gives the study pane;
 //   6. the "Always-visible footer dock" default of ON;
 //   7. reachability: the Brain tab follows the watched module, and a set opens
 //      from the Modules list, from resume and from a deep link.
@@ -53,6 +57,13 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf-8");
 
+/**
+ * The source with its comments removed. A file's header is allowed to say what
+ * the code deliberately does NOT do ("no Previous / Next / Skip button", "the
+ * glass is gone"), so the negative assertions below read the code, not the prose.
+ */
+const code = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 const practiceSet = read("utils/practiceSet.js");
 const mapping = read("utils/productMapping.js");
 const courseTypes = read("src/types/course.ts");
@@ -63,6 +74,8 @@ const productEditor = read("src/components/admin/products/ProductEditor.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
 const playerApp = read("src/CoursePlayerApp.tsx");
 const brainPanel = read("src/course/CourseBrainPanel.tsx");
+const brainDeck = read("src/course/BrainQuestionDeck.tsx");
+const brainCards = read("src/course/BrainCards.tsx");
 const revisionPlayer = read("src/revision/pages/TestPlayerPage.tsx");
 const indexCss = read("src/index.css");
 const demo = read("src/data/demoCourseContent.ts");
@@ -304,37 +317,157 @@ test("saving normalises the brain set, and a brain resource keeps no URL", () =>
 });
 
 // ---------------------------------------------------------------------------
-// 5. Player — the Brain page IS the revision test-taking page
+// 5. Player — the Brain question card IS the reference Product Card Deck
 // ---------------------------------------------------------------------------
+//
+// Owner brief, 2026-10-03:
+//
+//   "Course Player ke andar Mind/Brain page par jo Test/MCQ cards hain, unka
+//    current design completely replace karo. Is reference design ko exactly
+//    follow karo: https://aicanvas.me/components/product-card-deck … Glass
+//    design bilkul use nahi karna hai … user jis option per click kare vahi
+//    submit ho jaaye aur card out ho slide hokar next per jaaye … user kisi
+//    bhi direction mein swipe kar sake … top-right corner mein ek small
+//    circular box add karo jismein current question ka count show ho."
+//
+// The revision test-taking design the Brain page used to copy is gone from the
+// question screen. These tests pin the reference's mechanics instead — the
+// ones the owner asked to be followed "exactly" — so a later edit cannot
+// quietly turn the deck back into a form.
 
-test("the Brain page reuses the revision page's exact markup language", () => {
-  // Every one of these literals must appear in BOTH the revision test player
-  // and the Brain panel — that is what "the same design" means in code.
-  const shared = [
-    "dc-tile aspect-auto",
-    "[&>span]:w-full [&>span]:justify-start [&>span]:gap-3",
-    "dc-scene-plate dc-scene-plate--bar",
-    "grid-cols-5",
-    "Skip this question",
-    "Tap any question to jump back and change your answer before you submit.",
-    "Keep Reviewing",
-    "Answered",
-    "Unanswered",
-    "ProgressBar",
-    "GlassTile",
-    "Badge",
-  ];
-  for (const literal of shared) {
-    assert.ok(revisionPlayer.includes(literal), `revision TestPlayerPage is missing "${literal}" (the design reference changed)`);
-    assert.ok(brainPanel.includes(literal), `the Brain panel is missing the revision design's "${literal}"`);
+test("the Brain question card is the reference deck, mechanically", () => {
+  // The reference's own source, line for line: four slots at a straight stack,
+  // each card owning its own motion values, the drag-tilt capped at ±18°, the
+  // 300/30 slot spring.
+  assert.match(brainDeck, /const VISIBLE = 4;/);
+  assert.match(brainDeck, /const SLOT_Y = \[0, 12, 24, 36\];/);
+  assert.match(brainDeck, /const SLOT_SCALE = \[1, 0\.95, 0\.9, 0\.86\];/);
+  assert.match(brainDeck, /const SLOT_OPACITY = \[1, 1, 0\.92, 0\.82\];/);
+  assert.match(brainDeck, /const SPRING = \{ type: "spring", stiffness: 300, damping: 30 \} as const;/);
+  assert.match(brainDeck, /zIndex: 100 - slot,/);
+  assert.match(brainDeck, /const rotate = useTransform\(x, \[-200, 200\], \[-18, 18\], \{ clamp: true \}\);/);
+  assert.match(brainDeck, /const x = useMotionValue\(0\);/);
+  assert.match(brainDeck, /const y = useMotionValue\(SLOT_Y\[safeSlot\]\);/);
+  assert.match(brainDeck, /const scale = useMotionValue\(SLOT_SCALE\[safeSlot\]\);/);
+  assert.match(brainDeck, /const opacity = useMotionValue\(0\);/);
+  assert.match(brainDeck, /animate\(y, SLOT_Y\[safeSlot\], SPRING\)/);
+  assert.match(brainDeck, /animate\(scale, SLOT_SCALE\[safeSlot\], SPRING\)/);
+  assert.match(brainDeck, /if \(!isTop\) controls\.push\(animate\(x, 0, SPRING\)\);/);
+  // The reference's flick test and its slow-but-far fallback.
+  assert.match(brainDeck, /const FLICK_SPEED = 500;/);
+  assert.match(brainDeck, /const FLICK_DISTANCE = 130;/);
+  assert.match(brainDeck, /if \(speed > FLICK_SPEED \|\| distance > FLICK_DISTANCE\) \{/);
+  assert.match(brainDeck, /speed > SLOW_FLICK_SPEED \? \{ x: info\.velocity\.x, y: info\.velocity\.y \} : \{ x: info\.offset\.x \* 9, y: info\.offset\.y \* 9 \}/);
+  // …a weak drag springs back into the top slot, never costing a question.
+  assert.match(brainDeck, /animate\(x, 0, SPRING\);\s*\n\s*animate\(y, SLOT_Y\[0\], SPRING\);/);
+  // …and a flick flies off along the release velocity: normalized × 1500,
+  // fading over 0.45 s, shrinking to 0.85 over 0.5 s, then `safeToRemove`.
+  assert.match(brainDeck, /const FLY_DISTANCE = 1500;/);
+  assert.match(brainDeck, /animate\(x, \(velocity\.x \/ magnitude\) \* FLY_DISTANCE, \{ duration: 0\.5, ease: "easeOut" \}\)/);
+  assert.match(brainDeck, /animate\(y, \(velocity\.y \/ magnitude\) \* FLY_DISTANCE, \{ duration: 0\.5, ease: "easeOut" \}\)/);
+  assert.match(brainDeck, /animate\(opacity, 0, \{ duration: 0\.45, ease: "easeOut" \}\)/);
+  assert.match(brainDeck, /animate\(scale, 0\.85, \{/);
+  assert.match(brainDeck, /usePresence\(\)/);
+  assert.match(brainDeck, /<AnimatePresence>/);
+  // The top card is FREE to drag — no axis, no constraints, touch-action none —
+  // which is what makes left / right / up / down / diagonal swipes all work.
+  assert.match(brainDeck, /drag=\{isTop\}/);
+  assert.doesNotMatch(brainDeck, /dragConstraints|drag="x"|drag="y"/, "the card is never locked to one direction");
+  // (`pan-y` only on a card whose content is taller than any card can be, where
+  // the pane's own scroll gesture is the only way to reach the last answers.)
+  assert.match(brainDeck, /touchAction: isTop \? \(scrolls \? "pan-y" : "none"\) : "auto",/);
+  assert.match(brainDeck, /pointerEvents: isTop \? "auto" : "none",/);
+});
+
+test("a practice card has no buttons: answers answer, a swipe skips", () => {
+  // Nothing on the card navigates it. (The result screen still offers Review
+  // Answers / Practice again / All practice sets — those are not on the card.)
+  for (const banned of ["Previous", "Next", "Skip this question", "Review & Submit"]) {
+    assert.ok(!code(brainDeck).includes(banned), `the deck must not carry a "${banned}" button`);
+    assert.ok(!code(brainPanel).includes(banned), `the Brain panel must not carry a "${banned}" button`);
   }
-  // The selected answer's indigo ink + letter circle, exactly as revision paints it.
-  assert.match(brainPanel, /selected \? "bg-indigo-600 text-white" : "border border-white\/20 text-white\/75"/);
-  // The submit dialog is the revision dialog (its own scoped copy: the panel
-  // lives inside the player's study pane, not a revision page column).
-  assert.match(brainPanel, /data-brain-submit-dialog/);
-  assert.match(brainPanel, /GlassSurface/);
-  assert.match(brainPanel, /unanswered question\{unansweredCount === 1 \? "" : "s"\}/);
+  // The card carries exactly three things: the question, its answers, the count.
+  assert.match(brainDeck, /data-brain-card-prompt=""/);
+  assert.match(brainDeck, /data-brain-options=""/);
+  assert.match(brainDeck, /data-brain-option=\{optionIndex\}/);
+  assert.match(brainDeck, /<BrainCounter/);
+  // Tapping an answer RECORDS it first, then the card flicks itself away — the
+  // owner's flow: option click → answer saved → card slides out → next card.
+  assert.match(
+    brainDeck,
+    /onAnswer\(item\.index, optionIndex\);\s*\n\s*holdTimer\.current = window\.setTimeout\(\(\) => flick\(ANSWER_FLICK\), ANSWER_HOLD_MS\);/,
+  );
+  assert.match(brainDeck, /const ANSWER_FLICK = \{ x: -1, y: 0 \};/);
+  assert.match(brainDeck, /const ANSWER_HOLD_MS = 260;/);
+  // Only the top card answers, and only once: the card that is leaving cannot
+  // record a second answer.
+  assert.match(brainDeck, /if \(!isTop \|\| flying\.current \|\| picked !== null\) return;/);
+  // A card DRAG over an answer can never answer it — the pointer has to come
+  // back up on the same spot to count (which is how swipe-any-direction and
+  // tap-an-answer live on the same surface).
+  assert.match(brainDeck, /if \(Math\.hypot\(event\.clientX - press\.x, event\.clientY - press\.y\) > TAP_SLOP\) return;/);
+  // The deck DRAINS, and the last card's fly-off hands the practice to the
+  // existing review → submit → result flow (no button, no dead end).
+  assert.match(brainPanel, /const dismissTopCard = useCallback\(\(\) => \{\s*\n\s*setDeck\(\(previous\) => previous\.slice\(1\)\);/);
+  assert.match(brainPanel, /const finishDeck = useCallback\(\(\) => \{\s*\n\s*setMode\("review"\);/);
+  assert.match(brainDeck, /if \(lastExit\.current\) onEmpty\(\);/);
+  assert.match(brainPanel, /onFlick=\{dismissTopCard\}/);
+  assert.match(brainPanel, /onEmpty=\{finishDeck\}/);
+  // A question swiped without an answer stays unanswered: only a tapped option
+  // is ever written to `selections` (an unanswered one counts as skipped).
+  assert.match(brainPanel, /const answerQuestion = useCallback\(\(questionIndex: number, optionIndex: number\) => \{\s*\n\s*setSelections\(\(previous\) => \(\{ \.\.\.previous, \[questionIndex\]: optionIndex \}\)\);/);
+  assert.match(brainDeck, /data-brain-deck-hint=""/);
+});
+
+test("the question count is a small round box in the card's top-right corner", () => {
+  // "MCQ card ke top-right corner mein ek small circular box add karo. Ismein
+  //  current question ka count show ho. Example: 1/10, 2/10, 3/10."
+  assert.match(brainCards, /export function BrainCounter\(/);
+  assert.match(brainCards, /borderRadius: 9999,/);
+  assert.match(brainCards, /\{value\}\/\{total\}/);
+  assert.match(brainCards, /fontVariantNumeric: "tabular-nums"/);
+  assert.match(brainCards, /aria-label=\{`Question \$\{value\} of \$\{total\}`\}/);
+  assert.match(brainDeck, /<BrainCounter\s*\n\s*value=\{ordinal\}\s*\n\s*total=\{total\}\s*\n\s*size=\{unitNum\(44\) \* fit\}/);
+  assert.match(brainDeck, /style=\{\{ position: "absolute", top: unit\(14 \* fit\), right: unit\(14 \* fit\) \}\}/);
+  // It is measured in the SAME scale as the text it sits above, so it stays a
+  // small clean circle on a card that had to be fitted into a short pane.
+  assert.match(brainDeck, /const unitNum = \(px: number\) => px \* scale;/);
+  // The question reserves exactly that corner, so the count never sits on the
+  // words the learner is reading.
+  assert.match(brainDeck, /paddingRight: unit\(48\),/);
+  // The count is the CURRENT question of the SET: 1/10, 2/10, 3/10 …
+  assert.match(brainDeck, /ordinal=\{item\.index \+ 1\}/);
+  assert.match(brainDeck, /total=\{total\}/);
+});
+
+test("the Brain practice flow is solid — the glass design is gone from it", () => {
+  // "Glass design bilkul use nahi karna hai" — none of the revision page's
+  // glass materials may survive in the Brain tab's own surfaces.
+  const banned = ["GlassSurface", "GlassTile", "GlassButton", "backdrop", "dc-scene-plate", "dc-rev-glass", "dc-tile", "[aria-hidden]:nth-of-type"];
+  for (const [name, source] of [["panel", brainPanel], ["deck", brainDeck], ["cards", brainCards]]) {
+    for (const token of banned) {
+      assert.ok(!code(source).includes(token), `the Brain ${name} must not carry glass (${token})`);
+    }
+  }
+  // …and what paints it instead is the reference's own palette, verbatim:
+  // the #D3DDEE card, the #111111 ink, the #141312 / #F5F1E8 pill, the two
+  // shadows and the 22 px radius.
+  assert.match(brainCards, /card: "#D3DDEE"/);
+  assert.match(brainCards, /ink: "#111111"/);
+  assert.match(brainCards, /pill: "#141312"/);
+  assert.match(brainCards, /pillHover: "#2C2825"/);
+  assert.match(brainCards, /pillPress: "#000000"/);
+  assert.match(brainCards, /pillInk: "#F5F1E8"/);
+  assert.match(brainCards, /shadowTop: "0 30px 60px rgba\(0,0,0,0\.30\), 0 10px 20px rgba\(0,0,0,0\.20\)"/);
+  assert.match(brainCards, /shadowRest: "0 14px 30px rgba\(0,0,0,0\.18\)"/);
+  assert.match(brainCards, /radius: 22/);
+  // The reference card's own paint: heavier shadow on the TOP card only.
+  assert.match(brainDeck, /boxShadow: isTop \? BRAIN\.shadowTop : BRAIN\.shadowRest,/);
+  // The reference pill's hover / press states, and its stopPropagation rule.
+  assert.match(brainCards, /whileHover=\{disabled \? undefined : hover\}/);
+  assert.match(brainCards, /whileTap=\{disabled \? undefined : tap\}/);
+  assert.match(brainCards, /scale: 1\.06, backgroundColor: BRAIN\.pillHover/);
+  assert.match(brainCards, /scale: 0\.93, backgroundColor: BRAIN\.pillPress/);
 });
 
 test("the Brain page covers the whole practice loop: questions, review, submit, result, answers", () => {
@@ -346,22 +479,67 @@ test("the Brain page covers the whole practice loop: questions, review, submit, 
   assert.match(brainPanel, /Submit Practice/);
   assert.match(brainPanel, /Review Answers/);
   assert.match(brainPanel, /Practice again/);
-  assert.match(brainPanel, /const SWIPE_THRESHOLD = 60;/, "the revision page's swipe threshold");
   assert.match(brainPanel, /export const BRAIN_PASS_SCORE = 60;/);
+  // The question screen is the deck: the panel hands it the queue, the
+  // recorded answers and the two flow callbacks, and owns no button of its own
+  // inside the pane below the header row.
+  assert.match(
+    brainPanel,
+    /<BrainQuestionDeck\s*\n\s*items=\{deck\}\s*\n\s*questions=\{questions\}\s*\n\s*total=\{total\}\s*\n\s*selections=\{selections\}\s*\n\s*onAnswer=\{answerQuestion\}\s*\n\s*onFlick=\{dismissTopCard\}\s*\n\s*onEmpty=\{finishDeck\}/,
+  );
+  // The review grid still jumps back into the deck at any question, so an
+  // answer can be changed before submitting.
+  assert.match(brainPanel, /data-brain-review-tile=\{index \+ 1\}/);
+  assert.match(brainPanel, /onClick=\{\(\) => openDeck\(index\)\}/);
+  assert.match(brainPanel, /Tap any question to jump back and change your answer before you submit\./);
+  // …and Back resumes at the first question that still has no answer, so a
+  // learner returning to finish what they skipped is not sent through the whole
+  // set again (the cards they answered have left the deck for good).
+  assert.match(brainPanel, /const firstUnanswered = questions\.findIndex\(\(_, index\) => selections\[index\] === undefined\);/);
+  assert.match(brainPanel, /openDeck\(firstUnanswered < 0 \? 0 : firstUnanswered\);/);
 });
 
-test("text and cards scale with the viewport", () => {
-  // Every metric the design fixes in px is written as a scaled calc…
+test("the deck scales with its own box, and the panel keeps the S() language", () => {
+  // Every metric the panel fixes in px is written as a scaled calc…
   assert.match(brainPanel, /const S = \(px: number\) => `calc\(\$\{px\}px \* var\(--brain-scale, 1\)\)`;/);
   assert.ok(!/fontSize: \d+/.test(brainPanel), "no raw numeric font size may bypass the scale");
   assert.match(brainPanel, /style=\{\{ fontSize: S\(16\) \}\}/, "the panel root carries the scaled type scale");
-  assert.match(brainPanel, /style=\{\{ minHeight: S\(56\), fontSize: S\(15\), padding: `\$\{S\(12\)\} \$\{S\(16\)\}` \}\}/, "the answer tile");
+  // …the deck measures its own box out of the pane…
+  assert.match(brainDeck, /const box = useMemo\(\(\) => brainDeckSize\(pane\.width, pane\.height\), \[pane\.width, pane\.height\]\);/);
+  assert.match(brainDeck, /new ResizeObserver\(\(\) => setSize\(\{ width: node\.clientWidth, height: node\.clientHeight \}\)\)/);
+  // …and derives every card metric from the reference card's own width, so the
+  // reference design is the design at 1× and stays proportional at any size.
+  assert.match(brainDeck, /const unitScale = width \/ BRAIN_DECK_REFERENCE_WIDTH;/);
+  assert.match(brainDeck, /fontSize: unit\(21\),/);
+  assert.match(brainDeck, /minHeight: unit\(46\),/);
+  // A card whose content is taller than the pane shares the deck's one fit and
+  // is never cut off (the fit is a transform; deep overflow scrolls instead).
+  assert.match(brainDeck, /const contentFit = tallest > heightCap \? Math\.max\(CONTENT_FLOOR, heightCap \/ tallest\) : 1;/);
+  assert.match(brainDeck, /fit={scrolls \? 1 : fit}/);
   // …and the ladder itself lives in the one global stylesheet.
   assert.match(indexCss, /\[data-course-brain-panel\] \{\s*\n\s*--brain-scale: 1;/);
   assert.match(indexCss, /@media \(min-width: 560px\) \{\s*\n\s*\[data-course-brain-panel\] \{\s*\n\s*--brain-scale: 1\.08;/);
   assert.match(indexCss, /@media \(min-width: 820px\) \{\s*\n\s*\[data-course-brain-panel\] \{\s*\n\s*--brain-scale: 1\.16;/);
   assert.match(indexCss, /@media \(min-width: 1200px\) \{\s*\n\s*\[data-course-brain-panel\] \{\s*\n\s*--brain-scale: 1\.24;/);
   assert.match(indexCss, /@media \(max-height: 460px\) \{\s*\n\s*\[data-course-brain-panel\] \{\s*\n\s*--brain-scale: 1;/);
+});
+
+test("the deck has its own dev sandbox, wired like the app's other previews", () => {
+  // The card lives inside the player's study pane — the one place that is
+  // hardest to reach while designing (sign in, open a course, pick a module,
+  // drag the Split Deck divider). `#/dev/brain-deck` mounts the REAL panel with
+  // the demo course's real practice set on a box you can size by hand.
+  const main = read("src/main.tsx");
+  const preview = read("src/components/dev/BrainDeckPreview.tsx");
+  assert.match(main, /const BRAIN_DECK_PREVIEW_HASH = "#\/dev\/brain-deck";/);
+  assert.match(main, /const BrainDeckPreview = lazyRoute\(\(\) => import\("\.\/components\/dev\/BrainDeckPreview"\)\);/);
+  assert.match(main, /if \(hash\.startsWith\(BRAIN_DECK_PREVIEW_HASH\)\) return <BrainDeckPreview \/>;/);
+  // …the real panel, the real demo set, no copy of either.
+  assert.match(preview, /import CourseBrainPanel from "@\/course\/CourseBrainPanel";/);
+  assert.match(preview, /collectBrainPracticeSets\(\s*\n\s*demoCourseContent,/);
+  assert.match(preview, /<CourseBrainPanel productId="dev-brain-deck" sets=\{SETS\} \/>/);
+  // It is read-only, and it styles nothing of its own.
+  assert.match(preview, /never writes Firestore/);
 });
 
 test("the Brain tab hosts the panel and keeps the placeholder as a fallback", () => {
