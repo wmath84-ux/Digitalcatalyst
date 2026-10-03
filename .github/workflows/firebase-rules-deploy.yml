@@ -34,7 +34,7 @@ on:
       - firestore.indexes.json
       - storage.rules
       - firebase.json
-      - tests/sanctuaryFirestoreRules.emulator.mjs
+      - tests/firestoreRules.emulator.mjs
       - utils/courseNotes.js
       - utils/deviceNotifications.js
       - utils/mindMapTree.js
@@ -59,8 +59,8 @@ jobs:
 
       # Compile the complete rules and exercise real normal-user note/map
       # writes against a demo emulator BEFORE touching the live project.
-      - name: Verify sanctuary Firestore rules
-        run: npm run test:sanctuary:rules
+      - name: Verify shared Firestore rules
+        run: npm run test:firestore:rules
 
       # FIREBASE_SERVICE_ACCOUNT alone is not understood by firebase-tools.
       # Use ADC, without logging the secret or keeping it in the checkout.

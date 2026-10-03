@@ -1,25 +1,18 @@
 // utils/courseNotes.js
 //
-// Course-player + Sanctuary NOTES: the stored shape, the caps the Firestore
-// rules mirror, and the cloud ↔ device merge.
+// Course Player notes: the stored shape, the caps the Firestore rules mirror,
+// and the cloud ↔ device merge.
 //
-// Notes used to live ONLY in `localStorage` (`src/course/notesStore.ts`), which
-// is why "Sanctuary ke notes save nahi ho rahe": a note written on the 3D board
-// existed on that one device, in that one browser profile, and vanished the
-// moment the learner cleared site data or opened the app anywhere else. The
-// type comment in `src/types/course.ts` even promised Firestore storage
-// ("Multi-device sync is automatic via the Firestore listener") that was never
-// wired up.
-//
-// Storage now mirrors the mind-map design exactly:
+// Notes used to live only in `localStorage` (`src/course/notesStore.ts`), so
+// they were limited to one device and could disappear when site data was
+// cleared. This module now holds the pure part of the shared cloud-sync model:
+// payload normalization and merge rules, with no Firebase or bundler required.
 //
 //   users/{uid}/notes/{noteId}      one document per note, owner-only
 //
-// with `localStorage` kept as an offline mirror (instant paint + a queue of
-// work that never reached the cloud). This module holds the PURE part — id /
-// payload normalisation and the merge rule — so the Node test runner can drive
-// it with no Firebase and no bundler, and so the client and the security rules
-// can never disagree about a cap.
+// `localStorage` remains an offline mirror (instant paint + work that never
+// reached the cloud), and the same caps are applied by the client and security
+// rules.
 
 /** Bumped whenever the stored note shape changes, so readers can migrate. */
 export const NOTES_SCHEMA_VERSION = 1;

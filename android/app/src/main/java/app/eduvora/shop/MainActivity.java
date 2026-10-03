@@ -73,8 +73,8 @@ public class MainActivity extends BridgeActivity {
      * Swap in the fullscreen-capable WebChromeClient.
      *
      * Capacitor's stock client answers every {@code requestFullscreen()} with an
-     * immediate "no", which is why the Sanctuary's Fullscreen button (and every
-     * video fullscreen in the app) did nothing inside the APK. The subclass
+     * immediate "no", which is why video fullscreen in the app did nothing
+     * inside the APK. The subclass
      * keeps all other Capacitor behaviour and hosts the custom view properly.
      * Runs AFTER {@code super.onCreate()} because that is where the Bridge —
      * and therefore the WebView — is created.
@@ -162,13 +162,6 @@ public class MainActivity extends BridgeActivity {
             } else {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             }
-        } catch (Exception ignored) {}
-    }
-
-    /** Force landscape for the 3D Sanctuary — auto-rotate ON or OFF. */
-    public void lockLandscapeForSanctuary() {
-        try {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         } catch (Exception ignored) {}
     }
 

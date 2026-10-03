@@ -37,9 +37,8 @@
 //     very bottom edge when the footer is hidden (the keyboard rule) or absent
 //     — see ./courseFooterInset.ts and ./useCourseFooterInset.ts.
 //   · Floating UI (selection toolbar, slash menu, block controls) portals to
-//     <body>, so the player's overflow-hidden panes can never clip it — and it
-//     still lands correctly on the Sanctuary's 3D board, because positions come
-//     from the screen-space selection rect.
+//     <body>, so the player's overflow-hidden panes can never clip it; positions
+//     are anchored to the screen-space selection rectangle.
 
 import "@blocknote/react/style.css";
 import "./noteEditor/noteEditor.css";

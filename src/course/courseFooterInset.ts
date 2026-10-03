@@ -26,9 +26,9 @@
 //
 // And the footer is not always there: the player's ONE keyboard rule hides it
 // completely while the soft keyboard is open (src/course/useCourseKeyboard.tsx),
-// and the notes also render outside the player shell (the Sanctuary's 3D study
-// board), where no footer exists at all. So the lift is measured, never
-// assumed: how many px of the writing surface's bottom edge the footer covers.
+// and notes can render outside the player shell without a footer. So the lift
+// is measured, never assumed: how many px of the writing surface's bottom edge
+// the footer covers.
 //
 //   footer overlays the bottom  →  lift by exactly the covered px
 //   footer sits below (in flow) →  0

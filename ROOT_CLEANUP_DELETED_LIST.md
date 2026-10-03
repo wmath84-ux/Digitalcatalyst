@@ -2,6 +2,11 @@
 
 **Branch:** `arena/01a0e209-digitalcatalyst`
 **Date:** 2026-09-27
+
+> Historical inventory: the Sanctuary scene/assets and the two Blender source
+> files listed as retained below were removed in a later cleanup on 2026-10-03.
+> References to `public/sanctuary/` and those source files describe the state at
+> the time of this report, not the current checkout.
 **Total: 18 files deleted, ~94,276,882 bytes (≈ 89.9 MiB) freed**
 
 Every file below was verified to have **zero requirement in the code, the app,
@@ -85,7 +90,7 @@ list of failing test names was diffed between the two runs and is
 **byte-for-byte identical** — this cleanup introduced zero regressions.
 
 Also confirmed after deletion:
-- All converted glTF/GLB/JPEG outputs still present in `public/sanctuary/`.
+- At the time of this report, the converted scene outputs were present in `public/sanctuary/`; they have since been removed with the 3D feature.
 - `public/sanctuary/models/rusty_roof_house.CREDIT.txt` reworded so its
   provenance line no longer points at the deleted zip (attribution preserved,
   now cites the upstream CGTrader download).
@@ -97,8 +102,7 @@ Also confirmed after deletion:
 | File | Reason |
 |------|--------|
 | `gatePersonalAccess.gs` | Read directly by `tests/drivePersonalCopyContract.test.mjs:106`. |
-| `pahadon ke upar gras replace hill.blend` | Existence asserted by `tests/nature3dHillGrassContract.test.mjs:191` (`exists(...)`). |
-| `Beach+House_Pack+JSGraphics_CGTrader.blend` | Read as the source by `scripts/blend/extract-beach-house.py` (offline bake script, `blendfile.BlendFile(BLEND)`). |
+| `pahadon ke upar gras replace hill.blend` and `Beach+House_Pack+JSGraphics_CGTrader.blend` | Kept at the time for scene authoring; both were later removed together with the 3D scene and its authoring scripts. |
 | `mobile_pricing_page.html` | Cited as the colour/design reference in `src/subscription/components/PricingGlassCard.tsx` and `SubscriptionPage.tsx`. |
 | `google01732aa339b62388.html` | Google Search Console site-verification token. |
 | `index.html`, `package.json`, `firebase.ts`, `firebase.json`, `.firebaserc`, `vite.config.ts`, `tsconfig*.json`, `firestore.rules`, `storage.rules`, `capacitor.config.ts`, `metadata.json`, `vercel.json`, `.env.example`, `.npmrc`, `pnpm-*.yaml`, `run_tests.sh`, `google-services.json`, `components.json`, `package-lock.json`, `pnpm-lock.yaml`, `firestore.indexes.json` | Live project configuration — not junk. |

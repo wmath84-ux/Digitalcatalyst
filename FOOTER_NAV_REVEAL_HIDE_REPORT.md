@@ -124,8 +124,8 @@ on `store`), `course-hover` (`notes` selected, closes), `course-touch`, `course-
 against a stashed baseline. The fixed tree's 69 failures are a strict subset of the
 baseline's 73 — the four extra baseline failures are the new `peekDockRevealContract`
 tests (they assert the fix, so they fail on the old code). Every remaining failure is a
-pre-existing, unrelated one (Sanctuary/FlowPath/Store/style pins and the Sanctuary engine
-`pretest` build artifacts).
+pre-existing and unrelated to the footer change; this historical failure list
+may include checks for features that have since been retired.
 
 ## Note
 

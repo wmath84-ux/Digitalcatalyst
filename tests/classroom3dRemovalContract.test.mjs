@@ -118,38 +118,22 @@ test("no source file references the classroom, its CSS or its hooks", () => {
   }
 });
 
-// `three` itself came back on 2026-09-18 for the 3D Study Sanctuary
-// (src/nature3d/**, reachable from the desktop rail at #/nature-studio). That
-// is a NEW feature with its own contract in tests/nature3dSanctuaryContract.test.mjs
-// — it is not the course-player classroom, and nothing in the player imports it.
-//
-// So this test no longer bans the renderer outright. What it still guarantees is
-// the part that actually matters for the removal:
-//   • the React wrappers the classroom used (@react-three/fiber + drei) stay out;
-//   • `three` is imported ONLY from the sanctuary, never from the course player
-//     or anywhere else that could grow a second room.
-const THREE_ALLOWED_PREFIX = "src/nature3d/";
+/* ── 2. The shared Three.js renderer is fully removed ───────────────────── */
 
-test("the classroom's React-3D wrappers stay out of the manifest", () => {
+test("all Three.js renderer packages and source imports stay out", () => {
   const pkg = JSON.parse(read("package.json"));
-  for (const dependency of ["@react-three/fiber", "@react-three/drei"]) {
-    assert.equal(pkg.dependencies[dependency], undefined, dependency);
-    assert.equal(pkg.devDependencies[dependency], undefined, dependency);
+  const lock = read("package-lock.json");
+  const pnpmLock = read("pnpm-lock.yaml");
+  for (const dependency of ["three", "@types/three", "@react-three/fiber", "@react-three/drei"]) {
+    assert.equal(pkg.dependencies[dependency], undefined, `${dependency} must not be a runtime dependency`);
+    assert.equal(pkg.devDependencies[dependency], undefined, `${dependency} must not be a development dependency`);
   }
-  assert.doesNotMatch(read("package-lock.json"), /@react-three\/fiber|@react-three\/drei/);
+  assert.doesNotMatch(lock, /node_modules\/(?:three|@types\/three|@react-three\/(?:fiber|drei))(?:\/|")/);
+  assert.doesNotMatch(pnpmLock, /(?:^|\n)\s{2,}(?:three|'?(?:@types\/three|@react-three\/(?:fiber|drei))'?):/);
   for (const file of SOURCE_FILES()) {
-    assert.doesNotMatch(codeOnly(read(file)), /@react-three/, file);
-  }
-});
-
-test("only the 3D Sanctuary may import three — never the course player", () => {
-  for (const file of SOURCE_FILES()) {
-    if (file.startsWith(THREE_ALLOWED_PREFIX)) continue;
-    assert.doesNotMatch(
-      codeOnly(read(file)),
-      /from ["']three["']|from ["']three\//,
-      `${file} must not import three — the renderer belongs to ${THREE_ALLOWED_PREFIX}`,
-    );
+    const text = codeOnly(read(file));
+    assert.doesNotMatch(text, /@react-three/ , file);
+    assert.doesNotMatch(text, /(?:from\s*|import\s*\(|require\s*\()\s*["']three(?:\/[^"']*)?["']/, file);
   }
 });
 

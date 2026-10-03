@@ -71,10 +71,6 @@ const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibrary
 const MyCourseEditorPage = lazyRoute(() => import("./personal-library/MyCourseEditorPage"));
 const MyCoursePlayerPage = lazyRoute(() => import("./personal-library/MyCoursePlayerPage"));
 const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage"));
-// The 3D sanctuary is a heavy chunk (three.js + the procedural world), so it
-// is lazy like every other route — nothing is downloaded until the learner
-// opens it from the rail.
-const NatureStudioPage = lazyRoute(() => import("./nature3d/NatureStudioPage"));
 const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
@@ -93,7 +89,6 @@ const RenewalPreviewPage = lazyRoute(() => import("./components/subscription/Ren
 const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/OpeningAnimationPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import { StudyLibraryErrorBoundary } from "./personal-library/StudyLibraryErrorBoundary";
-import { SanctuaryErrorBoundary } from "./nature3d/SanctuaryErrorBoundary";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
@@ -215,7 +210,6 @@ const STUDY_LIBRARY_HASH = "#/study-library";
 /** Learner-authored courses: `#/my-course/new`, `#/my-course/<id>`, `#/my-course/<id>/edit`. */
 const MY_COURSE_HASH = "#/my-course/";
 const STUDY_PACK_HASH = "#/pack/";
-const NATURE_STUDIO_HASH = "#/nature-studio";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -606,7 +600,6 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(USAGE_LIMITS_HASH)) return UsageLimitsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
   if (hash.startsWith(MY_COURSE_HASH)) return isMyCourseEditorRoute(hash) ? MyCourseEditorPage : MyCoursePlayerPage;
-  if (hash.startsWith(NATURE_STUDIO_HASH)) return NatureStudioPage;
   if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
@@ -730,10 +723,6 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
     || hash.startsWith(OPENING_PREVIEW_HASH)
-    // The 3D Study Sanctuary is a full-screen WebGL experience: the rail,
-    // the top bar and the page scroller all have to get out of the way so
-    // the canvas owns the entire viewport.
-    || hash.startsWith(NATURE_STUDIO_HASH)
   ) {
     return <>{children}</>;
   }
@@ -752,8 +741,6 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                 ? "My Study Library"
                 : hash.startsWith(USAGE_LIMITS_HASH)
                   ? "Usage Limits"
-                  : hash.startsWith(NATURE_STUDIO_HASH)
-                    ? "3D Study Sanctuary"
                   : undefined
       }
       pageSubtitle={
@@ -767,9 +754,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                 ? "Modules, saved resources and recent learning"
                 : hash.startsWith(USAGE_LIMITS_HASH)
                   ? "Your personal learning allowances"
-                  : hash.startsWith(NATURE_STUDIO_HASH)
-                    ? "Walk the meadow, place the board, study with the herd"
-                    : undefined
+                  : undefined
       }
     >
       {children}
@@ -1861,18 +1846,6 @@ function RootPage(): ReactNode {
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(USAGE_LIMITS_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><UsageLimitsPage /></PageEnter>;
-  if (hash.startsWith(NATURE_STUDIO_HASH)) {
-    // The boundary keeps a Sanctuary render crash contained to this route:
-    // instead of the whole app unmounting to a black canvas (and the learner
-    // being thrown back to Home), they get a recoverable card with a working
-    // Try again / Back to Home — the same protection FlowPath and Study
-    // Library already have.
-    return (
-      <SanctuaryErrorBoundary>
-        <NatureStudioPage />
-      </SanctuaryErrorBoundary>
-    );
-  }
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
   // Learner-authored courses (My Study Library): `#/my-course/new` and
   // `#/my-course/<id>/edit` open the builder, `#/my-course/<id>` opens the

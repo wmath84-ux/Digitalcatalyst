@@ -275,14 +275,12 @@ test("unverified user cannot write a different owner's namespace; reconnect/page
   assert.equal(text("status"), "saved");
 });
 
-test("blank scopes are read-only and an unpicked sanctuary workspace is fully saveable", async () => {
-  fresh(); const board = mount(input({ productId: "" })); await settle();
+test("blank Course Player scopes are read-only", async () => {
+  fresh(); const mounted = mount(input({ productId: "" })); await settle();
   branch("Cannot save without scope");
   let key; act(() => { key = ctl().createMap("Should not exist"); });
   assert.equal(key, null); assert.equal(cloud.submitted.length, 0); assert.equal(text("nodes"), "");
-  const personal = input({ productId: "__sanctuary__" });
-  act(() => board.render(personal)); await settle(); branch("Personal branch"); await settle(50);
-  assert.equal(cloud.store.get(mapPath(personal)).nodes[0].topic, "Personal branch");
+  unmount(mounted);
 });
 
 

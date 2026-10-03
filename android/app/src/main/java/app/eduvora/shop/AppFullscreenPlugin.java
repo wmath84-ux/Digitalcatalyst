@@ -14,7 +14,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
  * Fullscreen for the Android shell — the layer that finally makes the
- * Sanctuary's Fullscreen button work inside the APK.
+ * Course Player and media-viewer fullscreen controls work inside the APK.
  *
  * <p>Android WebView refuses to honour an HTML5 {@code requestFullscreen()} call
  * unless the host Activity implements

@@ -40,7 +40,7 @@ import { JSDOM } from "jsdom";
 const require = createRequire(import.meta.url);
 const ROOT = process.cwd();
 
-/* ── fixture: the real dock, eight tabs like Home's mobile footer ─────────── */
+/* ── fixture: the real dock, the seven tabs on Home's mobile footer ─────────── */
 
 const FIXTURE = `
 import * as React from "react";
@@ -54,7 +54,7 @@ const Icon = ({ size = 22, style }) => <svg width={size} height={size} style={st
 export const selected: string[] = [];
 
 export function mountDock(host: HTMLElement) {
-  const items = Array.from({ length: 8 }, (_, i) => ({
+  const items = Array.from({ length: 7 }, (_, i) => ({
     id: \`tab-\${i}\`,
     label: \`Tab \${i}\`,
     color: "#FFBE0B",
@@ -240,10 +240,10 @@ test("a drag across the dock takes no layout read and writes no layout property"
   const before = reads.count;
   await drag(centreOf(1), centreOf(6));
 
-  // ONE measure pass for the whole gesture — the eight plates, read once on
-  // pointerdown while they were still at rest. The old wave read all eight
+  // ONE measure pass for the whole gesture — the seven plates, read once on
+  // pointerdown while they were still at rest. The old wave read all seven
   // again on every single frame.
-  assert.equal(reads.count - before, 8, "one measure() pass, then nothing");
+  assert.equal(reads.count - before, 7, "one measure() pass, then nothing");
 
   // The plates' boxes are the tap targets: they never animate.
   for (const button of buttons()) {

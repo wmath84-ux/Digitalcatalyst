@@ -37,7 +37,6 @@ export default function UsageLimitsPage() {
     else if (tab === "study-library") window.location.hash = "#/study-library";
     else if (tab === "revision") window.location.hash = "#/revision";
     else if (tab === "flowpath") window.location.hash = "#/flowpath";
-    else if (tab === "sanctuary") window.location.hash = "#/nature-studio";
   };
 
   if (!user) return null;

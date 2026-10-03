@@ -261,10 +261,9 @@ service cloud.firestore {
     // This collection used to have NO rule of its own, which meant every read
     // fell through to the admin-only catch-all at the bottom of this file: the
     // developer's account resolved all purchased courses, while any other
-    // learner's listener (`useCourseAccess`, and the Sanctuary reading board's
-    // `useOwnedCourses`) was refused with `permission-denied` and their library
-    // looked empty. Reads are owner-scoped; writes stay server-only so no
-    // client can ever grant itself a course.
+    // learner's `useCourseAccess` listener was refused with `permission-denied`
+    // and their library looked empty. Reads are owner-scoped; writes stay
+    // server-only so no client can ever grant itself a course.
     match /entitlements/{entitlementId} {
       // Only the server writes these, so `resource.data.uid` is trustworthy:
       // a learner can read exactly their own entitlements and nothing else.
@@ -403,17 +402,15 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
-      // ── Course Player / Sanctuary NOTES ─────────────────────────────────
+      // ── Course Player NOTES ────────────────────────────────────────────
       // ONE document per note, exactly like `mindMaps` below: the learner's own
       // writing, private to them, written straight from the client so
       // Firestore's offline queue keeps a note taken on a flaky connection.
       //
-      // The Notes tab of the Course Player and the note board inside the 3D
-      // Sanctuary are the SAME store (`src/course/useCourseNotes.ts` +
-      // `src/course/cloudNotes.ts`), scoped by `productId` — `String(product.id)`
-      // for a purchased course, `mine-<courseId>` for a course the learner
-      // built, `__library__` for AI personal notes, `__sanctuary__` for the
-      // sanctuary's private scratch workspace (no course selection required).
+      // The Notes tab uses the shared `src/course/useCourseNotes.ts` and
+      // `src/course/cloudNotes.ts` store, scoped by `productId` —
+      // `String(product.id)` for a purchased course, `mine-<courseId>` for a
+      // learner-authored course, and `__library__` for AI personal notes.
       //
       // Ownership is re-derived from the PATH and the document id must equal
       // the `id` field inside it, so a browser can never read — or write into —

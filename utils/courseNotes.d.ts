@@ -2,9 +2,8 @@
 // sibling `.js` file so the Node test runner can import it without a TS
 // toolchain — the same split `utils/mindMapTree.js` / `.d.ts` uses.
 //
-// The React consumers are `src/course/useCourseNotes.ts` (the persistence hook
-// behind the Course Player AND the Sanctuary note board) and
-// `src/course/cloudNotes.ts` (the Firestore I/O layer).
+// The React consumers are `src/course/useCourseNotes.ts` (the Course Player
+// persistence hook) and `src/course/cloudNotes.ts` (the Firestore I/O layer).
 
 export const NOTES_SCHEMA_VERSION: 1;
 export const NOTES_COLLECTION: "notes";

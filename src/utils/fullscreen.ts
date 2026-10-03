@@ -4,8 +4,8 @@
 //
 // ── WHY THIS EXISTS (the "Fullscreen button APK mein kaam nahi karta" bug) ──
 //
-// The Sanctuary's Fullscreen row (and the Course Player's "Hide status bar"
-// switch, and the media viewer's Fullscreen row) all called
+// The Course Player's "Hide status bar" switch and the media viewer's
+// Fullscreen row both called
 //
 //     document.documentElement.requestFullscreen()
 //
@@ -35,7 +35,7 @@
 //      Used only where a page genuinely cannot hide the OS chrome (iOS Safari,
 //      an in-app browser). The screen keeps working, the button visibly
 //      responds, and screens that want it can hide their own chrome for the
-//      duration (the Sanctuary frees the whole viewport).
+//      duration when a caller needs an in-page full-bleed fallback.
 //
 // Every layer reports through ONE snapshot + subscription, so a button's label
 // ("Fullscreen" ⇄ "Exit fullscreen") is always honest about what is really on.

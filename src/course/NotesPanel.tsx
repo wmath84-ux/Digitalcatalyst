@@ -19,7 +19,7 @@
 //     images, …) is preserved verbatim, never dropped.
 //
 // The owning hook stores notes in Firestore with a device mirror, per user
-// and course (or the sanctuary personal workspace).
+// and course scope.
 //
 // ── Session persistence ─────────────────────────────────────────────────
 // The panel's UI state (list vs. the big editor, plus any open draft) lives
@@ -57,8 +57,6 @@ const loadNoteEditor = () => import("./NoteEditor");
 const NoteEditor = lazy(loadNoteEditor);
 
 interface NotesPanelProps {
-  /** Isolate sanctuary drafts from the player's session and other courses. */
-  sessionKey?: string;
   notes: CoursePlayerNote[];
   onAdd: (html: string) => void;
   onEdit: (id: string, html: string) => void;
@@ -182,7 +180,6 @@ export default function NotesPanel({
   onDelete,
   onEditorOpenChange,
   composerOpenSignal,
-  sessionKey,
   syncState,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
@@ -190,7 +187,7 @@ export default function NotesPanel({
   // learner who left the editor open (compose or edit) comes straight back
   // into that same editor with the same draft. An edit view whose note no
   // longer exists degrades to the list instead of resurrecting a ghost.
-  const sessionNotes = getCoursePanelSession(sessionKey).notes;
+  const sessionNotes = getCoursePanelSession().notes;
   const restoreEdit =
     sessionNotes.view === "edit" && notes.some((note) => note.id === sessionNotes.noteId);
   const [composing, setComposing] = useState(sessionNotes.view === "compose");
@@ -238,11 +235,11 @@ export default function NotesPanel({
   // exit flush — even if this component unmounts before an effect fires.
   useEffect(() => {
     if (composing) {
-      setNotesSessionView({ view: "compose", draft, title: draftTitle }, sessionKey);
+      setNotesSessionView({ view: "compose", draft, title: draftTitle });
     } else if (editingId) {
-      setNotesSessionView({ view: "edit", noteId: editingId, draft: editDraft, title: editTitle }, sessionKey);
+      setNotesSessionView({ view: "edit", noteId: editingId, draft: editDraft, title: editTitle });
     } else {
-      setNotesSessionView({ view: "list" }, sessionKey);
+      setNotesSessionView({ view: "list" });
     }
   });
 
@@ -257,14 +254,14 @@ export default function NotesPanel({
       if (editingId) {
         setEditDraft(next.bodyHtml);
         setEditTitle(next.title);
-        setNotesSessionView({ view: "edit", noteId: editingId, draft: next.bodyHtml, title: next.title }, sessionKey);
+        setNotesSessionView({ view: "edit", noteId: editingId, draft: next.bodyHtml, title: next.title });
       } else {
         setDraft(next.bodyHtml);
         setDraftTitle(next.title);
-        setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title }, sessionKey);
+        setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title });
       }
     },
-    [editingId, sessionKey],
+    [editingId],
   );
 
   // The overlay expands the notes sheet while the editor is open so the

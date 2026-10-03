@@ -99,7 +99,7 @@ and no constant:
 |---|---|---|
 | **Peek dock** (bottom centre, pinned to the player, overlays the pane) | the covered px — line + hit strip + open panel | toolbar ends exactly at the footer's top edge, clear of its hit strip |
 | **Always-visible dock** (the study pane's last child, in flow *below* the notes panel) | `0` — it starts exactly where the pane ends | toolbar already ends at it; no empty strip above it |
-| **Off** — hidden by the player's ONE keyboard rule (`display: none`, i.e. a zeroed rect), or absent altogether (the Sanctuary's 3D board) | `0` | toolbar drops flush to the bottom edge, **no phantom gap above nothing** |
+| **Off** — hidden by the player's ONE keyboard rule (`display: none`, i.e. a zeroed rect), or absent altogether | `0` | toolbar drops flush to the bottom edge, **no phantom gap above nothing** |
 
 A sub-pixel seam counts as 0, and a full-height footer can never invert the page.
 Every footer in the document is considered and the largest answer wins, so the

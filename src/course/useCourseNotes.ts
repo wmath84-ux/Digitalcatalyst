@@ -1,16 +1,13 @@
 // src/course/useCourseNotes.ts
 //
-// Per-course NOTES persistence — the hook behind the Course Player's Notes tab
-// AND the Sanctuary's note board.
+// Per-course NOTES persistence — the hook behind the Course Player's Notes tab.
 //
 // ── Why this exists ───────────────────────────────────────────────────────
 // Notes were device-only: `notesStore.ts` wrote the list to `localStorage` and
 // nothing else. The type comment in `src/types/course.ts` even claimed
 // "Multi-device sync is automatic via the Firestore listener", but no listener
-// existed — so a note taken inside the 3D Sanctuary (or on a phone) was never
-// in Firebase, never rendered on another device, and was gone the moment site
-// data was cleared. That is the reported "Sanctuary ke notes aur mind map save
-// nahi ho rahe".
+// existed — so a note taken on one device was never in Firebase, never
+// rendered on another device, and was gone the moment site data was cleared.
 //
 // ── Two layers, exactly like `useCourseMindMap` ───────────────────────────
 //   1. Firestore is the source of truth: one document per note at

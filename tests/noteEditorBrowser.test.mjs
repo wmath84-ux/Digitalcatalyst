@@ -26,7 +26,7 @@
 //     unmounting a moment after the last keystroke;
 //   · 320 / 360 / 375 / 390 / 412 / 430 / 768 / 1024 px: no horizontal overflow.
 //
-// Needs Chromium, like tests/sanctuaryWorldBrowser.test.mjs: install Playwright's
+// Needs Chromium: install Playwright's
 // (`npx playwright install chromium`) or point PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 // at one. Without it every test here SKIPS with that reason.
 

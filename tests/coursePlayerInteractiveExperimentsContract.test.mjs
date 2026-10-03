@@ -64,7 +64,6 @@ const sharedDoc = read("utils/myCourseDoc.js");
 const editor = read("src/personal-library/MyCourseEditorPage.tsx");
 const panel = read("src/personal-library/MyCourseExperimentEditor.tsx");
 const templates = read("src/personal-library/experimentTemplates.ts");
-const readingBoard = read("src/nature3d/boards/ReadingBoard.tsx");
 const lumenTypes = read("src/lumen/course/types.ts");
 const aiReaders = read("utils/aiFileReaders.js");
 
@@ -251,8 +250,6 @@ test("the Modules tab shows an experiment and gives it its own icon", () => {
   assert.match(overlay, /file\.type === "interactive"/);
   assert.match(overlay, /const isVisibleFile = \(file: CourseFile\) =>\s*\n\s*file\.accessLevel !== "hidden" && \(hasUrlContent\(file\) \|\| isExperimentFile\(file\)\);/);
   assert.match(overlay, /if \(file\.type === "interactive"\) return FlaskConical;/);
-  // …and the Sanctuary reading board opens it in the same viewer.
-  assert.match(readingBoard, /interactive: FlaskConical,/);
 });
 
 test("the viewer stack opens experiments and never a URL-less type it cannot render", () => {

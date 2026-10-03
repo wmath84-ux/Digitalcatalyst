@@ -1,33 +1,19 @@
 // tests/courseNotesCloudSyncContract.test.mjs
 //
-// "Sanctuary ke andar jo notes aur mind map hai vah save ho — abhi save nahin
-// ho rahe. Sab Firebase par properly saved aur render hone chahiye."
+// Contract for Course Player notes persistence: one Firestore document per
+// note, an offline device mirror, tombstones for deletes, and owner-scoped
+// security rules. The hook and its client helpers are shared with AI-saved
+// notes, so all notes keep the same payload and caps.
 //
-// ROOT CAUSE (notes): notes were never written to Firebase at all.
-// `src/course/notesStore.ts` stored the whole list in `localStorage` under
-// `dc.courseNotes.{uid}.{productId}` and that was the end of it — the Course
-// Player and the Sanctuary note board both read and wrote that one key. The
-// type comment in `src/types/course.ts` even promised "Multi-device sync is
-// automatic via the Firestore listener", but no listener, no collection and no
-// rule existed. A note taken inside the 3D Sanctuary therefore lived on one
-// device in one browser profile, and vanished when site data was cleared.
-//
-// THE FIX, pinned here:
-//   1. one Firestore document per note at `users/{uid}/notes/{noteId}`, read
-//      through a LIVE listener, written from the client (so Firestore's offline
-//      queue still protects a note typed on a flaky connection);
-//   2. `localStorage` demoted to the OFFLINE MIRROR it should always have been,
-//      plus tombstones so a delete that never reached the cloud cannot come
-//      back on the next snapshot;
-//   3. ONE hook (`useCourseNotes`) behind BOTH surfaces — the player's Notes tab
-//      and the Sanctuary's note board — so a note written in either place is the
-//      same document;
-//   4. every note that exists only on the device (written offline, or by the old
-//      localStorage-only build) is uploaded on the next open, so nothing already
-//      written is lost by the migration;
-//   5. firestore.rules carries an owner-scoped `notes` block whose caps are the
-//      SAME NUMBERS `utils/courseNotes.js` applies — asserted here by parsing
-//      both files, so the client can never build a payload the rules reject.
+// The contract pins:
+//   1. one Firestore document per note at `users/{uid}/notes/{noteId}`;
+//   2. localStorage as an offline mirror, plus tombstones for offline deletes;
+//   3. the Course Player's Notes tab using the cloud hook;
+//   4. AI-saved notes using the same cloud path;
+//   5. open drafts rescued to the cloud when the Course Player exits;
+//   6. device-only notes uploaded on a later open and failures retried safely;
+//   7. firestore.rules enforcing the same owner scope and payload caps as the
+//      client normalizer.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -40,7 +26,6 @@ const cloud = read("src/course/cloudNotes.ts");
 const mirror = read("src/course/notesStore.ts");
 const util = read("utils/courseNotes.js");
 const player = read("src/CoursePlayerApp.tsx");
-const boards = read("src/nature3d/boards/StudyBoards.tsx");
 const aiNotes = read("src/ai/aiNotes.ts");
 const rules = read("firestore.rules");
 
@@ -69,7 +54,7 @@ test("the cloud copy is read through a LIVE listener, with a one-shot fallback",
   // mind-map list uses, so the query cannot fail with failed-precondition.
   assert.match(cloud, /where\("productId", "==", String\(productId\)\)/);
   assert.match(cloud, /Equality-only filter: Firestore needs no composite index/);
-  // A refused listener falls back to one read instead of stranding the board.
+  // A refused listener falls back to one read instead of stranding the notes list.
   assert.match(cloud, /void fetchCloudNotes\(owner, String\(productId\)\)/);
 });
 
@@ -103,7 +88,7 @@ test("a deleted note leaves a tombstone, so no snapshot can resurrect it", () =>
 });
 
 // ---------------------------------------------------------------------------
-// 3. ONE hook behind both surfaces
+// 3. The Course Player uses the shared notes hook
 // ---------------------------------------------------------------------------
 
 test("the Course Player's Notes tab uses the cloud hook, not the local store", () => {
@@ -119,17 +104,6 @@ test("the Course Player's Notes tab uses the cloud hook, not the local store", (
   assert.doesNotMatch(player, /persistLocalNotes\(/);
   assert.doesNotMatch(player, /loadLocalNotes\(/);
   assert.doesNotMatch(player, /setNotes\(/);
-});
-
-test("the Sanctuary note board uses the SAME hook, so both write one document", () => {
-  assert.match(boards, /import useCourseNotes from "\.\.\/\.\.\/course\/useCourseNotes";/);
-  assert.match(boards, /function useBoardNotes\(uid: string \| null, productId: string \| null\)/);
-  assert.match(boards, /const notes = useBoardNotes\(uid, productId\);/);
-  assert.match(boards, /useCourseNotes\(\{\n\s*uid,\n\s*productId,\n\s*\}\)/);
-  assert.doesNotMatch(boards, /persistLocalNotes\(/);
-  // Still the player's own panel, unmodified — the brief never changed.
-  assert.match(boards, /import NotesPanel from "\.\.\/\.\.\/course\/NotesPanel"/);
-  assert.match(boards, /notes=\{notes\.notes\}/);
 });
 
 test("an AI-saved note reaches the cloud too, not just the device", () => {
