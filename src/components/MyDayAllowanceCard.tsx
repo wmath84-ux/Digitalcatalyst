@@ -1,27 +1,10 @@
-// src/components/MyDayAllowanceCard.tsx
-//
-// My Day free-creation allowance, presented as a premium Usage Limits card.
-//
-// The allowance used to be a plain strip pinned to the top of the My Day
-// dashboard, which pushed the actual day planning below the fold and shouted
-// "you are limited" on every visit. It now lives on the dedicated Usage Limits
-// page beside the School AI allowance, using the same server-authoritative
-// snapshot.
-//
-// Material (owner brief 2026-09-30, Home card → profile): this card imports
-// the Profile page's `ProfileCard`, which IS the Home page's card — the navy
-// `.dc-scene-plate` at the pinned docs sensitivity (tint 0.25 · blur 0 ·
-// radius 24) — so it follows the page automatically. The card's copy wears the
-// same Home card ramp as the other account cards, and the state paragraphs
-// were cut to one line each (the badge, the bar and the reset line right above
-// them already carried the numbers). This card renders on the Usage Limits page
-// only.
-
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
+  BookOpenCheck,
   CalendarClock,
+  CheckCircle2,
   Clock3,
   RefreshCw,
   Sparkles,
@@ -68,9 +51,6 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
   } = useMyDayAccess();
   const [now, setNow] = useState(() => Date.now());
 
-  // The hook starts from an optimistic placeholder. `dayKey` is only filled in
-  // once the server has answered, so it is the honest "we have real numbers"
-  // signal — never show placeholder counts as if they were the user's usage.
   const resolved = Boolean(access.dayKey);
 
   useEffect(() => {
@@ -87,14 +67,14 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
   const exhausted = !unlimited && !canCreate && freeLimit > 0;
 
   const badge = !resolved
-    ? { label: loading ? "Syncing" : "Unavailable", tone: loading ? "border border-white/15 text-white/55" : "bg-amber-500/20 text-amber-200" }
+    ? { label: loading ? "Syncing" : "Unavailable", tone: loading ? "border border-white/15 text-white/55" : "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/30" }
     : unlimited
-      ? { label: "Unlimited", tone: "bg-violet-500/20 text-violet-200" }
+      ? { label: "Unlimited", tone: "bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/30" }
       : browseOnlyPlan
         ? { label: "Browse only", tone: "border border-white/15 text-white/85" }
         : exhausted
-          ? { label: "Used up", tone: "bg-amber-500/20 text-amber-200" }
-          : { label: "Available", tone: "bg-emerald-500/20 text-emerald-200" };
+          ? { label: "Used up", tone: "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/30" }
+          : { label: "Available", tone: "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30" };
 
   const headline = unlimited
     ? "Unlimited My Day creation"
@@ -104,10 +84,6 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         ? "Today’s free allowance is used"
         : `${freeRemaining} of ${freeLimit} free creation${freeLimit === 1 ? "" : "s"} left today`;
 
-  // Owner brief 2026-09-30 (account allowance card → "ekadam clean professional"): one
-  // short line per state. The old paragraphs repeated the badge, the bar and
-  // the reset line that sit directly above them, and the unlimited state said
-  // the same thing twice (its own panel + this line).
   const description = unlimited
     ? ""
     : browseOnlyPlan
@@ -123,104 +99,137 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
       data-myday-allowance-card
       data-myday-allowance-state={!resolved ? "loading" : unlimited ? "unlimited" : browseOnlyPlan ? "browse-only" : exhausted ? "exhausted" : "available"}
       aria-live="polite"
-      className="relative"
+      className="relative h-full"
     >
-      <GlassSurface contentClassName="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white">
-              {unlimited ? <Zap className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
+      <GlassSurface className="h-full" contentClassName="flex h-full flex-col justify-between p-4 sm:p-5 lg:p-6">
+        <div>
+          {/* Card Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35">
+                {unlimited ? <Zap className="h-5 w-5" /> : <CalendarClock className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0">
+                <p className="dc-profile-card-accent uppercase tracking-wider">My Day allowance</p>
+                <h3 data-myday-allowance-headline className="dc-profile-card-title mt-0.5 text-base font-bold text-white">
+                  {resolved ? headline : "Checking today’s allowance…"}
+                </h3>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="dc-profile-card-accent">My Day allowance</p>
-              <h3 data-myday-allowance-headline className="dc-profile-card-title mt-0.5">
-                {resolved ? headline : "Checking today’s allowance…"}
-              </h3>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <GlassButton
+                type="button"
+                data-myday-allowance-refresh
+                aria-label="Refresh My Day allowance"
+                disabled={loading || !uid}
+                onClick={() => void refresh()}
+                className="shrink-0 disabled:opacity-50 [&_.size-12]:size-8"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              </GlassButton>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${badge.tone}`}>
+                {badge.label}
+              </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <GlassButton
-              type="button"
-              data-myday-allowance-refresh
-              aria-label="Refresh My Day allowance"
-              disabled={loading || !uid}
-              onClick={() => void refresh()}
-              className="shrink-0 disabled:opacity-50 [&_.size-12]:size-8"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            </GlassButton>
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${badge.tone}`}>{badge.label}</span>
-          </div>
-        </div>
 
-        {!resolved ? (
-          <div className="mt-5 rounded-2xl border border-white/10 p-4" role="status">
-            {loading ? (
-              <div className="space-y-3">
-                <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-500/20" />
-                <div className="h-2.5 animate-pulse rounded-full bg-indigo-500/10" />
-                <p className="text-xs font-semibold text-white/55">Loading used, remaining and reset information from the server…</p>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2 text-amber-200">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold">Allowance could not be verified</p>
-                  <p className="mt-1 text-[11px] leading-5">{error || "Please retry. No client-side estimate is shown as real usage."}</p>
+          {/* Primary Telemetry Subpanel */}
+          {!resolved ? (
+            <div className="dc-profile-subpanel mt-4 p-4" role="status">
+              {loading ? (
+                <div className="space-y-3">
+                  <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-500/20" />
+                  <div className="h-2.5 animate-pulse rounded-full bg-indigo-500/10" />
+                  <p className="text-xs font-semibold text-white/55">Loading used, remaining and reset information from the server…</p>
                 </div>
+              ) : (
+                <div className="flex items-start gap-2 text-amber-200">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold">Allowance could not be verified</p>
+                    <p className="mt-1 text-[11px] leading-5">{error || "Please retry. No client-side estimate is shown as real usage."}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : unlimited ? (
+            <div className="dc-profile-subpanel mt-4 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="dc-profile-card-title inline-flex items-center gap-2 text-violet-200">
+                  <Sparkles className="h-4 w-4 shrink-0 text-violet-300" />
+                  <span>Full Subscriber Capacity</span>
+                </span>
+                <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200">
+                  Uncapped
+                </span>
               </div>
-            )}
-          </div>
-        ) : unlimited ? (
-          <p className="dc-profile-card-meta mt-3 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-300" />
-            No daily cap on tasks, schedule, reminders or notes.
-          </p>
-        ) : (
-          <>
-            <div className="mt-3">
-              <div className="dc-profile-card-meta flex items-center justify-between">
-                <span>Today · {freeLimit > 0 ? `${freeUsed} / ${freeLimit} used` : "no free creations"}</span>
-                <span className={exhausted || browseOnlyPlan ? "text-amber-200" : "text-indigo-200"}>
+              <p className="dc-profile-card-meta mt-2">
+                No daily cap on tasks, schedule, reminders or notes.
+              </p>
+            </div>
+          ) : (
+            <div className="dc-profile-subpanel mt-4 p-4">
+              <div className="dc-profile-card-meta flex items-center justify-between gap-2">
+                <span className="font-semibold text-white/85">
+                  Today · {freeLimit > 0 ? `${freeUsed} / ${freeLimit} used` : "no free creations"}
+                </span>
+                <span className={`font-bold ${exhausted || browseOnlyPlan ? "text-amber-200" : "text-indigo-200"}`}>
                   {browseOnlyPlan ? "Subscribers only" : `${freeRemaining} left`}
                 </span>
               </div>
-              <div className="dc-profile-bar mt-1.5">
+              <div className="dc-profile-bar mt-2.5">
                 <div
                   data-myday-allowance-bar
                   className={`h-full rounded-full transition-all duration-500 ${browseOnlyPlan ? "bg-white/40" : exhausted ? "bg-amber-500" : "bg-indigo-500"}`}
                   style={{ width: `${Math.max(6, usedPercent)}%` }}
                 />
               </div>
+              {browseOnlyPlan ? null : (
+                <p className="dc-profile-card-meta mt-2.5 flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
+                  <span>Resets in {resetIn}{resetAt ? ` · ${formatResetClock(resetAt)}` : ""}</span>
+                </p>
+              )}
             </div>
+          )}
 
-            {/* A browse-only plan has nothing to count or reset, so the reset
-                line is the single fact that matters. */}
-            {browseOnlyPlan ? null : (
-              <p className="dc-profile-card-meta mt-2 flex items-center gap-1.5">
-                <Clock3 className="h-3.5 w-3.5 shrink-0" />
-                Resets in {resetIn}{resetAt ? ` · ${formatResetClock(resetAt)}` : ""}
-              </p>
-            )}
-          </>
-        )}
+          {/* 2-Column Scope Breakdown */}
+          <div className="mt-3.5 grid grid-cols-2 gap-2.5">
+            <div className="dc-profile-subpanel flex items-start gap-2.5 p-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-300" />
+              <div className="min-w-0">
+                <span className="dc-profile-card-title block truncate text-xs">Creation Scope</span>
+                <span className="dc-profile-card-meta mt-0.5 block">Tasks, notes &amp; reminders</span>
+              </div>
+            </div>
+            <div className="dc-profile-subpanel flex items-start gap-2.5 p-3">
+              <BookOpenCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <div className="min-w-0">
+                <span className="dc-profile-card-title block truncate text-xs">Reading Access</span>
+                <span className="dc-profile-card-meta mt-0.5 block">Saved items stay open</span>
+              </div>
+            </div>
+          </div>
 
-        {resolved && description ? <p className="dc-profile-card-meta mt-2">{description}</p> : null}
+          {resolved && description ? <p className="dc-profile-card-meta mt-3">{description}</p> : null}
 
-        {error && resolved ? (
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold leading-5 text-amber-200">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Last verified allowance is shown. {error}
-          </p>
-        ) : null}
+          {error && resolved ? (
+            <p className="mt-2.5 flex items-start gap-1.5 text-[11px] font-semibold leading-5 text-amber-200">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Last verified allowance is shown. {error}
+            </p>
+          ) : null}
+        </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        {/* Footer Action Bar */}
+        <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t border-white/[0.08] pt-3.5 sm:flex-nowrap">
           <button
             type="button"
             data-myday-allowance-open
             onClick={onOpenMyDay}
             className="flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-500 active:scale-[0.99]"
           >
-            Open My Day <ArrowRight className="h-3.5 w-3.5" />
+            <span>Open My Day</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
           {resolved && !unlimited && (
             <GlassButton
@@ -228,7 +237,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
               type="button"
               data-myday-allowance-subscribe
               onClick={onSubscribe}
-              className="shrink-0 [&>span>div]:h-9 [&>span>div]:px-4 [&_span]:text-xs [&_span]:font-semibold"
+              className="shrink-0 [&>span>div]:h-10 [&>span>div]:px-4 [&_span]:text-xs [&_span]:font-semibold"
             >
               Go unlimited
             </GlassButton>

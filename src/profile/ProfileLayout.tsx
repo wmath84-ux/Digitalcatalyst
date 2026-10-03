@@ -5,23 +5,34 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialo
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRight,
+  ArrowUpRight,
   BadgeCheck,
   Bell,
+  BookOpen,
   Boxes,
   CalendarDays,
   Camera,
+  Check,
   ChevronRight,
+  Clock3,
+  Copy,
   Crown,
   Gauge,
   Heart,
+  Layers,
   LoaderCircle,
+  Lock,
   LogOut,
+  Mail,
   Pencil,
   Rocket,
   Save,
   ShieldCheck,
   ShoppingBag,
+  SlidersHorizontal,
   Sparkles,
+  Ticket,
+  UserCheck,
   X,
   Zap,
 } from "lucide-react";
@@ -67,10 +78,10 @@ export const PLAN_LABELS: Record<MembershipTier, string> = {
 };
 
 const TIER_ICONS: Record<MembershipTier, ReactNode> = {
-  normal: <Crown className="h-4 w-4" />,
-  basic: <Crown className="h-4 w-4" />,
-  premium: <Sparkles className="h-4 w-4" />,
-  pro: <Zap className="h-4 w-4" />,
+  normal: <Crown className="h-5 w-5" />,
+  basic: <Crown className="h-5 w-5" />,
+  premium: <Sparkles className="h-5 w-5" />,
+  pro: <Zap className="h-5 w-5" />,
 };
 
 /* ── Design tokens ───────────────────────────────────────────────────── */
@@ -78,7 +89,7 @@ const BTN = "[&>span>div]:h-10 [&>span>div]:px-4 [&_span]:text-xs [&_span]:font-
 const BTN_PRIMARY = `w-full [&>span>div]:w-full ${BTN}`;
 const BTN_SECONDARY = `w-full [&>span>div]:w-full ${BTN}`;
 const BTN_SMALL = "[&>span>div]:h-9 [&>span>div]:px-3.5 [&_span]:text-[11px] [&_span]:font-semibold";
-const ICON_CHIP = "grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1";
+const ICON_CHIP = "grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1";
 
 const INPUT =
   "dc-field w-full rounded-full border border-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:text-white/55";
@@ -164,7 +175,7 @@ export type ProfileLayoutProps = {
   onOpenDashboard: () => void;
 };
 
-/* ── Layout ─────────────────────────────────────────────────────────── */
+/* ── Complete From-Scratch Profile Workspace Layout ─────────────────── */
 export default function ProfileLayout({
   name,
   email,
@@ -194,14 +205,46 @@ export default function ProfileLayout({
   onOpenDashboard,
 }: ProfileLayoutProps) {
   return (
-    <div data-profile-layout className="space-y-4">
-      {/* ── Page Header ── */}
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-0.5">
+    <div data-profile-layout>
+      {/* ── Top Workspace Command Bar ── */}
+      <header className="flex flex-wrap items-center justify-between gap-3 px-0.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <h1 className="dc-scene-ink dc-profile-title truncate font-bold text-white">Profile</h1>
-          {membershipBadge}
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">
+            <UserCheck className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="dc-scene-ink dc-profile-title truncate font-bold text-white">Profile</h1>
+              {membershipBadge}
+            </div>
+            <p className="dc-profile-card-meta truncate">Identity, membership &amp; learning workspace</p>
+          </div>
         </div>
-        {saving ? <LoaderCircle className="h-4 w-4 animate-spin text-violet-300" /> : null}
+
+        <div className="flex shrink-0 items-center gap-2">
+          {saving ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/30 bg-violet-500/15 px-2.5 py-1 text-[10px] font-semibold text-violet-200">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-violet-300" />
+              <span>Syncing</span>
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={onOpenUsageLimits}
+            className="dc-profile-tile hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold text-indigo-200 sm:inline-flex"
+          >
+            <Gauge className="h-3.5 w-3.5 text-indigo-300" />
+            <span>Quotas</span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="dc-profile-tile inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold text-white/85"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 text-indigo-300" />
+            <span>Preferences</span>
+          </button>
+        </div>
       </header>
 
       {message ? (
@@ -210,7 +253,7 @@ export default function ProfileLayout({
         </div>
       ) : null}
 
-      {/* ── Identity & Quick Stats Card ── */}
+      {/* ── Executive Identity & Metrics Bento Hero (spans full width) ── */}
       <ProfileHero
         name={name}
         email={email}
@@ -219,6 +262,8 @@ export default function ProfileLayout({
         initials={initials}
         memberSince={memberSince}
         planLabel={membership.subscriber ? membership.planLabel : PLAN_LABELS.normal}
+        subscriber={membership.subscriber}
+        active={membership.active}
         onEdit={onEdit}
         onChoosePhoto={onChoosePhoto}
         photoUploading={photoUploading}
@@ -226,85 +271,55 @@ export default function ProfileLayout({
         stats={stats}
       />
 
-      {/* ── 2-Column Responsive Workspace Grid ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start lg:gap-5">
-        {/* ── Primary Column: Membership & Usage (col-span-7) ── */}
-        <div data-profile-col="main" className="space-y-4 lg:col-span-7">
-          {membership.subscriber ? (
-            <MembershipCard
-              tier={membership.tier}
-              active={membership.active}
-              tierLabel={membership.tierLabel}
-              planLabel={membership.planLabel}
-              subscription={membership.subscription}
-              renewal={renewal}
-              onOpenPlans={onOpenPlans}
-              onOpenUsageLimits={onOpenUsageLimits}
-            />
-          ) : (
-            <UpgradeCard
-              onOpenPlans={onOpenPlans}
-              onOpenSubscriberExperience={onOpenSubscriberExperience}
-              onOpenUsageLimits={onOpenUsageLimits}
-            />
-          )}
-
-          {/* ── Learning Hub & Enrolled Courses Card ── */}
-          <LearningCard
-            onOpenStudyLibrary={onOpenStudyLibrary}
-            items={library.items}
-            ownedCount={library.ownedCount}
-            onOpenCourse={library.onOpenCourse}
-            onOpenPurchases={library.onOpenPurchases}
+      {/* ── Primary Workspace Column (7/12 on Desktop & Tablet Landscape, Left on Tablet Portrait) ── */}
+      <div data-profile-col="main">
+        {membership.subscriber ? (
+          <MembershipCard
+            tier={membership.tier}
+            active={membership.active}
+            tierLabel={membership.tierLabel}
+            planLabel={membership.planLabel}
+            subscription={membership.subscription}
+            renewal={renewal}
+            onOpenPlans={onOpenPlans}
           />
-        </div>
-
-        {/* ── Side Column: Preferences, Referral & Account (col-span-5) ── */}
-        <div data-profile-col="side" className="space-y-4 lg:col-span-5">
-          <PreferencesHubCard
-            onOpenSettings={onOpenSettings}
-            referral={referral}
+        ) : (
+          <UpgradeCard
+            onOpenPlans={onOpenPlans}
+            onOpenSubscriberExperience={onOpenSubscriberExperience}
           />
+        )}
 
-          <div className="space-y-3 pt-1">
-            <GlassButton
-              variant="capsule"
-              onClick={onLogout}
-              className="w-full text-rose-300 [&>span>div]:w-full [&>span>div]:ring-1 [&>span>div]:ring-rose-400/30 [&_span]:text-sm [&_span]:font-semibold"
-            >
-              <span className="inline-flex items-center gap-2 text-rose-300">
-                <LogOut size={16} /> Log out
-              </span>
-            </GlassButton>
+        <LearningWorkspaceCard
+          onOpenStudyLibrary={onOpenStudyLibrary}
+          items={library.items}
+          ownedCount={library.ownedCount}
+          onOpenCourse={library.onOpenCourse}
+          onOpenPurchases={library.onOpenPurchases}
+        />
+      </div>
 
-            <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-medium text-white/70">
-              <a href="/privacy-policy.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">
-                Privacy Policy
-              </a>
-              <span aria-hidden="true" className="text-white/40">·</span>
-              <a href="/terms-of-service.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">
-                Terms of Service
-              </a>
-            </nav>
+      {/* ── Secondary Workspace Column (5/12 on Desktop & Tablet Landscape, Right on Tablet Portrait) ── */}
+      <div data-profile-col="side">
+        <UsageQuotasLaunchpadCard onOpenUsageLimits={onOpenUsageLimits} />
 
-            {isAdmin ? (
-              <button
-                type="button"
-                data-profile-open-dashboard
-                onClick={onOpenDashboard}
-                className="mx-auto block text-[9px] font-medium tracking-wide text-white/55 transition hover:text-white/80"
-              >
-                Open dashboard
-              </button>
-            ) : null}
-          </div>
-        </div>
+        <PreferencesAndReferralCard
+          onOpenSettings={onOpenSettings}
+          referral={referral}
+        />
+
+        <AccountSessionCard
+          email={email}
+          onLogout={onLogout}
+          isAdmin={isAdmin}
+          onOpenDashboard={onOpenDashboard}
+        />
       </div>
     </div>
   );
 }
 
-/* ── Profile Hero (Identity + Quick Stats) ──────────────────────────── */
+/* ── 1. Executive Identity & Metrics Bento Hero ─────────────────────── */
 function ProfileHero({
   name,
   email,
@@ -313,6 +328,8 @@ function ProfileHero({
   initials,
   memberSince,
   planLabel,
+  subscriber,
+  active,
   onEdit,
   onChoosePhoto,
   photoUploading,
@@ -326,6 +343,8 @@ function ProfileHero({
   initials: string;
   memberSince: string;
   planLabel: string;
+  subscriber: boolean;
+  active: boolean;
   onEdit: () => void;
   onChoosePhoto?: () => void;
   photoUploading: boolean;
@@ -337,10 +356,14 @@ function ProfileHero({
   const showPhoto = Boolean(src) && src !== brokenPhoto;
 
   return (
-    <ProfileCard data-profile-hero className="relative overflow-hidden border border-white/10">
-      {/* Top identity banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5 sm:gap-4">
+    <ProfileCard data-profile-hero
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5 lg:p-6"
+    >
+      {/* Top Identity Row */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
+          {/* Interactive Avatar Studio */}
           <div className="shrink-0 text-center">
             <button
               type="button"
@@ -348,7 +371,7 @@ function ProfileHero({
               disabled={!onChoosePhoto || photoUploading}
               aria-label={photoURL ? "Change profile photo" : "Add profile photo"}
               title={photoURL ? "Change photo" : "Add photo"}
-              className="group relative block rounded-full p-[2px] ring-2 ring-indigo-400/40 ring-offset-2 ring-offset-slate-950 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-default"
+              className="group relative block rounded-full p-[3px] ring-2 ring-indigo-400/45 transition hover:ring-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-default"
               data-profile-photo-upload
             >
               {showPhoto ? (
@@ -356,9 +379,9 @@ function ProfileHero({
                   src={src}
                   alt=""
                   decoding="async"
-                  width={64}
-                  height={64}
-                  className="h-14 w-14 rounded-full object-cover sm:h-16 sm:w-16"
+                  width={72}
+                  height={72}
+                  className="h-16 w-16 rounded-full object-cover sm:h-[72px] sm:w-[72px]"
                   referrerPolicy="no-referrer"
                   draggable={false}
                   data-profile-photo
@@ -366,7 +389,7 @@ function ProfileHero({
                 />
               ) : (
                 <span
-                  className="grid h-14 w-14 place-items-center rounded-full bg-indigo-600 text-lg font-bold text-white sm:h-16 sm:w-16 sm:text-xl"
+                  className="grid h-16 w-16 place-items-center rounded-full bg-indigo-600 text-xl font-bold text-white sm:h-[72px] sm:w-[72px] sm:text-2xl"
                   data-profile-photo-fallback
                 >
                   {initials}
@@ -375,92 +398,130 @@ function ProfileHero({
               {onChoosePhoto ? (
                 <span
                   aria-hidden="true"
-                  className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-slate-950 bg-indigo-500 text-white shadow transition group-hover:bg-indigo-400"
+                  className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-slate-950 bg-indigo-500 text-white shadow transition group-hover:scale-105 group-hover:bg-indigo-400"
                 >
-                  {photoUploading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+                  {photoUploading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
                 </span>
               ) : null}
             </button>
             {onChoosePhoto ? (
-              <span className="mt-1 block text-[9px] font-semibold text-white/55">
+              <span className="mt-1.5 block text-[10px] font-semibold text-indigo-200/80">
                 {photoUploading ? "Uploading…" : photoURL ? "Change photo" : "Add photo"}
               </span>
             ) : null}
           </div>
 
+          {/* Identity Details */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="truncate text-base font-bold tracking-tight text-white sm:text-lg md:text-xl">{name}</h2>
-            </div>
-            <p className="dc-profile-card-meta mt-0.5 truncate text-white/70">{email}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 data-profile-plan-label
-                className="dc-profile-card-accent inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-semibold ring-1 ring-indigo-400/30"
+                className="dc-profile-card-accent inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-indigo-400/35"
               >
-                <BadgeCheck className="h-3 w-3 text-indigo-300" /> {planLabel}
+                <BadgeCheck className="h-3.5 w-3.5 text-indigo-300" />
+                <span>{planLabel}</span>
               </span>
-              <span aria-hidden="true" className="text-[10px] text-white/40">·</span>
-              <span className="dc-profile-card-meta inline-flex items-center gap-1 text-white/60">
-                <CalendarDays className="h-3 w-3 text-white/50" /> Since {memberSince}
+              <span className="dc-profile-card-meta inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-0.5">
+                <CalendarDays className="h-3 w-3 text-indigo-300/80" />
+                <span>Since {memberSince}</span>
               </span>
+              {subscriber ? (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${
+                    active
+                      ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30"
+                      : "bg-rose-500/15 text-rose-200 ring-rose-400/30"
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-400" : "bg-rose-400"}`} />
+                  {active ? "Verified Member" : "Plan Expired"}
+                </span>
+              ) : null}
             </div>
+
+            <h2 className="mt-2 truncate text-lg font-bold tracking-tight text-white sm:text-xl lg:text-2xl">
+              {name}
+            </h2>
+
+            <p className="dc-profile-card-meta mt-0.5 flex items-center gap-1.5 truncate">
+              <Mail className="h-3.5 w-3.5 shrink-0 text-indigo-300/75" aria-hidden="true" />
+              <span className="truncate">{email}</span>
+            </p>
+
+            {bio ? (
+              <div className="dc-profile-subpanel mt-3 px-3.5 py-2.5">
+                <p className="dc-profile-card-note line-clamp-2">{bio}</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-300/85 transition hover:text-indigo-200"
+              >
+                <Pencil className="h-3 w-3" />
+                <span>Add a short bio to personalize your profile</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end">
-          <GlassButton onClick={onEdit} aria-label="Edit profile" className="shrink-0 [&_.size-12]:size-9">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
-              <Pencil size={14} />
-              <span className="hidden sm:inline">Edit</span>
+        {/* Edit Profile Action */}
+        <div className="flex shrink-0 items-center justify-end self-end sm:self-start">
+          <GlassButton
+            variant="capsule"
+            onClick={onEdit}
+            aria-label="Edit profile"
+            className={`shrink-0 ${BTN_SMALL}`}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Pencil size={13} />
+              <span>Edit profile</span>
             </span>
           </GlassButton>
         </div>
       </div>
 
       {photoError ? (
-        <p role="alert" data-profile-photo-error className="mt-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-[11px] font-semibold text-rose-200">
+        <p role="alert" data-profile-photo-error className="mt-3.5 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3.5 py-2.5 text-xs font-semibold text-rose-200">
           {photoError}
         </p>
       ) : null}
 
-      {bio ? (
-        <div className="mt-3.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
-          <p className="dc-profile-card-note line-clamp-2 text-white/80">{bio}</p>
-        </div>
-      ) : null}
-
-      {/* Integrated Quick Stats */}
-      <div className="mt-4 border-t border-white/[0.08] pt-3.5" data-profile-stats>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <QuickStat
-            icon={<ShoppingBag className="h-4 w-4" />}
-            value={stats.ownedCount}
-            label="Purchased"
-            tone="bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"
-            onClick={stats.onOpenPurchases}
-          />
-          <QuickStat
-            icon={<Heart className="h-4 w-4" />}
-            value={stats.favoriteCount}
-            label="Favorites"
-            tone="bg-rose-500/15 text-rose-400 ring-rose-400/30"
-            onClick={stats.onOpenFavorites}
-          />
-          <QuickStat
-            icon={<Boxes className="h-4 w-4" />}
-            value={stats.cartCount}
-            label="In cart"
-            tone="bg-amber-500/15 text-amber-300 ring-amber-400/30"
-            onClick={stats.onOpenCart}
-          />
-        </div>
+      {/* Integrated 3-Tile Bento Quick Stats Strip */}
+      <div
+        data-profile-stats
+        className="mt-5 grid grid-cols-3 gap-2.5 border-t border-white/[0.08] pt-4 sm:gap-3.5"
+      >
+        <QuickStatTile
+          icon={<ShoppingBag className="h-4 w-4" />}
+          value={stats.ownedCount}
+          label="Purchased"
+          caption="Owned courses"
+          tone="bg-indigo-500/15 text-indigo-300 ring-indigo-400/30"
+          onClick={stats.onOpenPurchases}
+        />
+        <QuickStatTile
+          icon={<Heart className="h-4 w-4" />}
+          value={stats.favoriteCount}
+          label="Favorites"
+          caption="Saved items"
+          tone="bg-rose-500/15 text-rose-300 ring-rose-400/30"
+          onClick={stats.onOpenFavorites}
+        />
+        <QuickStatTile
+          icon={<Boxes className="h-4 w-4" />}
+          value={stats.cartCount}
+          label="In cart"
+          caption="Ready to buy"
+          tone="bg-amber-500/15 text-amber-300 ring-amber-400/30"
+          onClick={stats.onOpenCart}
+        />
       </div>
     </ProfileCard>
   );
 }
 
-/* ── Membership Card (Subscriber) ───────────────────────────────────── */
+/* ── 2A. Membership & Subscription Command Center (Subscriber) ──────── */
 function MembershipCard({
   tier,
   active,
@@ -469,7 +530,6 @@ function MembershipCard({
   subscription,
   renewal,
   onOpenPlans,
-  onOpenUsageLimits,
 }: {
   tier: MembershipTier;
   active: boolean;
@@ -478,7 +538,6 @@ function MembershipCard({
   subscription: SubscriptionSnapshot | null;
   renewal: ProfileLayoutProps["renewal"];
   onOpenPlans: () => void;
-  onOpenUsageLimits: () => void;
 }) {
   const snapshot = renewal?.subscription || subscription;
   const now = renewal?.now || Date.now();
@@ -496,58 +555,88 @@ function MembershipCard({
       data-profile-membership-card
       data-renewal-card
       data-stage={expired ? "expired" : "active"}
-      className="relative overflow-hidden border border-white/10"
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
     >
-      <div className="flex items-center gap-3">
-        <span
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ${
-            active ? "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30" : "bg-rose-500/15 text-rose-300 ring-rose-400/30"
-          }`}
-        >
-          {TIER_ICONS[tier]}
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <h3 data-renewal-card-headline className="dc-profile-card-title truncate text-base font-bold text-white">
-            {tierLabel} membership
-          </h3>
-          <p className="dc-profile-card-meta mt-0.5 truncate text-white/70">
-            {planLabel}
-            {snapshot ? ` · ${cycleLabel(snapshot.cycle)} billing` : ""}
-          </p>
+      {/* Card Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`${ICON_CHIP} ${
+              active
+                ? "bg-indigo-500/20 text-indigo-200 ring-indigo-400/35"
+                : "bg-rose-500/20 text-rose-200 ring-rose-400/35"
+            }`}
+          >
+            {TIER_ICONS[tier]}
+          </span>
+          <div className="min-w-0">
+            <p className="dc-profile-card-accent uppercase tracking-wider">Membership &amp; Billing</p>
+            <h3 data-renewal-card-headline className="dc-profile-card-title mt-0.5 truncate text-base font-bold text-white">
+              {tierLabel} membership
+            </h3>
+            <p className="dc-profile-card-meta mt-0.5 truncate">
+              {planLabel}
+              {snapshot ? ` · ${cycleLabel(snapshot.cycle)} billing` : ""}
+            </p>
+          </div>
         </div>
 
         <span
           data-profile-plan-status={active ? "active" : "expired"}
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
-            active ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-rose-400/30"
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ${
+            active
+              ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30"
+              : "bg-rose-500/15 text-rose-300 ring-rose-400/30"
           }`}
         >
           {active ? "Active" : "Expired"}
         </span>
       </div>
 
+      {/* Subscription Timeline & Progress Telemetry Box */}
       {snapshot ? (
-        <div className="mt-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-          <div className="dc-profile-card-meta flex items-center justify-between gap-2 text-xs font-medium">
-            <span data-renewal-expiry className="truncate text-white/80">
-              {expired ? `Ended ${formatDate(snapshot.expiresAt)}` : `Access until ${formatDate(snapshot.expiresAt)}`}
+        <div className="dc-profile-subpanel mt-4 p-3.5">
+          <div className="grid grid-cols-2 gap-2.5 pb-3 border-b border-white/[0.06] sm:grid-cols-3">
+            <div>
+              <span className="dc-profile-card-meta block">Active Plan</span>
+              <span className="dc-profile-card-title mt-0.5 block truncate">{planLabel}</span>
+            </div>
+            <div>
+              <span className="dc-profile-card-meta block">Billing Cycle</span>
+              <span className="dc-profile-card-title mt-0.5 block truncate">{cycleLabel(snapshot.cycle)}</span>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <span className="dc-profile-card-meta block">Renewal Policy</span>
+              <span className="dc-profile-card-title mt-0.5 block truncate text-emerald-200">Manual control</span>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span data-renewal-expiry className="dc-profile-card-meta flex items-center gap-1.5 truncate text-white/85">
+              <Clock3 className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
+              <span>{expired ? `Ended ${formatDate(snapshot.expiresAt)}` : `Access until ${formatDate(snapshot.expiresAt)}`}</span>
             </span>
-            <span data-renewal-remaining className="shrink-0 font-semibold text-indigo-300">
+            <span data-renewal-remaining className="dc-profile-card-accent shrink-0 font-bold">
               {expired ? "Renew to continue" : `${daysRemaining} days left`}
             </span>
           </div>
+
           {expired ? null : (
-            <div className="dc-profile-bar mt-2">
+            <div className="dc-profile-bar mt-2.5">
               <span data-renewal-progress style={{ width: `${Math.max(4, progress)}%` }} />
             </div>
           )}
         </div>
       ) : null}
 
-      <div className="mt-3.5 flex items-center gap-2">
+      {/* Primary Action Controls */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <GlassButton variant="capsule" onClick={onOpenPlans} className={BTN_PRIMARY}>
-          {active ? "Manage subscription" : "Renew subscription"} <ArrowRight className="h-3.5 w-3.5" />
+          <span className="inline-flex items-center gap-2">
+            <span>{active ? "Manage subscription" : "Renew subscription"}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </GlassButton>
         {snapshot && renewal ? (
           <GlassButton
@@ -561,56 +650,75 @@ function MembershipCard({
         ) : null}
       </div>
 
-      {/* Integrated Usage Limits Link */}
-      <div data-profile-usage-limits-link className="mt-3 border-t border-white/[0.08] pt-3">
-        <button
-          type="button"
-          onClick={onOpenUsageLimits}
-          className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-        >
-          <span className={`${ICON_CHIP} bg-indigo-500/15 text-indigo-200 ring-indigo-400/30`}>
-            <Gauge size={17} aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="dc-profile-card-title block">Usage limits</span>
-            <span className="dc-profile-card-meta mt-0.5 block">View personal quotas and reset details</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-white/55" aria-hidden="true" />
-        </button>
-      </div>
-
-      <p className="dc-profile-card-meta mt-2.5 flex items-center gap-1.5 text-white/60">
-        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-300" /> Renewal is manual and secure — no automatic charge.
+      <p className="dc-profile-card-meta mt-3 flex items-center gap-1.5">
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
+        <span>Renewal is manual and secure — no automatic charge.</span>
       </p>
     </ProfileCard>
   );
 }
 
-/* ── Upgrade Card (Free Learner) ────────────────────────────────────── */
+/* ── 2B. Membership Upgrade Showcase (Free Learner) ─────────────────── */
 function UpgradeCard({
   onOpenPlans,
   onOpenSubscriberExperience,
-  onOpenUsageLimits,
 }: {
   onOpenPlans: () => void;
   onOpenSubscriberExperience: () => void;
-  onOpenUsageLimits: () => void;
 }) {
   return (
-    <ProfileCard data-profile-upgrade-card className="relative overflow-hidden border border-white/10">
-      <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white ring-1 ring-indigo-400/40">
-          <Rocket className="h-4 w-4" />
+    <ProfileCard
+      data-profile-upgrade-card
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`${ICON_CHIP} bg-indigo-600 text-white ring-indigo-400/40`}>
+            <Rocket className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="dc-profile-card-accent uppercase tracking-wider">Membership Tier</p>
+            <h3 className="dc-profile-card-title mt-0.5 truncate text-base font-bold text-white">Free plan</h3>
+            <p className="dc-profile-card-meta mt-0.5">Subscriber plans unlock more practice, notes and My Day.</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/80">
+          Standard
         </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="dc-profile-card-title truncate text-base font-bold text-white">Free plan</h3>
-          <p className="dc-profile-card-meta mt-0.5 text-white/70">Subscriber plans unlock more practice, notes and My Day.</p>
+      </div>
+
+      {/* Value Highlights Grid */}
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="dc-profile-subpanel flex items-center gap-2.5 p-2.5">
+          <Zap className="h-4 w-4 shrink-0 text-indigo-300" />
+          <div className="min-w-0">
+            <span className="dc-profile-card-title block truncate text-xs">Unlimited My Day</span>
+            <span className="dc-profile-card-meta block truncate">Tasks &amp; daily notes</span>
+          </div>
+        </div>
+        <div className="dc-profile-subpanel flex items-center gap-2.5 p-2.5">
+          <Sparkles className="h-4 w-4 shrink-0 text-violet-300" />
+          <div className="min-w-0">
+            <span className="dc-profile-card-title block truncate text-xs">Higher AI Quotas</span>
+            <span className="dc-profile-card-meta block truncate">Expanded token cap</span>
+          </div>
+        </div>
+        <div className="dc-profile-subpanel flex items-center gap-2.5 p-2.5">
+          <Layers className="h-4 w-4 shrink-0 text-cyan-300" />
+          <div className="min-w-0">
+            <span className="dc-profile-card-title block truncate text-xs">Study Packs</span>
+            <span className="dc-profile-card-meta block truncate">Full course unlocks</span>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3.5 grid gap-2 sm:grid-cols-2">
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
         <GlassButton variant="capsule" onClick={onOpenPlans} className={BTN_PRIMARY}>
-          Explore plans <ArrowRight className="h-3.5 w-3.5" />
+          <span className="inline-flex items-center gap-2">
+            <span>Explore plans</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </GlassButton>
         <GlassButton
           variant="capsule"
@@ -621,30 +729,12 @@ function UpgradeCard({
           Subscriber experience
         </GlassButton>
       </div>
-
-      {/* Integrated Usage Limits Link */}
-      <div data-profile-usage-limits-link className="mt-3 border-t border-white/[0.08] pt-3">
-        <button
-          type="button"
-          onClick={onOpenUsageLimits}
-          className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-        >
-          <span className={`${ICON_CHIP} bg-indigo-500/15 text-indigo-200 ring-indigo-400/30`}>
-            <Gauge size={17} aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="dc-profile-card-title block">Usage limits</span>
-            <span className="dc-profile-card-meta mt-0.5 block">View personal quotas and reset details</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-white/55" aria-hidden="true" />
-        </button>
-      </div>
     </ProfileCard>
   );
 }
 
-/* ── Learning Hub Card (Study Library + Course Shelf) ───────────────── */
-function LearningCard({
+/* ── 3. Learning Workspace & Enrolled Courses Hub ───────────────────── */
+function LearningWorkspaceCard({
   onOpenStudyLibrary,
   items,
   ownedCount,
@@ -658,146 +748,358 @@ function LearningCard({
   onOpenPurchases: () => void;
 }) {
   return (
-    <ProfileCard data-profile-study-library className="relative overflow-hidden border border-white/10">
-      {/* Study Library Section */}
-      <div className="flex items-center gap-3">
-        <span className={`${ICON_CHIP} bg-cyan-500/15 text-cyan-200 ring-cyan-400/30`}>
-          <Boxes className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="dc-profile-card-title truncate text-base font-bold text-white">My Study Library</h3>
-          <p className="dc-profile-card-meta mt-0.5 truncate text-white/70">Your modules, saved items and recent resources.</p>
+    <ProfileCard
+      data-profile-study-library
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
+    >
+      {/* My Study Library Banner */}
+      <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`${ICON_CHIP} bg-cyan-500/15 text-cyan-200 ring-cyan-400/35`}>
+            <BookOpen className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="dc-profile-card-accent uppercase tracking-wider">Learning Workspace</p>
+            <h3 className="dc-profile-card-title mt-0.5 truncate text-base font-bold text-white">My Study Library</h3>
+            <p className="dc-profile-card-meta mt-0.5 truncate">Your modules, saved items and recent resources.</p>
+          </div>
+        </div>
+
+        <div className="shrink-0">
+          <GlassButton variant="capsule" onClick={onOpenStudyLibrary} className={`w-full sm:w-auto ${BTN}`}>
+            <span className="inline-flex items-center gap-2 text-cyan-100">
+              <span>Open Study Library</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </GlassButton>
         </div>
       </div>
 
-      <GlassButton variant="capsule" onClick={onOpenStudyLibrary} className={`mt-3 text-cyan-100 ${BTN_PRIMARY}`}>
-        <span className="inline-flex items-center gap-2">
-          Open Study Library <ArrowRight className="h-3.5 w-3.5" />
-        </span>
-      </GlassButton>
-
-      {/* Courses Section */}
-      <div className="my-4 border-t border-white/[0.08]" />
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="dc-profile-card-title truncate text-sm font-semibold text-white">Your courses</h3>
-          {items.length > 0 ? (
-            <p className="dc-profile-card-meta mt-0.5 text-white/60">{ownedCount} course{ownedCount === 1 ? "" : "s"}</p>
-          ) : null}
+      {/* Enrolled Courses Section */}
+      <div className="mt-4 border-t border-white/[0.08] pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="dc-profile-card-title truncate">Your courses</h3>
+            <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-bold text-indigo-200 ring-1 ring-indigo-400/30">
+              {ownedCount}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenPurchases}
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-indigo-300 transition hover:text-indigo-200"
+          >
+            <span>View all</span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onOpenPurchases}
-          className="shrink-0 text-xs font-semibold text-indigo-300 transition hover:text-indigo-200"
-        >
-          View all
-        </button>
-      </div>
 
-      {items.length > 0 ? (
-        <div className="mt-3 space-y-2">
-          {items.slice(0, 3).map((product) => (
+        {items.length > 0 ? (
+          <div className="mt-3 space-y-2.5">
+            {items.slice(0, 3).map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                onClick={() => onOpenCourse(product.id)}
+                className="dc-profile-tile group flex w-full items-center gap-3 p-2.5 text-left"
+              >
+                <img
+                  src={product.image}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  width={68}
+                  height={48}
+                  className="h-12 w-16 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+                  referrerPolicy="no-referrer"
+                  onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="dc-profile-card-title block truncate group-hover:text-indigo-200">
+                    {product.title}
+                  </span>
+                  <span className="dc-profile-card-meta mt-0.5 inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span>Owned · Ready to open</span>
+                  </span>
+                </span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.04] text-white/65 transition group-hover:bg-indigo-500/20 group-hover:text-indigo-200">
+                  <ChevronRight size={16} />
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="dc-profile-subpanel mt-3 flex items-center justify-between gap-3 p-3.5">
+            <p className="dc-profile-card-meta">
+              Nothing owned yet — find a course in the store to start your library.
+            </p>
             <button
-              key={product.id}
               type="button"
-              onClick={() => onOpenCourse(product.id)}
-              className="flex w-full items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 text-left transition hover:bg-white/[0.05] active:scale-[0.99]"
+              onClick={onOpenPurchases}
+              className="shrink-0 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-3 py-1.5 text-[11px] font-semibold text-indigo-200 transition hover:bg-indigo-500/25"
             >
-              <img
-                src={product.image}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                width={64}
-                height={48}
-                className="h-11 w-14 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
-                referrerPolicy="no-referrer"
-                onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="dc-profile-card-title block truncate">{product.title}</span>
-                <span className="dc-profile-card-meta block text-white/60">Owned</span>
-              </span>
-              <ChevronRight size={16} className="shrink-0 text-white/40" />
+              Browse
             </button>
-          ))}
-        </div>
-      ) : (
-        <p className="dc-profile-card-meta mt-2 text-white/60">
-          Nothing owned yet — find a course in the store to start your library.
-        </p>
-      )}
+          </div>
+        )}
+      </div>
     </ProfileCard>
   );
 }
 
-/* ── Preferences, Referral & Settings Hub ───────────────────────────── */
-function PreferencesHubCard({
+/* ── 4. Daily Quotas & Usage Limits Launchpad Card ──────────────────── */
+function UsageQuotasLaunchpadCard({
+  onOpenUsageLimits,
+}: {
+  onOpenUsageLimits: () => void;
+}) {
+  return (
+    <ProfileCard
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`${ICON_CHIP} bg-indigo-500/20 text-indigo-200 ring-indigo-400/35`}>
+            <Gauge className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="dc-profile-card-accent uppercase tracking-wider">Resource Telemetry</p>
+            <h3 className="dc-profile-card-title mt-0.5 truncate text-base font-bold text-white">Usage limits</h3>
+            <p className="dc-profile-card-meta mt-0.5 truncate">View personal quotas and reset details</p>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-200 ring-1 ring-emerald-400/30">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Live
+        </span>
+      </div>
+
+      {/* 2-Column Quota Preview Strip */}
+      <div className="mt-3.5 grid grid-cols-2 gap-2.5">
+        <div className="dc-profile-subpanel p-2.5">
+          <span className="dc-profile-card-meta block">My Day Creations</span>
+          <span className="dc-profile-card-title mt-0.5 block truncate text-xs">Daily allowance</span>
+        </div>
+        <div className="dc-profile-subpanel p-2.5">
+          <span className="dc-profile-card-meta block">School AI Budget</span>
+          <span className="dc-profile-card-title mt-0.5 block truncate text-xs">Token &amp; test meter</span>
+        </div>
+      </div>
+
+      <div data-profile-usage-limits-link className="mt-3.5">
+        <button
+          type="button"
+          onClick={onOpenUsageLimits}
+          className="dc-profile-tile flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+        >
+          <span className="min-w-0">
+            <span className="dc-profile-card-title block">Open Usage Limits Dashboard</span>
+            <span className="dc-profile-card-meta mt-0.5 block">Real-time balances &amp; midnight reset clock</span>
+          </span>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/30">
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </span>
+        </button>
+      </div>
+    </ProfileCard>
+  );
+}
+
+/* ── 5. Preferences, Privacy & Referral Studio Card ─────────────────── */
+function PreferencesAndReferralCard({
   onOpenSettings,
   referral,
 }: {
   onOpenSettings: () => void;
   referral: ProfileLayoutProps["referral"];
 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (!referral) return;
+    referral.onCopy();
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
   return (
-    <ProfileCard className="relative overflow-hidden border border-white/10">
-      {/* Notifications & Privacy */}
+    <ProfileCard
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
+    >
+      {/* Notifications & Privacy Header */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">
-            <Bell size={16} aria-hidden="true" />
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`${ICON_CHIP} bg-violet-500/15 text-violet-300 ring-violet-400/35`}>
+            <Bell className="h-5 w-5" aria-hidden="true" />
           </span>
-          <span className="min-w-0">
-            <h3 className="dc-profile-card-title truncate font-semibold text-white">Notifications &amp; privacy</h3>
-            <span className="dc-profile-card-meta block truncate text-white/70">Push, email &amp; learning preferences</span>
-          </span>
+          <div className="min-w-0">
+            <p className="dc-profile-card-accent uppercase tracking-wider">Account Controls</p>
+            <h3 className="dc-profile-card-title mt-0.5 truncate text-base font-bold text-white">
+              Notifications &amp; privacy
+            </h3>
+            <span className="dc-profile-card-meta mt-0.5 block truncate">
+              Push, email &amp; learning preferences
+            </span>
+          </div>
         </div>
+
         <GlassButton
           onClick={onOpenSettings}
-          className="shrink-0 [&_.size-12]:size-9 [&_svg]:text-indigo-300"
+          className="shrink-0 [&_.size-12]:size-9 [&_svg]:text-indigo-200"
           aria-label="Open preferences"
         >
           <ChevronRight size={16} />
         </GlassButton>
       </div>
 
-      {/* Referral Code (if available) */}
+      {/* Interactive Preference Pills */}
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="dc-profile-tile mt-3.5 flex w-full flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-left"
+      >
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-semibold text-white/85">
+            Push Alerts
+          </span>
+          <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-semibold text-white/85">
+            Email Updates
+          </span>
+          <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-semibold text-white/85">
+            Activity Privacy
+          </span>
+        </div>
+        <span className="dc-profile-card-accent inline-flex items-center gap-1">
+          <span>Configure</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </span>
+      </button>
+
+      {/* Referral Pass Studio */}
       {referral ? (
-        <div data-profile-referral className="mt-3.5 border-t border-white/[0.08] pt-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="dc-profile-card-meta text-white/70">Your referral code</p>
-              <code className={`mt-0.5 block truncate text-sm font-bold ${referral.used ? "text-white/60 line-through decoration-2 decoration-rose-400" : "text-white"}`}>
-                {referral.code}
-              </code>
+        <div data-profile-referral className="mt-4 border-t border-white/[0.08] pt-4">
+          <div className="dc-profile-subpanel flex items-center justify-between gap-3 p-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30">
+                <Ticket className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="dc-profile-card-meta">Your referral code</p>
+                <code
+                  className={`mt-0.5 block truncate font-mono text-sm font-bold tracking-wider ${
+                    referral.used ? "text-white/60 line-through decoration-2 decoration-rose-400" : "text-white"
+                  }`}
+                >
+                  {referral.code}
+                </code>
+              </div>
             </div>
+
             {referral.used ? (
-              <span data-profile-referral-used className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">Used</span>
+              <span
+                data-profile-referral-used
+                className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200 ring-1 ring-amber-400/30"
+              >
+                Used
+              </span>
             ) : (
-              <GlassButton variant="capsule" onClick={referral.onCopy} className={`shrink-0 ${BTN_SMALL}`}>
-                Copy
+              <GlassButton variant="capsule" onClick={handleCopy} className={`shrink-0 ${BTN_SMALL}`}>
+                <span className="inline-flex items-center gap-1.5">
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copied ? "Copied" : "Copy"}</span>
+                </span>
               </GlassButton>
             )}
           </div>
-          {referral.used ? <p className="dc-profile-card-meta mt-1.5 text-white/60">This referral ID is no longer active.</p> : null}
+          {referral.used ? (
+            <p className="dc-profile-card-meta mt-2">This referral ID is no longer active.</p>
+          ) : null}
         </div>
       ) : null}
     </ProfileCard>
   );
 }
 
-/* ── Small Building Blocks ──────────────────────────────────────────── */
-function QuickStat({
+/* ── 6. Account Session & Security Footer Card ──────────────────────── */
+function AccountSessionCard({
+  email,
+  onLogout,
+  isAdmin,
+  onOpenDashboard,
+}: {
+  email: string;
+  onLogout: () => void;
+  isAdmin: boolean;
+  onOpenDashboard: () => void;
+}) {
+  return (
+    <ProfileCard
+      className="relative overflow-hidden"
+      contentClassName="p-4 sm:p-5"
+    >
+      <div className="flex items-center gap-3 pb-3.5 border-b border-white/[0.08]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">
+          <Lock className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="dc-profile-card-title truncate">Active session</p>
+          <p className="dc-profile-card-meta truncate">{email}</p>
+        </div>
+      </div>
+
+      <div className="mt-3.5 space-y-3">
+        <GlassButton
+          variant="capsule"
+          onClick={onLogout}
+          className="w-full text-rose-300 [&>span>div]:w-full [&>span>div]:ring-1 [&>span>div]:ring-rose-400/30 [&_span]:text-sm [&_span]:font-semibold"
+        >
+          <span className="inline-flex items-center gap-2 text-rose-300">
+            <LogOut size={16} /> Log out
+          </span>
+        </GlassButton>
+
+        <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-medium text-white/70">
+          <a href="/privacy-policy.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">
+            Privacy Policy
+          </a>
+          <span aria-hidden="true" className="text-white/40">·</span>
+          <a href="/terms-of-service.html" className="dc-scene-ink transition hover:text-violet-300 hover:underline">
+            Terms of Service
+          </a>
+        </nav>
+
+        {isAdmin ? (
+          <button
+            type="button"
+            data-profile-open-dashboard
+            onClick={onOpenDashboard}
+            className="mx-auto block text-[9px] font-medium tracking-wide text-white/55 transition hover:text-white/80"
+          >
+            Open dashboard
+          </button>
+        ) : null}
+      </div>
+    </ProfileCard>
+  );
+}
+
+/* ── Bento Quick Stat Tile ──────────────────────────────────────────── */
+function QuickStatTile({
   icon,
   value,
   label,
+  caption,
   tone,
   onClick,
 }: {
   icon: ReactNode;
   value: number;
   label: string;
+  caption: string;
   tone: string;
   onClick: () => void;
 }) {
@@ -805,16 +1107,24 @@ function QuickStat({
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5 text-center transition hover:bg-white/[0.05] active:scale-[0.97]"
+      className="dc-profile-tile group flex items-center justify-between gap-2.5 p-3 text-left sm:p-3.5"
     >
-      <span className={`grid h-8 w-8 place-items-center rounded-lg ring-1 transition group-hover:scale-105 ${tone}`}>{icon}</span>
-      <span className="dc-profile-card-value mt-1.5 block text-base font-bold text-white group-hover:text-indigo-200">{value}</span>
-      <span className="dc-profile-card-meta block text-[10px] text-white/70">{label}</span>
+      <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 transition group-hover:scale-105 ${tone}`}>
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <span className="dc-profile-card-value block group-hover:text-indigo-200">{value}</span>
+          <span className="dc-profile-card-title mt-0.5 block truncate text-xs">{label}</span>
+          <span className="dc-profile-card-meta hidden truncate sm:block">{caption}</span>
+        </div>
+      </div>
+      <ArrowUpRight className="hidden h-4 w-4 shrink-0 text-white/40 transition group-hover:text-indigo-200 sm:block" />
     </button>
   );
 }
 
-/* ── Modals (shared) ────────────────────────────────────────────────── */
+/* ── Modals (shared with SettingsPage) ──────────────────────────────── */
 export function BaseModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
