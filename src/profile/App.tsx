@@ -323,7 +323,7 @@ export default function ProfileApp() {
 
   return (
     <div data-profile-page className="min-h-screen text-white sm:py-0 lg:py-0">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 md:max-w-4xl lg:max-w-6xl xl:max-w-7xl lg:rounded-none lg:border-0">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:max-w-none sm:overflow-hidden sm:rounded-none sm:border-0">
         <Header
           cartCount={cartIds.size}
           notifCount={0}

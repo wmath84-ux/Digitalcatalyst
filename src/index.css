@@ -4433,17 +4433,10 @@ html[data-nature-studio-active="true"] {
 @media (min-width: 640px) {
   [data-profile-col="main"],
   [data-profile-col="side"] {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
-    gap: clamp(14px, 2vw, 20px);
-    align-items: start;
-  }
-  [data-profile-col="main"] > [data-profile-membership-card],
-  [data-profile-col="main"] > [data-profile-upgrade-card],
-  [data-profile-col="main"] > [data-renewal-card],
-  [data-profile-col="side"] > [data-profile-referral],
-  [data-profile-col="side"] > nav {
-    grid-column: 1 / -1;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: clamp(16px, 1.8vw, 22px);
+    min-width: 0;
   }
 }
 
@@ -5012,24 +5005,17 @@ html[data-nature-studio-active="true"] {
   }
 }
 
-/* ── 3. Main Profile: compact single-column redesign (< 768 px) ────────────
-   On phones and small tablets the profile becomes a tight vertical stack —
-   every card one below the other — with smaller card padding, smaller type,
-   smaller buttons/icon chips and square quick-stat tiles. 768 px+ keeps the
-   existing two-column / desktop layout untouched. */
+/* ── 3. Main Profile: responsive single-column stack (< 768 px) ──────────── */
 @media (max-width: 767px) {
-  /* Tighter page gutter with bottom clearance for floating footer dock */
   [data-profile-page] [data-profile-content] {
     padding: 12px 14px 120px;
   }
 
-  /* One card under another: override the tablet-portrait two-column split
-     (640-959 px) and the container-query stack so the rhythm stays even. */
   [data-profile-layout] {
     display: block !important;
   }
   [data-profile-layout] > * + * {
-    margin-top: 12px !important;
+    margin-top: 14px !important;
   }
   [data-profile-col="main"],
   [data-profile-col="side"] {
@@ -5037,168 +5023,7 @@ html[data-nature-studio-active="true"] {
   }
   [data-profile-col="main"] > * + *,
   [data-profile-col="side"] > * + * {
-    margin-top: 12px !important;
-  }
-
-  /* Page header: the title is Home's greeting type (`.dc-profile-title`) on
-     every breakpoint and there is no tagline line left to shrink (brief
-     2026-09-30). */
-
-  /* Quick stats → row of square tiles (3-across even in the narrow
-     container-query band, where the last tile would otherwise span two
-     columns and turn into a giant square). */
-  [data-profile-page] [data-profile-stats] {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-  }
-  [data-profile-page] [data-profile-stats] > *:last-child {
-    grid-column: auto !important;
-  }
-  [data-profile-stats] > button {
-    aspect-ratio: 1 / 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 8px 2px !important;
-    border-radius: 14px !important;
-  }
-  [data-profile-stats] > button > span:first-child {
-    height: 2rem !important;
-    width: 2rem !important;
-    border-radius: 0.625rem !important;
-  }
-  [data-profile-stats] > button > span:first-child svg {
-    height: 1rem !important;
-    width: 1rem !important;
-  }
-  [data-profile-stats] > button > span:nth-child(2) {
-    font-size: 1.125rem !important;
-    margin-top: 2px !important;
-  }
-  [data-profile-stats] > button > span:last-child {
-    font-size: 0.5625rem !important;
-  }
-
-  /* Cards: smaller padding + radius (the branded hero is excluded — it is a
-     <section> too, but keeps its own full-bleed treatment + inner padding). */
-  [data-profile-layout] section:not([data-profile-hero]) {
-    padding: 14px !important;
-    border-radius: 18px !important;
-  }
-  [data-profile-layout] section h3 {
-    font-size: 0.9375rem !important;
-  }
-  /* Body copy only — the tiny 10-12 px helper labels stay as they are. */
-  [data-profile-layout] section p.text-sm,
-  [data-profile-layout] section p.text-base {
-    font-size: 0.8125rem !important;
-  }
-
-  /* Icon chips inside cards: h-11 w-11 → 36 px, h-12 w-12 → 40 px */
-  [data-profile-layout] .h-11.w-11 {
-    height: 2.25rem !important;
-    width: 2.25rem !important;
-    border-radius: 0.75rem !important;
-  }
-  [data-profile-layout] .h-12.w-12 {
-    height: 2.5rem !important;
-    width: 2.5rem !important;
-    border-radius: 0.75rem !important;
-  }
-
-  /* CTA buttons: shorter, smaller type */
-  [data-profile-layout] section button.py-3\.5,
-  [data-profile-layout] section button.py-3 {
-    padding-top: 0.625rem !important;
-    padding-bottom: 0.625rem !important;
-    border-radius: 0.875rem !important;
-    font-size: 0.8125rem !important;
-  }
-  [data-profile-layout] section button.py-3\.5 svg,
-  [data-profile-layout] section button.py-3 svg {
-    height: 0.9375rem !important;
-    width: 0.9375rem !important;
-  }
-
-  /* Stat chips inside membership / renewal cards: value a touch smaller,
-     the tiny 9 px label untouched. */
-  [data-profile-layout] section .rounded-2xl.bg-slate-50 {
-    padding: 8px 6px !important;
-    border-radius: 0.75rem !important;
-  }
-  [data-profile-layout] section .rounded-2xl.bg-slate-50 p.mt-1 {
-    font-size: 0.6875rem !important;
-  }
-
-  /* Hero: smaller avatar, tighter padding + type */
-  [data-profile-hero] > div {
-    padding: 16px !important;
-  }
-  [data-profile-hero] .h-16.w-16 {
-    height: 3rem !important;
-    width: 3rem !important;
-  }
-  [data-profile-hero] .h-16.w-16 img,
-  [data-profile-hero] .h-16.w-16 div {
-    height: 3rem !important;
-    width: 3rem !important;
-    font-size: 0.9375rem !important;
-  }
-  [data-profile-hero] h2 {
-    font-size: 1.0625rem !important;
-  }
-  [data-profile-hero] p {
-    font-size: 0.8125rem !important;
-  }
-  [data-profile-hero] .flex.items-center.gap-1\.5 {
-    font-size: 0.6875rem !important;
-  }
-  [data-profile-hero] .flex.items-center.gap-1\.5 svg {
-    height: 0.875rem !important;
-    width: 0.875rem !important;
-  }
-  [data-profile-hero] p.rounded-2xl {
-    padding: 10px 12px !important;
-    font-size: 0.75rem !important;
-    line-height: 1.45 !important;
-  }
-  /* Only the labelled "Edit profile" text button — not the circular
-     pencil icon button. */
-  [data-profile-hero] button.inline-flex {
-    margin-top: 12px !important;
-    padding: 8px 12px !important;
-    border-radius: 0.75rem !important;
-    font-size: 0.75rem !important;
-  }
-  [data-profile-hero] button.inline-flex svg {
-    height: 0.875rem !important;
-    width: 0.875rem !important;
-  }
-
-  /* Library rows: smaller thumbnails + type */
-  [data-profile-layout] section .h-12.w-16 {
-    height: 2.5rem !important;
-    width: 3.25rem !important;
-    border-radius: 0.625rem !important;
-  }
-  [data-profile-layout] section button .text-sm {
-    font-size: 0.8125rem !important;
-  }
-
-  /* Logout button: shorter (the tiny admin link keeps its text-only look) */
-  [data-profile-layout] > [data-profile-col="side"] > button:not([data-profile-open-dashboard]) {
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
-    border-radius: 0.875rem !important;
-    font-size: 0.8125rem !important;
-  }
-
-  /* Preferences bell button */
-  [data-profile-layout] section .h-10.w-10 {
-    height: 2.25rem !important;
-    width: 2.25rem !important;
+    margin-top: 14px !important;
   }
 }
 
