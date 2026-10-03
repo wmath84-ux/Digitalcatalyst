@@ -1,10 +1,8 @@
-# Fullscreen — the APK, mobile and tablet fix
+# Fullscreen — Android WebView, mobile and tablet
 
 Owner report, 2026-09-28:
 
-> "Sanctuary ke andar full screen button APK mein kaam nahin kar raha hai …
-> shayad browser mein kaam kar raha hai aur mobile per bhi nahin … tablet per
-> bhi."
+> The Course Player and media-viewer fullscreen controls must work in the APK, mobile browsers, and tablets.
 
 Every fullscreen button in the app used to call
 `document.documentElement.requestFullscreen()` and swallow the rejection
@@ -45,13 +43,11 @@ negotiates, in order, and reports one snapshot (`active`, `mode`:
    Android, element requests for media stages).
 3. **App immersive (fallback)** — `data-app-fullscreen="true"` on `<html>`,
    used only where a page genuinely cannot hide the OS chrome (iOS Safari, an
-   in-app browser). The screen always answers; the Sanctuary's own chrome steps
-   aside through CSS (`src/nature3d/winter.css`) and its bottom-right button
-   becomes *Exit fullscreen*.
+   in-app browser). The screen always answers; callers may use the published
+   `data-app-fullscreen` state to present a full-bleed fallback.
 
-Buttons mirror the live snapshot, so the label is never a lie:
-`Fullscreen ⇄ Exit fullscreen` (Sanctuary), `Hide status bar` (Course Player),
-`Fullscreen` (media viewer rows).
+The Course Player and media-viewer controls mirror the live snapshot, so
+fullscreen labels reflect the active native, web, or in-page layer.
 
 ## Android pieces (this is the half that needs an APK rebuild)
 

@@ -24,7 +24,7 @@ const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const statusBar = fs.readFileSync("src/utils/courseStatusBar.ts", "utf8");
 // The platform decision (native immersive bridge / web Fullscreen API /
 // in-page fallback) now lives in ONE shared controller that every fullscreen
-// button in the app uses — the Sanctuary's Fullscreen row included.
+// button in the app uses — the Course Player and media viewer included.
 const fullscreen = fs.readFileSync("src/utils/fullscreen.ts", "utf8");
 
 test("status bar hiding is an explicit Player-tab row because auto-hide cannot be gesture-less", () => {

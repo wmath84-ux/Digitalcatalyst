@@ -87,7 +87,7 @@ test("a rotate-back overlay covers landscape while the player is closed (phones 
   // player. `phone` comes from `isPhoneDevice()` (orientation-independent),
   // so a phone rotated to landscape is still caught, while a tablet/desktop
   // is never — this is the tablet exemption.
-  assert.match(guard, /if \(!phone \|\| playerOpen \|\| !landscape\) return null;/);
+  assert.match(guard, /if \(!phone \|\| rotationFree \|\| !landscape\) return null;/);
   assert.match(guard, /setPhone\(isPhoneDevice\(\)\)/);
   assert.match(guard, /useState\(isPhoneDevice\)/);
 });

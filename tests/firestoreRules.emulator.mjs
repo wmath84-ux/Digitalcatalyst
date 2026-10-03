@@ -1,4 +1,4 @@
-// Intentionally not *.test.mjs: run with npm run test:sanctuary:rules.
+// Intentionally not *.test.mjs: run with npm run test:firestore:rules.
 // Uses the REAL deployed-rule syntax and Firestore SDK, never production data.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,8 +13,8 @@ import { addChildNode, createMindMap, mindMapDocId, toFirestoreMindMap } from ".
 let env;
 let owner;
 let stranger;
-const uid = "sanctuary-owner";
-const scopes = ["__sanctuary__", "purchased-course", "mine-self-authored"];
+const uid = "course-notes-owner";
+const scopes = ["purchased-course", "mine-self-authored"];
 
 before(async () => {
   env = await initializeTestEnvironment({
@@ -30,7 +30,7 @@ for (const productId of scopes) {
   test(`normal learner saves, reads, updates and deletes notes in ${productId}`, async () => {
     const id = `note-${productId.replace(/_/g, "-")}`;
     const ref = doc(owner, "users", uid, "notes", id);
-    const note = toFirestoreNote({ id, html: "<h1>Revision</h1><p>Saved from the board</p>", text: "Revision Saved from the board", createdAt: 10, links: [] }, { uid, productId });
+    const note = toFirestoreNote({ id, html: "<h1>Revision</h1><p>Saved from the Course Player</p>", text: "Revision Saved from the Course Player", createdAt: 10, links: [] }, { uid, productId });
     await assertSucceeds(setDoc(ref, note));
     assert.equal((await assertSucceeds(getDoc(ref))).data().productId, productId);
     const results = await assertSucceeds(getDocs(query(collection(owner, "users", uid, "notes"), where("productId", "==", productId))));

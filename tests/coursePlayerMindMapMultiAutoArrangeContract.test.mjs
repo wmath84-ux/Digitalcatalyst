@@ -286,10 +286,10 @@ test("the panel ships a notes-style card list of the module's maps", () => {
   // visit the learner's last view is restored from the panel session instead
   // (library stays library, canvas stays canvas), so tab switches never yank
   // them back to the picker — leaving the player is what resets it.
-  assert.match(panel, /useState\(\s*\(\) => getCoursePanelSession\(sessionKey\)\.mindMapView !== "canvas",?\s*\)/);
-  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas", sessionKey\)/);
+  assert.match(panel, /useState\(\s*\(\) => getCoursePanelSession\(\)\.mindMapView !== "canvas",?\s*\)/);
+  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
   assert.match(panel, /if \(open && !prevOpenRef\.current\) \{/);
-  assert.match(panel, /const resumeCanvas = getCoursePanelSession\(sessionKey\)\.mindMapView === "canvas";/);
+  assert.match(panel, /const resumeCanvas = getCoursePanelSession\(\)\.mindMapView === "canvas";/);
   assert.match(panel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 

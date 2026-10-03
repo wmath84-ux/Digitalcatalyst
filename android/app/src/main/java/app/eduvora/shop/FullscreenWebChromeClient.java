@@ -16,8 +16,8 @@ import com.getcapacitor.BridgeWebChromeClient;
  * host app overrides {@code onShowCustomView()} / {@code onHideCustomView()};
  * Capacitor's stock {@code BridgeWebChromeClient} implements the first one as
  * {@code callback.onCustomViewHidden()} — an immediate "no" — so EVERY element
- * fullscreen request in the app used to fail: the Sanctuary's Fullscreen row,
- * the Course Player's media "Fullscreen" action, and YouTube / <video>
+ * fullscreen request in the app used to fail: the Course Player's media
+ * "Fullscreen" action and YouTube / <video>
  * fullscreen inside lesson iframes.</p>
  *
  * <p>This subclass keeps every other Capacitor behaviour (dialogs, permissions,

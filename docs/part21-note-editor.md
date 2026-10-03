@@ -74,8 +74,7 @@ used. On touch, while the soft keyboard is open and the editor is focused, the s
 one slim bar laid out **in flow** at the bottom of the editor — so it rides exactly as high as
 the pane, which the deck already sizes to the visible area (no hard-coded heights, no double
 inset, in both the resize and the overlay keyboard engines). Floating UI portals to `<body>`
-(never clipped by the player's `overflow-hidden` panes, and correct on the Sanctuary's 3D board
-because it uses screen-space rectangles) and clamps to the visible rectangle, ending above the dock.
+(never clipped by the player's `overflow-hidden` panes) and clamps to the visible rectangle, ending above the dock.
 
 ## Runtime floor (older Android WebViews)
 

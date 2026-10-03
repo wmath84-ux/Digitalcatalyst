@@ -42,7 +42,6 @@ const footerMath = read("src/course/courseFooterInset.ts");
 const footerHook = read("src/course/useCourseFooterInset.ts");
 const overlay = read("src/course/CourseOverlay.tsx");
 const player = read("src/CoursePlayerApp.tsx");
-const boards = read("src/nature3d/boards/StudyBoards.tsx");
 const richText = read("src/utils/richText.ts");
 
 // ── 1. Dependencies ────────────────────────────────────────────────────────
@@ -109,8 +108,8 @@ test("save semantics are the existing ones: explicit Save / Cancel, session sync
   assert.match(notesPanel, /onAdd\(html\);/);
   assert.match(notesPanel, /onEdit\(editingId, html\);/);
   assert.match(notesPanel, /combineHtml\(live \? live\.title : fallbackTitle, live \? live\.bodyHtml : fallbackBody\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "compose", draft, title: draftTitle \}, sessionKey\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "edit", noteId: editingId, draft: editDraft, title: editTitle \}, sessionKey\)/);
+  assert.match(notesPanel, /setNotesSessionView\(\{ view: "compose", draft, title: draftTitle \}\)/);
+  assert.match(notesPanel, /setNotesSessionView\(\{ view: "edit", noteId: editingId, draft: editDraft, title: editTitle \}\)/);
   assert.match(notesPanel, /<ConfirmDeleteDialog/);
   for (const hook of [
     "data-course-notes-save", "data-course-notes-cancel", "data-course-note-edit-save", "data-course-note-edit-cancel",
@@ -132,7 +131,6 @@ test("the subtle status chip: Unsaved · Saving… · Saved · Synced, fed by th
   assert.match(notesPanel, /role="status"/);
   assert.match(overlay, /syncState=\{props\.notesSync\}/);
   assert.match(player, /notesSync=\{\{ status: notesCtl\.status, synced: notesCtl\.synced \}\}/);
-  assert.match(boards, /syncState=\{\{ status: notes\.status,/);
 });
 
 // ── 3. Engine behaviour ────────────────────────────────────────────────────

@@ -23,7 +23,7 @@ setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
 This overrode the manifest's `android:screenOrientation="fullSensor"` at runtime
 and pinned the activity to portrait. The JS layer (`src/utils/appOrientation.ts`)
-only ever *unlocks* rotation for the Course Player / 3D Sanctuary; for tablets its
+unlocks rotation for the Course Player; for tablets its
 `lockAppToPortrait()` early-returns and **never undoes** the native portrait lock.
 
 Consequences:
@@ -45,12 +45,11 @@ physical display, so it stays correct inside a resizable DeX / freeform window.
   orientation even when the system auto-rotate lock is ON.
 - `MainActivity.lockPortraitForApp()` — restores `FULL_SENSOR` on tablets instead
   of forcing portrait (e.g. when the JS re-locks after leaving the Course Player).
-- `AppOrientationPlugin.lockPortrait()` and `AppOrientationPlugin.lock("portrait")`
-  — downgrade portrait requests to `FULL_SENSOR` on tablets, so no JS call can
-  re-pin a tablet to portrait.
+- `AppOrientationPlugin.lockPortrait()` — keeps portrait requests from
+  re-pinning tablets, which remain on `FULL_SENSOR`.
 
-Phone behaviour is unchanged: phones remain portrait-locked everywhere except the
-Course Player (FULL_SENSOR) and the 3D Sanctuary (SENSOR_LANDSCAPE).
+Phone behavior: phones remain portrait-locked everywhere except the Course
+Player (FULL_SENSOR).
 
 ## Files changed
 
@@ -72,4 +71,4 @@ npx cap sync android
 - Tablet (rotation lock ON), held in landscape → app opens/rotates to landscape.
 - Tablet in DeX / Android desktop mode → window can be landscape/wide and the
   desktop side panel shows consistently across pages.
-- Phone → still locked to portrait outside the Course Player / Sanctuary.
+- Phone → still locked to portrait outside the Course Player.

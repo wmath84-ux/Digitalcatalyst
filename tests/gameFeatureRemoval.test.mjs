@@ -34,17 +34,11 @@ test('both old and downloaded game implementations and their build hook are dele
   assert.doesNotMatch(read('.gitignore'), /game-world|threejs-world/);
 });
 
-// This test used to pin the 3D vendor stack + src/classroom3d as "shared, do
-// not delete" while the game was being removed. The 3D Classroom was then
-// removed as a feature of its own (owner, 2026-09-08).
-//
-// `three` returned on 2026-09-18 for the 3D Study Sanctuary (src/nature3d/**),
-// which is unrelated to both the game and the classroom. What this test still
-// pins is that NEITHER removed feature came back: no React-3D wrappers, and no
-// src/classroom3d or game directory.
-test('neither removed 3D feature is left behind', () => {
+// The standalone game, classroom, and remaining 3D scene have been removed.
+// No Three.js renderer belongs in this app now.
+test('Three.js renderer dependencies remain absent', () => {
   const pkg = JSON.parse(read('package.json'));
-  for (const dependency of ['@react-three/fiber', '@react-three/drei']) {
+  for (const dependency of ['three', '@types/three', '@react-three/fiber', '@react-three/drei']) {
     assert.equal(pkg.dependencies[dependency], undefined, dependency);
     assert.equal(pkg.devDependencies[dependency], undefined, dependency);
   }

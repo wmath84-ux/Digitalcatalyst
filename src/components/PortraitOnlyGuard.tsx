@@ -1,22 +1,10 @@
 // src/components/PortraitOnlyGuard.tsx
 //
-// HARD RULE - Mobile Portrait Only (except Course Player + Nature Studio):
-// - Phones are locked to portrait EVERYWHERE except the course player and
-//   the Nature Studio 3D world. The phone is detected
-//   orientation-independently (see isPhoneDevice in appOrientation), so a
-//   phone held in landscape is still recognised as a phone.
-// - If a phone user rotates to landscape outside those screens, show
-//   "Rotate your phone" overlay
-// - This applies to ALL contexts: PWA, mobile browser, Capacitor native app
-// - Tablet/desktop NEVER show overlay - their layouts work in landscape
-// - The course player and the 3D world are the screens allowed to be
-//   landscape on phones
-//
-// Enforcement layers:
-//   1. AndroidManifest.xml screenOrientation="portrait" (native)
-//   2. Web Manifest orientation="portrait" (PWA)
-//   3. JS Screen Orientation API + Capacitor plugins (runtime)
-//   4. This overlay (visual fallback when API lock fails - e.g. browser tabs, iOS)
+// Keep phone layouts in portrait everywhere except the Course Player, which
+// supports rotating lessons. If a phone is held in landscape outside the
+// player, show a rotate-back overlay; tablets and desktops remain unrestricted.
+// The phone check is orientation-independent (see appOrientation.ts), so a
+// rotated phone is still recognized as a phone.
 
 import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
@@ -30,9 +18,8 @@ import { useBranding } from "../context/BrandingContext";
 
 export default function PortraitOnlyGuard() {
   const { appName } = useBranding();
-  // True while a rotation-free screen (course player or nature studio) is
-  // open. One subscription is enough: both screens notify through the same
-  // listener set in appOrientation.
+  // True while the Course Player is open. One subscription is enough: the
+  // Course Player notifies through the listener set in appOrientation.
   const [rotationFree, setRotationFree] = useState<boolean>(isRotationUnlockedActive);
   const [landscape, setLandscape] = useState(false);
   const [phone, setPhone] = useState(isPhoneDevice);
@@ -46,7 +33,7 @@ export default function PortraitOnlyGuard() {
       setPhone(isPhoneDevice());
 
       // HARD RULE: Re-lock to portrait whenever the viewport changes and we're
-      // NOT on a rotation-free screen (course player / nature studio).
+      // NOT on a rotation-free screen (Course Player).
       // `isPhoneDevice()` is orientation-independent, so a phone that is rotated to landscape
       // (auto-rotate ON) is still recognised as a phone and gets re-locked + overlay — it can
       // never slip through as a "tablet" just because its width grew past 768px.
@@ -87,7 +74,7 @@ export default function PortraitOnlyGuard() {
   // HARD RULE LOGIC:
   // - Show overlay ONLY on phones in landscape outside rotation-free screens
   // - Tablet/desktop never show it (layouts work in landscape)
-  // - Course player / nature studio never show it (screens allowed to rotate)
+  // - The Course Player never shows it (lessons are allowed to rotate)
   // - `isPhoneDevice()` is orientation-independent, so a phone rotated to
   //   landscape is still detected as a phone and the overlay shows — the old
   //   `innerWidth < 768` check failed here because landscape width exceeds 768.
@@ -117,7 +104,7 @@ export default function PortraitOnlyGuard() {
           {appName} is designed for portrait mode. Please rotate your device to continue.
           <br />
           <span className="mt-2 inline-block text-xs text-violet-300">
-            Rotation is available inside course lessons and the 3D nature studio.
+            Rotation is available inside course lessons.
           </span>
         </p>
       </div>

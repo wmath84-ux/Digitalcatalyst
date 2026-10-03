@@ -1,15 +1,14 @@
 // src/course/cloudNotes.ts
 //
-// The Firestore half of course-player / Sanctuary NOTES.
+// The Firestore half of Course Player notes.
 //
 //   users/{uid}/notes/{noteId}     one document per note, owner-only
 //
 // Notes used to be device-only (`localStorage`), which is exactly why "notes
-// save nahi ho rahe": nothing was ever written to Firebase, so a note taken on
-// the 3D board or in the player existed on that one device and disappeared on
-// every other one. This module is the single place that talks to Firestore for
-// notes — `src/course/useCourseNotes.ts` owns the state, the debounce and the
-// offline mirror, and calls the functions below.
+// save nahi ho rahe": nothing was ever written to Firebase, so a note taken
+// in the player existed on that one device and disappeared on every other one.
+// This module is the single place that talks to Firestore for notes —
+// `src/course/useCourseNotes.ts` owns the state, debounce, and offline mirror.
 //
 // Reads use a LIVE listener (so a note saved on the phone appears on the
 // laptop without a refresh) with a one-shot `getDocs` fallback; writes are

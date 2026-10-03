@@ -23,8 +23,7 @@ per frame, and stops publishing the footer's height while it is mid-spring.
 ### 1. The plates animated layout properties
 
 `DockItem` drove `style={{ width: size, height: size }}` off the magnification spring, so
-every spring tick wrote a **layout** property on all seven (eight on Home, which adds the
-Sanctuary slot) plates. Consequences, in order:
+every spring tick wrote a **layout** property on all seven Home plates. Consequences, in order:
 
 * a layout pass every frame;
 * the capsule is `w-max`, so widening the plates **resized the capsule**;
@@ -41,7 +40,7 @@ Sanctuary slot) plates. Consequences, in order:
 ### 2. The distance was measured per item, per frame
 
 Each plate's `useTransform` called `el.getBoundingClientRect()` to work out how far it was
-from the pointer. One pointer move therefore forced **eight synchronous layouts**, taken
+from the pointer. One pointer move therefore forced **seven synchronous layouts**, taken
 right after that frame's style writes — the worst possible place for a read.
 
 ### 3. Every one of those writes was a document-wide event
@@ -97,7 +96,7 @@ cost scales with the document.)*
 * **The capsule carries the envelope change on one element**, through its own
   `padding-top` (grows upward only, exactly like the bottom-aligned row did) and
   `padding-inline` (grows symmetrically, exactly like a centred capsule whose plates
-  widened). One small subtree re-lays out, instead of eight plates plus a material layer.
+  widened). One small subtree re-lays out, instead of seven plates plus a material layer.
 * **One spring config** (`stiffness 300 / damping 22 / mass 0.5`) drives plate scale,
   lift, push and both paddings, so glass and plates cannot drift apart mid-gesture.
 * **Centres are measured once per gesture** (on `pointerdown`, at rest) plus on mount and
@@ -142,7 +141,7 @@ that used to rebuild it dozens of times rebuilds it at most once or twice.
 | full contract + runtime suite | `node --test tests/*.test.mjs` | **2788 tests, 2731 pass, 56 fail** — the same 56 pre-existing failures as before this change (`comm` on the two failure lists is empty); +15 new tests, all passing |
 | new contract (geometry + shape) | `node --test tests/footerDockSmoothDragContract.test.mjs` | 10/10 |
 | new runtime (real `GlassDock` in jsdom) | `node --test tests/footerDockSmoothDragRuntime.test.mjs` | 5/5 |
-| types | `npx tsc --noEmit -p tsconfig.json` | clean (one pre-existing unrelated error in `src/nature3d/boards/sanctuaryModules.ts`) |
+| types | `npx tsc --noEmit -p tsconfig.json` | one unrelated legacy-module diagnostic at that time; that legacy module has since been removed |
 | production bundle | `npm run build` | ✓ built in ~19 s |
 
 `tests/footerDockSmoothDragContract.test.mjs` re-derives **both** models — the old
@@ -150,7 +149,7 @@ layout-driven row and the new transform row — for four mid-gesture states and 
 capsule's left edge, width and height, and every plate's centre X and top edge, agree to
 1e-9. The look did not move.
 
-`tests/footerDockSmoothDragRuntime.test.mjs` mounts the real dock (eight tabs, like
+`tests/footerDockSmoothDragRuntime.test.mjs` mounts the real dock (seven tabs, like
 Home's mobile footer) and asserts the behaviour:
 
 * a 14-step drag takes **exactly 8** layout reads (one `measure()` pass), then none;

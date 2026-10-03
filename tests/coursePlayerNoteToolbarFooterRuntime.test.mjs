@@ -28,7 +28,7 @@
 //      zeroed rect) — the "footer navigation is off" case — lifts nothing, so
 //      the toolbar drops flush to the bottom edge with no phantom gap, and it
 //      comes back when the footer does, with no remount;
-//   4. a footer that is not there at all (the Sanctuary's 3D board) lifts nothing;
+//   4. if there is no footer element, it lifts nothing;
 //   5. the learner flipping the player's footer-dock setting — one footer
 //      unmounts, the other mounts — is picked up live;
 //   6. the hook subscribes to nothing at all while there is no toolbar to place.

@@ -129,7 +129,7 @@ on the same elements: `data-profile-hero`, `-stats`, `-membership-card`,
 
 - `npx vite build` — clean.
 - `npx tsc --noEmit` — no errors in any Profile file (the repo's pre-existing
-  errors in FlowPath / nature3d / capacitorBridge are untouched).
+  errors in FlowPath / capacitorBridge are untouched).
 - `node --test tests/*.test.mjs` — the failure set is byte-identical to the
   branch's baseline before this change (74 pre-existing failures elsewhere,
   **zero** new; the three old Profile-material failures are replaced by the new

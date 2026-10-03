@@ -1,9 +1,7 @@
 // tests/fullscreenEverywhereContract.test.mjs
 //
-// The FULLSCREEN contract for the whole app (owner report, 2026-09-28:
-// "Sanctuary ke andar full screen button APK mein nahin kam kar raha hai …
-// shayad browser mein kam kar raha hai aur mobile per bhi nahin … tablet per
-// bhi").
+// The app-wide fullscreen contract: the Android WebView shell, shared
+// controller, Course Player controls, and media viewer must agree on state.
 //
 // Root cause, in the shipped code: every fullscreen button called
 // `document.documentElement.requestFullscreen()` and swallowed the rejection.
@@ -23,9 +21,9 @@
 //   2. SHARED CONTROLLER — src/utils/fullscreen.ts picks the layer: native →
 //      web → in-page fallback (`data-app-fullscreen`), reports one snapshot
 //      and one subscription, and honours `allowAppFallback: false`.
-//   3. CALL SITES — the Sanctuary's Fullscreen row, the Course Player's
-//      "Hide status bar" switch and the media viewer's Fullscreen row all go
-//      through the controller (no bare swallowed requestFullscreen left).
+//   3. CALL SITES — the Course Player's "Hide status bar" switch and the
+//      media viewer's Fullscreen row both go through the controller (no bare
+//      swallowed requestFullscreen left).
 //   4. RUNTIME — the controller is bundled with esbuild and exercised in
 //      jsdom: every platform shape (no API, honoured API, rejected API,
 //      element request) lands on a real, released fullscreen state.
@@ -41,9 +39,6 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
 const controller = read("src/utils/fullscreen.ts");
-const naturePage = read("src/nature3d/NatureStudioPage.tsx");
-const settings = read("src/nature3d/SanctuarySettings.tsx");
-const winterCss = read("src/nature3d/winter.css");
 const statusBar = read("src/utils/courseStatusBar.ts");
 const resourceViewer = read("src/course/ResourceViewer.tsx");
 const player = read("src/CoursePlayerApp.tsx");
@@ -119,9 +114,6 @@ test("the AppFullscreen plugin hides both system bars and survives rotation", ()
   // The shell must keep handling orientation itself, or every rotation would
   // recreate the Activity and drop the flag.
   assert.match(manifest, /android:configChanges="orientation\|keyboardHidden\|keyboard\|screenSize/);
-  // The Sanctuary landscape rule is untouched.
-  assert.match(androidMain, /public void lockLandscapeForSanctuary\(\)/);
-  assert.match(androidMain, /SCREEN_ORIENTATION_SENSOR_LANDSCAPE/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -151,38 +143,13 @@ test("the controller layers native → web → in-page fallback", () => {
   assert.match(controller, /addEventListener\("visibilitychange"/);
 });
 
-test("every fullscreen button in the app goes through the controller", () => {
-  // Sanctuary → Scene → Fullscreen (the row the owner reported).
-  assert.match(naturePage, /toggleFullscreen as toggleAppFullscreen/);
-  assert.match(naturePage, /void toggleAppFullscreen\(\);/);
-  assert.doesNotMatch(naturePage, /root\.requestFullscreen\?\.\(\)/, "no bare, swallowed request is left");
-  assert.doesNotMatch(naturePage, /document\.exitFullscreen\?\.\(\)\.catch/, "the APK path cannot swallow a rejection any more");
-  assert.match(settings, /label=\{immersive \? "Exit fullscreen" : "Fullscreen"\}/);
-  // The label mirrors the LIVE snapshot, not a local guess.
-  assert.match(naturePage, /subscribeFullscreen\(\(\) => setFullscreen\(getFullscreenSnapshot\(\)\)\)/);
-  // Leaving the world releases the layer (the system bars must come back).
-  assert.match(naturePage, /if \(isFullscreenActive\(\)\) void exitAppFullscreen\(\);/);
+test("Course Player and media-viewer fullscreen actions use the shared controller", () => {
   // Course Player → Player tab → "Hide status bar".
   assert.match(statusBar, /enterFullscreen\(\{ allowAppFallback: false \}\)/);
   assert.match(statusBar, /isFullscreenActive\(\)/);
   assert.match(player, /enterCoursePlayerFullscreen\(\)/);
   // Media viewer → Player tab → "Fullscreen" (element request).
   assert.match(resourceViewer, /toggleAppFullscreen\(\{ element: root \}\)/);
-});
-
-test("the page-level fallback frees the sanctuary viewport", () => {
-  // Only the fallback layer applies, the OS bars arrive by themselves
-  // everywhere else — so the HUD chrome steps aside through CSS…
-  assert.match(winterCss, /html\[data-app-fullscreen="true"\] \[data-sanctuary-root\] \[data-sanctuary-chrome\]/);
-  assert.match(naturePage, /data-sanctuary-chrome/);
-  // …and the engine's HUD insets follow the same state.
-  assert.match(naturePage, /if \(hudHidden \|\| appImmersive\)/);
-  assert.match(naturePage, /const appImmersive = fullscreen\.mode === "app";/);
-  // The tray (and the gear inside it) is off-screen in the fallback, so the
-  // bottom-right corner button becomes the exit control — a fullscreen mode
-  // the learner cannot leave would be a trap.
-  assert.match(naturePage, /if \(appImmersive\) \{[\s\S]{0,120}void exitAppFullscreen\(\);\s*return;/);
-  assert.match(naturePage, /appImmersive\s*\?\s*"Exit fullscreen"/);
 });
 
 /* ------------------------------------------------------------------ */

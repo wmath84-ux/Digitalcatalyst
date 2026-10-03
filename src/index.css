@@ -3834,37 +3834,9 @@ body.is-desktop nav:has([data-site-footer]) {
   }
 }
 
-/* Rotation-free screens active (course player / nature studio) - allow
-   landscape */
-html[data-course-player-active="true"],
-html[data-nature-studio-active="true"] {
-  /* Remove any portrait restrictions */
+/* The Course Player can use either orientation on phones. */
+html[data-course-player-active="true"] {
   overflow: auto;
-}
-
-/* ── Sanctuary HARD landscape fallback (PUBG / BGMI) ───────────────────
-   Native Android (SENSOR_LANDSCAPE) physically rotates the activity, even
-   with auto-rotate OFF. Mobile browsers often reject orientation.lock
-   outside fullscreen, so if the phone is STILL in portrait while the
-   studio is open we CSS-rotate the stage 90° — the world opens already
-   "landscape" instead of waiting for the user to turn the phone.
-   Tablets never match (gated on data-phone-device). When the native lock
-   succeeds, orientation is landscape and this block does not apply. */
-@media screen and (orientation: portrait) {
-  html[data-phone-device="true"][data-nature-studio-active="true"] [data-sanctuary-root] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 100vw !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: 100dvh !important;
-    height: 100dvw !important;
-    max-width: none !important;
-    max-height: none !important;
-    transform: rotate(90deg) !important;
-    transform-origin: top left !important;
-    inset: auto !important;
-  }
 }
 
 /* Extra safety: Hide any landscape-specific UI outside course player on mobile.
@@ -3876,11 +3848,7 @@ html[data-nature-studio-active="true"] {
    in appOrientation.ts, which reads the device's smaller physical CSS
    dimension — still true in Android split-screen, false on any real tablet. */
 @media screen and (orientation: landscape) and (max-width: 767px) {
-  /* The freeze must NOT apply while a rotation-free screen (course player
-     or the 3D nature studio) is open — the learner has to be able to drag
-     and pinch the world in landscape, so the freeze keys off BOTH
-     `data-*` attributes that appOrientation sets. */
-  html[data-phone-device="true"]:not([data-course-player-active="true"]):not([data-nature-studio-active="true"]) body,
+  /* The Course Player is the only phone screen allowed to rotate. */
   html[data-phone-device="true"]:not([data-course-player-active="true"]) body {
     /* Prevent content from being interactive in landscape - overlay handles it */
     touch-action: none;
@@ -6881,65 +6849,6 @@ html[data-nature-studio-active="true"] {
  * so nothing here touches them — `[data-dock-count="7"]` keeps their spacing
  * exactly as designed.
  * ════════════════════════════════════════════════════════════════════════ */
-/* Home has one extra, mobile-only destination: the dinosaur Sanctuary button
-   immediately after FlowPath. Eight destinations still stay in ONE capsule;
-   the wrapper selects 38 px plates through 479 px and 34 px through 349 px,
-   while these rules only solve the remaining gap/padding arithmetic.
-
-   Since 2026-09-28 these bands are also the RESTING RHYTHM the Home dock's
-   width fill grows from ("footer navigation ka size thoda bada karo … side
-   mein jitna area khali hai vah sab cover ho jaaye, ekadam edge se sat na
-   jaaye"): SiteFooterNav reads `--dc-home-dock-gap/pad/pad-block` off the nav
-   (getComputedStyle) as the base, solves the biggest plate + gap that still
-   keeps a margin from the edge, and renders the dock with those numbers. The
-   values below are therefore the single source of truth for both paths — the
-   CSS-only rendering (what these rules produce on their own) and the measured
-   fill — which is why the dock's gap/padding are stated ONCE, as variables,
-   and consumed by one rule instead of being re-declared per band. */
-[data-site-footer-nav][data-dock-count="8"] {
-  --dc-home-dock-gap: 8px;
-  --dc-home-dock-pad: 16px;
-  --dc-home-dock-pad-block: 12px;
-}
-
-[data-site-footer-nav][data-dock-count="8"] [data-glass-dock] {
-  gap: var(--dc-home-dock-gap, 8px);
-  padding-inline: var(--dc-home-dock-pad, 16px);
-}
-
-@media (max-width: 479px) {
-  [data-site-footer-nav][data-dock-count="8"] {
-    --dc-home-dock-gap: 4px;
-    --dc-home-dock-pad: 8px;
-    --dc-home-dock-pad-block: 10px;
-  }
-}
-@media (max-width: 379px) {
-  [data-site-footer-nav][data-dock-count="8"] {
-    --dc-home-dock-gap: 2px;
-    --dc-home-dock-pad: 6px;
-    --dc-home-dock-pad-block: 10px;
-  }
-
-  /* The nav's own gutter, i.e. what the filled capsule keeps clear of the edge
-     (on top of the fill's 4 px reserve). */
-  [data-site-footer-nav][data-dock-count="8"] {
-    padding-inline: 8px;
-  }
-}
-@media (max-width: 349px) {
-  [data-site-footer-nav][data-dock-count="8"] {
-    --dc-home-dock-gap: 2px;
-    --dc-home-dock-pad: 4px;
-    --dc-home-dock-pad-block: 8px;
-  }
-}
-@media (max-width: 319px) {
-  [data-site-footer-nav][data-dock-count="8"] {
-    padding-inline: 2px;
-  }
-}
-
 @media (max-width: 429px) {
   [data-site-footer-nav][data-dock-count="7"] [data-glass-dock] {
     gap: 4px;

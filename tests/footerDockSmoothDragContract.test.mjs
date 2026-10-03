@@ -21,7 +21,7 @@
 //      loop plus a blocking `toDataURL()` PNG encode plus a React
 //      re-render — once per distinct capsule size;
 //   2. each plate measured itself (`getBoundingClientRect`) inside the
-//      pointer transform, so one move forced eight synchronous layouts;
+//      pointer transform, so one move forced seven synchronous layouts;
 //   3. every one of those inline-style writes woke footerNavSpace's
 //      body-wide MutationObserver, which re-measured the footer and — because
 //      the capsule's height changes mid-wave — rewrote `--dc-footer-nav-h` on
@@ -127,13 +127,13 @@ function models({ navW, padX, padTop, padBottom, gap, growths, lifts }) {
 test("the transform-only wave draws the SAME dock the layout wave drew", () => {
   const cases = [
     // pointer on the first plate: the row is shoved right
-    { growths: [24.2, 12.1, 3.3, 0, 0, 0, 0, 0], lifts: [12, 6, 1.6, 0, 0, 0, 0, 0] },
-    // pointer in the middle of the eight-tab Home dock
-    { growths: [0, 2.2, 14.5, 24.2, 9.8, 1.1, 0, 0], lifts: [0, 1.1, 7.2, 12, 4.9, 0.5, 0, 0] },
+    { growths: [24.2, 12.1, 3.3, 0, 0, 0, 0], lifts: [12, 6, 1.6, 0, 0, 0, 0] },
+    // pointer in the middle of the seven-tab Home dock
+    { growths: [0, 2.2, 14.5, 24.2, 9.8, 1.1, 0], lifts: [0, 1.1, 7.2, 12, 4.9, 0.5, 0] },
     // pointer on the last plate
-    { growths: [0, 0, 0, 0, 4.4, 15.6, 24.2, 8.8], lifts: [0, 0, 0, 0, 2.2, 7.7, 12, 4.4] },
+    { growths: [0, 0, 0, 0, 4.4, 15.6, 24.2], lifts: [0, 0, 0, 0, 2.2, 7.7, 12] },
     // a fractional, everywhere-at-once state
-    { growths: [7.13, 7.13, 7.13, 7.13, 7.13, 7.13, 7.13, 7.13], lifts: [3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5] },
+    { growths: [7.13, 7.13, 7.13, 7.13, 7.13, 7.13, 7.13], lifts: [3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5] },
   ];
 
   for (const [index, { growths, lifts }] of cases.entries()) {
@@ -220,7 +220,7 @@ test("the capsule carries the whole envelope change, on one element", () => {
 test("the pinned geometry of the dock is untouched", () => {
   assert.match(dock, /export const ICON_SIZE = 44/);
   assert.match(dock, /export const COMPACT_ICON_SIZE = 38/);
-  assert.match(dock, /export const DENSE_ICON_SIZE = 34/);
+  assert.doesNotMatch(dock, /DENSE_ICON_SIZE/);
   assert.match(dock, /export const MAG_RANGE = 120/);
   assert.match(dock, /export const MAG_SCALE = 1\.55/);
   assert.match(dock, /export const MAG_LIFT = 12/);

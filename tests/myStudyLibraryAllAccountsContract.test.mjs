@@ -22,11 +22,10 @@
 //     deployed to the project predates it, only the admin can open the shelf.
 //     There was no mechanism that ever pushed firestore.rules to the project
 //     (hosting had an automatic deploy; the rules did not).
-//   · `entitlements` — the top-level collection `useCourseAccess` and the
-//     Sanctuary reading board's `useOwnedCourses` both query. It had NO rule at
-//     all, so it fell through to the admin catch-all: the developer saw every
-//     purchased course and every other learner's ownership query was refused,
-//     leaving their library/board empty. Now owner-scoped.
+//   · `entitlements` — the top-level collection `useCourseAccess` queries. It
+//     had NO rule at all, so it fell through to the admin catch-all: the
+//     developer saw purchased courses and every other learner was refused.
+//     Now owner-scoped.
 //
 // THE FIX has two independent halves, both pinned here:
 //   1. rules: `entitlements` gets an owner read rule, and a GitHub workflow
@@ -56,7 +55,6 @@ const vercel = JSON.parse(read("vercel.json"));
 const client = read("src/lib/myCourseClient.ts");
 const hook = read("src/hooks/useMyCourses.ts");
 const page = read("src/personal-library/StudyLibraryPage.tsx");
-const sanctuaryModules = read("src/nature3d/boards/sanctuaryModules.ts");
 const shared = read("utils/myCourseDoc.js");
 const clientTypes = read("src/types/myCourse.ts");
 const workflow = read(".github/workflows/firebase-rules-deploy.yml");
@@ -81,7 +79,6 @@ test("My Study Library has no admin-only gate anywhere in the client path", () =
     ["the shelf page", page],
     ["the library controller", hook],
     ["the storage layer", client],
-    ["the Sanctuary module tray", sanctuaryModules],
   ]) {
     const codeOnly = code(source);
     assert.doesNotMatch(codeOnly, /isAdmin/, `${label} must not branch on an admin role`);
@@ -95,7 +92,7 @@ test("My Study Library has no admin-only gate anywhere in the client path", () =
 });
 
 // ---------------------------------------------------------------------------
-// 2. Rules: owner-scoped paths for everything the library and the boards read
+// 2. Rules: owner-scoped paths for the library and course-access checks
 // ---------------------------------------------------------------------------
 
 test("firestore.rules keeps an owner-scoped rule for the learner's own courses", () => {
@@ -117,9 +114,8 @@ test("entitlements is readable by its owner — it was falling through to the ad
   assert.match(block, /allow read: if isAdmin\(\)\n\s*\|\| \(signedIn\(\) && resource\.data\.uid == request\.auth\.uid\);/);
   // Writes stay server-only: no client may ever grant itself a course.
   assert.match(block, /allow write: if false;/);
-  // Both consumers that were silently refused for non-admins.
+  // Course access was silently refused for non-admins.
   assert.match(read("src/hooks/useCourseAccess.ts"), /query\(collection\(db, "entitlements"\), where\("uid", "==", uid\)\)/);
-  assert.match(read("src/nature3d/boards/useOwnedCourses.ts"), /query\(collection\(db, "entitlements"\), where\("uid", "==", uid\)\)/);
 });
 
 test("the admin catch-all is still the LAST rule, and the workflow keeps the rules deployed", () => {
@@ -233,13 +229,6 @@ test("the learner is told what actually refused, in words they can act on", () =
   assert.equal(hook.match(/describeMyCoursesError\(writeError\)/g)?.length, 2);
   // Firestore's own text must never reach the learner again.
   assert.doesNotMatch(hook, /setError\(nextError\.message \|\| "Your library could not be loaded\."\);/);
-});
-
-test("the Sanctuary module tray rides the same guaranteed path", () => {
-  // It creates a real My Study Library course through saveMyCourse, so the
-  // fallback above covers it with no second implementation.
-  assert.match(sanctuaryModules, /await saveMyCourse\(uid, course\);/);
-  assert.match(sanctuaryModules, /from "\.\.\/\.\.\/lib\/myCourseClient"/);
 });
 
 // ---------------------------------------------------------------------------
