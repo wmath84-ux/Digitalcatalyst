@@ -20,3 +20,35 @@ Storage objects are replaced/deleted only after the corresponding product Firest
 ## PDF.js runtime
 
 The Mozilla Generic Viewer, core, worker, viewer CSS/images, locale module and supporting CMaps/ICC/font/WASM/sandbox assets are copied from the pinned npm packages into versioned `dist/pdfjs-viewer/` and `dist/pdfjs-data/` directories. The viewer script is requested only when a learner opens a PDF. Vite development serves the same local package assets, and the production files are part of the Vite `dist` directory shipped by Capacitor. The PWA service worker caches versioned PDF.js support assets on use; remote PDF bytes themselves are not cached for offline reading.
+
+## Learner uploads — "Your annotations"
+
+The Read tab is also the learner's own library. The header's **+** button picks a
+PDF from the device; the file is stored in the learner's own Storage folder:
+
+```
+userReadUploads/{uid}/{uploadId}-{slug}.pdf      bytes
+users/{uid}/readUploads/{uploadId}               the library row
+```
+
+The Firestore document is re-derivable and its ownership comes from the PATH
+(`storage.rules` scopes writes to `userReadUploads/{uid}/**`, `firestore.rules`
+requires the document's `storagePath` to resolve inside that same folder), so a
+hand-written document can never point at another learner's object. Every write is
+owner-only, PDF-only and inside the same **100 MiB** ceiling the instructor-side
+uploads use.
+
+A learner PDF opens in the **same** bundled PDF.js Generic Viewer as a course
+PDF, and the reader chrome adds the one thing a course PDF cannot offer: saving.
+The viewer's annotation storage is observed (PDF.js's own `onSetModified` /
+`onResetModified` callbacks) so the panel can say *Unsaved annotations*, and
+**Save** writes `pdfDocument.saveDocument()` — the same bytes the viewer's own
+save button produces, annotations included — back over the learner's object.
+The document then records `hasAnnotations`, `annotationCount`, `annotatedAt`,
+`sizeBytes`, the refreshed download URL and, on every page change, `lastPage` /
+`lastOpenedAt`, so the next device continues where the learner stopped.
+
+"Your annotations" is also the source of a learner-authored module: every row can
+be saved into a My Study Library course as a `read` resource carrying its owned
+Storage path, and that course's Read tab then opens it in this same annotated
+viewer.

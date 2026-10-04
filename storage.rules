@@ -94,6 +94,25 @@ service firebase.storage {
       allow read, write: if signedIn();
     }
 
+    // Course Player → Read library: the LEARNER's own PDFs
+    // (`userReadUploads/{uid}/{uploadId}-{slug}.pdf`). Ownership is the PATH:
+    // only the folder's own uid may write there, the bytes must really be a
+    // PDF, and the same 100 MiB ceiling the viewer / Firestore document use
+    // applies — READ_PDF_MAX_BYTES in utils/readResources.js and
+    // READ_UPLOAD_MAX_BYTES in utils/readUploads.js. Reads are the owner's
+    // (the viewer fetches the download URL) plus admins.
+    match /userReadUploads/{uid}/{fileName} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && fileName.matches('^[A-Za-z0-9._-]+[.]pdf$')
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }

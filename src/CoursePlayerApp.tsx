@@ -50,6 +50,8 @@ import { getCoursePanelSession, resetCoursePanelSession } from "./course/courseP
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
+import { readStoredExcalidrawLibraryLink } from "../utils/excalidrawLibraryLink.js";
+import { readUploadModuleDraft, type ReadUpload } from "../utils/readUploads.js";
 import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import type { CourseAccessResolution } from "../utils/courseAccess";
@@ -517,6 +519,17 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   useEffect(() => {
     if (dockTab === "ai") setAiOpened(true);
   }, [dockTab]);
+  // A library arriving from libraries.excalidraw.com ("Add to Excalidraw" —
+  // parked by main.tsx, see utils/excalidrawLibraryLink.js) must land where
+  // the learner can see it: open the Sketch tab ONCE so the editor mounts and
+  // installs the items into their personal library.
+  const libraryReturnOpened = useRef(false);
+  useEffect(() => {
+    if (libraryReturnOpened.current || !user?.id || hiddenTabs.includes("sketch")) return;
+    if (!readStoredExcalidrawLibraryLink(window.sessionStorage)) return;
+    libraryReturnOpened.current = true;
+    setDockTab("sketch");
+  }, [hiddenTabs, user?.id]);
   // ── Split Deck — the player's ONE layout ────────────────────────────────
   // The old "sheet" home and its Split-mode settings toggle are gone (owner's
   // direction): the player is ALWAYS two glass panes — the lesson on one side
@@ -730,6 +743,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       url: draft.url,
       description: draft.description,
       source: "link",
+      // A `read` resource must keep its library provenance: the owned Storage
+      // path + file size are what let the player resolve it
+      // (getReadResourcePresentation) and reopen it in the annotated PDF.js
+      // viewer inside the module the learner just built.
+      ...(draft.type === "read" && draft.readSourceKind
+        ? {
+            readSourceKind: draft.readSourceKind,
+            readStoragePath: draft.readStoragePath,
+            readFileName: draft.readFileName || draft.name,
+            readFileSize: draft.readFileSize,
+          }
+        : {}),
       ...(draft.type === "brain" && draft.practiceQuestions
         ? {
             practiceTitle: draft.practiceTitle || draft.name,
@@ -803,23 +828,52 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const addOfficialToLibrary = async (
     input: AddOfficialSaveInput,
   ): Promise<{ ok: boolean; alreadyExists?: boolean; destinationTitle?: string; message?: string }> => {
-    if (!officialResourceDraft) return { ok: false, message: "Open a lesson file first." };
+    // The dialog's own target, not the active lesson: the same dialog is
+    // opened from the Player settings (the official file) AND from the Read
+    // library's "Save to my module" (one of the learner's own PDFs).
+    const draft = officialDialogTarget;
+    if (!draft) return { ok: false, message: "Open a lesson file first." };
     if (!user?.id) return { ok: false, message: "Please sign in to save to your library." };
-    trackFeatureEvent("library_official_add", { surface: "course_player_settings" });
+    trackFeatureEvent("library_official_add", { surface: "course_player_settings", type: draft.type });
     if (input.existingCourseId) {
       const course = myLibrary.courses.find((entry) => entry.id === input.existingCourseId);
       if (!course) return { ok: false, message: "That course no longer exists. Please pick another destination." };
-      return addLibraryResource(course, officialResourceDraft, {
+      return addLibraryResource(course, draft, {
         moduleId: input.moduleId,
         newModuleTitle: input.newModuleTitle,
       });
     }
     const course = createMyCourse(user.id, input.newCourseTitle || "My course");
-    return addLibraryResource(course, officialResourceDraft, {
+    return addLibraryResource(course, draft, {
       moduleId: null,
       newModuleTitle: input.newModuleTitle || "Module 1",
     });
   };
+
+  /**
+   * The Read library's "Save to my module": one of the learner's OWN uploaded
+   * PDFs becomes a `read` resource in a My Study Library course — the same
+   * builder path the Player settings use, so it lands in a module and opens
+   * there in the annotated viewer with its annotations intact. The PDF never
+   * leaves the learner's own Storage folder: only the reference travels.
+   */
+  const addReadUploadToModule = useCallback(
+    (row: ReadUpload) => {
+      if (!user?.id) {
+        toast({ title: "Sign in first", description: "Please sign in to build your own modules.", variant: "info" });
+        return;
+      }
+      const draft = readUploadModuleDraft(row) as OfficialResourceDraft | null;
+      if (!draft) {
+        toast({ title: "That PDF can't be added", description: "Re-upload it and try again.", variant: "error" });
+        return;
+      }
+      trackFeatureEvent("read_upload_add_to_module", { surface: "course_player_read" });
+      setOfficialDialogTarget(draft);
+      setAddOfficialOpen(true);
+    },
+    [user?.id],
+  );
 
   const saveSelectedOfficialForLater = async () => {
     if (!officialResourceDraft || personalActionRef.current) return;
@@ -1574,6 +1628,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onTabChange={handleDockTabChange}
       modules={modules}
       productId={String(product.id)}
+      // Read tab → "Save to my module": the learner's own PDF becomes a
+      // My Study Library resource through the same dialog the Player
+      // settings use.
+      onAddReadUploadToModule={addReadUploadToModule}
       selectedFileId={selectedFile?.id}
       ownedUpdateIds={ownedUpdateIds}
       accessibleModuleIds={resolution.accessibleModuleIds}
@@ -1652,6 +1710,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             canvasColor={sketch.canvasColor}
             onCanvasColorChange={sketch.setCanvasColor}
             boardName={activeMindMapModuleTitle || product.title}
+            // The personal library is the LEARNER's (users/{uid}/sketchLibraries),
+            // so the panel needs to know who is signed in.
+            uid={user?.id ?? null}
           />
         </Suspense>
       )}

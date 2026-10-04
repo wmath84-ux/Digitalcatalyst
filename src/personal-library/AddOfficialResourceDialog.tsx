@@ -21,15 +21,26 @@ export interface OfficialResourceDraft {
   name: string;
   /**
    * The destination is always a My Study Library resource, whose vocabulary
-   * now includes the learner-authored `interactive` experiment — so this is
-   * the full content-type union, not the official catalogue's 13 values.
+   * now includes the learner-authored `interactive` experiment AND the
+   * annotatable `read` library — so this is the full content-type union, not
+   * the official catalogue's 13 values.
    */
-  type: CourseContentFileType;
+  type: CourseContentFileType | "read";
   url: string;
   description: string;
   /** Brain practice payload (type "brain" only) — copied verbatim. */
   practiceTitle?: string;
   practiceQuestions?: MyCourseModule["resources"][number]["practiceQuestions"];
+  /**
+   * Read payload (type "read" only). A learner's own PDF — either one they
+   * uploaded in the Read library (`upload` + the owned Storage path) or a
+   * public PDF link — travels with the resource so the player's Read tab can
+   * open it in the annotated viewer.
+   */
+  readSourceKind?: MyCourseModule["resources"][number]["readSourceKind"];
+  readStoragePath?: string;
+  readFileName?: string;
+  readFileSize?: number;
 }
 
 export interface AddOfficialSaveInput {

@@ -8,6 +8,8 @@ export const READ_PDFJS_VERSION: string;
 export function normalizeReadSourceKind(value?: unknown, storagePath?: unknown): ReadSourceKind;
 export function buildReadStoragePath(productId: string, resourceId: string, uploadId?: string): string;
 export function isOwnedReadUploadPath(value: unknown, productId?: string | null, resourceId?: string | null): boolean;
+/** The learner's own Memory tree: `userReadUploads/{uid}/{uploadId}-{slug}.pdf`. */
+export function isOwnedLearnerReadUploadPath(value: unknown): boolean;
 export function googleDrivePdfUrl(value: unknown): string;
 export function normalizeReadResourceUrl(
   value: unknown,

@@ -580,6 +580,87 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
+      // Course Player → Sketch PERSONAL LIBRARY. ONE document per learner
+      // (`users/{uid}/sketchLibraries/main`) holding the Excalidraw library
+      // items as a JSON string — same nested-array reasoning as the boards
+      // above, and the same size ceiling (see SKETCH_LIBRARY_MAX_CHARS /
+      // SKETCH_LIBRARY_MAX_ITEMS in src/course/useSketchLibrary.ts).
+      //
+      // This document is what makes the library panel persist at all: the
+      // editor itself is memory-only, so without a host adapter every item a
+      // learner saved vanished when the Sketch tab unmounted. Owner-only, doc
+      // id fixed to `main`, and the payload is opaque text.
+      match /sketchLibraries/{libraryId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && libraryId == 'main'
+          && request.resource.data.uid == uid
+          && request.resource.data.version is number
+          && request.resource.data.items is string
+          && request.resource.data.items.size() <= 900000
+          && request.resource.data.itemCount is number
+          && request.resource.data.itemCount <= 500
+          && request.resource.data.truncated is bool
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      // Course Player → READ library, the LEARNER's OWN PDFs. One document per
+      // uploaded file (`users/{uid}/readUploads/{uploadId}`); the bytes live in
+      // Storage under `userReadUploads/{uid}/{uploadId}-{slug}.pdf` (see the
+      // `userReadUploads` match in storage.rules).
+      //
+      // Ownership comes from the PATH, never from the payload: a document can
+      // only exist in its author's own namespace, its id must match the field
+      // inside it, and `storagePath` must resolve to this learner's folder with
+      // a PDF name — so a hand-written document can never alias somebody else's
+      // object into this library. The numbers are the same ceilings
+      // utils/readUploads.js clamps to (100 MiB, 20000 pages, 100000
+      // annotations), and the payload the learner saves is a PDF, never HTML.
+      match /readUploads/{uploadId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.uploadId == uploadId
+          && uploadId.matches('^[A-Za-z0-9][A-Za-z0-9-]{5,119}$')
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 160
+          && request.resource.data.module is string
+          && request.resource.data.module.size() <= 60
+          && request.resource.data.storagePath is string
+          && request.resource.data.storagePath.size() > 0
+          && request.resource.data.storagePath.size() <= 400
+          && request.resource.data.storagePath.split('/').size() == 3
+          && request.resource.data.storagePath.split('/')[0] == 'userReadUploads'
+          && request.resource.data.storagePath.split('/')[1] == uid
+          && request.resource.data.storagePath.split('/')[2].matches('^[A-Za-z0-9][A-Za-z0-9._-]*[.]pdf$')
+          && request.resource.data.url is string
+          && request.resource.data.url.size() <= 2048
+          && request.resource.data.contentType == 'application/pdf'
+          && request.resource.data.sizeBytes is number
+          && request.resource.data.sizeBytes >= 0
+          && request.resource.data.sizeBytes <= 104857600
+          && request.resource.data.pageCount is number
+          && request.resource.data.pageCount >= 0
+          && request.resource.data.pageCount <= 20000
+          && request.resource.data.lastPage is number
+          && request.resource.data.lastPage >= 1
+          && request.resource.data.lastPage <= 20000
+          && request.resource.data.hasAnnotations is bool
+          && request.resource.data.annotationCount is number
+          && request.resource.data.annotationCount >= 0
+          && request.resource.data.annotationCount <= 100000
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number
+          && request.resource.data.lastOpenedAt is number
+          && (!request.resource.data.keys().hasAny(['annotatedAt']) || request.resource.data.annotatedAt is number)
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /webPushSubscriptions/{subscriptionId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

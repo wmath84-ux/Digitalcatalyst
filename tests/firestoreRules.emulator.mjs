@@ -9,6 +9,7 @@ import {
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { toFirestoreNote } from "../utils/courseNotes.js";
 import { addChildNode, createMindMap, mindMapDocId, toFirestoreMindMap } from "../utils/mindMapTree.js";
+import { buildReadUploadStoragePath, toFirestoreReadUpload } from "../utils/readUploads.js";
 
 let env;
 let owner;
@@ -83,4 +84,74 @@ test("mixed revision parent validation still rejects deleted parents (valid Rule
   });
   await assertFails(setDoc(ref, payload));
   await assertFails(setDoc(ref, { ...payload, parentTestKeys: ["100", 101] }));
+});
+
+test("a learner's own Read upload is owner-only, and its document must describe an owned PDF", async () => {
+  const uploadId = "pdf-emulator-1";
+  const storagePath = buildReadUploadStoragePath(uid, uploadId, "Physics Notes.pdf");
+  const payload = toFirestoreReadUpload({
+    uid,
+    uploadId,
+    name: "Physics Notes.pdf",
+    module: "Physics",
+    storagePath,
+    url: "https://firebasestorage.googleapis.com/v0/b/demo.appspot.com/o/owned.pdf?alt=media&token=t",
+    sizeBytes: 2048,
+    pageCount: 12,
+    lastPage: 3,
+    hasAnnotations: false,
+    annotationCount: 0,
+    createdAt: 10,
+    updatedAt: 11,
+  });
+  const ref = doc(owner, "users", uid, "readUploads", uploadId);
+  await assertSucceeds(setDoc(ref, payload));
+  assert.equal((await assertSucceeds(getDoc(ref))).data().module, "Physics");
+
+  // Somebody else can never read or write it.
+  await assertFails(getDoc(doc(stranger, "users", uid, "readUploads", uploadId)));
+  await assertFails(setDoc(doc(stranger, "users", uid, "readUploads", uploadId), payload));
+
+  // Ownership is re-derived from the PATH, never trusted from the payload.
+  await assertFails(setDoc(ref, { ...payload, uid: "different-owner" }));
+  await assertFails(setDoc(ref, { ...payload, uploadId: "another-upload" }));
+  await assertFails(setDoc(ref, { ...payload, storagePath: `userReadUploads/different-owner/${uploadId}-x.pdf` }));
+  await assertFails(setDoc(ref, { ...payload, storagePath: "adminProductContent/read/p1/res-1.pdf" }));
+  // The ceilings are enforced, not just advertised.
+  await assertFails(setDoc(ref, { ...payload, sizeBytes: 104857601 }));
+  await assertFails(setDoc(ref, { ...payload, pageCount: 20001 }));
+  await assertFails(setDoc(ref, { ...payload, annotationCount: 100001 }));
+  await assertFails(setDoc(ref, { ...payload, contentType: "text/html" }));
+  await assertFails(setDoc(ref, { ...payload, name: "" }));
+  // Privileged fields stay out of a learner write.
+  await assertFails(setDoc(ref, { ...payload, role: "admin" }));
+  // …and the legitimate update (an annotation save) still lands.
+  await assertSucceeds(setDoc(ref, { ...payload, hasAnnotations: true, annotationCount: 4, annotatedAt: 12, updatedAt: 12 }));
+  await assertSucceeds(deleteDoc(ref));
+});
+
+test("the Sketch personal library is one owner-only document per learner", async () => {
+  const payload = {
+    uid,
+    version: 1,
+    items: JSON.stringify([{ id: "lib-1", status: "published", elements: [] }]),
+    itemCount: 1,
+    truncated: false,
+    createdAt: 10,
+    updatedAt: 11,
+  };
+  const ref = doc(owner, "users", uid, "sketchLibraries", "main");
+  await assertSucceeds(setDoc(ref, payload));
+  assert.equal((await assertSucceeds(getDoc(ref))).data().itemCount, 1);
+
+  await assertFails(getDoc(doc(stranger, "users", uid, "sketchLibraries", "main")));
+  await assertFails(setDoc(doc(stranger, "users", uid, "sketchLibraries", "main"), payload));
+  // One document per learner, and it has to describe itself honestly.
+  await assertFails(setDoc(doc(owner, "users", uid, "sketchLibraries", "second"), payload));
+  await assertFails(setDoc(ref, { ...payload, uid: "different-owner" }));
+  await assertFails(setDoc(ref, { ...payload, items: "x".repeat(900001) }));
+  await assertFails(setDoc(ref, { ...payload, itemCount: 501 }));
+  await assertFails(setDoc(ref, { ...payload, truncated: "yes" }));
+  await assertFails(setDoc(ref, { ...payload, role: "admin" }));
+  await assertSucceeds(deleteDoc(ref));
 });

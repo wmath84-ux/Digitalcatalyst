@@ -47,10 +47,18 @@ import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react
 // font loader runs (see the file's header).
 import "./excalidrawAssets";
 import { Excalidraw } from "@excalidraw/excalidraw";
+// A second import line on purpose: the integration contract pins the FIRST
+// line's exact text, and the editor's library hook is the only other symbol
+// this panel needs from the package.
+import { useHandleLibrary } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { Pencil } from "lucide-react";
+import { BookMarked, Pencil } from "lucide-react";
 import type { SketchSaveStatus } from "./useCourseSketch";
 import type { SketchScene } from "../../utils/sketchScene";
+// The learner's PERSONAL LIBRARY (the editor ships the panel but no storage —
+// see the hook's header) plus the "Add to Excalidraw" return link it installs.
+import { useSketchLibrary } from "./useSketchLibrary";
+import { isAllowedExcalidrawLibraryUrl } from "../../utils/excalidrawLibraryLink.js";
 
 /**
  * The editor's imperative API, derived from the component's own props type
@@ -235,6 +243,11 @@ export interface SketchPanelProps {
   onCanvasColorChange: (color: string | null) => void;
   /** The module this board belongs to (export filename + the save line). */
   boardName?: string;
+  /**
+   * The signed-in learner — scopes their PERSONAL LIBRARY document
+   * (`users/{uid}/sketchLibraries/main`). Absent/null = no library storage.
+   */
+  uid?: string | null;
 }
 
 /** The slim save line — the only chrome this panel adds. Never a banner. */
@@ -308,13 +321,73 @@ export default function SketchPanel({
   canvasColor,
   onCanvasColorChange,
   boardName,
+  uid = null,
 }: SketchPanelProps) {
-  /** The editor's imperative API (canvas colour + nothing else). */
+  /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
+  /**
+   * The same API in state: `useHandleLibrary` below only wires itself up once
+   * it receives a non-null API, and state is what re-runs it. Passing the ref
+   * would leave the library adapter mounted with a null editor.
+   */
+  const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawAPI | null>(null);
+  /** The learner's own library — stored and synced by `useSketchLibrary`. */
+  const library = useSketchLibrary({ uid });
   /** The canvas colour as the learner currently sees it (null = theme). */
   const [canvasColour, setCanvasColour] = useState<string | null>(canvasColor);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Where libraries.excalidraw.com sends the browser back to. A STABLE value
+   * (`origin + pathname`, never the current hash route): the site appends
+   * `#addLibrary=<url>` to it, and main.tsx turns that return into the route
+   * the learner was on (see utils/excalidrawLibraryLink.js).
+   */
+  const libraryReturnUrl = useMemo(
+    () => (typeof window === "undefined" ? "" : `${window.location.origin}${window.location.pathname}`),
+    [],
+  );
+
+  /**
+   * THE fix for "my library items were saved but the library is empty again":
+   * the editor persists nothing by itself, so the host hands it the adapter
+   * that does (Firestore + a localStorage mirror). Also the same call the
+   * editor's own library panel expects for the "Browse libraries" return
+   * link — with a validator widened to the two library hosts (the default
+   * only allows excalidraw.com and would reject our own origin's return).
+   */
+  useHandleLibrary({
+    excalidrawAPI: excalidrawApi,
+    adapter: library.adapter as never,
+    validateLibraryUrl: (url: string) => isAllowedExcalidrawLibraryUrl(url),
+  });
+
+  /**
+   * Belt-and-braces: the editor also reports every library change directly.
+   * `useHandleLibrary` is the primary writer; this makes a change survive even
+   * if that hook's own save pass bails — the save is debounced and idempotent,
+   * so the duplicate is free.
+   */
+  const onLibraryChange = (items: unknown) => {
+    void library.adapter.save({ libraryItems: items });
+  };
+
+  /**
+   * Install a parked "Add to Excalidraw" library into this editor, once per
+   * link per mount. `updateLibrary({merge: true})` is the editor's own import
+   * path (the same one its file-drop uses), so the items are real library
+   * items — and, because the adapter above is mounted, they are persisted the
+   * moment the editor reports them.
+   */
+  const importAttemptedRef = useRef("");
+  useEffect(() => {
+    const link = library.pendingImport;
+    if (!link || !excalidrawApi) return;
+    if (importAttemptedRef.current === link.libraryUrl) return;
+    importAttemptedRef.current = link.libraryUrl;
+    void library.importPending(excalidrawApi);
+  }, [excalidrawApi, library]);
 
   // A "custom" colour is any saved colour that is neither the theme default
   // (null) nor the white swatch — the pencil chip shows it.
@@ -412,6 +485,45 @@ export default function SketchPanel({
       data-sketch-scope={scoped ? "module" : "none"}
     >
       <SketchStatus status={status} pendingSync={pendingSync} errorMessage={errorMessage} boardName={boardName}>
+        {/* The learner's PERSONAL LIBRARY, at a glance: how many items their
+            own library holds on this device/account, and what the "Add to
+            Excalidraw" return is doing right now. The panel itself is
+            Excalidraw's own (the book icon in its toolbar) — this is a
+            read-out, never a second library UI. */}
+        <span
+          data-course-sketch-library={library.state}
+          data-course-sketch-library-count={library.itemCount}
+          title={
+            library.importError ||
+            library.error ||
+            "Your personal library — saved to your account and synced to your other devices"
+          }
+          className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
+            library.importState === "importing"
+              ? "border-white/25 text-white/70"
+              : library.importError || library.error
+                ? "border-amber-400/40 text-amber-300"
+                : "border-white/15 text-white/55"
+          }`}
+        >
+          {library.importState === "importing" ? (
+            <span
+              aria-hidden
+              className="block h-2.5 w-2.5 animate-spin rounded-full border border-white/25 border-t-white/80"
+            />
+          ) : (
+            <BookMarked aria-hidden size={11} />
+          )}
+          <span className="tabular-nums">
+            {library.importState === "importing"
+              ? "Adding library…"
+              : library.importState === "imported"
+                ? "Library added"
+                : library.itemCount > 0
+                  ? `Library ${library.itemCount}`
+                  : "Library"}
+          </span>
+        </span>
         {/* Canvas colour: the theme default (dark, what the player always
             opened with), white, and the pencil → full-RGB custom colour.
             The choice persists with the board AND as the learner's device
@@ -485,12 +597,21 @@ export default function SketchPanel({
               initialData={initialData}
               onChange={onChange}
               name={boardName || "Sketch"}
+              // "Browse libraries" opens libraries.excalidraw.com; it returns
+              // the learner to `libraryReturnUrl` with `#addLibrary=…`, which
+              // main.tsx intercepts and this panel then installs (see the
+              // effects above). Persistence of every change runs through the
+              // adapter: `onLibraryChange` is the belt, `useHandleLibrary`
+              // the braces.
+              libraryReturnUrl={libraryReturnUrl}
+              onLibraryChange={onLibraryChange}
               // The player owns its own ⌘/Ctrl shortcuts: the editor only
               // takes the keyboard while the learner is actually in it.
               handleKeyboardGlobally={false}
               autoFocus={false}
               onExcalidrawAPI={(api) => {
                 apiRef.current = api;
+                setExcalidrawApi(api);
               }}
             />
           </div>

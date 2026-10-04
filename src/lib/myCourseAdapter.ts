@@ -58,6 +58,14 @@ const toCourseFile = (resource: MyCourseResource): CourseFile => ({
   type: resource.type,
   url: resource.url || undefined,
   description: resource.description || undefined,
+  // A learner-authored Read resource keeps its library provenance, so
+  // `getReadResourcePresentation` (utils/readResources.js) can resolve it and
+  // the Read tab opens it in the annotated PDF.js viewer — the same viewer the
+  // official Read PDFs get, with the same saved annotations/activity.
+  readSourceKind: resource.readSourceKind,
+  readStoragePath: resource.readStoragePath,
+  readFileName: resource.readFileName,
+  readFileSize: resource.readFileSize,
   // `interactive` files carry their source in the course document itself; the
   // player renders it in a sandboxed iframe (src/utils/experimentSpec.ts).
   interactiveHtml: resource.type === "interactive" ? resource.interactiveHtml || "" : undefined,
