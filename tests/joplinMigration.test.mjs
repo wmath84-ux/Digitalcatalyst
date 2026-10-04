@@ -268,3 +268,20 @@ test("reminder text splitting and note titles follow the legacy UI's rules", () 
   assert.equal(deriveNoteTitle("\n\n## Heading here\nbody", "fallback"), "Heading here");
   assert.equal(deriveNoteTitle("   ", "fallback"), "fallback");
 });
+
+test("server migration sanitizer never produces undefined document fields (Firestore safety)", async () => {
+  const fs = await import("node:fs");
+  const joplinSource = fs.readFileSync("api/_lib/joplin.ts", "utf8");
+  const adminSource = fs.readFileSync("api/_lib/firebaseAdmin.ts", "utf8");
+
+  // Notebook rows must never have `body: undefined` (which throws Firestore Cannot use "undefined" as value)
+  assert.equal(joplinSource.includes("body: isNote ? body : undefined"), false, "Must not set body to undefined on notebooks");
+  assert.match(joplinSource, /\.\.\.\(isNote\s*\?\s*\{\s*body\s*\}\s*:\s*\{\}\)/, "Must conditionally spread body only for notes");
+
+  // Schedules must never have undefined recurrence fields
+  assert.equal(joplinSource.includes("byWeekday: Array.isArray(recurrence.byWeekday)"), false, "Must not set byWeekday to undefined");
+
+  // Firebase Admin Firestore must enable ignoreUndefinedProperties
+  assert.match(adminSource, /ignoreUndefinedProperties:\s*true/, "adminDb must configure ignoreUndefinedProperties: true");
+});
+

@@ -163,7 +163,7 @@ function sanitizeNoteOrNotebook(raw: Row, uid: string): Row {
     type_: type,
     parent_id: parentId,
     title,
-    body: isNote ? body : undefined,
+    ...(isNote ? { body } : {}),
     source_url: text(raw.source_url, 2000),
     markup_language: int(raw.markup_language, 1),
     is_todo: int(raw.is_todo, 0) ? 1 : 0,
@@ -261,6 +261,14 @@ function sanitizeSchedule(raw: Row, uid: string): Row {
   if (!RECURRENCE_FREQS.includes(freq)) {
     throw error(400, "JOPLIN_BAD_RECURRENCE", "That recurrence is not supported.");
   }
+  const weekdaysRaw = recurrence.weekdays ?? recurrence.byWeekday;
+  const weekdays = Array.isArray(weekdaysRaw)
+    ? (weekdaysRaw as unknown[]).map((d) => int(d, 0)).filter((d) => d >= 0 && d <= 6)
+    : undefined;
+  const dayOfMonth = int(recurrence.dayOfMonth ?? recurrence.monthDay, 0);
+  const intervalMinutes = int(recurrence.intervalMinutes, 0);
+  const count = Math.max(0, int(recurrence.count, 0));
+  const until = Math.max(0, int(recurrence.until, 0));
   const now = Date.now();
   return {
     ...stripReserved(raw),
@@ -280,10 +288,11 @@ function sanitizeSchedule(raw: Row, uid: string): Row {
     recurrence: {
       freq,
       interval: Math.max(1, int(recurrence.interval, 1)),
-      byWeekday: Array.isArray(recurrence.byWeekday) ? recurrence.byWeekday.map((d) => int(d, 0)).filter((d) => d >= 0 && d <= 6) : undefined,
-      monthDay: Math.max(0, int(recurrence.monthDay, 0)),
-      count: Math.max(0, int(recurrence.count, 0)),
-      until: Math.max(0, int(recurrence.until, 0)),
+      ...(weekdays && weekdays.length ? { weekdays, byWeekday: weekdays } : {}),
+      ...(dayOfMonth ? { dayOfMonth, monthDay: dayOfMonth } : {}),
+      ...(intervalMinutes ? { intervalMinutes } : {}),
+      ...(count ? { count } : {}),
+      ...(until ? { until } : {}),
     },
     enabled: raw.enabled === false ? false : true,
     completionHandling: ["continue", "stop-on-complete", "disable-after-fire"].includes(String(raw.completionHandling))
