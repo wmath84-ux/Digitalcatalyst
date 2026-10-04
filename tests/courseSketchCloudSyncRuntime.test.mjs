@@ -29,7 +29,10 @@
 //   8. a uid the session cannot verify never writes into anyone's namespace;
 //   9. drawing never re-renders the player — the scene lives outside React;
 //  10. the scene key is stable across re-renders, so nothing can remount the
-//      editor except a genuine change of board.
+//      editor except a genuine change of board;
+//  11. a CANVAS COLOUR is part of the board: chosen through the panel, it is
+//      written even when the board holds no elements at all, and the board
+//      that reopens is the board that was left (theme included).
 
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
@@ -573,5 +576,93 @@ test("the newer copy wins: local work drawn offline is pushed over an older clou
   await settle(150);
   assert.equal(text("ids"), "fresh", "the learner's own newer work stays on screen");
   assert.equal(cloudScene(UID, PRODUCT, MODULE_A).elements[0].id, "fresh", "and is pushed up");
+  app.unmount();
+});
+
+/* ── 11. the canvas colour belongs to the board ───────────────────────────── */
+
+/** The Sketch panel's colour control, in one call: appState + the announcement. */
+function pickCanvas(appState) {
+  draw([], appState);
+  act(() => {
+    fixture.latest.ctl.markSceneChanged();
+  });
+}
+
+test("a canvas colour is saved even when the board is empty — and reopens with it", async () => {
+  const target = freshWorld();
+  const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle();
+
+  // The learner picks the White preset. The panel writes the pair Excalidraw
+  // needs (`theme` + the scene-space background) and then, because the change
+  // queue watches elements, says so out loud.
+  pickCanvas({ theme: "light", viewBackgroundColor: "#ffffff" });
+  await settle(150);
+
+  assert.equal(fsx.writes.length, 1, "a colour with no drawing still reaches the cloud");
+  const scene = cloudScene(UID, PRODUCT, MODULE_A);
+  assert.equal(scene.elements.length, 0, "…as a board with nothing on it");
+  assert.equal(scene.appState.theme, "light");
+  assert.equal(scene.appState.viewBackgroundColor, "#ffffff");
+  assert.equal(text("status"), "saved");
+  app.unmount();
+
+  // Reopening the module must show the canvas the learner left, not the default.
+  const again = fixture.mount(newHost(), { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle(80);
+  const live = fixture.latest.ctl.getScene();
+  assert.equal(live.appState.theme, "light");
+  assert.equal(live.appState.viewBackgroundColor, "#ffffff");
+  assert.equal(fsx.writes.length, 1, "opening a board is still not an edit");
+  again.unmount();
+});
+
+test("a colour picked and abandoned still flushes, and the next pick replaces it", async () => {
+  const target = freshWorld();
+  // A long debounce: nothing can land on a timer, only on the way out.
+  const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: 5000 });
+  await settle();
+
+  draw([], { theme: "dark", viewBackgroundColor: "#ffffff" });
+  act(() => {
+    fixture.latest.ctl.markSceneChanged();
+  });
+  assert.equal(fsx.writes.length, 0, "still inside the quiet window");
+
+  app.unmount();
+  await settle(60);
+  assert.equal(fsx.writes.length, 1, "leaving the tab wrote the canvas choice");
+  assert.equal(cloudScene(UID, PRODUCT, MODULE_A).appState.viewBackgroundColor, "#ffffff");
+  assert.equal(cloudScene(UID, PRODUCT, MODULE_A).appState.theme, "dark");
+
+  // Second visit: a different colour, and the board remembers the newer one.
+  const again = fixture.mount(newHost(), { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle(80);
+  pickCanvas({ theme: "light", viewBackgroundColor: "#f6f3e7" });
+  await settle(150);
+  assert.equal(cloudScene(UID, PRODUCT, MODULE_A).appState.viewBackgroundColor, "#f6f3e7");
+  assert.equal(cloudScene(UID, PRODUCT, MODULE_A).appState.theme, "light");
+  again.unmount();
+});
+
+test("a colour change while a write is in flight is not swallowed by its acknowledgement", async () => {
+  const target = freshWorld();
+  const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle();
+
+  // Hold the first write open…
+  fsx.state.writeDelayMs = 120;
+  pickCanvas({ theme: "dark", viewBackgroundColor: "#ffffff" });
+  await settle(90);
+  // …and change the canvas again before it lands.
+  pickCanvas({ theme: "light", viewBackgroundColor: "#ffffff" });
+  await settle(400);
+  fsx.state.writeDelayMs = 0;
+
+  const scene = cloudScene(UID, PRODUCT, MODULE_A);
+  assert.equal(scene.appState.theme, "light", "the newer choice is what the cloud holds");
+  assert.equal(scene.appState.viewBackgroundColor, "#ffffff");
+  assert.equal(fsx.writes.length >= 2, true, "the change that arrived mid-write was written too");
   app.unmount();
 });

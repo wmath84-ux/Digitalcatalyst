@@ -11,9 +11,11 @@
 // It is the HOST: it gives Excalidraw a box with a real, resolved width and
 // height, hands it the scene the player loaded for this module, forwards every
 // change to `useCourseSketch` (which owns persistence) and shows one slim save
-// line. It is NOT a drawing UI: every tool, the toolbar, the menus, undo/redo,
-// zoom, the shape/colour pickers and the canvas gestures are Excalidraw's own
-// official component — nothing here reimplements, hides or re-skins them.
+// line with the canvas control (White / Dark / the pencil's full-RGB picker —
+// `SketchCanvasControls.tsx`). It is NOT a drawing UI: every tool, the
+// toolbar, the menus, undo/redo, zoom, the shape/colour pickers and the canvas
+// gestures are Excalidraw's own official component — nothing here reimplements,
+// hides or re-skins them.
 //
 // ── Sizing (the one thing that breaks Excalidraw) ────────────────────────
 // Excalidraw fills its parent, so the parent must RESOLVE a height. The pane
@@ -27,18 +29,38 @@
 //
 // ── Lifecycle ────────────────────────────────────────────────────────────
 // The editor is keyed by the SCENE's identity (`sceneKey` = course+module, as
-// handed down by the hook) — never by the split ratio, the pane size or the
-// active tab, so resizing the deck can never recreate the canvas. Switching
-// modules DOES change the key, because that is a different board.
+// handed down by the hook) — never by the split, the pane size or the active
+// tab, so resizing the deck can never recreate the canvas. Switching modules
+// DOES change the key, because that is a different board.
+//
+// ── Canvas colour ────────────────────────────────────────────────────────
+// The control writes TWO appState values, because one is not enough to render
+// a colour: `theme` and the scene-space `viewBackgroundColor` the dark-mode
+// filter is applied to (see `utils/sketchCanvas.js`). They are written through
+// Excalidraw's own API, so the editor reports them back through `onChange` and
+// the sketch pipeline persists them with the board. A colour change is also
+// announced to the hook with `markSceneChanged()`, because the hook's change
+// queue watches ELEMENTS (one write per stroke, never one per hover): a canvas
+// choice must still reach the cloud even when the board is otherwise empty.
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Must come first: it sets window.EXCALIDRAW_ASSET_PATH before the editor's
 // font loader runs (see the file's header).
 import "./excalidrawAssets";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { SketchSaveStatus } from "./useCourseSketch";
 import type { SketchScene } from "../../utils/sketchScene";
+import {
+  SKETCH_CANVAS_DEFAULT,
+  readSketchCanvasPreference,
+  sketchCanvasAppState,
+  sketchCanvasFromAppState,
+  writeSketchCanvasPreference,
+  type SketchCanvasTheme,
+} from "../../utils/sketchCanvas";
+import SketchCanvasControls from "./SketchCanvasControls";
 
 export interface SketchPanelProps {
   /**
@@ -61,6 +83,37 @@ export interface SketchPanelProps {
   onChange: (elements: unknown, appState: unknown, files: unknown) => void;
   /** The module this board belongs to (export filename + the save line). */
   boardName?: string;
+  /** The learner — scopes the remembered canvas preference. */
+  uid?: string | null;
+  /**
+   * Tell the hook the live scene changed in a way its element signature cannot
+   * see — i.e. the canvas colour. Without it a colour-only change would sit in
+   * the scene and never reach the cloud.
+   */
+  markSceneChanged?: () => void;
+}
+
+/** The pair of appState values that paints one canvas colour. */
+interface CanvasChoice {
+  theme: SketchCanvasTheme;
+  sceneColor: string;
+}
+
+/**
+ * The canvas a board OPENS with: its own remembered colour, else the learner's
+ * preference (a new module, the next course), else the dark default — which is
+ * Excalidraw's own default board, unchanged.
+ */
+function openingCanvas(appState: unknown, uid: string): CanvasChoice {
+  const saved = sketchCanvasFromAppState(appState);
+  if (saved) return { theme: saved.theme, sceneColor: saved.sceneColor };
+  const preference = readSketchCanvasPreference(uid);
+  const applied = preference ? sketchCanvasAppState(preference.color) : null;
+  if (applied) return { theme: applied.theme, sceneColor: applied.viewBackgroundColor };
+  const fallback = sketchCanvasAppState(SKETCH_CANVAS_DEFAULT.color);
+  return fallback
+    ? { theme: fallback.theme, sceneColor: fallback.viewBackgroundColor }
+    : { theme: SKETCH_CANVAS_DEFAULT.theme, sceneColor: "#ffffff" };
 }
 
 /** The slim save line — the only chrome this panel adds. Never a banner. */
@@ -69,11 +122,17 @@ function SketchStatus({
   pendingSync,
   errorMessage,
   boardName,
+  canvas,
+  onPickCanvas,
+  canvasReady,
 }: {
   status: SketchSaveStatus;
   pendingSync: boolean;
   errorMessage: string | null;
   boardName?: string;
+  canvas: CanvasChoice;
+  onPickCanvas: (color: string) => void;
+  canvasReady: boolean;
 }) {
   let label = "Sketch";
   let tone: "muted" | "ok" | "warn" = "muted";
@@ -112,6 +171,12 @@ function SketchStatus({
           {boardName}
         </span>
       ) : null}
+      <SketchCanvasControls
+        theme={canvas.theme}
+        sceneColor={canvas.sceneColor}
+        onPick={onPickCanvas}
+        ready={canvasReady}
+      />
     </div>
   );
 }
@@ -126,7 +191,74 @@ export default function SketchPanel({
   scoped,
   onChange,
   boardName,
+  uid,
+  markSceneChanged,
 }: SketchPanelProps) {
+  const uidText = String(uid || "").trim();
+
+  /** The canvas the row reports — the editor's live appState, mirrored. */
+  // (No explicit type argument here on purpose: `<CanvasChoice>` would read as
+  // a `<canvas>` element to the integration contract that forbids one.)
+  const [canvas, setCanvas] = useState(() => openingCanvas(getScene().appState, uidText));
+  const canvasRef = useRef(canvas);
+  canvasRef.current = canvas;
+
+  /** The live editor API, for the one thing a prop cannot do: change appState. */
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
+
+  // A different board is a different canvas: re-read it when the scene
+  // identity moves (module switch, or a late cloud board replacing this one).
+  useEffect(() => {
+    setCanvas(openingCanvas(getScene().appState, uidText));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneKey]);
+
+  /**
+   * The editor's own `onChange`, forwarded untouched — plus a cheap mirror of
+   * the two appState fields the canvas row shows, so a theme toggled from
+   * Excalidraw's own menu is reflected here too. It re-renders the panel only
+   * when those two values actually change: never per stroke.
+   */
+  const handleChange = useCallback(
+    (elements: unknown, appState: unknown, files: unknown) => {
+      onChange(elements, appState, files);
+      const next = sketchCanvasFromAppState(appState);
+      if (!next) return;
+      const previous = canvasRef.current;
+      if (next.theme === previous.theme && next.sceneColor === previous.sceneColor) return;
+      const value: CanvasChoice = { theme: next.theme, sceneColor: next.sceneColor };
+      canvasRef.current = value;
+      setCanvas(value);
+    },
+    [onChange],
+  );
+
+  const handleApi = useCallback((instance: ExcalidrawImperativeAPI | null) => {
+    apiRef.current = instance;
+    setCanvasReady(Boolean(instance));
+  }, []);
+
+  /** The learner picked a colour: paint it, remember it, persist it. */
+  const pickCanvas = useCallback(
+    (color: string) => {
+      const applied = sketchCanvasAppState(color);
+      if (!applied) return;
+      const value: CanvasChoice = { theme: applied.theme, sceneColor: applied.viewBackgroundColor };
+      canvasRef.current = value;
+      setCanvas(value);
+      // The learner's choice follows them to boards that never chose one.
+      writeSketchCanvasPreference(uidText, color);
+      const editor = apiRef.current;
+      if (!editor) return;
+      editor.updateScene({ appState: { theme: value.theme, viewBackgroundColor: value.sceneColor } });
+      // The change queue watches elements; a colour must be able to save on
+      // its own, so the board keeps the canvas it was last left with.
+      markSceneChanged?.();
+    },
+    [uidText, markSceneChanged],
+  );
+
   /**
    * Excalidraw reads `initialData` ONCE, on mount. It is therefore memoised
    * on the scene's identity — the same thing the editor is keyed by — so a
@@ -139,6 +271,9 @@ export default function SketchPanel({
     // A board that was saved mid-pan reopens exactly where the learner left
     // it; a board with no remembered viewport is centred on its drawing.
     const hasViewport = Number.isFinite(saved.scrollX) && Number.isFinite(saved.scrollY);
+    // A board that never chose a canvas colour opens with the learner's
+    // remembered one (the White preset included) instead of the dark default.
+    const opening = sketchCanvasFromAppState(saved) ? null : openingCanvas(saved, uidText);
     return {
       elements: scene.elements as never,
       appState: {
@@ -146,6 +281,9 @@ export default function SketchPanel({
         // learner flipped Excalidraw's own theme toggle (which is persisted).
         theme: "dark",
         ...saved,
+        // …and the colour and the theme that renders it are ONE choice, so
+        // they are applied together — never a colour under the wrong theme.
+        ...(opening ? { theme: opening.theme, viewBackgroundColor: opening.sceneColor } : {}),
       } as never,
       files: scene.files as never,
       scrollToContent: !hasViewport,
@@ -161,11 +299,19 @@ export default function SketchPanel({
       data-course-sketch-panel
       data-sketch-scope={scoped ? "module" : "none"}
     >
-      <SketchStatus status={status} pendingSync={pendingSync} errorMessage={errorMessage} boardName={boardName} />
+      <SketchStatus
+        status={status}
+        pendingSync={pendingSync}
+        errorMessage={errorMessage}
+        boardName={boardName}
+        canvas={canvas}
+        onPickCanvas={pickCanvas}
+        canvasReady={canvasReady && !loading}
+      />
 
       {/* The canvas host: a positioned, flex-sized box. The editor is its
           absolutely-filled child, so its width and height always resolve from
-          the study pane — whatever the split ratio is doing. */}
+          the study pane — whatever the split is doing. */}
       <div className="relative min-h-0 w-full flex-1" data-course-sketch-canvas>
         {loading ? (
           <div className="absolute inset-0 grid place-items-center">
@@ -179,7 +325,8 @@ export default function SketchPanel({
             <Excalidraw
               key={sceneKey}
               initialData={initialData}
-              onChange={onChange}
+              onChange={handleChange}
+              onExcalidrawAPI={handleApi}
               name={boardName || "Sketch"}
               // The player owns its own ⌘/Ctrl shortcuts: the editor only
               // takes the keyboard while the learner is actually in it.

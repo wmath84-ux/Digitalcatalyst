@@ -1646,6 +1646,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             scoped={sketch.scoped}
             onChange={sketch.updateScene}
             boardName={activeMindMapModuleTitle || product.title}
+            // The learner, so the Sketch tab's canvas colour is remembered
+            // across boards (and so a colour-only change — no elements at all
+            // — still reaches the cloud).
+            uid={user?.id}
+            markSceneChanged={sketch.markSceneChanged}
           />
         </Suspense>
       )}

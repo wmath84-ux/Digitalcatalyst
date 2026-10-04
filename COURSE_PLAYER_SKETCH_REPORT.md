@@ -3,6 +3,10 @@
 Technical report, 14 points. Branch `arena/01a10511-digitalcatalyst`, commit
 `071ff54`.
 
+The follow-up — white canvas, the full-RGB pencil, the missing "colourful
+card" and the remembered canvas — is the addendum at the end (branch
+`arena/01a10569-digitalcatalyst`).
+
 ---
 
 ## 1. What was integrated
@@ -306,3 +310,192 @@ proved by their text and by the payload builder, not by the emulator suite.
 scene survives, but Excalidraw's undo history does not; (b) a board with no
 module scope (no lesson open) is editable but not saved, and says so; (c) CJK
 text needs the CDN fallback.
+
+---
+
+# Addendum — the white canvas, the pencil, and the missing "colourful card"
+
+**Branch `arena/01a10569-digitalcatalyst`.** The 14 points above still stand.
+This addendum covers the four asks that followed them:
+
+1. a **white** canvas next to the dark one;
+2. a **pencil** that opens a **full-RGB** colour picker — not preset swatches;
+3. the **"colourful card"** the learner saw in the toolbar on excalidraw.com
+   but not in this app — find out whether it is genuinely missing, and add it;
+4. the choice must be **remembered**: close the sketch, reopen it, same canvas.
+
+## 15. The missing toolbar item was the sticky note — and it needed the nightly
+
+The item the learner remembered as a *colourful card* is Excalidraw's
+**sticky note** (element type `stickynote`, tool letter `N`, click-place
+250×250 or drag-to-size, its own colour domain). It was *not* installed
+incorrectly: it does not exist in any stable release yet.
+
+- Mounting the real `@excalidraw/excalidraw@0.18.1` editor (an esbuild+jsdom
+  probe, the recipe in §20) listed the whole toolbar: hand, selection,
+  rectangle, diamond, ellipse, arrow, line, freedraw, text, eraser — plus
+  lock, main menu, Library, zoom, undo/redo, Help. **No sticky note**, and no
+  public prop or `UIOptions` key to add one.
+- Upstream, sticky notes landed on `master` (changelog entry 2026-09-06;
+  PR #12064 merged 2026-09-10) and are live on excalidraw.com, but they are in
+  **no published stable version** — 0.18.1 predates them.
+- **Decision: pin the nightly `@excalidraw/excalidraw@0.18.0-4ce38fb`**
+  (registry time 2026-10-01T15:16Z). It is the only line that carries *both*
+  the sticky-note tool and the dark-mode filter helpers the canvas colour
+  needs (`applyDarkModeFilter` / `removeDarkModeFilter`).
+- **Verified, not assumed**: the new `tests/courseSketchToolbarRuntime.test.mjs`
+  bundles *this* panel, mounts the *real* editor and asserts the toolbar
+  contains `aria-label="Sticky note"` (testid `toolbar-stickynote`) among the
+  other tools. `tests/courseSketchIntegrationContract.test.mjs` pins the
+  version (`^0\.18\.0-[0-9a-f]{7}$`) and greps the built chunk and locales for
+  `stickynote`, so a silent downgrade back to 0.18.1 fails the suite.
+
+**What the pin costs, stated plainly**
+
+| | |
+| --- | --- |
+| lazy chunk | `course-sketch` is now **2 500.40 kB minified / 755.65 kB gzip** (the build's largest chunk; `CoursePlayerApp` itself is 185.87 kB). It is still lazy — nothing above it imports the editor — but the first Sketch open pulls that payload. |
+| API deltas | `onExcalidrawAPI?(api \| null)` replaces `excalidrawAPI`; `setViewport({ fit })` replaces `scrollToContent`; `setActiveTool(tool, { keepSelection?, toggle? })` replaces the `toggle*Tool`/`setFrameAsActiveTool`/`setEmbeddableAsActiveTool` helpers. `handleKeyboardGlobally`, `autoFocus`, `name`, `window.EXCALIDRAW_ASSET_PATH` and `index.css` are unchanged. |
+| interop | an app still on 0.18.1 treats `stickynote` as an unknown element and drops it. Boards drawn here are only fully visible in editors on the same nightly line. |
+| lockfile | the 384 new packages are the nightly's **own closure** — it depends on `radix-ui@1.4.3` (the whole `@radix-ui/react-*` set), `@codemirror/*`, `browser-fs-access@0.38.0` — which also explains the moved `@radix-ui/react-popover` / `react-tabs` versions. Reproduced from HEAD's lock with *only* the version swapped: `npm install --package-lock-only` yields the current lock byte-for-byte (1 453 entries, **0** version diffs). No unrelated upgrade is hidden in the diff. |
+
+## 16. A canvas colour is two appState values, not one
+
+Excalidraw renders `viewBackgroundColor` **through** a theme filter: the
+`theme` decides whether the dark filter applies, and the filter is a real
+transform of the stored colour, so the value you write is not the value on
+screen. The nightly's `@excalidraw/common` exposes it:
+
+- forward (`applyDarkModeFilter`): per channel,
+  `round(clamp(c·(1−p) + (255−c)·p, 0, 255))` with **p = 0.93**, then
+  `hue-rotate(180°)`, re-hexed and memoised;
+- inverse (`removeDarkModeFilter`): `round(clamp((c − 255p)/(1 − 2p), 0, 255))`
+  plus the same rotation.
+
+Emitted range is `[18, 237]`: `#ffffff → #121212`, `#000000 → #ededed`,
+`#121212 → #dedede`, `#808080 → #7f7f7f` (greys survive the rotation).
+
+**Round trip, inverse → forward, measured** (this is the honest part):
+
+| colour | requested → rendered | error |
+| --- | --- | --- |
+| `#121212`, `#1e293b`, `#212529`, `#2b2b2b`, `#20303c`, `#006400` | exact | 0 |
+| `#3f1d38` | `#3f1d38`-family | −3 |
+| mid greys | ±1 | 1 |
+| `#141e3c` | `#17212d` | 20 |
+| `#1e40af` | `#284a7a` | 53 |
+| `#8b0000` | `#532a2a` | 56 |
+| `#4b0082` | `#412041` | 65 |
+| worst grid case | — | 202 |
+
+An uncompensated `#1e40af` would render `#98b5ff`; the inverse pass makes it a
+dark navy. Neutrals and slates are exact, mid greys ±1, saturated colours keep
+their hue family but drift — that is the filter's gamut, not a rounding bug.
+`tests/courseSketchCanvasTheme.test.mjs` asserts exactly this (same hue family
+**and** closer than stock, plus the exact exceptions) — do not tighten it to
+byte-equality for saturated colours, it cannot hold.
+
+## 17. `utils/sketchCanvas.js` (+ `.d.ts`) — the model
+
+Pure, and it imports **nothing** from Excalidraw or React, so the maths is
+testable and reusable:
+
+| export | role |
+| --- | --- |
+| `SKETCH_CANVAS_PRESETS` | dark `#121212` (default), white `#ffffff`, paper `#f6f3e7`, sky `#e4eeff`, mint `#e3f3ea`, grey `#eef0f3` |
+| `sketchCanvasAppState(color)` | `{ theme, viewBackgroundColor }` — `theme` is `light` for luminance ≥ 0.5, else `dark` |
+| `sketchThemeForColor`, `sketchColorLuminance`, `normalizeSketchColor`, `sketchColorChannels`, `sketchRgbToHex` | colour maths |
+| `sketchColorUnderDarkFilter`, `sketchSceneCanvasColor`, `sketchRenderedCanvasColor` | forward filter, inverse (what to store), and what the learner will actually see |
+| `sketchCanvasFromAppState(appState)` | read a board's canvas back |
+| `readSketchCanvasPreference` / `writeSketchCanvasPreference` | the remembered choice (`dc.sketchCanvas.v1`, `.<uid>` when signed in); every read/write is guarded and never throws (private mode, SSR) |
+
+The header of the file documents the filter's real gamut (`[18, 237]`) so the
+next reader does not have to rediscover it.
+
+## 18. The control — `src/course/SketchCanvasControls.tsx`
+
+It lives in the panel's existing save line, **not** as a cloned toolbar. A host
+button cannot render Excalidraw's `.ToolIcon` island/`--checked` chrome, and
+re-skinning the toolbar is exactly what §1 forbids; the control is ours, the
+drawing UI stays theirs.
+
+- **Canvas row**: a **Dark** swatch and a **White** swatch (the two the learner
+  asked for) plus a **pencil** icon.
+- **Pencil → popover**: 6 preset swatches, **R / G / B sliders with number
+  spinners**, a hex field, a live preview and **Done**. Full 0–255 RGB, not a
+  fixed palette.
+- Dismissal: `Escape` and a `fixed inset-0` backdrop **button** (no document
+  listeners, so no listener leak and no interference with the editor's own
+  keyboard handling).
+- Props-only: it renders what it is told and reports the pick through
+  `onPick(color)`; the panel owns the state and the write.
+- DOM hooks for the runtime tests: `data-course-sketch-canvas-{controls,pencil,picker,rgb}`
+  and `data-canvas-{quick,preset,channel,hex,preview,current,theme,backdrop}`.
+
+## 19. Remembered — and durable
+
+- **Immediately**: the choice is mirrored to `localStorage` under
+  `dc.sketchCanvas.v1[.<uid>]`, so reopening the panel paints the learner's
+  colour before Firestore answers.
+- **Durably**: the colour is written into the board itself
+  (`appState.viewBackgroundColor` + `appState.theme`), so it survives a new
+  device and a cleared browser. `sanitizeSketchAppState` already keeps any
+  string ≤ 200 characters, so a `#rrggbb` value round-trips localStorage and
+  the Firestore `scene` payload with **no schema and no rules change**.
+- **Apply path**: `editor.updateScene({ appState })` → the editor reports the
+  change back through `onChange` → `useCourseSketch` persists it, exactly like
+  a stroke. Plus `markSceneChanged()`, because the hook's write queue watches
+  **elements**: without it, choosing a colour on an otherwise empty board
+  would never reach the cloud. The revision bump it raises also stops an
+  in-flight older write from acknowledging the new colour.
+- **Who wins on open**: a board that already carries its own colour wins; the
+  remembered preference is only used when the board has none. So a colour set
+  on the phone shows up on the laptop, and a board is never re-tinted behind
+  the learner's back.
+
+## 20. Verification (updated), and what is still not verified
+
+**TypeScript** — `tsc --noEmit`: the same 9 pre-existing `TS6133` errors
+(`FlowPathImportModal`, `FlowPathView`, `main.tsx`, `capacitorBridge`), none in
+the sketch files.
+
+**Build** — `vite build` ✓ in 52 s. `course-sketch` 2 500.40 kB
+(755.65 kB gzip) stays lazy; `dist/excalidraw-assets/` is unchanged at 504 KB
+/ 25 files.
+
+**Tests** — the five sketch suites: **64 ✓** —
+
+| suite | tests |
+| --- | --- |
+| `tests/courseSketchScene.test.mjs` | 13 ✓ |
+| `tests/courseSketchCanvasTheme.test.mjs` | 10 ✓ |
+| `tests/courseSketchCloudSyncRuntime.test.mjs` | 16 ✓ |
+| `tests/courseSketchIntegrationContract.test.mjs` | 19 ✓ |
+| `tests/courseSketchToolbarRuntime.test.mjs` | 6 ✓ |
+
+**Full suite** — `node --test tests/*.test.mjs` (271 files, run through
+`run_tests.sh`): **3 105 tests, 3 027 pass, 33 fail, 45 skipped** in 127 s, and
+all 33 failures are pre-existing. Proof, not assertion: the same 21 files
+re-run in a clean worktree of `HEAD` fail with the same 33 tests, and the 33
+names are identical between the dot-reporter and spec-reporter full runs; none
+of the 21 reads any file this change touches (`store`/`leaderboard`/`My Day`/
+glass-plate/FlowPath/APK/user-query contracts). Zero new failures, and the
+sketch suites are green inside the full run.
+
+**The real-editor toolbar suite** (worth keeping working): it esbuild-bundles
+a TSX fixture that renders the actual `SketchPanel`, mounts it in jsdom and
+drives the real editor. Three non-obvious things are load-bearing — the
+fixture must go through esbuild `stdin` + `resolveDir` (an on-disk fixture
+inside `node_modules/…/` resolves its relative imports there);
+`conditions: ["production"]` is required or `@excalidraw/excalidraw/index.css`
+cannot resolve; and the runner must release the editor's Node timers and
+`unref()` the React scheduler's `MessagePort` handles on teardown, otherwise
+the process sits alive ~15 minutes *after* a green run.
+
+**Still not verified here:** the editor has never been painted in a real
+browser (no Chromium binary, Playwright CDN unreachable), so the white canvas
+and the sticky note are proven by the real editor's own DOM in jsdom, not by a
+screenshot. `pnpm-lock.yaml` cannot be regenerated in this environment and
+Vercel installs through it: `package.json` is pinned, but the pnpm lock still
+says 0.18.1 and must be refreshed from a machine that has pnpm (until then a
+frozen-lockfile install will not see the nightly).

@@ -11,7 +11,12 @@
 //   · the Split Deck is still the only owner of the split — the panel does
 //     not read, write, or guess a ratio, and never measures the window;
 //   · nothing can remount the editor except a real change of board;
-//   · the chunk is lazy, the fonts are self-hosted, the rules are owner-only.
+//   · the chunk is lazy, the fonts are self-hosted, the rules are owner-only;
+//   · the editor build in package.json is the one that HAS the sticky note
+//     tool (the colourful "card" the toolbar was missing), and no UIOptions
+//     switch in this repo can hide it;
+//   · the canvas colour is a control on the panel's own chrome, never a second
+//     canvas or a second rendering path, and its choice is persisted.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -210,4 +215,139 @@ test("Excalidraw's fonts are self-hosted, so the offline build still renders tex
   assert.match(viteConfig, /name: "excalidraw-assets"/);
   assert.match(viteConfig, /fileName: `excalidraw-assets\/fonts\/\$\{family\}\/\$\{name\}`/);
   assert.match(viteConfig, /EXCALIDRAW_SKIPPED_FONTS = new Set\(\["Xiaolai"\]\)/);
+});
+
+// ---------------------------------------------------------------------------
+// The editor build itself — the toolbar tool that was missing
+// ---------------------------------------------------------------------------
+
+test("the editor build in package.json is the one that carries the sticky note tool", () => {
+  // Sticky notes (the colourful card tool, `N`, a native `stickynote` element)
+  // are live on excalidraw.com but are NOT in the latest tagged release —
+  // 0.18.1 has no stickynote code at all, which is exactly why the toolbar had
+  // no such button here. The dependency is pinned to the exact `next` build
+  // that carries it; move to the next tagged release when one ships.
+  const version = pkg.dependencies?.["@excalidraw/excalidraw"];
+  assert.equal(typeof version, "string");
+  assert.notEqual(version, "0.18.1", "the tagged release has no sticky notes");
+  assert.match(version, /^0\.18\.0-[0-9a-f]{7}$/, "a nightly, pinned EXACTLY (nightlies are not semver-ordered)");
+
+  // …and the installed tree proves it: the element type, its own colour
+  // domain, and its toolbar label are all in the shipped bundle. Skipped (not
+  // failed) when the tree is not installed, e.g. a rules-only checkout.
+  const bundle = path.join(ROOT, "node_modules/@excalidraw/excalidraw/dist/prod/index.js");
+  const locale = path.join(ROOT, "node_modules/@excalidraw/excalidraw/dist/prod/chunk-FLFP27SU.js");
+  if (fs.existsSync(bundle)) {
+    const editor = fs.readFileSync(bundle, "utf8");
+    assert.match(editor, /stickynote/, "the sticky note element type is in the bundle");
+    assert.match(editor, /currentItemStickynoteBackgroundColor/, "…with its own colour domain");
+    if (fs.existsSync(locale)) {
+      assert.match(fs.readFileSync(locale, "utf8"), /stickynote:"Sticky note"/, "…and its toolbar label");
+    }
+  }
+
+  // Nothing here hides a tool: no `UIOptions.tools`, no headless canvas, no
+  // read-only mode — in either file that renders the editor.
+  for (const source of [panel, read("src/course/SketchCanvasControls.tsx")]) {
+    assert.doesNotMatch(code(source), /UIOptions/);
+    assert.doesNotMatch(code(source), /viewModeEnabled=\{true\}|zenModeEnabled=\{true\}/);
+    assert.doesNotMatch(code(source), /ui=\{?false/);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The canvas colour: white, dark, and a full-RGB pencil
+// ---------------------------------------------------------------------------
+
+const controls = read("src/course/SketchCanvasControls.tsx");
+
+test("the canvas control is one row of the panel's own chrome — not a second editor", () => {
+  // The panel hosts it in the save line…
+  assert.match(panel, /<SketchCanvasControls\b/);
+  assert.match(panel, /import SketchCanvasControls from "\.\/SketchCanvasControls"/);
+  // …and the control is a control: no canvas of its own, no rendering path,
+  // no gesture interception (the editor's pointer handling stays untouched).
+  const body = code(controls);
+  assert.doesNotMatch(body, /<canvas/i, "the control never draws a canvas");
+  assert.doesNotMatch(body, /touch-action|preventDefault|stopPropagation|pointerdown|setPointerCapture/i);
+  assert.doesNotMatch(body, /ResizeObserver|requestAnimationFrame/);
+  assert.doesNotMatch(body, /ratio/i, "the split still belongs to the deck alone");
+});
+
+test("White and Dark are one click, and the pencil opens a full-RGB picker", () => {
+  const canvasModel = read("utils/sketchCanvas.js");
+  // The presets, including the white canvas that was asked for, live in the
+  // model — with the dark default unchanged.
+  assert.match(canvasModel, /\{ id: "white", label: "White", color: "#ffffff" \}/);
+  assert.match(canvasModel, /\{ id: "dark", label: "Dark", color: "#121212" \}/);
+  assert.match(canvasModel, /SKETCH_CANVAS_DEFAULT = \{ color: "#121212", theme: SKETCH_THEME_DARK \}/);
+  // The row paints the presets from that one list…
+  assert.match(controls, /SKETCH_CANVAS_PRESETS\.filter/);
+  assert.match(controls, /data-canvas-quick=\{preset\.id\}/);
+  assert.match(controls, /data-canvas-preset=\{preset\.id\}/);
+  // …and the pencil icon is the way into the custom colour.
+  assert.match(controls, /import \{ Pencil \} from "lucide-react"/);
+  assert.match(controls, /data-course-sketch-canvas-pencil/);
+  assert.match(controls, /aria-label="Custom canvas colour, full RGB"/);
+  assert.match(controls, /data-course-sketch-canvas-picker/);
+  // Full RGB: a slider AND a spinner per channel, plus a hex field.
+  assert.equal((controls.match(/type="range"/g) || []).length, 1, "one channel row component, reused");
+  assert.match(controls, /channel: "r"/);
+  assert.match(controls, /data-course-sketch-canvas-rgb/);
+  assert.match(controls, /data-canvas-hex/);
+  assert.match(controls, /data-canvas-preview/);
+});
+
+test("a colour is applied through Excalidraw's own appState — never by us painting", () => {
+  // The pair Excalidraw needs, written through its API…
+  assert.match(panel, /onExcalidrawAPI=\{handleApi\}/);
+  assert.match(
+    panel,
+    /editor\.updateScene\(\{ appState: \{ theme: value\.theme, viewBackgroundColor: value\.sceneColor \} \}\)/,
+  );
+  // …where the pair comes from the model, so the canvas RENDERS the pick.
+  assert.match(panel, /sketchCanvasAppState\(color\)/);
+  assert.match(panel, /sketchCanvasFromAppState\(appState\)/);
+  // No exporter, no snapshot, no image: the colour is appState, not pixels.
+  assert.doesNotMatch(code(panel), /exportToCanvas|exportToBlob|toDataURL/);
+  assert.doesNotMatch(code(controls), /exportToCanvas|exportToBlob|toDataURL/);
+});
+
+test("the learner's canvas colour is remembered — per board, and per learner", () => {
+  // PER BOARD: the scene's own appState already carries both keys (the
+  // whitelist lives in the scene model)…
+  const sceneModel = read("utils/sketchScene.js");
+  assert.match(sceneModel, /"viewBackgroundColor"/);
+  assert.match(sceneModel, /"theme"/);
+  // …even when the board holds no elements at all: the hook's change queue
+  // watches elements, so a colour announces itself explicitly.
+  assert.match(hook, /markSceneChanged: \(\) => void;/);
+  assert.match(hook, /scope\.revision \+= 1;\s*\n\s*scope\.dirty = true;\s*\n\s*scheduleSave\(scope\);/);
+  assert.match(panel, /markSceneChanged\?\.\(\)/);
+  assert.match(player, /markSceneChanged=\{sketch\.markSceneChanged\}/);
+
+  // PER LEARNER: a small localStorage preference, applied by the panel to any
+  // board that has never chosen a colour of its own.
+  const canvasModel = read("utils/sketchCanvas.js");
+  assert.match(canvasModel, /SKETCH_CANVAS_PREF_KEY = "dc\.sketchCanvas\.v1"/);
+  assert.match(canvasModel, /export const sketchCanvasPrefKey/);
+  assert.match(panel, /readSketchCanvasPreference\(uid\)/);
+  assert.match(panel, /writeSketchCanvasPreference\(uidText, color\)/);
+  assert.match(player, /uid=\{user\?\.id\}/);
+  // The board's own colour wins over the preference; only a board that never
+  // chose one inherits it.
+  assert.match(panel, /sketchCanvasFromAppState\(saved\) \? null : openingCanvas\(saved, uidText\)/);
+});
+
+test("the canvas choice rides the SAME Firestore document, and the rules still hold", () => {
+  // No new collection, no new field, no rules change: the colour is inside the
+  // scene string the sketch tab already writes.
+  const rules = read("firestore.rules");
+  assert.doesNotMatch(rules, /viewBackgroundColor|canvasColor|canvasTheme/);
+  assert.match(rules, /match \/sketches\/\{sketchId\} \{/);
+  const sketchBlock = rules.slice(rules.indexOf("match /sketches/{sketchId}"));
+  assert.match(sketchBlock, /request\.resource\.data\.scene is string/);
+  // …and the model that produces that string keeps both keys.
+  const sceneModel = read("utils/sketchScene.js");
+  assert.match(sceneModel, /const APP_STATE_KEYS = \[/);
 });

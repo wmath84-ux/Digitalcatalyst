@@ -32,7 +32,10 @@
 // when the SAVE STATE changes), no JSON serialisation per stroke (the device
 // mirror is written on a 350 ms tail) and no Firestore write per stroke (the
 // cloud write is debounced, with a max-wait so a long continuous drawing
-// still checkpoints).
+// still checkpoints). The ONE thing the stroke signature deliberately cannot
+// see is a change with no elements in it — the canvas colour — which is what
+// `markSceneChanged()` is for: an explicit "look at the scene again" the
+// Sketch panel calls after writing that choice through Excalidraw's API.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -94,6 +97,14 @@ export interface UseCourseSketchResult {
   elementCount: number;
   /** Excalidraw's `onChange` — elements + appState + files. */
   updateScene: (elements: unknown, appState: unknown, files: unknown) => void;
+  /**
+   * Announce a change the element stream cannot see — the canvas colour, and
+   * the theme that renders it. `updateScene()` arms the save queue on ELEMENT
+   * changes only (that is what keeps a stroke to one write and a hover to
+   * none), so an otherwise empty board that only changed its canvas would
+   * never reach the cloud without this.
+   */
+  markSceneChanged: () => void;
   /** Write everything pending right now (tab switch, unmount, page hide). */
   flush: () => void;
 }
@@ -564,6 +575,24 @@ export default function useCourseSketch({
   /** The live scene, read at call time — see `getScene` on the result type. */
   const getScene = useCallback(() => scopeRef.current.scene, []);
 
+  /**
+   * Something outside the element stream changed the scene (today: the canvas
+   * colour and theme, written through Excalidraw's API). The scene itself is
+   * already current — `updateScene()` keeps it so on every editor event — so
+   * this only has to make the queue look at it: the same mirror-then-cloud
+   * path a stroke takes, with the same debounce and the same retry.
+   */
+  const markSceneChanged = useCallback(() => {
+    const scope = scopeRef.current;
+    if (!scope.scoped || !scope.loaded || scope.disposed) return;
+    // Counted as an edit, exactly like a stroke: without the revision bump a
+    // write that is already in flight (built from the older scene) would
+    // acknowledge this change as saved when it lands.
+    scope.revision += 1;
+    scope.dirty = true;
+    scheduleSave(scope);
+  }, [scheduleSave]);
+
   const flush = useCallback(() => {
     const scope = scopeRef.current;
     if (!scope.scoped) return;
@@ -621,11 +650,12 @@ export default function useCourseSketch({
       lastSavedAt: session.lastSavedAt,
       elementCount: session.scene.elements.length,
       updateScene,
+      markSceneChanged,
       flush,
     }),
     // `bump()` drives this recompute: every field above is read off the
     // session object, which mutates in place by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, generation, session.status, session.loaded, session.pendingSync, session.errorMessage, updateScene, flush, getScene],
+    [session, generation, session.status, session.loaded, session.pendingSync, session.errorMessage, updateScene, markSceneChanged, flush, getScene],
   );
 }
