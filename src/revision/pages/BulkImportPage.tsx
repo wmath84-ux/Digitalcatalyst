@@ -42,9 +42,20 @@ D) Hydrogen`;
 
 type PreviewItem = ParsedQuestion & { key: string };
 
+/** What an import without a subject label is filed under (never invented). */
+const IMPORT_SUBJECT_LABEL = "My Imports";
+
 export default function BulkImportPage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
   const { navigate } = useExitGuard();
   const [title, setTitle] = useState("");
+  /**
+   * The chapter the learner types in for the imported plan. It is stored on
+   * the test's own `planDetails.chapterNames` and is what the Revision
+   * Dashboard's slide card prints as the card's supporting information, so an
+   * imported test is labelled with the chapter the learner entered — not with
+   * a name derived from the questions.
+   */
+  const [chapterName, setChapterName] = useState("");
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<PreviewItem[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -100,6 +111,10 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
       const reservation = await reserveRevisionTestSlotOrOffline(uid);
       reservationId = reservation.reservationId;
       const cleanTitle = title.trim() || "My Imported Test";
+      // The chapter type-in is saved with the test so the dashboard card can
+      // show it as the plan's supporting information. Legacy plans without
+      // planDetails keep deriving their labels from their questions.
+      const cleanChapter = chapterName.trim();
       const created = createCustomTest(uid, {
         title: cleanTitle,
         estimatedMinutes: Math.max(2, Math.ceil(preview.length * 0.75)),
@@ -110,9 +125,20 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
           correctIndex: p.correctIndex,
           explanation: p.explanation,
           difficulty: "medium",
-          subjectName: "My Imports",
-          topicName: cleanTitle,
+          subjectName: IMPORT_SUBJECT_LABEL,
+          topicName: cleanChapter || cleanTitle,
         })),
+        planDetails: {
+          // An import has no class picker, so it carries no class labels; the
+          // subject stays the importer's own bucket and the chapter is exactly
+          // what the learner typed.
+          classNames: [],
+          subjectNames: [IMPORT_SUBJECT_LABEL],
+          chapterNames: cleanChapter ? [cleanChapter] : [],
+          topicNames: [],
+          difficulty: "medium",
+          questionMode: "mixed",
+        },
       });
       createdTestId = created.testId;
       const persisted = await persistCustomTestToBank(uid, created.testId, reservationId);
@@ -188,12 +214,35 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               </div>
 
               <div className="mt-4 space-y-3">
-                <input
-                  className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
-                  placeholder="Test name (optional)"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
+                {/* Test name + Chapter name travel together: the name is what
+                    the dashboard card prints under its count, the chapter is
+                    the card's supporting information. Both are optional here —
+                    an import with no chapter keeps the old derived label. */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
+                      Test name
+                    </span>
+                    <input
+                      className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
+                      placeholder="Test name (optional)"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
+                      Chapter name
+                    </span>
+                    <input
+                      data-rev-import-chapter
+                      className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
+                      placeholder="e.g. Electrostatics"
+                      value={chapterName}
+                      onChange={(e) => setChapterName(e.target.value)}
+                    />
+                  </label>
+                </div>
                 <textarea
                   rows={9}
                   className="dc-field w-full rounded-xl border p-3 font-mono text-xs leading-relaxed outline-none"

@@ -249,6 +249,13 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
   const [questionMode, setQuestionMode] = useState<QuestionMode>("mixed");
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [totalMinutes, setTotalMinutes] = useState(10);
+  /**
+   * The test's own name. Left empty the generator keeps its automatic
+   * `Revision · <subject>` title; typed in, that exact name becomes the test's
+   * title — the name the Revision Dashboard's slide card prints under the
+   * count (the import form's chapter type-in is the card's supporting line).
+   */
+  const [testName, setTestName] = useState("");
 
   const [phase, setPhase] = useState<"idle" | "generating" | "ready">("idle");
   const [genMessage, setGenMessage] = useState(GENERATING_MESSAGES[0]);
@@ -586,8 +593,9 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     let createdTestId: number | null = null;
     try {
       const subjectNames = Array.from(new Set(finalQuestions.map((q) => q.subjectName)));
-      const title =
-        subjectNames.length === 1 ? `Revision · ${subjectNames[0]}` : `Revision · ${subjectNames.length} subjects`;
+      // The learner's own name wins; the automatic title stays the fallback.
+      const title = testName.trim()
+        || (subjectNames.length === 1 ? `Revision · ${subjectNames[0]}` : `Revision · ${subjectNames.length} subjects`);
       const created = createCustomTest(uid, {
         title,
         estimatedMinutes: Math.max(1, Math.min(240, Math.round(totalMinutes))),
@@ -756,6 +764,19 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   />
                 ))}
               </div>
+              <label className="mt-3 block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
+                  Test name (optional)
+                </span>
+                <input
+                  data-rev-ai-test-name
+                  className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
+                  placeholder="e.g. Physics Chapter Test"
+                  value={testName}
+                  onChange={(e) => setTestName(e.target.value)}
+                  disabled={phase === "generating"}
+                />
+              </label>
               {openMeta && (
                 <PickerPanel
                   title={`Select ${openMeta.label.toLowerCase()}${openMeta.label === "Class" ? "es" : "s"}`}

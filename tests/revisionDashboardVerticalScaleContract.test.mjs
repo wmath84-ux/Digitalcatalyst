@@ -122,44 +122,63 @@ test("every .rev-card padding rule leaves the Test Bank cards alone", () => {
   );
 });
 
-test("the dashboard columns fill the row instead of ending short", () => {
+test("the dashboard's hero is the slide deck, sized from the visible area", () => {
+  // The hero is no longer a stretched card: it is the AI Canvas slide deck
+  // (https://aicanvas.me/components/slide-deck), whose stage takes the space
+  // between the page top and the bottom of the page's own scroller so the
+  // first card owns the visible area and the rest of the dashboard waits
+  // below the fold. Nothing may size it from the VIEWPORT (`100vh`/`100dvh`),
+  // or a phone's browser chrome and the footer navigation would clip it.
+  const deck = fs.readFileSync("src/revision/components/PlanSlideDeck.tsx", "utf8");
   const dashRules = rules.filter((r) => /data-rev-layout="dashboard"|data-revision-page="dashboard"/.test(r.selector) && /display:\s*grid/.test(r.body));
   assert.ok(dashRules.length >= 2, "expected the desktop-shell dashboard grid rules");
   for (const rule of dashRules) {
     const align = rule.body.match(/align-items:\s*([^;]+)/)?.[1]?.trim();
     if (align !== undefined) {
-      assert.equal(align, "stretch", `${rule.selector}: 'start' leaves the plan column short next to the tall right column`);
+      assert.equal(align, "stretch", `${rule.selector}: 'start' leaves the columns short next to each other`);
     }
   }
-  // …and the hero card has the flex chain that needs that height.
-  assert.match(dashboard, /data-rev-panel="primary" className="flex flex-col/);
-  assert.match(dashboard, /<section aria-label="Your revision plans" className="flex min-h-0 flex-auto flex-col">/);
-  assert.match(dashboard, /data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center/);
-  assert.match(dashboard, /className="relative flex min-h-\[270px\] flex-auto flex-col overflow-hidden/);
-  // The CTA must not be squeezed by the growing card, and it must not fight the
-  // details box for the slack: an `mt-auto` margin eats free space before
-  // `flex-grow`, which would move the empty band back under the copy.
-  assert.match(dashboard, /min-h-\[48px\] w-full shrink-0/);
-  assert.match(dashboard, /data-rev-plan-cta/);
-  assert.doesNotMatch(dashboard, /data-rev-plan-cta[^>]*mt-auto/);
+  // The hero panel and the deck itself.
+  assert.match(dashboard, /data-rev-panel="primary" className="flex flex-col gap-4/);
+  assert.match(dashboard, /<PlanSlideDeck/);
+  assert.match(deck, /data-plan-slide-deck/);
+  // The sizing rule: measured against the page's scroller, scroll-independent.
+  assert.match(deck, /el\.closest\("\[data-revision-page-main\]"\),? ?(as HTMLElement \| null)?/);
+  assert.match(deck, /main\.clientHeight - innerTop - BOTTOM_RESERVE/);
+  assert.match(deck, /const innerTop = rect\.top - mainRect\.top \+ main\.scrollTop;/);
+  assert.doesNotMatch(deck, /100vh|100dvh/);
+  // The card fits inside that box: both the width and the height are capped
+  // and the stage clips its own overflow, so no card can spill sideways.
+  assert.match(deck, /Math\.min\(\(stageW - 28\) \/ CARD_W, Math\.max\(CARD_H \* MIN_SCALE, stageH - CHROME_BELOW_CARD\) \/ CARD_H\)/);
+  assert.match(deck, /className="relative flex w-full flex-col items-center justify-center overflow-hidden rounded-\[28px\]"/);
+  // The compact phone band still compacts the no-plans entry card, which keeps
+  // the hook it always had.
+  assert.match(dashboard, /className="relative flex min-h-\[270px\] flex-auto flex-col overflow-hidden dc-scene-plate text-white lg:min-h-\[220px\]"/);
+  assert.match(clean, /\[data-revision-app\] \[data-revision-page-main\] \.min-h-\\\[270px\\\] \{\s*min-height: 205px !important/);
 });
 
-test("the fill chain grows from the content, never from a zero basis", () => {
-  // `flex-1` is `1 1 0%`. Against a stretched row the zero basis lets a card be
-  // clamped below its own content and `overflow-hidden` then clips the CTA —
-  // the same class of bug as the Test Bank squares. `flex-auto` (1 1 auto) keeps
-  // the content height as the floor and still grows into the free space.
-  const chain = /(<section aria-label="Your revision plans"[^>]*>|className="[^"]*min-h-\[270px\][^"]*"|data-rev-panel="primary" className="[^"]*")/g;
+test("the deck's own box never relies on a zero flex basis", () => {
+  // `flex-1` is `1 1 0%`. The deck is the one surface on this page whose height
+  // is solved from the scroller rather than grown by flex, so the rule that
+  // matters is simpler: its stage is sized by the measurement hook, its inner
+  // stack is a plain centred column, and the panels below it keep their content
+  // height (`space-y`/`grid` with real heights), never a zero basis that would
+  // let a column be clamped below its own content.
+  const chain = /(data-rev-panel="primary" className="[^"]*"|data-rev-panel="secondary" className="[^"]*")/g;
   const found = [...dashboard.matchAll(chain)].map((m) => m[0]);
-  assert.ok(found.length >= 3, "expected the panel, the card roots and the carousel section");
+  assert.ok(found.length >= 2, "expected both dashboard panels");
   for (const snippet of found) {
     assert.doesNotMatch(snippet, /flex-1(?!\S)/, `zero flex basis in: ${snippet}`);
   }
-  // The compact phone band still reaches the plan card button.
-  assert.match(clean, /\[data-revision-app\] \[data-revision-page-main\] \[data-rev-plan-cta\] button \{\s*min-height: 38px !important/);
-  // A flex column spaces its children with `gap`, not `space-y`: without it the
-  // hero card and the stat row would touch on the phone band.
-  assert.match(dashboard, /data-rev-panel="primary" className="flex flex-col gap-4/);
+  // The stat row and the follow-up panel are real boxes with real heights.
+  assert.match(dashboard, /data-rev-stat-grid\s*\n?\s*className="grid shrink-0 grid-cols-3 gap-3 lg:col-span-5 lg:gap-2"/);
+  assert.match(dashboard, /data-rev-panel="secondary" className="space-y-4 lg:col-span-7 lg:space-y-3"/);
+  // The deck's card root keeps the reference's fixed box (a solved width and
+  // height), so nothing inside it can be squeezed by a flex row.
+  const deck = fs.readFileSync("src/revision/components/PlanSlideDeck.tsx", "utf8");
+  assert.match(deck, /const CARD_W = 260;/);
+  assert.match(deck, /const CARD_H = 300;/);
+  assert.match(deck, /width: cardW,\s*\n\s*height: cardH,/);
 });
 
 test("the quick stats ride along in the plan column", () => {

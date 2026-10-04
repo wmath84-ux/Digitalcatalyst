@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import PageShell from "../components/PageShell";
 import { Card, PrimaryButton, ProgressBar } from "../components/ui";
 import { GlassSurface } from "../../components/ui/glass";
-import { GlassButton } from "../../components/ui/glass-button";
 import {
-  BankIcon,
   ChartIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ClockIcon,
   FlameIcon,
   SparklesIcon,
   TargetIcon,
@@ -21,9 +14,7 @@ import { useExitGuard } from "../components/ExitGuardContext";
 import { getRevisionOverview } from "../engine/statsService";
 import { questionModeLabel } from "../engine/questionMode";
 import { listCustomTests, type CustomTestListItem } from "../engine/customTestService";
-
-const SWIPE_DISTANCE = 65;
-const SWIPE_VELOCITY = 350;
+import { PlanSlideDeck, type PlanSlide } from "../components/PlanSlideDeck";
 
 function trendIcon(trend: string) {
   if (trend === "improving") return <TrendUpIcon className="h-4 w-4 text-emerald-300" />;
@@ -65,6 +56,16 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
     navigate("#/revision/ai-generate");
   };
 
+  /**
+   * The deck hands back the slide it opened; the dashboard owns the test, so
+   * the id is resolved back to the plan before navigating (a deleted test
+   * between render and tap simply does nothing).
+   */
+  const openSlide = (slide: PlanSlide) => {
+    const plan = revisionPlans.find((item) => item.id === slide.id);
+    if (plan) openPlan(plan);
+  };
+
   const openPlan = (plan: CustomTestListItem) => {
     // Saved tests are owned learner data and remain usable after expiry or a
     // downgrade. Only creating another test is a paid entitlement action.
@@ -100,17 +101,43 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       <div
         data-revision-page="dashboard"
         data-rev-layout="dashboard"
-        className="animate-fade-in space-y-4 px-4 py-4 pb-28 md:pb-32 lg:pb-16 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:max-w-[1200px] lg:mx-auto"
+        className="animate-fade-in space-y-4 px-4 py-4 pb-28 md:pb-32 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-16 lg:max-w-[1200px] lg:mx-auto"
       >
-        {/* Primary Panel: Hero Revision Plan + Quick Stats */}
-        <div data-rev-panel="primary" className="flex flex-col gap-4 lg:col-span-7 lg:gap-3">
+        {/**
+         * Primary Panel — the Slide Deck.
+         *
+         * The dashboard's hero is the AI Canvas slide deck
+         * (src/revision/components/PlanSlideDeck.tsx): ONE prominent card for
+         * the learner's most recent saved test, a swipe (or a dot) for the
+         * next, and the rest of the dashboard below the fold. The old glass
+         * hero card and its arrow carousel are gone.
+         *
+         * With no saved tests there is nothing to deck, so the slot keeps the
+         * AI entry card — the one action that creates the first test.
+         */}
+        <div data-rev-panel="primary" className="flex flex-col gap-4 lg:gap-3">
           {revisionPlans.length === 0 ? (
             <FirstRevisionCard onGenerate={openGenerator} />
           ) : (
-            <RevisionPlanCarousel plans={revisionPlans} onOpen={openPlan} />
+            <PlanSlideDeck
+              slides={revisionPlans.map((plan, index) => planToSlide(plan, index, revisionPlans.length))}
+              onOpen={openSlide}
+            />
           )}
+        </div>
 
-          <div data-rev-stat-grid className="grid shrink-0 grid-cols-3 gap-3 lg:gap-2">
+        {/**
+         * Secondary Panel — the numbers and the follow-ups.
+         *
+         * These sit UNDER the deck on every width (the deck owns the visible
+         * area, these are reached by scrolling), and keep the desktop 12-column
+         * rhythm between themselves.
+         */}
+        <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-3 lg:items-start lg:space-y-0">
+          <div
+            data-rev-stat-grid
+            className="grid shrink-0 grid-cols-3 gap-3 lg:col-span-5 lg:gap-2"
+          >
             <StatChip
               icon={<ChartIcon className="h-5 w-5 text-indigo-300" />}
               label="Revisions"
@@ -127,11 +154,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
               value={`${data.quickStats.streak}d`}
             />
           </div>
-        </div>
 
-        {/* Secondary Panel: Weak Topics + Revision Bank */}
-        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-5 lg:space-y-3">
-          <div className="space-y-4 lg:space-y-3">
+          <div data-rev-panel="secondary" className="space-y-4 lg:col-span-7 lg:space-y-3">
             <Card className="rounded-3xl border border-white/[0.12] bg-[#0c1220]/85 p-4 shadow-lg backdrop-blur-xl sm:p-5">
               <div className="mb-3.5 flex items-center justify-between border-b border-white/[0.06] pb-2.5">
                 <div className="flex items-center gap-2">
@@ -216,6 +240,41 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
   );
 }
 
+/**
+ * One saved test → one slide.
+ *
+ * The owner's mapping, exactly:
+ *   · SUBJECT      — what the learner picked in the AI generator (the plan's
+ *                    own subject list; an imported test keeps its import
+ *                    labels, since the importer creates them).
+ *   · COUNT        — the test's count, shown as the card's big numeral.
+ *   · TEST NAME    — the stored title: the type-in from the import form, or
+ *                    the name given in the AI generator.
+ *   · CHAPTER NAME — the chapter the learner typed on import (or the chapter
+ *                    selected in the generator), never an invented value.
+ * The `XX / NN` counter keeps the deck's existing count — every saved test is
+ * in the ring, exactly as the old carousel counted them.
+ */
+function planToSlide(plan: CustomTestListItem, index: number, total: number): PlanSlide {
+  const details = plan.planDetails;
+  const action =
+    plan.status === "completed" ? "View Results" : plan.status === "in_progress" ? "Continue Revision" : "Start Revision";
+  const subject = displayList(details.subjectNames, "General");
+  const chapter = displayList(details.chapterNames, "Not labelled");
+  return {
+    id: plan.id,
+    subject,
+    countLabel: String(plan.totalQuestions),
+    countUnit: plan.totalQuestions === 1 ? "Question" : "Questions",
+    title: plan.title,
+    chapter,
+    position: index + 1,
+    total,
+    actionLabel: action,
+    meta: `${plan.estimatedMinutes} min · ${questionModeLabel(details.questionMode)}`,
+  };
+}
+
 function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
   return (
     <GlassSurface
@@ -250,149 +309,10 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
   );
 }
 
-function RevisionPlanCarousel({ plans, onOpen }: { plans: CustomTestListItem[]; onOpen: (plan: CustomTestListItem) => void }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [direction, setDirection] = useState(1);
-
-  useEffect(() => {
-    if (activeIndex >= plans.length) setActiveIndex(Math.max(0, plans.length - 1));
-  }, [activeIndex, plans.length]);
-
-  const move = (step: number) => {
-    if (plans.length < 2) return;
-    setDirection(step);
-    setActiveIndex((current) => (current + step + plans.length) % plans.length);
-  };
-
-  const onDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.x <= -SWIPE_DISTANCE || info.velocity.x <= -SWIPE_VELOCITY) move(1);
-    else if (info.offset.x >= SWIPE_DISTANCE || info.velocity.x >= SWIPE_VELOCITY) move(-1);
-  };
-
-  const plan = plans[activeIndex];
-  return (
-    <section aria-label="Your revision plans" className="flex min-h-0 flex-auto flex-col">
-      <AnimatePresence mode="wait" initial={false} custom={direction}>
-        <motion.div
-          key={plan.id}
-          custom={direction}
-          initial={{ x: direction > 0 ? 70 : -70, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: direction > 0 ? -70 : 70, opacity: 0 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          drag={plans.length > 1 ? "x" : false}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.35}
-          onDragEnd={onDragEnd}
-          className="flex min-h-0 flex-auto cursor-grab flex-col touch-pan-y active:cursor-grabbing"
-        >
-          <RevisionPlanCard plan={plan} onOpen={() => onOpen(plan)} position={`${activeIndex + 1} of ${plans.length}`} />
-        </motion.div>
-      </AnimatePresence>
-
-      {plans.length > 1 && (
-        <div className="mt-3 flex shrink-0 items-center justify-center gap-4">
-          <GlassButton onClick={() => move(-1)} aria-label="Previous revision plan" className="[&_.size-12]:size-10">
-            <ChevronLeftIcon className="h-4 w-4" />
-          </GlassButton>
-          <div className="min-w-[132px] text-center">
-            <p className="dc-scene-ink text-xs font-semibold text-white/55">Swipe to change plan</p>
-            <div data-rev-plan-dots className="mt-1.5 flex justify-center gap-1">
-              {plans.map((item, index) => (
-                <span
-                  key={item.id}
-                  className={`h-1.5 rounded-full transition-all ${index === activeIndex ? "w-5 bg-indigo-500" : "w-1.5 bg-white/25"}`}
-                />
-              ))}
-            </div>
-          </div>
-          <GlassButton onClick={() => move(1)} aria-label="Next revision plan" className="[&_.size-12]:size-10">
-            <ChevronRightIcon className="h-4 w-4" />
-          </GlassButton>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem; onOpen: () => void; position: string }) {
-  const details = plan.planDetails;
-  const subjects = displayList(details.subjectNames, "Subject not labelled");
-  const chapters = displayList(details.chapterNames, "Chapter not labelled");
-  const topics = displayList(details.topicNames, "All selected chapter topics");
-  const action = plan.status === "completed" ? "View Revision Results" : plan.status === "in_progress" ? "Continue Revision" : "Start Revision";
-
-  return (
-    <GlassSurface
-      tint={0.4}
-      radius={24}
-      className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden dc-scene-plate text-white"
-      contentClassName="relative flex min-h-0 flex-1 flex-col p-5 sm:p-6 rounded-3xl border border-white/[0.12] bg-[#0c111e]/90 shadow-xl"
-    >
-      <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
-                <SparklesIcon className="h-3 w-3" /> Active Plan
-              </span>
-              <span className="text-xs text-white/40">·</span>
-              <span className="text-xs font-semibold text-white/60">Start Revision</span>
-            </div>
-            <h2 className="mt-1 line-clamp-2 text-xl font-extrabold tracking-tight text-white sm:text-2xl">{subjects}</h2>
-          </div>
-          <span className="shrink-0 rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-[11px] font-bold text-white/80">
-            {position}
-          </span>
-        </div>
-
-        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs">
-          {details.classNames.length > 0 && <PlanRow label="Class" value={displayList(details.classNames, "")} />}
-          <PlanRow label="Chapter" value={chapters} />
-          <PlanRow label="Topics" value={topics} />
-        </div>
-
-        <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold text-white/80">
-          <span className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 text-indigo-200">
-            <BankIcon className="h-3.5 w-3.5" /> {plan.totalQuestions} questions
-          </span>
-          <span className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70">
-            <ClockIcon className="h-3.5 w-3.5" /> {plan.estimatedMinutes} min
-          </span>
-          <span className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 capitalize text-white/70">
-            {details.difficulty}
-          </span>
-          <span className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70">
-            {questionModeLabel(details.questionMode)}
-          </span>
-        </div>
-
-        <div data-rev-plan-cta className="mt-3.5 min-h-[48px] w-full shrink-0">
-          <PrimaryButton onClick={onOpen}>
-            {plan.status === "completed" && <CheckIcon className="h-4 w-4" />}
-            {action}
-            {plan.status !== "completed" && <ChevronRightIcon className="h-4 w-4" />}
-          </PrimaryButton>
-        </div>
-      </div>
-    </GlassSurface>
-  );
-}
-
 function displayList(items: string[], fallback: string) {
   if (items.length === 0) return fallback;
   if (items.length <= 2) return items.join(" · ");
   return `${items.slice(0, 2).join(" · ")} +${items.length - 2}`;
-}
-
-function PlanRow({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="line-clamp-1">
-      <span className="font-bold text-indigo-300">{label}:</span>{" "}
-      <span className="text-white/90">{value}</span>
-    </p>
-  );
 }
 
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

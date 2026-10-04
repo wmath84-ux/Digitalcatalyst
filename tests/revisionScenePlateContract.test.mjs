@@ -276,9 +276,17 @@ test("the copy with no surface under it takes the ink hook", () => {
     );
   }
   assert.match(weak, /className="dc-scene-ink order-first flex items-center gap-2 rounded-2xl bg-rose-500\/20/);
-  // Dashboard carousel hint; the empty / error / loading states (shared, so
-  // every bare usage is covered, including the bank + weak-topics empties).
-  assert.match(dashboard, /<p className="dc-scene-ink text-xs font-semibold text-white\/55">Swipe to change plan<\/p>/);
+  // The dashboard carousel — and its `dc-scene-ink` swipe hint — is gone: the
+  // hero is the AI Canvas slide deck now (aicanvas.me/components/slide-deck),
+  // whose hint sits INSIDE the deck's own solid stage (#1A1A19 / #E8E8DF), so
+  // it needs no scene ink hook. The option settles for the deck's own line.
+  assert.match(dashboard, /<PlanSlideDeck/);
+  assert.match(
+    fs.readFileSync("src/revision/components/PlanSlideDeck.tsx", "utf8"),
+    /data-plan-deck-hint/,
+  );
+  // The empty / error / loading states (shared, so every bare usage is
+  // covered, including the bank + weak-topics empties).
   assert.match(ui, /<p className="dc-scene-ink text-sm font-medium text-white\/75">\{label\}<\/p>/);
   assert.match(ui, /<h3 className="dc-scene-ink text-base font-bold text-white">\{title\}<\/h3>/);
   assert.match(ui, /<h3 className="dc-scene-ink text-base font-bold text-white">Something went wrong<\/h3>/);
@@ -297,8 +305,11 @@ test("the copy with no surface under it takes the ink hook", () => {
   assert.match(css, /:where\(\.dc-scene-ink\):where\(\.text-white\\\/50, \.text-white\\\/55, \.text-white\\\/60\) \{\s*\n\s*color: rgba\(255, 255, 255, 0\.86\);/);
 });
 
-test("the plan-carousel dots get Home's dot shadow, keyed off their own hook", () => {
-  assert.match(dashboard, /<div data-rev-plan-dots className="mt-1\.5 flex justify-center gap-1">/);
+test("the plan-deck dots get Home's dot shadow, keyed off their own hook", () => {
+  // The deck (src/revision/components/PlanSlideDeck.tsx) is the surface that
+  // now owns `data-rev-plan-dots`; it is still the plan deck's dot row, so the
+  // Home dot shadow keeps the same hook.
+  assert.match(fs.readFileSync("src/revision/components/PlanSlideDeck.tsx", "utf8"), /<div data-rev-plan-dots style=/);
   assert.match(
     css,
     /html\[data-glass="on"\] :where\(\[data-rev-plan-dots\]\) > span \{\s*\n\s*box-shadow: 0 1px 6px rgba\(4, 8, 18, 0\.7\);/,
@@ -393,10 +404,12 @@ test("the status rail and the desktop tab row drag with a mouse", () => {
   ]) {
     assert.doesNotMatch(source, /overflow-x-auto/, `${name} has no horizontal rail — this pass must not add one`);
   }
-  // The dashboard carousel already drags with a mouse (framer-motion `drag`
+  // The dashboard's slide deck already drags with a mouse (framer-motion `drag`
   // listens to pointers, not just touches) — pinned so nobody "fixes" it.
-  assert.match(dashboard, /drag=\{plans\.length > 1 \? "x" : false\}/);
-  assert.match(dashboard, /onDragEnd=\{onDragEnd\}/);
+  const deck = read("src/revision/components/PlanSlideDeck.tsx");
+  assert.match(deck, /drag=\{isFront && count > 1 \? "x" : false\}/);
+  assert.match(deck, /onDragEnd=\{onDragEnd\}/);
+  assert.match(deck, /info\.offset\.x <= -DISMISS_OFFSET \|\| info\.velocity\.x <= -DISMISS_VELOCITY/);
   // The hook itself is shared and unchanged: a drag is still not a tap.
   const hook = read("src/hooks/useDragScroll.ts");
   assert.match(hook, /suppressClick\.current = state\.moved;/);
