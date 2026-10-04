@@ -52,7 +52,9 @@ test("the editor is built on React Flow, which is the only candidate with touch 
 // ---------------------------------------------------------------------------
 
 test("Mind map is a dock tab declared immediately after Note (Player closes the list)", () => {
-  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player";/);
+  // Mind map still sits immediately after Note. Sketch was appended at the
+  // END of the union (and of TABS), so no existing tab moved position.
+  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "sketch";/);
   const order = [...overlay.matchAll(/\{ key: "(modules|brain|notes|mindmap|ai|paid|player)"/g)].map((m) => m[1]);
   assert.deepEqual(order.slice(0, 5), ["modules", "brain", "notes", "mindmap", "ai"], "Mind map must sit right after Note");
   assert.deepEqual(order.slice(5), ["paid", "player"], "the Player settings tab closes the dock");

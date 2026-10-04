@@ -16,6 +16,10 @@ import SnowOverlay from "./course/SnowOverlay";
 // never touches the mind map — while the element below stays byte-identical
 // and the panel, once opened, stays mounted exactly as before.
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
+/* The Excalidraw editor is a heavy chunk (the whole drawing engine + its UI),
+   so it is downloaded on the FIRST activation of the Sketch tab and never for
+   a learner who does not draw — the same lazy contract the mind map uses. */
+const SketchPanel = lazy(() => import("./course/SketchPanel"));
 const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
 const LumenChat = lazy(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
@@ -38,6 +42,7 @@ import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
+import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
@@ -899,6 +904,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     rootTopic: activeMindMapModuleTitle || product.title,
   });
 
+  // ── Per-module sketch (Excalidraw) ──────────────────────────────────────
+  // Scoped exactly like the mind map above — uid + course + module — so
+  // Module A's board can never appear under Module B, and coming back to A
+  // restores A. The resource open beside it is recorded as an association
+  // only; it does NOT split the board, because a learner draws about the
+  // lesson, not about one PDF inside it.
+  //
+  // The hook lives HERE, not in the panel, so the scene survives the panel
+  // unmounting on every tab switch (the editor only mounts while its tab is
+  // active) and so an unsaved stroke is flushed even if the learner leaves
+  // the player straight from another tab.
+  const sketch = useCourseSketch({
+    uid: user?.id,
+    productId: storageProductId,
+    moduleId: activeMindMapModuleId,
+    resourceId: selectedFile ? String(selectedFile.id) : null,
+    resourceName: selectedFile?.name ?? null,
+  });
+
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as
   // matchMedia covers mobile/PWA browsers whose media query can lag behind
@@ -1354,6 +1378,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // Same flush rule as every panel close path: a debounced mind map write
       // left pending is never dropped on the way out.
       if (dockTab === "mindmap") mindMap.flush();
+      if (dockTab === "sketch") sketch.flush();
       splitDeckRef.current?.toggleStudy();
       return;
     }
@@ -1361,7 +1386,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
   };
 
-  // ⌘/Ctrl+1…7 walks the study tabs — a desktop shortcut, so it stays out of
+  // ⌘/Ctrl+1…8 walks the study tabs — a desktop shortcut, so it stays out of
   // the way of any text field and of anything outside the player.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1433,7 +1458,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     const previous = previousDockTab.current;
     previousDockTab.current = dockTab;
     if (previous === "mindmap" && dockTab !== "mindmap") mindMap.flush();
-    // `mindMap.flush` is a stable callback, so only the tab is watched.
+    // The board is unmounted the instant its tab loses focus, so the last
+    // stroke has to be written on the way out, not on the next debounce.
+    if (previous === "sketch" && dockTab !== "sketch") sketch.flush();
+    // `mindMap.flush` / `sketch.flush` are stable callbacks, so only the tab
+    // is watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dockTab]);
 
@@ -1594,6 +1623,30 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // back to the library home screen.
           open={dockTab === "mindmap"}
         />
+        </Suspense>
+      )}
+      // The sketch board, owned here for the same reason as the mind map:
+      // the scene + its Firestore hook outlive the editor, which only mounts
+      // while the Sketch tab is on screen.
+      sketchPanel={(
+        <Suspense
+          fallback={(
+            <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
+              <span className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-orange-400" />
+            </div>
+          )}
+        >
+          <SketchPanel
+            getScene={sketch.getScene}
+            sceneKey={sketch.sceneKey}
+            loading={sketch.loading}
+            status={sketch.status}
+            errorMessage={sketch.errorMessage}
+            pendingSync={sketch.pendingSync}
+            scoped={sketch.scoped}
+            onChange={sketch.updateScene}
+            boardName={activeMindMapModuleTitle || product.title}
+          />
         </Suspense>
       )}
       playerPanel={playerPanel}
@@ -1776,8 +1829,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // reacts to the player's ONE keyboard state (see useCourseKeyboard),
           // so "keyboard open → module/course content hidden" is one rule, not
           // three per-tab hacks.
-          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai"}
-          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player"}
+          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai" || dockTab === "sketch"}
+          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player" || dockTab === "sketch"}
           handleRef={splitDeckRef}
         />
       </section>

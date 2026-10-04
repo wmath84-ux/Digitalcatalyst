@@ -49,7 +49,7 @@ import {
   type ReactNode,
 } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -57,7 +57,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -315,6 +315,11 @@ interface CourseOverlayProps {
   // Firestore hook), so the pane only hosts it — this keeps the overlay
   // presentational and lets the map survive tab switches.
   mindMapPanel?: ReactNode;
+  // The Sketch tab's Excalidraw board, owned by the parent exactly like the
+  // mind map: the player holds the scene + its Firestore hook, so the board
+  // survives every tab switch even though the editor itself only mounts
+  // while its tab is active.
+  sketchPanel?: ReactNode;
   // The Player tab's panel (course identity, progress, the ACTIVE file's own
   // buttons and every player preference). Owned by the parent for the same
   // reason as the mind map panel.
@@ -364,7 +369,7 @@ interface CourseOverlayProps {
 }
 
 /**
- * The seven study tabs, in dock order. Exported because the Split Deck
+ * The eight study tabs, in dock order. Exported because the Split Deck
  * (src/course/studyPanels.tsx) needs the active tab's colour and its icon
  * for the study peek rail — the deck must never keep its own copy of the
  * list. (The divider line itself is fixed yellow.)
@@ -387,9 +392,14 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // the ⚙ popover used to offer — course details, progress, mark-complete,
   // the ACTIVE file's buttons and every player preference — lives here.
   { key: "player", label: "Player", heading: "Player settings", hint: "Course, active file aur controls — sab ek list mein", color: "#FF6BF5", icon: Settings },
+  // The drawing board — the official Excalidraw editor, hosted in the study
+  // pane beside the lecture (src/course/SketchPanel.tsx). It sits last so no
+  // existing tab's dock position (or ⌘/Ctrl+N shortcut) moves; pulling it up
+  // next to Mind map is a one-line reorder of this array, nothing else.
+  { key: "sketch", label: "Sketch", heading: "Sketch", hint: "Lecture ke saath likhein aur banayein", color: "#F97316", icon: PenLine },
 ];
 
-/** The dock's tab order — ⌘/Ctrl+1…6 walks this list. */
+/** The dock's tab order — ⌘/Ctrl+1…8 walks this list. */
 export const STUDY_TAB_ORDER: DockTab[] = TABS.map(({ key }) => key);
 
 /** The tab record for a key, falling back to the first one for unknown keys. */
@@ -412,6 +422,16 @@ export const MINDMAP_FALLBACK = (
 export const PLAYER_FALLBACK = (
   <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
     Player settings abhi available nahi hain.
+  </p>
+);
+
+/**
+ * Rendered when a call site has no sketch panel to host (older embeds of the
+ * overlay), mirroring the mind map and player fallbacks.
+ */
+export const SKETCH_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Sketch is course me abhi available nahi hai.
   </p>
 );
 
@@ -701,6 +721,7 @@ export function StudyContent({
   personalModulesPanel,
   aiPanel,
   brainPanel,
+  sketchPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -714,6 +735,13 @@ export function StudyContent({
   personalModulesPanel?: ReactNode;
   aiPanel?: ReactNode;
   brainPanel?: ReactNode;
+  /**
+   * The Excalidraw board. Rendered ONLY while its tab is active, so the
+   * editor's chunk is never downloaded — let alone mounted — for a learner
+   * who does not draw. The scene itself lives in the player's hook, so this
+   * mounting/unmounting costs no work.
+   */
+  sketchPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -731,6 +759,10 @@ export function StudyContent({
         // handed down ready-rendered. A missing slot (older call sites)
         // degrades to a hint instead of a blank surface.
         mindMapPanel
+      ) : tab === "sketch" ? (
+        // The drawing board. Like the mind map, the parent owns the scene +
+        // its Firestore hook and hands the panel down ready-rendered.
+        sketchPanel ?? SKETCH_FALLBACK
       ) : tab === "player" ? (
         // Everything the player header used to be — course details, progress,
         // the active file's own buttons and every player preference, one list.
@@ -787,7 +819,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
 
-  // ── The seven tabs' rows ───────────────────────────────────────────────
+  // ── The eight tabs' rows ───────────────────────────────────────────────
   const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
   // ── Footer navigation: the home footer, exactly ────────────────────────
@@ -825,6 +857,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       personalModulesPanel={props.personalModulesPanel}
       aiPanel={props.aiPanel}
       brainPanel={props.brainPanel}
+      sketchPanel={props.sketchPanel}
     />
   );
 

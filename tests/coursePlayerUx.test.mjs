@@ -335,8 +335,8 @@ test("CoursePlayer routes a single module's 'buy' click back to the parent's onP
 // Bottom dock + overlay (redesign)
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer's footer dock carries the seven study tabs (Player included)", () => {
-  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "player"]) {
+test("CoursePlayer's footer dock carries the eight study tabs (Player + Sketch included)", () => {
+  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "player", "sketch"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
   // The footer is the home page's GlassDock itself — no course-specific
