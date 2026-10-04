@@ -1645,6 +1645,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             pendingSync={sketch.pendingSync}
             scoped={sketch.scoped}
             onChange={sketch.updateScene}
+            canvasColor={sketch.canvasColor}
+            onCanvasColorChange={sketch.setCanvasColor}
             boardName={activeMindMapModuleTitle || product.title}
           />
         </Suspense>
