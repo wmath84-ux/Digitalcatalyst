@@ -9,9 +9,6 @@ import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
-// The lower pane of a DOUBLE TAP on a module file — the file opens beside
-// whatever the upper area is showing (see `openFileInSplit` below).
-import SplitFilePane from "./course/SplitFilePane";
 // The mind map canvas is the single heaviest thing in the player: the panel
 // plus `@xyflow/react` is a 221 kB / 73 kB-gzip chunk. `StudyContent` only
 // renders this slot when the mind-map tab is the active one, so React.lazy
@@ -453,19 +450,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // show, and no "preview mode" either.
   const hasActiveSubscription = isMine ? false : accessState.hasActiveSubscription;
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
-  /**
-   * The file opened with a DOUBLE tap on a module row, rendered in the Split
-   * Deck's LOWER (study) pane while the upper pane keeps its own content.
-   * `null` = the study pane is doing its normal tab job.
-   */
-  const [splitFile, setSplitFile] = useState<CourseFile | null>(null);
-  /**
-   * The upper pane as the LAST single click found it: a double tap's first tap
-   * has already run the single-click path (a fast single click must never wait
-   * on a timer), so the double handler restores this to leave the upper area
-   * exactly as it was.
-   */
-  const preSelectRef = useRef<{ file: CourseFile | null; at: number } | null>(null);
   // Tracks whether the LEARNER has manually picked a file this session. The
   // first-lesson auto-selection and the saved-position resume both set
   // `selectedFile` directly (not through `selectFile`), so this flag is the
@@ -1322,9 +1306,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // playing in the background. `ResourceViewer` does that itself the moment
     // it stops being the active file (see its `active` prop).
     userSelectedRef.current = true;
-    // Remember what the upper pane was showing, so a double tap's second press
-    // can put it back instead of the double-opened file hijacking the lesson.
-    preSelectRef.current = { file: selectedFile, at: Date.now() };
     setSelectedFile(file);
     // The Split Deck keeps the study pane visible while the freshly opened
     // content loads beside it — side-by-side is the whole point of the
@@ -1336,38 +1317,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       void setDoc(progressRef, { productId: storageProductId, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
     }
   };
-
-  /**
-   * The DOUBLE tap / double click on a module file row: open that file in the
-   * Split Deck's LOWER (study) area, beside whatever the upper area shows.
-   *
-   * The row has already run the single-click path for the pair's FIRST press
-   * (so a one-off click is never delayed by a double-tap timer) — this puts the
-   * upper pane back exactly as it was, then hands the file to the study pane
-   * and makes sure the pane is open rather than peek-collapsed. A Brain
-   * resource has no document to render, so its double tap falls back to the
-   * single-tap behaviour (the practice set on the Brain tab).
-   */
-  const openFileInSplit = useCallback((file: CourseFile) => {
-    if (file.type === "brain") {
-      selectFile(file);
-      return;
-    }
-    userSelectedRef.current = true;
-    const previous = preSelectRef.current;
-    if (previous && Date.now() - previous.at <= 900) setSelectedFile(previous.file);
-    setSplitFile(file);
-    splitDeckRef.current?.activateStudy();
-  }, [selectFile]);
-
-  /** Close the split — the study pane returns to the active tab's body. */
-  const closeSplitFile = useCallback(() => setSplitFile(null), []);
-
-  /** Promote the split file to the upper pane (the single-click seat). */
-  const promoteSplitFile = useCallback((file: CourseFile) => {
-    setSplitFile(null);
-    selectFile(file);
-  }, [selectFile]);
 
   // Keep every opened file mounted. The active one is visible; the others are
   // hidden but alive, so a Google Doc keeps its scroll position, a mind map
@@ -1401,9 +1350,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    *     footer stays reachable even when the pane has become a 28px rail.
    */
   const handleDockTabChange = (next: DockTab) => {
-    // A tab press takes the study pane back from a split file; pressing the
-    // tab that is already active keeps its peek-collapse behaviour.
-    setSplitFile(null);
     if (next === dockTab) {
       // Same flush rule as every panel close path: a debounced mind map write
       // left pending is never dropped on the way out.
@@ -1596,8 +1542,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onTabChange={handleDockTabChange}
       modules={modules}
       selectedFileId={selectedFile?.id}
-      // Double tap on a module file row → the file opens in the LOWER pane.
-      onSelectFileInSplit={openFileInSplit}
       ownedUpdateIds={ownedUpdateIds}
       accessibleModuleIds={resolution.accessibleModuleIds}
       previewModuleIds={resolution.previewModuleIds}
@@ -1692,24 +1636,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             void markFileComplete(fileId);
           }}
         />
-      }
-      // ── The lower pane's split file ─────────────────────────────────────
-      // While a file is open down here the STUDY pane hosts it (and the
-      // active tab's body steps aside); the upper pane is untouched. Closing
-      // it, promoting it, or pressing any dock tab hands the pane straight
-      // back to the tab body.
-      splitPaneActive={Boolean(splitFile)}
-      splitPane={
-        splitFile ? (
-          <SplitFilePane
-            file={splitFile}
-            playback={playbackReady ? playbackRef.current : undefined}
-            onPlaybackChange={reportPlayback}
-            desktopView={desktopView}
-            onPromote={promoteSplitFile}
-            onClose={closeSplitFile}
-          />
-        ) : undefined
       }
       aiPanel={
         user?.id && aiOpened ? (

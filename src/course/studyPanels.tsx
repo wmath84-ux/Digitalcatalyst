@@ -47,8 +47,8 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
-import { PlayCircle } from "lucide-react";
+import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
+import { ArrowLeftRight, ArrowUpDown, PlayCircle } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
@@ -69,11 +69,18 @@ import {
   SPLIT_SNAP_POINTS,
   SPRING_ENTRY,
   SPRING_SETTLE,
+  SWAP_BUTTON_PX,
+  SWAP_HINT_MS,
+  SWAP_ICON_PX,
+  SWAP_TAP_MS,
+  SWAP_TAP_SLOP_PX,
   clampSplitRatio,
   loadSplitCollapsed,
   loadSplitRatio,
+  loadSplitSwapped,
   saveSplitCollapsed,
   saveSplitRatio,
+  saveSplitSwapped,
   splitFloorFor,
   type SplitAxis,
   type SplitSide,
@@ -154,6 +161,7 @@ const railGlowStyle = (axis: SplitAxis, side: SplitSide, accent: string): CSSPro
 
 function PeekRail({
   side,
+  glowSide,
   axis,
   accent,
   icon: Icon,
@@ -162,6 +170,9 @@ function PeekRail({
   onRestore,
 }: {
   side: SplitSide;
+  /** Which END of the deck this rail sits at — it flips when the panes are
+   *  swapped, so the 2px glow always hugs the divider. */
+  glowSide: SplitSide;
   axis: SplitAxis;
   accent: string;
   icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
@@ -184,7 +195,7 @@ function PeekRail({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: EASE_OUT_MOTION }}
     >
-      <span aria-hidden style={railGlowStyle(axis, side, accent)} data-peek-glow="" />
+      <span aria-hidden style={railGlowStyle(axis, glowSide, accent)} data-peek-glow="" />
       {/* Gentle breathing — transform only, and never on a coarse pointer. */}
       <motion.span
         aria-hidden
@@ -215,6 +226,10 @@ interface SplitDividerProps {
   onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  /** True while the STUDY pane is the first one (the panes are swapped). */
+  swapped: boolean;
+  /** Swap the two panes — the switch button's one job. */
+  onSwap: () => void;
 }
 
 function SplitDivider({
@@ -229,9 +244,86 @@ function SplitDivider({
   onPointerCancel,
   onDoubleClick,
   onKeyDown,
+  swapped,
+  onSwap,
 }: SplitDividerProps) {
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const row = axis === "row"; // landscape → a vertical divider
+
+  // ── The switch button ───────────────────────────────────────────────────
+  // At rest the divider is what it has always been: a bare 2px yellow line.
+  // TAP the line and a very small switch icon appears on it; tap that and the
+  // two panes trade places (tap it again and they trade back). The button
+  // fades out on its own after an idle window, or on the next tap of the line,
+  // so nothing permanent is added to the divider's chrome.
+  const [swapVisible, setSwapVisible] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+  }, []);
+  const armHideTimer = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => setSwapVisible(false), SWAP_HINT_MS);
+  }, [clearHideTimer]);
+  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+  // A rotation re-lays the deck out; the hint should not survive it.
+  useEffect(() => {
+    setSwapVisible(false);
+    clearHideTimer();
+  }, [axis, clearHideTimer]);
+
+  const revealSwap = useCallback(() => {
+    setSwapVisible(true);
+    armHideTimer();
+  }, [armHideTimer]);
+
+  const toggleSwapHint = useCallback(() => {
+    setSwapVisible((visible) => {
+      if (visible) {
+        clearHideTimer();
+        return false;
+      }
+      armHideTimer();
+      return true;
+    });
+  }, [armHideTimer, clearHideTimer]);
+
+  // Tap vs drag: the divider's resize drag owns the pointer, so the tap is
+  // recognised on pointer UP — the press only counts when the pointer barely
+  // moved and came up quickly. A real resize never reveals the switch.
+  const tapRef = useRef<{ x: number; y: number; at: number; id: number } | null>(null);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    tapRef.current = { x: event.clientX, y: event.clientY, at: Date.now(), id: event.pointerId };
+    onPointerDown(event);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = tapRef.current;
+    tapRef.current = null;
+    onPointerUp(event);
+    if (!start || start.id !== event.pointerId) return;
+    const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    if (moved <= SWAP_TAP_SLOP_PX && Date.now() - start.at <= SWAP_TAP_MS) toggleSwapHint();
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    tapRef.current = null;
+    onPointerCancel(event);
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    // Keyboard parity with the tap: "s" swaps the panes outright, and the
+    // switch is shown while it does so (the same control, same feedback).
+    if (event.key === "s" || event.key === "S") {
+      event.preventDefault();
+      revealSwap();
+      onSwap();
+      return;
+    }
+    onKeyDown(event);
+  };
 
   // The live read-out never goes through React: the separator's
   // aria-valuenow is written straight to the DOM on every frame.
@@ -264,13 +356,16 @@ function SplitDivider({
         // cost stays 10px.
         flex: `0 0 ${DIVIDER_HIT}px`,
         touchAction: "none",
+        // The panes are reordered with `order` when they are swapped (see the
+        // deck below); the divider always keeps the middle slot.
+        order: 1,
       }}
-      onPointerDown={onPointerDown}
+      onPointerDown={handlePointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onDoubleClick={onDoubleClick}
-      onKeyDown={onKeyDown}
+      onKeyDown={handleKeyDown}
     >
       {/* The ONLY visible divider chrome: a 2px yellow core line. It draws
           itself along its own axis when the deck opens (240ms, the pack's
@@ -289,6 +384,56 @@ function SplitDivider({
         animate={{ scaleX: 1, scaleY: 1 }}
         transition={{ duration: 0.24, ease: EASE_OUT_MOTION }}
       />
+
+      {/* The switch: revealed by a tap on the line, centred ON the line, and
+          deliberately tiny. Its own pointer events never reach the divider,
+          so pressing it can never start a resize drag. */}
+      <span
+        aria-hidden={swapVisible ? undefined : true}
+        className="pointer-events-none absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+      >
+        <AnimatePresence initial={false}>
+          {swapVisible ? (
+            <motion.button
+              type="button"
+              data-course-split-swap=""
+              data-swapped={swapped ? "true" : "false"}
+              aria-label={
+                swapped
+                  ? "Swap the panes back — lesson first, study pane second"
+                  : "Swap the panes — study pane first, lesson second"
+              }
+              title="Swap the two panes"
+              className="pointer-events-auto grid cursor-pointer place-items-center rounded-full"
+              style={{
+                width: SWAP_BUTTON_PX,
+                height: SWAP_BUTTON_PX,
+                background: "rgba(10, 12, 18, 0.88)",
+                border: `1px solid ${DIVIDER_LINE}`,
+                color: DIVIDER_LINE,
+                boxShadow: `0 0 12px ${DIVIDER_LINE}55`,
+                touchAction: "manipulation",
+              }}
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ duration: 0.16, ease: EASE_OUT_MOTION }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                // Every press swaps: the same button takes the panes back.
+                onSwap();
+                revealSwap();
+              }}
+            >
+              {row ? <ArrowLeftRight size={SWAP_ICON_PX} /> : <ArrowUpDown size={SWAP_ICON_PX} />}
+            </motion.button>
+          ) : null}
+        </AnimatePresence>
+      </span>
     </div>
   );
 }
@@ -422,6 +567,17 @@ export function SplitDeck({
    *  "grown from nothing" state the entry spring then takes over from. */
   const ratio = useMotionValue(ENTRY_START);
   const [collapsed, setCollapsed] = useState<SplitSide | null>(null);
+  /**
+   * The divider's switch: `true` = the two panes have traded places, i.e. the
+   * STUDY pane is the first one (left in landscape, top in portrait) and the
+   * lesson is the far one. Nothing is re-rendered into a different part of the
+   * tree for this — the panes keep their DOM position and only their flex
+   * `order` changes — so the lesson's viewer stack (videos, PDFs, iframes)
+   * is never unmounted or reloaded by a swap.
+   */
+  const [swapped, setSwapped] = useState(false);
+  const swappedRef = useRef(false);
+  swappedRef.current = swapped;
   const [dragging, setDragging] = useState(false);
   const [ariaNow, setAriaNow] = useState(100 - ENTRY_START);
   /** While dragging, the smaller pane leans on its divider-side edge. */
@@ -485,6 +641,21 @@ export function SplitDeck({
     // Mount only — the axis effect below owns every later change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The learner's arrangement comes back with the course (it is NOT per axis:
+  // rotating the device must not quietly put the panes back the other way).
+  useLayoutEffect(() => {
+    setSwapped(loadSplitSwapped(courseId));
+  }, [courseId]);
+
+  /** The switch button: trade the panes' places, and remember it. */
+  const toggleSwap = useCallback(() => {
+    setSwapped((current) => {
+      const next = !current;
+      saveSplitSwapped(courseId, next);
+      return next;
+    });
+  }, [courseId]);
 
   // ── Rotation: the other axis's own ratio + collapse come back ──────────
   const axisRunsRef = useRef(0);
@@ -556,13 +727,17 @@ export function SplitDeck({
     (clientX: number, clientY: number): number | null => {
       const rect = sectionRef.current?.getBoundingClientRect();
       if (!rect) return null;
-      // The study pane is the SECOND one: right of the divider in landscape,
-      // below it in portrait — so its percent is measured from the far edge.
+      // `ratio` is always the STUDY pane's percent. By default that pane is
+      // the SECOND one (right of the divider in landscape, below it in
+      // portrait), so its percent is measured from the far edge; once the
+      // panes are swapped it is the FIRST one and the measurement flips, which
+      // keeps the divider following the finger either way round.
       const raw =
         axis === "row"
           ? ((rect.right - clientX) / Math.max(1, rect.width)) * 100
           : ((rect.bottom - clientY) / Math.max(1, rect.height)) * 100;
-      return Math.min(100, Math.max(0, raw));
+      const oriented = swappedRef.current ? 100 - raw : raw;
+      return Math.min(100, Math.max(0, oriented));
     },
     [axis],
   );
@@ -703,16 +878,21 @@ export function SplitDeck({
 
   const paneSizeProp = axis === "row" ? "minWidth" : "minHeight";
   const initialRatio = ratio.get();
+  // The swap is a pure FLEX REORDER: both panes stay exactly where they are
+  // in the DOM (so nothing remounts) and only their visual slot changes —
+  // 0 = before the divider, 2 = after it.
   const lessonStyle: CSSProperties = {
     flexGrow: Math.max(0.0001, 100 - initialRatio),
     flexShrink: 1,
     flexBasis: "0%",
+    order: swapped ? 2 : 0,
     ...(collapsed === "lesson" ? { [paneSizeProp]: PEEK_RAIL_PX } : { [paneSizeProp]: 0 }),
   };
   const studyStyle: CSSProperties = {
     flexGrow: Math.max(0.0001, initialRatio),
     flexShrink: 1,
     flexBasis: "0%",
+    order: swapped ? 0 : 2,
     ...(collapsed === "study" ? { [paneSizeProp]: PEEK_RAIL_PX } : { [paneSizeProp]: 0 }),
   };
 
@@ -730,6 +910,7 @@ export function SplitDeck({
       data-orientation={orientation}
       data-dragging={dragging ? "true" : "false"}
       data-split-collapsed={collapsed ?? "none"}
+      data-split-swapped={swapped ? "true" : "false"}
       data-split-compressed={dragging && compressed ? compressed : "none"}
       data-keyboard-inset={keyboardInset || undefined}
       data-keyboard-takeover={keyboardTakeover ? "true" : undefined}
@@ -755,6 +936,7 @@ export function SplitDeck({
         {collapsed === "lesson" ? (
           <PeekRail
             side="lesson"
+            glowSide={swapped ? "study" : "lesson"}
             axis={axis}
             accent={accent}
             icon={PlayCircle}
@@ -780,6 +962,8 @@ export function SplitDeck({
         onPointerCancel={endDrag}
         onDoubleClick={fiftyFifty}
           onKeyDown={onSplitKeyDown}
+          swapped={swapped}
+          onSwap={toggleSwap}
         />
       )}
 
@@ -815,6 +999,7 @@ export function SplitDeck({
         {collapsed === "study" ? (
           <PeekRail
             side="study"
+            glowSide={swapped ? "lesson" : "study"}
             axis={axis}
             accent={accent}
             icon={studyIcon}
