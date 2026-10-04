@@ -43,6 +43,9 @@ const footerHook = read("src/course/useCourseFooterInset.ts");
 const overlay = read("src/course/CourseOverlay.tsx");
 const player = read("src/CoursePlayerApp.tsx");
 const richText = read("src/utils/richText.ts");
+const clipboard = read("src/course/noteEditor/clipboardNormalization.ts");
+const mathRendering = read("src/course/noteEditor/mathRendering.ts");
+const noteMath = read("src/utils/noteMath.ts");
 
 // ── 1. Dependencies ────────────────────────────────────────────────────────
 
@@ -67,6 +70,15 @@ test("package-lock.json and pnpm-lock.yaml agree on the BlockNote versions", () 
   }
   assert.equal(lock.packages[""].dependencies["@floating-ui/react"], pkg.dependencies["@floating-ui/react"]);
   assert.match(pnpmLock, new RegExp(`'@floating-ui/react':\\n\\s+specifier: ${pkg.dependencies["@floating-ui/react"].replace(/\./g, "\\.")}`));
+});
+
+test("official KaTeX rendering and the Markdown parser are direct, pinned dependencies", () => {
+  assert.equal(pkg.dependencies.katex, "0.16.47");
+  assert.equal(pkg.dependencies.marked, "16.4.2");
+  assert.equal(lock.packages[""].dependencies.katex, pkg.dependencies.katex);
+  assert.equal(lock.packages[""].dependencies.marked, pkg.dependencies.marked);
+  assert.match(pnpmLock, /katex:\n\s+specifier: 0\.16\.47\n\s+version: 0\.16\.47/);
+  assert.match(pnpmLock, /marked:\n\s+specifier: 16\.4\.2\n\s+version: 16\.4\.2/);
 });
 
 // ── 2. Rebuilt in place ────────────────────────────────────────────────────
@@ -172,15 +184,37 @@ test("the engine's runtime floor: BlockNote's unguarded ES2023 array calls are c
   assert.doesNotMatch(notesPanel + overlay + player, /installRuntimeCompat|editorRuntime/, "the player's other chunks never import it");
 });
 
-test("the schema, links and paste are the player's: allow-listed links, literal plain text, one importer", () => {
+test("the schema, links and paste are the player's: safe rich/plain normalization, editable math and one importer", () => {
   assert.match(factory, /const SAFE_LINK = \/\^\(https\?:\|mailto:\|tel:\)\/i;/);
   assert.match(factory, /isValidLink: isNoteLinkAllowed/);
   assert.match(factory, /plainTextAsMarkdown: false/);
+  assert.match(factory, /mathBlock: mathBlock\(\)/);
+  assert.match(factory, /type: "math" as const/);
+  assert.match(factory, /toExternalHTML\(inlineContent\)/);
+  assert.match(factory, /toExternalHTML\(block\)/);
   assert.match(factory, /animations: false/);
-  assert.match(editor, /sanitizeRichText\(html\)/);
+  assert.match(editor, /normalizeRichClipboardHtml\(html\)/);
+  assert.match(editor, /normalizePlainClipboardText\(normalised\)/);
+  assert.match(editor, /looksLikeMarkdown\(normalised\)/);
   assert.match(editor, /importLegacyHtml\(clean\)/);
+  assert.match(clipboard, /marked\.parse\(prepared\.text/);
+  assert.match(clipboard, /scanMathText/);
+  assert.match(mathRendering, /output: "htmlAndMathml"/);
   assert.match(factory, /legacyHtml: legacyHtmlBlock\(\)/);
   assert.match(commands, /tr\.setMeta\("addToHistory", false\)/);
+});
+
+test("KaTeX renders only at bounded math nodes and memoized note previews", () => {
+  assert.match(notesPanel, /import "katex\/dist\/katex\.min\.css"/);
+  assert.match(notesPanel, /const NoteCardPreview = memo\(/);
+  assert.match(notesPanel, /renderNoteHtmlWithMath\(html\)/);
+  assert.match(mathRendering, /katex\.renderToString/);
+  assert.match(mathRendering, /trust: false/);
+  assert.match(mathRendering, /maxExpand: 500/);
+  assert.match(mathRendering, /CACHE_LIMIT = 256/);
+  assert.match(mathRendering, /NOTE_PREVIEW_CACHE_LIMIT = 64/);
+  assert.match(noteMath, /MAX_NOTE_MATH_SOURCE_LENGTH = 4096/);
+  assert.doesNotMatch(mathRendering, /renderMathInElement|renderMathInDocument/);
 });
 
 test("read-only goes through the same renderer", () => {
@@ -237,7 +271,7 @@ test("no hard-coded keyboard heights or bottom offsets; the docked toolbar is in
   for (const [name, source] of [["NoteEditor.tsx", editor], ["NoteEditorToolbar.tsx", toolbar], ["noteEditor.css", css]]) {
     assert.doesNotMatch(source, /\b(280|300|320|336|340)\s*px/, `${name} must not carry a keyboard-sized constant`);
   }
-  assert.doesNotMatch(css, /position:\s*fixed/);
+  assert.doesNotMatch(css, /\.dc-note \.dc-note-dock \{[^}]*position:\s*fixed/);
   assert.doesNotMatch(css, /(^|[^-])bottom:\s*-?\d+(\.\d+)?(px|rem)/m);
   assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: relative;/);
   // Taps on the toolbar never move focus out of the writing surface.
@@ -357,8 +391,12 @@ test("the player's exit rescue, panel session and keyboard files are untouched i
   assert.match(read("src/course/useCourseKeyboard.tsx"), /export const useCourseKeyboard = \(\): CourseKeyboardState => useContext\(CourseKeyboardContext\);/);
 });
 
-test("the sanitiser gained exactly one attribute: data-checked on <li>", () => {
+test("sanitizer tightly allow-lists task state and source-only math markers", () => {
   assert.match(richText, /li: new Set\(\["value", "data-checked"\]\)/);
-  assert.equal((richText.match(/data-checked/g) || []).length >= 3, true);
+  assert.match(richText, /span: new Set\(\["data-note-math", "data-latex"\]\)/);
+  assert.match(richText, /div: new Set\(\["data-note-math", "data-latex"\]\)/);
+  assert.match(richText, /tag === "span" && mathMode === "inline"/);
+  assert.match(richText, /tag === "div" && mathMode === "block"/);
+  assert.match(richText, /mathSource\.length > MAX_NOTE_MATH_SOURCE_LENGTH/);
   assert.doesNotMatch(richText, /data-\*|startsWith\("data-"\)/);
 });

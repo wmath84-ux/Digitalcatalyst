@@ -15,9 +15,11 @@
 //   quote          <blockquote>…</blockquote>
 //   code           <pre><code>…</code></pre>
 //   divider        <hr>
+//   mathBlock      <div data-note-math="block" data-latex="…">$$…$$</div>
 //   legacyHtml     the preserved fragment, verbatim (re-sanitised)
 //
-// Inline: <strong> <em> <u> <s> <code> <sup> <sub> <a href> and one
+// Inline: <span data-note-math="inline" data-latex="…">$…$</span>, plus
+// <strong> <em> <u> <s> <code> <sup> <sub> <a href> and one
 // <span style="color; background-color"> for the legacy colours; a soft line
 // break is <br>. Everything here is already inside the player's sanitiser
 // allow-list, and `sanitizeRichText` runs over the final string anyway.
@@ -30,12 +32,14 @@
 // every character is kept, only the indent is not persisted.
 
 import { escapeHtml, sanitizeRichText } from "../../utils/richText";
+import { MAX_NOTE_MATH_SOURCE_LENGTH, mathSourceText } from "../../utils/noteMath";
 
 /** The structural slice of a block this adapter reads (editor or importer). */
 export interface SerializableInline {
   type: string;
   text?: string;
   styles?: Record<string, unknown>;
+  props?: Record<string, unknown>;
   href?: string;
   content?: SerializableInline[];
 }
@@ -103,6 +107,9 @@ export const inlineToHtml = (content: SerializableInline[] | string | undefined)
       html += /^(https?:|mailto:|tel:)/i.test(href)
         ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
         : inner;
+    } else if (item.type === "math") {
+      const latex = String(item.props?.latex ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH);
+      html += `<span data-note-math="inline" data-latex="${escapeHtml(latex)}">${escapeHtml(mathSourceText(latex, false))}</span>`;
     } else {
       html += styledText(item);
     }
@@ -116,7 +123,11 @@ const inlineToText = (content: SerializableInline[] | string | undefined): strin
   if (content == null) return "";
   if (typeof content === "string") return content;
   return content
-    .map((item) => (item.type === "link" ? inlineToText(item.content) : String(item.text ?? "")))
+    .map((item) => {
+      if (item.type === "link") return inlineToText(item.content);
+      if (item.type === "math") return mathSourceText(String(item.props?.latex ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH), false);
+      return String(item.text ?? "");
+    })
     .join("");
 };
 
@@ -165,6 +176,10 @@ const blockHtml = (block: SerializableBlock): string => {
       return `<pre><code>${escapeHtml(inlineToText(block.content))}</code></pre>`;
     case "divider":
       return "<hr>";
+    case "mathBlock": {
+      const latex = String(block.props?.latex ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH);
+      return `<div data-note-math="block" data-latex="${escapeHtml(latex)}">${escapeHtml(mathSourceText(latex, true))}</div>`;
+    }
     case "legacyHtml":
       return sanitizeRichText(String(block.props?.html ?? ""));
     default: {

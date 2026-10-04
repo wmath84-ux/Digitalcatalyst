@@ -66,7 +66,7 @@ import {
 } from "@blocknote/react";
 import { flushSync } from "react-dom";
 import { autoPlacement, flip, offset, shift, size, type Middleware } from "@floating-ui/react";
-import { plainToRichText, sanitizeRichText } from "../utils/richText";
+import { looksLikeMarkdown, normalizePlainClipboardText, normalizeRichClipboardHtml } from "./noteEditor/clipboardNormalization";
 import { COURSE_FOOTER_INSET_PROPERTY } from "./courseFooterInset";
 import { useCourseFooterInset } from "./useCourseFooterInset";
 import { NoteDockedToolbar, NoteFormattingToolbar, NoteSideMenu, useNoteSlashItems } from "./NoteEditorToolbar";
@@ -189,7 +189,7 @@ function useCoarsePointer(): boolean {
 
 /** Clipboard HTML → blocks (the one importer, same as stored notes). */
 function pasteIntoEditor(html: string, editor: NoteEditorInstance, asBlocks = false): boolean {
-  const clean = sanitizeRichText(html);
+  const clean = normalizeRichClipboardHtml(html);
   if (!clean) return false;
   const { blocks } = importLegacyHtml(clean);
   if (!blocks.length) return false;
@@ -216,21 +216,30 @@ function pasteIntoEditor(html: string, editor: NoteEditorInstance, asBlocks = fa
 }
 
 /**
- * Plain-text clipboard → literal text. One line goes in at the caret as text
- * (replacing a selection); several lines become paragraphs after the current
- * block, with their runs of spaces kept — the way the old editor pasted.
+ * Plain-text clipboard → safe note HTML. Clearly marked Markdown and math
+ * become native editor structure; ordinary one-line text stays literal at the
+ * caret, and multiline plain text keeps its line breaks as paragraphs.
  */
 function pastePlainIntoEditor(text: string, editor: NoteEditorInstance): boolean {
   const normalised = text.replace(/\r\n?/g, "\n");
   if (!normalised.trim()) return false;
   const current = editor.getTextCursorPosition().block;
-  // Code blocks take plain text natively (and must not be re-flowed).
+  // Code blocks take plain text natively; delimiters and Markdown stay literal there.
   if (current.type === "codeBlock") return false;
-  if (!normalised.includes("\n")) {
+
+  const rich = normalizePlainClipboardText(normalised);
+  if (!rich) return false;
+  const hasMath = rich.includes("data-note-math=");
+  const markdown = looksLikeMarkdown(normalised);
+
+  // Ordinary one-line text stays a literal inline insertion (including a
+  // current selection); only structured Markdown/math goes through the rich
+  // importer. Multiline plain text remains line-preserving paragraphs.
+  if (!normalised.includes("\n") && !hasMath && !markdown) {
     editor.insertInlineContent([{ type: "text", text: normalised, styles: {} }]);
     return true;
   }
-  return pasteIntoEditor(plainToRichText(normalised), editor, true);
+  return pasteIntoEditor(rich, editor, normalised.includes("\n"));
 }
 
 const fitTitle = (element: HTMLTextAreaElement | null) => {

@@ -35,8 +35,9 @@
 // session — the next visit starts on the notes list, exactly like the mind
 // map restarts on its library.
 
-import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, lazy, memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";
+import "katex/dist/katex.min.css";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassCard } from "../components/ui/GlassCard";
 import type { CoursePlayerNote } from "../types/course";
@@ -45,6 +46,7 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
+import { renderNoteHtmlWithMath } from "./noteEditor/mathRendering";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
 import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
 
@@ -83,9 +85,19 @@ const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) 
 
 // A saved card shows ONLY the note's first heading (or its first line of
 // text), in its original format, centred in the square — the full note is
-// one tap away in the editor. Falling back to the plain preview keeps a
-// card from ever rendering blank.
-const noteCardHtml = (note: CoursePlayerNote) => firstRichTextBlock(noteHtml(note)) || notePreview(note);
+// one tap away in the editor. This child is memoized so typing in another
+// note does not rerun normalization or KaTeX for every saved card.
+const NoteCardPreview = memo(function NoteCardPreview({ sourceHtml, preview }: { sourceHtml: string; preview: string }) {
+  const html = firstRichTextBlock(sourceHtml) || preview;
+  return (
+    <div
+      className="course-note-card-preview min-h-0 w-full flex-1"
+      title={preview}
+      data-course-note-preview
+      dangerouslySetInnerHTML={{ __html: renderNoteHtmlWithMath(html) }}
+    />
+  );
+});
 
 /** Filled, high-contrast action marks — heavier than the old outline icons. */
 function PremiumEditIcon({ size = 13 }: { size?: number }) {
@@ -473,12 +485,7 @@ export default function NotesPanel({
                     data-note-id={note.id}
                   >
                   <div className="flex h-full flex-col overflow-hidden">
-                    <div
-                      className="course-note-card-preview min-h-0 w-full flex-1"
-                      title={preview}
-                      data-course-note-preview
-                      dangerouslySetInnerHTML={{ __html: noteCardHtml(note) }}
-                    />
+                    <NoteCardPreview sourceHtml={noteHtml(note)} preview={preview} />
                     <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
                       <GlassButton
                         onClick={() => startEdit(note)}

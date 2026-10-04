@@ -12,6 +12,8 @@
 // handlers, iframes, forms and javascript: URLs are stripped while the
 // presentational markup is preserved verbatim.
 
+import { MAX_NOTE_MATH_SOURCE_LENGTH } from "./noteMath";
+
 const ALLOWED_TAGS = new Set([
   "a", "b", "blockquote", "br", "caption", "code", "col", "colgroup", "dd", "del", "div", "dl", "dt",
   "em", "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd",
@@ -24,10 +26,14 @@ const GLOBAL_ATTRS = new Set(["style", "align", "dir", "title"]);
 const TAG_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "target", "rel"]),
   img: new Set(["src", "alt", "width", "height"]),
+  // Math is stored as a source-bearing semantic marker. Its exact two
+  // attributes are validated below; unlisted custom attributes stay banned.
+  span: new Set(["data-note-math", "data-latex"]),
+  div: new Set(["data-note-math", "data-latex"]),
   ol: new Set(["start", "type"]),
-  // `data-checked` is the checklist state the note editor stores on its task
-  // items (see src/course/noteEditor/editorSerialization.ts). It is the ONLY
-  // data attribute allowed, and its value is restricted to true / false below.
+  // `data-checked` is the checklist state stored on task items. Math nodes
+  // separately allow only their validated source marker on spans/divs above;
+  // no other custom attributes are accepted.
   li: new Set(["value", "data-checked"]),
   td: new Set(["colspan", "rowspan"]),
   th: new Set(["colspan", "rowspan", "scope"]),
@@ -102,6 +108,20 @@ const scrub = (node: Element) => {
     }
     if (name === "href" && !SAFE_URL.test(attribute.value.trim())) node.removeAttribute("href");
     if (name === "src" && !SAFE_IMAGE_URL.test(attribute.value.trim())) node.removeAttribute("src");
+  }
+
+  const mathMode = node.getAttribute("data-note-math");
+  const mathSource = node.getAttribute("data-latex");
+  if (mathMode !== null || mathSource !== null) {
+    const supportedMarker =
+      (tag === "span" && mathMode === "inline") ||
+      (tag === "div" && mathMode === "block");
+    if (!supportedMarker || mathSource === null || mathSource.length > MAX_NOTE_MATH_SOURCE_LENGTH) {
+      node.removeAttribute("data-note-math");
+      node.removeAttribute("data-latex");
+    } else {
+      node.setAttribute("data-note-math", mathMode);
+    }
   }
 
   if (tag === "a") {
@@ -222,7 +242,14 @@ export const splitFirstHeading = (html: string): { heading: string; body: string
   const parsed = new window.DOMParser().parseFromString(`<body>${input}</body>`, "text/html");
   const body = parsed.body;
   const first = body.firstElementChild;
-  if (first && /^H[1-6]$/i.test(first.tagName) && (first.textContent || "").trim()) {
+  const headingText = first?.textContent || "";
+  const headingContainsMath = Boolean(first?.querySelector("[data-note-math]")) ||
+    /\$\$?[\s\S]+?\$\$?/.test(headingText) ||
+    /\\(?:mathbb|frac|dfrac|tfrac|sqrt|pi|alpha|beta|gamma|sum|int|dots|ldots)\b/.test(headingText);
+  // A first H1 containing a formula is body content, not the title field: the
+  // title is intentionally plain text, so splitting it would destroy an
+  // editable math node on a save/reload cycle.
+  if (first && !headingContainsMath && /^H[1-6]$/i.test(first.tagName) && (headingText || "").trim()) {
     const heading = (first.textContent || "").replace(/\u200b/g, "").trim();
     const next = first.nextElementSibling;
     if (next && next.tagName.toLowerCase() === "hr") next.remove();

@@ -546,6 +546,95 @@
   .dc-note .dc-note-dock [role="combobox"] { font-size: 0.8125rem; gap: 0.3rem; padding: 0 0.55rem; }
 }
 
+/* ── Native, source-editable math nodes ──────────────────────────────────── */
+.dc-note-math-inline-node,
+.dc-note-math-block-node { position: relative; }
+.dc-note-math-inline-node { display: inline; white-space: normal; }
+.dc-note-math-block-node { display: block; max-width: 100%; margin: 0.75rem 0; text-align: center; }
+.dc-note-math-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+  margin: 0 0.04em;
+  padding: 0.08em 0.16em;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+.dc-note-math-trigger:hover { background: var(--dc-note-accent-soft); }
+.dc-note-math-trigger:focus-visible {
+  outline: 2px solid var(--dc-note-accent);
+  outline-offset: 2px;
+}
+.dc-note-math-rendered-inline { display: inline; }
+.dc-note-math-block-trigger {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem;
+  overflow-x: auto;
+  text-align: center;
+}
+.dc-note-math-block-trigger .katex-display,
+.dc-note-math-rendered-block .katex-display { margin: 0; }
+.dc-note-math-source-panel {
+  position: fixed;
+  z-index: 140;
+  top: 0;
+  left: 0;
+  display: grid;
+  gap: 0.45rem;
+  width: min(25rem, 82vw);
+  padding: 0.7rem;
+  border: 1px solid var(--dc-note-rule);
+  border-radius: 0.7rem;
+  background: var(--dc-note-paper);
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.18);
+  color: var(--dc-note-ink);
+  text-align: left;
+}
+.dc-note-math-source-panel[hidden] { display: none; }
+.dc-note-math-source-panel .dc-note-math-source-label {
+  display: grid;
+  gap: 0.3rem;
+  font: 600 0.75rem/1.25 var(--dc-note-sans);
+}
+.dc-note-math-source-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--dc-note-rule);
+  border-radius: 0.45rem;
+  background: #fff;
+  color: var(--dc-note-ink);
+  font: 0.8125rem/1.45 var(--dc-note-mono);
+  resize: vertical;
+}
+.dc-note-math-source-input:focus-visible { outline: 2px solid var(--dc-note-accent); outline-offset: 1px; }
+.dc-note-math-source-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.35rem; }
+.dc-note-math-source-actions button {
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--dc-note-rule);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dc-note-ink);
+  font: 600 0.75rem/1.2 var(--dc-note-sans);
+  cursor: pointer;
+}
+.dc-note-math-source-actions .dc-note-math-source-apply { border-color: var(--dc-note-accent); background: var(--dc-note-accent); color: #fff; }
+.dc-note-math-source-actions .dc-note-math-source-delete { color: var(--dc-note-danger); }
+.dc-note-math-source-actions button:focus-visible { outline: 2px solid var(--dc-note-accent); outline-offset: 2px; }
+
 /* ── Read-only: the same page, no chrome ─────────────────────────────────── */
 .dc-note[data-note-readonly="true"] .dc-note-title { cursor: default; }
 .dc-note[data-note-readonly="true"] .bn-editor { cursor: text; }
