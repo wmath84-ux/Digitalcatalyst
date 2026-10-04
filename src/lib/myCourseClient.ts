@@ -75,6 +75,8 @@ const asNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(number) ? number : fallback;
 };
 
+const READ_SOURCE_KINDS = ["upload", "gdrive", "pdf_url", "embed_url"];
+
 const DIFFICULTIES: MyCourseQuestion["difficulty"][] = ["easy", "medium", "hard"];
 
 // ── Factories ─────────────────────────────────────────────────────────────
@@ -177,6 +179,16 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
     size: Number.isFinite(Number(source.size)) && source.size != null ? Number(source.size) : undefined,
     source: source.source === "upload" ? "upload" : "link",
     practiceTitle: typeof source.practiceTitle === "string" ? source.practiceTitle : undefined,
+    // Read resources (the learner's own annotatable PDFs): the library fields
+    // travel with the resource, or the player would show an empty Read row.
+    readSourceKind: READ_SOURCE_KINDS.includes(String(source.readSourceKind))
+      ? (String(source.readSourceKind) as MyCourseResource["readSourceKind"])
+      : undefined,
+    readStoragePath: typeof source.readStoragePath === "string" ? source.readStoragePath : undefined,
+    readFileName: typeof source.readFileName === "string" ? source.readFileName : undefined,
+    readFileSize: Number.isFinite(Number(source.readFileSize)) && source.readFileSize != null
+      ? Number(source.readFileSize)
+      : undefined,
     practiceQuestions: type === "brain" ? questions : undefined,
     interactiveHtml: type === "interactive" && typeof source.interactiveHtml === "string" ? source.interactiveHtml : undefined,
     createdAt: asNumber(source.createdAt, 0),

@@ -39,7 +39,7 @@ export interface MyCourseQuestion {
  * `interactive`, the learner-authored 2D experiment (see
  * `src/utils/experimentSpec.ts`).
  */
-export type MyCourseResourceType = CourseContentFileType;
+export type MyCourseResourceType = CourseContentFileType | "read";
 
 export interface MyCourseResource {
   id: string;
@@ -58,6 +58,20 @@ export interface MyCourseResource {
   practiceTitle?: string;
   /** Brain practice-set questions (type "brain" only). */
   practiceQuestions?: MyCourseQuestion[];
+  /**
+   * Read resource origin (type "read" only). A learner's own annotatable PDF:
+   * `upload` when it lives in their `userReadUploads/{uid}/…` tree, or one of
+   * the public source kinds. Read by
+   * `getReadResourcePresentation` (utils/readResources.js), which is what puts
+   * the resource in the player's Read library with the annotated PDF.js viewer
+   * — the same viewer the official Read PDFs use.
+   */
+  readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
+  /** Owned Storage object path (type "read" + sourceKind "upload" only). */
+  readStoragePath?: string;
+  /** Original PDF filename and size — the Read library's row copy. */
+  readFileName?: string;
+  readFileSize?: number;
   /**
    * Interactive 2D experiment source (type "interactive" only): ONE
    * self-contained HTML document authored by the learner — usually generated

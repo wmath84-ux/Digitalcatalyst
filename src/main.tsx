@@ -117,7 +117,8 @@ import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, syncSystemThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
-import { recordRouteVisit } from "./utils/routeHistory";
+import { recordRouteVisit, ROUTE_HISTORY_KEY } from "./utils/routeHistory";
+import { captureExcalidrawLibraryReturn } from "../utils/excalidrawLibraryLink.js";
 import { isMyCourseEditorRoute, isMyCoursePlayerRoute, readMyCourseId, requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
@@ -2000,6 +2001,32 @@ function RootPage(): ReactNode {
     />
     </PageEnter>
   );
+}
+
+// ── "Add to Excalidraw" return link (Sketch personal library) ───────────────
+// libraries.excalidraw.com sends the browser back to us as
+// `…/#addLibrary=<library url>&token=<id>`. This app routes with `#/…` hashes,
+// so that return URL would otherwise land on an unknown route and bounce the
+// learner out of the Course Player. The interception runs HERE — before React
+// reads `window.location.hash` and before the route chunk warm-up below — so
+// the link is parked in sessionStorage, the URL is rewritten back to the route
+// the learner was on, and the Sketch panel installs the library when it opens.
+// The listener covers the same return arriving while the app is already open.
+if (typeof window !== "undefined") {
+  const resolveLibraryReturn = () =>
+    captureExcalidrawLibraryReturn({
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      storage: window.sessionStorage,
+      routeHistoryKey: ROUTE_HISTORY_KEY,
+      fallbackRoute: "#/home",
+      replace: (url) => window.history.replaceState(null, "", url),
+    });
+  resolveLibraryReturn();
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash.includes("addLibrary")) resolveLibraryReturn();
+  });
 }
 
 // Take ownership of the pre-React opening overlay BEFORE the first render, so

@@ -51,6 +51,24 @@ export const isOwnedReadUploadPath = (value, productId, resourceId) => {
   return true;
 };
 
+/**
+ * The SECOND owned-upload tree: a learner's own Read uploads
+ * (`userReadUploads/{uid}/{uploadId}-{slug}.pdf` — see utils/readUploads.js).
+ *
+ * A resource inside a learner-authored course (`mine-<courseId>`) points at the
+ * learner's OWN object instead of an admin product folder, so the admin check
+ * above cannot apply: there is no product id to match. The shape is verified
+ * the same way — exactly three segments, the same root, a non-empty owner
+ * folder and a PDF name — and the bytes stay protected by `storage.rules`
+ * (only that uid may read or write them), so the path itself is the proof.
+ */
+export const isOwnedLearnerReadUploadPath = (value) => {
+  const parts = String(value || "").trim().split("/");
+  if (parts.length !== 3 || parts[0] !== "userReadUploads") return false;
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(parts[1] || "")) return false;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*\.pdf$/i.test(parts[2] || "");
+};
+
 const storagePathFromDownloadUrl = (value) => {
   try {
     const url = new URL(String(value || "").trim());
@@ -145,7 +163,12 @@ export const normalizeReadResourceUrl = (value, sourceKind, options = {}) => {
   if (kind === "upload") {
     const path = String(options.storagePath || "").trim();
     const resourceId = options.resourceId == null ? undefined : String(options.resourceId);
-    if (!isOwnedReadUploadPath(path, options.productId, resourceId)) return "";
+    // Two legitimate owners of an uploaded Read PDF: an admin product folder,
+    // or the learner's own `userReadUploads/{uid}/…` tree (a resource inside a
+    // course the learner built in My Study Library).
+    const owned = isOwnedReadUploadPath(path, options.productId, resourceId)
+      || isOwnedLearnerReadUploadPath(path);
+    if (!owned) return "";
     const fromUrl = storagePathFromDownloadUrl(value);
     if (!fromUrl || fromUrl !== path) return "";
     if (options.fileSize == null) return "";

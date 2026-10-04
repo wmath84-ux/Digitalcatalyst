@@ -52,6 +52,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type
 import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
+import type { ReadUpload } from "../../utils/readUploads.js";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -324,6 +325,13 @@ interface CourseOverlayProps {
   // survives every tab switch even though the editor itself only mounts
   // while its tab is active.
   sketchPanel?: ReactNode;
+  /**
+   * Read tab → "Add to my module": the panel hands back the learner's own
+   * uploaded PDF and the PARENT opens the existing Add-to-My-Module dialog
+   * (the same one the Player settings use). Optional — the tab works without
+   * it, it just loses that action.
+   */
+  onAddReadUploadToModule?: (row: ReadUpload) => void;
   // The Player tab's panel (course identity, progress, the ACTIVE file's own
   // buttons and every player preference). Owned by the parent for the same
   // reason as the mind map panel.
@@ -948,7 +956,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         hidden={props.tab !== "read"}
         aria-hidden={props.tab !== "read"}
       >
-        <ReadLibraryPanel entries={readEntries} productId={String(props.productId || "")} />
+        <ReadLibraryPanel
+          entries={readEntries}
+          productId={String(props.productId || "")}
+          onAddToModule={props.onAddReadUploadToModule}
+        />
       </div>
       {dock}
     </>
