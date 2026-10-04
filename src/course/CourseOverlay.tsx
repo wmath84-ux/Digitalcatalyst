@@ -46,12 +46,10 @@ import {
   useState,
   type ComponentType,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -59,7 +57,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -155,33 +153,8 @@ interface SheetRowSpec {
    * (see `SnapList`).
    */
   press?: () => void;
-  /**
-   * The row's SECOND gesture — a double tap / double click on the same row.
-   *
-   * A single tap still runs `press` (the upper/main area's behaviour is
-   * untouched); two taps inside `DOUBLE_TAP_MS`, on the same row, without the
-   * finger moving, are the deliberate "open this in the split area" gesture.
-   * Only rows that can be split pass it (module files), so every other row
-   * behaves exactly as before.
-   */
-  doublePress?: () => void;
   dataAttrs?: Record<string, string | number | undefined>;
 }
-
-/**
- * Double-tap window: two presses on the SAME row inside this many ms are one
- * double tap (desktop double-click and a touch double-tap both arrive as two
- * clicks, so one rule serves both).
- */
-const DOUBLE_TAP_MS = 320;
-/**
- * A press whose finger travelled further than this is a SCROLL, never a tap —
- * the row list scrolls with the same finger that would tap it, so this is what
- * keeps a swipe through the module library from opening anything.
- */
-const TAP_SLOP_PX = 10;
-/** After a double has been handled, ignore the browser's extra `dblclick`. */
-const DOUBLE_TAP_GUARD_MS = 420;
 
 function SheetRow({
   spec,
@@ -204,94 +177,14 @@ function SheetRow({
   const color = spec.selected ? "#B388FF" : spec.color;
   const interactive = Boolean(spec.press);
 
-  // ── Tap / double-tap (and never a scroll) ────────────────────────────────
-  // The press point and time of this row's last tap, plus the timestamp of the
-  // last double that was handled (so the browser's own `dblclick`, which
-  // arrives right after the second click, can never fire the split twice).
-  const downRef = useRef<{ x: number; y: number } | null>(null);
-  const lastTapRef = useRef(0);
-  const doubleHandledAtRef = useRef(0);
-
-  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!spec.doublePress) return;
-    downRef.current = { x: event.clientX, y: event.clientY };
-  };
-
-  const handlePress = () => {
-    if (!interactive) return;
-    if (!spec.doublePress) {
-      spec.press?.();
-      return;
-    }
-    const now = Date.now();
-    if (now - doubleHandledAtRef.current < DOUBLE_TAP_GUARD_MS) return;
-    if (lastTapRef.current && now - lastTapRef.current <= DOUBLE_TAP_MS) {
-      // Second tap of the pair: the FIRST tap already ran the single-click
-      // path (a fast single click must stay fast), so the double handler puts
-      // the upper area back and opens the file in the lower split area.
-      lastTapRef.current = 0;
-      doubleHandledAtRef.current = now;
-      spec.doublePress?.();
-      return;
-    }
-    lastTapRef.current = now;
-    spec.press?.();
-  };
-
-  /**
-   * The row's one press path. A pointer that travelled more than the slop is a
-   * SCROLL gesture: the click the browser may still synthesise is dropped and
-   * the tap record is cleared, so the next real tap starts a fresh pair.
-   * Everything else is `handlePress`, which plays out the single / double
-   * decision above. Rows without a double gesture keep the browser's plain
-   * click (unchanged behaviour).
-   */
-  const onClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
-    const down = downRef.current;
-    downRef.current = null;
-    if (spec.doublePress && down) {
-      const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
-      if (moved > TAP_SLOP_PX) {
-        lastTapRef.current = 0;
-        return;
-      }
-    }
-    handlePress();
-  };
-
-  const onDoubleClick = () => {
-    if (!spec.doublePress) return;
-    const now = Date.now();
-    if (now - doubleHandledAtRef.current < DOUBLE_TAP_GUARD_MS) return;
-    // Keyboard-free fallback for browsers that suppress the second click.
-    doubleHandledAtRef.current = now;
-    spec.doublePress();
-  };
-
-  /**
-   * The SPLIT gesture's props — spread after the plain click on purpose, so
-   * only rows that offer a second gesture take this path (a single/double
-   * decision inside the row). Every other row keeps the press path it has
-   * always had: the button's own `onClick` calling `spec.press()`, and nothing
-   * else — a scroll still never presses a row.
-   */
-  const splitGestureProps = spec.doublePress
-    ? {
-        onClick,
-        onPointerDown: interactive ? onPointerDown : undefined,
-        onDoubleClick,
-        // `manipulation` kills the legacy double-tap-zoom wait, so two quick
-        // taps are two taps instead of a zoom gesture.
-        style: { touchAction: "manipulation" as const },
-      }
-    : null;
-
+  // The row has ONE gesture: a plain press. (The old double-tap-to-split
+  // gesture is gone — the split's two sides are swapped from the divider's
+  // own switch button instead, see src/course/studyPanels.tsx.)
   return (
     <motion.button
       ref={ref}
       type="button"
       onClick={interactive ? () => spec.press?.() : undefined}
-      {...splitGestureProps}
       whileTap={interactive ? { scale: 0.97 } : undefined}
       aria-pressed={spec.selected || undefined}
       className={`relative flex w-full snap-center items-center gap-3 rounded-2xl px-2 py-2 text-left ${
@@ -408,13 +301,6 @@ interface CourseOverlayProps {
   updates: PaidCourseUpdate[];
   moduleTitleById: Record<string, string>;
   onSelectFile: (file: CourseFile) => void;
-  /**
-   * The SECOND gesture on a module file: a double tap / double click on the
-   * same file row opens that file in the Split Deck's lower (study) area,
-   * leaving whatever the upper area is showing exactly as it was. Absent →
-   * rows keep the single-click-only behaviour they have always had.
-   */
-  onSelectFileInSplit?: (file: CourseFile) => void;
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
   // Notes wiring
@@ -429,6 +315,11 @@ interface CourseOverlayProps {
   // Firestore hook), so the pane only hosts it — this keeps the overlay
   // presentational and lets the map survive tab switches.
   mindMapPanel?: ReactNode;
+  // The Sketch tab's Excalidraw board, owned by the parent exactly like the
+  // mind map: the player holds the scene + its Firestore hook, so the board
+  // survives every tab switch even though the editor itself only mounts
+  // while its tab is active.
+  sketchPanel?: ReactNode;
   // The Player tab's panel (course identity, progress, the ACTIVE file's own
   // buttons and every player preference). Owned by the parent for the same
   // reason as the mind map panel.
@@ -469,16 +360,6 @@ interface CourseOverlayProps {
    */
   brainPanel?: ReactNode;
   /**
-   * The file the learner opened with a DOUBLE tap on a module row, rendered
-   * inside the study pane in place of the active tab's body (the upper pane
-   * keeps its own content). Owned by the Course Player so the split survives
-   * tab switches that do not ask for another tab; any dock tab press hands the
-   * pane back to that tab. Absent → the pane is the plain tab body.
-   */
-  splitPane?: ReactNode;
-  /** True while `splitPane` is the pane's content (the tab body steps aside). */
-  splitPaneActive?: boolean;
-  /**
    * Tabs this player must NOT show. A learner-authored course (My Study
    * Library) passes `["paid"]`: there is nothing to purchase in a course the
    * learner built, so the premium tab is gone from the dock (and from the
@@ -488,7 +369,7 @@ interface CourseOverlayProps {
 }
 
 /**
- * The seven study tabs, in dock order. Exported because the Split Deck
+ * The eight study tabs, in dock order. Exported because the Split Deck
  * (src/course/studyPanels.tsx) needs the active tab's colour and its icon
  * for the study peek rail — the deck must never keep its own copy of the
  * list. (The divider line itself is fixed yellow.)
@@ -511,9 +392,14 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // the ⚙ popover used to offer — course details, progress, mark-complete,
   // the ACTIVE file's buttons and every player preference — lives here.
   { key: "player", label: "Player", heading: "Player settings", hint: "Course, active file aur controls — sab ek list mein", color: "#FF6BF5", icon: Settings },
+  // The drawing board — the official Excalidraw editor, hosted in the study
+  // pane beside the lecture (src/course/SketchPanel.tsx). It sits last so no
+  // existing tab's dock position (or ⌘/Ctrl+N shortcut) moves; pulling it up
+  // next to Mind map is a one-line reorder of this array, nothing else.
+  { key: "sketch", label: "Sketch", heading: "Sketch", hint: "Lecture ke saath likhein aur banayein", color: "#F97316", icon: PenLine },
 ];
 
-/** The dock's tab order — ⌘/Ctrl+1…6 walks this list. */
+/** The dock's tab order — ⌘/Ctrl+1…8 walks this list. */
 export const STUDY_TAB_ORDER: DockTab[] = TABS.map(({ key }) => key);
 
 /** The tab record for a key, falling back to the first one for unknown keys. */
@@ -536,6 +422,16 @@ export const MINDMAP_FALLBACK = (
 export const PLAYER_FALLBACK = (
   <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
     Player settings abhi available nahi hain.
+  </p>
+);
+
+/**
+ * Rendered when a call site has no sketch panel to host (older embeds of the
+ * overlay), mirroring the mind map and player fallbacks.
+ */
+export const SKETCH_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Sketch is course me abhi available nahi hai.
   </p>
 );
 
@@ -568,7 +464,6 @@ export type StudyRowsArgs = Pick<
   | "previewModuleIds"
   | "updates"
   | "onSelectFile"
-  | "onSelectFileInSplit"
   | "onBuyModule"
   | "onBuyUpdate"
   | "personalModulesEntry"
@@ -597,7 +492,6 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     previewModuleIds,
     updates,
     onSelectFile,
-    onSelectFileInSplit,
     onBuyModule,
     onBuyUpdate,
   } = args;
@@ -680,10 +574,6 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
             selected: selectedFileId === file.id,
             extra: fileLocked ? <LockKeyhole size={12} className="text-amber-400" /> : null,
             press: fileLocked ? undefined : () => onSelectFile(file),
-            // Double tap / double click on the SAME row opens the file in the
-            // Split Deck's lower (study) area instead of the upper one. A
-            // single tap is untouched, and a scroll never counts as a tap.
-            doublePress: fileLocked ? undefined : () => onSelectFileInSplit?.(file),
             dataAttrs: {
               "data-course-overlay-file": "",
               "data-file-id": file.id,
@@ -717,7 +607,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
       });
     }
     return rows;
-  }, [listMode, activeTab.color, flatModules, expanded, toggleModule, modules, accessibleModuleIds, ownedUpdateIds, previewModuleIds, selectedFileId, onSelectFile, onSelectFileInSplit, args]);
+  }, [listMode, activeTab.color, flatModules, expanded, toggleModule, modules, accessibleModuleIds, ownedUpdateIds, previewModuleIds, selectedFileId, onSelectFile, args]);
 
   // Keep the module holding the open file expanded by default.
   useEffect(() => {
@@ -831,6 +721,7 @@ export function StudyContent({
   personalModulesPanel,
   aiPanel,
   brainPanel,
+  sketchPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -844,6 +735,13 @@ export function StudyContent({
   personalModulesPanel?: ReactNode;
   aiPanel?: ReactNode;
   brainPanel?: ReactNode;
+  /**
+   * The Excalidraw board. Rendered ONLY while its tab is active, so the
+   * editor's chunk is never downloaded — let alone mounted — for a learner
+   * who does not draw. The scene itself lives in the player's hook, so this
+   * mounting/unmounting costs no work.
+   */
+  sketchPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -861,6 +759,10 @@ export function StudyContent({
         // handed down ready-rendered. A missing slot (older call sites)
         // degrades to a hint instead of a blank surface.
         mindMapPanel
+      ) : tab === "sketch" ? (
+        // The drawing board. Like the mind map, the parent owns the scene +
+        // its Firestore hook and hands the panel down ready-rendered.
+        sketchPanel ?? SKETCH_FALLBACK
       ) : tab === "player" ? (
         // Everything the player header used to be — course details, progress,
         // the active file's own buttons and every player preference, one list.
@@ -917,7 +819,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
 
-  // ── The seven tabs' rows ───────────────────────────────────────────────
+  // ── The eight tabs' rows ───────────────────────────────────────────────
   const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
   // ── Footer navigation: the home footer, exactly ────────────────────────
@@ -930,9 +832,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const dockItems: GlassDockItem[] = buildDockItems(tab, props.hiddenTabs);
 
   // ── The tab body ───────────────────────────────────────────────────────
-  // The split file (a double tap on a module row) renders as its OWN pane
-  // below instead of this body, so this element stays exactly what it always
-  // was: the active tab's content.
+  // The pane is always the ACTIVE TAB's content — there is no second body.
   const studyBody = (
     <StudyContent
       tab={tab}
@@ -957,6 +857,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       personalModulesPanel={props.personalModulesPanel}
       aiPanel={props.aiPanel}
       brainPanel={props.brainPanel}
+      sketchPanel={props.sketchPanel}
     />
   );
 
@@ -1002,48 +903,26 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // every tab starts at the very top of the pane so the content keeps every
   // pixel the header used to take.
   const peekPad = props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : "";
-  const splitOpen = Boolean(props.splitPaneActive && props.splitPane);
   const hideKeyedBody = Boolean(props.aiPanel) && props.tab === "ai";
 
   return (
     <>
-      {/**
-       * TWO pane bodies, one at a time.
-       *
-       *  · the SPLIT FILE (a double tap on a module row) — the file opens here,
-       *    in the LOWER area, while the upper area keeps its own content. Its
-       *    own header carries the close / “open above” actions, and any dock
-       *    tab press hands the pane straight back to the tab body.
-       *  · otherwise the ACTIVE TAB's body, exactly as before.
-       */}
-      {splitOpen ? (
-        <motion.div
-          key="split-file"
-          initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden ${peekPad}`}
-        >
-          {props.splitPane}
-        </motion.div>
-      ) : (
-        /* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */
-        <motion.div
-          key={props.tab}
-          initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${hideKeyedBody ? "hidden" : ""}`}
-        >
-          {studyBody}
-        </motion.div>
-      )}
+      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
+      <motion.div
+        key={props.tab}
+        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${hideKeyedBody ? "hidden" : ""}`}
+      >
+        {studyBody}
+      </motion.div>
       {props.aiPanel ? (
         <div
-          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "ai" && !splitOpen ? "flex" : "hidden"}`}
+          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "ai" ? "flex" : "hidden"}`}
           data-course-ai-panel
-          hidden={props.tab !== "ai" || splitOpen}
-          aria-hidden={props.tab !== "ai" || splitOpen}
+          hidden={props.tab !== "ai"}
+          aria-hidden={props.tab !== "ai"}
         >
           {props.aiPanel}
         </div>

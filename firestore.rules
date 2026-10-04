@@ -537,6 +537,49 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
+      // Course Player → Sketch. One Excalidraw board per learner per course
+      // MODULE, written straight from the client like the mind maps above
+      // (same offline-queue reasoning). The id is re-derived here —
+      // `{uid}__{productId}__{moduleId}` for the default board, `…__{key}`
+      // for any future named board — so a learner cannot pick an id that
+      // lands in somebody else's namespace, and the key inside the document
+      // must match the key in the id.
+      //
+      // The scene is a JSON STRING, not a map: Excalidraw elements contain
+      // `points: [[x, y], …]`, and Firestore rejects nested arrays outright.
+      // The rules therefore validate the envelope (ownership, identity, the
+      // size ceiling) and treat the payload itself as opaque text — mirroring
+      // MAX_SKETCH_SCENE_CHARS / MAX_SKETCH_ELEMENTS in utils/sketchScene.js
+      // so one runaway board can never creep up on the 1 MB document limit
+      // and start failing every write.
+      match /sketches/{sketchId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.productId is string
+          && request.resource.data.moduleId is string
+          && request.resource.data.productId.size() > 0
+          && request.resource.data.moduleId.size() > 0
+          && request.resource.data.sketchKey is string
+          && request.resource.data.sketchKey.size() > 0
+          && request.resource.data.sketchKey.size() <= 40
+          && request.resource.data.sketchKey.matches('^[a-z0-9-]+$')
+          && (
+            (request.resource.data.sketchKey == 'main'
+              && sketchId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId)
+            || sketchId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId + '__' + request.resource.data.sketchKey
+          )
+          && (request.resource.data.version is int || request.resource.data.version is float)
+          && request.resource.data.scene is string
+          && request.resource.data.scene.size() <= 900000
+          && (request.resource.data.elementCount is int || request.resource.data.elementCount is float)
+          && request.resource.data.elementCount <= 1500
+          && (!request.resource.data.keys().hasAny(['resourceId']) || (request.resource.data.resourceId is string && request.resource.data.resourceId.size() <= 200))
+          && (!request.resource.data.keys().hasAny(['resourceName']) || (request.resource.data.resourceName is string && request.resource.data.resourceName.size() <= 200))
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /webPushSubscriptions/{subscriptionId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

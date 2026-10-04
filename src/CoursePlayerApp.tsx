@@ -9,9 +9,6 @@ import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
-// The lower pane of a DOUBLE TAP on a module file — the file opens beside
-// whatever the upper area is showing (see `openFileInSplit` below).
-import SplitFilePane from "./course/SplitFilePane";
 // The mind map canvas is the single heaviest thing in the player: the panel
 // plus `@xyflow/react` is a 221 kB / 73 kB-gzip chunk. `StudyContent` only
 // renders this slot when the mind-map tab is the active one, so React.lazy
@@ -19,6 +16,10 @@ import SplitFilePane from "./course/SplitFilePane";
 // never touches the mind map — while the element below stays byte-identical
 // and the panel, once opened, stays mounted exactly as before.
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
+/* The Excalidraw editor is a heavy chunk (the whole drawing engine + its UI),
+   so it is downloaded on the FIRST activation of the Sketch tab and never for
+   a learner who does not draw — the same lazy contract the mind map uses. */
+const SketchPanel = lazy(() => import("./course/SketchPanel"));
 const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
 const LumenChat = lazy(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
@@ -41,6 +42,7 @@ import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
+import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
@@ -453,19 +455,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // show, and no "preview mode" either.
   const hasActiveSubscription = isMine ? false : accessState.hasActiveSubscription;
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
-  /**
-   * The file opened with a DOUBLE tap on a module row, rendered in the Split
-   * Deck's LOWER (study) pane while the upper pane keeps its own content.
-   * `null` = the study pane is doing its normal tab job.
-   */
-  const [splitFile, setSplitFile] = useState<CourseFile | null>(null);
-  /**
-   * The upper pane as the LAST single click found it: a double tap's first tap
-   * has already run the single-click path (a fast single click must never wait
-   * on a timer), so the double handler restores this to leave the upper area
-   * exactly as it was.
-   */
-  const preSelectRef = useRef<{ file: CourseFile | null; at: number } | null>(null);
   // Tracks whether the LEARNER has manually picked a file this session. The
   // first-lesson auto-selection and the saved-position resume both set
   // `selectedFile` directly (not through `selectFile`), so this flag is the
@@ -915,6 +904,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     rootTopic: activeMindMapModuleTitle || product.title,
   });
 
+  // ── Per-module sketch (Excalidraw) ──────────────────────────────────────
+  // Scoped exactly like the mind map above — uid + course + module — so
+  // Module A's board can never appear under Module B, and coming back to A
+  // restores A. The resource open beside it is recorded as an association
+  // only; it does NOT split the board, because a learner draws about the
+  // lesson, not about one PDF inside it.
+  //
+  // The hook lives HERE, not in the panel, so the scene survives the panel
+  // unmounting on every tab switch (the editor only mounts while its tab is
+  // active) and so an unsaved stroke is flushed even if the learner leaves
+  // the player straight from another tab.
+  const sketch = useCourseSketch({
+    uid: user?.id,
+    productId: storageProductId,
+    moduleId: activeMindMapModuleId,
+    resourceId: selectedFile ? String(selectedFile.id) : null,
+    resourceName: selectedFile?.name ?? null,
+  });
+
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as
   // matchMedia covers mobile/PWA browsers whose media query can lag behind
@@ -1322,9 +1330,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // playing in the background. `ResourceViewer` does that itself the moment
     // it stops being the active file (see its `active` prop).
     userSelectedRef.current = true;
-    // Remember what the upper pane was showing, so a double tap's second press
-    // can put it back instead of the double-opened file hijacking the lesson.
-    preSelectRef.current = { file: selectedFile, at: Date.now() };
     setSelectedFile(file);
     // The Split Deck keeps the study pane visible while the freshly opened
     // content loads beside it — side-by-side is the whole point of the
@@ -1336,38 +1341,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       void setDoc(progressRef, { productId: storageProductId, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
     }
   };
-
-  /**
-   * The DOUBLE tap / double click on a module file row: open that file in the
-   * Split Deck's LOWER (study) area, beside whatever the upper area shows.
-   *
-   * The row has already run the single-click path for the pair's FIRST press
-   * (so a one-off click is never delayed by a double-tap timer) — this puts the
-   * upper pane back exactly as it was, then hands the file to the study pane
-   * and makes sure the pane is open rather than peek-collapsed. A Brain
-   * resource has no document to render, so its double tap falls back to the
-   * single-tap behaviour (the practice set on the Brain tab).
-   */
-  const openFileInSplit = useCallback((file: CourseFile) => {
-    if (file.type === "brain") {
-      selectFile(file);
-      return;
-    }
-    userSelectedRef.current = true;
-    const previous = preSelectRef.current;
-    if (previous && Date.now() - previous.at <= 900) setSelectedFile(previous.file);
-    setSplitFile(file);
-    splitDeckRef.current?.activateStudy();
-  }, [selectFile]);
-
-  /** Close the split — the study pane returns to the active tab's body. */
-  const closeSplitFile = useCallback(() => setSplitFile(null), []);
-
-  /** Promote the split file to the upper pane (the single-click seat). */
-  const promoteSplitFile = useCallback((file: CourseFile) => {
-    setSplitFile(null);
-    selectFile(file);
-  }, [selectFile]);
 
   // Keep every opened file mounted. The active one is visible; the others are
   // hidden but alive, so a Google Doc keeps its scroll position, a mind map
@@ -1401,13 +1374,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    *     footer stays reachable even when the pane has become a 28px rail.
    */
   const handleDockTabChange = (next: DockTab) => {
-    // A tab press takes the study pane back from a split file; pressing the
-    // tab that is already active keeps its peek-collapse behaviour.
-    setSplitFile(null);
     if (next === dockTab) {
       // Same flush rule as every panel close path: a debounced mind map write
       // left pending is never dropped on the way out.
       if (dockTab === "mindmap") mindMap.flush();
+      if (dockTab === "sketch") sketch.flush();
       splitDeckRef.current?.toggleStudy();
       return;
     }
@@ -1415,7 +1386,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
   };
 
-  // ⌘/Ctrl+1…7 walks the study tabs — a desktop shortcut, so it stays out of
+  // ⌘/Ctrl+1…8 walks the study tabs — a desktop shortcut, so it stays out of
   // the way of any text field and of anything outside the player.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1487,7 +1458,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     const previous = previousDockTab.current;
     previousDockTab.current = dockTab;
     if (previous === "mindmap" && dockTab !== "mindmap") mindMap.flush();
-    // `mindMap.flush` is a stable callback, so only the tab is watched.
+    // The board is unmounted the instant its tab loses focus, so the last
+    // stroke has to be written on the way out, not on the next debounce.
+    if (previous === "sketch" && dockTab !== "sketch") sketch.flush();
+    // `mindMap.flush` / `sketch.flush` are stable callbacks, so only the tab
+    // is watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dockTab]);
 
@@ -1596,8 +1571,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onTabChange={handleDockTabChange}
       modules={modules}
       selectedFileId={selectedFile?.id}
-      // Double tap on a module file row → the file opens in the LOWER pane.
-      onSelectFileInSplit={openFileInSplit}
       ownedUpdateIds={ownedUpdateIds}
       accessibleModuleIds={resolution.accessibleModuleIds}
       previewModuleIds={resolution.previewModuleIds}
@@ -1652,6 +1625,30 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         />
         </Suspense>
       )}
+      // The sketch board, owned here for the same reason as the mind map:
+      // the scene + its Firestore hook outlive the editor, which only mounts
+      // while the Sketch tab is on screen.
+      sketchPanel={(
+        <Suspense
+          fallback={(
+            <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
+              <span className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-orange-400" />
+            </div>
+          )}
+        >
+          <SketchPanel
+            getScene={sketch.getScene}
+            sceneKey={sketch.sceneKey}
+            loading={sketch.loading}
+            status={sketch.status}
+            errorMessage={sketch.errorMessage}
+            pendingSync={sketch.pendingSync}
+            scoped={sketch.scoped}
+            onChange={sketch.updateScene}
+            boardName={activeMindMapModuleTitle || product.title}
+          />
+        </Suspense>
+      )}
       playerPanel={playerPanel}
       // My Modules — the Modules tab swaps its official list for the
       // learner-owned manager panel (owned here, hosted by the overlay).
@@ -1692,24 +1689,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             void markFileComplete(fileId);
           }}
         />
-      }
-      // ── The lower pane's split file ─────────────────────────────────────
-      // While a file is open down here the STUDY pane hosts it (and the
-      // active tab's body steps aside); the upper pane is untouched. Closing
-      // it, promoting it, or pressing any dock tab hands the pane straight
-      // back to the tab body.
-      splitPaneActive={Boolean(splitFile)}
-      splitPane={
-        splitFile ? (
-          <SplitFilePane
-            file={splitFile}
-            playback={playbackReady ? playbackRef.current : undefined}
-            onPlaybackChange={reportPlayback}
-            desktopView={desktopView}
-            onPromote={promoteSplitFile}
-            onClose={closeSplitFile}
-          />
-        ) : undefined
       }
       aiPanel={
         user?.id && aiOpened ? (
@@ -1850,8 +1829,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // reacts to the player's ONE keyboard state (see useCourseKeyboard),
           // so "keyboard open → module/course content hidden" is one rule, not
           // three per-tab hacks.
-          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai"}
-          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player"}
+          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai" || dockTab === "sketch"}
+          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player" || dockTab === "sketch"}
           handleRef={splitDeckRef}
         />
       </section>

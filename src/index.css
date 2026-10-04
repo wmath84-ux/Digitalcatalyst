@@ -1913,6 +1913,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 [data-course-split-deck][data-split-compressed="study"] [data-course-study-pane] {
   box-shadow: var(--course-split-compress-start);
 }
+/* The divider's switch can SWAP the two panes (they trade flex `order`), so
+   the compressed pane's lean trades edges with them. */
+[data-course-split-deck][data-split-swapped="true"][data-split-compressed="lesson"] [data-course-lesson-pane] {
+  box-shadow: var(--course-split-compress-start);
+}
+[data-course-split-deck][data-split-swapped="true"][data-split-compressed="study"] [data-course-study-pane] {
+  box-shadow: var(--course-split-compress-end);
+}
+
+/* The divider's switch: a tap on the line reveals it, it swaps the panes, and
+   it fades away again. No tap flash on touch, and no pulse for reduced
+   motion — it is the smallest piece of chrome on the deck. */
+[data-course-split-swap] {
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* Notes + Mind map sit on a deeper plate in the study pane too, exactly like
    the sheet's `data-solid-panel` treatment, so the writing surface reads the

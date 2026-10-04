@@ -388,7 +388,9 @@ test("The soft keyboard hands the whole deck to a writing tab, then hands it bac
   // inset — the inset alone is 0 when the layout viewport RESIZES under the
   // keyboard instead of being overlaid. Notes / mind map behaviour is
   // otherwise untouched.
-  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "ai"\}/);
+  // Sketch joined the writing surfaces: drawing with the soft keyboard
+  // open (text tool) must hand the deck over exactly like the others.
+  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "ai" \|\| dockTab === "sketch"\}/);
   assert.match(studyPanels, /const keyboardTakeover = \(keyboardInset > 0 \|\| keyboardVisible\) && keyboardExpandEnabled && collapsed !== "study";/);
   assert.match(studyPanels, /data-keyboard-takeover=\{keyboardTakeover \? "true" : undefined\}/);
   assert.match(studyPanels, /style=\{keyboardTakeover \? \{ display: "none" \} : lessonStyle\}/);
@@ -426,7 +428,7 @@ test("The deck never unmounts — there is no off state to hand over to", () => 
 });
 
 test("The divider is fixed yellow; the peek rail wears the active tab colour", () => {
-  // The seven tab colours, straight from the dock's own list.
+  // The eight tab colours, straight from the dock's own list.
   assert.match(overlay, /\{ key: "modules"[\s\S]*?color: "#FFBE0B"/);
   assert.match(overlay, /\{ key: "brain"[\s\S]*?color: "#34D399"/);
   assert.match(overlay, /\{ key: "notes"[\s\S]*?color: "#3A86FF"/);
@@ -434,6 +436,7 @@ test("The divider is fixed yellow; the peek rail wears the active tab colour", (
   assert.match(overlay, /\{ key: "ai"[\s\S]*?color: "#22D3EE"/);
   assert.match(overlay, /\{ key: "paid"[\s\S]*?color: "#C9A96E"/);
   assert.match(overlay, /\{ key: "player"[\s\S]*?color: "#FF6BF5"/);
+  assert.match(overlay, /\{ key: "sketch"[\s\S]*?color: "#F97316"/);
   // The divider's core line is ALWAYS yellow — never the tab colour.
   assert.match(splitMotion, /export const DIVIDER_LINE = "#FFBE0B";/);
   assert.match(studyPanels, /background: DIVIDER_LINE,/);
@@ -478,7 +481,9 @@ test("The split surfaces are built from the player's own glass tokens", () => {
 test("Notes, mind map and the Player panel keep their tiling inside the pane", () => {
   assert.match(styles, /\[data-course-overlay\] \[data-course-notes-grid\],\s*\n\[data-course-study-pane\] \[data-course-notes-grid\] \{/);
   assert.match(studyPanels, /data-solid-panel=\{solid \? "true" : "false"\}/);
-  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "brain" \|\| dockTab === "ai" \|\| dockTab === "player"\}/);
+  // The sketch canvas is opaque for the same reason the notes grid is: a
+  // frosted pane behind a drawing surface is unreadable.
+  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "brain" \|\| dockTab === "ai" \|\| dockTab === "player" \|\| dockTab === "sketch"\}/);
 });
 
 test("Coarse pointers and reduced motion get the cheap deck", () => {
@@ -510,8 +515,9 @@ test("Switching tabs inside the pane crossfades the content", () => {
 });
 
 test("A landscape pane never settles narrower than the dock inside it, on any device", () => {
-  // The seven-icon glass dock's natural width is the floor's reason to exist.
-  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 336;/);
+  // The eight-icon glass dock's natural width is the floor's reason to exist
+  // (8 plates x 38 + 7 gaps x 6 + 24 inline padding = 370, rounded to 380).
+  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 380;/);
   assert.match(splitMotion, /export const SPLIT_SHORT_VIEWPORT_PX = 500;/);
   // "Phone" = a narrow viewport OR a short one (turned sideways).
   assert.match(
@@ -524,7 +530,7 @@ test("A landscape pane never settles narrower than the dock inside it, on any de
   // The measured dock floor governs EVERY landscape stage — phones AND
   // tablets/desktops — so the now-always-visible dock is never clipped on a
   // narrow landscape tablet / desktop window (wide stages are unaffected,
-  // since 336 px is below their 15 % band). Collapse-to-rail bypasses it.
+  // since 380 px is below their 15 % band). Collapse-to-rail bypasses it.
   assert.match(
     studyPanels,
     /const dockFloor =\s+axis === "row" && deckWidth > 0 \? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\) : 0;/,

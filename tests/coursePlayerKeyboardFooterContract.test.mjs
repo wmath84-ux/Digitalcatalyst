@@ -170,7 +170,9 @@ test("the shared CSS backstop hides both footer homes on the published attribute
 // ---------------------------------------------------------------------------
 
 test("notes, mind map AND the AI chat hand the whole deck to the writing surface", () => {
-  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "ai"\}/);
+  // Sketch joined the writing surfaces: drawing with the soft keyboard
+  // open (text tool) must hand the deck over exactly like the others.
+  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "ai" \|\| dockTab === "sketch"\}/);
   assert.match(studyPanels, /const keyboardTakeover = \(keyboardInset > 0 \|\| keyboardVisible\) && keyboardExpandEnabled && collapsed !== "study";/);
   // The takeover consumes the player's ONE state…
   assert.match(studyPanels, /import \{ useCourseKeyboard \} from "\.\/useCourseKeyboard";/);

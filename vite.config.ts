@@ -1,5 +1,5 @@
 import path from "path";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
@@ -86,6 +86,72 @@ function resolveCssTarget(): string[] | undefined {
 
 const cssTarget = resolveCssTarget();
 
+/* ── Excalidraw fonts, self-hosted (Course Player → Sketch tab) ──────────────
+   @excalidraw/excalidraw does not bundle its hand-drawn fonts into the JS
+   chunk: at runtime it builds `<EXCALIDRAW_ASSET_PATH>/fonts/<Family>/*.woff2`
+   URLs and, when that variable is unset, falls back to the public esm.sh CDN.
+   Two problems with the fallback: a third-party font request every time a
+   learner opens a sketch, and NO text at all inside the Capacitor build, whose
+   WebView serves the app from a local origin that may be offline.
+
+   `src/course/excalidrawAssets.ts` points the editor at `/excalidraw-assets/`;
+   this plugin is what actually serves that path — straight out of
+   node_modules in dev, and copied into `dist/excalidraw-assets/fonts/` at
+   build time so the folder ships inside the APK and the service worker.
+
+   `Xiaolai` (the CJK family) is deliberately excluded: it is 13 MB on its own
+   — 26× the other eight families combined — for a script this catalogue does
+   not teach in. If a learner ever types CJK text, Excalidraw's own CDN
+   fallback still resolves it. */
+const EXCALIDRAW_FONT_DIR = path.resolve(
+  __dirname,
+  "node_modules/@excalidraw/excalidraw/dist/prod/fonts",
+);
+const EXCALIDRAW_SKIPPED_FONTS = new Set(["Xiaolai"]);
+const EXCALIDRAW_ASSET_ROUTE = "/excalidraw-assets/";
+
+function excalidrawAssets(): import("vite").Plugin {
+  return {
+    name: "excalidraw-assets",
+    configureServer(server) {
+      server.middlewares.use(EXCALIDRAW_ASSET_ROUTE, (req, res, next) => {
+        // `req.url` is already relative to the mount point here.
+        const rel = decodeURIComponent((req.url || "/").split("?")[0]).replace(/^\/+/, "");
+        const file = path.resolve(EXCALIDRAW_FONT_DIR, "..", rel);
+        // Never let a `..` escape the package's own dist folder.
+        const root = path.resolve(EXCALIDRAW_FONT_DIR, "..");
+        if (!file.startsWith(root + path.sep) || !existsSync(file) || !statSync(file).isFile()) {
+          next();
+          return;
+        }
+        res.setHeader("content-type", file.endsWith(".woff2") ? "font/woff2" : "application/octet-stream");
+        res.setHeader("cache-control", "public, max-age=31536000, immutable");
+        res.end(readFileSync(file));
+      });
+    },
+    generateBundle() {
+      if (!existsSync(EXCALIDRAW_FONT_DIR)) {
+        this.warn("@excalidraw/excalidraw fonts not found — the Sketch tab will fall back to the CDN.");
+        return;
+      }
+      for (const family of readdirSync(EXCALIDRAW_FONT_DIR)) {
+        if (EXCALIDRAW_SKIPPED_FONTS.has(family)) continue;
+        const dir = path.join(EXCALIDRAW_FONT_DIR, family);
+        if (!statSync(dir).isDirectory()) continue;
+        for (const name of readdirSync(dir)) {
+          const source = path.join(dir, name);
+          if (!statSync(source).isFile()) continue;
+          this.emitFile({
+            type: "asset",
+            fileName: `excalidraw-assets/fonts/${family}/${name}`,
+            source: readFileSync(source),
+          });
+        }
+      }
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -149,6 +215,7 @@ export default defineConfig({
         });
       },
     },
+    excalidrawAssets(),
   ],
   resolve: {
     alias: {
@@ -185,6 +252,18 @@ export default defineConfig({
            player's mind map imports — is left to Rollup so it lands inside
            the lazy chunk that actually needs it. */
         manualChunks(id) {
+          /* The Sketch tab (Excalidraw) is pinned to one named chunk.
+             Rollup would otherwise name it after whichever vendor module it
+             happened to hash first — the first build called it
+             `percentages-BXMCSKIN.js`, after a diagram module deep inside
+             Excalidraw's own tree, which makes the single heaviest lazy
+             chunk in the app unreadable in a build report and in the service
+             worker's precache list. `course-sketch` says what it is: ~1.1 MB
+             (371 kB gzip) + its stylesheet, downloaded the first time a
+             learner opens the Sketch tab and never for anyone else.
+             (Excalidraw's Mermaid import dialog stays behind its own dynamic
+             import — a separate chunk this one does not pull in.) */
+          if (/[\\/]src[\\/]course[\\/](SketchPanel|excalidrawAssets)\./.test(id)) return "course-sketch";
           if (!id.includes("node_modules")) return undefined;
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "vendor-react";
           if (/[\\/]node_modules[\\/](@firebase|firebase|idb)[\\/]/.test(id)) return "vendor-firebase";

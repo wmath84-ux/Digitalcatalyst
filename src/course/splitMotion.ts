@@ -52,14 +52,15 @@ export const SPLIT_SMALL_SCREEN_MIN = 30;
 export const SPLIT_SMALL_SCREEN_PX = 430;
 /** A phone in landscape has a short viewport; it gets the same treatment. */
 export const SPLIT_SHORT_VIEWPORT_PX = 500;
-/** The seven-icon compact dock's natural width (7×38 + gaps + padding ≈ 326).
+/** The eight-icon compact dock's natural width (8×38 + 7×6 gaps + 2×12 inline
+ *  padding = 370, rounded up to 380 for the plate's own border).
  *  In landscape (axis "row") the
  *  study pane never *settles* narrower than this on ANY device — phones,
  *  tablets and desktops alike — or the dock would sit inside the pane yet be
  *  clipped by it, which defeats the point of putting it there (the pane
  *  already starts well above this width on wide stages, so the floor only
  *  bites on short/narrow landscape windows). Collapse-to-rail bypasses it. */
-export const SPLIT_DOCK_MIN_PX = 336;
+export const SPLIT_DOCK_MIN_PX = 380;
 /** Magnetic snap points, in study-pane percent. */
 export const SPLIT_SNAP_POINTS = [20, 35, 50, 65, 80] as const;
 /** Released within this many percent of a snap point → animate onto it. */
@@ -83,6 +84,22 @@ export const DIVIDER_HIT = 10;
 /** The collapsed pane's glass strip, in px. */
 export const PEEK_RAIL_PX = 28;
 /**
+ * The divider's SWITCH button — the one control that swaps the two panes.
+ *
+ *   · it is hidden until the learner TAPS the divider line (a tap, never a
+ *     drag), so the split keeps its bare 2px line at rest;
+ *   · it is deliberately tiny (the owner's "bahut chhota sa icon");
+ *   · it fades away again after an idle window, or on the next divider tap.
+ *
+ * A press is a TAP only while the pointer stayed inside the slop AND came up
+ * inside the window — anything else is the divider's own resize drag.
+ */
+export const SWAP_BUTTON_PX = 22;
+export const SWAP_ICON_PX = 12;
+export const SWAP_HINT_MS = 3600;
+export const SWAP_TAP_SLOP_PX = 6;
+export const SWAP_TAP_MS = 400;
+/**
  * The ratio the study pane starts from when the deck opens. Not exactly 0: a
  * truly zero-width pane would squash the dock's flex layout for one frame
  * before the spring gets going.
@@ -103,6 +120,12 @@ export const KEY_STEP_FINE = 1;
 
 export const splitRatioKey = (courseId: string, axis: SplitAxis) => `dc.splitDeck.ratio.v1:${courseId}:${axis}`;
 export const splitCollapsedKey = (courseId: string, axis: SplitAxis) => `dc.splitDeck.collapsed.v1:${courseId}:${axis}`;
+/**
+ * Which side each pane sits on. Unlike the ratio and the collapse state this
+ * is NOT per axis: "the lesson is on the far side" is one arrangement the
+ * learner chose, and rotating the device must not quietly undo it.
+ */
+export const splitSwappedKey = (courseId: string) => `dc.splitDeck.swapped.v1:${courseId}`;
 
 const clampPercent = (value: number) => (Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0);
 
@@ -146,6 +169,28 @@ export const saveSplitCollapsed = (courseId: string, axis: SplitAxis, side: Spli
     else localStorage.removeItem(splitCollapsedKey(courseId, axis));
   } catch {
     /* private mode / storage disabled — nothing to remember */
+  }
+};
+
+/**
+ * The divider's switch button swapped the panes: `true` = the STUDY pane is
+ * the first one (left in landscape, top in portrait) and the lesson is the
+ * far one. Any parse problem reads as "not swapped", i.e. the default layout.
+ */
+export const loadSplitSwapped = (courseId: string): boolean => {
+  try {
+    return localStorage.getItem(splitSwappedKey(courseId)) === "true";
+  } catch {
+    return false;
+  }
+};
+
+export const saveSplitSwapped = (courseId: string, swapped: boolean): void => {
+  try {
+    if (swapped) localStorage.setItem(splitSwappedKey(courseId), "true");
+    else localStorage.removeItem(splitSwappedKey(courseId));
+  } catch {
+    /* private mode / storage disabled — the swap still holds for this visit */
   }
 };
 

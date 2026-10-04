@@ -249,11 +249,11 @@ test("the flat Split Deck player is intact end to end", () => {
   assert.match(deck, /data-course-split-divider/);
   assert.match(deck, /data-course-peek-rail/);
   assert.match(deck, /SPLIT_SNAP_POINTS/);
-  // The seven dock tabs; the study pane carries no chrome row.
+  // The eight dock tabs; the study pane carries no chrome row.
   assert.doesNotMatch(overlay, /data-course-study-chrome/);
   assert.match(overlay, /data-course-dock\b/);
   assert.match(overlay, /data-course-sheet-row/);
-  assert.match(read("src/course/CourseOverlay.tsx"), /modules|brain|notes|mindmap|ai|paid|player/);
+  assert.match(read("src/course/CourseOverlay.tsx"), /modules|brain|notes|mindmap|ai|paid|player|sketch/);
 });
 
 test("the room's panel look is what survived — as flat-player paint", () => {
