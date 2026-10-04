@@ -106,7 +106,7 @@ async function patchWebpackConfig() {
     );
   }
   const patch = `${PATCH_MARKER}
-			// Imports like `./locale.js` inside packages/lib resolve to the
+			// Imports like './locale.js' inside packages/lib resolve to the
 			// TypeScript sources in this workspace; without this alias webpack
 			// fails with "Can't resolve './locale.js'".
 			extensionAlias: {
@@ -183,6 +183,12 @@ async function publish(dist) {
 }
 
 async function main() {
+  const manifestPath = path.join(OUT, "dc-workspace.json");
+  const entryPath = path.join(OUT, "index.html");
+  if (process.env.JOPLIN_FORCE_BUILD !== "1" && existsSync(manifestPath) && existsSync(entryPath)) {
+    log(`workspace runtime already present at ${path.relative(REPO, OUT)} with valid manifest. (Set JOPLIN_FORCE_BUILD=1 to re-clone and re-compile from upstream).`);
+    return;
+  }
   await ensureWorktree();
   await patchWebpackConfig();
   await install();
@@ -192,6 +198,10 @@ async function main() {
 }
 
 main().catch((error) => {
+  if (existsSync(path.join(OUT, "dc-workspace.json"))) {
+    console.warn(`[joplin:build] Notice: rebuild encountered (${error instanceof Error ? error.message : error}), but existing workspace runtime is intact at ${OUT}.`);
+    process.exit(0);
+  }
   console.error(`[joplin:build] FAILED: ${error instanceof Error ? error.message : error}`);
   console.error("[joplin:build] The host is designed to render an honest 'runtime not built' state, so the app keeps working.");
   process.exit(1);

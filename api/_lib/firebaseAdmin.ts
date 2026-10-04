@@ -159,7 +159,19 @@ export const getFirebaseAdminApp = (): App => {
   }
 };
 
-export const adminDb = (): Firestore => getFirestore(getFirebaseAdminApp());
+let cachedAdminDb: Firestore | null = null;
+export const adminDb = (): Firestore => {
+  if (cachedAdminDb) return cachedAdminDb;
+  const app = getFirebaseAdminApp();
+  const db = getFirestore(app);
+  try {
+    db.settings({ ignoreUndefinedProperties: true });
+  } catch {
+    // Settings can only be configured once before any Firestore operation.
+  }
+  cachedAdminDb = db;
+  return cachedAdminDb;
+};
 
 const readAuthorization = (request: VercelRequest) => {
   const raw = request.headers?.authorization;
