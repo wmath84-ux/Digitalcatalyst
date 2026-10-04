@@ -804,3 +804,137 @@ html, body, #app {
     overflow-y: auto;
   }
 }
+
+/* Structural rich-formatting and rendered note content. */
+.workspace-editor, .editor-body, .editor-textarea-container, .editor-preview,
+.editor-format-tools, .editor-toolbar-actions { min-width: 0; }
+.editor-toolbar { min-width: 0; }
+.editor-format-tools { flex: 1 1 auto; flex-wrap: wrap; }
+.editor-toolbar-actions { flex: 0 0 auto; flex-wrap: wrap; margin-left: auto; }
+.editor-toolbar .toolbar-btn {
+  min-height: 34px;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.editor-textarea-container { width: 100%; overflow: hidden; }
+.editor-view-preview .editor-textarea { display: none; }
+.editor-view-preview .editor-preview {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-left: 0;
+  padding-left: 0;
+}
+.editor-preview :is(h1, h2, h3, h4, h5, h6) { margin: 0.9em 0 0.4em; line-height: 1.25; }
+.editor-preview :is(p, ul, ol, blockquote, pre, table, figure) { margin: 0.55em 0; }
+.editor-preview :is(ul, ol) { padding-left: 1.5rem; }
+.editor-preview ul.contains-task-list { list-style: none; padding-left: 0.35rem; }
+.editor-preview .myday-checklist-item { list-style: none; }
+.editor-preview .myday-checklist-control {
+  width: 1em;
+  height: 1em;
+  margin: 0 0.45em 0 0;
+  accent-color: var(--jp-primary);
+  vertical-align: -0.12em;
+  opacity: 1;
+}
+.editor-preview .myday-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--jp-border);
+  border-radius: 6px;
+}
+.editor-preview table { border-collapse: collapse; min-width: 100%; width: max-content; margin: 0; }
+.editor-preview :is(th, td) { border: 1px solid var(--jp-border); padding: 7px 10px; text-align: left; vertical-align: top; }
+.editor-preview th { background: var(--jp-sidebar-bg); font-weight: 700; }
+.editor-preview pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--jp-border);
+  border-radius: 6px;
+  background: var(--jp-sidebar-bg);
+  white-space: pre;
+}
+.editor-preview pre code { display: block; padding: 0; background: transparent; font-size: 0.9em; }
+.editor-preview code { overflow-wrap: anywhere; }
+.editor-preview .myday-empty-note { color: var(--jp-subtext); font-style: italic; }
+.editor-preview .dc-note-math-rendered-inline { display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: baseline; }
+.editor-preview .dc-note-math-rendered-block { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.editor-preview .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.editor-preview :is(img, video, svg) { max-width: 100%; height: auto; }
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .editor-textarea-container.editor-view-split { display: block; overflow-y: auto; }
+  .editor-textarea-container.editor-view-split .editor-textarea {
+    display: block;
+    width: 100%;
+    height: min(40vh, 420px);
+    min-height: 200px;
+  }
+  .editor-textarea-container.editor-view-split .editor-preview {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    border-left: 0;
+    border-top: 1px solid var(--jp-border);
+    padding: 12px 0 0;
+  }
+  .editor-textarea-container.editor-view-preview .editor-preview { display: block; }
+  .editor-toolbar { align-items: flex-start; }
+  .editor-format-tools { flex: 1 1 100%; }
+  .editor-toolbar-actions { margin-left: 0; }
+}
+
+@media (max-width: 767px) {
+  .editor-toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    overflow: visible;
+    padding: 6px 8px;
+  }
+  .editor-format-tools {
+    flex: 1 1 100%;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 3px;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .editor-toolbar-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+  .editor-toolbar .toolbar-btn { flex: 0 0 auto; min-height: 38px; padding: 5px 8px; }
+  .editor-textarea-container { min-height: 200px; }
+  .editor-textarea-container.editor-view-split { display: block; overflow-y: auto; }
+  .editor-textarea-container.editor-view-split .editor-textarea {
+    display: block;
+    width: 100%;
+    height: max(32vh, 190px);
+    min-height: 190px;
+  }
+  .editor-textarea-container.editor-view-split .editor-preview {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    border-left: 0;
+    border-top: 1px solid var(--jp-border);
+    padding: 12px 0 0;
+  }
+  .editor-textarea-container.editor-view-preview .editor-preview { display: block; }
+  .editor-body { min-height: 0; padding: 10px 12px; }
+  .editor-title-input { min-width: 0; }
+}

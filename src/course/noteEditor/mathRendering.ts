@@ -26,6 +26,97 @@ export interface MathRenderResult {
 
 const renderCache = new Map<string, MathRenderResult>();
 
+const UNICODE_GREEK: Readonly<Record<string, string>> = {
+  "α": String.raw`\alpha`, "β": String.raw`\beta`, "γ": String.raw`\gamma`, "δ": String.raw`\delta`,
+  "ε": String.raw`\epsilon`, "θ": String.raw`\theta`, "λ": String.raw`\lambda`, "μ": String.raw`\mu`,
+  "π": String.raw`\pi`, "ρ": String.raw`\rho`, "σ": String.raw`\sigma`, "τ": String.raw`\tau`,
+  "φ": String.raw`\phi`, "χ": String.raw`\chi`, "ψ": String.raw`\psi`, "ω": String.raw`\omega`,
+  "Γ": String.raw`\Gamma`, "Δ": String.raw`\Delta`, "Θ": String.raw`\Theta`, "Λ": String.raw`\Lambda`,
+  "Ξ": String.raw`\Xi`, "Π": String.raw`\Pi`, "Σ": String.raw`\Sigma`, "Φ": String.raw`\Phi`,
+  "Ψ": String.raw`\Psi`, "Ω": String.raw`\Omega`,
+};
+
+const UNICODE_OPERATORS: Readonly<Record<string, string>> = {
+  "×": String.raw`\times`, "÷": String.raw`\div`, "·": String.raw`\cdot`, "±": String.raw`\pm`,
+  "∓": String.raw`\mp`, "≈": String.raw`\approx`, "≤": String.raw`\leq`, "≥": String.raw`\geq`,
+  "≠": String.raw`\neq`, "≡": String.raw`\equiv`, "∞": String.raw`\infty`, "→": String.raw`\to`,
+  "←": String.raw`\leftarrow`, "⇒": String.raw`\Rightarrow`, "⇔": String.raw`\Leftrightarrow`,
+  "∑": String.raw`\sum`, "∏": String.raw`\prod`, "∫": String.raw`\int`, "∂": String.raw`\partial`,
+  "∇": String.raw`\nabla`, "∈": String.raw`\in`, "∉": String.raw`\notin`, "∪": String.raw`\cup`,
+  "∩": String.raw`\cap`, "∅": String.raw`\emptyset`, "−": "-",
+};
+
+const SUPER_SCRIPT: Readonly<Record<string, string>> = {
+  "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+  "⁺": "+", "⁻": "-", "⁼": "=", "⁽": "(", "⁾": ")", "ⁱ": "i", "ⁿ": "n",
+};
+const SUB_SCRIPT: Readonly<Record<string, string>> = {
+  "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+  "₊": "+", "₋": "-", "₌": "=", "₍": "(", "₎": ")", "ₐ": "a", "ₑ": "e", "ₕ": "h", "ᵢ": "i",
+  "ⱼ": "j", "ₖ": "k", "ₗ": "l", "ₘ": "m", "ₙ": "n", "ₒ": "o", "ₚ": "p", "ᵣ": "r", "ₛ": "s", "ₜ": "t",
+};
+
+/** Convert common Unicode math glyphs to equivalent TeX for KaTeX only. */
+export function normalizeUnicodeMathSource(latex: string): string {
+  const source = String(latex ?? "");
+  let output = "";
+  for (let index = 0; index < source.length;) {
+    const char = String.fromCodePoint(source.codePointAt(index) || 0);
+    const nextIndex = index + char.length;
+    if (char === "√") {
+      let operand = "";
+      if (source[nextIndex] === "(") {
+        let depth = 0;
+        let cursor = nextIndex;
+        for (; cursor < source.length; cursor += 1) {
+          if (source[cursor] === "(") depth += 1;
+          else if (source[cursor] === ")" && --depth === 0) { cursor += 1; break; }
+        }
+        if (depth === 0) operand = source.slice(nextIndex, cursor);
+      } else {
+        const match = source.slice(nextIndex).match(/^[\p{L}\p{N}]+(?:[⁰¹²³⁴⁵⁶⁷⁸⁹]+)?/u);
+        if (match) operand = match[0];
+      }
+      if (operand) {
+        output += String.raw`\sqrt{${normalizeUnicodeMathSource(operand)}}`;
+        index = nextIndex + operand.length;
+        continue;
+      }
+    }
+    if (char in UNICODE_GREEK) {
+      output += UNICODE_GREEK[char];
+      if (/[A-Za-z]/.test(source[nextIndex] || "")) output += " ";
+      index = nextIndex;
+      continue;
+    }
+    if (char in UNICODE_OPERATORS) {
+      const converted = UNICODE_OPERATORS[char];
+      output += converted;
+      if (converted.startsWith("\\") && /[A-Za-z]/.test(source[nextIndex] || "")) output += " ";
+      index = nextIndex;
+      continue;
+    }
+    if (char in SUPER_SCRIPT || char in SUB_SCRIPT) {
+      const scripts = char in SUPER_SCRIPT ? SUPER_SCRIPT : SUB_SCRIPT;
+      const command = char in SUPER_SCRIPT ? "^" : "_";
+      let indexEnd = nextIndex;
+      let value = scripts[char];
+      while (indexEnd < source.length) {
+        const following = String.fromCodePoint(source.codePointAt(indexEnd) || 0);
+        if (!(following in scripts)) break;
+        value += scripts[following];
+        indexEnd += following.length;
+      }
+      output += `${command}{${value}}`;
+      index = indexEnd;
+      continue;
+    }
+    output += char;
+    index = nextIndex;
+  }
+  return output;
+}
+
 /**
  * Parse and render one formula. No caller should render pasted TeX directly:
  * this function bounds source size/expansion, disables KaTeX's trusted HTML
@@ -50,7 +141,7 @@ export function renderMathSource(latex: string, displayMode = false): MathRender
     try {
       result = {
         valid: true,
-        html: katex.renderToString(source, {
+        html: katex.renderToString(normalizeUnicodeMathSource(source), {
           displayMode,
           output: "htmlAndMathml",
           throwOnError: true,
