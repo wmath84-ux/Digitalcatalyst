@@ -113,6 +113,28 @@ service firebase.storage {
       allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
     }
 
+    // Joplin My Day workspace attachments:
+    //   myDayWorkspace/{uid}/resources/{resourceId}/{safeName}
+    // The metadata row (`users/{uid}/joplinResources/{resourceId}`) is written
+    // by the server path first, so bytes can only ever land for a row that
+    // exists and belongs to the caller. The 25 MB ceiling and the MIME list
+    // mirror `MAX_RESOURCE_BYTES` / `ALLOWED_RESOURCE_MIME` in
+    // `src/joplin/joplinStorageBridge.ts` — the client refuses them too, so the
+    // rule and the UI agree end to end.
+    match /myDayWorkspace/{uid}/resources/{resourceId}/{fileName} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size < 25 * 1024 * 1024
+        && (request.resource.contentType.matches('image/(png|jpeg|webp|gif|svg[+]xml)')
+          || request.resource.contentType.matches('audio/(mpeg|mp4|webm|wav)')
+          || request.resource.contentType.matches('video/mp4')
+          || request.resource.contentType in ['application/pdf', 'application/zip', 'application/json', 'text/plain', 'text/markdown', 'text/csv']);
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }

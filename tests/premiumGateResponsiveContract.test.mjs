@@ -217,10 +217,13 @@ test("asPage mode renders a full-screen scroll, not a modal", () => {
 // ---------------------------------------------------------------------------
 
 test("My Day imports and renders the redesigned premium gate", () => {
+  // The workspace route renders the gate as a PAGE (there is no planner body
+  // behind it to blur) — browsing stays possible, creating is what the
+  // allowance buys, which is why the server refuses creates rather than the
+  // route refusing to mount.
   assert.match(myDay, /import\s+PremiumGate\s+from\s+["']\.?\.?\/components\/subscription\/PremiumGate["']/);
-  assert.match(myDay, /<PremiumGate[\s\S]{0,200}variant="myday"/);
-  // Multi-line JSX: closing tag is indented, not flush.
-  assert.match(myDay, /<PremiumGate[\s\S]{0,800}\/>\s*\n\s*<Toast/);
+  assert.match(myDay, /<PremiumGate[\s\S]{0,300}variant="myday"/);
+  assert.match(myDay, /[\s\S]{0,300}asPage/);
 });
 
 test("Revision imports and renders the redesigned premium gate", () => {

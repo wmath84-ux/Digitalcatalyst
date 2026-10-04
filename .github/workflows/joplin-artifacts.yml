@@ -1,0 +1,91 @@
+name: Joplin workspace + clipper artifacts
+
+# Builds the two artifacts the Digitalcatalyst My Day integration depends on,
+# reproducibly and from pinned sources:
+#
+#   1. the Joplin web sub-application (`public/my-day-workspace`) — Joplin's own
+#      webpack build, pinned to an exact upstream commit;
+#   2. the Web Clipper extension (`dist/joplin-clipper-*.zip`).
+#
+# The app itself is designed to run WITHOUT artifact 1 (it renders an honest
+# "workspace runtime not built" state), so this workflow is a release step, not
+# a build blocker. Run it manually, or let the nightly schedule keep the pinned
+# bundle fresh and auditable.
+
+on:
+  workflow_dispatch:
+    inputs:
+      joplin_commit:
+        description: "Upstream Joplin commit to build (defaults to the pinned one)"
+        required: false
+        type: string
+      build_mode:
+        description: "Webpack mode"
+        required: false
+        default: production
+        type: choice
+        options: [production, development]
+  schedule:
+    # 04:10 UTC every Monday — the pinned bundle is rebuilt from source weekly,
+    # so a silently broken upstream checkout is noticed by a human, not a user.
+    - cron: "10 4 * * 1"
+
+jobs:
+  clipper:
+    name: Web Clipper extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Package the extension
+        run: node scripts/joplin/build-clipper.mjs
+      - name: Verify the archives are readable and carry the manifest
+        run: |
+          for archive in dist/joplin-clipper-*.zip; do
+            unzip -l "$archive" | grep -q manifest.json
+            unzip -l "$archive" | grep -q background.js
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: joplin-clipper
+          path: |
+            dist/joplin-clipper-*.zip
+            dist/joplin-clipper.json
+          if-no-files-found: error
+
+  workspace:
+    name: Joplin web workspace
+    runs-on: ubuntu-latest
+    # Terser needs real headroom to seal Joplin's ~27 MB bundle; the local
+    # sandbox (3.8 GB) is why `joplin:build:dev` exists.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the pinned Joplin web bundle
+        env:
+          JOPLIN_SOURCE_COMMIT: ${{ inputs.joplin_commit }}
+          JOPLIN_BUILD_MODE: ${{ inputs.build_mode || 'production' }}
+        run: node scripts/joplin/build-workspace.mjs
+      - name: Check the manifest the host probes
+        run: |
+          node -e "
+            const manifest = require('./public/my-day-workspace/dc-workspace.json');
+            if (manifest.schema !== 1) throw new Error('bad schema');
+            if (!manifest.sourceCommit) throw new Error('missing sourceCommit');
+            if (manifest.bridge.protocol !== 1) throw new Error('bridge protocol drift');
+            if (!manifest.serviceWorker || !manifest.serviceWorker.scope.startsWith('/my-day-workspace/')) {
+              throw new Error('service worker scope must stay inside the workspace path');
+            }
+            console.log('workspace manifest ok:', manifest.sourceCommit.slice(0, 12), manifest.buildMode);
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my-day-workspace
+          path: public/my-day-workspace
+          if-no-files-found: error
+          retention-days: 30

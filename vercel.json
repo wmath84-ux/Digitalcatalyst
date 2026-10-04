@@ -43,6 +43,26 @@
       "destination": "/api/referral-leaderboard"
     },
     {
+      "source": "/api/joplin/items",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/joplin/schedules",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/joplin/migrate",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/joplin/resources",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/joplin/clipper",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
       "source": "/api/personal-course",
       "destination": "/api/referral-leaderboard"
     },

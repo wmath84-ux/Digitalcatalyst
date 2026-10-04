@@ -26,7 +26,6 @@ const FROZEN = [
   "src/components/glass-dock/DesktopPeekDock.tsx",
   "src/cartWishlist/components/BottomNav.tsx",
   "src/revision/components/BottomNav.tsx",
-  "src/components/myday/BottomNav.tsx",
 ];
 
 test("the bottom footer navigation stays off-limits to the registry components", () => {

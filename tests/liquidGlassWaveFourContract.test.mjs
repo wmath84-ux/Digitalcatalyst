@@ -120,16 +120,9 @@ test("revision and My Day pickers use the pack's selectable components", () => {
   // per-provider identity ring survives the swap
   assert.match(cfg, /selected \? meta\.ring : ""/);
 
-  const notes = read("src/components/myday/QuickNotes.tsx");
-  assert.match(notes, /from "\.\.\/ui\/glass-tooltip"/);
-  // Phase A5: the tooltip runs on the pack's own default tint (0.55) — no
-  // app-side 0.85 white wash, and the label inherits the pack's white ink.
-  assert.match(notes, /<TooltipContent side="top">/);
-  assert.doesNotMatch(notes, /<TooltipContent[^>]*tint=/, "tooltip must use the pack's own tint");
-  assert.doesNotMatch(notes, /title="[^"]*"/, "a native title bubble is still shipping");
-  // the pinned editor hooks survive
-  assert.match(notes, /data-myday-note-editor-cancel/);
-  assert.match(notes, /data-myday-note-save/);
+  // The planner's Quick Notes surface went with the planner (the personal
+  // workspace is the Joplin workspace now, with Joplin's own editor chrome),
+  // so the only "selectable component" consumer left here is Revision.
 });
 
 test("the light-theme tile ink keeps the pack's unselected look intact", () => {
@@ -160,26 +153,4 @@ test("revision cards ARE the pack surface (Phase A4)", () => {
   assert.doesNotMatch(cardFn, /dc-glass/);
 });
 
-test("My Day's Create menu keeps its pinned drop-up instead of the pack popover", () => {
-  // tests/myDayCreateMenuDropdownContract.test.mjs pins the anchored drop-up,
-  // the staggered item animation and dismissal on scroll/touchmove/wheel — all
-  // three differ from `glass-popover` (bottom side, outside-mousedown + Escape,
-  // re-place on scroll). Swapping it would regress documented behaviour, so
-  // Wave 4 vendored the popover for new surfaces and left this one alone.
-  const m = read("src/components/myday/CreateMenu.tsx");
-  assert.match(m, /dc-create-menu-anchor/);
-  assert.match(m, /bottom: "calc\(100% \+ 0\.9rem\)"/);
-  assert.match(m, /role="menu"/);
-  assert.match(m, /role="menuitem"/);
-  assert.doesNotMatch(m, /from "\.\.\/ui\/glass-popover"/);
-});
 
-test("the Save hint that a revision contract pins stays a native title", () => {
-  const pinned = 'title={kind === "edit" ? "Save note & close editor" : "Save note & close"}';
-  assert.ok(read("src/components/myday/QuickNotes.tsx").includes(pinned));
-  assert.match(
-    read("tests/myDayQuickNotesBigEditorContract.test.mjs"),
-    /Save note & close editor/,
-    "if that pin moved, the tooltip conversion above must move with it",
-  );
-});

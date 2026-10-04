@@ -341,9 +341,11 @@ test("only BlockNote's structural stylesheet is imported — no default UI skin"
 
 // ── 6. Nothing with consumers was removed ──────────────────────────────────
 
-test("the previous editor stays: My Day still uses it and it is the emergency fallback", () => {
+test("the previous editor stays as the course notes panel's implementation", () => {
+  // The planner's Quick Notes used to import this editor too; it is retired,
+  // so the course notes panel is the remaining consumer — and the file is kept
+  // because that panel still needs it.
   assert.ok(fs.existsSync(path.join(root, "src/course/RichTextEditor.tsx")));
-  assert.match(read("src/components/myday/QuickNotes.tsx"), /import RichTextEditor from "\.\.\/\.\.\/course\/RichTextEditor";/);
   assert.match(notesPanel, /import RichTextEditor from "\.\/RichTextEditor";/);
 });
 

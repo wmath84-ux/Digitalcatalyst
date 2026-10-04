@@ -113,7 +113,12 @@ function addedCount(previous: MyDayData, next: MyDayData): number {
   }, 0);
 }
 
-function validTimeZone(value: unknown): string {
+/**
+ * The ONE validated-timezone rule for the whole personal workspace. The Joplin
+ * scheduler stores an explicit IANA zone per row, and `/api/joplin/*` reuses
+ * this so a crafted zone can never manufacture an extra calendar-day reset.
+ */
+export function validTimeZone(value: unknown): string {
   const zone = text(value, 80) || "UTC";
   try {
     new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(new Date());
@@ -168,7 +173,13 @@ type Access = {
   hidden: boolean;
 };
 
-function accessSnapshot(
+/**
+ * The ONE entitlement/allowance snapshot. Exported because the Joplin
+ * workspace's server write path (`api/_lib/joplin.ts`) must consume the SAME
+ * counter with the SAME rules — a second implementation would be a second
+ * entitlement policy (§58).
+ */
+export function accessSnapshot(
   feature: Record<string, unknown> | null,
   subscription: Record<string, unknown>,
   usage: Record<string, unknown>,

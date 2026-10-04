@@ -6,7 +6,6 @@ const hook = fs.readFileSync("src/hooks/useUnreadNotificationCount.ts", "utf8");
 const header = fs.readFileSync("src/components/Header.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const storage = fs.readFileSync("utils/siteNotifications.ts", "utf8");
-const myDayNav = fs.readFileSync("src/components/myday/BottomNav.tsx", "utf8");
 
 test("shared notification badge combines local and cloud unread IDs without double count", () => {
   assert.match(hook, /loadSiteNotifications/);
@@ -29,8 +28,3 @@ test("same-tab notification writes notify every mounted badge", () => {
   assert.match(hook, /addEventListener\("eduvora:notifications-updated"/);
 });
 
-test("My Day footer keeps Home as the far-left first item", () => {
-  const home = myDayNav.indexOf('{ id: "home"');
-  const day = myDayNav.indexOf('{ id: "overview"');
-  assert.ok(home >= 0 && home < day);
-});

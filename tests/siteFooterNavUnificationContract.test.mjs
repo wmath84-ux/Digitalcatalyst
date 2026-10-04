@@ -37,7 +37,6 @@ const glass = read("src/glass.css");
 
 const FOOTERS = [
   ["primary (home / store / pdp / profile / library / checkout / notifications / search / queries / leaderboard)", "src/components/BottomNav.tsx"],
-  ["my day", "src/components/myday/BottomNav.tsx"],
   ["revision", "src/revision/components/BottomNav.tsx"],
   ["cart + favourites", "src/cartWishlist/components/BottomNav.tsx"],
 ];

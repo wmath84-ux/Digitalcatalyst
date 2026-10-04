@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clip to My Day</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="clip">
+      <header class="clip__head">
+        <span class="clip__mark" aria-hidden="true"></span>
+        <div>
+          <h1>Clip to My Day</h1>
+          <p id="account" class="clip__meta">Not connected</p>
+        </div>
+      </header>
+
+      <section id="pairing" class="clip__section" hidden>
+        <label class="clip__label" for="code">Pairing code from My Day → Usage &amp; Limits → Web Clipper</label>
+        <input id="code" class="clip__input" inputmode="latin" autocomplete="off" placeholder="ABCD-EFGH" />
+        <label class="clip__label" for="origin">Workspace address</label>
+        <input id="origin" class="clip__input" inputmode="url" autocomplete="off" placeholder="https://eduvora.shop" />
+        <button id="pair" class="clip__button clip__button--primary" type="button">Connect</button>
+      </section>
+
+      <section id="clipping" class="clip__section" hidden>
+        <p id="page-title" class="clip__title">…</p>
+        <label class="clip__row">
+          <input id="selection-only" type="checkbox" />
+          <span>Selection only</span>
+        </label>
+        <button id="clip" class="clip__button clip__button--primary" type="button">Clip this page</button>
+        <button id="disconnect" class="clip__button" type="button">Disconnect</button>
+      </section>
+
+      <p id="status" class="clip__status" role="status"></p>
+      <p class="clip__note">
+        Clips land in the <strong>Web Clippings</strong> notebook as normal notes. The extension holds a revocable
+        clip-only token — never your password or a Firebase session.
+      </p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

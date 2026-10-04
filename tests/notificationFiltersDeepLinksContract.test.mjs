@@ -30,6 +30,7 @@ const page = read("src/components/NotificationsPage.tsx");
 const main = read("src/main.tsx");
 const sw = read("public/sw.js");
 const myDayApp = read("src/MyDayApp.tsx");
+const joplinLinks = read("src/joplin/joplinDeepLinks.ts");
 const cron = read("api/cron/subscription-renewals.ts");
 const pushSend = read("api/push/send.ts");
 const pushSchedulerDts = read("utils/pushScheduler.d.ts");
@@ -106,21 +107,23 @@ test("My Day deep link resolves to #/my-day?section=<tab>&item=<id>", () => {
   assert.match(siteNotifications, /return `#\/my-day\?section=\$\{target\.section\}&item=\$\{encodeURIComponent\(String\(target\.itemId\)\)\}`/);
 });
 
-test("My Day page applies the deep link (section + item highlight)", () => {
-  assert.match(myDayApp, /new URLSearchParams\(hash\.slice\(queryIndex \+ 1\)\)/);
-  assert.match(myDayApp, /setActiveSection\(section\)/);
-  assert.match(myDayApp, /setHighlightId\(item && item\.trim\(\) \? item\.trim\(\) : null\)/);
+test("My Day resolves a deep link to its migrated workspace target", () => {
+  // The planner answered `#/my-day?section=tasks&item=<id>` by switching a tab
+  // and highlighting a row. The workspace has no such tabs, so the route now
+  // TRANSLATES the legacy hash into the canonical target of the migrated object
+  // (`parseMyDayHash` → `resolveLegacySection`) and hands it to the workspace —
+  // every notification URL already in the wild keeps working.
+  assert.match(myDayApp, /parseMyDayHash/);
+  assert.match(myDayApp, /buildMyDayDeepLink/);
   assert.match(myDayApp, /hashchange/);
-  assert.match(myDayApp, /highlightId=\{highlightId\}/);
+  assert.match(joplinLinks, /resolveLegacySection/);
 });
 
-test("My Day list components scroll to + highlight the deep-linked item", () => {
-  for (const file of ["src/components/myday/TaskList.tsx", "src/components/myday/Timeline.tsx", "src/components/myday/Reminders.tsx"]) {
-    const source = read(file);
-    assert.match(source, /highlightId\?: string \| null/);
-    assert.match(source, /data-highlight=\{/);
-    assert.match(source, /scrollIntoView/);
-  }
+test("the workspace owns its own scrolling — no second scroll container", () => {
+  // The planner's lists scrolled + highlighted inside the page. Joplin's list
+  // and editor panes are the scroll containers now, so the host must not wrap
+  // them in another scroller (§ one scroll context).
+  assert.doesNotMatch(myDayApp, /overflow-y-auto/);
 });
 
 test("expired subscription reminders deep-link into the renewal flow", () => {
@@ -130,8 +133,10 @@ test("expired subscription reminders deep-link into the renewal flow", () => {
 });
 
 test("foreground local notifications use the same deep links", () => {
-  // My Day foreground system alerts deep-link to the exact tab + item.
-  assert.match(main, /const itemUrl = `\/\$\{getMyDayItemDeepLink\(item\.section, item\.itemId\)\}`/);
+  // My Day foreground system alerts deep-link through the ONE resolver: a
+  // canonical schedule carries the migrated target's link, the legacy path
+  // falls back to the section+item URL the old planner understood.
+  assert.match(main, /const itemUrl = `\/\$\{itemDeepLink\(item\)\}`/);
   assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`\)/);
   // FlowPath: the same call carries the server-agreed tag (activity id +
   // kind) so the tray entry and the FCM push collapse instead of stacking.
