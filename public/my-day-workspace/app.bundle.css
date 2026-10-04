@@ -22,7 +22,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme]) {
     --jp-bg: #1e1e1e;
     --jp-text: #e8eaed;
     --jp-subtext: #9aa0a6;
@@ -42,6 +42,48 @@
     --jp-card-bg: #252629;
     --jp-danger: #f28b82;
   }
+}
+
+html[data-theme="dark"] {
+  --jp-bg: #1e1e1e;
+  --jp-text: #e8eaed;
+  --jp-subtext: #9aa0a6;
+  --jp-border: #3c4043;
+  --jp-sidebar-bg: #18191a;
+  --jp-sidebar-text: #e8eaed;
+  --jp-sidebar-hover: #2d2f31;
+  --jp-sidebar-active: #2b394e;
+  --jp-sidebar-active-text: #8ab4f8;
+  --jp-primary: #8ab4f8;
+  --jp-primary-hover: #aecbfa;
+  --jp-item-hover: #26272a;
+  --jp-item-selected: #2d3748;
+  --jp-badge-bg: #3c4043;
+  --jp-tag-bg: #283347;
+  --jp-tag-text: #8ab4f8;
+  --jp-card-bg: #252629;
+  --jp-danger: #f28b82;
+}
+
+html[data-theme="light"] {
+  --jp-bg: #ffffff;
+  --jp-text: #202124;
+  --jp-subtext: #5f6368;
+  --jp-border: #dadce0;
+  --jp-sidebar-bg: #f1f3f4;
+  --jp-sidebar-text: #202124;
+  --jp-sidebar-hover: #e8eaed;
+  --jp-sidebar-active: #d2e3fc;
+  --jp-sidebar-active-text: #1967d2;
+  --jp-primary: #1a73e8;
+  --jp-primary-hover: #1557b0;
+  --jp-item-hover: #f8f9fa;
+  --jp-item-selected: #e8f0fe;
+  --jp-badge-bg: #e8eaed;
+  --jp-tag-bg: #e8f0fe;
+  --jp-tag-text: #1967d2;
+  --jp-card-bg: #ffffff;
+  --jp-danger: #d93025;
 }
 
 * {
@@ -569,22 +611,196 @@ html, body, #app {
   cursor: pointer;
 }
 
-/* Mobile responsive */
-@media (max-width: 768px) {
+/* Theme switch — Joplin-style sun/moon plate in the chrome. */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--jp-border);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  color: var(--jp-subtext);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.theme-toggle:hover {
+  background: var(--jp-sidebar-hover);
+  color: var(--jp-text);
+}
+
+.mobile-topbar {
+  display: none;
+}
+.sidebar-backdrop {
+  display: none;
+}
+.editor-back {
+  display: none;
+}
+
+/* Tablet + desktop: Joplin's 3-pane desktop layout, fluid from small tablets up. */
+@media (min-width: 768px) {
   .workspace-sidebar {
-    width: 60px;
-    min-width: 60px;
+    width: clamp(200px, 22vw, 280px);
+    min-width: 200px;
+    max-width: 320px;
   }
-  .sidebar-title, .nav-item span, .nav-section-title {
+  .workspace-list {
+    width: clamp(240px, 30vw, 400px);
+    min-width: 220px;
+    max-width: 440px;
+  }
+  .workspace-editor {
+    min-width: 0;
+  }
+  .editor-textarea-container {
+    min-height: 0;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 959px) {
+  .workspace-container {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .editor-preview {
     display: none;
   }
+  .editor-body {
+    padding: 12px 16px;
+  }
+  .editor-title-input {
+    font-size: 18px;
+  }
+  .list-quick-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* Phone: Joplin mobile app — one pane at a time, notebooks as a drawer. */
+@media (max-width: 767px) {
+  .workspace-container {
+    flex-direction: column;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  }
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--jp-border);
+    background: var(--jp-bg);
+    min-height: 48px;
+    flex-shrink: 0;
+  }
+  .mobile-topbar .mobile-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--jp-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 320px);
+    min-width: 0;
+    max-width: 320px;
+    z-index: 40;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 36px);
+  }
+  .workspace-container.sidebar-open .workspace-sidebar {
+    transform: translateX(0);
+  }
+  .sidebar-title, .nav-item span, .nav-section-title {
+    display: initial;
+  }
   .nav-item {
-    justify-content: center;
-    padding: 10px 0;
-    margin-right: 0;
-    border-radius: 8px;
+    justify-content: flex-start;
+    padding: 10px 16px;
+    margin-right: 8px;
+    border-radius: 0 16px 16px 0;
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 30;
+  }
+  .workspace-container.sidebar-open .sidebar-backdrop {
+    display: block;
+  }
+
+  .workspace-list,
+  .workspace-editor {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-right: none;
+    flex: 1;
+  }
+
+  .workspace-container[data-pane="list"] .workspace-editor {
+    display: none;
+  }
+  .workspace-container[data-pane="editor"] .workspace-list {
+    display: none;
+  }
+  .workspace-container[data-pane="editor"] .mobile-topbar[data-bar="list"] {
+    display: none;
+  }
+  .workspace-container[data-pane="list"] .mobile-topbar[data-bar="editor"] {
+    display: none;
+  }
+
+  .editor-back {
+    display: inline-flex;
   }
   .editor-preview {
     display: none;
+  }
+  .editor-body {
+    padding: 12px 14px;
+  }
+  .editor-title-input {
+    font-size: 18px;
+  }
+  .editor-toolbar {
+    padding: 6px 10px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .list-header {
+    padding: 8px 10px;
+  }
+  .list-quick-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .note-card {
+    padding: 14px 12px;
+  }
+  .modal-dialog {
+    width: calc(100% - 24px);
+    max-height: 90vh;
+    overflow-y: auto;
   }
 }

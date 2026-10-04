@@ -123,13 +123,14 @@ test("the revision tabs step out of the way on the focused test surfaces", () =>
 
 test("My Day renders no horizontal tab strip", () => {
   // The planner is retired: the strip, its side rail and its phone pill went
-  // with it. `#/my-day` is the Joplin workspace, whose own sidebar and toolbar
-  // are the only chrome on the route — no Digitalcatalyst strip, and no second
-  // nav layered on top of Joplin's.
+  // with it. `#/my-day` is the Joplin workspace. Phone/tablet also mount the
+  // SAME home peek footer (BottomNav peek) so learners can leave My Day the
+  // way they leave Home — desktop CSS still hides that capsule from 960 px.
   assert.doesNotMatch(myDay, /PageTabs/);
   assert.doesNotMatch(myDay, /DAY_TABS/);
   assert.doesNotMatch(myDay, /<SideNav/);
-  assert.doesNotMatch(myDay, /<BottomNav/);
+  assert.match(myDay, /<BottomNav/);
+  assert.match(myDay, /peek/);
   // The route stays a thin adapter that lazy-loads the workspace.
   assert.match(myDay, /import\("\.\/joplin\/JoplinWorkspace"\)/);
 });

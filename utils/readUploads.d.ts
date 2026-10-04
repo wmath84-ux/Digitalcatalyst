@@ -17,6 +17,8 @@ export interface ReadUpload {
   name: string;
   /** "" = the default group; otherwise the learner-made module name. */
   module: string;
+  /** "" = no submodule; otherwise a folder under `module`. */
+  submodule: string;
   storagePath: string;
   url: string;
   sizeBytes: number;
@@ -35,6 +37,7 @@ export interface ReadUploadInput {
   uploadId?: unknown;
   name?: unknown;
   module?: unknown;
+  submodule?: unknown;
   storagePath?: unknown;
   url?: unknown;
   sizeBytes?: unknown;
@@ -53,6 +56,7 @@ export function createReadUploadId(seed?: unknown): string;
 export function isReadUploadId(value: unknown): boolean;
 export function sanitizeReadUploadName(value: unknown, fallback?: string): string;
 export function sanitizeReadUploadModule(value: unknown): string;
+export function sanitizeReadUploadSubmodule(value: unknown): string;
 export function buildReadUploadStoragePath(uid: unknown, uploadId: unknown, fileName?: unknown): string;
 export function isOwnedReadUploadPath(value: unknown, uid: unknown): boolean;
 export function isReadUploadFile(file: { size?: number; type?: string; name?: string } | null | undefined): boolean;
@@ -60,7 +64,12 @@ export function readUploadFileIssue(file: { size?: number; type?: string; name?:
 export function toFirestoreReadUpload(input?: ReadUploadInput): Record<string, unknown>;
 export function parseReadUploadDoc(raw: Record<string, unknown> | null | undefined, uidHint?: string): ReadUpload | null;
 export function sortReadUploads(uploads: ReadUpload[]): ReadUpload[];
-export function groupReadUploads(uploads: ReadUpload[]): Array<{ module: string; items: ReadUpload[] }>;
+export function groupReadUploads(uploads: ReadUpload[]): Array<{
+  module: string;
+  items: ReadUpload[];
+  submodules: Array<{ submodule: string; items: ReadUpload[] }>;
+}>;
+export function groupReadUploadSubmodules(uploads: ReadUpload[]): Array<{ submodule: string; items: ReadUpload[] }>;
 export function readUploadModuleNames(uploads: ReadUpload[]): string[];
 export function formatReadUploadSize(bytes: unknown): string;
 export function readUploadMetaLabel(doc: Partial<ReadUpload> | null | undefined): string;

@@ -475,6 +475,7 @@ export default function App({
 
         <BottomNav
           active="home"
+          peek
           onChange={handleFooterChange}
           purchasesBadge={purchasedIds.size}
         />

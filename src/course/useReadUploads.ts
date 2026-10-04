@@ -44,6 +44,7 @@ import {
   readUploadFileIssue,
   sanitizeReadUploadModule,
   sanitizeReadUploadName,
+  sanitizeReadUploadSubmodule,
   sortReadUploads,
   toFirestoreReadUpload,
   type ReadUpload,
@@ -70,7 +71,9 @@ export interface UseReadUploadsResult {
   /** Recoverable upload failure (clear it when the learner dismisses it). */
   clearUploadError: () => void;
   /** Upload one PDF. Resolves with the stored row, or null when it failed. */
-  uploadPdf: (file: File, module?: string) => Promise<ReadUpload | null>;
+  uploadPdf: (file: File, module?: string, submodule?: string) => Promise<ReadUpload | null>;
+  /** Upload many PDFs into the same module / submodule. */
+  uploadPdfs: (files: File[], module?: string, submodule?: string) => Promise<ReadUpload[]>;
   removeUpload: (uploadId: string) => Promise<boolean>;
   renameUpload: (uploadId: string, name: string) => Promise<boolean>;
   setUploadModule: (uploadId: string, module: string) => Promise<boolean>;
@@ -179,7 +182,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
 
   // ── Upload ─────────────────────────────────────────────────────────────
   const uploadPdf = useCallback<UseReadUploadsResult["uploadPdf"]>(
-    async (file, module) => {
+    async (file, module, submodule) => {
       const issue = readUploadFileIssue(file);
       if (issue) {
         setUploadError(issue);
@@ -198,21 +201,63 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       }
       const name = sanitizeReadUploadName(file.name, "My PDF");
       setUploadError(null);
-      setUploading({ uploadId, name, progress: 0 });
+      setUploading({ uploadId, name, progress: 0.04 });
       try {
+        // A stale ID token is a common reason the resumable XHR sits at 0%.
+        await auth.currentUser?.getIdToken(true).catch(() => null);
         const storage = await getFirebaseStorage();
-        const { getDownloadURL, ref, uploadBytesResumable } = await import("firebase/storage");
+        const { getDownloadURL, ref, uploadBytesResumable, uploadBytes } = await import("firebase/storage");
         const target = ref(storage, storagePath);
-        const task = uploadBytesResumable(target, file, { contentType: "application/pdf" });
         await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const succeed = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+          const fail = (error: unknown) => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+          };
+          const task = uploadBytesResumable(target, file, { contentType: "application/pdf" });
+          const stall = window.setTimeout(() => {
+            if (settled) return;
+            try {
+              task.cancel();
+            } catch {
+              /* ignore */
+            }
+            setUploading({ uploadId, name, progress: 0.45 });
+            void uploadBytes(target, file, { contentType: "application/pdf" })
+              .then(() => {
+                setUploading({ uploadId, name, progress: 0.92 });
+                succeed();
+              })
+              .catch(fail);
+          }, 3500);
           task.on(
             "state_changed",
             (snapshot) => {
               const total = snapshot.totalBytes || file.size || 1;
-              setUploading({ uploadId, name, progress: Math.min(0.98, snapshot.bytesTransferred / total) });
+              const ratio = snapshot.bytesTransferred / total;
+              if (ratio > 0) window.clearTimeout(stall);
+              setUploading({ uploadId, name, progress: Math.min(0.98, Math.max(0.05, ratio || 0.05)) });
             },
-            (failure) => reject(failure),
-            () => resolve(),
+            (failure) => {
+              window.clearTimeout(stall);
+              setUploading({ uploadId, name, progress: 0.4 });
+              void uploadBytes(target, file, { contentType: "application/pdf" })
+                .then(() => {
+                  setUploading({ uploadId, name, progress: 0.92 });
+                  succeed();
+                })
+                .catch(() => fail(failure));
+            },
+            () => {
+              window.clearTimeout(stall);
+              succeed();
+            },
           );
         });
         const url = await getDownloadURL(target);
@@ -222,6 +267,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
           uploadId,
           name,
           module: sanitizeReadUploadModule(module),
+          submodule: sanitizeReadUploadSubmodule(submodule),
           storagePath,
           url,
           sizeBytes: file.size,
@@ -244,6 +290,19 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       }
     },
     [uid],
+  );
+
+  const uploadPdfs = useCallback<UseReadUploadsResult["uploadPdfs"]>(
+    async (files, module, submodule) => {
+      const list = Array.isArray(files) ? files.filter(Boolean) : [];
+      const stored: ReadUpload[] = [];
+      for (const file of list) {
+        const row = await uploadPdf(file, module, submodule);
+        if (row) stored.push(row);
+      }
+      return stored;
+    },
+    [uploadPdf],
   );
 
   // ── Row edits ──────────────────────────────────────────────────────────
@@ -418,6 +477,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       uploadError,
       clearUploadError,
       uploadPdf,
+      uploadPdfs,
       removeUpload,
       renameUpload,
       setUploadModule,
@@ -433,6 +493,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       uploadError,
       clearUploadError,
       uploadPdf,
+      uploadPdfs,
       removeUpload,
       renameUpload,
       setUploadModule,

@@ -146,6 +146,40 @@ export function subscribeMigrationMarker(uid: string, onChange: (marker: Migrati
 export const isMigrationComplete = (marker: MigrationMarker | null): boolean =>
   Boolean(marker && marker.version >= MIGRATION_VERSION && marker.completedAt);
 
+/**
+ * Close the legacy My Day → workspace migration without copying old rows.
+ *
+ * Used when the remaining items are test / invalid (JOPLIN_BAD_ID) data the
+ * learner does not need restored. The original keys stay in place (§11); the
+ * marker is marked complete so the next visit does not retry or nag.
+ */
+export async function skipLegacyMigration(uid: string, reason = "legacy_not_needed"): Promise<MigrationMarker> {
+  const now = Date.now();
+  const phases: MigrationPhaseKey[] = ["tasks", "notes", "reminders", "schedule"];
+  const marker: MigrationMarker = {
+    version: MIGRATION_VERSION,
+    sourceVersion: LEGACY_SOURCE_VERSION,
+    startedAt: now,
+    completedAt: now,
+    phases: Object.fromEntries(
+      phases.map((phase) => [
+        phase,
+        { completed: true, completedAt: now, count: 0, verified: true, attempts: 0, lastError: reason },
+      ]),
+    ) as MigrationMarker["phases"],
+    counts: { notebooks: 0, notes: 0, todos: 0, tags: 0, schedules: 0 },
+    warnings: [reason],
+    legacyRetained: true,
+  };
+  try {
+    await setDoc(markerRef(uid), marker, { merge: true });
+  } catch {
+    /* offline — the device cache still stops the next visit from nagging */
+  }
+  cacheMarker(uid, marker);
+  return marker;
+}
+
 // ── legacy snapshot collection ──────────────────────────────────────────────
 
 function readLegacyJson<T>(key: string, fallback: T): T {

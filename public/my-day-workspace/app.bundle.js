@@ -30,6 +30,9 @@
     isModalOpen: false,
     modalType: null, // "schedule" | "notebook" | "tag"
     tokenRequestCallbacks: new Map(),
+    theme: "light",
+    mobilePane: "list", // "list" | "editor"
+    sidebarOpen: false,
   };
 
   // ── ID Helper ────────────────────────────────────────────────────────────
@@ -42,15 +45,89 @@
     return id;
   }
 
+  function isHex32(value) {
+    return /^[0-9a-f]{32}$/.test(String(value || ""));
+  }
+
+  function namedId(name) {
+    const src = String(name || "");
+    const seeds = [0x811c9dc5, 0x9e3779b1, 0x85ebca77, 0xc2b2ae3d];
+    const out = [];
+    for (let lane = 0; lane < 4; lane++) {
+      let hash = seeds[lane] >>> 0;
+      for (let i = 0; i < src.length; i++) {
+        hash ^= src.charCodeAt(i);
+        hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+      }
+      out.push((hash >>> 0).toString(16).padStart(8, "0"));
+    }
+    return out.join("");
+  }
+
+  const NB = {
+    root: namedId("notebook:My Day"),
+    tasks: namedId("notebook:Tasks"),
+    notes: namedId("notebook:Quick Notes"),
+    reminders: namedId("notebook:Reminders"),
+    clipper: namedId("notebook:Web Clippings"),
+  };
+
+  const LEGACY_NB = {
+    "nb-root": NB.root,
+    "nb-tasks": NB.tasks,
+    "nb-notes": NB.notes,
+    "nb-reminders": NB.reminders,
+    "nb-clipper": NB.clipper,
+  };
+
   // ── Default Hierarchy ────────────────────────────────────────────────────
   function getDefaultNotebooks() {
+    const now = Date.now();
     return [
-      { id: "nb-root", type_: 2, title: "My Day", parent_id: "", created_time: Date.now(), updated_time: Date.now() },
-      { id: "nb-tasks", type_: 2, title: "Tasks", parent_id: "nb-root", created_time: Date.now(), updated_time: Date.now() },
-      { id: "nb-notes", type_: 2, title: "Quick Notes", parent_id: "nb-root", created_time: Date.now(), updated_time: Date.now() },
-      { id: "nb-reminders", type_: 2, title: "Reminders", parent_id: "nb-root", created_time: Date.now(), updated_time: Date.now() },
-      { id: "nb-clipper", type_: 2, title: "Web Clippings", parent_id: "nb-root", created_time: Date.now(), updated_time: Date.now() },
+      { id: NB.root, type_: 2, title: "My Day", parent_id: "", created_time: now, updated_time: now },
+      { id: NB.tasks, type_: 2, title: "Tasks", parent_id: NB.root, created_time: now, updated_time: now },
+      { id: NB.notes, type_: 2, title: "Quick Notes", parent_id: NB.root, created_time: now, updated_time: now },
+      { id: NB.reminders, type_: 2, title: "Reminders", parent_id: NB.root, created_time: now, updated_time: now },
+      { id: NB.clipper, type_: 2, title: "Web Clippings", parent_id: NB.root, created_time: now, updated_time: now },
     ];
+  }
+
+  function remapLegacyId(id) {
+    const raw = String(id || "");
+    if (!raw) return "";
+    if (LEGACY_NB[raw]) return LEGACY_NB[raw];
+    if (isHex32(raw)) return raw;
+    return namedId("id:" + raw);
+  }
+
+  const THEME_KEY = "eduvora.joplin_theme";
+
+  function readStoredTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_KEY);
+      if (stored === "dark" || stored === "light") return stored;
+    } catch (_) {}
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+    } catch (_) {}
+    return "light";
+  }
+
+  function applyTheme() {
+    document.documentElement.setAttribute("data-theme", state.theme);
+    try {
+      localStorage.setItem(THEME_KEY, state.theme);
+    } catch (_) {}
+  }
+
+  function toggleTheme() {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    applyTheme();
+    render();
+  }
+
+  function isPhone() {
+    return typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
   }
 
   // ── Bridge Communication ─────────────────────────────────────────────────
@@ -161,6 +238,7 @@
       }
       if (noteId) {
         state.activeNoteId = noteId;
+        state.mobilePane = "editor";
       }
       if (scheduleId) {
         state.activeView = "schedule";
@@ -201,7 +279,7 @@
           legacyNotes.push({
             id: makeId(),
             type_: 1,
-            parent_id: "nb-tasks",
+            parent_id: NB.tasks,
             title: t.title || "Untitled Task",
             body: t.subject ? `Subject: ${t.subject}\n` : "",
             is_todo: 1,
@@ -219,7 +297,7 @@
           legacyNotes.push({
             id: makeId(),
             type_: 1,
-            parent_id: "nb-notes",
+            parent_id: NB.notes,
             title: (n.text || "Note").split("\n")[0].slice(0, 50),
             body: n.text || "",
             is_todo: 0,
@@ -237,7 +315,7 @@
           legacyNotes.push({
             id: makeId(),
             type_: 1,
-            parent_id: "nb-reminders",
+            parent_id: NB.reminders,
             title: r.text || "Reminder",
             body: r.note || "",
             is_todo: 1,
@@ -256,13 +334,22 @@
       }
     }
 
-    state.notebooks = loadedNotebooks && loadedNotebooks.length > 0 ? loadedNotebooks : getDefaultNotebooks();
-    state.notes = loadedNotes || [];
-    state.tags = loadedTags || [
-      { id: "tag-high", type_: 5, title: "high" },
-      { id: "tag-medium", type_: 5, title: "medium" },
-      { id: "tag-study", type_: 5, title: "study" },
-    ];
+    const notebooksIn = loadedNotebooks && loadedNotebooks.length > 0 ? loadedNotebooks : getDefaultNotebooks();
+    state.notebooks = notebooksIn.map((nb) => ({
+      ...nb,
+      id: remapLegacyId(nb.id),
+      parent_id: remapLegacyId(nb.parent_id),
+    }));
+    state.notes = (loadedNotes || []).map((note) => ({
+      ...note,
+      id: remapLegacyId(note.id),
+      parent_id: remapLegacyId(note.parent_id),
+    }));
+    state.tags = (loadedTags || [
+      { id: namedId("tag:high"), type_: 5, title: "high" },
+      { id: namedId("tag:medium"), type_: 5, title: "medium" },
+      { id: namedId("tag:study"), type_: 5, title: "study" },
+    ]).map((tag) => ({ ...tag, id: remapLegacyId(tag.id) }));
     state.schedules = loadedSchedules || [];
 
     if (!state.activeNoteId && state.notes.length > 0) {
@@ -362,7 +449,7 @@
 
   // ── Note Actions ─────────────────────────────────────────────────────────
   function createNewNote(isTodo = false) {
-    const parentId = state.activeNotebookId || (state.notebooks[0] ? state.notebooks[0].id : "nb-root");
+    const parentId = state.activeNotebookId || (state.notebooks[0] ? state.notebooks[0].id : NB.root);
     const newNote = {
       id: makeId(),
       type_: 1,
@@ -379,6 +466,8 @@
     };
     state.notes.unshift(newNote);
     state.activeNoteId = newNote.id;
+    state.mobilePane = "editor";
+    state.sidebarOpen = false;
     saveLocally();
     syncItemToCloud(newNote);
     postToHost("analytics", { event: isTodo ? "joplin_todo_create" : "joplin_note_create" });
@@ -387,11 +476,11 @@
 
   function createNewNotebook(title) {
     if (!title || !title.trim()) return;
-    const parentId = state.activeNotebookId || "nb-root";
+    const parentId = state.activeNotebookId || NB.root;
     const nb = {
       id: makeId(),
       type_: 2,
-      parent_id: parentId === "nb-root" ? "" : parentId,
+      parent_id: parentId === NB.root ? "" : parentId,
       title: title.trim(),
       created_time: Date.now(),
       updated_time: Date.now(),
@@ -447,7 +536,7 @@
       ownerId: state.uid || "local",
       targetType: note ? (note.is_todo ? "todo" : "note") : "custom",
       targetId: note ? note.id : scheduleId,
-      notebookId: note ? note.parent_id : "nb-reminders",
+      notebookId: note ? note.parent_id : NB.reminders,
       title: reminderTitle || (note ? note.title : "Reminder"),
       body: note ? note.body.slice(0, 200) : "",
       dueAt: dueAtMs,
@@ -534,13 +623,31 @@
     const totalTodos = state.notes.filter((n) => n.is_todo === 1).length;
     const pendingTodos = state.notes.filter((n) => n.is_todo === 1 && !n.todo_completed).length;
 
+    const themeIcon = state.theme === "dark" ? "☀️" : "🌙";
+    const themeLabel = state.theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+    const paneTitle = state.activeView === "todos"
+      ? "To-dos"
+      : state.activeView === "schedule"
+        ? "Schedule"
+        : state.activeNotebookId
+          ? (state.notebooks.find((n) => n.id === state.activeNotebookId) || {}).title || "Notebook"
+          : "All notes";
+
     let html = `
-      <div class="workspace-container">
+      <div class="workspace-container ${state.sidebarOpen ? "sidebar-open" : ""}" data-pane="${state.mobilePane}" data-theme-active="${state.theme}">
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+        <div class="mobile-topbar" data-bar="list">
+          <button class="icon-btn" id="btn-open-sidebar" title="Notebooks" aria-label="Open notebooks">☰</button>
+          <span class="mobile-title">${escapeHtml(paneTitle)}</span>
+          <button class="theme-toggle" id="btn-theme-mobile" title="${themeLabel}" aria-label="${themeLabel}">${themeIcon}</button>
+          <button class="icon-btn" id="btn-add-notebook-mobile" title="New Notebook">📁+</button>
+        </div>
         <!-- 1. Left Sidebar: Notebooks & Views -->
         <aside class="workspace-sidebar">
           <div class="sidebar-header">
             <span class="sidebar-title">My Day</span>
             <div class="sidebar-actions">
+              <button class="theme-toggle" id="btn-theme" title="${themeLabel}" aria-label="${themeLabel}">${themeIcon}</button>
               <button class="icon-btn" id="btn-add-notebook" title="New Notebook">📁+</button>
             </div>
           </div>
@@ -654,6 +761,7 @@
               ? `
             <div class="editor-toolbar">
               <div class="toolbar-group">
+                <button class="toolbar-btn editor-back" id="btn-editor-back" aria-label="Back to notes">← Back</button>
                 <button class="toolbar-btn" data-action="bold">B</button>
                 <button class="toolbar-btn" data-action="italic"><i>I</i></button>
                 <button class="toolbar-btn" data-action="h1">H1</button>
@@ -753,12 +861,41 @@
 
   // ── Event Handlers ───────────────────────────────────────────────────────
   function bindEvents() {
+    const themeBtn = document.getElementById("btn-theme");
+    const themeBtnMobile = document.getElementById("btn-theme-mobile");
+    if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
+    if (themeBtnMobile) themeBtnMobile.addEventListener("click", toggleTheme);
+
+    const openSidebar = document.getElementById("btn-open-sidebar");
+    if (openSidebar) {
+      openSidebar.addEventListener("click", () => {
+        state.sidebarOpen = true;
+        render();
+      });
+    }
+    const backdrop = document.getElementById("sidebar-backdrop");
+    if (backdrop) {
+      backdrop.addEventListener("click", () => {
+        state.sidebarOpen = false;
+        render();
+      });
+    }
+    const editorBack = document.getElementById("btn-editor-back");
+    if (editorBack) {
+      editorBack.addEventListener("click", () => {
+        state.mobilePane = "list";
+        render();
+      });
+    }
+
     // Nav Views
     document.querySelectorAll(".nav-item[data-view]").forEach((el) => {
       el.addEventListener("click", () => {
         state.activeView = el.getAttribute("data-view");
         state.activeNotebookId = null;
         state.activeTagId = null;
+        state.sidebarOpen = false;
+        state.mobilePane = "list";
         render();
       });
     });
@@ -769,6 +906,8 @@
         state.activeNotebookId = el.getAttribute("data-notebook-id");
         state.activeView = "notebook";
         state.activeTagId = null;
+        state.sidebarOpen = false;
+        state.mobilePane = "list";
         render();
       });
     });
@@ -779,18 +918,21 @@
         state.activeTagId = el.getAttribute("data-tag-id");
         state.activeView = "tags";
         state.activeNotebookId = null;
+        state.sidebarOpen = false;
+        state.mobilePane = "list";
         render();
       });
     });
 
     // Add Notebook
-    const addNbBtn = document.getElementById("btn-add-notebook") || document.getElementById("btn-quick-nb");
-    if (addNbBtn) {
-      addNbBtn.addEventListener("click", () => {
-        const title = prompt("Enter notebook name:");
-        if (title) createNewNotebook(title);
-      });
-    }
+    const addNotebook = () => {
+      const title = prompt("Enter notebook name:");
+      if (title) createNewNotebook(title);
+    };
+    ["btn-add-notebook", "btn-quick-nb", "btn-add-notebook-mobile"].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener("click", addNotebook);
+    });
 
     // Filter Chips
     document.querySelectorAll(".chip-btn[data-filter]").forEach((el) => {
@@ -953,6 +1095,7 @@
     document.querySelectorAll(".note-card[data-note-id]").forEach((card) => {
       card.addEventListener("click", () => {
         state.activeNoteId = card.getAttribute("data-note-id");
+        state.mobilePane = "editor";
         render();
       });
     });
@@ -1013,9 +1156,17 @@
   }
 
   // Initial Boot
+  state.theme = readStoredTheme();
+  applyTheme();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", loadData);
   } else {
     loadData();
   }
+  window.addEventListener("resize", () => {
+    if (!isPhone() && state.sidebarOpen) {
+      state.sidebarOpen = false;
+      render();
+    }
+  });
 })();

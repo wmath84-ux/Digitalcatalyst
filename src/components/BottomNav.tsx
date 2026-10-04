@@ -10,6 +10,8 @@ type BottomNavProps = {
   onChange: (tab: TabKey) => void;
   storeBadge?: number;
   purchasesBadge?: number;
+  /** Course-player peek reveal/drag on the home icons (Home + My Day). */
+  peek?: boolean;
 };
 
 const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: string }[] = [
@@ -28,7 +30,7 @@ const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: st
  * wears. It hugs its icons, magnifies and lifts nearby tabs under the
  * pointer/finger, and floats the active label above the dock.
  */
-export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
+export default function BottomNav({ active, onChange, storeBadge, purchasesBadge, peek = false }: BottomNavProps) {
   const items: GlassDockItem[] = TABS.map(({ key, label, icon, color }) => {
     const badge = key === "store" ? storeBadge : key === "purchases" ? purchasesBadge : undefined;
     return { id: key, label, icon, color, active: active === key, badge };
@@ -37,6 +39,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
   return (
     <SiteFooterNav
       label="Primary"
+      peek={peek}
       items={items}
       onSelect={(id) => {
         const key = id as TabKey;

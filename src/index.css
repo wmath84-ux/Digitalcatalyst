@@ -5558,6 +5558,69 @@ html[data-course-player-active="true"] {
   padding-bottom: 6px;
 }
 
+/* Home / My Day peek footer — same line, hit strip, open animation and
+   drag-to-select as the course player's peek dock (icons stay the site's). */
+[data-site-peek-dock] {
+  pointer-events: none;
+  padding-bottom: max(env(safe-area-inset-bottom), 10px);
+}
+
+[data-site-peek-line],
+[data-site-peek-line] * {
+  max-width: none !important;
+}
+
+[data-site-peek-line-hit] {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: min(26rem, 92%);
+  padding: 30px 24px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+[data-site-peek-dock][data-open="true"] [data-site-peek-line-hit] {
+  padding-top: 0;
+}
+
+[data-site-peek-line] {
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(22rem, 68%);
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 9999px;
+  background: transparent !important;
+  touch-action: none;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 10px 28px -12px rgba(0, 0, 0, 0.18);
+}
+
+[data-site-peek-panel] {
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+[data-site-peek-dock][data-open="true"] [data-site-peek-panel] {
+  pointer-events: auto;
+  height: auto;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  padding-bottom: 6px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    CHROME GLASS — WebsiteGlass docs sensitivity on every header
    ══════════════════════════════════════════════════════════════════════
