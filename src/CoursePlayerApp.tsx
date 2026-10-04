@@ -148,6 +148,7 @@ const firstAccessibleFile = (
     if (module.accessLevel === "hidden") continue;
     const moduleLocked = inheritedLocked || !accessible.has(String(module.id));
     const file = filesInModule(module).find((item) =>
+      item.type !== "read" &&
       item.accessLevel !== "hidden" &&
       Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) &&
       !moduleLocked &&
@@ -383,7 +384,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const { user } = useAuth();
   const { logoUrl, appName } = useBranding();
   const modules = product.courseContent || [];
-  const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
+  // Read resources open from the dedicated Read dock tab, not the lesson
+  // stack, last-opened resume target, completion tally or progress denominator.
+  const files = useMemo(() => allFiles(modules).filter((file) => file.type !== "read" && file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   /**
    * …and the ONE lesson type that is playable with no URL at all: an
    * interactive 2D experiment, whose source (`interactiveHtml`) travels inside
@@ -637,11 +640,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // needs. Both settings actions consume this, so an official resource and
   // its library copy always carry the same name, type, link and Brain set.
   const officialResourceDraft: OfficialResourceDraft | null = useMemo(() => {
-    if (!selectedFile || activeFileIsPersonal) return null;
+    if (!selectedFile || activeFileIsPersonal || selectedFile.type === "read") return null;
     const file = selectedFile;
     return {
       name: String(file.name || "Course resource"),
-      type: file.type,
+      type: file.type as Exclude<CourseFile["type"], "read">,
       url: String(file.url || file.embedUrl || file.youtubeUrl || ""),
       description: String(file.description || ""),
       ...(file.type === "brain" && Array.isArray(file.practiceQuestions)
@@ -1386,7 +1389,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
   };
 
-  // ⌘/Ctrl+1…8 walks the study tabs — a desktop shortcut, so it stays out of
+  // ⌘/Ctrl+1…9 walks the study tabs — a desktop shortcut, so it stays out of
   // the way of any text field and of anything outside the player.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1570,6 +1573,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       tab={dockTab}
       onTabChange={handleDockTabChange}
       modules={modules}
+      productId={String(product.id)}
       selectedFileId={selectedFile?.id}
       ownedUpdateIds={ownedUpdateIds}
       accessibleModuleIds={resolution.accessibleModuleIds}

@@ -41,6 +41,17 @@ service firebase.storage {
         && request.resource.contentType == 'application/pdf';
     }
 
+    // First-class Course Player Read uploads. The client rejects 100 MiB and
+    // larger files too, so the finite limit and content type agree end to end.
+    match /adminProductContent/read/{productId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && fileName.matches('^[A-Za-z0-9._-]+[.]pdf$')
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if isAdmin();
+    }
+
     match /adminProductContent/ebook/{productId}/{fileName} {
       allow read: if true;
       allow write: if isAdmin()

@@ -33,6 +33,7 @@
 //     even without valid resources.
 
 import { normalizePracticeQuestions, practiceQuestionsReady } from "./practiceSet.js";
+import { normalizeReadResourceUrl, normalizeReadSourceKind } from "./readResources.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isString = (v) => typeof v === "string";
@@ -105,7 +106,7 @@ const normResourceType = (v) => {
     s === "gform" || s === "google_form" ||
     s === "ebook" ||
     s === "github_pages" || s === "whimsical" || s === "iframe" ||
-    s === "brain" || s === "interactive" ||
+    s === "brain" || s === "interactive" || s === "read" ||
     s === "doc" || s === "sheet" || s === "embed" || s === "mindmap"
   ) return s;
   return "embed";
@@ -130,6 +131,32 @@ const practiceQuestionsOf = (raw) => normalizePracticeQuestions(raw && raw.pract
 /** Title shown on the Brain tab for this set (falls back to the resource name). */
 const practiceTitleOf = (raw) => str(raw && (raw.practiceTitle || raw.practiceTitleText)).trim();
 
+/** Read-only upload/source metadata (`read` resources only). */
+const readMetadataOf = (raw, type) => {
+  if (type !== "read") return {};
+  const sourceKind = normalizeReadSourceKind(raw && raw.readSourceKind, raw && raw.readStoragePath);
+  const storagePath = str(raw && raw.readStoragePath).trim();
+  const fileName = str(raw && raw.readFileName).trim().slice(0, 255);
+  const fileSize = numOrNull(raw && raw.readFileSize);
+  return {
+    readSourceKind: sourceKind,
+    readStoragePath: storagePath || undefined,
+    readFileName: fileName || undefined,
+    readFileSize: fileSize !== null && fileSize > 0 ? fileSize : undefined,
+  };
+};
+
+/** The Read URL boundary is deliberately separate from generic product URLs. */
+const readResourceUrlOf = (raw) => {
+  const sourceKind = normalizeReadSourceKind(raw && raw.readSourceKind, raw && raw.readStoragePath);
+  return normalizeReadResourceUrl(raw && raw.url, sourceKind, {
+    productId: raw && raw.productId,
+    resourceId: raw && raw.id,
+    storagePath: raw && raw.readStoragePath,
+    fileSize: raw && raw.readFileSize,
+  });
+};
+
 const isExperimentResourceType = (type) => type === "interactive";
 
 /** The inline HTML source an experiment resource carries ("" when hosted-only). */
@@ -138,6 +165,7 @@ const experimentHtmlOf = (raw) => (raw && typeof raw.interactiveHtml === "string
 /** A Brain resource is publishable when it holds a complete, answerable set. */
 const isUsableResource = (type, url, youtubeVideoId, raw) => {
   if (isBrainResourceType(type)) return practiceQuestionsReady(raw && raw.practiceQuestions);
+  if (type === "read") return Boolean(readResourceUrlOf(raw));
   if (isExperimentResourceType(type)) {
     // An experiment is playable with its inline source OR a hosted page —
     // the same rule the Course Player's Modules tab reads (`isExperimentFile`).
@@ -250,7 +278,7 @@ const toPlayerResourceType = (raw) => toCanonicalResourceType(raw);
 // URL validation — the canonical rule (the legacy `src/utils/courseContent.ts` shim was deleted).
 const VALID_URL_TYPES = new Set([
   "youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "image",
-  "google_form", "ebook", "embed", "mindmap", "iframe", "brain", "interactive",
+  "google_form", "ebook", "embed", "mindmap", "iframe", "brain", "interactive", "read",
   "video_url", "audio_url", "image_url", "gdrive", "gdoc", "gsheet",
   "gslides", "gform", "github_pages", "whimsical",
 ]);
@@ -362,6 +390,7 @@ export const normalizeResourceUrl = (value, resourceType = "") => {
     const videoId = extractYoutubeVideoId(value);
     if (videoId) return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   }
+  if (type === "read") return normalizeReadResourceUrl(value, "pdf_url");
   return normalizeHttpsUrl(value);
 };
 
@@ -387,8 +416,8 @@ export const isProductPublished = (raw) => getProductPublicationStatus(raw) === 
  */
 export const editorResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
-  const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = toCanonicalResourceType(raw.type);
+  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   // YouTube resources are valid via their video id alone, so recover the id
   // from any pasted form (bare 11-char id, watch?v=, youtu.be, shorts, embed,
   // or a link missing its https:// scheme) instead of requiring a full https URL.
@@ -405,7 +434,7 @@ export const editorResourceToCanonical = (raw) => {
     parentModuleId: str(raw.parentModuleId),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: url || str(raw.url),
+    url: type === "read" ? url : url || str(raw.url),
     provider: str(raw.provider, type === "mindmap" ? "whimsical_mindmap" : ""),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -426,6 +455,7 @@ export const editorResourceToCanonical = (raw) => {
     practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
     // Same idea for the experiment: the inline HTML IS the lesson.
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    ...readMetadataOf(raw, type),
   };
 };
 
@@ -498,8 +528,8 @@ export const editorModulesToCanonicalTree = (flat) => {
  */
 export const editorResourceToFirestore = (raw) => {
   if (!isObject(raw)) return null;
-  const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = normResourceType(raw.type);
+  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
@@ -510,7 +540,7 @@ export const editorResourceToFirestore = (raw) => {
     id: str(raw.id),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: url || str(raw.url),
+    url: type === "read" ? url : url || str(raw.url),
     embedUrl: pickValidUrl(raw.embedUrl) || undefined,
     youtubeUrl: pickValidUrl(raw.youtubeUrl) || undefined,
     youtubeVideoId: youtubeVideoId || undefined,
@@ -540,6 +570,7 @@ export const editorResourceToFirestore = (raw) => {
     // The experiment's inline source travels the same way (hosted-only
     // experiments carry nothing here — their link is `url` above).
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    ...readMetadataOf(raw, type),
   };
   // Firestore rejects `undefined` field values outright, so the optional
   // slots above (embedUrl / youtubeUrl / youtubeVideoId / paidUpdatePrice)
@@ -678,16 +709,18 @@ export const editorPaidUpdateToFirestore = (raw, allFlatModules) => {
  */
 export const firestoreResourceToEditor = (raw) => {
   if (!isObject(raw)) return null;
-  // Prefer any usable HTTPS URL slot (url → embedUrl → youtubeUrl) so
-  // resources stored with only a `youtubeUrl` / `embedUrl` still come back
-  // into the editor with a working link. Falls back to the raw string so a
-  // bad URL is preserved for the admin to fix rather than silently dropped.
-  const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl) || str(raw.url);
+  const type = normResourceType(raw.type);
+  // Read is validated by its dedicated source-kind boundary in the editor;
+  // preserve its raw field so an admin can repair a malformed saved draft.
+  // Other types keep the shared HTTPS URL recovery behavior.
+  const url = type === "read"
+    ? str(raw.url)
+    : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl) || str(raw.url);
   return {
     id: str(raw.id),
     name: str(raw.name, "Untitled resource"),
     // Editor only knows the 14-type enum; map back from the 11-type alias.
-    type: fromPlayerResourceType(normResourceType(raw.type)),
+    type: fromPlayerResourceType(type),
     url,
     provider: str(raw.provider),
     sortOrder: num(raw.sortOrder),
@@ -713,6 +746,7 @@ export const firestoreResourceToEditor = (raw) => {
     // re-preview the same source (gated by type, so a stale payload from an
     // earlier resource type never haunts the editor).
     interactiveHtml: isExperimentResourceType(normResourceType(raw.type)) ? experimentHtmlOf(raw) || undefined : undefined,
+    ...readMetadataOf(raw, type),
     parentModuleId: raw.parentModuleId === null || raw.parentModuleId === undefined || raw.parentModuleId === ""
       ? null
       : str(raw.parentModuleId),
@@ -843,8 +877,8 @@ export const firestorePaidUpdateToEditor = (raw) => {
  */
 export const firestoreResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
-  const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = toCanonicalResourceType(raw.type);
+  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
@@ -855,7 +889,7 @@ export const firestoreResourceToCanonical = (raw) => {
     parentModuleId: str(raw.parentModuleId),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: url || str(raw.url),
+    url: type === "read" ? url : url || str(raw.url),
     provider: str(raw.provider, type === "mindmap" ? "whimsical_mindmap" : ""),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -872,6 +906,7 @@ export const firestoreResourceToCanonical = (raw) => {
     practiceQuestions: isBrainResourceType(type) ? practiceQuestionsOf(raw) : undefined,
     practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    ...readMetadataOf(raw, type),
   };
 };
 
@@ -980,6 +1015,7 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     // The experiment stage's content: the admin's inline HTML, carried to the
     // player untouched (a hosted experiment arrives via `url` above instead).
     interactiveHtml: isExperimentResourceType(toPlayerResourceType(r.type)) ? experimentHtmlOf(r) || undefined : undefined,
+    ...readMetadataOf(r, toPlayerResourceType(r.type)),
   };
 };
 

@@ -152,6 +152,95 @@ function excalidrawAssets(): import("vite").Plugin {
   };
 }
 
+const PDFJS_VERSION = "6.3.289";
+const PDFJS_VIEWER_PACKAGE = path.resolve(__dirname, "node_modules/pdfjs-viewer-element/dist");
+const PDFJS_DIST_PACKAGE = path.resolve(__dirname, "node_modules/pdfjs-dist");
+
+/**
+ * Locally host the PDF.js Generic Viewer and every runtime support asset it
+ * can request. The web component itself is still a dynamic import; these files
+ * are emitted as versioned static assets so Vite dev, production and Capacitor
+ * all use the same same-origin paths.
+ */
+function pdfjsViewerAssets(): import("vite").Plugin {
+  const contentType = (file: string) => {
+    const lower = file.toLowerCase();
+    if (lower.endsWith(".mjs") || lower.endsWith(".js")) return "text/javascript; charset=utf-8";
+    if (lower.endsWith(".css")) return "text/css; charset=utf-8";
+    if (lower.endsWith(".svg")) return "image/svg+xml";
+    if (lower.endsWith(".png")) return "image/png";
+    if (lower.endsWith(".gif")) return "image/gif";
+    if (lower.endsWith(".wasm")) return "application/wasm";
+    if (lower.endsWith(".bcmap")) return "application/octet-stream";
+    if (lower.endsWith(".icc")) return "application/vnd.iccprofile";
+    if (lower.endsWith(".otf")) return "font/otf";
+    if (lower.endsWith(".pfb")) return "application/octet-stream";
+    return "application/octet-stream";
+  };
+  const sendPackageFile = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: (error?: unknown) => void,
+    packageRoot: string,
+  ) => {
+    const raw = decodeURIComponent((req.url || "/").split("?")[0]).replace(/^\/+/, "");
+    const versionPrefix = `${PDFJS_VERSION}/`;
+    if (!raw.startsWith(versionPrefix)) return next();
+    const relative = raw.slice(versionPrefix.length);
+    const root = path.resolve(packageRoot);
+    const file = path.resolve(root, relative);
+    if (!file.startsWith(root + path.sep) || !existsSync(file) || !statSync(file).isFile()) return next();
+    res.setHeader("content-type", contentType(file));
+    res.setHeader("cache-control", "public, max-age=31536000, immutable");
+    res.end(readFileSync(file));
+  };
+  const copyTree = (
+    emit: (asset: { type: "asset"; fileName: string; source: Uint8Array }) => unknown,
+    sourceRoot: string,
+    outputRoot: string,
+  ) => {
+    if (!existsSync(sourceRoot)) return;
+    const visit = (directory: string, relative = "") => {
+      for (const name of readdirSync(directory)) {
+        const source = path.join(directory, name);
+        const childRelative = path.posix.join(relative, name);
+        const stat = statSync(source);
+        if (stat.isDirectory()) {
+          visit(source, childRelative);
+        } else if (stat.isFile() && !name.endsWith(".map") && !name.endsWith(".ts")) {
+          emit({ type: "asset", fileName: `${outputRoot}/${childRelative}`, source: readFileSync(source) });
+        }
+      }
+    };
+    visit(sourceRoot);
+  };
+
+  return {
+    name: "pdfjs-viewer-assets",
+    configureServer(server) {
+      server.middlewares.use("/pdfjs-viewer/", (req, res, next) => sendPackageFile(req, res, next, PDFJS_VIEWER_PACKAGE));
+      server.middlewares.use("/pdfjs-data/", (req, res, next) => sendPackageFile(req, res, next, PDFJS_DIST_PACKAGE));
+    },
+    generateBundle() {
+      if (!existsSync(PDFJS_VIEWER_PACKAGE) || !existsSync(PDFJS_DIST_PACKAGE)) {
+        this.error("PDF.js packages are missing. Install pdfjs-viewer-element and pdfjs-dist before building.");
+      }
+      const emit = (asset: { type: "asset"; fileName: string; source: Uint8Array }) => this.emitFile(asset);
+      copyTree(emit, PDFJS_VIEWER_PACKAGE, `pdfjs-viewer/${PDFJS_VERSION}`);
+      for (const directory of ["cmaps", "iccs", "image_decoders", "standard_fonts", "wasm"]) {
+        copyTree(emit, path.join(PDFJS_DIST_PACKAGE, directory), `pdfjs-data/${PDFJS_VERSION}/${directory}`);
+      }
+      const sandbox = path.join(PDFJS_DIST_PACKAGE, "build/pdf.sandbox.min.mjs");
+      if (!existsSync(sandbox)) this.error("The pinned PDF.js sandbox bundle was not found.");
+      this.emitFile({
+        type: "asset",
+        fileName: `pdfjs-data/${PDFJS_VERSION}/build/pdf.sandbox.min.mjs`,
+        source: readFileSync(sandbox),
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -216,6 +305,7 @@ export default defineConfig({
       },
     },
     excalidrawAssets(),
+    pdfjsViewerAssets(),
   ],
   resolve: {
     alias: {

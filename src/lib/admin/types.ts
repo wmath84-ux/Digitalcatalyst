@@ -49,6 +49,12 @@ export type ProductResource = {
      */
     | "brain"
     /**
+     * Read library item — upload a PDF, link a Drive/direct PDF, or embed a
+     * safe public HTTPS webpage. It opens from the Course Player's Read tab,
+     * not the ordinary lesson viewer.
+     */
+    | "read"
+    /**
      * Interactive 2D experiment — the admin-authored twin of the Study
      * Library's experiment: ONE self-contained HTML file (usually generated
      * by an AI from the builder's prompt), designed in the product editor
@@ -84,6 +90,11 @@ export type ProductResource = {
    * plays offline in a sandboxed iframe. See `src/utils/experimentSpec.ts`.
    */
   interactiveHtml?: string;
+  /** Read source metadata (`type: "read"` only). */
+  readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
+  readStoragePath?: string;
+  readFileName?: string;
+  readFileSize?: number;
 };
 
 export type ProductModule = {

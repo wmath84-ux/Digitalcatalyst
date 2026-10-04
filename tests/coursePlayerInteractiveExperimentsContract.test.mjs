@@ -83,8 +83,9 @@ test("the experiment is its own union member and CourseFileType keeps its 13 off
   assert.match(courseTypes, /export const isExperimentFileType = \(type\?: string \| null\): type is CourseInteractiveFileType =>/);
   // The two declarations of the id (types + spec) must agree.
   assert.equal(EXPERIMENT_FILE_TYPE, "interactive");
-  // A CourseFile may carry the experiment, plus its inline source.
-  assert.match(courseTypes, /export interface CourseFile extends CourseAccessMeta \{[\s\S]*?type: CourseContentFileType;/);
+  // A CourseFile may carry the experiment and the separate admin Read type;
+  // neither expands the official 13-member CourseFileType union.
+  assert.match(courseTypes, /export interface CourseFile extends CourseAccessMeta \{[\s\S]*?type: CourseContentFileType \| CourseReadResourceFileType;/);
   assert.match(courseTypes, /interactiveHtml\?: string;/);
 });
 
@@ -253,8 +254,9 @@ test("the Modules tab shows an experiment and gives it its own icon", () => {
 });
 
 test("the viewer stack opens experiments and never a URL-less type it cannot render", () => {
-  // `files` stays URL-only (a Brain set is opened through the Brain tab)…
-  assert.match(player, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
+  // `files` stays URL-backed lesson content, with Read explicitly kept out of
+  // the lesson stack (Brain and Read each open from their own dock tab)…
+  assert.match(player, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
   // …while experiments join `playableFiles`, which drives the first-lesson /
   // deep-link selection, resume, and the progress denominator.
   assert.match(player, /const experimentFiles = useMemo\(\s*\n\s*\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.accessLevel !== "hidden" && isExperimentFileType\(file\.type\) && Boolean\(String\(file\.interactiveHtml \|\| ""\)\.trim\(\)\)\),/);

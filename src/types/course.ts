@@ -38,8 +38,12 @@ export type CourseFileType =
  */
 export const EXPERIMENT_FILE_TYPE = "interactive" as const;
 export type CourseInteractiveFileType = typeof EXPERIMENT_FILE_TYPE;
-/** Anything a `CourseFile.type` may hold: official types + the experiment. */
+/** Official lesson content plus the experiment; `CourseFile.type` adds Read separately. */
 export type CourseContentFileType = CourseFileType | CourseInteractiveFileType;
+
+/** Admin-authored Read library resource; intentionally separate from lessons. */
+export const READ_RESOURCE_FILE_TYPE = "read" as const;
+export type CourseReadResourceFileType = typeof READ_RESOURCE_FILE_TYPE;
 
 /** True for the learner-authored interactive experiment. */
 export const isExperimentFileType = (type?: string | null): type is CourseInteractiveFileType =>
@@ -129,7 +133,7 @@ export interface CourseAccessMeta {
 export interface CourseFile extends CourseAccessMeta {
   id: string;
   name: string;
-  type: CourseContentFileType;
+  type: CourseContentFileType | CourseReadResourceFileType;
   url?: string;
   embedUrl?: string;
   youtubeUrl?: string;
@@ -137,6 +141,13 @@ export interface CourseFile extends CourseAccessMeta {
   size?: number;
   contentType?: string;
   provider?: string;
+  /** Read resource origin (`type: "read"` only). */
+  readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
+  /** Owned Firebase Storage object path for an uploaded Read PDF. */
+  readStoragePath?: string;
+  /** Original uploaded PDF filename and size, used in the Read library. */
+  readFileName?: string;
+  readFileSize?: number;
   /**
    * Personal Modules ("My Modules") provenance. Set ONLY when this file was
    * opened from the learner's OWN personal-content space — official course
