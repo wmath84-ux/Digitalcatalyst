@@ -94,6 +94,29 @@ export interface UseCourseSketchResult {
   elementCount: number;
   /** Excalidraw's `onChange` — elements + appState + files. */
   updateScene: (elements: unknown, appState: unknown, files: unknown) => void;
+  /**
+   * The learner's canvas colour choice, remembered two ways:
+   *
+   *   · ON the board — `appState.viewBackgroundColor` + `theme` (both
+   *     whitelisted keys), so the board reopens exactly as saved;
+   *   · ON the device — a small per-learner preference, so a board that has
+   *     no saved colour of its own still opens with the colour the learner
+   *     used last time ("dobra open karen to wahi dikhe").
+   *
+   * `null` means "no custom colour — the theme default": the board opens
+   * dark, the canvas the player always had. A hex means that colour ON A
+   * LIGHT-BOARD — in the dark theme the editor inverts the canvas colour
+   * (white paints as #121212), so any chosen colour also flips the board's
+   * theme to light: what the learner picks is what they see.
+   */
+  setCanvasColor: (color: string | null) => void;
+  /**
+   * The mode this board opens with: `null` (theme default — dark board) or
+   * a hex (light board with that canvas colour). The board's own saved
+   * theme wins; a board with no saved theme of its own falls back to the
+   * learner's device preference.
+   */
+  canvasColor: string | null;
   /** Write everything pending right now (tab switch, unmount, page hide). */
   flush: () => void;
 }
@@ -115,6 +138,32 @@ const localKey = (uid: string, productId: string, moduleId: string) =>
 /** Durable "this device has work the cloud has not acknowledged" marker. */
 const outboxKey = (uid: string, productId: string, moduleId: string) =>
   `dc.sketchOutbox.v1.${uid}.${productId}.${moduleId}`;
+
+/**
+ * The learner's last canvas colour (device level). Per learner, because the
+ * same device can study under two accounts and a colour is a preference, not
+ * a board fact — boards carry their own saved colour in the scene.
+ */
+const canvasColorPrefKey = (uid: string) =>
+  `dc.sketchCanvasColor.v1.${uid || "guest"}`;
+
+const readCanvasColorPref = (uid: string): string | null => {
+  try {
+    const value = localStorage.getItem(canvasColorPrefKey(uid));
+    return value && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCanvasColorPref = (uid: string, color: string | null) => {
+  try {
+    if (color) localStorage.setItem(canvasColorPrefKey(uid), color);
+    else localStorage.removeItem(canvasColorPrefKey(uid));
+  } catch {
+    /* private mode — the scene copy still carries the colour */
+  }
+};
 
 /** A Firestore failure's code (`permission-denied`, `unavailable`, …). */
 const errorCode = (thrown: unknown): string =>
@@ -561,6 +610,38 @@ export default function useCourseSketch({
     [scheduleSave],
   );
 
+  // ── Canvas colour ──────────────────────────────────────────────────────
+  // A colour pick is an appState-only change: the element signature does
+  // NOT move, so `updateScene` above would file it and schedule nothing.
+  // The pick therefore marks the session dirty and queues the save itself —
+  // otherwise "remember the canvas colour" would silently depend on the
+  // learner drawing another stroke first.
+  const setCanvasColor = useCallback(
+    (color: string | null) => {
+      const scope = scopeRef.current;
+      writeCanvasColorPref(scope.uid, color);
+      if (!scope.scoped || !scope.loaded || scope.disposed) return;
+      // A chosen colour always lands on a LIGHT board (the dark theme would
+      // invert it); the default lands on a dark board with the editor's own
+      // default canvas. Both `theme` and `viewBackgroundColor` are
+      // whitelisted appState keys, so the choice reopens with the board.
+      scope.scene = {
+        ...scope.scene,
+        appState: {
+          ...(scope.scene.appState ?? {}),
+          ...(color
+            ? { theme: "light", viewBackgroundColor: color }
+            : { theme: "dark", viewBackgroundColor: "#ffffff" }),
+        },
+      };
+      scope.revision += 1;
+      scope.dirty = true;
+      persistLocal(scope);
+      scheduleSave(scope);
+    },
+    [persistLocal, scheduleSave],
+  );
+
   /** The live scene, read at call time — see `getScene` on the result type. */
   const getScene = useCallback(() => scopeRef.current.scene, []);
 
@@ -621,11 +702,26 @@ export default function useCourseSketch({
       lastSavedAt: session.lastSavedAt,
       elementCount: session.scene.elements.length,
       updateScene,
+      setCanvasColor,
+      // The board's own saved THEME is authoritative: a light board reopens
+      // with its saved colour, a dark board reopens dark. A board with no
+      // saved theme of its own (fresh) opens with the learner's last-used
+      // device colour, else dark.
+      canvasColor: (() => {
+        const saved = (session.scene.appState ?? {}) as Record<string, unknown>;
+        const savedTheme = saved.theme;
+        if (savedTheme === "light") {
+          const savedColor = saved.viewBackgroundColor;
+          return typeof savedColor === "string" && savedColor ? savedColor : "#ffffff";
+        }
+        if (savedTheme === "dark") return null;
+        return readCanvasColorPref(session.uid);
+      })(),
       flush,
     }),
     // `bump()` drives this recompute: every field above is read off the
     // session object, which mutates in place by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, generation, session.status, session.loaded, session.pendingSync, session.errorMessage, updateScene, flush, getScene],
+    [session, generation, session.status, session.loaded, session.pendingSync, session.errorMessage, updateScene, setCanvasColor, flush, getScene],
   );
 }
