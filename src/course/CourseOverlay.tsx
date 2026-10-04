@@ -50,6 +50,8 @@ import {
 } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { collectAccessibleReadResources } from "../../utils/readResources.js";
+import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -57,7 +59,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch" | "read";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -294,6 +296,8 @@ interface CourseOverlayProps {
    *  tab: the Split Deck peek-collapses the study pane (its toggleStudy). */
   onTabChange: (tab: DockTab) => void;
   modules: CourseModule[];
+  /** Product document id binds Read uploads and page-position storage. */
+  productId?: string;
   selectedFileId?: string;
   ownedUpdateIds: Set<string>;
   accessibleModuleIds: Set<string>;
@@ -369,7 +373,7 @@ interface CourseOverlayProps {
 }
 
 /**
- * The eight study tabs, in dock order. Exported because the Split Deck
+ * The nine study tabs, in dock order. Exported because the Split Deck
  * (src/course/studyPanels.tsx) needs the active tab's colour and its icon
  * for the study peek rail — the deck must never keep its own copy of the
  * list. (The divider line itself is fixed yellow.)
@@ -397,9 +401,12 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // existing tab's dock position (or ⌘/Ctrl+N shortcut) moves; pulling it up
   // next to Mind map is a one-line reorder of this array, nothing else.
   { key: "sketch", label: "Sketch", heading: "Sketch", hint: "Lecture ke saath likhein aur banayein", color: "#F97316", icon: PenLine },
+  // The Read library is a distinct resource tab; the existing eight tab keys
+  // stay in their original order so their numeric keyboard shortcuts persist.
+  { key: "read", label: "Read", heading: "Read library", hint: "Accessible PDFs and reading links", color: "#E879F9", icon: FileText },
 ];
 
-/** The dock's tab order — ⌘/Ctrl+1…8 walks this list. */
+/** The dock's tab order — ⌘/Ctrl+1…9 walks this list. */
 export const STUDY_TAB_ORDER: DockTab[] = TABS.map(({ key }) => key);
 
 /** The tab record for a key, falling back to the first one for unknown keys. */
@@ -522,7 +529,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     const visible = flatModules.filter(({ module }) => unlocked.has(String(module.id)));
 
     for (const { module, depth } of visible) {
-      const files = moduleFiles(module).filter((file) => isVisibleFile(file));
+      const files = moduleFiles(module).filter((file) => file.type !== "read" && isVisibleFile(file));
       const moduleId = String(module.id);
       const accessible = accessibleModuleIds.has(moduleId);
       const preview = previewModuleIds.has(moduleId);
@@ -819,7 +826,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
 
-  // ── The eight tabs' rows ───────────────────────────────────────────────
+  // Read entries reuse the exact module-unlock resolver already used by the
+  // Modules tab, plus the current paid-update ownership set for resource-level
+  // gating. No second entitlement or content hierarchy is introduced.
+  const readEntries = useMemo(() => {
+    const unlocked = unlockedModuleIds(props.modules, props.accessibleModuleIds, props.ownedUpdateIds);
+    return collectAccessibleReadResources(props.modules, unlocked, props.ownedUpdateIds, props.productId);
+  }, [props.modules, props.accessibleModuleIds, props.ownedUpdateIds, props.productId]);
+
+  // ── The nine tabs' rows ───────────────────────────────────────────────
   const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
   // ── Footer navigation: the home footer, exactly ────────────────────────
@@ -903,7 +918,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // every tab starts at the very top of the pane so the content keeps every
   // pixel the header used to take.
   const peekPad = props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : "";
-  const hideKeyedBody = Boolean(props.aiPanel) && props.tab === "ai";
+  const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read";
 
   return (
     <>
@@ -927,6 +942,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           {props.aiPanel}
         </div>
       ) : null}
+      <div
+        className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "read" ? "flex" : "hidden"}`}
+        data-course-read-tab
+        hidden={props.tab !== "read"}
+        aria-hidden={props.tab !== "read"}
+      >
+        <ReadLibraryPanel entries={readEntries} productId={String(props.productId || "")} />
+      </div>
       {dock}
     </>
   );

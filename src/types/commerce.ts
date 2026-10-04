@@ -79,7 +79,9 @@ export type ResourceType =
    * sandboxed stage. Its content is `interactiveHtml` below; a hosted https
    * page in `url` is the fallback for files too big to store inline.
    */
-  | "interactive";
+  | "interactive"
+  /** Admin-managed Read library entry, not an ordinary lesson viewer file. */
+  | "read";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -110,6 +112,11 @@ export interface CanonicalCourseResource {
   practiceTitle?: string;
   /** Interactive 2D experiment source (`type: "interactive"` only). */
   interactiveHtml?: string;
+  /** Read source metadata (`type: "read"` only). */
+  readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
+  readStoragePath?: string;
+  readFileName?: string;
+  readFileSize?: number;
 }
 
 export interface CanonicalCourseModule {

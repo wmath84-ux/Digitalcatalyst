@@ -16,6 +16,7 @@ import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.j
 import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
 import { normalizePlanPersonalModules } from "../../../utils/personalCourse.js";
 import { normalizePlanStudyPacks } from "../../../utils/studyPacks.js";
+import { sanitizeReadUploadsForProduct } from "../../../utils/readResources.js";
 import { apiFetch } from "../../utils/apiBase";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
@@ -159,6 +160,7 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
   const visibility = requestedStatus === "published" ? "visible" : "hidden";
   const normalizedBody = stripUndefinedDeep({
     ...body,
+    ...(Array.isArray(body.modules) ? { modules: sanitizeReadUploadsForProduct(body.modules, ref.id) } : {}),
     id: ref.id,
     status: requestedStatus,
     visibility,

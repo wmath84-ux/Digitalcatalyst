@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAdminRouter as useRouter } from "@/lib/admin/router";
 import {
   DangerButton,
@@ -23,6 +23,13 @@ import ModulesResourcesEditor from "@/components/admin/products/ModulesResources
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
 import { normalizeResourceUrl, productExperimentBudget, productExperimentBudgetError } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
+import { getFirebaseStorage } from "../../../../firebase";
+import {
+  collectReadUploadPaths,
+  normalizeReadResourceUrl,
+  normalizeReadSourceKind,
+  sanitizeReadUploadsForProduct,
+} from "../../../../utils/readResources.js";
 import {
   DEFAULT_STORE_FILTER_GROUP,
   STORE_FILTER_GROUPS,
@@ -126,6 +133,27 @@ function csvToList(value: string): string[] {
     .filter(Boolean);
 }
 
+async function deleteReadStorageObjects(paths: Iterable<string>): Promise<string[]> {
+  const uniquePaths = [...new Set(paths)].filter(Boolean);
+  if (uniquePaths.length === 0) return [];
+  try {
+    const storage = await getFirebaseStorage();
+    const { ref, deleteObject } = await import("firebase/storage");
+    const failed = await Promise.all(uniquePaths.map(async (path) => {
+      try {
+        await deleteObject(ref(storage, path));
+        return "";
+      } catch (error) {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "storage/object-not-found") return "";
+        return path;
+      }
+    }));
+    return failed.filter(Boolean);
+  } catch {
+    return uniquePaths;
+  }
+}
+
 export function ProductEditor({ productId }: { productId?: string }) {
   const isNew = !productId;
   const router = useRouter();
@@ -139,12 +167,16 @@ export function ProductEditor({ productId }: { productId?: string }) {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("basic");
   const [newImageUrl, setNewImageUrl] = useState("");
+  const persistedReadUploadPathsRef = useRef<Set<string>>(new Set());
+  const pendingReadUploadPathsRef = useRef<Set<string>>(new Set());
+  const failedReadCleanupPathsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (isNew) return;
     (async () => {
       try {
         const res = await adminFetch<{ product: ProductForm }>(`/api/admin/products/${productId}`);
+        persistedReadUploadPathsRef.current = collectReadUploadPaths(res.product.modules, res.product.id || productId || "");
         setForm({
           ...res.product,
           filterIds: Array.isArray(res.product.filterIds) ? res.product.filterIds : [],
@@ -224,6 +256,22 @@ export function ProductEditor({ productId }: { productId?: string }) {
               add(`Interactive experiment “${r.name || "Untitled resource"}” in “${m.title}”: ${issue.message}`, "modules", true);
             }
           }
+        } else if (r.type === "read") {
+          const readSourceKind = normalizeReadSourceKind(r.readSourceKind, r.readStoragePath);
+          const readUrl = normalizeReadResourceUrl(r.url, readSourceKind, {
+            productId: form.id || productId || undefined,
+            resourceId: r.id,
+            storagePath: r.readStoragePath,
+            fileSize: r.readFileSize,
+          });
+          if (!readUrl) {
+            const expected = readSourceKind === "upload"
+              ? "a valid owned PDF upload smaller than 100 MiB"
+              : readSourceKind === "gdrive"
+                ? "a valid Google Drive share link"
+                : "a safe public HTTPS URL";
+            add(`Read resource “${r.name || "Untitled resource"}” in “${m.title}” needs ${expected}.`, "modules", learnerVisible);
+          }
         } else if (!normalizeResourceUrl(r.url, r.type)) {
           add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "modules", learnerVisible);
         }
@@ -273,6 +321,23 @@ export function ProductEditor({ productId }: { productId?: string }) {
     return issues;
   }, [form]);
 
+  async function cleanupReadUploadsAfterSave(savedProduct: ProductForm, fallbackModules: ProductModule[]) {
+    const savedProductId = savedProduct.id || productId || "";
+    const nextModules = Array.isArray(savedProduct.modules) ? savedProduct.modules : fallbackModules;
+    const nextPaths = collectReadUploadPaths(nextModules, savedProductId);
+    const candidates = new Set([
+      ...persistedReadUploadPathsRef.current,
+      ...pendingReadUploadPathsRef.current,
+      ...failedReadCleanupPathsRef.current,
+    ]);
+    const obsolete = [...candidates].filter((path) => !nextPaths.has(path));
+    const failed = await deleteReadStorageObjects(obsolete);
+    persistedReadUploadPathsRef.current = nextPaths;
+    pendingReadUploadPathsRef.current = new Set([...pendingReadUploadPathsRef.current].filter((path) => nextPaths.has(path)));
+    failedReadCleanupPathsRef.current = new Set(failed);
+    return failed.length;
+  }
+
   async function persist(nextStatus?: ProductForm["status"]) {
     const status = nextStatus ?? form.status;
     // The experiment budget gates EVERY save — draft included — because an
@@ -297,7 +362,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
     // module must not leave stale paid-update IDs behind in adminProduct.
     const knownIds = new Set(form.modules.flatMap((module) => [module.id, ...(module.resources || []).map((resource) => resource.id)]));
     const paidUpdateIds = new Set(form.paidUpdates.map((update) => update.id));
-    const modules = form.modules.map((module) => ({
+    const ownerProductId = form.id || productId || "";
+    const modules = sanitizeReadUploadsForProduct(form.modules.map((module) => ({
       ...module,
       resources: (module.resources || []).map((resource, index) => {
         const paidUpdateId = resource.paidUpdateId && paidUpdateIds.has(resource.paidUpdateId) ? resource.paidUpdateId : null;
@@ -332,6 +398,21 @@ export function ProductEditor({ productId }: { productId?: string }) {
             interactiveHtml: typeof resource.interactiveHtml === "string" ? resource.interactiveHtml : "",
           };
         }
+        if (resource.type === "read") {
+          const readSourceKind = normalizeReadSourceKind(resource.readSourceKind, resource.readStoragePath);
+          return {
+            ...resource,
+            url: normalizeReadResourceUrl(resource.url, readSourceKind, {
+              productId: form.id || productId || undefined,
+              resourceId: resource.id,
+              storagePath: resource.readStoragePath,
+              fileSize: resource.readFileSize,
+            }),
+            readSourceKind,
+            sortOrder: index,
+            paidUpdateId,
+          };
+        }
         return {
           ...resource,
           url: normalizeResourceUrl(resource.url, resource.type) || resource.url.trim(),
@@ -339,7 +420,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
           paidUpdateId,
         };
       }),
-    }));
+    })), ownerProductId);
     const paidUpdates = form.paidUpdates.map((update) => ({
       ...update,
       includedIds: update.includedIds.filter((id, index, list) => knownIds.has(id) && list.indexOf(id) === index),
@@ -356,24 +437,32 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
     setSaving(true);
     try {
+      let savedProduct: ProductForm;
       if (isNew) {
         const res = await adminFetch<{ product: ProductForm }>("/api/admin/products", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        setForm(res.product);
-        setDirty(false);
-        notify("success", status === "published" ? "Product published to Home, Store and search." : "Draft saved.");
-        router.replace(`/admin/products/${res.product.id}`);
+        savedProduct = res.product;
       } else {
         const res = await adminFetch<{ product: ProductForm }>(`/api/admin/products/${productId}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
-        setForm(res.product);
-        setDirty(false);
-        notify("success", status === "published" ? "Product updated live everywhere." : status === "archived" ? "Product archived and hidden." : "Draft saved and hidden from users.");
+        savedProduct = res.product;
       }
+      setForm(savedProduct);
+      setDirty(false);
+      const cleanupFailures = await cleanupReadUploadsAfterSave(savedProduct, modules);
+      const successMessage = isNew
+        ? status === "published" ? "Product published to Home, Store and search." : "Draft saved."
+        : status === "published" ? "Product updated live everywhere." : status === "archived" ? "Product archived and hidden." : "Draft saved and hidden from users.";
+      if (cleanupFailures > 0) {
+        notify("error", `${successMessage} Some obsolete Read PDFs could not be removed (${cleanupFailures}); retry saving or ask an administrator to clean them up.`);
+      } else {
+        notify("success", successMessage);
+      }
+      if (isNew) router.replace(`/admin/products/${savedProduct.id}`);
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Failed to save product.");
     } finally {
@@ -393,7 +482,18 @@ export function ProductEditor({ productId }: { productId?: string }) {
     if (!confirmed) return;
     try {
       await adminFetch(`/api/admin/products/${productId}`, { method: "DELETE", body: JSON.stringify({ reason }) });
-      notify("success", "Product deleted.");
+      const ownedPaths = new Set([
+        ...persistedReadUploadPathsRef.current,
+        ...collectReadUploadPaths(form.modules, form.id || productId),
+        ...pendingReadUploadPathsRef.current,
+        ...failedReadCleanupPathsRef.current,
+      ]);
+      const cleanupFailures = await deleteReadStorageObjects(ownedPaths);
+      if (cleanupFailures.length) {
+        notify("error", `Product deleted, but ${cleanupFailures.length} Read PDF object(s) could not be removed.`);
+      } else {
+        notify("success", "Product and its uploaded Read PDFs deleted.");
+      }
       router.replace("/admin/products");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Failed to delete product.");
@@ -405,7 +505,14 @@ export function ProductEditor({ productId }: { productId?: string }) {
     try {
       const res = await adminFetch<{ product: ProductForm }>("/api/admin/products", {
         method: "POST",
-        body: JSON.stringify({ ...form, id: newId, title: `${form.title} (Copy)`, status: "draft" }),
+        body: JSON.stringify({
+          ...form,
+          id: newId,
+          title: `${form.title} (Copy)`,
+          status: "draft",
+          // This product must never reference another product's Storage path.
+          modules: sanitizeReadUploadsForProduct(form.modules, newId),
+        }),
       });
       notify("success", "Product duplicated as draft.");
       router.push(`/admin/products/${res.product.id}`);
@@ -668,9 +775,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
         {tab === "modules" && (
           <ModulesResourcesEditor
+            productId={productId || form.id || ""}
             modules={form.modules}
             onChange={(modules) => update("modules", modules)}
             paidUpdates={form.paidUpdates}
+            onReadUploadAdded={(storagePath) => pendingReadUploadPathsRef.current.add(storagePath)}
           />
         )}
 

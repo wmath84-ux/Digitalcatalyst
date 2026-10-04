@@ -41,7 +41,16 @@ import AdminExperimentEditor from "@/components/admin/products/ExperimentEditor"
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
+import { getFirebaseStorage } from "../../../../firebase";
+import {
+  buildReadStoragePath,
+  normalizeReadResourceUrl,
+  normalizeReadSourceKind,
+  READ_PDF_MAX_BYTES,
+} from "../../../../utils/readResources.js";
 import type { PaidUpdate, ProductModule, ProductResource } from "@/lib/admin/types";
+
+type ReadUploadResult = { url: string; storagePath: string; fileName: string; fileSize: number };
 
 const RESOURCE_TYPES = [
   "youtube",
@@ -60,6 +69,7 @@ const RESOURCE_TYPES = [
   "iframe",
   "brain",
   "interactive",
+  "read",
 ] as const;
 
 const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
@@ -79,6 +89,7 @@ const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
   iframe: "Other embed / iframe",
   brain: "Brain · practice set",
   interactive: "Interactive 2D experiment",
+  read: "Read · PDF / library",
 };
 
 function providerForType(type: ProductResource["type"]) {
@@ -87,6 +98,7 @@ function providerForType(type: ProductResource["type"]) {
   // the same idea — its content is the HTML designed in the panel below.
   if (type === "brain") return "Brain";
   if (type === "interactive") return "Experiment";
+  if (type === "read") return "Read library";
   if (type === "youtube") return "YouTube";
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
@@ -198,15 +210,19 @@ function PillRail<T>({
 /* ------------------------------------------------------------------ */
 
 interface ModulesResourcesEditorProps {
+  productId: string;
   modules: ProductModule[];
   onChange: (modules: ProductModule[]) => void;
   paidUpdates: PaidUpdate[];
+  onReadUploadAdded: (storagePath: string) => void;
 }
 
 export default function ModulesResourcesEditor({
+  productId,
   modules,
   onChange,
   paidUpdates,
+  onReadUploadAdded,
 }: ModulesResourcesEditorProps) {
   // Focus state — at any moment at most one module is in focus,
   // and at most one resource in that module is in focus. The
@@ -256,6 +272,60 @@ export default function ModulesResourcesEditor({
     () => modules.reduce((count, module) => count + (module.resources || []).length, 0),
     [modules],
   );
+
+  async function uploadReadPdf(
+    resourceId: string,
+    file: File,
+    onProgress: (progress: number) => void,
+  ): Promise<ReadUploadResult> {
+    if (!productId) throw new Error("Save the product draft before uploading a Read PDF.");
+    if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== "application/pdf")) {
+      throw new Error("Choose a PDF file (application/pdf).");
+    }
+    if (file.size <= 0 || file.size >= READ_PDF_MAX_BYTES) {
+      throw new Error(`PDFs must be smaller than ${Math.floor(READ_PDF_MAX_BYTES / 1024 / 1024)} MiB.`);
+    }
+    const storagePath = buildReadStoragePath(productId, resourceId);
+    if (!storagePath) throw new Error("Could not create an owned Storage path for this resource.");
+    const storage = await getFirebaseStorage();
+    const { ref, uploadBytesResumable, getDownloadURL, deleteObject } = await import("firebase/storage");
+    const target = ref(storage, storagePath);
+    try {
+      const downloadUrl = await new Promise<string>((resolve, reject) => {
+        const task = uploadBytesResumable(target, file, { contentType: "application/pdf" });
+        task.on(
+          "state_changed",
+          (snapshot) => onProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)),
+          reject,
+          async () => {
+            try {
+              resolve(await getDownloadURL(task.snapshot.ref));
+            } catch (error) {
+              reject(error);
+            }
+          },
+        );
+      });
+      const url = normalizeReadResourceUrl(downloadUrl, "upload", {
+        productId,
+        resourceId,
+        storagePath,
+        fileSize: file.size,
+      });
+      if (!url) throw new Error("The uploaded PDF URL did not match this resource's Storage object.");
+      onReadUploadAdded(storagePath);
+      return { url, storagePath, fileName: file.name.slice(0, 255), fileSize: file.size };
+    } catch (error) {
+      // A failed URL lookup or interrupted transfer must not leave an unowned
+      // object behind. The catch intentionally does not mask the upload error.
+      try {
+        await deleteObject(target);
+      } catch {
+        // A partial/canceled upload may have no object to remove.
+      }
+      throw error;
+    }
+  }
 
   /* ---------------------------------------------------------------- */
   /* Module mutations                                                 */
@@ -528,7 +598,9 @@ export default function ModulesResourcesEditor({
             <ResourceCard
               module={activeModule}
               resource={activeResource}
+              productId={productId}
               onUpdate={(patch) => updateResource(activeModule.id, activeResource.id, patch)}
+              onUploadReadPdf={uploadReadPdf}
               onRemove={() => {
                 if (window.confirm("Delete this resource?")) {
                   removeResource(activeModule.id, activeResource.id);
@@ -712,7 +784,9 @@ export default function ModulesResourcesEditor({
 function ResourceCard({
   module,
   resource,
+  productId,
   onUpdate,
+  onUploadReadPdf,
   onRemove,
   onMoveUp,
   onMoveDown,
@@ -722,7 +796,9 @@ function ResourceCard({
 }: {
   module: ProductModule;
   resource: ProductResource;
+  productId: string;
   onUpdate: (patch: Partial<ProductResource>) => void;
+  onUploadReadPdf: (resourceId: string, file: File, onProgress: (progress: number) => void) => Promise<ReadUploadResult>;
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -730,7 +806,20 @@ function ResourceCard({
   modules: ProductModule[];
   paidUpdates: PaidUpdate[];
 }) {
-  const cleanUrl = normalizeResourceUrl(resource.url, resource.type);
+  const isRead = resource.type === "read";
+  const readSourceKind = isRead
+    ? normalizeReadSourceKind(resource.readSourceKind, resource.readStoragePath)
+    : "pdf_url";
+  const cleanUrl = isRead
+    ? normalizeReadResourceUrl(resource.url, readSourceKind, {
+        productId,
+        resourceId: resource.id,
+        storagePath: resource.readStoragePath,
+        fileSize: resource.readFileSize,
+      })
+    : normalizeResourceUrl(resource.url, resource.type);
+  const [readUploadProgress, setReadUploadProgress] = useState<number | null>(null);
+  const [readUploadError, setReadUploadError] = useState("");
   const index = module.resources.findIndex((r) => r.id === resource.id);
   const isFirst = index === 0;
   const isLast = index === module.resources.length - 1;
@@ -776,6 +865,8 @@ function ResourceCard({
                 ? `${experimentErrors.length} error${experimentErrors.length === 1 ? "" : "s"} to fix`
                 : "Experiment ready"}
           </Pill>
+        ) : isRead ? (
+          <Pill tone={cleanUrl ? "success" : "warn"}>{cleanUrl ? "Read source ready" : "Source required"}</Pill>
         ) : (
           <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
         )}
@@ -794,9 +885,29 @@ function ResourceCard({
           <select
             className={selectClass}
             value={resource.type}
+            disabled={readUploadProgress !== null}
             onChange={(event) => {
               const type = event.target.value as ProductResource["type"];
-              onUpdate({ type, provider: providerForType(type) });
+              if (type === "read") {
+                onUpdate({
+                  type,
+                  provider: providerForType(type),
+                  url: "",
+                  readSourceKind: "pdf_url",
+                  readStoragePath: undefined,
+                  readFileName: undefined,
+                  readFileSize: undefined,
+                });
+              } else {
+                onUpdate({
+                  type,
+                  provider: providerForType(type),
+                  readSourceKind: undefined,
+                  readStoragePath: undefined,
+                  readFileName: undefined,
+                  readFileSize: undefined,
+                });
+              }
             }}
           >
             {RESOURCE_TYPES.map((type) => (
@@ -849,6 +960,117 @@ function ResourceCard({
           {/* The Study Library's experiment builder, re-skinned for the admin
               panel: AI prompt → paste/upload/template → live preview → checks. */}
           <AdminExperimentEditor resource={resource} onChange={onUpdate} />
+        </div>
+      ) : isRead ? (
+        <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3">
+          <Field label="Read source" required hint="PDF sources open in the locally bundled PDF.js viewer; generic websites open in a sandboxed embed.">
+            <select
+              className={selectClass}
+              value={readSourceKind}
+              disabled={readUploadProgress !== null}
+              onChange={(event) => {
+                const nextKind = event.target.value as NonNullable<ProductResource["readSourceKind"]>;
+                onUpdate({
+                  readSourceKind: nextKind,
+                  url: "",
+                  readStoragePath: undefined,
+                  readFileName: undefined,
+                  readFileSize: undefined,
+                });
+                setReadUploadError("");
+              }}
+            >
+              <option value="upload">Upload a PDF</option>
+              <option value="gdrive">Google Drive PDF</option>
+              <option value="pdf_url">Direct PDF URL</option>
+              <option value="embed_url">Generic embed URL</option>
+            </select>
+          </Field>
+
+          {readSourceKind === "upload" ? (
+            <div className="space-y-2 rounded-lg border border-violet-100 bg-white p-3">
+              <p className="text-xs leading-5 text-slate-600">
+                PDF files must be smaller than {Math.floor(READ_PDF_MAX_BYTES / 1024 / 1024)} MiB. Replacing a PDF keeps the previous file until this product save succeeds.
+              </p>
+              {!productId ? (
+                <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800">Save the product draft first, then upload the PDF.</p>
+              ) : null}
+              <label className={`inline-flex cursor-pointer items-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-800 ${!productId || readUploadProgress !== null ? "pointer-events-none opacity-50" : ""}`}>
+                {readUploadProgress === null ? (resource.readFileName ? "Replace PDF" : "Choose PDF") : `Uploading ${readUploadProgress}%`}
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  disabled={!productId || readUploadProgress !== null}
+                  onChange={async (event) => {
+                    const input = event.currentTarget;
+                    const file = input.files?.[0];
+                    input.value = "";
+                    if (!file) return;
+                    setReadUploadError("");
+                    setReadUploadProgress(0);
+                    try {
+                      const uploaded = await onUploadReadPdf(resource.id, file, setReadUploadProgress);
+                      onUpdate({
+                        url: uploaded.url,
+                        readSourceKind: "upload",
+                        readStoragePath: uploaded.storagePath,
+                        readFileName: uploaded.fileName,
+                        readFileSize: uploaded.fileSize,
+                      });
+                    } catch (error) {
+                      setReadUploadError(error instanceof Error ? error.message : "PDF upload failed.");
+                    } finally {
+                      setReadUploadProgress(null);
+                    }
+                  }}
+                />
+              </label>
+              {readUploadProgress !== null ? (
+                <progress className="block h-2 w-full accent-violet-600" max={100} value={readUploadProgress} aria-label="PDF upload progress" />
+              ) : null}
+              {resource.readFileName && cleanUrl ? (
+                <p className="text-xs text-emerald-700">
+                  {resource.readFileName} · {((resource.readFileSize || 0) / (1024 * 1024)).toFixed(2)} MiB
+                </p>
+              ) : null}
+              {readUploadError ? <p role="alert" className="text-xs font-medium text-red-700">{readUploadError}</p> : null}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Field
+                label={readSourceKind === "gdrive" ? "Google Drive share URL" : readSourceKind === "pdf_url" ? "Direct PDF URL" : "Generic embed URL"}
+                required
+                hint={readSourceKind === "gdrive"
+                  ? "Use a drive.google.com file share link and make it accessible to learners."
+                  : readSourceKind === "pdf_url"
+                    ? "The host must allow browser CORS access for PDF.js to read the PDF."
+                    : "Enter a URL only, not iframe HTML. It will open in a sandboxed frame."}
+              >
+                <textarea
+                  className={`${textareaClass} min-h-[72px] bg-white ${cleanUrl ? "border-emerald-300" : "border-slate-200"}`}
+                  placeholder={readSourceKind === "gdrive" ? "https://drive.google.com/file/d/…/view" : "https://…"}
+                  value={resource.url || ""}
+                  onChange={(event) => onUpdate({
+                    url: event.target.value,
+                    readSourceKind,
+                    readStoragePath: undefined,
+                    readFileName: undefined,
+                    readFileSize: undefined,
+                  })}
+                  onBlur={() => {
+                    const normalized = normalizeReadResourceUrl(resource.url, readSourceKind);
+                    if (normalized && normalized !== resource.url) onUpdate({ url: normalized });
+                  }}
+                />
+              </Field>
+              {resource.url?.trim() && !cleanUrl ? (
+                <p role="alert" className="rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">
+                  Enter a safe public HTTPS URL. Private/local hosts, IP addresses, credentials, Firebase Storage URLs and iframe HTML are not accepted.
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
       ) : resource.type === "image_url" ? (
         <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">

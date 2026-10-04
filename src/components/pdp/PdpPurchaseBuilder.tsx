@@ -21,6 +21,7 @@ import {
   Check,
   CircleAlert,
   CircleCheck,
+  FileText,
   FlaskConical,
   Info,
   Package,
@@ -122,6 +123,7 @@ const RESOURCE_TYPE_LABEL = {
   mindmap: "Mind map",
   brain: "Practice set",
   interactive: "Experiment",
+  read: "Read",
 };
 
 const RESOURCE_TYPE_ICON = {
@@ -139,6 +141,7 @@ const RESOURCE_TYPE_ICON = {
   mindmap: Sparkles,
   brain: BrainCircuit,
   interactive: FlaskConical,
+  read: FileText,
 };
 
 // ---------------------------------------------------------------------------

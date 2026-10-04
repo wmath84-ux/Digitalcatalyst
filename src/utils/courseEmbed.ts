@@ -311,6 +311,9 @@ export const getGoogleEditorUrl = (file: CourseFile, chrome: DocsEditorChrome = 
 };
 
 export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {}): { url: string; kind: CourseEmbedKind } => {
+  // Read resources belong to the dedicated Read dock tab and local PDF.js
+  // viewer, never the ordinary selected-lesson stack.
+  if (file.type === "read") return { url: "", kind: "none" };
   const mobile = options.viewport === "mobile";
   const editMode = options.mode === "edit";
   const raw = getCourseFileUrl(file);
@@ -416,6 +419,7 @@ export interface CourseDownload {
  * downloads that previously landed as an extension-less blob.
  */
 export const getCourseDownload = (file: CourseFile): CourseDownload => {
+  if (file.type === "read") return { url: "", label: "Read library", downloadable: false, extension: "", fileName: downloadFileName(file.name, "") };
   const raw = getCourseFileUrl(file);
   const google = googleParts(raw);
   const build = (url: string, label: string, downloadable: boolean, extension: string): CourseDownload =>

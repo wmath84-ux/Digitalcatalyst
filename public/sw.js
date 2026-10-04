@@ -26,6 +26,12 @@ const isHashedAsset = (url) =>
   url.origin === self.location.origin
   && url.pathname.startsWith('/assets/')
   && HASHED_ASSET.test(url.pathname);
+// PDF.js runtime/support files are emitted under exact-version paths rather
+// than content hashes; versioned URLs are immutable and are cached lazily only
+// after a learner opens the Read viewer (never as part of app installation).
+const isVersionedPdfJsAsset = (url) =>
+  url.origin === self.location.origin
+  && /^\/pdfjs-(?:viewer|data)\/6\.3\.289\//.test(url.pathname);
 
 // Live branding pushed from the page (BrandingContext). Falls back to the
 // built-in defaults until the first message arrives. Lets notification titles
@@ -96,7 +102,7 @@ self.addEventListener('fetch', event => {
   } catch {
     return;
   }
-  if (!isHashedAsset(url)) return;
+  if (!isHashedAsset(url) && !isVersionedPdfJsAsset(url)) return;
   event.respondWith(
     caches.open(ASSET_CACHE_NAME).then((cache) => cache.match(event.request).then((hit) => {
       if (hit) return hit;
