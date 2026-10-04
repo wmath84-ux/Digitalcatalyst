@@ -39,6 +39,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22, not 20: several dev dependencies the install pulls in
+          # (jsdom 30, undici 8, whatwg-url 17, @asamuzakjp/*) declare
+          # `engines.node` of ^22.x or newer, so Node 20 made every `npm ci`
+          # print a wall of EBADENGINE warnings. Nothing in the tree excludes
+          # 22 (checked against every `engines` field in package-lock.json),
+          # Vite 7 wants ^20.19 || >=22.12, and firebase-rules-deploy.yml has
+          # been building on 22 already.
+          node-version: 22
       - name: Probe the production API origins
         run: node scripts/api-health-check.mjs
