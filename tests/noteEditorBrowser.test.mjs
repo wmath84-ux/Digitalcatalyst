@@ -808,6 +808,9 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
     assert.ok(o.doc <= 0 && o.panel <= 0, `list overflow ${JSON.stringify(o)}`);
     await press('[data-note-id="n6"] [data-course-note-edit]');
     await editorReady();
+    assert.equal(await page.locator(".dc-note-math-inline-trigger .katex").count(), 1, "inline math renders with KaTeX in the actual editor");
+    assert.equal(await page.locator(".dc-note-math-block-trigger .katex-display").count(), 1, "display math renders with KaTeX in the actual editor");
+    assert.match(await bodyText(page), /const mathText = \"\$x\^2\$\";/, "math-like code stays literal inside fenced code");
     o = await overflow();
     assert.ok(o.doc <= 0 && o.panel <= 0 && o.scroller <= 0, `editor overflow ${JSON.stringify(o)} (long URL, wide table, long code line, deep nesting, long title)`);
     const m = await page.evaluate(() => {

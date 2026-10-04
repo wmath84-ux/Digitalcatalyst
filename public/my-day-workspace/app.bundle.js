@@ -405,37 +405,11 @@
     } catch (_) {}
   }
 
-  // ── Markdown Parser (Simple & Robust) ────────────────────────────────────
+  // ── Canonical Markdown → sanitized rich preview + KaTeX ──────────────────
+  // My Day note bodies stay Markdown in local storage and Firestore. Rendering
+  // happens once from that canonical representation; HTML is never saved back.
   function parseMarkdown(md) {
-    if (!md) return '<p class="text-neutral-400">Empty note body</p>';
-    let html = escapeHtml(md);
-
-    // Code blocks
-    html = html.replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>");
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-    // Headers
-    html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-    html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-    html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
-    // Bold & Italic
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    // Blockquote
-    html = html.replace(/^\> (.*$)/gim, "<blockquote>$1</blockquote>");
-    // Checkbox list
-    html = html.replace(/^- \[x\] (.*$)/gim, '<div class="flex items-center gap-2"><input type="checkbox" checked disabled /> <span>$1</span></div>');
-    html = html.replace(/^- \[ \] (.*$)/gim, '<div class="flex items-center gap-2"><input type="checkbox" disabled /> <span>$1</span></div>');
-    // Bullet list
-    html = html.replace(/^- (.*$)/gim, "<ul><li>$1</li></ul>");
-    html = html.replace(/<\/ul>\s*<ul>/g, "");
-    // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    // Paragraphs
-    html = html.replace(/\n\n/g, "</p><p>");
-    html = "<p>" + html.replace(/\n/g, "<br/>") + "</p>";
-
-    return html;
+    return window.DCMyDayNoteFormatting.renderMyDayMarkdown(String(md || ""));
   }
 
   function escapeHtml(str) {
@@ -513,6 +487,17 @@
     saveLocally();
     syncItemToCloud(note);
     render();
+  }
+
+  function persistEditedNoteBody(note, body) {
+    note.body = String(body ?? "");
+    note.updated_time = Date.now();
+    saveLocally();
+    syncItemToCloud(note);
+    const preview = document.querySelector(".editor-preview");
+    if (preview) preview.innerHTML = parseMarkdown(note.body);
+    const snippet = document.querySelector(`.note-card[data-note-id="${note.id}"] .note-snippet`);
+    if (snippet) snippet.textContent = note.body.slice(0, 120) || "No additional text";
   }
 
   function deleteActiveNote() {
@@ -759,21 +744,35 @@
           ${
             activeNote
               ? `
-            <div class="editor-toolbar">
-              <div class="toolbar-group">
+            <div class="editor-toolbar" role="toolbar" aria-label="Note formatting">
+              <div class="toolbar-group editor-format-tools" role="group" tabindex="0" aria-label="Formatting tools; scroll horizontally on small screens">
                 <button class="toolbar-btn editor-back" id="btn-editor-back" aria-label="Back to notes">← Back</button>
-                <button class="toolbar-btn" data-action="bold">B</button>
-                <button class="toolbar-btn" data-action="italic"><i>I</i></button>
-                <button class="toolbar-btn" data-action="h1">H1</button>
-                <button class="toolbar-btn" data-action="h2">H2</button>
-                <button class="toolbar-btn" data-action="ul">• List</button>
-                <button class="toolbar-btn" data-action="todo">☑ Check</button>
-                <button class="toolbar-btn" data-action="code">&lt;&gt;</button>
+                <button type="button" class="toolbar-btn" data-action="bold" aria-label="Bold" title="Bold"><strong>B</strong></button>
+                <button type="button" class="toolbar-btn" data-action="italic" aria-label="Italic" title="Italic"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-action="bold-italic" aria-label="Bold and italic" title="Bold and italic"><strong><i>B/I</i></strong></button>
+                <button type="button" class="toolbar-btn" data-action="strike" aria-label="Strikethrough" title="Strikethrough"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-action="heading" data-heading-level="1" aria-label="Heading 1" title="Heading 1">H1</button>
+                <button type="button" class="toolbar-btn" data-action="heading" data-heading-level="2" aria-label="Heading 2" title="Heading 2">H2</button>
+                <button type="button" class="toolbar-btn" data-action="heading" data-heading-level="3" aria-label="Heading 3" title="Heading 3">H3</button>
+                <button type="button" class="toolbar-btn" data-action="heading" data-heading-level="4" aria-label="Heading 4" title="Heading 4">H4</button>
+                <button type="button" class="toolbar-btn" data-action="bullet" aria-label="Bullet list" title="Bullet list">• List</button>
+                <button type="button" class="toolbar-btn" data-action="numbered" aria-label="Numbered list" title="Numbered list">1. List</button>
+                <button type="button" class="toolbar-btn" data-action="checklist" aria-label="Checklist" title="Checklist">☐ Task</button>
+                <button type="button" class="toolbar-btn" data-action="check-complete" aria-label="Toggle completed checklist item" title="Toggle checklist completion">☑ Done</button>
+                <button type="button" class="toolbar-btn" data-action="quote" aria-label="Blockquote" title="Blockquote">❝ Quote</button>
+                <button type="button" class="toolbar-btn" data-action="inline-code" aria-label="Inline code" title="Inline code">&#96; Code</button>
+                <button type="button" class="toolbar-btn" data-action="code-block" aria-label="Code block" title="Fenced code block">&lt;&gt;</button>
+                <button type="button" class="toolbar-btn" data-action="link" aria-label="Insert link" title="Text link">🔗 Link</button>
+                <button type="button" class="toolbar-btn" data-action="table" aria-label="Insert table" title="Insert table">▦ Table</button>
+                <button type="button" class="toolbar-btn" data-action="inline-math" aria-label="Inline formula" title="Inline formula">ƒx</button>
+                <button type="button" class="toolbar-btn" data-action="block-math" aria-label="Display formula" title="Display formula">∑</button>
+                <button type="button" class="toolbar-btn" data-action="horizontal-rule" aria-label="Horizontal rule" title="Horizontal rule">―</button>
               </div>
-              <div class="toolbar-group">
+              <div class="toolbar-group editor-toolbar-actions">
                 <button class="toolbar-btn" id="btn-schedule-modal" style="color: var(--jp-primary);">⏰ Remind</button>
-                <button class="toolbar-btn ${state.previewMode === "split" ? "active" : ""}" id="btn-toggle-split">Split</button>
-                <button class="toolbar-btn" id="btn-delete-note" style="color: var(--jp-danger);">🗑️</button>
+                <button class="toolbar-btn ${state.previewMode === "preview" ? "active" : ""}" id="btn-toggle-preview" aria-pressed="${state.previewMode === "preview"}">${state.previewMode === "preview" ? "Edit" : "Preview"}</button>
+                <button class="toolbar-btn ${state.previewMode === "split" ? "active" : ""}" id="btn-toggle-split" aria-pressed="${state.previewMode === "split"}">${state.previewMode === "split" ? "Editor only" : "Split"}</button>
+                <button class="toolbar-btn" id="btn-delete-note" aria-label="Delete note" style="color: var(--jp-danger);">🗑️</button>
               </div>
             </div>
 
@@ -798,11 +797,11 @@
                 }
               </div>
 
-              <div class="editor-textarea-container">
-                <textarea class="editor-textarea" id="editor-body-input" placeholder="Type notes here in Markdown...">${escapeHtml(activeNote.body)}</textarea>
+              <div class="editor-textarea-container editor-view-${state.previewMode}" data-preview-mode="${state.previewMode}">
+                <textarea class="editor-textarea" id="editor-body-input" aria-label="Markdown note body" placeholder="Type notes here in Markdown...">${escapeHtml(activeNote.body)}</textarea>
                 ${
-                  state.previewMode === "split"
-                    ? `<div class="editor-preview">${parseMarkdown(activeNote.body)}</div>`
+                  state.previewMode !== "editor"
+                    ? `<div class="editor-preview" aria-label="Rendered note preview">${parseMarkdown(activeNote.body)}</div>`
                     : ""
                 }
               </div>
@@ -1020,38 +1019,58 @@
       });
     }
 
-    // Editor Body Textarea
+    // Editor Body: Markdown is the persisted form; preview HTML is transient.
     const editorBody = document.getElementById("editor-body-input");
     if (editorBody) {
-      editorBody.addEventListener("input", (e) => {
-        const note = state.notes.find((n) => n.id === state.activeNoteId);
-        if (note) {
-          note.body = e.target.value;
-          note.updated_time = Date.now();
-          saveLocally();
-          syncItemToCloud(note);
-
-          const preview = document.querySelector(".editor-preview");
-          if (preview) {
-            preview.innerHTML = parseMarkdown(note.body);
-          }
-          const snippet = document.querySelector(`.note-card[data-note-id="${note.id}"] .note-snippet`);
-          if (snippet) {
-            snippet.textContent = note.body.slice(0, 120) || "No additional text";
-          }
+      editorBody.addEventListener("input", (event) => {
+        const note = state.notes.find((item) => item.id === state.activeNoteId);
+        if (note) persistEditedNoteBody(note, event.target.value);
+      });
+      editorBody.addEventListener("paste", (event) => {
+        const clipboard = event.clipboardData;
+        if (!clipboard) return;
+        const html = clipboard.getData("text/html");
+        const plain = clipboard.getData("text/plain");
+        let pasted = "";
+        if (html) pasted = window.DCMyDayNoteFormatting.richHtmlToMyDayMarkdown(html);
+        if (!pasted) pasted = window.DCMyDayNoteFormatting.normalizeMyDayPlainTextPaste(plain);
+        if (!pasted && !html && !plain) return;
+        event.preventDefault();
+        const start = editorBody.selectionStart;
+        const end = editorBody.selectionEnd;
+        const before = editorBody.value.slice(0, start);
+        const after = editorBody.value.slice(end);
+        const isBlockHtml = Boolean(html && /<(?:p|div|h[1-6]|ul|ol|blockquote|pre|table|hr)\b/i.test(html));
+        if (isBlockHtml && pasted) {
+          const leading = before && !/\n\n$/.test(before) ? before.endsWith("\n") ? "\n" : "\n\n" : "";
+          const trailing = after && !/^\n\n/.test(after) ? after.startsWith("\n") ? "\n" : "\n\n" : "";
+          pasted = `${leading}${pasted}${trailing}`;
         }
+        editorBody.setRangeText(pasted, start, end, "end");
+        const note = state.notes.find((item) => item.id === state.activeNoteId);
+        if (note) persistEditedNoteBody(note, editorBody.value);
       });
     }
 
-    // Toolbar Formatting Buttons
+    // Toolbar Formatting Buttons — selections remain editable Markdown.
     document.querySelectorAll(".toolbar-btn[data-action]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const action = btn.getAttribute("data-action");
-        applyFormatting(action);
+        const headingLevel = Number(btn.getAttribute("data-heading-level") || 1);
+        applyFormatting(action, { headingLevel });
       });
     });
 
-    // Toggle Split View
+    // Toggle rendered preview (including on phones and tablets).
+    const previewBtn = document.getElementById("btn-toggle-preview");
+    if (previewBtn) {
+      previewBtn.addEventListener("click", () => {
+        state.previewMode = state.previewMode === "preview" ? "editor" : "preview";
+        render();
+      });
+    }
+
+    // Toggle source/preview split view.
     const splitBtn = document.getElementById("btn-toggle-split");
     if (splitBtn) {
       splitBtn.addEventListener("click", () => {
@@ -1107,52 +1126,32 @@
     });
   }
 
-  function applyFormatting(action) {
+  function applyFormatting(action, options = {}) {
     const textarea = document.getElementById("editor-body-input");
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selected = text.slice(start, end);
-
-    let replacement = "";
-    switch (action) {
-      case "bold":
-        replacement = `**${selected || "bold text"}**`;
-        break;
-      case "italic":
-        replacement = `*${selected || "italic text"}*`;
-        break;
-      case "h1":
-        replacement = `# ${selected || "Heading 1"}\n`;
-        break;
-      case "h2":
-        replacement = `## ${selected || "Heading 2"}\n`;
-        break;
-      case "ul":
-        replacement = `- ${selected || "List item"}\n`;
-        break;
-      case "todo":
-        replacement = `- [ ] ${selected || "To-do item"}\n`;
-        break;
-      case "code":
-        replacement = `\`\`\`\n${selected || "code"}\n\`\`\``;
-        break;
+    if (!textarea || !action) return;
+    const aliases = { h1: "heading", h2: "heading", h3: "heading", h4: "heading", ul: "bullet", todo: "checklist", code: "code-block" };
+    const normalizedAction = aliases[action] || action;
+    const headingLevel = options.headingLevel || (action === "h2" ? 2 : action === "h3" ? 3 : action === "h4" ? 4 : 1);
+    const formatOptions = { ...options, headingLevel };
+    if (normalizedAction === "link") {
+      const linkUrl = window.prompt("Enter a safe link address (https, http, mailto or tel):", "https://");
+      if (linkUrl === null) return;
+      formatOptions.linkUrl = linkUrl;
     }
-
-    textarea.value = text.slice(0, start) + replacement + text.slice(end);
+    const formatted = window.DCMyDayNoteFormatting.formatMyDayMarkdown(
+      textarea.value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      normalizedAction,
+      formatOptions,
+    );
+    if (formatted.value === textarea.value) return;
+    textarea.value = formatted.value;
     textarea.focus();
+    textarea.setSelectionRange(formatted.selectionStart, formatted.selectionEnd);
 
-    const note = state.notes.find((n) => n.id === state.activeNoteId);
-    if (note) {
-      note.body = textarea.value;
-      note.updated_time = Date.now();
-      saveLocally();
-      syncItemToCloud(note);
-      const preview = document.querySelector(".editor-preview");
-      if (preview) preview.innerHTML = parseMarkdown(note.body);
-    }
+    const note = state.notes.find((item) => item.id === state.activeNoteId);
+    if (note) persistEditedNoteBody(note, textarea.value);
   }
 
   // Initial Boot

@@ -70,7 +70,7 @@ const formulaLooksUnambiguous = (source: string): boolean => {
   const value = source.trim();
   if (!value || value.length > MAX_NOTE_MATH_SOURCE_LENGTH) return false;
   if (/\\[A-Za-z]+/.test(value)) return true;
-  if (/[=<>^_±∓≤≥≠≈∑∏∫∞×÷∈∉→←⇒⇔]/u.test(value)) return true;
+  if (/[=<>^_±∓≤≥≠≈∑∏∫∞×÷∈∉→←⇒⇔√]/u.test(value)) return true;
   // Tiny symbols and scalar values ($x$, $R$, $2$) are common and not prose.
   if (value.length <= 3 && /^[\p{L}\p{N}().,+-]+$/u.test(value)) return true;
   // A bare integer/decimal or a simple fraction is a useful math expression;
@@ -95,6 +95,22 @@ const readGroup = (value: string, start: number, open = "{", close = "}"): numbe
 
 interface Atom { end: number; hasScript: boolean; numeric: boolean }
 
+const SUPER_SCRIPT_CHARS = new Set(Array.from("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁱⁿ"));
+const SUB_SCRIPT_CHARS = new Set(Array.from("₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜ"));
+const UNICODE_SCRIPT_CHARS = new Set([...SUPER_SCRIPT_CHARS, ...SUB_SCRIPT_CHARS]);
+
+const readUnicodeScript = (value: string, start: number): number => {
+  const first = String.fromCodePoint(value.codePointAt(start) || 0);
+  if (!UNICODE_SCRIPT_CHARS.has(first)) return -1;
+  let end = start;
+  while (end < value.length) {
+    const char = String.fromCodePoint(value.codePointAt(end) || 0);
+    if (!SUPER_SCRIPT_CHARS.has(char) && !SUB_SCRIPT_CHARS.has(char)) break;
+    end += char.length;
+  }
+  return end;
+};
+
 const readScript = (value: string, start: number): number => {
   if (value[start] !== "^" && value[start] !== "_") return -1;
   const next = start + 1;
@@ -104,6 +120,7 @@ const readScript = (value: string, start: number): number => {
     return command?.end ?? -1;
   }
   const char = String.fromCodePoint(value.codePointAt(next) || 0);
+  if (SUPER_SCRIPT_CHARS.has(char) || SUB_SCRIPT_CHARS.has(char)) return readUnicodeScript(value, next);
   return isWord(char) ? next + char.length : -1;
 };
 
@@ -152,10 +169,28 @@ const readTexCommand = (value: string, start: number): Atom | null => {
   return { end, hasScript, numeric: false };
 };
 
+const readParenthesizedGroup = (value: string, start: number): number => {
+  if (value[start] !== "(") return -1;
+  let depth = 0;
+  for (let cursor = start; cursor < value.length; cursor += 1) {
+    if (isEscapedAt(value, cursor)) continue;
+    if (value[cursor] === "(") depth += 1;
+    else if (value[cursor] === ")") {
+      depth -= 1;
+      if (depth === 0) return cursor + 1;
+    }
+  }
+  return -1;
+};
+
 const readTexAtom = (value: string, start: number): Atom | null => {
   if (value[start] === "\\") return readTexCommand(value, start);
   if (value[start] === "{") {
     const end = readGroup(value, start);
+    return end > 0 ? { end, hasScript: false, numeric: false } : null;
+  }
+  if (value[start] === "(") {
+    const end = readParenthesizedGroup(value, start);
     return end > 0 ? { end, hasScript: false, numeric: false } : null;
   }
   const char = String.fromCodePoint(value.codePointAt(start) || 0);
@@ -163,6 +198,22 @@ const readTexAtom = (value: string, start: number): Atom | null => {
   let end = start + char.length;
   if (/\d/.test(char)) {
     while (/\d/.test(value[end] || "")) end += 1;
+  } else {
+    // In a bare equation, consume adjacent Unicode variables/symbols (πr²)
+    // and letter runs immediately followed by a Unicode superscript (cm²),
+    // without turning ordinary ASCII words such as "weather" into atoms.
+    let runEnd = end;
+    while (runEnd < value.length) {
+      const next = String.fromCodePoint(value.codePointAt(runEnd) || 0);
+      if (!isWord(next) || UNICODE_SCRIPT_CHARS.has(next)) break;
+      runEnd += next.length;
+    }
+    if (runEnd > end) {
+      let afterRun = runEnd;
+      while (/[ \t]/.test(value[afterRun] || "")) afterRun += 1;
+      const followedByOperator = readOperator(value, afterRun) > afterRun;
+      if (/[^\u0000-\u007f]/.test(value.slice(start, runEnd)) || readUnicodeScript(value, runEnd) > runEnd || followedByOperator) end = runEnd;
+    }
   }
   let hasScript = false;
   while (value[end] === "^" || value[end] === "_") {
@@ -170,6 +221,17 @@ const readTexAtom = (value: string, start: number): Atom | null => {
     if (scriptEnd < 0) break;
     hasScript = true;
     end = scriptEnd;
+  }
+  const unicodeScriptEnd = readUnicodeScript(value, end);
+  if (unicodeScriptEnd > end) { hasScript = true; end = unicodeScriptEnd; }
+  // Chemical/compound notation may put the subscript between adjacent letters
+  // (H₂O). Keep the trailing element symbol with its scripted atom.
+  if (hasScript) {
+    while (end < value.length) {
+      const next = String.fromCodePoint(value.codePointAt(end) || 0);
+      if (!isWord(next) || UNICODE_SCRIPT_CHARS.has(next)) break;
+      end += next.length;
+    }
   }
   return { end, hasScript, numeric: /^\d/.test(char) };
 };
@@ -288,6 +350,15 @@ const readBareMath = (value: string, start: number): number => {
   return -1;
 };
 
+const readUnicodeRadical = (value: string, start: number): number => {
+  if (value[start] !== "√") return -1;
+  let operandStart = start + 1;
+  while (/\s/.test(value[operandStart] || "")) operandStart += 1;
+  if (operandStart > start + 1 && !/[\d({]/.test(value[operandStart] || "")) return -1;
+  const operand = readTexAtom(value, operandStart);
+  return operand ? operand.end : -1;
+};
+
 const backtickRunEnd = (value: string, start: number): number => {
   let runEnd = start;
   while (value[runEnd] === "`") runEnd += 1;
@@ -342,12 +413,22 @@ const scanMathText = (value: string): Segment[] => {
       emitMath(cursor, rawLatexEnd, value.slice(cursor, rawLatexEnd).trim(), "inline");
       continue;
     }
-    const bareEnd = /[\p{L}\p{N}]/u.test(value[cursor]) ? readBareMath(value, cursor) : -1;
+    const radicalEnd = value[cursor] === "√" ? readUnicodeRadical(value, cursor) : -1;
+    if (radicalEnd > cursor) {
+      emitMath(cursor, radicalEnd, value.slice(cursor, radicalEnd).trim(), "inline");
+      continue;
+    }
+    const glyph = String.fromCodePoint(value.codePointAt(cursor) || 0);
+    if (glyph === "∞" && !isWord(value[cursor - 1]) && !isWord(value[cursor + glyph.length])) {
+      emitMath(cursor, cursor + glyph.length, glyph, "inline");
+      continue;
+    }
+    const bareEnd = /[\p{L}\p{N}]/u.test(glyph) ? readBareMath(value, cursor) : -1;
     if (bareEnd > cursor) {
       emitMath(cursor, bareEnd, value.slice(cursor, bareEnd).trim(), "inline");
       continue;
     }
-    cursor += String.fromCodePoint(value.codePointAt(cursor) || 0).length;
+    cursor += glyph.length;
   }
   if (plainStart < value.length) segments.push({ kind: "text", value: value.slice(plainStart) });
   return segments.length ? segments : [{ kind: "text", value }];
@@ -521,6 +602,17 @@ const normalizeMathTextNodes = (root: HTMLElement): void => {
  * strips MathML or source attributes; this function itself returns only the
  * existing allow-listed note markup plus the two validated math attributes.
  */
+const normalizeChecklistMarkup = (root: HTMLElement): void => {
+  for (const item of Array.from(root.querySelectorAll("li"))) {
+    const checkbox = Array.from(item.querySelectorAll('input[type="checkbox"]')).find(
+      (input) => input.closest("li") === item,
+    );
+    if (!checkbox) continue;
+    item.setAttribute("data-checked", checkbox.hasAttribute("checked") || (checkbox as HTMLInputElement).checked ? "true" : "false");
+    checkbox.remove();
+  }
+};
+
 export function normalizeRichClipboardHtml(html: string): string {
   const source = String(html || "");
   if (!source.trim()) return "";
@@ -529,6 +621,10 @@ export function normalizeRichClipboardHtml(html: string): string {
     const parsed = new window.DOMParser().parseFromString(`<body>${source}</body>`, "text/html");
     normalizeMathMarkup(parsed.body);
     normalizeMathTextNodes(parsed.body);
+    // Marked/GFM and many rich-text clipboards express task state with an
+    // <input type=checkbox>. Inputs are intentionally not in the HTML allow-list;
+    // convert the state to our inert semantic li attribute before sanitizing.
+    normalizeChecklistMarkup(parsed.body);
     return sanitizeRichText(parsed.body.innerHTML);
   } catch {
     // The normalizer is a best-effort clipboard boundary; sanitizer fallback
@@ -541,6 +637,109 @@ export function normalizeRichClipboardHtml(html: string): string {
 const fenceLine = (line: string): { char: string; length: number } | null => {
   const match = line.match(/^ {0,3}(`{3,}|~{3,})/);
   return match ? { char: match[1][0], length: match[1].length } : null;
+};
+
+/**
+ * Split a Markdown table row without treating escaped pipes or pipes inside
+ * inline code as column boundaries. The returned cells are used only to infer
+ * column count; Marked remains responsible for parsing each cell's content.
+ */
+const markdownTableCells = (line: string): string[] | null => {
+  const source = line.trim();
+  if (!source.includes("|")) return null;
+  const cells: string[] = [];
+  let cell = "";
+  let codeTicks = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "\\" && source[index + 1] === "|") {
+      cell += "\\|";
+      index += 1;
+      continue;
+    }
+    if (char === "`") {
+      let end = index + 1;
+      while (source[end] === "`") end += 1;
+      const ticks = end - index;
+      codeTicks = codeTicks === 0 ? ticks : codeTicks === ticks ? 0 : codeTicks;
+      cell += source.slice(index, end);
+      index = end - 1;
+      continue;
+    }
+    if (char === "|" && codeTicks === 0) {
+      cells.push(cell.trim());
+      cell = "";
+      continue;
+    }
+    cell += char;
+  }
+  cells.push(cell.trim());
+  if (source.startsWith("|") && cells[0] === "") cells.shift();
+  if (source.endsWith("|") && cells[cells.length - 1] === "") cells.pop();
+  return cells.length >= 2 ? cells : null;
+};
+
+const isMarkdownTableSeparator = (cells: string[] | null): boolean =>
+  Boolean(cells?.length && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, ""))));
+
+const tableLikeLines = (lines: string[]): boolean => {
+  let fence: { char: string; length: number } | null = null;
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const line = lines[index];
+    const marker = fenceLine(line);
+    if (!fence && marker) { fence = marker; continue; }
+    if (fence) {
+      const close = fenceLine(line);
+      if (close && close.char === fence.char && close.length >= fence.length && !line.slice(line.indexOf(close.char) + close.length).trim()) fence = null;
+      continue;
+    }
+    const cells = markdownTableCells(line);
+    if (!cells) continue;
+    const next = markdownTableCells(lines[index + 1]);
+    if (isMarkdownTableSeparator(next) && next?.length === cells.length) return true;
+    if (next && next.length === cells.length) return true;
+  }
+  return false;
+};
+
+/**
+ * GFM requires a delimiter row, but educational copy/paste often produces a
+ * plain pipe table with only a header followed by data (for example
+ * "Revision| Time"). Infer the standard neutral alignment row only for a
+ * contiguous, rectangular pipe-table run; leave prose and fenced code alone.
+ */
+const inferMarkdownTableSeparators = (input: string): string => {
+  const lines = input.split("\n");
+  let fence: { char: string; length: number } | null = null;
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const marker = fenceLine(lines[index]);
+    if (!fence && marker) { fence = marker; continue; }
+    if (fence) {
+      const close = fenceLine(lines[index]);
+      if (close && close.char === fence.char && close.length >= fence.length && !lines[index].slice(lines[index].indexOf(close.char) + close.length).trim()) fence = null;
+      continue;
+    }
+    const header = markdownTableCells(lines[index]);
+    if (!header) continue;
+    const next = markdownTableCells(lines[index + 1]);
+    if (isMarkdownTableSeparator(next) && next?.length === header.length) {
+      index += 1;
+      continue;
+    }
+    if (!next || next.length !== header.length) continue;
+    // A header plus at least one consistently shaped row is sufficient. Stop
+    // at the first blank/non-row line, so nearby prose cannot be swallowed.
+    let end = index + 1;
+    while (end < lines.length) {
+      const row = markdownTableCells(lines[end]);
+      if (!row || row.length !== header.length) break;
+      end += 1;
+    }
+    if (end - index < 2) continue;
+    lines.splice(index + 1, 0, header.map(() => "---").join(" | "));
+    index += end - index;
+  }
+  return lines.join("\n");
 };
 
 interface PreparedPlainText { text: string; formulas: Map<string, MathSegment> }
@@ -620,7 +819,8 @@ const replaceFormulaTokens = (root: HTMLElement, formulas: Map<string, MathSegme
 
 /** Heuristic gate: unmarked prose stays literal; recognizable Markdown is parsed. */
 export function looksLikeMarkdown(text: string): boolean {
-  const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  const source = String(text || "").replace(/\r\n?/g, "\n");
+  const lines = source.split("\n");
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (/^ {0,3}(?:#{1,6}\s+\S|>|```|~~~|[-+*]\s+\S|\d+[.)]\s+\S)/.test(line)) return true;
@@ -628,7 +828,8 @@ export function looksLikeMarkdown(text: string): boolean {
     if (index + 1 < lines.length && /^ {0,3}(?:=+|-{3,})\s*$/.test(lines[index + 1]) && line.trim()) return true;
     if (index + 1 < lines.length && /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[index + 1]) && line.includes("|")) return true;
   }
-  return /(?:\*\*|__)[^\n]+?(?:\*\*|__)|`[^`\n]+`|\[[^\]]+\]\([^)]+\)/.test(String(text || ""));
+  if (tableLikeLines(lines)) return true;
+  return /(?:\*\*|__)[^\n]+?(?:\*\*|__)|~~[^\n]+?~~|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`|\[[^\]]+\]\([^)]+\)|^\s*<(?:p|div|h[1-6]|ul|ol|li|blockquote|table|pre|hr)\b/im.test(source);
 }
 
 /**
@@ -640,7 +841,8 @@ export function normalizePlainClipboardText(text: string): string {
   const source = String(text || "").replace(/\r\n?/g, "\n");
   if (!source.trim()) return "";
   try {
-    const prepared = tokenizePlainTextMath(source);
+    const tableNormalized = inferMarkdownTableSeparators(source);
+    const prepared = tokenizePlainTextMath(tableNormalized);
     const html = looksLikeMarkdown(prepared.text)
       ? String(marked.parse(prepared.text, { gfm: true, breaks: true }))
       : plainToRichText(prepared.text);

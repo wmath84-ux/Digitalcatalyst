@@ -25,6 +25,7 @@ const GLOBAL_ATTRS = new Set(["style", "align", "dir", "title"]);
 
 const TAG_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "target", "rel"]),
+  code: new Set(["class"]),
   img: new Set(["src", "alt", "width", "height"]),
   // Math is stored as a source-bearing semantic marker. Its exact two
   // attributes are validated below; unlisted custom attributes stay banned.
@@ -98,6 +99,14 @@ const scrub = (node: Element) => {
       const style = sanitizeStyle(attribute.value);
       if (style) node.setAttribute("style", style);
       else node.removeAttribute("style");
+      continue;
+    }
+    if (name === "class") {
+      const classes = tag === "code"
+        ? attribute.value.trim().split(/\s+/).filter((value) => /^language-[A-Za-z0-9_+.-]{1,32}$/.test(value))
+        : [];
+      if (classes.length) node.setAttribute("class", classes.join(" "));
+      else node.removeAttribute("class");
       continue;
     }
     if (name === "data-checked") {

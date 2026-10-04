@@ -32,6 +32,8 @@
     "build": "vite build",
     "joplin:build": "node scripts/joplin/build-workspace.mjs",
     "joplin:build:dev": "JOPLIN_BUILD_MODE=development node scripts/joplin/build-workspace.mjs",
+    "myday:formatting:build": "node scripts/joplin/build-note-formatting.mjs",
+    "test:myday": "npm run myday:formatting:build && node --test tests/myDayNoteFormatting.test.mjs tests/myDayWorkspaceRuntime.test.mjs tests/myDayWorkspaceBrowser.test.mjs",
     "clipper:build": "node scripts/joplin/build-clipper.mjs",
     "preview": "vite preview",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",

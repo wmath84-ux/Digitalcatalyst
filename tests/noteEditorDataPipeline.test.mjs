@@ -75,7 +75,7 @@ export * from "./src/course/noteEditor/editorCommands";
 export * from "./src/course/noteEditor/editorRuntime";
 export { sanitizeRichText, plainToRichText, splitFirstHeading, isEmptyRichText, richTextToPlain } from "./src/utils/richText";
 export { normalizePlainClipboardText, normalizeRichClipboardHtml, looksLikeMarkdown } from "./src/course/noteEditor/clipboardNormalization";
-export { renderMathSource, renderNoteHtmlWithMath, clearMathRenderCache } from "./src/course/noteEditor/mathRendering";
+export { renderMathSource, renderNoteHtmlWithMath, normalizeUnicodeMathSource, clearMathRenderCache } from "./src/course/noteEditor/mathRendering";
 export { combineHtml, loadLocalNotes, persistLocalNotes } from "./src/course/notesStore";
 export { normalizeNote, toFirestoreNote, parseCloudNote, mergeNoteSets, MAX_NOTE_HTML_LENGTH } from "./utils/courseNotes.js";
 `,
@@ -163,10 +163,21 @@ test("raw mathematical expressions are recognized conservatively without swallow
   const html = m.normalizePlainClipboardText("A copied solution: x^2 + y^2 = z^2, and the symbols √ ∑ ∫ ≤ ≥ ≠ ∞ π α β γ → ± remain readable.");
   const blocks = run(html).blocks;
   const math = blocks[0].content.filter((item) => item.type === "math");
-  assert.deepEqual(math.map((item) => item.props.latex), ["x^2 + y^2 = z^2"]);
+  assert.deepEqual(math.map((item) => item.props.latex), ["x^2 + y^2 = z^2", "∞"]);
   const plain = blocks[0].content.filter((item) => item.type === "text").map((item) => item.text).join("");
   assert.match(plain, /A copied solution:/);
-  assert.match(plain, /and the symbols √ ∑ ∫ ≤ ≥ ≠ ∞ π α β γ → ± remain readable\./);
+  assert.match(plain, /and the symbols √ ∑ ∫ ≤ ≥ ≠  π α β γ → ± remain readable\./);
+});
+
+test("bare Unicode math scripts, roots, operators and Greek variables become editable KaTeX markers", () => {
+  const source = "A = πr²; x²; H₂O; √(a+b); 3 × 10⁸; ∞.";
+  const normalized = m.normalizePlainClipboardText(source);
+  const formulas = run(normalized).blocks.flatMap((block) => block.content ?? []).filter((item) => item.type === "math");
+  assert.deepEqual(formulas.map((item) => item.props.latex), ["A = πr²", "x²", "H₂O", "√(a+b)", "3 × 10⁸", "∞"]);
+  assert.equal(m.normalizeUnicodeMathSource("A = πr²; x²; H₂O; √(a+b); 3 × 10⁸; ∞"), "A = \\pi r^{2}; x^{2}; H_{2}O; \\sqrt{(a+b)}; 3 \\times 10^{8}; \\infty");
+  const preview = m.renderNoteHtmlWithMath(normalized);
+  assert.equal((preview.match(/data-note-math-rendered="inline"/g) ?? []).length, formulas.length);
+  assert.equal((preview.match(/class="katex"/g) ?? []).length, formulas.length, "all valid Unicode formula source is rendered by KaTeX");
 });
 
 test("malformed and ambiguous formulas stay readable instead of blocking the paste", () => {
@@ -202,6 +213,25 @@ test("Markdown paste keeps headings, emphasis, links, lists, code and math struc
   assert.equal(blocks[2].content.some((item) => item.type === "math" && item.props.latex === "x^2"), true);
   assert.equal(blocks[1].content.some((item) => item.type === "link" && item.href === "https://example.com"), true);
   assert.equal(blocks[5].content[0].text, "$\\mathbb{R}$", "code stays literal");
+});
+
+test("plain pipe tables infer missing GFM separators and Markdown checklists keep their checked state", () => {
+  const source = "Revision | Time | Task\nRead chapter | 20 min | Done\nPractice | 15 min | Open";
+  const normalized = m.normalizePlainClipboardText(source);
+  const imported = run(normalized);
+  assert.equal(imported.blocks.length, 1);
+  assert.equal(imported.blocks[0].type, "legacyHtml", "the existing editor preserves tables as safe legacy HTML blocks");
+  assert.match(imported.blocks[0].props.html, /<table>/);
+  assert.match(imported.blocks[0].props.html, /<th>Revision<\/th>/);
+  assert.match(imported.blocks[0].props.html, /<td>Practice<\/td>/);
+
+  const checklist = run(m.normalizePlainClipboardText("- [x] complete\n- [ ] pending")).blocks;
+  assert.deepEqual(checklist.map((block) => [block.type, block.props.checked]), [["checkListItem", true], ["checkListItem", false]]);
+
+  const code = m.normalizePlainClipboardText('```js\nconst formula = "$x^2$";\n```');
+  assert.match(code, /<code class="language-js">/);
+  assert.match(code, /\$x\^2\$/);
+  assert.doesNotMatch(code, /data-note-math="inline"/, "math-like strings inside fenced code stay literal");
 });
 
 test("KaTeX validates formulas, emits safe output and falls back to readable source on errors", () => {
@@ -348,6 +378,11 @@ test("sanitizer allow-lists checklist state and bounded math-source markers only
   assert.equal(m.sanitizeRichText('<span data-note-math="inline" data-latex="x" data-x="1">x</span>'), '<span data-note-math="inline" data-latex="x">x</span>');
   assert.equal(m.sanitizeRichText('<span data-note-math="inline" data-latex="javascript:alert(1)">source</span>').includes("data-note-math"), true, "LaTeX is inert data, never evaluated as HTML");
   assert.equal(m.sanitizeRichText('<span data-note-math="invalid" data-latex="x">x</span>'), '<span>x</span>');
+  assert.equal(
+    m.sanitizeRichText('<pre><code class="language-js injected" onclick="alert(1)">safe</code></pre>'),
+    '<pre><code class="language-js">safe</code></pre>',
+    "only validated code-language classes survive for syntax-aware previews",
+  );
   const oversizedLatex = "x".repeat(4097);
   const oversizedMarker = m.sanitizeRichText(`<span data-note-math="inline" data-latex="${oversizedLatex}">$x$</span>`);
   assert.equal(oversizedMarker, "<span>$x$</span>", "source over the limit loses its control attributes, not its visible text");
