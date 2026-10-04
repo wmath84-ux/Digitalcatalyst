@@ -54,7 +54,7 @@ test("the editor is built on React Flow, which is the only candidate with touch 
 test("Mind map is a dock tab declared immediately after Note (Player closes the list)", () => {
   // Mind map still sits immediately after Note. Sketch was appended at the
   // END of the union (and of TABS), so no existing tab moved position.
-  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "sketch";/);
+  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "sketch" \| "read";/);
   const order = [...overlay.matchAll(/\{ key: "(modules|brain|notes|mindmap|ai|paid|player)"/g)].map((m) => m[1]);
   assert.deepEqual(order.slice(0, 5), ["modules", "brain", "notes", "mindmap", "ai"], "Mind map must sit right after Note");
   assert.deepEqual(order.slice(5), ["paid", "player"], "the Player settings tab closes the dock");
@@ -124,7 +124,7 @@ test("the old landscape split machinery is gone — the lesson keeps full width"
 
 test("the mind map follows the ACTIVE module, not just the selected file", () => {
   assert.match(coursePlayer, /const collectModuleIdByFileId = \(modules: CourseModule\[\]\): Record<string, string> =>/);
-  assert.match(coursePlayer, /const activeMindMapModuleId = selectedFile \? moduleIdByFileId\[String\(selectedFile\.id\)\] : undefined;/);
+  assert.match(coursePlayer, /const activeMindMapModuleId = selectedFile\s*\? moduleIdByFileId\[String\(selectedFile\.id\)\] \|\| selectedFile\.personalModuleId \|\| undefined\s*: undefined;/);
   assert.match(coursePlayer, /moduleId: activeMindMapModuleId,/);
 });
 

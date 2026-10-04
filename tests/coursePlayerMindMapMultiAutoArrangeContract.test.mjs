@@ -42,6 +42,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const panel = readSource("src/course/MindMapPanel.tsx");
+const resourceCard = readSource("src/course/StudyResourceCard.tsx");
+const resourceCardStyles = readSource("src/course/study-resource-card.css");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const styles = readSource("src/index.css");
@@ -275,10 +277,12 @@ test("the learner returns to the map they had open in that module", () => {
 test("the panel ships a notes-style card list of the module's maps", () => {
   assert.match(panel, /data-course-mindmap-maps/, "a switcher must open the library");
   assert.match(panel, /data-course-mindmap-library/);
-  assert.match(panel, /data-course-mindmap-map-card/);
+  assert.match(panel, /StudyResourceCard/);
   assert.match(panel, /data-course-mindmap-new/);
-  assert.match(panel, /data-course-mindmap-rename/);
-  assert.match(panel, /data-course-mindmap-delete-map/);
+  assert.match(resourceCard, /data-course-mindmap-map-card/);
+  assert.match(resourceCard, /data-course-mindmap-rename-input/);
+  assert.match(resourceCard, /data-course-mindmap-delete-map/);
+  assert.match(resourceCard, /data-course-mindmap-open-map/);
   // The library slides over the canvas so the diagram surface stays clean
   // when it is closed — the mind map tab has no header of its own.
   //
@@ -346,36 +350,19 @@ test("the rules tie every map document id to its own map key", () => {
 // width (`repeat(auto-fill, minmax(…))`); the library had no such rule.
 // ---------------------------------------------------------------------------
 
-test("the map library re-uses the notes grid's own tiling function", () => {
-  // The library opts into the shared rule with the same kind of hook the notes
-  // list uses (`data-course-notes-grid`), on BOTH its states — cards and
-  // skeleton — so a loading grid never tiles differently than the real one.
+test("both study libraries share a content-aware, no-overflow responsive grid", () => {
   assert.match(notesPanel, /data-course-notes-grid="true"/);
   const grids = [...panel.matchAll(/data-course-mindmap-map-grid="true"/g)];
-  assert.equal(grids.length, 2, "the card list AND its skeleton placeholder must both tile by width");
+  assert.equal(grids.length, 2, "map cards and loading skeletons share one grid contract");
 
-  // Same function, same floor: auto-fill over 160 px, i.e. the grid is measured
-  // by the space it got and never by a fixed column count.
-  const notesRule = styles.match(/\[data-course-notes-grid\][^{]*\{[^}]*\}/);
-  const libraryRule = styles.match(/^\[data-course-mindmap-map-grid\] \{[^}]*\}/m);
-  assert.ok(notesRule && libraryRule, "both grids need a tiling rule in the stylesheet");
-  for (const rule of [notesRule[0], libraryRule[0]]) {
-    assert.match(rule, /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(/, "tile by the width the grid got");
-    assert.match(rule, /160px/, "a card never shrinks below a readable 160 px");
-    assert.doesNotMatch(rule, /grid-template-columns:\s*repeat\((2|3)/, "no fixed column count");
-  }
-  // The library rule starts its own line with a BARE selector on purpose: the
-  // notes grid only needs rescuing inside the landscape split, while the map
-  // library is the panel's home screen and owns the whole sheet — so the same
-  // measurement has to hold for the portrait sheet too instead of a second,
-  // viewport-based rule taking over there.
-  assert.doesNotMatch(libraryRule[0], /data-split-kind/, "no orientation/split mode may be excluded");
-  // …and a sheet dragged to its 10% minimum is narrower than one 160 px card.
-  // The grid must NOT shrink to the container there: cards keep their 160 px
-  // floor and clip at the sheet edge — the exact dismissal behaviour of the
-  // Note Library — instead of shrinking to a sliver as the drag closes.
-  assert.match(libraryRule[0], /minmax\(160px, 1fr\)/);
-  assert.doesNotMatch(libraryRule[0], /minmax\(min\(160px/, "cards never shrink below 160 px during a drag-close");
+  const gridRules = [...styles.matchAll(/\[(?:data-course-notes-grid|data-course-mindmap-map-grid)\](?:,\s*\[data-course-(?:notes|mindmap-map)-grid\])?\s*\{[^}]*\}/g)];
+  assert.ok(gridRules.length >= 1, "responsive library grid rules exist");
+  assert.match(gridRules[0][0], /repeat\(auto-fill,\s*minmax\(min\(100%,\s*260px\),\s*1fr\)\)/);
+  assert.match(gridRules[0][0], /align-items:\s*stretch/);
+  assert.doesNotMatch(gridRules[0][0], /grid-template-columns:\s*repeat\((2|3)/, "no viewport-counted columns");
+  assert.match(resourceCardStyles, /min-height: 212px/);
+  assert.doesNotMatch(panel, /aspect-square/);
+  assert.doesNotMatch(panel, /grid-cols-2|sm:grid-cols-3/);
 });
 
 test("the library is still mounted inside the right-side sheet", () => {
@@ -386,17 +373,14 @@ test("the library is still mounted inside the right-side sheet", () => {
   assert.match(panel, /data-course-mindmap-library/);
 });
 
-test("a map card keeps a floor of height and a real surface, never a flat grey tile", () => {
-  // A square card in a squeezed column used to collapse into a grey blob: no
-  // minimum height, and the background was a 6% white wash. The height floor
-  // keeps the two action buttons inside the card, and the surface — including
-  // the "this map is open right now" violet state — is painted in CSS so both
-  // themes get a lifted card.
-  assert.match(panel, /data-course-mindmap-map-card/);
-  assert.match(panel, /aspect-square min-h-\[104px\]/);
-  assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*background:/);
-  assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*box-shadow:/);
-  assert.match(styles, /\[data-course-mindmap-map-card\]\[data-active="true"\]/);
-  // Dark only: the card has one palette, so no light-theme override exists.
+test("map cards use the shared spacious study-resource surface and real map context", () => {
+  assert.match(panel, /StudyResourceCard/);
+  assert.match(resourceCard, /data-course-mindmap-map-card/);
+  assert.match(panel, /topicLabel="Root topic"/);
+  assert.match(resourceCardStyles, /min-height: 212px/);
+  assert.match(resourceCardStyles, /--resource-accent: #b9a0ff/);
+  assert.match(resourceCardStyles, /study-resource-card\[data-active="true"\]/);
+  assert.doesNotMatch(panel, /aspect-square/);
+  // Dark only: the map has one palette, so no light-theme override exists.
   assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
 });

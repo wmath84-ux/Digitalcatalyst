@@ -86,7 +86,7 @@ export interface CoursePracticeQuestion {
  */
 export interface CoursePlayerNote {
   id: string;
-  /** Plain-text projection — used for the thin saved-note strip + search. */
+  /** Plain-text projection — used for safe study-card previews and search. */
   text: string;
   /**
    * Sanitised rich-text HTML. Keeps the exact formatting of anything pasted

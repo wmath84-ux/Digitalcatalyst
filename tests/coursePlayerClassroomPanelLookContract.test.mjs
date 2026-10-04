@@ -180,8 +180,8 @@ test("the five surface accents are the room's five", () => {
   assert.match(css, /--dc-flat-violet: #a78bfa;/);
   assert.match(css, /--dc-flat-amber: #f59e0b;/);
   assert.match(css, /--dc-flat-done: #6ee7b7;/);
-  // The notes wall's accent is the one the note cards wear.
-  assert.match(css, /\[data-course-notes-grid\] \[data-course-note\]:focus-within \{[^}]*--dc-flat-amber-wash/s);
+  // The shared notes card carries the wall's amber accent as CSS variables.
+  assert.match(css, /\.course-player-shell \[data-course-notes-grid\] \[data-course-note\]\.study-resource-card \{[^}]*--resource-accent-soft: var\(--dc-flat-amber-wash\)/s);
 });
 
 test("the backdrop, scrollbars and type rendering are the room's", () => {

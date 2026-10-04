@@ -29,6 +29,7 @@ const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
+const resourceCard = readSource("src/course/StudyResourceCard.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
 const notesHook = readSource("src/course/useCourseNotes.ts");
 const notesCloud = readSource("src/course/cloudNotes.ts");
@@ -107,7 +108,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-image-download",
   ];
   for (const hook of hooks) {
-    const allSources = [coursePlayer, playerPanel, overlay, audioPlayer, chargingButton, notesPanel, resourceViewer, imageViewer].join("\n");
+    const allSources = [coursePlayer, playerPanel, overlay, audioPlayer, chargingButton, notesPanel, resourceCard, resourceViewer, imageViewer].join("\n");
     assert.ok(allSources.includes(hook), `missing data attribute ${hook}`);
   }
 });

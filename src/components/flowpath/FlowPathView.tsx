@@ -8,7 +8,7 @@ const toast = {
 };
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Trash2, BookOpen } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type {
   Activity,
   ActivityType,

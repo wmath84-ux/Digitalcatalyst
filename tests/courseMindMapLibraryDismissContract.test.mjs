@@ -1,56 +1,39 @@
-// tests/courseMindMapLibraryDismissContract.test.mjs
-//
-// Contract for the Mind Map Library dismissal parity fix:
-//
-//   When the sheet is dragged shut (landscape split drag), the library grid
-//   must behave EXACTLY like the Note Library grid: cards keep a fixed
-//   160 px floor and clip at the sheet edge — they must never shrink to a
-//   sliver with the container. The old `minmax(min(160px, 100%), 1fr)`
-//   guard let the cards shrink all the way to zero during the drag, which
-//   is the "boxes shrink as the screen space reduces" report.
+// Contract for the shared responsive Note / Mind Map study-resource grid.
+// Narrow panels become one full-width column without shrinking typography or
+// creating horizontal overflow; wider tablet / desktop panes add columns.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const indexCss = fs.readFileSync("src/index.css", "utf8");
+const cardCss = fs.readFileSync("src/course/study-resource-card.css", "utf8");
+const panel = fs.readFileSync("src/course/MindMapPanel.tsx", "utf8");
 
-test("the mind map library grid keeps the same 160px floor as the notes grid", () => {
-  const notesRule = indexCss.match(/\[data-course-notes-grid\][^{]*\{[^}]*\}/);
-  const libraryRule = indexCss.match(/^\[data-course-mindmap-map-grid\] \{[^}]*\}/m);
-  assert.ok(notesRule && libraryRule, "both grids need a tiling rule in the stylesheet");
+test("both library grids tile by available width and never overflow a narrow pane", () => {
+  const baseRule = indexCss.match(/\[data-course-notes-grid\],\s*\[data-course-mindmap-map-grid\]\s*\{[^}]*\}/);
+  assert.ok(baseRule, "both libraries share one base grid rule");
+  assert.match(baseRule[0], /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(100%,\s*260px\),\s*1fr\)\)/);
+  assert.match(baseRule[0], /align-items:\s*stretch/);
+  assert.doesNotMatch(baseRule[0], /grid-template-columns:\s*repeat\((2|3)/);
 
-  // Identical tiling philosophy: count the space the grid actually got.
-  for (const rule of [notesRule[0], libraryRule[0]]) {
-    assert.match(rule, /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(160px,\s*1fr\)/);
-  }
-  // The map library rule must NOT contain the old shrink-to-container guard:
-  // `min(160px, 100%)` let cards contract below 160px (down to nothing) as
-  // the sheet was dragged closed.
-  assert.doesNotMatch(libraryRule[0], /minmax\(min\(160px/);
-  assert.doesNotMatch(libraryRule[0], /100%\)/);
+  const desktopRule = indexCss.match(/@media \(min-width: 1100px\)\s*\{\s*\[data-course-notes-grid\],\s*\[data-course-mindmap-map-grid\]\s*\{[^}]*\}/);
+  assert.ok(desktopRule, "wide desktop cards may use a more generous width");
+  assert.match(desktopRule[0], /min\(100%,\s*290px\)/);
 });
 
-test("the library cards themselves are width-independent boxes", () => {
-  // The card is a square with a min-height floor and a 160px+ grid column,
-  // so a narrower sheet clips the grid instead of squashing the cards.
-  const panel = fs.readFileSync("src/course/MindMapPanel.tsx", "utf8");
-  assert.match(panel, /aspect-square min-h-\[104px\]/);
-  // The grid itself is the auto-fill 160px floor rule (never a fixed
-  // viewport column count that would let cards track the sheet width).
-  assert.match(indexCss, /\[data-course-mindmap-map-grid\]\s*\{[\s\S]*?\}/);
+test("cards keep readable copy and a real study-resource height rather than shrinking to slivers", () => {
+  assert.match(panel, /min-h-\[212px\]/);
+  assert.match(cardCss, /min-height: 212px/);
+  assert.match(cardCss, /font-size: 17px/);
+  assert.match(cardCss, /overflow-wrap: anywhere/);
+  assert.doesNotMatch(panel, /aspect-square/);
+  assert.doesNotMatch(cardCss, /font-size:\s*9px|font-size:\s*10px/);
 });
 
-test("the mind map pane never slides a sheet in or out", () => {
-  // The course overlay no longer uses the right-edge Glass Sheet at all —
-  // the split pane swaps tabs in place with a 150ms crossfade, so there is
-  // no transform slide and no width animation anywhere near the mind map.
-  const overlay = fs.readFileSync("src/course/CourseOverlay.tsx", "utf8");
-  assert.doesNotMatch(overlay, /glass-sheet/);
-  assert.match(overlay, /key=\{tab\}/);
-  assert.match(overlay, /duration: 0\.15, ease: EASE_OUT_MOTION/);
-  // The shared sheet component (screens outside the player) stays intact.
-  const sheet = fs.readFileSync("src/components/ui/glass-sheet.tsx", "utf8");
-  assert.match(sheet, /if \(!mounted \|\| !open\) return null;/);
-  assert.match(sheet, /animation: "glass-sheet-in 0\.34s cubic-bezier\(0\.22,1,0\.36,1\) both"/);
+test("the mind-map grid keeps its shared card contract while loading and with data", () => {
+  assert.equal((panel.match(/data-course-mindmap-map-grid="true"/g) || []).length, 2);
+  assert.match(panel, /StudyResourceCardSkeleton kind="mind-map"/);
+  assert.match(panel, /StudyResourceCard/);
+  assert.match(panel, /data-course-mindmap-library/);
 });
