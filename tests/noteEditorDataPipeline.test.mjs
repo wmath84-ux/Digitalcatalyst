@@ -74,6 +74,8 @@ export * from "./src/course/noteEditor/editorSerialization";
 export * from "./src/course/noteEditor/editorCommands";
 export * from "./src/course/noteEditor/editorRuntime";
 export { sanitizeRichText, plainToRichText, splitFirstHeading, isEmptyRichText, richTextToPlain } from "./src/utils/richText";
+export { normalizePlainClipboardText, normalizeRichClipboardHtml, looksLikeMarkdown } from "./src/course/noteEditor/clipboardNormalization";
+export { renderMathSource, renderNoteHtmlWithMath, clearMathRenderCache } from "./src/course/noteEditor/mathRendering";
 export { combineHtml, loadLocalNotes, persistLocalNotes } from "./src/course/notesStore";
 export { normalizeNote, toFirestoreNote, parseCloudNote, mergeNoteSets, MAX_NOTE_HTML_LENGTH } from "./utils/courseNotes.js";
 `,
@@ -135,6 +137,89 @@ test("quote, code (indentation intact) and divider", () => {
   assert.equal(blocks[1].content[0].text, "let a = 1;\n  let b = 2;");
   // A multi-paragraph quote reads as one quote: a run of quote blocks.
   assert.deepEqual(types("<blockquote><p>a</p><p>b</p></blockquote>"), ["quote", "quote"]);
+});
+
+test("inline, block, raw-LaTeX and mixed text normalize to editable math nodes", () => {
+  const mixed = m.normalizePlainClipboardText("Real numbers are denoted by $\\mathbb{R}$ and include $\\sqrt{2}$. Also \\(x^2\\).");
+  const imported = run(mixed).blocks;
+  assert.deepEqual(imported.map((block) => block.type), ["paragraph"]);
+  assert.deepEqual(imported[0].content.filter((item) => item.type === "math").map((item) => item.props.latex), ["\\mathbb{R}", "\\sqrt{2}", "x^2"]);
+  assert.equal(imported[0].content.filter((item) => item.type === "math").length, 3);
+  assert.match(m.serializeNoteBody(imported), /Real numbers are denoted by <span data-note-math="inline"/);
+  assert.match(m.serializeNoteBody(imported), /and include <span data-note-math="inline"/);
+  assert.equal(m.serializeNoteBody(run(m.serializeNoteBody(imported)).blocks), m.serializeNoteBody(imported), "save/reload remains a fixed point");
+
+  const raw = run(m.normalizePlainClipboardText(String.raw`Raw \mathbb{R}, \frac{3}{4}, \sqrt{2}, \pi, \dots`)).blocks[0];
+  assert.deepEqual(raw.content.filter((item) => item.type === "math").map((item) => item.props.latex), ["\\mathbb{R}", "\\frac{3}{4}", "\\sqrt{2}", "\\pi", "\\dots"]);
+
+  const display = run(m.normalizePlainClipboardText("$$\n\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n$$\n\\[x^2+y^2\\]")).blocks;
+  assert.deepEqual(display.map((block) => block.type), ["mathBlock", "mathBlock"]);
+  assert.equal(display[0].props.latex, "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}");
+  assert.equal(display[1].props.latex, "x^2+y^2");
+  assert.match(m.serializeNoteBody(display), /data-note-math="block"/);
+});
+
+test("raw mathematical expressions are recognized conservatively without swallowing prose", () => {
+  const html = m.normalizePlainClipboardText("A copied solution: x^2 + y^2 = z^2, and the symbols √ ∑ ∫ ≤ ≥ ≠ ∞ π α β γ → ± remain readable.");
+  const blocks = run(html).blocks;
+  const math = blocks[0].content.filter((item) => item.type === "math");
+  assert.deepEqual(math.map((item) => item.props.latex), ["x^2 + y^2 = z^2"]);
+  const plain = blocks[0].content.filter((item) => item.type === "text").map((item) => item.text).join("");
+  assert.match(plain, /A copied solution:/);
+  assert.match(plain, /and the symbols √ ∑ ∫ ≤ ≥ ≠ ∞ π α β γ → ± remain readable\./);
+});
+
+test("malformed and ambiguous formulas stay readable instead of blocking the paste", () => {
+  const malformed = m.normalizePlainClipboardText(String.raw`Unclosed $\frac{1}{2 and open \(`);
+  const blocks = run(malformed).blocks;
+  const plain = blocks.map((block) => block.content?.map((item) => item.text || (item.type === "math" ? `math:${item.props.latex}` : "")).join("") || "").join(" ");
+  assert.match(plain, /Unclosed/);
+  assert.match(plain, /frac\{1\}\{2/);
+  assert.match(plain, /open/);
+  assert.doesNotThrow(() => m.renderNoteHtmlWithMath(malformed));
+});
+
+test("rich HTML keeps semantic formatting and imports KaTeX/MathJax/MathML sources", () => {
+  const source = '<h2>Mixed lesson</h2><p>Read <strong>bold</strong> text <span class="katex"><span class="katex-mathml"><math><semantics><mi>x</mi><annotation encoding="application/x-tex">\\frac{3}{4}</annotation></semantics></math></span></span></p><ul><li>one</li><li><em>two</em></li></ul>';
+  const normalized = m.normalizeRichClipboardHtml(source);
+  const blocks = run(normalized).blocks;
+  assert.deepEqual(blocks.map((block) => block.type), ["heading", "paragraph", "bulletListItem", "bulletListItem"]);
+  assert.deepEqual(blocks[1].content.map((item) => item.type), ["text", "text", "text", "math"]);
+  assert.equal(blocks[1].content.find((item) => item.type === "math").props.latex, "\\frac{3}{4}");
+  assert.equal(blocks[1].content[1].styles.bold, true);
+  assert.equal(blocks[3].content[0].styles.italic, true);
+
+  const bareMathMl = m.normalizeRichClipboardHtml('<p>Fraction: <math display="block"><mfrac><mn>3</mn><mn>4</mn></mfrac></math></p>');
+  assert.deepEqual(run(bareMathMl).blocks.map((block) => block.type), ["paragraph", "mathBlock"]);
+  assert.equal(run(bareMathMl).blocks[1].props.latex, "\\frac{3}{4}");
+});
+
+test("Markdown paste keeps headings, emphasis, links, lists, code and math structure", () => {
+  const markdown = "# Algebra\n\nUse **bold** and [a link](https://example.com).\n\n- First $x^2$\n- Second\n\n> Remember the rule.\n\n```text\n$\\mathbb{R}$\n```";
+  const html = m.normalizePlainClipboardText(markdown);
+  const blocks = run(html).blocks;
+  assert.deepEqual(blocks.map((block) => block.type), ["heading", "paragraph", "bulletListItem", "bulletListItem", "quote", "codeBlock"]);
+  assert.equal(blocks[2].content.some((item) => item.type === "math" && item.props.latex === "x^2"), true);
+  assert.equal(blocks[1].content.some((item) => item.type === "link" && item.href === "https://example.com"), true);
+  assert.equal(blocks[5].content[0].text, "$\\mathbb{R}$", "code stays literal");
+});
+
+test("KaTeX validates formulas, emits safe output and falls back to readable source on errors", () => {
+  const valid = m.renderMathSource(String.raw`\frac{3}{4}`, false);
+  assert.equal(valid.valid, true);
+  assert.match(valid.html, /class="katex"/);
+  assert.match(valid.html, /application\/x-tex/);
+  const block = m.renderMathSource(String.raw`\frac{-b \pm \sqrt{b^2-4ac}}{2a}`, true);
+  assert.equal(block.valid, true);
+  assert.match(block.html, /katex-display/);
+  const invalid = m.renderMathSource(String.raw`\notARealCommand{<script>alert(1)</script>}`, false);
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.html, /\\notARealCommand/);
+  assert.doesNotMatch(invalid.html, /<script/i);
+  const rendered = m.renderNoteHtmlWithMath('<p>safe $\\notARealCommand{x}$ text</p>');
+  assert.ok(rendered.includes("$\\notARealCommand{x}$"));
+  assert.ok(rendered.includes("safe "));
+  assert.ok(rendered.includes(" text"));
 });
 
 test("inline marks, safe links, sub/superscript, highlights and colours", () => {
@@ -206,6 +291,9 @@ const CORPUS = {
   checklist: '<ul><li data-checked="true">done</li><li data-checked="false">todo</li></ul><ul><li>plain bullet after</li></ul>',
   alignment: '<p style="text-align:center">centred</p><h2 align="right">right</h2>',
   spaces: "<div>a&nbsp;&nbsp;b</div><div> lead</div>",
+  // Pre-upgrade notes stay compatible: old HTML with source-like math is
+  // normalized in memory on open, while the saved format remains stable.
+  legacyMath: '<p>Previously saved $x^2 + y^2 = z^2$; Unicode π, ≤, and √ stay readable.</p>',
   aiNote: AI_NOTE,
   legacyPlainText: undefined, // filled below from plainToRichText
 };
@@ -225,6 +313,10 @@ test("the AI-note format and legacy plain-text notes import intact", () => {
   assert.deepEqual(types(AI_NOTE), ["heading", "divider", "paragraph", "bulletListItem", "bulletListItem"]);
   const plain = run(CORPUS.legacyPlainText);
   assert.deepEqual(texts(plain.blocks), ["Line one", "", "  indented line", "last & final <tag>"]);
+  const legacyPreview = m.renderNoteHtmlWithMath(CORPUS.legacyMath);
+  assert.match(legacyPreview, /class="katex"/);
+  assert.match(legacyPreview, /Previously saved/);
+  assert.doesNotMatch(legacyPreview, /data-note-math="inline"/);
 });
 
 test("the plain-text projection keeps words from different blocks apart (search, previews, AI grounding)", () => {
@@ -242,11 +334,23 @@ test("everything the serialiser writes is a fixed point of the player's sanitise
   }
 });
 
-test("the sanitiser allows data-checked (true/false only) and no other data attribute", () => {
+test("sanitizer allow-lists checklist state and bounded math-source markers only", () => {
   assert.equal(m.sanitizeRichText('<ul><li data-checked="true">a</li></ul>'), '<ul><li data-checked="true">a</li></ul>');
   assert.equal(m.sanitizeRichText('<ul><li data-checked="TRUE">a</li></ul>'), '<ul><li data-checked="true">a</li></ul>');
   assert.equal(m.sanitizeRichText('<ul><li data-checked="javascript:1" data-x="1">a</li></ul>'), "<ul><li>a</li></ul>");
   assert.equal(m.sanitizeRichText('<p data-checked="true" data-x="1">a</p>'), "<p>a</p>");
+  assert.equal(
+    m.sanitizeRichText('<p><span data-note-math="inline" data-latex="\\pi">$\\pi$</span></p>'),
+    '<p><span data-note-math="inline" data-latex="\\pi">$\\pi$</span></p>',
+  );
+  assert.equal(m.sanitizeRichText('<div data-note-math="block" data-latex="\\frac{1}{2}">$$x$$</div>'), '<div data-note-math="block" data-latex="\\frac{1}{2}">$$x$$</div>');
+  assert.equal(m.sanitizeRichText('<span data-note-math="block" data-latex="x">$$x$$</span>'), '<span>$$x$$</span>', "block math uses a block marker");
+  assert.equal(m.sanitizeRichText('<span data-note-math="inline" data-latex="x" data-x="1">x</span>'), '<span data-note-math="inline" data-latex="x">x</span>');
+  assert.equal(m.sanitizeRichText('<span data-note-math="inline" data-latex="javascript:alert(1)">source</span>').includes("data-note-math"), true, "LaTeX is inert data, never evaluated as HTML");
+  assert.equal(m.sanitizeRichText('<span data-note-math="invalid" data-latex="x">x</span>'), '<span>x</span>');
+  const oversizedLatex = "x".repeat(4097);
+  const oversizedMarker = m.sanitizeRichText(`<span data-note-math="inline" data-latex="${oversizedLatex}">$x$</span>`);
+  assert.equal(oversizedMarker, "<span>$x$</span>", "source over the limit loses its control attributes, not its visible text");
 });
 
 // ── 3. The title / body model the panel and the exit rescue speak ──────────
@@ -263,6 +367,13 @@ test("title pipeline: split → body import → serialise → combine reproduces
     const edited = m.combineHtml(heading, body(rest));
     assert.equal(edited, html);
   }
+
+  const mathHeading = '<h1>Area $A=\\pi r^2$</h1><hr><p>Keep the equation in the body.</p>';
+  const split = m.splitFirstHeading(mathHeading);
+  assert.equal(split.heading, "", "math-containing headings cannot be flattened into the plain-text title field");
+  const savedMathHeading = m.combineHtml(split.heading, body(split.body));
+  assert.match(savedMathHeading, /^<h1>Area <span data-note-math="inline"/);
+  assert.ok(savedMathHeading.includes('data-latex="A=\\pi r^2"'));
 });
 
 test("an untouched new note is the empty string, and trailing blank lines are trimmed", () => {
@@ -273,8 +384,10 @@ test("an untouched new note is the empty string, and trailing blank lines are tr
 
 // ── 4. Persistence: local mirror + Firestore payload ───────────────────────
 
-test("editor HTML survives the device mirror and the Firestore payload byte for byte", () => {
-  const html = m.combineHtml("Mixed", body(CORPUS.tableAndImages + CORPUS.checklist + CORPUS.marks));
+test("editor HTML, including editable formula sources, survives the device mirror and Firestore byte for byte", () => {
+  const mathNote = body(String.raw`<p>Area $A=\pi r^2$ and point $x^2$.</p>`);
+  const html = m.combineHtml("Mixed", body(CORPUS.tableAndImages + CORPUS.checklist + CORPUS.marks) + mathNote);
+  assert.match(html, /data-note-math="inline"/);
   const note = { id: "note-1", text: m.richTextToPlain(html), html, createdAt: 1, updatedAt: 2, links: [] };
   m.persistLocalNotes("uid1", "course1", [note]);
   const [loaded] = m.loadLocalNotes("uid1", "course1");
@@ -311,12 +424,22 @@ test("slash commands: the documented set, filterable by title and alias", () => 
   assert.deepEqual(m.filterNoteCommands("zzzz"), []);
 });
 
-test("the document API: load → read round-trips inside a real editor instance", () => {
+test("the document API: editable math load → read → external copy → re-import round-trips", () => {
   const editor = m.createNoteEditor();
-  const html = '<p>hello <strong>world</strong></p><ul><li data-checked="true">x</li></ul><table><tbody><tr><td>t</td></tr></tbody></table>';
+  const html = String.raw`<p>hello <strong>world</strong> <span data-note-math="inline" data-latex="\mathbb{R}">$\mathbb{R}$</span></p><div data-note-math="block" data-latex="\frac{3}{4}">$$\frac{3}{4}$$</div><ul><li data-checked="true">x</li></ul><table><tbody><tr><td>t</td></tr></tbody></table>`;
   m.loadNoteBody(editor, html);
-  assert.deepEqual(editor.document.map((b) => b.type), ["paragraph", "checkListItem", "legacyHtml"]);
-  assert.equal(m.readNoteBody(editor), html);
+  assert.deepEqual(editor.document.map((b) => b.type), ["paragraph", "mathBlock", "checkListItem", "legacyHtml"]);
+  const savedHtml = m.readNoteBody(editor);
+  assert.match(savedHtml, /data-note-math="inline"/);
+  assert.match(savedHtml, /data-note-math="block"/);
+  assert.equal(m.serializeNoteBody(run(savedHtml).blocks), savedHtml, "the editor's canonical math markup is stable on reload");
+  const copiedHtml = editor.blocksToHTMLLossy(editor.document);
+  assert.match(copiedHtml, /data-note-math="inline"/);
+  assert.match(copiedHtml, /data-note-math="block"/);
+  const pasted = run(copiedHtml).blocks;
+  assert.deepEqual(pasted.map((block) => block.type), ["paragraph", "mathBlock", "checkListItem", "legacyHtml"]);
+  assert.equal(pasted[0].content.some((item) => item.type === "math" && item.props.latex === "\\mathbb{R}"), true);
+  assert.equal(pasted[1].props.latex, "\\frac{3}{4}");
   assert.equal(m.isNoteBodyEmpty(editor), false);
   m.loadNoteBody(editor, "");
   assert.equal(editor.document.length, 1);
@@ -327,8 +450,9 @@ test("the document API: load → read round-trips inside a real editor instance"
 test("the schema is exactly the documented blocks, styles and inline content", () => {
   assert.deepEqual(
     Object.keys(m.noteSchema.blockSpecs).sort(),
-    ["bulletListItem", "checkListItem", "codeBlock", "divider", "heading", "legacyHtml", "numberedListItem", "paragraph", "quote"],
+    ["bulletListItem", "checkListItem", "codeBlock", "divider", "heading", "legacyHtml", "mathBlock", "numberedListItem", "paragraph", "quote"],
   );
+  assert.deepEqual(Object.keys(m.noteSchema.inlineContentSpecs).sort(), ["link", "math", "text"]);
   assert.deepEqual(
     Object.keys(m.noteSchema.styleSpecs).sort(),
     ["backgroundColor", "bold", "code", "italic", "strike", "sub", "sup", "textColor", "underline"],

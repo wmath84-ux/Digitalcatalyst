@@ -413,8 +413,8 @@ browserTest("the last words survive the panel — or the whole player — unmoun
   await context.close();
 });
 
-browserTest("paste: structure becomes blocks, a table is preserved, scripts die, plain text stays literal", async () => {
-  const { page, press, editorReady, context } = await open();
+browserTest("paste: rich HTML wins, Markdown and math become editable structure, scripts die, Unicode stays readable", async () => {
+  const { page, press, editorReady, context, problems } = await open();
   const paste = (data) =>
     page.evaluate((d) => {
       const dt = new DataTransfer();
@@ -431,9 +431,57 @@ browserTest("paste: structure becomes blocks, a table is preserved, scripts die,
   assert.match(pasted, /data-content-type="bulletListItem"/);
   assert.equal(await page.locator(".dc-note-legacy table").count(), 1);
   assert.equal(await page.evaluate(() => window.__pwn), undefined);
-  await paste({ "text/plain": "# not a heading **nor bold**\nsecond line" });
-  await page.waitForTimeout(300);
-  assert.match(await bodyText(page), /# not a heading \*\*nor bold\*\*/);
+  assert.doesNotMatch(await bodyText(page), /ignored/);
+
+  await paste({ "text/plain": "# Algebra\n\nUse **bold** and [the rule](https://example.com): $x^2$.\n\n- α + β = γ\n- Unicode stays: café ☕ π ≤ 3.14" });
+  await page.waitForTimeout(350);
+  const markdownPasted = await html(page);
+  assert.match(markdownPasted, /data-content-type="heading"/);
+  assert.match(markdownPasted, /<strong>bold<\/strong>/);
+  assert.match(markdownPasted, /data-note-math-node="inline"/);
+  assert.match(await bodyText(page), /Algebra/);
+  assert.match(await bodyText(page), /café ☕ π/);
+
+  await paste({ "text/plain": "plain copy — naïve résumé 😀" });
+  await page.waitForTimeout(150);
+  assert.match(await bodyText(page), /plain copy — naïve résumé 😀/);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+browserTest("inline formulas stay editable source: replace LaTeX, type around it, save and preview", async () => {
+  const { page, press, editorReady, context, problems } = await open();
+  const paste = (text) => page.evaluate((value) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", value);
+    document.querySelector(".bn-editor").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, text);
+  await press("[data-course-notes-add]");
+  await editorReady();
+  await page.keyboard.press("Enter");
+  await paste("Before $x^2$ after");
+  await page.waitForSelector(".dc-note-math-inline-trigger .katex");
+  await page.keyboard.type(" end");
+  await page.keyboard.press("Control+Home");
+  await page.keyboard.type("start ");
+  await page.waitForTimeout(250);
+  await page.locator(".dc-note-math-inline-trigger").click();
+  const source = page.locator(".dc-note-math-source-input");
+  await source.waitFor({ state: "visible" });
+  await source.fill("x^3");
+  await page.locator(".dc-note-math-source-apply").click();
+  await page.waitForTimeout(250);
+  assert.match(await html(page), /data-note-math-node="inline"/);
+  assert.match(await html(page), /<annotation encoding="application\/x-tex">x\^3<\/annotation>/);
+  assert.match(await bodyText(page), /start Before/);
+  assert.match(await bodyText(page), /after end/);
+  await page.click("[data-course-notes-save]");
+  await page.waitForFunction(() => window.__log.includes("add"));
+  const saved = await page.evaluate(() => window.__notes[0].html);
+  assert.match(saved, /data-note-math="inline"/);
+  assert.match(saved, /data-latex="x\^3"/);
+  assert.equal(await page.locator("[data-course-note-preview] .katex").count() > 0, true, "the saved card uses the shared KaTeX preview path");
+  assert.deepEqual(problems, []);
   await context.close();
 });
 

@@ -31,7 +31,8 @@
 // the white page is dropped (`colour-contrast`); an indented non-list block
 // is not indented (see the serialiser header).
 
-import { sanitizeRichText } from "../../utils/richText";
+import { MAX_NOTE_MATH_SOURCE_LENGTH } from "../../utils/noteMath";
+import { normalizeRichClipboardHtml } from "./clipboardNormalization";
 import type { NoteImportReport, NotePartialBlock } from "./editorTypes";
 
 // ── Internal inline model ──────────────────────────────────────────────────
@@ -40,7 +41,8 @@ type StyleFlag = "bold" | "italic" | "underline" | "strike" | "code" | "sup" | "
 type RunStyles = Partial<Record<StyleFlag, true>> & { textColor?: string; backgroundColor?: string };
 interface TextRun { type: "text"; text: string; styles: RunStyles }
 interface LinkRun { type: "link"; href: string; content: TextRun[] }
-type InlineRun = TextRun | LinkRun;
+interface MathRun { type: "math"; props: { latex: string } }
+type InlineRun = TextRun | LinkRun | MathRun;
 type Align = "left" | "center" | "right" | "justify";
 
 interface Context {
@@ -143,6 +145,7 @@ const isInlineNode = (node: Node): boolean => {
   if (node.nodeType === 3) return true;
   if (!isElement(node)) return false;
   const tag = tagOf(node);
+  if (node.getAttribute("data-note-math") === "block") return false;
   return !BLOCK_TAGS.has(tag) && !RAW_TAGS.has(tag) && !containsRaw(node);
 };
 
@@ -204,13 +207,28 @@ const collectRuns = (nodes: ArrayLike<Node>, base: RunStyles, report: Context["r
     }
     if (!isElement(node)) continue;
     const tag = tagOf(node);
+    if (node.getAttribute("data-note-math") === "inline") {
+      const latex = String(node.getAttribute("data-latex") ?? node.textContent ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH);
+      runs.push({ type: "math", props: { latex } });
+      continue;
+    }
     if (tag === "br") { runs.push({ type: "text", text: "\n", styles: base }); continue; }
     const styles = stylesFor(node, base, report);
     if (tag === "a" && !inLink) {
       const href = (node.getAttribute("href") || "").trim();
-      const inner = collectRuns(node.childNodes, styles, report, true).filter((run): run is TextRun => run.type === "text");
-      if (SAFE_LINK.test(href) && inner.length) runs.push({ type: "link", href, content: inner });
-      else runs.push(...inner);
+      const inner = collectRuns(node.childNodes, styles, report, true);
+      if (SAFE_LINK.test(href)) {
+        let linkedText: TextRun[] = [];
+        const flushLink = () => {
+          if (linkedText.length) runs.push({ type: "link", href, content: linkedText });
+          linkedText = [];
+        };
+        for (const item of inner) {
+          if (item.type === "text") linkedText.push(item);
+          else if (item.type === "math") { flushLink(); runs.push(item); }
+        }
+        flushLink();
+      } else runs.push(...inner);
       continue;
     }
     runs.push(...collectRuns(node.childNodes, styles, report, inLink));
@@ -230,12 +248,17 @@ const finishRuns = (runs: InlineRun[]): InlineRun[] => {
       return out;
     };
     if (run.type === "text") return { ...run, text: walk(run.text) };
-    return { ...run, content: run.content.map((inner) => ({ ...inner, text: walk(inner.text) })) };
+    if (run.type === "link") return { ...run, content: run.content.map((inner) => ({ ...inner, text: walk(inner.text) })) };
+    previousEndsWithSpace = false;
+    return run;
   });
   // 2. Trailing layout space / line breaks at the end of the block.
   for (let i = flat.length - 1; i >= 0; i -= 1) {
     const run = flat[i];
-    const last: TextRun | undefined = run.type === "text" ? run : run.content[run.content.length - 1];
+    // A math atom is real inline content; spaces immediately before it belong
+    // between the preceding words and the formula, not at the paragraph edge.
+    if (run.type === "math") break;
+    const last: TextRun | undefined = run.type === "text" ? run : run.type === "link" ? run.content[run.content.length - 1] : undefined;
     if (!last) continue;
     last.text = last.text.replace(/[ \n]+$/, "");
     if (last.text) break;
@@ -250,19 +273,31 @@ const finishRuns = (runs: InlineRun[]): InlineRun[] => {
       else out.push({ ...run });
       return;
     }
+    if (run.type === "math") {
+      out.push({ ...run, props: { ...run.props } });
+      return;
+    }
     const content = run.content.filter((inner) => inner.text);
     if (content.length) out.push({ ...run, content });
   };
   flat.forEach(push);
   const unNbsp = (run: TextRun): TextRun => ({ ...run, text: run.text.split(NBSP).join(" ") });
-  return out.map((run) => (run.type === "text" ? unNbsp(run) : { ...run, content: run.content.map(unNbsp) }));
+  return out.map((run) => {
+    if (run.type === "text") return unNbsp(run);
+    if (run.type === "link") return { ...run, content: run.content.map(unNbsp) };
+    return run;
+  });
 };
 
 const inlineFrom = (nodes: ArrayLike<Node>, report: Context["report"]): InlineRun[] =>
   finishRuns(collectRuns(nodes, {}, report));
 
 const runsAreEmpty = (runs: InlineRun[]): boolean =>
-  runs.every((run) => (run.type === "text" ? !run.text.trim() : run.content.every((inner) => !inner.text.trim())));
+  runs.every((run) => {
+    if (run.type === "text") return !run.text.trim();
+    if (run.type === "math") return false;
+    return run.content.every((inner) => !inner.text.trim());
+  });
 
 // ── Blocks ──────────────────────────────────────────────────────────────────
 
@@ -323,6 +358,11 @@ function importList(list: Element, ctx: Context, out: NotePartialBlock[]): void 
 
 function importBlockElement(el: Element, ctx: Context, out: NotePartialBlock[]): void {
   const tag = tagOf(el);
+  if (el.getAttribute("data-note-math") === "block") {
+    const latex = String(el.getAttribute("data-latex") ?? el.textContent ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH);
+    out.push({ type: "mathBlock", props: { latex } } as NotePartialBlock);
+    return;
+  }
   if (RAW_TAGS.has(tag)) { out.push(rawBlock(el, ctx)); return; }
   const own = alignOf(el);
   const scoped: Context = own ? { ...ctx, align: own } : ctx;
@@ -417,7 +457,7 @@ export function importLegacyHtml(html: string): NoteImportReport {
     const source = looksLikePlainText(input) && input.includes("\n")
       ? input.split(/\r?\n/).map((line) => `<div>${line.replace(/&(?![a-z#0-9]+;)/gi, "&amp;").replace(/</g, "&lt;") || "<br>"}</div>`).join("")
       : input;
-    const clean = sanitizeRichText(source);
+    const clean = normalizeRichClipboardHtml(source);
     if (!clean) return empty;
     const doc = new window.DOMParser().parseFromString(`<body>${clean}</body>`, "text/html");
     const blocks: NotePartialBlock[] = [];

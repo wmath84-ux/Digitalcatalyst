@@ -28,12 +28,15 @@ import {
   createBlockSpec,
   createCodeBlockSpec,
   createHeadingBlockSpec,
+  createInlineContentSpec,
   createStyleSpec,
   defaultBlockSpecs,
+  defaultInlineContentSpecs,
   defaultStyleSpecs,
 } from "@blocknote/core";
 import { en } from "@blocknote/core/locales";
 import { sanitizeRichText } from "../../utils/richText";
+import { MAX_NOTE_MATH_SOURCE_LENGTH, mathSourceText, renderMathSource } from "./mathRendering";
 import { installRuntimeCompat } from "./editorRuntime";
 import type { NotePartialBlock } from "./editorTypes";
 
@@ -69,6 +72,221 @@ const legacyHtmlBlock = createBlockSpec(
     toExternalHTML(block) {
       const dom = document.createElement("div");
       dom.innerHTML = sanitizeRichText(block.props.html);
+      return { dom };
+    },
+  },
+);
+
+// ── Native, editable math nodes ────────────────────────────────────────────
+
+const safeLatex = (value: unknown): string => String(value ?? "").slice(0, MAX_NOTE_MATH_SOURCE_LENGTH);
+
+/** Render KaTeX output only from the bounded, trust-disabled renderer. */
+const paintMath = (target: HTMLElement, latex: string, displayMode: boolean): void => {
+  const result = renderMathSource(latex, displayMode);
+  target.replaceChildren();
+  target.className = displayMode ? "dc-note-math-rendered dc-note-math-rendered-block" : "dc-note-math-rendered dc-note-math-rendered-inline";
+  if (result.valid) target.innerHTML = result.html;
+  else target.textContent = mathSourceText(latex, displayMode);
+};
+
+/** A small DOM-native source editor shared by inline and block formula nodes. */
+const createMathSourcePanel = (
+  initialSource: string,
+  onApply: (source: string) => void,
+  onDelete: () => void,
+): { panel: HTMLDivElement; focus: (anchor: HTMLElement) => void } => {
+  const panel = document.createElement("div");
+  panel.className = "dc-note-math-source-panel";
+  panel.setAttribute("contenteditable", "false");
+  panel.hidden = true;
+
+  const label = document.createElement("label");
+  label.className = "dc-note-math-source-label";
+  const labelText = document.createElement("span");
+  labelText.textContent = "LaTeX source";
+  const textarea = document.createElement("textarea");
+  textarea.className = "dc-note-math-source-input";
+  textarea.setAttribute("aria-label", "LaTeX formula source");
+  textarea.rows = 2;
+  textarea.value = initialSource;
+  label.append(labelText, textarea);
+
+  const actions = document.createElement("div");
+  actions.className = "dc-note-math-source-actions";
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "dc-note-math-source-apply";
+  apply.textContent = "Apply";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "dc-note-math-source-cancel";
+  cancel.textContent = "Cancel";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "dc-note-math-source-delete";
+  remove.textContent = "Delete formula";
+  actions.append(apply, cancel, remove);
+  panel.append(label, actions);
+
+  const close = () => { panel.hidden = true; };
+  const stopEditorEvent = (event: Event) => event.stopPropagation();
+  panel.addEventListener("mousedown", stopEditorEvent);
+  panel.addEventListener("click", stopEditorEvent);
+  apply.addEventListener("click", () => { onApply(safeLatex(textarea.value)); close(); });
+  cancel.addEventListener("click", close);
+  remove.addEventListener("click", () => { close(); onDelete(); });
+  textarea.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Escape") { event.preventDefault(); close(); }
+    else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); apply.click(); }
+  });
+
+  return {
+    panel,
+    focus: (anchor) => {
+      panel.hidden = false;
+      const view = panel.ownerDocument.defaultView;
+      const placeAndFocus = () => {
+        const anchorBox = anchor.getBoundingClientRect();
+        const visual = view?.visualViewport;
+        const leftEdge = visual?.offsetLeft ?? 0;
+        const topEdge = visual?.offsetTop ?? 0;
+        const viewportWidth = visual?.width ?? view?.innerWidth ?? 0;
+        const viewportHeight = visual?.height ?? view?.innerHeight ?? 0;
+        const panelBox = panel.getBoundingClientRect();
+        const left = Math.max(leftEdge + 8, Math.min(anchorBox.left, leftEdge + viewportWidth - panelBox.width - 8));
+        const below = topEdge + viewportHeight - anchorBox.bottom;
+        const preferredTop = below >= panelBox.height + 12
+          ? anchorBox.bottom + 6
+          : anchorBox.top - panelBox.height - 6;
+        const top = Math.max(topEdge + 8, Math.min(preferredTop, topEdge + viewportHeight - panelBox.height - 8));
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        textarea.focus();
+        textarea.select();
+      };
+      if (view) view.requestAnimationFrame(placeAndFocus);
+      else placeAndFocus();
+    },
+  };
+};
+
+const mathInline = createInlineContentSpec(
+  {
+    type: "math" as const,
+    propSchema: { latex: { default: "" } },
+    content: "none",
+  },
+  {
+    meta: { draggable: false },
+    parse(element) {
+      if (element.getAttribute("data-note-math") !== "inline") return undefined;
+      return { latex: safeLatex(element.getAttribute("data-latex") ?? element.textContent) };
+    },
+    render(inlineContent, updateInlineContent, editor, node, getPos) {
+      const latex = safeLatex(inlineContent.props.latex);
+      const dom = document.createElement("span");
+      dom.className = "dc-note-math-inline-node";
+      dom.setAttribute("data-note-math-node", "inline");
+      dom.setAttribute("contenteditable", "false");
+
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "dc-note-math-trigger dc-note-math-inline-trigger";
+      trigger.setAttribute("aria-label", "Edit inline formula");
+      trigger.title = "Click to edit formula source";
+      const preview = document.createElement("span");
+      paintMath(preview, latex, false);
+      trigger.appendChild(preview);
+
+      const removeInline = () => {
+        if (!editor.isEditable) return;
+        const position = getPos();
+        if (typeof position !== "number") return;
+        editor.transact((transaction) => transaction.delete(position, position + node.nodeSize));
+      };
+      const sourcePanel = createMathSourcePanel(latex, (next) => {
+        if (!editor.isEditable) return;
+        updateInlineContent({ type: "math", props: { latex: next } });
+        paintMath(preview, next, false);
+      }, removeInline);
+      dom.append(trigger, sourcePanel.panel);
+      trigger.addEventListener("mousedown", (event) => event.stopPropagation());
+      trigger.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!editor.isEditable) return;
+        sourcePanel.focus(trigger);
+      });
+
+      return { dom, ignoreMutation: () => true };
+    },
+    toExternalHTML(inlineContent) {
+      const latex = safeLatex(inlineContent.props.latex);
+      const dom = document.createElement("span");
+      dom.setAttribute("data-note-math", "inline");
+      dom.setAttribute("data-latex", latex);
+      dom.textContent = mathSourceText(latex, false);
+      return { dom };
+    },
+  },
+);
+
+const mathBlock = createBlockSpec(
+  {
+    type: "mathBlock" as const,
+    propSchema: { latex: { default: "" } },
+    content: "none",
+  },
+  {
+    meta: { selectable: true },
+    parse(element) {
+      if (element.getAttribute("data-note-math") !== "block") return undefined;
+      return { latex: safeLatex(element.getAttribute("data-latex") ?? element.textContent) };
+    },
+    render(block, editor) {
+      const latex = safeLatex(block.props.latex);
+      const dom = document.createElement("div");
+      dom.className = "dc-note-math-block-node";
+      dom.setAttribute("data-note-math-node", "block");
+      dom.setAttribute("contenteditable", "false");
+
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "dc-note-math-trigger dc-note-math-block-trigger";
+      trigger.setAttribute("aria-label", "Edit block formula");
+      trigger.title = "Click to edit formula source";
+      const preview = document.createElement("span");
+      paintMath(preview, latex, true);
+      trigger.appendChild(preview);
+
+      const sourcePanel = createMathSourcePanel(
+        latex,
+        (next) => {
+          if (!editor.isEditable) return;
+          editor.updateBlock(block.id, { props: { latex: next } });
+          paintMath(preview, next, true);
+        },
+        () => { if (editor.isEditable) editor.removeBlocks([block.id]); },
+      );
+      dom.append(trigger, sourcePanel.panel);
+      trigger.addEventListener("mousedown", (event) => event.stopPropagation());
+      trigger.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!editor.isEditable) return;
+        sourcePanel.focus(trigger);
+      });
+
+      return { dom, ignoreMutation: () => true, update: () => false };
+    },
+    toExternalHTML(block) {
+      const latex = safeLatex(block.props.latex);
+      const dom = document.createElement("div");
+      dom.setAttribute("data-note-math", "block");
+      dom.setAttribute("data-latex", latex);
+      dom.textContent = mathSourceText(latex, true);
       return { dom };
     },
   },
@@ -127,6 +345,11 @@ export const noteSchema = BlockNoteSchema.create({
     }),
     divider: defaultBlockSpecs.divider,
     legacyHtml: legacyHtmlBlock(),
+    mathBlock: mathBlock(),
+  },
+  inlineContentSpecs: {
+    ...defaultInlineContentSpecs,
+    math: mathInline,
   },
   styleSpecs: {
     bold: defaultStyleSpecs.bold,
@@ -163,7 +386,7 @@ export interface CreateNoteEditorOptions {
    * the importer (which itself needs the schema above).
    */
   pasteHtml?: (html: string, editor: NoteEditorInstance) => boolean;
-  /** Same for a plain-text-only clipboard — kept literal (see `pasteIntoEditor`). */
+  /** Same for plain-text-only clipboard — selectively parses Markdown/math, otherwise literal. */
   pastePlain?: (text: string, editor: NoteEditorInstance) => boolean;
   /** Extra attributes on the contenteditable (aria-label, test hooks…). */
   editableAttributes?: Record<string, string>;
@@ -171,7 +394,7 @@ export interface CreateNoteEditorOptions {
 
 /**
  * Build ONE editor instance. Everything the player needs to be true of every
- * editor lives here: the schema, safe links, literal plain-text paste, no
+ * editor lives here: the schema, safe links, explicit plain-text paste handling, no
  * animations (no layout shift while typing on a phone), Tab always indents.
  */
 export function createNoteEditor(options: CreateNoteEditorOptions = {}): NoteEditorInstance {
@@ -206,9 +429,9 @@ export function createNoteEditor(options: CreateNoteEditorOptions = {}): NoteEdi
       const plain = data?.getData("text/plain") || "";
       const typed = editor as unknown as NoteEditorInstance;
       if (html && pasteHtml && pasteHtml(html, typed)) return true;
-      // Plain text stays literal — the legacy editor never interpreted it, and
-      // "# not a heading" or "**stars**" must not turn into formatting just
-      // because they were pasted (TipTap's own paste rules would bold the latter).
+      // The player normalizes recognized Markdown / math in the custom hook;
+      // ordinary text falls through literally. Keep BlockNote's own Markdown
+      // paste disabled so it cannot reinterpret ambiguous prose on fallback.
       const files = Array.from(data?.types || []).includes("Files");
       if (!html && plain && !files && pastePlain && pastePlain(plain, typed)) return true;
       return defaultPasteHandler({ plainTextAsMarkdown: false, prioritizeMarkdownOverHTML: false });
