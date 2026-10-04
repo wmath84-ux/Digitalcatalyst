@@ -13,6 +13,15 @@ export const MAX_NOTIFICATION_SECTION_CHARS: number;
 export const NOTIFICATION_CATEGORIES: string[];
 export const NOTIFICATION_TARGET_TYPES: string[];
 
+export interface DeviceNotificationWorkspaceTarget {
+  type?: "joplin";
+  noteId?: string;
+  notebookId?: string;
+  tagId?: string;
+  resourceId?: string;
+  scheduleId?: string;
+}
+
 export interface DeviceNotificationItem {
   /** My Day / FlowPath item id. */
   itemId?: string;
@@ -22,6 +31,8 @@ export interface DeviceNotificationItem {
   section?: string;
   /** FlowPath kind (task / reminder / schedule / revision / mcq / lecture …). */
   kind?: string;
+  /** Canonical workspace target for a My Day occurrence (joplin). */
+  target?: DeviceNotificationWorkspaceTarget;
 }
 
 export interface DeviceNotificationInput {
@@ -29,7 +40,17 @@ export interface DeviceNotificationInput {
   title?: string;
   body?: string;
   category?: string;
-  target?: { type?: string; section?: string; itemId?: string; productId?: string | number };
+  target?: {
+    type?: string;
+    section?: string;
+    itemId?: string;
+    productId?: string | number;
+    noteId?: string;
+    notebookId?: string;
+    tagId?: string;
+    resourceId?: string;
+    scheduleId?: string;
+  };
   createdAtMs?: number;
 }
 
@@ -41,13 +62,32 @@ export interface DeviceNotificationPayload {
   read: false;
   source: "device";
   createdAtMs: number;
-  target: { type: string; section?: string; itemId?: string; productId?: string | number };
+  target: {
+    type: string;
+    section?: string;
+    itemId?: string;
+    productId?: string | number;
+    noteId?: string;
+    notebookId?: string;
+    tagId?: string;
+    resourceId?: string;
+    scheduleId?: string;
+  };
 }
 
 export function deviceNotificationDocId(kind: "myday" | "flowpath", item: DeviceNotificationItem): string;
 export function deviceNotificationTarget(
   kind: "myday" | "flowpath",
   item: DeviceNotificationItem,
-): { type: string; section?: string; itemId?: string };
+): {
+  type: string;
+  section?: string;
+  itemId?: string;
+  noteId?: string;
+  notebookId?: string;
+  tagId?: string;
+  resourceId?: string;
+  scheduleId?: string;
+};
 export function deviceNotificationCategory(kind: "myday" | "flowpath", item: DeviceNotificationItem): "mayday" | "course";
 export function buildDeviceNotification(input: DeviceNotificationInput): DeviceNotificationPayload | null;

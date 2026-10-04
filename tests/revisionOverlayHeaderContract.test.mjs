@@ -72,7 +72,10 @@ test("the overlay containing block is Revision-scoped, not every page-enter pane
       `page-enter-panel position:relative must stay under Revision, found ${rule.selector}`,
     );
   }
-  assert.match(myday, /data-page-enter-panel/);
+  // My Day is the Joplin workspace now and mounts no page-enter panel at all,
+  // so Revision is the only feature the `position: relative` containing block
+  // is scoped to.
+  assert.doesNotMatch(myday, /data-page-enter-panel/);
 });
 
 test("Revision glass toolbars share MAG frost, not the opaque white toolbar fill", () => {

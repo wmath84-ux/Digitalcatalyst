@@ -67,6 +67,11 @@ export const NOTIFICATION_TARGET_TYPES = [
   "mayday",
   "subscription",
   "flowpath",
+  // My Day workspace targets: a canonical Joplin object (note/to-do/notebook/
+  // tag/attachment) plus the schedule row that produced the alert. The old
+  // `mayday` target keeps working, so notifications already in Firestore and
+  // alarms already armed on a device stay valid (§28, §63).
+  "joplin",
 ];
 
 /** FlowPath kinds that are course content rather than a My Day item. */
@@ -108,6 +113,19 @@ export const deviceNotificationTarget = (kind, item) => {
   const source = item && typeof item === "object" ? item : {};
   const itemId = trim(source.itemId, 120);
   if (kind === "flowpath") return { type: "flowpath", itemId };
+  // A workspace occurrence carries its own canonical target (built by
+  // `src/joplin/scheduling/scheduleNotifications.ts`). It must be preserved as
+  // given: the ids in it are what a tap has to resolve.
+  const explicit = source.target && typeof source.target === "object" ? source.target : null;
+  if (explicit && explicit.type === "joplin") {
+    const target = { type: "joplin" };
+    if (explicit.noteId) target.noteId = trim(explicit.noteId, 120);
+    if (explicit.notebookId) target.notebookId = trim(explicit.notebookId, 120);
+    if (explicit.tagId) target.tagId = trim(explicit.tagId, 120);
+    if (explicit.resourceId) target.resourceId = trim(explicit.resourceId, 120);
+    if (explicit.scheduleId) target.scheduleId = trim(explicit.scheduleId, 120);
+    return target;
+  }
   const section = trim(source.section, MAX_NOTIFICATION_SECTION_CHARS);
   const target = { type: "mayday" };
   if (section) target.section = section;
@@ -143,6 +161,14 @@ export const buildDeviceNotification = (input) => {
   if (target.section) cleanTarget.section = trim(target.section, MAX_NOTIFICATION_SECTION_CHARS);
   if (target.itemId) cleanTarget.itemId = trim(target.itemId, 120);
   if (target.productId != null) cleanTarget.productId = target.productId;
+  // Workspace targets: the canonical ids the tap resolves to. Every field is
+  // trimmed and length-capped exactly like the legacy ones, and the caps are
+  // mirrored by firestore.rules.
+  if (targetType === "joplin") {
+    for (const key of ["noteId", "notebookId", "tagId", "resourceId", "scheduleId"]) {
+      if (target[key]) cleanTarget[key] = trim(target[key], 120);
+    }
+  }
   return {
     id,
     title,

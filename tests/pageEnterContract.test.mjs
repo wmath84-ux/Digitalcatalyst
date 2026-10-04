@@ -122,10 +122,15 @@ test("Revision inner pages animate via a path-keyed panel without remounting the
   assert.match(css, /\[data-revision-content\] \[data-page-enter-panel\] > \[data-revision-page-main\]/);
 });
 
-test("My Day sections animate via an activeSection-keyed panel without remounting the app", () => {
-  assert.match(myday, /data-page-enter-panel/);
-  assert.match(myday, /key=\{activeSection\}/);
-  assert.match(css, /\[data-myday-content\] \[data-page-enter-panel\]/);
+test("My Day hands the route to the workspace without a second page-enter panel", () => {
+  // The planner swapped sections inside a `key={activeSection}` page-enter
+  // panel. The workspace owns its layout, its panes and its single scroll
+  // context, so the route must not mount another panel (or another scroll
+  // container) around it. The `[data-myday-content]` rules stay in the
+  // stylesheet for the shells that still use the hook.
+  assert.doesNotMatch(myday, /data-page-enter-panel/);
+  assert.doesNotMatch(myday, /activeSection/);
+  assert.match(myday, /JoplinWorkspace/);
 });
 
 test("mobile two-layer CSS animates overlay headers from above, not with the body", () => {

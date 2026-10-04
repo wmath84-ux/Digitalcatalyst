@@ -23,9 +23,21 @@ export type SiteNotificationTarget =
   | { type: 'course'; productId: number | string }
   | { type: 'purchases' }
   | { type: 'community'; targetPage?: string; targetId?: string }
-  // My Day deep link: section is the tab the item lives in (tasks /
-  // schedule / reminders) and itemId is the exact item that fired.
+  // My Day deep link: section is the tab the item lived in the RETIRED planner
+  // (tasks / schedule / reminders) and itemId is the legacy item that fired.
+  // Kept so notifications already stored in Firestore keep resolving (§28).
   | { type: 'mayday'; section?: 'tasks' | 'schedule' | 'reminders'; itemId?: string }
+  // My Day WORKSPACE target: the canonical Joplin object a schedule points at,
+  // plus the schedule row itself. This is what the universal scheduler writes
+  // (§61) — the notification layer never needs Joplin's internal schema.
+  | {
+      type: 'joplin';
+      noteId?: string;
+      notebookId?: string;
+      tagId?: string;
+      resourceId?: string;
+      scheduleId?: string;
+    }
   // FlowPath items deep-link to the FlowPath page with the item highlighted.
   // Device-delivered alerts (src/lib/deviceNotificationInbox.ts) carry this
   // target so tapping one lands on the activity that fired.
@@ -179,6 +191,7 @@ const PRODUCT_CATEGORIES = new Set<SiteNotificationCategory>(['store', 'unlock',
 export const getNotificationFilterKey = (notification: SiteNotification): Exclude<NotificationFilterKey, 'all'> => {
   if (PRODUCT_CATEGORIES.has(notification.category)) return 'product';
   if (notification.category === 'mayday') return 'mayday';
+  if (notification.target?.type === 'joplin') return 'mayday';
   if (notification.category === 'subscription') return 'subscription';
   return 'updates';
 };
@@ -205,9 +218,21 @@ export const getNotificationDeepLink = (notification: SiteNotification): string 
   if (target.type === 'purchases') return '#/store/purchases';
   if (target.type === 'mayday') {
     if (target.section && target.itemId) {
+      // The retired planner's URL. `#/my-day` translates it to the migrated
+      // Joplin object, so an old alert still opens the right note (§28).
       return `#/my-day?section=${target.section}&item=${encodeURIComponent(String(target.itemId))}`;
     }
     return '#/my-day';
+  }
+  if (target.type === 'joplin') {
+    const query = new URLSearchParams();
+    if (target.noteId) query.set('note', String(target.noteId));
+    if (target.notebookId) query.set('notebook', String(target.notebookId));
+    if (target.tagId) query.set('tag', String(target.tagId));
+    if (target.resourceId) query.set('resource', String(target.resourceId));
+    if (target.scheduleId) query.set('schedule', String(target.scheduleId));
+    const suffix = query.toString();
+    return suffix ? `#/my-day?${suffix}` : '#/my-day';
   }
   if (target.type === 'flowpath') {
     return target.itemId ? `#/flowpath?item=${encodeURIComponent(String(target.itemId))}` : '#/flowpath';

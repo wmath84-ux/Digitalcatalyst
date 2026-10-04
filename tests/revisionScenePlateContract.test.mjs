@@ -431,7 +431,6 @@ test("the vendored registry, the dock and every bottom nav are untouched", () =>
     "src/components/glass-dock/GlassMaterial.tsx",
     "src/components/glass-dock/GlassSidebar.tsx",
     "src/components/BottomNav.tsx",
-    "src/components/myday/BottomNav.tsx",
     "src/revision/components/BottomNav.tsx",
   ]) {
     assert.doesNotMatch(read(file), /dc-scene-(plate|ink|field)/, `${file} must not carry scene hooks`);

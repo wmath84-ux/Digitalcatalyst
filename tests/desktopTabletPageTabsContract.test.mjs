@@ -35,7 +35,6 @@ const shell = read("src/components/DesktopShell.tsx");
 const topBarContext = read("src/components/TopBarTabsContext.tsx");
 const myDay = read("src/MyDayApp.tsx");
 const revision = read("src/revision/RevisionApp.tsx");
-const myDayFooter = read("src/components/myday/BottomNav.tsx");
 const revisionFooter = read("src/revision/components/BottomNav.tsx");
 const css = read("src/index.css");
 
@@ -123,14 +122,16 @@ test("the revision tabs step out of the way on the focused test surfaces", () =>
 });
 
 test("My Day renders no horizontal tab strip", () => {
-  // The strip and its buttons are gone from the page…
+  // The planner is retired: the strip, its side rail and its phone pill went
+  // with it. `#/my-day` is the Joplin workspace, whose own sidebar and toolbar
+  // are the only chrome on the route — no Digitalcatalyst strip, and no second
+  // nav layered on top of Joplin's.
   assert.doesNotMatch(myDay, /PageTabs/);
   assert.doesNotMatch(myDay, /DAY_TABS/);
-  // …and the pages stay reachable from the side rail + phone pill, both wired
-  // to the same section swap the strip used.
-  assert.match(myDay, /<SideNav active=\{activeSection\} onNavigate=\{handleNavigate\} \/>/);
-  assert.match(myDay, /<BottomNav active=\{activeSection\} onNavigate=\{handleNavigate\}/);
-  assert.match(myDayFooter, /id: "overview", label: "Day"/);
+  assert.doesNotMatch(myDay, /<SideNav/);
+  assert.doesNotMatch(myDay, /<BottomNav/);
+  // The route stays a thin adapter that lazy-loads the workspace.
+  assert.match(myDay, /import\("\.\/joplin\/JoplinWorkspace"\)/);
 });
 
 test("the footer capsule is the ONE footer on phone + tablet, released only on desktop", () => {
@@ -140,10 +141,11 @@ test("the footer capsule is the ONE footer on phone + tablet, released only on d
   // features render the shared capsule (src/components/SiteFooterNav.tsx) and
   // neither hides it at 768 px any more — a tablet in portrait used to lose the
   // footer completely here while Home / Store / Cart kept theirs.
+  // My Day used to be the second consumer; the planner's pill is retired with
+  // the planner (the Joplin workspace owns the route's chrome), so Revision is
+  // the remaining feature footer on top of the primary one.
   const shared = read("src/components/SiteFooterNav.tsx");
-  assert.match(myDayFooter, /<SiteFooterNav/);
   assert.match(revisionFooter, /<SiteFooterNav/);
-  assert.doesNotMatch(myDayFooter, /md:hidden/);
   assert.doesNotMatch(revisionFooter, /md:hidden/);
   assert.doesNotMatch(shared, /md:hidden/);
   assert.match(shared, /data-site-footer-nav/);

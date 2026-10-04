@@ -12,18 +12,20 @@ import fs from "node:fs";
 const css = fs.readFileSync("src/index.css", "utf8");
 const footer = fs.readFileSync("src/components/BottomNav.tsx", "utf8");
 const cartFooter = fs.readFileSync("src/cartWishlist/components/BottomNav.tsx", "utf8");
-const myDayFooter = fs.readFileSync("src/components/myday/BottomNav.tsx", "utf8");
 const revisionFooter = fs.readFileSync("src/revision/components/BottomNav.tsx", "utf8");
-// Every one of those four renders the SAME wrapper, and the wrapper is the
+// Every one of those three renders the SAME wrapper, and the wrapper is the
 // only place the tags live now (owner brief 2026-09-16: one footer design,
 // on every screen) — so the tags are asserted once, on the shared component.
+//
+// My Day used to be the fourth: the planner rendered its own `BottomNav`. The
+// personal workspace is the Joplin workspace now and brings Joplin's own
+// chrome, so there is no Digitalcatalyst footer on `#/my-day` to freeze.
 const siteFooterNav = fs.readFileSync("src/components/SiteFooterNav.tsx", "utf8");
 
 test("every site footer nav is tagged so CSS can hide the whole bar", () => {
   for (const [label, source] of [
     ["main", footer],
     ["cart", cartFooter],
-    ["myday", myDayFooter],
     ["revision", revisionFooter],
   ]) {
     assert.match(source, /<SiteFooterNav/, `${label} BottomNav must render the shared site footer`);
@@ -35,7 +37,6 @@ test("every site footer nav is tagged so CSS can hide the whole bar", () => {
   for (const [label, source] of [
     ["main", footer],
     ["cart", cartFooter],
-    ["myday", myDayFooter],
     ["revision", revisionFooter],
   ]) {
     assert.doesNotMatch(source, /data-site-footer-nav/, `${label} BottomNav must not hand-roll the footer nav`);

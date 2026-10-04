@@ -1,910 +1,327 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./myday-overview.css";
-import "./myday-reminders.css";
-import { saveMyDayData, type MyDayCloudData } from "./lib/myDayClient";
-import {
-  Bell,
-  CalendarClock,
-  ClipboardList,
-  NotebookPen,
-} from "lucide-react";
-import StoreHeader from "./components/Header";
-import { useBranding } from "./context/BrandingContext";
-import GreetingHeader from "./components/myday/GreetingHeader";
-import CreateMenu from "./components/myday/CreateMenu";
-import TaskList from "./components/myday/TaskList";
-import TaskModal from "./components/myday/TaskModal";
-import Timeline from "./components/myday/Timeline";
-import ScheduleModal from "./components/myday/ScheduleModal";
-import QuickNotes from "./components/myday/QuickNotes";
-import Reminders from "./components/myday/Reminders";
-import SideNav from "./components/myday/SideNav";
-import BottomNav from "./components/myday/BottomNav";
-import OverviewQuickActions from "./components/myday/OverviewQuickActions";
-import OverviewTasksCard from "./components/myday/OverviewTasksCard";
-import OverviewScheduleCard from "./components/myday/OverviewScheduleCard";
-import { QuoteCard, StreakCard } from "./components/myday/OverviewSideCards";
-import StoreBanner from "./components/myday/StoreBanner";
-import { useStudyStreak } from "./hooks/useStudyStreak";
-import ConfirmDialog from "./components/ui/ConfirmDialog";
-import Toast from "./components/ui/Toast";
-import type { ToastMessage } from "./components/ui/Toast";
-import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
-import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
-import { useCommerce } from "./context/CommerceContext";
+// src/MyDayApp.tsx
+//
+// The `#/my-day` route adapter.
+//
+// This file used to be the planner: Overview, Tasks, Schedule, Reminders and
+// Quick Notes, with their own side rail, bottom pill, glass surfaces and
+// localStorage-first save path. All of that is retired (Phase D): My Day is now
+// ONE personal workspace — the Joplin workspace host — and this component's only
+// jobs are the ones the workspace must not own:
+//
+//   1. AUTH BOUNDARY (§12, §111) — nothing personal is created until Firebase
+//      identity is resolved. No anonymous workspace that could later be attached
+//      to the wrong account.
+//   2. ENTITLEMENT (§57, §58) — the existing subscription / free-creation policy
+//      still governs the feature. It is not re-implemented here: the gate below
+//      renders the SAME `useMyDayAccess` state that governed the old planner, and
+//      creations are still charged on the server.
+//   3. MIGRATION (§8–§11) — the one-time, idempotent, resumable migration of the
+//      learner's legacy tasks, notes, reminders and schedule events into the
+//      canonical workspace model, before the workspace is handed their data.
+//   4. DEEP LINKS (§28, §116) — a legacy notification URL is translated into a
+//      canonical workspace target and forwarded into the frame.
+//
+// It deliberately renders NO task/schedule/note UI of its own: there is one
+// workspace, and the frame owns its interface (Joplin's).
+
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
 import { usePublishFeatureVisibility } from "./context/FeatureVisibilityContext";
 import PremiumGate from "./components/subscription/PremiumGate";
-import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
-import { richTextToPlain } from "./utils/richText";
-
-const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
-type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-const MYDAY_STORAGE_KEYS: Record<keyof MyDayCloudData, string> = {
-  tasks: "myday_tasks",
-  schedule: "myday_schedule",
-  notes: "myday_notes",
-  reminders: "myday_reminders",
-};
+import { parseMyDayHash, buildMyDayDeepLink } from "./joplin/joplinDeepLinks";
+import { JoplinWorkspaceBoundary } from "./joplin/JoplinWorkspace";
+import { trackMyDayEvent } from "./joplin/joplinAnalytics";
+import { isMigrationComplete, loadMigrationMarker, runMyDayMigrationV1, subscribeMigrationMarker } from "./joplin/joplinMigrationBridge";
+import type { MigrationMarker } from "./joplin/joplinMigrationBridge";
 
 /**
- * One-time fresh-start migration.
+ * The workspace host is its own chunk.
  *
- * Older builds seeded demo content (sampleData.ts) into these lists on
- * first run, and the local-first save mirrored those demo rows to cloud.
- * The ids below are the ONLY ids the demo content ever used — real user
- * creations always use crypto.randomUUID() — so filtering them is safe and
- * never touches genuine user data. Runs once per device (the cleaned
- * arrays are written straight back to localStorage), plus once against
- * the cloud snapshot when it loads.
+ * §88/§133: Joplin-scale code must never be part of the app's first load. The
+ * route itself is already lazy (`lazyRoute(() => import("./MyDayApp"))` in
+ * `src/main.tsx`); this second boundary keeps the host + bridge out of the My Day
+ * chunk until identity and access are resolved, so a paywalled learner never
+ * downloads it.
  */
-const LEGACY_SAMPLE_IDS: Record<keyof MyDayCloudData, ReadonlySet<string>> = {
-  tasks: new Set(["t1", "t2", "t3", "t4", "t5"]),
-  schedule: new Set(["e1", "e2", "e3", "e4", "e5", "e6", "e7"]),
-  notes: new Set(["n1", "n2", "n3", "n4", "n5"]),
-  reminders: new Set(["r1", "r2", "r3"]),
-};
+const JoplinWorkspace = lazy(() => import("./joplin/JoplinWorkspace"));
 
-function stripLegacySamples(data: MyDayCloudData): { cleaned: MyDayCloudData; removed: number } {
-  const before = data.tasks.length + data.schedule.length + data.notes.length + data.reminders.length;
-  const cleaned: MyDayCloudData = {
-    tasks: data.tasks.filter((t) => t && !LEGACY_SAMPLE_IDS.tasks.has(t.id)),
-    schedule: data.schedule.filter((e) => e && !LEGACY_SAMPLE_IDS.schedule.has(e.id)),
-    notes: data.notes.filter((n) => n && !LEGACY_SAMPLE_IDS.notes.has(n.id)),
-    reminders: data.reminders.filter((r) => r && !LEGACY_SAMPLE_IDS.reminders.has(r.id)),
-  };
-  const after = cleaned.tasks.length + cleaned.schedule.length + cleaned.notes.length + cleaned.reminders.length;
-  return { cleaned, removed: before - after };
-}
+type MigrationPhase = "idle" | "running" | "done" | "partial" | "failed";
 
-/** Load a My Day list and drop any lingering demo rows (fresh start). */
-function loadCleanedList<K extends keyof MyDayCloudData>(key: K): MyDayCloudData[K] {
-  const storageKey = MYDAY_STORAGE_KEYS[key];
-  const items = loadFromStorage<MyDayCloudData[K]>(storageKey, [] as unknown as MyDayCloudData[K]);
-  if (!Array.isArray(items)) return [] as unknown as MyDayCloudData[K];
-  const legacy = LEGACY_SAMPLE_IDS[key];
-  const cleaned = (items as Array<{ id?: unknown }>).filter(
-    (item) => item && typeof item.id === "string" && !legacy.has(item.id),
-  );
-  if (cleaned.length !== items.length) {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(cleaned));
-    } catch {
-      // Best-effort: the in-memory state below is already clean for this visit.
-    }
-  }
-  return cleaned as MyDayCloudData[K];
-}
-
-/**
- * My Day is intentionally local-first: the learner taps a task/note/etc. and
- * sees it immediately, then we try to mirror it to Firestore through the
- * secure server endpoint. If the cloud save is unavailable (offline, dev
- * server without an API stub, old deploy, etc.) we still keep the change on
- * this device instead of showing an unreadable error and losing the work.
- */
-function writeLocalMyDay(data: MyDayCloudData): void {
-  try {
-    Object.entries(MYDAY_STORAGE_KEYS).forEach(([key, storageKey]) => {
-      localStorage.setItem(storageKey, JSON.stringify(data[key as keyof MyDayCloudData]));
-    });
-  } catch {
-    // The in-memory state is still authoritative for this visit.
-  }
-}
-
-const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeof ClipboardList }[] = [
-  { id: "tasks", label: "Today Task", hint: "Plan what you need to finish today", icon: ClipboardList },
-  { id: "schedule", label: "Daily Schedule", hint: "Block time for classes and study", icon: CalendarClock },
-  { id: "reminders", label: "Reminder", hint: "Get pinged at the right moment", icon: Bell },
-  { id: "notes", label: "Quick Note", hint: "Capture a thought in seconds", icon: NotebookPen },
-];
-
-export default function App() {
-  const { cartIds } = useCommerce();
+export default function MyDayApp() {
   const { user } = useAuth();
-  const { appName } = useBranding();
-  const {
-    hasAccess: hasMyDayAccess,
-    canCreate: canCreateMyDay,
-    freeLimit,
-    uid,
-    setAccess: setMyDayAccess,
-    refresh: refreshMyDay,
-    hidden: myDayHidden,
-  } = useMyDayAccess();
-  const [cloudLoaded, setCloudLoaded] = useState(false);
-  const [paywallOpen, setPaywallOpen] = useState(false);
-  // Fresh start: new learners begin with empty lists (no demo rows). Any
-  // demo rows left on this device by older builds are stripped by
-  // loadCleanedList — real user items always survive (see comment above).
-  const [tasks, setTasks] = useState<Task[]>(() => loadCleanedList("tasks"));
-  const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadCleanedList("schedule"));
-  const [notes, setNotes] = useState<QuickNote[]>(() => loadCleanedList("notes"));
-  const [reminders, setReminders] = useState<Reminder[]>(() => loadCleanedList("reminders"));
+  const myDay = useMyDayAccess();
+  const [marker, setMarker] = useState<MigrationMarker | null>(null);
+  const [migrationPhase, setMigrationPhase] = useState<MigrationPhase>("idle");
+  const [migrationError, setMigrationError] = useState<string | null>(null);
+  const [gateOpen, setGateOpen] = useState(false);
+  const startedForUser = useRef<string | null>(null);
 
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
-  const [activeSection, setActiveSection] = useState<DaySection>("tasks");
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  // The My Day working column (right of the sticky side navigation). Every
-  // create/edit overlay (Modal / ConfirmDialog) clamps itself to this column's
-  // on-screen rectangle on tablet + desktop widths via OverlayBoundsProvider,
-  // so dialogs never cover the side panel or spill outside the app frame.
-  const contentColumnRef = useRef<HTMLElement>(null);
-  const [savingMyDay, setSavingMyDay] = useState(false);
-  const [cloudSyncFailed, setCloudSyncFailed] = useState(false);
+  const uid = user?.id ?? null;
 
-  // Latest full local snapshot. Used by the local-first save path so a cloud
-  // failure never discards a change the learner already made on this device.
-  const latestMyDayRef = useRef<MyDayCloudData | null>(null);
-  // Guard against overlapping cloud writes. The React state is still used to
-  // drive the "Saving My Day…" label, but the async guard must be a ref so the
-  // saved-local-first path can queue the newest snapshot right after a write.
-  const myDaySaveRunningRef = useRef(false);
+  // Phase-1 visibility contract is preserved: the rail/nav removes the My Day
+  // entry when the admin hides the feature from non-subscribers.
+  usePublishFeatureVisibility("myday", { hidden: Boolean(myDay.hidden) });
 
-  const userName = user?.name?.split(" ")[0] || "Learner";
-  const avatarInitial = (userName.trim().charAt(0) || "L").toUpperCase();
-
-  // Real study streak, derived from task completions (recorded below
-  // whenever a task transitions to completed).
-  const { streak, recordCompletionDay } = useStudyStreak(tasks);
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmConfig, setConfirmConfig] = useState({
-    title: "",
-    message: "",
-    onConfirm: () => {},
-    confirmLabel: "Delete",
-  });
-
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  const addToast = useCallback((text: string, type: ToastMessage["type"] = "success", description?: string) => {
-    const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, text, type, description }]);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  // Non-subscribers may create the Admin-configured free number of items.
-  // After today's allowance is consumed, My Day remains browseable and the
-  // same polished subscription gate returns for every CREATE action.
-  //
-  // IMPORTANT: Editing and deleting existing items is ALWAYS allowed.
-  // A user who has already created items (within their free limit or paid)
-  // must be able to manage those items without hitting a paywall.
-  const requireMyDayAccess = useCallback(() => {
-    if (hasMyDayAccess || canCreateMyDay) return true;
-    setPaywallOpen(true);
-    return false;
-  }, [canCreateMyDay, hasMyDayAccess]);
-
-  // canSaveMyDay allows editing, deleting, toggling existing items.
-  // Only creation of NEW items requires a check against free limit.
-  const canSaveMyDay = useCallback(() => {
-    // All users (free or paid) can save/edit/delete existing items.
-    // The server will handle any creation limits server-side.
-    return true;
-  }, []);
-
-  const applyCloudData = useCallback((data: MyDayCloudData) => {
-    latestMyDayRef.current = data;
-    setTasks(data.tasks);
-    setSchedule(data.schedule);
-    setNotes(data.notes);
-    setReminders(data.reminders);
-    writeLocalMyDay(data);
-  }, []);
-
-  /**
-   * Apply a change to the device-first My Day state. This always succeeds and
-   * is called before the cloud request so the learner never loses work when
-   * the server is unreachable. Returns both the merged local snapshot and the
-   * snapshot that existed before the change (used for a clean rollback when
-   * the server rejects a daily-free-limit breach).
-   */
-  const applyLocalMyDay = useCallback((next: Partial<MyDayCloudData>) => {
-    const previous = latestMyDayRef.current ?? { tasks, schedule, notes, reminders };
-    const merged: MyDayCloudData = {
-      tasks: next.tasks ?? previous.tasks,
-      schedule: next.schedule ?? previous.schedule,
-      notes: next.notes ?? previous.notes,
-      reminders: next.reminders ?? previous.reminders,
-    };
-    latestMyDayRef.current = merged;
-    setTasks(merged.tasks);
-    setSchedule(merged.schedule);
-    setNotes(merged.notes);
-    setReminders(merged.reminders);
-    writeLocalMyDay(merged);
-    return { previous, merged };
-  }, [notes, reminders, schedule, tasks]);
-
-  // My Day saves are local-first. The device state is updated immediately;
-  // the secure users/{uid}/myDay collection API is then asked to mirror it
-  // to cloud.
-  // If the server is unavailable the change still remains on this device and
-  // we show a readable non-blocking notice instead of a solid red error box.
-  const persistMyDay = useCallback(async (
-    next: Partial<MyDayCloudData>,
-  ): Promise<boolean> => {
-    const { previous, merged } = applyLocalMyDay(next);
-    setCloudLoaded(true);
-
-    // Without a signed-in user we still let learners create items locally
-    // (they persist on this device). This is the helpful fallback for a page
-    // where auth has not finished restoring, and it is clearly communicated
-    // to the user instead of silently failing.
+  // ── migration marker ───────────────────────────────────────────────────────
+  useEffect(() => {
     if (!uid) {
-      setCloudSyncFailed(true);
-      return true;
+      setMarker(null);
+      return undefined;
     }
+    return subscribeMigrationMarker(uid, setMarker);
+  }, [uid]);
 
-    // A cloud save is already in flight. The change is already on this device;
-    // the in-flight request won't overwrite it, and the finally block below
-    // sends the newest snapshot once that request completes.
-    if (myDaySaveRunningRef.current) {
-      setCloudSyncFailed(false);
-      return true;
-    }
-
-    myDaySaveRunningRef.current = true;
-    setSavingMyDay(true);
-    try {
-      const result = await saveMyDayData(merged, {
-        tzOffsetMinutes: new Date().getTimezoneOffset(),
-      });
-      // Keep the local-first snapshot as-is: a newer local change could have
-      // been made while this request was in flight. Overwriting it here would
-      // silently lose that device-only change.
-      setMyDayAccess(result.access);
-      setCloudSyncFailed(false);
-      return true;
-    } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
-      if (code === "MYDAY_DAILY_FREE_USED") {
-        // The server rejected the creation because today's free allowance is
-        // exhausted. Keep the paywall contract real by restoring the state
-        // that existed before this change.
-        applyLocalMyDay(previous);
-        setPaywallOpen(true);
-        addToast(
-          `Today's free My Day creation limit is reached. Subscribe for unlimited creation or try again after the daily reset.`,
-          "info",
-        );
-        return false;
-      }
-      // Every other failure (offline, wrong deploy, missing env var) becomes a
-      // device-only save instead of a lost task + unreadable red message.
-      setCloudSyncFailed(true);
-      addToast("Saved on this device", "info", "Cloud sync is temporarily unavailable — we'll retry on your next save.");
-      return true;
-    } finally {
-      myDaySaveRunningRef.current = false;
-      setSavingMyDay(false);
-      // If the user made another change while this request was running, push
-      // that newest snapshot now (the in-flight one stayed read-only for it).
-      if (latestMyDayRef.current && latestMyDayRef.current !== merged) {
-        void persistMyDay(latestMyDayRef.current);
-      }
-    }
-  }, [addToast, applyLocalMyDay, setMyDayAccess, uid]);
-
-  // Keep the local snapshot ref aligned with the rendered state so subsequent
-  // local-first saves can compute "before" correctly and queue the newest
-  // snapshot after a cloud write.
+  // ── data migration V1 ─────────────────────────────────────────────────────
+  // Staged, idempotent and resumable: it writes per section, verifies each write,
+  // and never deletes legacy data (§11). A failure leaves the affected phase
+  // pending and the next visit resumes from it.
   useEffect(() => {
-    latestMyDayRef.current = { tasks, schedule, notes, reminders };
-  }, [notes, reminders, schedule, tasks]);
+    if (!uid || myDay.loading) return undefined;
+    if (!myDay.unlimited && !myDay.paid && !myDay.canCreate) return undefined;
+    if (startedForUser.current === uid) return undefined;
+    startedForUser.current = uid;
 
-  useEffect(() => {
-    if (!uid) { setCloudLoaded(false); return; }
     let cancelled = false;
-    void refreshMyDay()
-      .then((result) => {
-        if (cancelled) return;
-        if (result) {
-          // Cloud data is authoritative for this account — apply it (the
-          // server normalises/validates every row) so the same tasks,
-          // schedule, notes and reminders appear on every device the
-          // learner signs in on. Demo rows an older build may have synced
-          // to cloud are stripped first (fresh start), and the cleaned
-          // snapshot is pushed straight back so the server copy is clean
-          // too. Genuine user items always survive the strip.
-          const { cleaned, removed } = stripLegacySamples(result.data);
-          applyCloudData(cleaned);
-          if (removed > 0) {
-            saveMyDayData(cleaned, { tzOffsetMinutes: new Date().getTimezoneOffset() })
-              .then((saved) => setMyDayAccess(saved.access))
-              .catch(() => {
-                // Best-effort: the device copy is already clean and the
-                // next user save retries the cloud mirror.
-              });
-          }
-          setCloudSyncFailed(false);
-        } else {
-          // Status fetch failed (network). Keep showing this device's data
-          // but mark the cloud as unavailable so saves surface the
-          // "synced on this device" notice instead of pretending.
-          setCloudSyncFailed(true);
-        }
-        setCloudLoaded(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCloudSyncFailed(true);
-        setCloudLoaded(true);
+    (async () => {
+      const existing = await loadMigrationMarker(uid);
+      if (cancelled) return;
+      setMarker(existing);
+      if (isMigrationComplete(existing)) {
+        setMigrationPhase("done");
+        return;
+      }
+      setMigrationPhase("running");
+      trackMyDayEvent("myday_migration_started", { hasMarker: Boolean(existing) });
+      const result = await runMyDayMigrationV1({
+        uid,
+        onProgress: (update) => {
+          if (cancelled) return;
+          trackMyDayEvent("myday_migration_phase", { phase: update.phase, status: update.status });
+        },
       });
-    return () => { cancelled = true; };
-  }, [applyCloudData, refreshMyDay, uid]);
+      if (cancelled) return;
+      setMarker(result.marker);
+      setMigrationError(result.error ?? null);
+      setMigrationPhase(result.ok ? "done" : result.error ? "partial" : "done");
+      if (result.ok) {
+        trackMyDayEvent("myday_migration_complete", {
+          notes: result.marker?.counts.notes ?? 0,
+          todos: result.marker?.counts.todos ?? 0,
+          schedules: result.marker?.counts.schedules ?? 0,
+        });
+      }
+    })();
 
-  // Phase-1: publish My Day's visibility into the shared context so the
-  // desktop rail + bottom nav can remove the entry when admin has set the
-  // feature to "hide" mode AND the user is not a subscriber. The hook
-  // already short-circuits to { hidden: false } when not signed in.
-  usePublishFeatureVisibility("myday", { hidden: Boolean(myDayHidden) });
+    return () => {
+      cancelled = true;
+    };
+  }, [myDay.canCreate, myDay.loading, myDay.paid, myDay.unlimited, uid]);
 
-  const handleNavigate = useCallback((id: string) => {
-    if (id === "home") {
-      window.location.hash = "#/home";
+  // ── deep links ────────────────────────────────────────────────────────────
+  // A legacy URL (an armed Android alarm, a Web Push payload already in flight,
+  // an old notification document) is translated to a canonical workspace target
+  // — never to the retired sections (§28, §128).
+  const deepLinkFromHash = useCallback((): string | null => {
+    if (typeof window === "undefined") return null;
+    const intent = parseMyDayHash(window.location.hash);
+    if (intent.kind === "target" && intent.source === "legacy") {
+      return buildMyDayDeepLink({ noteId: intent.noteId, notebookId: intent.notebookId, scheduleId: intent.scheduleId });
+    }
+    if (intent.kind === "target") {
+      return buildMyDayDeepLink({
+        noteId: intent.noteId,
+        notebookId: intent.notebookId,
+        tagId: intent.tagId,
+        resourceId: intent.resourceId,
+        scheduleId: intent.scheduleId,
+        view: intent.view as "agenda" | "search" | "tags" | "trash" | undefined,
+        action: intent.action,
+      });
+    }
+    return null;
+  }, []);
+
+  // A notification tapped while the workspace is ALREADY open changes the hash
+  // without remounting the route (the shell keeps rendering `#/my-day`). The
+  // target is therefore tracked, not read once: the workspace host re-sends the
+  // open message when it changes, so an armed alarm or a push tap keeps landing
+  // on the migrated object instead of doing nothing.
+  const [deepLink, setDeepLink] = useState<string | null>(() => deepLinkFromHash());
+  useEffect(() => {
+    const onHashChange = () => setDeepLink(deepLinkFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [deepLinkFromHash]);
+
+
+  const handleNavigate = useCallback((hash: string) => {
+    if (hash.startsWith("#/")) {
+      window.location.hash = hash;
       return;
     }
-    setActiveSection(id as DaySection);
-    setHighlightId(null);
+    window.location.assign(hash);
   }, []);
 
-  // The big "+" hub on the overview: the CreateMenu component owns the
-  // open/close lifecycle; the page only decides what a selection does —
-  // the same access-gated section swap it has always done.
-  const handleCreateSelect = useCallback((id: string) => {
-    if (!requireMyDayAccess()) return;
-    handleNavigate(id);
-  }, [handleNavigate, requireMyDayAccess]);
+  const getToken = useCallback(async () => {
+    try {
+      const current = user;
+      if (!current) return null;
+      const { auth } = await import("../firebase");
+      return (await auth.currentUser?.getIdToken()) ?? null;
+    } catch {
+      return null;
+    }
+  }, [user]);
 
-  useEffect(() => {
-    const applyDeepLink = () => {
-      const hash = window.location.hash;
-      const queryIndex = hash.indexOf("?");
-      const params = queryIndex >= 0 ? new URLSearchParams(hash.slice(queryIndex + 1)) : null;
-      const section = params?.get("section");
-      if (section === "tasks" || section === "schedule" || section === "reminders" || section === "notes") {
-        setActiveSection(section);
-      }
-      const item = params?.get("item");
-      setHighlightId(item && item.trim() ? item.trim() : null);
-    };
-    applyDeepLink();
-    window.addEventListener("hashchange", applyDeepLink);
-    return () => window.removeEventListener("hashchange", applyDeepLink);
-  }, []);
-
-  const showConfirm = useCallback((title: string, message: string, onConfirm: () => void, confirmLabel = "Delete") => {
-    setConfirmConfig({ title, message, onConfirm, confirmLabel });
-    setConfirmOpen(true);
-  }, []);
-
-  const handleToggleTask = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    const next = tasks.map((task) => task.id !== id ? task : {
-      ...task,
-      status: (task.status === "completed" ? "pending" : "completed") as TaskStatus,
-    });
-    const changed = next.find((task) => task.id === id);
-    void persistMyDay({ tasks: next }).then((saved) => {
-      if (!saved) return;
-      if (changed?.status === "completed") { playSfxComplete(); addToast("Task completed"); recordCompletionDay(); }
-      else playSfxToggle();
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, recordCompletionDay, tasks]);
-
-  const handleCycleStatus = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    const cycle: TaskStatus[] = ["pending", "in-progress", "completed"];
-    let changed: TaskStatus | null = null;
-    const next = tasks.map((task) => {
-      if (task.id !== id) return task;
-      const status = cycle[(cycle.indexOf(task.status) + 1) % cycle.length];
-      changed = status;
-      return { ...task, status };
-    });
-    void persistMyDay({ tasks: next }).then((saved) => {
-      if (!saved) return;
-      if (changed === "completed") { playSfxComplete(); addToast("Task completed"); recordCompletionDay(); }
-      else playSfxToggle();
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, recordCompletionDay, tasks]);
-
-  const handleDeleteTask = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    showConfirm("Delete Task", "Are you sure you want to delete this task? This action cannot be undone.", () => {
-      const next = tasks.filter((task) => task.id !== id);
-      void persistMyDay({ tasks: next }).then((saved) => {
-        if (!saved) return;
-        playSfxRemove();
-        addToast("Task deleted", "info");
-        setConfirmOpen(false);
-      });
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, showConfirm, tasks]);
-
-  const openAddTask = useCallback(() => {
-    if (!requireMyDayAccess()) return;
-    setEditingTask(null);
-    setTaskModalOpen(true);
-  }, [requireMyDayAccess]);
-
-  const openEditTask = useCallback((task: Task) => {
-    if (!canSaveMyDay()) return;
-    setEditingTask(task);
-    setTaskModalOpen(true);
-  }, [canSaveMyDay]);
-
-  const handleSaveTask = useCallback((task: Task) => {
-    // Check access for NEW task creation only. Editing existing tasks is always allowed.
-    const exists = tasks.some((current) => current.id === task.id);
-    if (!exists && !requireMyDayAccess()) return;
-    if (!canSaveMyDay()) return;
-    const next = exists ? tasks.map((current) => current.id === task.id ? task : current) : [task, ...tasks];
-    void persistMyDay({ tasks: next }).then((saved) => {
-      if (!saved) return;
-      setTaskModalOpen(false);
-      playSfxSuccess();
-      addToast(editingTask ? "Task updated successfully" : "New task created");
-    });
-  }, [addToast, canSaveMyDay, editingTask, persistMyDay, requireMyDayAccess, tasks]);
-
-  const openAddEvent = useCallback(() => {
-    if (!requireMyDayAccess()) return;
-    setEditingEvent(null);
-    setScheduleModalOpen(true);
-  }, [requireMyDayAccess]);
-
-  const openEditEvent = useCallback((event: ScheduleEvent) => {
-    if (!canSaveMyDay()) return;
-    setEditingEvent(event);
-    setScheduleModalOpen(true);
-  }, [canSaveMyDay]);
-
-  const handleSaveEvent = useCallback((event: ScheduleEvent) => {
-    // Check access for NEW event creation only. Editing existing events is always allowed.
-    const exists = schedule.some((current) => current.id === event.id);
-    if (!exists && !requireMyDayAccess()) return;
-    if (!canSaveMyDay()) return;
-    const next = exists ? schedule.map((current) => current.id === event.id ? event : current) : [...schedule, event];
-    void persistMyDay({ schedule: next }).then((saved) => {
-      if (!saved) return;
-      setScheduleModalOpen(false);
-      playSfxSuccess();
-      addToast(
-        editingEvent ? "Event updated" : "Event added",
-        "success",
-        editingEvent ? "Your schedule has been updated." : "Your schedule has been updated.",
-      );
-    });
-  }, [addToast, canSaveMyDay, editingEvent, persistMyDay, requireMyDayAccess, schedule]);
-
-  const handleDeleteEvent = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    showConfirm(
-      "Delete this event?",
-      "This event will be removed from your daily schedule.",
-      () => {
-        const next = schedule.filter((event) => event.id !== id);
-        void persistMyDay({ schedule: next }).then((saved) => {
-          if (!saved) return;
-          playSfxRemove();
-          addToast("Event removed", "info", "The schedule event was deleted.");
-          setConfirmOpen(false);
-        });
-      },
-      "Delete Event",
+  // ── auth boundary ─────────────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <WorkspaceNotice
+        title="Sign in to open My Day"
+        body="My Day is your personal workspace — notebooks, notes, to-dos, tags and schedules. It is tied to your account so it stays private and syncs across your devices."
+        actionLabel="Go to sign in"
+        onAction={() => {
+          window.location.hash = "#/auth";
+        }}
+      />
     );
-  }, [addToast, canSaveMyDay, persistMyDay, schedule, showConfirm]);
+  }
 
-  const handleAddNote = useCallback((noteHtml: string) => {
-    // Check access for NEW note creation. Editing/deleting existing notes is always allowed.
-    if (!requireMyDayAccess()) return;
-    if (!canSaveMyDay()) return;
-    const plain = richTextToPlain(noteHtml) || "";
-    const note: QuickNote = {
-      id: crypto.randomUUID(),
-      text: plain,
-      createdAt: Date.now(),
-      color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)],
-      html: noteHtml,
-    };
-    void persistMyDay({ notes: [note, ...notes] }).then((saved) => {
-      if (!saved) return;
-      playSfxAdd();
-      addToast("Note saved");
-    });
-  }, [addToast, canSaveMyDay, notes, persistMyDay, requireMyDayAccess]);
+  // ── entitlement boundary (§57, §58) ───────────────────────────────────────
+  // Browse stays open for everyone, exactly as before: the workspace renders, and
+  // the server refuses CREATES when the allowance is spent. A direct deep link
+  // into a paywalled workspace still lands on the gate.
+  const blocked = !myDay.loading && !myDay.unlimited && !myDay.paid && !myDay.canCreate;
 
-  const handleEditNote = useCallback((id: string, noteHtml: string) => {
-    if (!canSaveMyDay()) return;
-    const plain = richTextToPlain(noteHtml) || "";
-    const next = notes.map((note) => note.id === id ? { ...note, text: plain, html: noteHtml } : note);
-    void persistMyDay({ notes: next }).then((saved) => saved && addToast("Note updated"));
-  }, [addToast, canSaveMyDay, notes, persistMyDay]);
-
-  const handleDeleteNote = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    const next = notes.filter((note) => note.id !== id);
-    void persistMyDay({ notes: next }).then((saved) => {
-      if (!saved) return;
-      playSfxRemove();
-      addToast("Note deleted", "info");
-    });
-  }, [addToast, canSaveMyDay, notes, persistMyDay]);
-
-  const handleAddReminder = useCallback((reminder: Reminder) => {
-    // Check access for NEW reminder creation. Editing/deleting existing reminders is always allowed.
-    if (!requireMyDayAccess()) return;
-    if (!canSaveMyDay()) return;
-    void persistMyDay({ reminders: [...reminders, reminder] }).then((saved) => {
-      if (!saved) return;
-      playSfxAdd();
-      addToast("Reminder set");
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, reminders, requireMyDayAccess]);
-
-  const handleEditReminder = useCallback((reminder: Reminder) => {
-    if (!canSaveMyDay()) return;
-    const next = reminders.map((current) => current.id === reminder.id ? reminder : current);
-    void persistMyDay({ reminders: next }).then((saved) => {
-      if (!saved) return;
-      playSfxSuccess();
-      addToast("Reminder updated");
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, reminders]);
-
-  const handleToggleReminder = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    const next = reminders.map((reminder) => reminder.id !== id ? reminder : { ...reminder, done: !reminder.done });
-    void persistMyDay({ reminders: next }).then((saved) => saved && playSfxToggle());
-  }, [canSaveMyDay, persistMyDay, reminders]);
-
-  const handleDeleteReminder = useCallback((id: string) => {
-    if (!canSaveMyDay()) return;
-    showConfirm("Delete Reminder", "Remove this reminder?", () => {
-      const next = reminders.filter((reminder) => reminder.id !== id);
-      void persistMyDay({ reminders: next }).then((saved) => {
-        if (!saved) return;
-        playSfxRemove();
-        addToast("Reminder deleted", "info");
-        setConfirmOpen(false);
-      });
-    });
-  }, [addToast, canSaveMyDay, persistMyDay, reminders, showConfirm]);
-
-  const completedCount = useMemo(() => tasks.filter((t) => t.status === "completed").length, [tasks]);
-
-  const handleDownloadReport = useCallback(() => {
-    const date = new Date();
-    const dateStamp = date.toISOString().split("T")[0];
-    const printableDate = date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    const sortedSchedule = [...schedule].sort((a, b) => a.startTime.localeCompare(b.startTime));
-    const sortedReminders = [...reminders].sort((a, b) => a.time.localeCompare(b.time));
-
-    const report = [
-      "MY DAY REPORT",
-      `Date: ${printableDate}`,
-      "",
-      "SUMMARY",
-      `- Tasks completed: ${completedCount}/${tasks.length}`,
-      `- Notes count: ${notes.length}`,
-      `- Pending reminders: ${reminders.filter((r) => !r.done).length}`,
-      `- Schedule events: ${schedule.length}`,
-      "",
-      "TASKS",
-      ...tasks.map(
-        (task, index) =>
-          `${index + 1}. [${task.status.toUpperCase()}] ${task.title}${task.subject ? ` (${task.subject})` : ""}${task.time ? ` @ ${task.time}` : ""}`,
-      ),
-      "",
-      "SCHEDULE",
-      ...sortedSchedule.map(
-        (event, index) =>
-          `${index + 1}. ${event.startTime}-${event.endTime} [${event.type.toUpperCase()}] ${event.title}${event.detail ? ` - ${event.detail}` : ""}`,
-      ),
-      "",
-      "REMINDERS",
-      ...sortedReminders.map(
-        (reminder, index) =>
-          `${index + 1}. [${reminder.done ? "DONE" : "PENDING"}] ${reminder.time} - ${reminder.text}`,
-      ),
-      "",
-      "QUICK NOTES",
-      ...notes.map((note, index) => `${index + 1}. ${note.text}`),
-    ].join("\n");
-
-    const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `my-day-report-${dateStamp}.txt`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-
-    playSfxSuccess();
-    addToast("Report downloaded");
-  }, [schedule, reminders, completedCount, tasks, notes, addToast]);
+  if (myDay.loading && !myDay.unlimited && !myDay.paid) {
+    return <WorkspaceNotice title="Opening My Day…" body="Checking your access and preparing your workspace." />;
+  }
 
   return (
-    <OverlayBoundsProvider value={contentColumnRef}>
-    <div className="dc-app-shell myday-scope min-h-screen">
-      <div className="myday-sky" aria-hidden="true" />
-      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl">
-        <StoreHeader
-          cartCount={cartIds.size}
-          notifCount={1}
-          title={`${appName} Tasker`}
-          subtitle="My Day Activities"
-          onDownloadReport={handleDownloadReport}
-          onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
-          onNavigateToCart={() => { window.location.hash = "#/cart"; }}
-          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          action={(
-            <button
-              type="button"
-              onClick={() => { window.location.hash = "#/profile"; }}
-              aria-label="Open profile"
-              title="Profile"
-              className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white ring-1 ring-white/25 transition hover:brightness-110 active:scale-95"
-            >
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="" width={40} height={40} className="h-full w-full object-cover" />
-              ) : (
-                <span aria-hidden="true">{avatarInitial}</span>
-              )}
-            </button>
-          )}
+    <div // The route paints NO page plate of its own: the shared backdrop behind the
+    // app is the surface while the bundle loads, and the workspace brings
+    // Joplin's own canvas once it mounts (no Digitalcatalyst glass on top of it).
+    className="myday-workspace-root flex min-h-[100dvh] w-full flex-col">
+      {blocked ? (
+        <PremiumGate
+          variant="myday"
+          userName={user.name}
+          open
+          asPage
+          onClose={() => {
+            window.location.hash = "#/home";
+          }}
+          onViewSubscription={() => {
+            window.location.hash = "#/subscription";
+          }}
+          subtitle="Your My Day workspace is ready — subscribe or use today's free creation to add notes, to-dos and schedules."
         />
-
-        {/* No horizontal tab strip here any more. My Day switches pages with
-            the side rail (`SideNav`, from 768 px up) and the floating bottom
-            pill on a phone — both drive the same `handleNavigate` section
-            swap, so dropping the strip removes a duplicate row of buttons
-            without stranding any page. */}
-
-        {/* Shell gutter. The column below (the section page) is what must
-            never be squeezed: with the compact rail the page keeps ~636px at
-            768px and ~892px at 1024px; the full rail still leaves ~968px at
-            1280px. The old `md:px-8 md:gap-8` plus a 224px panel left only
-            ~448px at 768px, narrower than a phone. */}
-        <div data-myday-content className="mx-auto flex w-full max-w-none flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-4 lg:gap-4 lg:px-6 xl:gap-6 xl:px-6">
-          <SideNav active={activeSection} onNavigate={handleNavigate} />
-
-          {/* P3-13: MyDay overview — data hook + hover lift for quick actions (lens budget intact) */}
-          <main ref={contentColumnRef} className="min-w-0 flex-1 pb-6">
-            {/* The free-creation allowance summary is deliberately NOT rendered
-                here. It is account/usage information, so it lives on the
-                Usage Limits page inside MyDayAllowanceCard. My Day itself stays a
-                clean planning surface; the PremiumGate below still explains
-                the allowance at the exact moment a creation is blocked. */}
-            {/* Cloud-sync / device-saving status. This is the one line of My
-                Day copy with no surface under it — it floats on the scene (and,
-                from 1024px up, on the frame's 55% white veil), where `text-white/55`
-                was the least legible text on the page. `dc-scene-ink` is the
-                shared hook for exactly that: a per-glyph dark scrim plus the
-                lifted ink floor. */}
-            {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
-              <div className="myday-sync-wrap">
-                <span className="myday-sync-pill">
-                <p className={cloudSyncFailed ? "dc-scene-ink text-[11px] font-bold text-amber-200" : "dc-scene-ink text-[11px] font-semibold text-white/55"}>
-                  {savingMyDay
-                    ? "Saving My Day…"
-                    : cloudSyncFailed
-                      ? uid
-                        ? "Saved on this device — cloud sync will retry on your next save"
-                        : "Saved on this device — sign in to sync to cloud"
-                      : "Syncing My Day…"}
-                </p>
-                </span>
-              </div>
-            )}
-            <div key={activeSection} data-page-enter-panel="">
-            {activeSection === "overview" && (
-              <section className="myday-overview" data-p3-13="myday-overview-polish">
-                <GreetingHeader
-                  name={userName}
-                  completed={completedCount}
-                  total={tasks.length}
-                  streak={streak}
-                />
-
-                <OverviewQuickActions
-                  onAddTask={openAddTask}
-                  onNewNote={() => handleNavigate("notes")}
-                  onViewSchedule={() => handleNavigate("schedule")}
-                  onStartRevision={() => { window.location.hash = "#/revision"; }}
-                  onSeeAll={() => handleNavigate("tasks")}
-                />
-
-                <div className="myday-lower">
-                  <div className="myday-area-tasks">
-                    <OverviewTasksCard
-                      tasks={tasks}
-                      onToggle={handleToggleTask}
-                      onCycleStatus={handleCycleStatus}
-                      onEdit={openEditTask}
-                      onDelete={handleDeleteTask}
-                      onAdd={openAddTask}
-                      onSeeAll={() => handleNavigate("tasks")}
-                    />
-                  </div>
-                  <div className="myday-area-schedule">
-                    <OverviewScheduleCard
-                      events={schedule}
-                      onAdd={openAddEvent}
-                      onEdit={openEditEvent}
-                      onSeeAll={() => handleNavigate("schedule")}
-                    />
-                    {/* Snowman companion (desktop decor, non-interactive). */}
-                    <div className="myday-snowman" aria-hidden="true">
-                      <div className="myday-snowman-bubble">
-                        <p className="text-xs font-black">You can do it!</p>
-                        <p className="text-[10px] font-semibold opacity-75">Stay consistent</p>
-                      </div>
-                      <span className="myday-snowman-body myday-float">⛄</span>
-                    </div>
-                  </div>
-                  <div className="myday-area-side">
-                    <StreakCard streak={streak} onOpen={() => handleNavigate("tasks")} />
-                    {/* The side rail carries the quote only in its full-panel
-                        form (1280px up) — until then the panel is a compact
-                        icon rail with no room for it, so the in-content card
-                        is the edition every smaller screen sees. */}
-                    <QuoteCard className="xl:hidden" />
-                  </div>
-                </div>
-
-                <StoreBanner onExplore={() => { window.location.hash = "#/store"; }} />
-
-                {/* The big "+" creation hub — button + compact drop-up menu
-                    live in `CreateMenu`; the page only handles selection
-                    (access check → section swap). The drop-up always opens
-                    ABOVE the button and holds the same narrow menu width on
-                    phone / tablet / desktop, so it reads well everywhere. */}
-                <CreateMenu options={CREATE_OPTIONS} onSelect={handleCreateSelect} />
-              </section>
-            )}
-
-            {activeSection === "tasks" && (
-              <TaskList
-                tasks={tasks}
-                onToggle={handleToggleTask}
-                onCycleStatus={handleCycleStatus}
-                onEdit={openEditTask}
-                onDelete={handleDeleteTask}
-                onAdd={openAddTask}
-                highlightId={highlightId}
-                streak={streak}
-                onViewSchedule={() => handleNavigate("schedule")}
+      ) : (
+        <>
+          {migrationPhase === "running" || migrationPhase === "partial" ? (
+            <MigrationNotice marker={marker} phase={migrationPhase} error={migrationError} />
+          ) : null}
+          <JoplinWorkspaceBoundary
+            onGoHome={() => {
+              window.location.hash = "#/home";
+            }}
+          >
+            <Suspense fallback={<WorkspaceNotice title="Opening your workspace…" body="Starting notebooks, notes and to-dos." />}>
+              <JoplinWorkspace
+                uid={user.id}
+                email={user.email ?? null}
+                displayName={user.name ?? null}
+                getToken={getToken}
+                onNavigate={handleNavigate}
+                deepLink={deepLink}
+                onScheduleMessage={() => {
+                  // Schedule mutations from inside the frame are persisted by the
+                  // frame through the bridge API. The host only needs to know so
+                  // the delivery layer can re-arm (§52, §154-18) — the event is
+                  // announced by `joplinSchedulerBridge`, so there is exactly one
+                  // scheduler reacting to it.
+                }}
               />
-            )}
-
-            {activeSection === "schedule" && (
-              <Timeline
-                events={schedule}
-                onAdd={openAddEvent}
-                onEdit={openEditEvent}
-                onDelete={handleDeleteEvent}
-                highlightId={highlightId}
-              />
-            )}
-
-            {activeSection === "reminders" && (
-              <Reminders
-                reminders={reminders}
-                onAdd={handleAddReminder}
-                onEdit={handleEditReminder}
-                onToggle={handleToggleReminder}
-                onDelete={handleDeleteReminder}
-                highlightId={highlightId}
-                onRequireAccess={requireMyDayAccess}
-                loading={!cloudLoaded && reminders.length === 0}
-              />
-            )}
-
-            {activeSection === "notes" && (
-              <QuickNotes
-                notes={notes}
-                onAdd={handleAddNote}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-                onRequireAccess={requireMyDayAccess}
-              />
-            )}
-            </div>
-          </main>
-        </div>
-
-        <BottomNav active={activeSection} onNavigate={handleNavigate} />
-      </div>
-
-      <TaskModal
-        open={taskModalOpen}
-        initialTask={editingTask}
-        onClose={() => setTaskModalOpen(false)}
-        onSave={handleSaveTask}
-      />
-
-      <ScheduleModal
-        open={scheduleModalOpen}
-        initialEvent={editingEvent}
-        onClose={() => setScheduleModalOpen(false)}
-        onSave={handleSaveEvent}
-      />
-
-      <ConfirmDialog
-        open={confirmOpen}
-        title={confirmConfig.title}
-        message={confirmConfig.message}
-        confirmLabel={confirmConfig.confirmLabel}
-        onConfirm={confirmConfig.onConfirm}
-        onCancel={() => setConfirmOpen(false)}
-      />
-
-      {/* Premium subscription gate for My Day – same beautiful design as Revision */}
-      <PremiumGate
-        variant="myday"
-        userName={userName}
-        open={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        onViewSubscription={() => {
-          setPaywallOpen(false);
-          window.location.hash = "#/subscription";
-        }}
-        subtitle={`Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes. You have used today’s ${freeLimit} free My Day creation${freeLimit === 1 ? "" : "s"}; your pages remain available to browse until the daily reset.`}
-      />
-
-      <Toast toasts={toasts} onRemove={removeToast} />
+            </Suspense>
+          </JoplinWorkspaceBoundary>
+        </>
+      )}
+      {gateOpen ? (
+        <PremiumGate
+          variant="myday"
+          userName={user.name}
+          open
+          onClose={() => setGateOpen(false)}
+          onViewSubscription={() => {
+            window.location.hash = "#/subscription";
+          }}
+        />
+      ) : null}
     </div>
-    </OverlayBoundsProvider>
+  );
+}
+
+function WorkspaceNotice({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="grid min-h-[100dvh] w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900" data-myday-notice>
+      <div className="max-w-md text-center">
+        <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title}</h1>
+        <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">{body}</p>
+        {actionLabel && onAction ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-4 rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Migration progress, shown as a thin bar above the workspace.
+ *
+ * Stated plainly and without alarm: the migration runs in the background, the old
+ * data stays in place, and a partial run resumes on the next visit.
+ */
+function MigrationNotice({
+  marker,
+  phase,
+  error,
+}: {
+  marker: MigrationMarker | null;
+  phase: MigrationPhase;
+  error: string | null;
+}) {
+  const done = marker ? Object.values(marker.phases).filter((entry) => entry?.completed).length : 0;
+  return (
+    <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[11px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-500" aria-hidden="true" />
+      {phase === "running" ? (
+        <span>
+          Moving your existing My Day items into the workspace… ({done}/4 sections) Your original data is kept until the
+          move is verified.
+        </span>
+      ) : (
+        <span>
+          Some items could not be moved yet ({error ?? "unknown reason"}). They are still safe in your old My Day data;
+          the next visit will retry.
+        </span>
+      )}
+    </div>
   );
 }

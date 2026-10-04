@@ -322,6 +322,77 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
 
+      // ── Joplin My Day workspace (the ONE personal store) ────────────────
+      // Rows are Joplin-shaped (`joplinItems` / `joplinTags` /
+      // `joplinResources`) plus the universal `scheduledItems` series table.
+      //
+      // Read/update/delete belong to the owner: editing must work offline and
+      // must never consume an allowance. CREATES do not — every new note,
+      // notebook, tag, attachment or schedule is written by `/api/joplin/*`,
+      // which checks the entitlement and consumes one unit of the same daily
+      // counter the legacy planner used (`myDayUsage/current`). The one
+      // exception is the conflict copy the sync layer writes when two devices
+      // edited the same row: its id ends `_conflict_<epochMs>`, it is the
+      // learner's own data, and refusing it would silently drop the loser of a
+      // conflict (§96) — so the document id itself is the permission.
+      match /joplinItems/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isAdmin()
+          || (isOwner(uid) && documentId.matches('.*_conflict_[0-9]+$'));
+        allow update: if isAdmin()
+          || (isOwner(uid) && resource.data.ownerId == uid && request.resource.data.ownerId == uid);
+        allow delete: if isAdmin() || (isOwner(uid) && resource.data.ownerId == uid);
+      }
+
+      match /joplinTags/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isAdmin();
+        allow update: if isAdmin()
+          || (isOwner(uid) && resource.data.ownerId == uid && request.resource.data.ownerId == uid);
+        allow delete: if isAdmin() || (isOwner(uid) && resource.data.ownerId == uid);
+      }
+
+      match /joplinResources/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        // Metadata first (server), then the client merges the download URL and
+        // the pending flag back into the row it already owns.
+        allow create: if isAdmin();
+        allow update: if isAdmin()
+          || (isOwner(uid) && resource.data.ownerId == uid && request.resource.data.ownerId == uid);
+        allow delete: if isAdmin() || (isOwner(uid) && resource.data.ownerId == uid);
+      }
+
+      match /scheduledItems/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isAdmin()
+          || (isOwner(uid) && documentId.matches('.*_conflict_[0-9]+$'));
+        allow update: if isAdmin()
+          || (isOwner(uid) && resource.data.ownerId == uid && request.resource.data.ownerId == uid);
+        allow delete: if isAdmin() || (isOwner(uid) && resource.data.ownerId == uid);
+      }
+
+      // Web Clipper secrets. The pairing code and the token are stored as
+      // hashes and only ever read by the server: `codeHash` is what a claim
+      // compares against, `tokenHash` is what a clip authenticates with. A
+      // client that could read this collection could enumerate live extensions
+      // (and a client that could write it could mint one), so neither is
+      // allowed — "Web Clipper" in My Day talks to `/api/joplin/clipper`.
+      match /joplinClipperCodes/{documentId} {
+        allow read, write: if isAdmin();
+      }
+
+      match /joplinClipperTokens/{documentId} {
+        allow read, write: if isAdmin();
+      }
+
+      // Workspace metadata: the sync profile, the migration marker (V1, the
+      // switch that retires the legacy planner) and the sync state. Owner
+      // writable on purpose — a device must be able to record "phase 2
+      // verified" while offline, and none of it grants anything server-side.
+      match /joplinMeta/{documentId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+
       // ── Learner-authored courses (My Study Library → "+") ───────────────
       // ONE document per course: cover image, title, nested modules, resources
       // and Brain (MCQ) practice questions — the tree the Course Player opens

@@ -81,9 +81,16 @@ test("selected bonus products become subscription-granted products", () => {
 });
 
 test("My Day remains viewable but saving requires active my-day subscription", () => {
-  assert.match(myDay, /canSaveMyDay/);
-  assert.match(myDay, /Cloud saving has ongoing server costs\. Subscribe to save tasks, schedules and notes\./);
+  // Browsing is always allowed; CREATING goes through the one server path,
+  // which re-checks the membership and consumes the same daily allowance the
+  // planner used. The route reflects the same decision so the learner sees the
+  // gate instead of a failed save.
+  const joplinApi = fs.readFileSync("api/_lib/joplin.ts", "utf8");
+  assert.match(myDay, /useMyDayAccess/);
+  assert.match(myDay, /canCreate/);
   assert.match(access, /features\.includes\("my-day"\)/);
+  assert.match(joplinApi, /accessSnapshot/);
+  assert.match(joplinApi, /MYDAY_DAILY_FREE_USED/);
+  assert.match(joplinApi, /myDayUsage/);
   assert.match(rules, /features\.hasAny\(\['my-day'\]\)/);
-  assert.match(myDay, /collection|setDoc\(doc\(db, "users", uid, "myDay", "current"\)/);
 });

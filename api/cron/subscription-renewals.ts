@@ -2,15 +2,25 @@
 //
 // The project's single push scheduler (kept on this filename/path because the
 // Vercel Hobby plan allows only 12 functions and the daily cron entry already
-// points here). One invocation runs three independent, idempotent jobs:
+// points here). One invocation runs four independent, idempotent jobs:
 //
 //   1. Subscription renewal reminders (the original job) — 7d/3d/1d/due heads-up
 //      before expiry, then one `expired-<n>` stage per morning for 10 days after
 //      expiry. In-app notification + optional web push per user. The renew
 //      button (client-side) only activates on those expired stages.
-//   2. My Day activity reminders — tasks, schedule events and reminders fire a
-//      push at the exact user-set local time (device timezone is stored on the
-//      myDay document). Works when the app is closed: this is server push.
+//   2. My Day activity reminders (legacy planner) — tasks, schedule events and
+//      reminders from `users/{uid}/myDay/current` fire a push at the exact
+//      user-set local time (device timezone is stored on the myDay document).
+//      Works when the app is closed: this is server push. BOUNDED WINDOW: a
+//      learner whose workspace migration has completed is skipped entirely —
+//      the migrated schedule rows below are their only source of truth, so no
+//      reminder can arrive twice from two models.
+//   2a. My Day workspace schedules — the canonical `users/{uid}/scheduledItems`
+//      series rows, expanded by `utils/scheduleOccurrences.js` (the parity-tested
+//      mirror of `src/joplin/scheduling/recurrence.ts`). One occurrence yields
+//      ONE inbox document (`occurrenceNotificationDocId`) and one push whose
+//      tag matches the foreground/Android tag exactly, so the server push, the
+//      in-app bell and the device alarm can never become three notifications.
 //   3. Content announcements — new products (free or paid) push to every
 //      subscribed device; new modules/lessons in a purchased product push to
 //      that product's buyers. A Firestore baseline prevents repeat announcements.
@@ -40,6 +50,7 @@ import {
   diffProductInventory,
   resolveLookbackMs,
 } from "../../utils/pushScheduler.js";
+import { dueScheduleOccurrences } from "../../utils/scheduleOccurrences.js";
 import { runReferralRepairOnce } from "../_lib/referrals.js";
 import { getNotificationBrandChrome } from "../_lib/branding.js";
 import { fcmPushToAllDevices, fcmPushToUser, type FcmPayload } from "../_lib/fcm.js";
@@ -266,10 +277,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let processed = 0;
       let pushed = 0;
       let logged = 0;
+      let migrated = 0;
       for (const document of myDaySnap.docs) {
         if (document.id !== "current") continue;
         const uid = document.ref.parent.parent?.id;
         if (!uid) continue;
+        // The transition window closes per learner: once the migration marker
+        // says their planner data has been carried into the workspace, this
+        // job stops firing for them and job 2a takes over. Both models never
+        // deliver the same reminder ("no dual-write", spec §14).
+        const marker = await db.collection("users").doc(uid).collection("joplinMeta").doc("migrationV1").get();
+        const markerData = marker.data() || {};
+        if (Number(markerData.version) >= 1 && Number(markerData.completedAt) > 0) {
+          migrated += 1;
+          continue;
+        }
         const data = document.data() || {};
         const tzOffsetMinutes = Number(data.tzOffsetMinutes);
         const due = collectDueMyDayItems(data, now, tzOffsetMinutes, lookbackMs);
@@ -312,7 +334,103 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Doc may have been deleted between reads; next ping will retry.
         }
       }
-      summary.myDay = { scanned: myDaySnap.size, usersWithDueItems: processed, items: logged, pushed };
+      summary.myDay = { scanned: myDaySnap.size, usersWithDueItems: processed, items: logged, pushed, migratedSkipped: migrated };
+    }
+
+    // ------------------------------------------- 2a. canonical workspace schedules
+    // §29/§53/§64/§147/§167: the workspace's `scheduledItems` series rows are the
+    // ONE canonical schedule model, and this job is their ONE server delivery
+    // authority. The legacy collector above remains only for the transition.
+    {
+      const lookbackMs = resolveLookbackMs(lastRunAt, now);
+      const scheduleSnap = await db.collectionGroup("scheduledItems").get();
+      // Group by owner first: one learner's dedupe record is read once and a
+      // foreign `ownerId` can never cause a notification for the wrong account.
+      const rowsByUid = new Map<string, Array<Record<string, unknown>>>();
+      for (const document of scheduleSnap.docs) {
+        const uid = document.ref.parent.parent?.id;
+        if (!uid) continue;
+        const row = { id: document.id, ...(document.data() || {}) } as Record<string, unknown>;
+        const owner = String(row.ownerId || uid);
+        if (owner !== uid) continue;
+        const list = rowsByUid.get(uid);
+        if (list) list.push(row);
+        else rowsByUid.set(uid, [row]);
+      }
+      let usersWithDue = 0;
+      let delivered = 0;
+      let pushed = 0;
+      for (const [uid, rows] of rowsByUid) {
+        // A row records its own delivery (`lastFiredKey`/`lastFiredAt`) — the
+        // SAME fields the foreground path checks, so an open app and this cron
+        // cannot both deliver one occurrence.
+        const fired: Record<string, number> = {};
+        for (const row of rows) {
+          const key = String(row.lastFiredKey || "").trim();
+          if (key) fired[key] = Number(row.lastFiredAt) || 0;
+        }
+        const due = dueScheduleOccurrences(rows, now, lookbackMs, fired);
+        if (!due.length) continue;
+        usersWithDue += 1;
+        const newestBySchedule = new Map<string, { key: string; at: number }>();
+        for (const item of due) {
+          // The same legacy `section` vocabulary the device uses, so the push
+          // tag and the Android large icon match the foreground delivery.
+          const section = item.targetType === "todo" ? "tasks"
+            : item.targetType === "note" || item.targetType === "web-clip" ? "reminders"
+              : "schedule";
+          // ONE inbox document per occurrence. The id is the deterministic
+          // schedule+occurrence id the device writes too (§64), so if the
+          // alarm already mirrored this moment the write is a no-op.
+          await db.collection("users").doc(uid).collection("notifications").doc(item.notificationId).set({
+            id: item.notificationId,
+            title: item.title,
+            body: item.body,
+            category: "mayday",
+            read: false,
+            source: "system",
+            createdAt: Timestamp.fromMillis(item.dueAt),
+            target: {
+              type: "joplin",
+              scheduleId: item.scheduleId,
+              ...(item.targetType === "note" || item.targetType === "todo" || item.targetType === "web-clip"
+                ? { noteId: item.targetId }
+                : {}),
+              ...(item.targetType === "notebook" ? { notebookId: item.targetId } : {}),
+              ...(item.targetType === "tag" ? { tagId: item.targetId } : {}),
+              ...(item.targetType === "resource" ? { resourceId: item.targetId } : {}),
+            },
+          }, { merge: true });
+          delivered += 1;
+          // `tag` and `url` are byte-for-byte what the foreground path uses
+          // (`schedule:<id>:occurrence:<key>`), so a push and a local alert for
+          // the same occurrence collapse into one notification instead of two.
+          pushed += await sendPush(db, uid, item.title, item.body, {
+            tag: `myday-${item.scheduleId}:${item.occurrenceKey}-${section}`,
+            url: `/${item.deepLink}`,
+            category: "mayday",
+            section,
+            targetType: item.targetType,
+          });
+          const newest = newestBySchedule.get(item.scheduleId);
+          if (!newest || newest.at < item.dueAt) {
+            newestBySchedule.set(item.scheduleId, { key: item.key, at: item.dueAt });
+          }
+        }
+        // Mark delivered on the rows themselves (the app's own field), so a
+        // foreground check right after this ping stays silent.
+        await Promise.all(Array.from(newestBySchedule, ([scheduleId, entry]) =>
+          db.collection("users").doc(uid).collection("scheduledItems").doc(scheduleId)
+            .set({ lastFiredKey: entry.key, lastFiredAt: entry.at }, { merge: true })
+            .catch(() => undefined),
+        ));
+      }
+      summary.joplinSchedules = {
+        scanned: scheduleSnap.size,
+        usersWithDueItems: usersWithDue,
+        items: delivered,
+        pushed,
+      };
     }
 
     // ----------------------------------------------- 2b. FlowPath scheduled jobs

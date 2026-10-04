@@ -136,6 +136,18 @@ import {
 } from "../utils/deviceNotifications";
 import { recordDeviceNotification } from "./lib/deviceNotificationInbox";
 import { collectDueMyDayItems, collectUpcomingMyDayItems, MYDAY_UPCOMING_HORIZON_MS, type MyDayDocData } from "../utils/pushScheduler";
+// ── My Day scheduling source of truth (§29, §147, §167) ─────────────────────
+// The collectors above still exist for ONE purpose: the transition window, where
+// a learner whose data has not been migrated yet must keep receiving the
+// reminders they already had. Once the migration marker says V1 is complete the
+// scheduler below reads `users/{uid}/scheduledItems` — the canonical universal
+// schedule — and the legacy `myDay/current` document stops driving delivery
+// entirely. There is never a moment where both sources fire.
+import { collectDueScheduleOccurrences, collectUpcomingScheduleOccurrences, toLegacyShapedDueItem } from "./joplin/scheduling/scheduleNotifications";
+import { occurrenceNotificationDocId } from "./joplin/joplinIds";
+import { SCHEDULE_CHANGED_EVENT, watchMergedSchedules } from "./joplin/joplinSchedulerBridge";
+import { isMigrationComplete, loadMigrationMarker } from "./joplin/joplinMigrationBridge";
+import type { ScheduledItem } from "./joplin/scheduling/scheduledItem";
 import { collectDueFlowPathItems, collectUpcomingFlowPathItems, FLOWPATH_UPCOMING_HORIZON_MS, type FlowPathSchedulableItem } from "../utils/flowPathScheduler";
 
 // A device alert older than this was delivered while the app was CLOSED: the
@@ -934,21 +946,24 @@ function RootPage(): ReactNode {
     return undefined;
   }, [user]);
 
-  // Foreground safety net for My Day. Server Web Push is still responsible
-  // when the PWA is closed; while it is open this clock guarantees every due
-  // task, schedule event and reminder becomes an Android/system notification
-  // even if the external minute scheduler is delayed.
+  // Foreground safety net for My Day — now driven by the universal schedule.
   //
-  // On the TWA we go one step further and ALSO schedule a local
-  // notification at the exact wall-clock time. Local alarms (Android
-  // AlarmManager) fire even when the app process is killed, the
-  // device is locked, or doze mode is on — they are the only delivery
-  // mechanism that actually gives a "1 minute exact" guarantee on
-  // Android. The local alarm has a stable numeric id derived from the
-  // item key, so updating the My Day doc re-schedules cleanly.
+  // WHAT CHANGED (§29, §100, §148): this effect used to derive notifications from
+  // the legacy `myDay/current` arrays. It now derives them from the canonical
+  // `scheduledItems` rows, so ANY schedulable object (note, to-do, notebook, tag,
+  // web clip, attachment or a custom item) notifies through the same path.
+  // WHAT DID NOT CHANGE: the delivery layer. The 15-second clock, the five-minute
+  // re-arm, the Android local alarm, the Web/system notification and the in-app
+  // inbox mirror are the same calls as before, with the same stable-key
+  // discipline — so FlowPath, the Notifications page and the Android exact-alarm
+  // behaviour are untouched.
   useEffect(() => {
     if (!user) return undefined;
+    // Canonical rows (workspace) and the legacy document (transition window).
+    // Exactly one of them is the active source; see `source` below.
+    let scheduleRows: ScheduledItem[] = [];
     let current: MyDayDocData | null = null;
+    let source: "canonical" | "legacy" | "pending" = "pending";
     const pending = new Set<string>();
     const shownKey = `eduvora.myDaySystemNotifications.v1:${user.id}`;
     const readShown = (): Record<string, number> => {
@@ -966,18 +981,39 @@ function RootPage(): ReactNode {
       try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
     };
     // Hash the item key into a stable 31-bit alarm id. Android limits
-    // notification ids to 32-bit signed; SHA-1 mod 2^31 keeps the value
-    // in range and stable across re-renders of the same item.
+    // notification ids to 32-bit signed; the canonical scheduler already
+    // derives this from the notification key, and the legacy fallback keeps
+    // the original derivation so alarms armed before the cutover are replaced
+    // rather than duplicated.
     const alarmId = (key: string) => {
       let hash = 0;
       for (let i = 0; i < key.length; i += 1) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
       return Math.abs(hash) || 1;
     };
+    // One alert shape for both sources. `alarmId`/`deepLink`/`target` are present
+    // on the canonical path (built from the schedule row) and absent on the
+    // legacy path, which falls back to the original derivations.
+    type SchedulableAlert = {
+      key: string;
+      itemId: string;
+      section: "tasks" | "schedule" | "reminders";
+      title: string;
+      body: string;
+      dueAt: number;
+      alarmId?: number;
+      deepLink?: string;
+      occurrenceKey?: string;
+      target?: { type?: "joplin"; scheduleId?: string; noteId?: string; notebookId?: string; tagId?: string; resourceId?: string };
+    };
     const checkDue = () => {
-      if (!current) return;
+      if (source === "pending") return;
       const now = Date.now();
       const shown = readShown();
-      const due = collectDueMyDayItems(current, now, tzOffset(), FOREGROUND_CATCHUP_LOOKBACK_MS);
+      const due: SchedulableAlert[] = source === "canonical"
+        ? collectDueScheduleOccurrences(scheduleRows, now, FOREGROUND_CATCHUP_LOOKBACK_MS).map(toLegacyShapedDueItem)
+        : current
+          ? collectDueMyDayItems(current, now, tzOffset(), FOREGROUND_CATCHUP_LOOKBACK_MS)
+          : [];
       for (const item of due) {
         if (shown[item.key] || pending.has(item.key)) continue;
         // Already past its minute when this run started: the device showed it
@@ -985,7 +1021,7 @@ function RootPage(): ReactNode {
         // no second tray alert, no re-armed alarm.
         if (now - item.dueAt > FOREGROUND_DELIVERY_WINDOW_MS) {
           mirrorDeliveredAlert(item.key, {
-            id: deviceNotificationDocId("myday", item),
+            id: notificationDocId(item),
             title: item.title,
             body: item.body,
             category: deviceNotificationCategory("myday", item),
@@ -995,18 +1031,17 @@ function RootPage(): ReactNode {
           continue;
         }
         pending.add(item.key);
-        // Deep-link the system alert to the exact My Day tab + item so the
-        // tap lands on the task/schedule/reminder that fired, not the overview.
-        const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        // Deep-link the system alert to the exact object that fired. On the
+        // canonical path this is the target's own deep link (§142); on the
+        // legacy path it stays the old section/id URL, which `#/my-day`
+        // translates into the migrated Joplin object (§28).
+        const itemUrl = `/${itemDeepLink(item)}`;
         // On the TWA the local alarm is the source of truth — the
         // FCM payload that woke us is a bonus, not the only path.
         // Left small icon always app logo, right large icon contextual per section (task/schedule/reminder)
-        // On the TWA the exact-time local alarm is the delivery path; on the
-        // web `showLocalSystemNotification` renders the same alert. Either one
-        // counts as "the learner saw it" — see the bell entry below.
         const alarmArmed = isAndroidNative()
           ? scheduleLocalAlarm({
-              id: alarmId(item.key),
+              id: item.alarmId ?? alarmId(item.key),
               at: item.dueAt,
               title: item.title,
               body: item.body,
@@ -1029,7 +1064,7 @@ function RootPage(): ReactNode {
             // the server scheduler uses for this item, so the two can never
             // duplicate each other.
             recordDeviceNotification(user.id, {
-              id: deviceNotificationDocId("myday", item),
+              id: notificationDocId(item),
               title: item.title,
               body: item.body,
               category: deviceNotificationCategory("myday", item),
@@ -1046,37 +1081,52 @@ function RootPage(): ReactNode {
       Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
       try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
     };
-    // Prefer the timezone offset the doc was SAVED with (the same value the
-    // server scheduler uses) so the local alarm's dedupe key/tag always match
+    // Prefer the timezone offset the legacy doc was SAVED with (the same value
+    // the server scheduler uses) so the fallback's dedupe key/tag always match
     // the server's — falling back to the live device offset for docs written
-    // before the field existed.
+    // before the field existed. The canonical path carries an explicit IANA zone
+    // per row and needs no offset at all.
     const tzOffset = () => {
       const stored = Number(current?.tzOffsetMinutes);
       return Number.isFinite(stored) ? stored : new Date().getTimezoneOffset();
     };
+    // The Firestore document id for a delivered alert. Canonical occurrences use
+    // the deterministic schedule+occurrence id, which is the SAME id the Vercel
+    // cron writes — so device delivery and server push are one document (§64).
+    const notificationDocId = (item: SchedulableAlert) => {
+      const scheduleId = item.target?.scheduleId;
+      const occurrence = item.occurrenceKey;
+      if (source === "canonical" && scheduleId && occurrence) {
+        return occurrenceNotificationDocId(scheduleId, occurrence);
+      }
+      return deviceNotificationDocId("myday", item);
+    };
+    const itemDeepLink = (item: SchedulableAlert) => {
+      if (source === "canonical" && item.deepLink) return item.deepLink.replace(/^#\//, "#/");
+      return getMyDayItemDeepLink(item.section, item.itemId);
+    };
     // Schedule the upcoming alarms (the ones that haven't fired yet) the
-    // moment the doc is read or updated. This is what gives the TWA its
+    // moment the data is read or updated. This is what gives the TWA its
     // exact-time guarantee: even if the server push never arrives, the
     // local AlarmManager fires on the dot.
     const scheduleUpcoming = () => {
-      if (!isAndroidNative() || !current) return;
+      if (!isAndroidNative() || source === "pending") return;
       const now = Date.now();
-      // Collect every item whose next occurrence is within the horizon and
-      // arm a local alarm for each. (The previous version reused the DUE
-      // collector with `now` shifted 6h forward, which only ever saw the
-      // 15-minute slice ~5h45m out — so most same-day tasks were never
-      // armed and produced no notification when the app was closed.)
-      const items = collectUpcomingMyDayItems(current, now, tzOffset(), MYDAY_UPCOMING_HORIZON_MS);
+      const items: SchedulableAlert[] = source === "canonical"
+        ? collectUpcomingScheduleOccurrences(scheduleRows, now, MYDAY_UPCOMING_HORIZON_MS).map(toLegacyShapedDueItem)
+        : current
+          ? collectUpcomingMyDayItems(current, now, tzOffset(), MYDAY_UPCOMING_HORIZON_MS)
+          : [];
       // Cancel every previously-scheduled My Day alarm and re-create the
       // ones still in the future. This keeps the schedule authoritative
-      // against the latest doc — adding/removing a task in the app
+      // against the latest rows — adding, moving or disabling a schedule
       // updates the alarms immediately.
       const seen = new Set<number>();
       for (const item of items) {
         if (item.dueAt <= now) continue;
-        const id = alarmId(item.key);
+        const id = item.alarmId ?? alarmId(item.key);
         seen.add(id);
-        const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        const itemUrl = `/${itemDeepLink(item)}`;
         void scheduleLocalAlarm({
           id,
           at: item.dueAt,
@@ -1104,10 +1154,33 @@ function RootPage(): ReactNode {
       checkDue();
       scheduleUpcoming();
     };
-    const unsubscribe = onSnapshot(doc(db, "users", user.id, "myDay", "current"), (snapshot) => {
-      current = snapshot.exists() ? snapshot.data() as MyDayDocData : null;
+    // ── source selection: migration marker decides, never both ──────────────
+    let unsubscribeSchedules: () => void = () => undefined;
+    let unsubscribeLegacy: () => void = () => undefined;
+    const attachCanonical = () => {
+      source = "canonical";
+      unsubscribeSchedules = watchMergedSchedules(user.id, (rows) => {
+        scheduleRows = rows;
+        onDocChange();
+      });
       onDocChange();
+    };
+    const attachLegacy = () => {
+      source = "legacy";
+      unsubscribeLegacy = onSnapshot(doc(db, "users", user.id, "myDay", "current"), (snapshot) => {
+        current = snapshot.exists() ? snapshot.data() as MyDayDocData : null;
+        onDocChange();
+      });
+    };
+    void loadMigrationMarker(user.id).then((marker) => {
+      if (isMigrationComplete(marker)) attachCanonical();
+      else attachLegacy();
     });
+    // A schedule edit re-arms immediately instead of waiting for the next
+    // five-minute pass (§52, §154-18). The event is raised by the schedule
+    // write path, so there is exactly one scheduler reacting to it.
+    const onScheduleChanged = () => onDocChange();
+    window.addEventListener(SCHEDULE_CHANGED_EVENT, onScheduleChanged);
     const timer = window.setInterval(checkDue, 15_000);
     // Re-schedule upcoming alarms every 5 minutes as a safety net — if
     // the user kept the app in the background for hours the schedule
@@ -1116,7 +1189,9 @@ function RootPage(): ReactNode {
     const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      unsubscribe();
+      unsubscribeSchedules();
+      unsubscribeLegacy();
+      window.removeEventListener(SCHEDULE_CHANGED_EVENT, onScheduleChanged);
       window.clearInterval(timer);
       window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);

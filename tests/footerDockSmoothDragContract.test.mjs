@@ -313,7 +313,6 @@ test("footerNavSpace watches footers, not every style write in the app", () => {
 test("every footer still renders the ONE shared capsule (so the fix reaches all of them)", () => {
   for (const file of [
     "src/components/BottomNav.tsx",
-    "src/components/myday/BottomNav.tsx",
     "src/revision/components/BottomNav.tsx",
     "src/cartWishlist/components/BottomNav.tsx",
   ]) {

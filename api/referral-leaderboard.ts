@@ -4,6 +4,8 @@ import { handleEmbedProxy } from "./_lib/embedProxy.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 import { handleRevisionData } from "./_lib/revisionData.js";
 import { handleMyDay } from "./_lib/myDay.js";
+import { handleJoplinRoute, type JoplinRoute } from "./_lib/joplin.js";
+import { handleClipperAction } from "./_lib/joplinClipper.js";
 import { handleFlowPathControl } from "./_lib/flowpathControl.js";
 import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
@@ -125,6 +127,11 @@ const SHARED_ROUTES = [
   "my-courses",
   "personal-ai",
   "myday",
+  "joplin/items",
+  "joplin/schedules",
+  "joplin/migrate",
+  "joplin/resources",
+  "joplin/clipper",
   "flowpath/control",
   "revision/data",
   "revision/generate",
@@ -154,6 +161,11 @@ const ROUTE_LABEL: Record<SharedRoute, string> = {
   "my-courses": "My Study Library (cloud sync)",
   "personal-ai": "the AI study engine",
   myday: "My Day",
+  "joplin/items": "the My Day workspace",
+  "joplin/schedules": "the My Day scheduler",
+  "joplin/migrate": "the My Day migration",
+  "joplin/resources": "My Day attachments",
+  "joplin/clipper": "the Web Clipper",
   "flowpath/control": "FlowPath",
   "revision/data": "the Revision Test Bank",
   "revision/generate": "the Revision AI generator",
@@ -293,7 +305,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // dispatcher reads `req.body` itself, so a body the platform failed to
     // parse has to be written back or the recovery stops at this layer.
     if (!req.body || typeof req.body !== "object") req.body = rawBody;
+    // The Joplin workspace's creates are addressed BY PATH (`/api/joplin/items`
+    // …), not by body action: the sync bridge queues an operation, then POSTs
+    // the row it already built. Dispatch them before the action checks so a
+    // queued create can never fall through to the revision generator.
+    if (route && route.startsWith("joplin/")) {
+      try {
+        return await handleJoplinRoute(req, res, route as JoplinRoute);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "Could not save that change to My Day.");
+      }
+    }
     const action = String(rawBody?.action || "");
+    // The Web Clipper speaks `joplin.clipper.*` and is addressed by the
+    // extension as `/api/joplin/clipper`. It is dispatched BEFORE the generic
+    // `joplin.` branch so a clip never lands on the item-create endpoint.
+    if (action.startsWith("joplin.clipper.")) {
+      try {
+        return await handleClipperAction(action, req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "The Web Clipper could not complete that request.");
+      }
+    }
+    if (action.startsWith("joplin.")) {
+      const byAction = action.endsWith(".migrate") ? "joplin/migrate"
+        : action.endsWith(".schedule") || action.endsWith(".schedules") ? "joplin/schedules"
+        : action.endsWith(".resource") || action.endsWith(".resources") ? "joplin/resources"
+        : "joplin/items";
+      try {
+        return await handleJoplinRoute(req, res, byAction as JoplinRoute);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "Could not save that change to My Day.");
+      }
+    }
     if (action.startsWith("revision.data.")) {
       return handleRevisionData(req, res);
     }

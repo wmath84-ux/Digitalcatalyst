@@ -9,7 +9,6 @@ import {
 } from "../utils/pushScheduler.js";
 
 const cron = fs.readFileSync("api/cron/subscription-renewals.ts", "utf8");
-const myDayApp = fs.readFileSync("src/MyDayApp.tsx", "utf8");
 const notificationsPage = fs.readFileSync("src/components/NotificationsPage.tsx", "utf8");
 
 // 2026-08-13T04:30:00Z is exactly 10:00 in IST (offset −330 minutes).
@@ -121,7 +120,19 @@ test("dedupe keys survive Firestore dot-path restrictions", () => {
 });
 
 test("My Day saves the device timezone so server push fires at the right local time", () => {
-  assert.match(myDayApp, /tzOffsetMinutes: new Date\(\)\.getTimezoneOffset\(\)/);
+  // The planner sent `tzOffsetMinutes` on every save. The canonical contract is
+  // stricter: the device's IANA zone is resolved once, stored ON the schedule
+  // row, stamped on every create the sync bridge sends, and re-validated by the
+  // server before it is written.
+  const scheduledItem = fs.readFileSync("src/joplin/scheduling/scheduledItem.ts", "utf8");
+  assert.match(scheduledItem, /timeZone/);
+  const syncBridge = fs.readFileSync("src/joplin/joplinSyncBridge.ts", "utf8");
+  assert.match(syncBridge, /clientTimeZone: safeTimeZone\(\)/);
+  const api = fs.readFileSync("api/_lib/joplin.ts", "utf8");
+  assert.match(api, /validTimeZone\(clientTimeZone\)/);
+  // …and the legacy-compat endpoint still records the offset for the old rows.
+  const myDayApi = fs.readFileSync("api/_lib/myDay.ts", "utf8");
+  assert.match(myDayApi, /tzOffsetMinutes/);
 });
 
 test("bell center maps stored cloud categories (My Day reminders are not mislabeled)", () => {

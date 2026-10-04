@@ -17,6 +17,7 @@ import AiQuotaCard from "../components/AiQuotaCard";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import Header from "../components/Header";
 import MyDayAllowanceCard from "../components/MyDayAllowanceCard";
+import WebClipperCard from "../components/WebClipperCard";
 import { GlassButton } from "../components/ui/glass-button";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
@@ -187,6 +188,14 @@ export default function UsageLimitsPage() {
 
               <section aria-label="School AI usage and allowance" className="min-w-0 h-full">
                 <AiQuotaCard uid={user.id} material="home" />
+              </section>
+
+              {/* The Web Clipper's pairing surface. It lives HERE, not inside
+                  `#/my-day`: that route is the Joplin workspace and its chrome
+                  belongs to Joplin — a Digitalcatalyst card over it would be the
+                  exact "custom toolbar on top of Joplin's UI" the brief forbids. */}
+              <section aria-label="Web Clipper" className="min-w-0 xl:col-span-2">
+                <WebClipperCard />
               </section>
             </div>
 

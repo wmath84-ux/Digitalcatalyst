@@ -30,6 +30,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "joplin:build": "node scripts/joplin/build-workspace.mjs",
+    "joplin:build:dev": "JOPLIN_BUILD_MODE=development node scripts/joplin/build-workspace.mjs",
+    "clipper:build": "node scripts/joplin/build-clipper.mjs",
     "preview": "vite preview",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
     "ensure:google-services": "node scripts/ensure-google-services.mjs",
