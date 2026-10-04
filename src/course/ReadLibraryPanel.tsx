@@ -123,7 +123,13 @@ export default function ReadLibraryPanel({
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [moduleDraft, setModuleDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [libraryMode, setLibraryMode] = useState<"course" | "mine">("course");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeModule, setComposeModule] = useState("");
+  const [composeSubmodule, setComposeSubmodule] = useState("");
+  const [composeFiles, setComposeFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composeInputRef = useRef<HTMLInputElement | null>(null);
   const annotationApiRef = useRef<PdfAnnotationApi | null>(null);
   const readUploadsRef = useRef(readUploads);
   readUploadsRef.current = readUploads;
@@ -304,18 +310,38 @@ export default function ReadLibraryPanel({
     async (file: File | null | undefined) => {
       if (!file) return;
       setNotice(null);
-      const row = await readUploadsRef.current.uploadPdf(file);
+      const row = await readUploadsRef.current.uploadPdf(file, composeModule, composeSubmodule);
       if (!row) return;
       setNotice(`“${row.name}” is in Your annotations — annotate it and it saves to your account.`);
       setActiveId(withKind("learner", row.id));
     },
-    [],
+    [composeModule, composeSubmodule],
   );
 
   const openUploadPicker = useCallback(() => {
     readUploadsRef.current.clearUploadError();
-    fileInputRef.current?.click();
+    setLibraryMode("mine");
+    setComposeOpen(true);
   }, []);
+
+  const submitCompose = useCallback(async () => {
+    const files = composeFiles;
+    if (!files.length) {
+      composeInputRef.current?.click();
+      return;
+    }
+    setNotice(null);
+    const stored = await readUploadsRef.current.uploadPdfs(files, composeModule, composeSubmodule);
+    setComposeFiles([]);
+    setComposeOpen(false);
+    if (!stored.length) return;
+    setNotice(
+      stored.length === 1
+        ? `“${stored[0].name}” is in Your annotations — annotate it and it saves to your account.`
+        : `${stored.length} PDFs are in Your annotations.`,
+    );
+    setActiveId(withKind("learner", stored[0].id));
+  }, [composeFiles, composeModule, composeSubmodule]);
 
   const handleDelete = useCallback(async () => {
     const target = confirmDelete;
@@ -346,8 +372,37 @@ export default function ReadLibraryPanel({
           <div className="mb-2 flex items-center gap-2">
             <BookOpenText size={17} className="shrink-0 text-violet-300" aria-hidden="true" />
             <h2 className="text-sm font-bold text-white">Read library</h2>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300" aria-label={`${entries.length} resources`}>
-              {entries.length}
+            <div
+              className="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-white/[0.05] p-0.5"
+              role="tablist"
+              aria-label="Read library source"
+              data-course-read-mode-switch
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-pressed={libraryMode === "course"}
+                onClick={() => setLibraryMode("course")}
+                className={`h-7 rounded-full px-2.5 text-[10px] font-bold ${libraryMode === "course" ? "bg-violet-500 text-white" : "text-slate-300 hover:text-white"}`}
+                data-course-read-mode="course"
+                title="Course PDFs from the product builder"
+              >
+                Course
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-pressed={libraryMode === "mine"}
+                onClick={() => setLibraryMode("mine")}
+                className={`h-7 rounded-full px-2.5 text-[10px] font-bold ${libraryMode === "mine" ? "bg-emerald-500 text-white" : "text-slate-300 hover:text-white"}`}
+                data-course-read-mode="mine"
+                title="Your own modules and PDFs"
+              >
+                My PDFs
+              </button>
+            </div>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300" aria-label={`${libraryMode === "course" ? entries.length : readUploads.uploads.length} resources`}>
+              {libraryMode === "course" ? entries.length : readUploads.uploads.length}
             </span>
             {/* The library grows here: a learner's own PDF, in one tap. */}
             <button
@@ -373,6 +428,19 @@ export default function ReadLibraryPanel({
                 void handlePickedFile(file);
               }}
               data-course-read-upload-input
+            />
+            <input
+              ref={composeInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+              className="sr-only"
+              onChange={(event) => {
+                const picked = Array.from(event.currentTarget.files || []);
+                event.currentTarget.value = "";
+                if (picked.length) setComposeFiles((current) => [...current, ...picked]);
+              }}
+              data-course-read-compose-input
             />
           </div>
           <label className="sr-only" htmlFor="course-read-search">Search Read resources</label>
@@ -426,6 +494,8 @@ export default function ReadLibraryPanel({
         ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4" data-course-read-list>
+          {libraryMode === "mine" ? (
+          <>
           {/* ── Your annotations ─────────────────────────────────────────── */}
           <section className="mb-4" aria-label="Your annotations" data-course-read-mine>
             <div className="mb-2 flex items-center gap-2">
@@ -440,15 +510,17 @@ export default function ReadLibraryPanel({
             </p>
 
             {uploadGroups.every((group) => group.items.length === 0) ? (
-              <div className="rounded-2xl border border-dashed border-white/15 px-4 py-4 text-center" data-course-read-mine-empty>
+              <div className="rounded-2xl border border-dashed border-white/15 px-4 py-10 text-center" data-course-read-mine-empty>
+                <FileText size={42} className="mx-auto mb-3 text-emerald-300/80" aria-hidden="true" />
                 <p className="text-xs font-semibold text-slate-300">
                   {readUploads.uploads.length === 0 ? "No PDFs of your own yet." : "No uploads match this search."}
                 </p>
+                <p className="mt-1 text-[10px] text-slate-500">Create a module, add a submodule, and upload one or more PDFs.</p>
                 <button
                   type="button"
                   onClick={openUploadPicker}
                   disabled={uploadBusy}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-300/30 bg-violet-400/15 px-3 py-1.5 text-[11px] font-bold text-violet-100 hover:bg-violet-400/25 disabled:opacity-50"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-violet-300/30 bg-violet-400/15 px-3 py-1.5 text-[11px] font-bold text-violet-100 hover:bg-violet-400/25 disabled:opacity-50"
                 >
                   <Plus size={13} aria-hidden="true" /> Upload a PDF
                 </button>
@@ -461,8 +533,13 @@ export default function ReadLibraryPanel({
                       <FolderPlus size={12} aria-hidden="true" /> {group.module}
                     </p>
                   ) : null}
+                  {(group.submodules || [{ submodule: "", items: group.items }]).map((bucket) => (
+                  <div key={`${group.module || "default"}:${bucket.submodule || "root"}`}>
+                  {bucket.submodule ? (
+                    <p className="mb-1 ml-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">{bucket.submodule}</p>
+                  ) : null}
                   <ul className="space-y-2" aria-label={group.module ? `${group.module} PDFs` : "Your uploaded PDFs"}>
-                    {group.items.map((row) => {
+                    {bucket.items.map((row) => {
                       const meta = [readUploadMetaLabel(row), readUploadPageLabel(row)].filter(Boolean).join(" · ");
                       return (
                         <li key={row.id} className="rounded-2xl border border-white/10 bg-white/[0.045]" data-course-read-mine-row={row.id}>
@@ -549,11 +626,15 @@ export default function ReadLibraryPanel({
                       );
                     })}
                   </ul>
+                  </div>
+                  ))}
                 </div>
               ))
             )}
           </section>
-
+          </>
+          ) : (
+          <>
           {/* ── Course Read resources ───────────────────────────────────── */}
           {filteredEntries.length === 0 ? (
             <div className="grid min-h-32 place-items-center px-5 text-center" role="status" data-course-read-empty>
@@ -592,6 +673,8 @@ export default function ReadLibraryPanel({
                 </li>
               ))}
             </ul>
+          )}
+          </>
           )}
         </div>
       </div>
@@ -717,6 +800,63 @@ export default function ReadLibraryPanel({
           </>
         ) : null}
       </div>
+
+      {composeOpen ? (
+        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/50 p-3 sm:items-center" data-course-read-compose>
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">Create your module</h3>
+              <button type="button" onClick={() => setComposeOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+              Module name
+              <input
+                value={composeModule}
+                onChange={(event) => setComposeModule(event.currentTarget.value)}
+                placeholder="e.g. Physics"
+                className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/70"
+              />
+            </label>
+            <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+              Submodule
+              <input
+                value={composeSubmodule}
+                onChange={(event) => setComposeSubmodule(event.currentTarget.value)}
+                placeholder="e.g. Chapter 1 (optional)"
+                className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/70"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => composeInputRef.current?.click()}
+              className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-3 py-6 text-xs font-bold text-slate-200 hover:bg-white/[0.07]"
+            >
+              <FileText size={22} className="text-emerald-300" aria-hidden="true" />
+              {composeFiles.length ? `${composeFiles.length} PDF${composeFiles.length === 1 ? "" : "s"} selected — tap to add more` : "Choose PDFs"}
+            </button>
+            {composeFiles.length ? (
+              <ul className="mb-3 max-h-28 overflow-y-auto text-[11px] text-slate-300">
+                {composeFiles.map((file) => (
+                  <li key={`${file.name}-${file.size}`} className="truncate px-1 py-0.5">
+                    {file.name}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void submitCompose()}
+              disabled={uploadBusy}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 text-xs font-black text-white hover:bg-emerald-400 disabled:opacity-50"
+            >
+              {uploadBusy ? <LoaderCircle size={15} className="animate-spin" /> : <CloudUpload size={15} />}
+              Upload to my module
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <CourseConfirmDialog
         open={Boolean(confirmDelete)}

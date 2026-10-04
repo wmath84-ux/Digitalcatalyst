@@ -111,6 +111,9 @@ export const sanitizeReadUploadName = (value, fallback = "My PDF") => {
 export const sanitizeReadUploadModule = (value) =>
   text(value).replace(/\s+/g, " ").slice(0, READ_UPLOAD_MODULE_MAX);
 
+/** A learner-made submodule name. `""` = no submodule under the module. */
+export const sanitizeReadUploadSubmodule = (value) => sanitizeReadUploadModule(value);
+
 /**
  * Storage object path for one uploaded PDF. The uid is the folder (the rules
  * scope writes to it), the id keeps saves of the SAME document on the SAME
@@ -181,6 +184,7 @@ export const toFirestoreReadUpload = (input = {}) => {
     uploadId,
     name: sanitizeReadUploadName(input.name),
     module: sanitizeReadUploadModule(input.module),
+    submodule: sanitizeReadUploadSubmodule(input.submodule),
     storagePath,
     url: text(input.url).slice(0, READ_UPLOAD_URL_MAX),
     contentType: PDF_TYPE,
@@ -221,6 +225,7 @@ export const parseReadUploadDoc = (raw, uidHint = "") => {
     uid,
     name: sanitizeReadUploadName(raw.name, "My PDF"),
     module: sanitizeReadUploadModule(raw.module),
+    submodule: sanitizeReadUploadSubmodule(raw.submodule),
     storagePath,
     url,
     sizeBytes,
@@ -257,12 +262,35 @@ export const groupReadUploads = (uploads) => {
     groups.get(key).push(row);
   }
   return [...groups.entries()]
-    .map(([module, items]) => ({ module, items }))
+    .map(([module, items]) => ({
+      module,
+      items,
+      submodules: groupReadUploadSubmodules(items),
+    }))
     .sort((a, b) => {
       if (a.module === b.module) return 0;
       if (!a.module) return -1;
       if (!b.module) return 1;
       return a.module.localeCompare(b.module);
+    });
+};
+
+/** Submodule buckets inside one module group (blank first, then A→Z). */
+export const groupReadUploadSubmodules = (uploads) => {
+  const rows = Array.isArray(uploads) ? uploads : [];
+  const groups = new Map();
+  for (const row of rows) {
+    const key = sanitizeReadUploadSubmodule(row?.submodule);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups.entries()]
+    .map(([submodule, items]) => ({ submodule, items }))
+    .sort((a, b) => {
+      if (a.submodule === b.submodule) return 0;
+      if (!a.submodule) return -1;
+      if (!b.submodule) return 1;
+      return a.submodule.localeCompare(b.submodule);
     });
 };
 

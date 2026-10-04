@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
+import SitePeekFooter from "./SitePeekFooter";
 
 /**
  * The ONE site footer navigation. Every page shares the same floating capsule,
@@ -58,6 +59,13 @@ export type SiteFooterNavProps = {
   position?: "absolute" | "fixed";
   /** Extra hooks for page CSS/tests; never used to restyle the capsule. */
   dataAttrs?: Record<string, string | undefined>;
+  /**
+   * Course-player peek interaction: a thin line at the bottom reveals the
+   * same GlassDock, hold+drag drives the magnification wave, and a tap
+   * pins it on touch. Icons stay the caller's. Home and My Day use this
+   * so the footer is as smooth as the course player's.
+   */
+  peek?: boolean;
 };
 
 export default function SiteFooterNav({
@@ -67,8 +75,21 @@ export default function SiteFooterNav({
   leading,
   position = "absolute",
   dataAttrs,
+  peek = false,
 }: SiteFooterNavProps) {
   const compact = useCompactFit();
+
+  if (peek) {
+    return (
+      <SitePeekFooter
+        label={label}
+        items={items}
+        onSelect={onSelect}
+        compact={compact}
+        dataAttrs={dataAttrs}
+      />
+    );
+  }
 
   return (
     <nav

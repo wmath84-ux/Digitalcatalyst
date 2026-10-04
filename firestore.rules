@@ -701,6 +701,7 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 160
           && request.resource.data.module is string
           && request.resource.data.module.size() <= 60
+          && (!request.resource.data.keys().hasAny(['submodule']) || (request.resource.data.submodule is string && request.resource.data.submodule.size() <= 60))
           && request.resource.data.storagePath is string
           && request.resource.data.storagePath.size() > 0
           && request.resource.data.storagePath.size() <= 400

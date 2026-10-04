@@ -32,8 +32,8 @@ import PremiumGate from "./components/subscription/PremiumGate";
 import { parseMyDayHash, buildMyDayDeepLink } from "./joplin/joplinDeepLinks";
 import { JoplinWorkspaceBoundary } from "./joplin/JoplinWorkspace";
 import { trackMyDayEvent } from "./joplin/joplinAnalytics";
-import { isMigrationComplete, loadMigrationMarker, runMyDayMigrationV1, subscribeMigrationMarker } from "./joplin/joplinMigrationBridge";
-import type { MigrationMarker } from "./joplin/joplinMigrationBridge";
+import { isMigrationComplete, loadMigrationMarker, runMyDayMigrationV1, skipLegacyMigration } from "./joplin/joplinMigrationBridge";
+import BottomNav, { type TabKey } from "./components/BottomNav";
 
 /**
  * The workspace host is its own chunk.
@@ -46,14 +46,9 @@ import type { MigrationMarker } from "./joplin/joplinMigrationBridge";
  */
 const JoplinWorkspace = lazy(() => import("./joplin/JoplinWorkspace"));
 
-type MigrationPhase = "idle" | "running" | "done" | "partial" | "failed";
-
 export default function MyDayApp() {
   const { user } = useAuth();
   const myDay = useMyDayAccess();
-  const [marker, setMarker] = useState<MigrationMarker | null>(null);
-  const [migrationPhase, setMigrationPhase] = useState<MigrationPhase>("idle");
-  const [migrationError, setMigrationError] = useState<string | null>(null);
   const [gateOpen, setGateOpen] = useState(false);
   const startedForUser = useRef<string | null>(null);
 
@@ -62,15 +57,6 @@ export default function MyDayApp() {
   // Phase-1 visibility contract is preserved: the rail/nav removes the My Day
   // entry when the admin hides the feature from non-subscribers.
   usePublishFeatureVisibility("myday", { hidden: Boolean(myDay.hidden) });
-
-  // ── migration marker ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!uid) {
-      setMarker(null);
-      return undefined;
-    }
-    return subscribeMigrationMarker(uid, setMarker);
-  }, [uid]);
 
   // ── data migration V1 ─────────────────────────────────────────────────────
   // Staged, idempotent and resumable: it writes per section, verifies each write,
@@ -86,12 +72,7 @@ export default function MyDayApp() {
     (async () => {
       const existing = await loadMigrationMarker(uid);
       if (cancelled) return;
-      setMarker(existing);
-      if (isMigrationComplete(existing)) {
-        setMigrationPhase("done");
-        return;
-      }
-      setMigrationPhase("running");
+      if (isMigrationComplete(existing)) return;
       trackMyDayEvent("myday_migration_started", { hasMarker: Boolean(existing) });
       const result = await runMyDayMigrationV1({
         uid,
@@ -101,15 +82,16 @@ export default function MyDayApp() {
         },
       });
       if (cancelled) return;
-      setMarker(result.marker);
-      setMigrationError(result.error ?? null);
-      setMigrationPhase(result.ok ? "done" : result.error ? "partial" : "done");
       if (result.ok) {
         trackMyDayEvent("myday_migration_complete", {
           notes: result.marker?.counts.notes ?? 0,
           todos: result.marker?.counts.todos ?? 0,
           schedules: result.marker?.counts.schedules ?? 0,
         });
+      } else {
+        // Test / invalid leftover rows (JOPLIN_BAD_ID) are not restored — the
+        // workspace is the product now, and there is no user-base data to keep.
+        await skipLegacyMigration(uid, result.error || "legacy_not_needed");
       }
     })();
 
@@ -202,7 +184,7 @@ export default function MyDayApp() {
     <div // The route paints NO page plate of its own: the shared backdrop behind the
     // app is the surface while the bundle loads, and the workspace brings
     // Joplin's own canvas once it mounts (no Digitalcatalyst glass on top of it).
-    className="myday-workspace-root flex min-h-[100dvh] w-full flex-col">
+    className="myday-workspace-root relative flex min-h-[100dvh] w-full flex-col">
       {blocked ? (
         <PremiumGate
           variant="myday"
@@ -219,9 +201,6 @@ export default function MyDayApp() {
         />
       ) : (
         <>
-          {migrationPhase === "running" || migrationPhase === "partial" ? (
-            <MigrationNotice marker={marker} phase={migrationPhase} error={migrationError} />
-          ) : null}
           <JoplinWorkspaceBoundary
             onGoHome={() => {
               window.location.hash = "#/home";
@@ -258,6 +237,22 @@ export default function MyDayApp() {
           }}
         />
       ) : null}
+      {!blocked ? (
+        <BottomNav
+          active="myday"
+          peek
+          onChange={(tab: TabKey) => {
+            if (tab === "myday") return;
+            if (tab === "home") window.location.hash = "#/home";
+            else if (tab === "store") window.location.hash = "#/store";
+            else if (tab === "purchases") window.location.hash = "#/store/purchases";
+            else if (tab === "profile") window.location.hash = "#/profile";
+            else if (tab === "study-library") window.location.hash = "#/study-library";
+            else if (tab === "revision") window.location.hash = "#/revision";
+            else if (tab === "flowpath") window.location.hash = "#/flowpath";
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -288,40 +283,6 @@ function WorkspaceNotice({
           </button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-/**
- * Migration progress, shown as a thin bar above the workspace.
- *
- * Stated plainly and without alarm: the migration runs in the background, the old
- * data stays in place, and a partial run resumes on the next visit.
- */
-function MigrationNotice({
-  marker,
-  phase,
-  error,
-}: {
-  marker: MigrationMarker | null;
-  phase: MigrationPhase;
-  error: string | null;
-}) {
-  const done = marker ? Object.values(marker.phases).filter((entry) => entry?.completed).length : 0;
-  return (
-    <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[11px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-500" aria-hidden="true" />
-      {phase === "running" ? (
-        <span>
-          Moving your existing My Day items into the workspace… ({done}/4 sections) Your original data is kept until the
-          move is verified.
-        </span>
-      ) : (
-        <span>
-          Some items could not be moved yet ({error ?? "unknown reason"}). They are still safe in your old My Day data;
-          the next visit will retry.
-        </span>
-      )}
     </div>
   );
 }
