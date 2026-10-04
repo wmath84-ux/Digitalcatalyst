@@ -83,6 +83,15 @@ five tests swipes through exactly five cards.
 
 ## Sizing (mobile, tablet, desktop)
 
+> Follow-up (2026-10-04): the desktop and tablet *bands* still split the
+> dashboard grid through the old `lg:col-span-7` / `lg:col-span-5` child
+> classes, which this pass removed — no panel matched them any more, the grid
+> auto-placed both panels into a single 1/12 column, and the whole dashboard
+> read as "shrink ho gaya" on desktop (77 px panels at 1440 px) and tablet.
+> Fixed in `REVISION_DASHBOARD_DESKTOP_TABLET_SHRINK_FIX_REPORT.md`: the deck
+> panel now spans the full canvas on every band and the follow-ups keep their
+> 5 / 7 rhythm under it. The sizing model below is unchanged.
+
 The deck measures the Revision page's own scroller
 (`[data-revision-page-main]`), never the viewport: the stage takes the visible
 height between its top edge and the container's bottom edge (`BOTTOM_RESERVE`

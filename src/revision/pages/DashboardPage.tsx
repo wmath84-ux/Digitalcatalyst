@@ -133,7 +133,10 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
          * area, these are reached by scrolling), and keep the desktop 12-column
          * rhythm between themselves.
          */}
-        <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-3 lg:items-start lg:space-y-0">
+        <div
+          data-rev-followups
+          className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-3 lg:items-start lg:space-y-0"
+        >
           <div
             data-rev-stat-grid
             className="grid shrink-0 grid-cols-3 gap-3 lg:col-span-5 lg:gap-2"

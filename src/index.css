@@ -3094,37 +3094,64 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     gap: clamp(10px, 1vw, 14px);
   }
 
-  /* Dashboard: 12-col compact grid — left 7 (plan hero + quick stats), right 5
-     (weak topics + revision bank).
-     `align-items: stretch`, NOT `start`: with `start` every column ended at its
-     own height, so the shorter one trailed off into a band of empty wallpaper
-     next to the taller one and the dashboard read as collapsing vertically. The
-     hero card now has a flex chain that fills the row (see `DashboardPage.tsx`)
-     and the plan-details box inside it absorbs the slack, so the columns stay
-     balanced instead of one of them being cut short. */
+  /* Dashboard: the slide deck owns row 1, the follow-ups row 2.
+     (History: this grid used to be a 7 / 5 split — plan hero + quick stats on
+     the left, weak topics + revision bank on the right — and every column
+     stretch-filled so the shorter one never trailed off into empty wallpaper.
+     The deck replaced the hero and sizes itself from this scroller, so the
+     split moved one level down: the deck spans the row and the 5 / 7 rhythm
+     lives inside `[data-rev-followups]`.)
+     The deck (PlanSlideDeck.tsx) is the dashboard's hero and solves its own
+     height from this scroller, so its panel spans all 12 columns and the
+     quick stats + Weak Topics + Revision Bank stack under it on the same
+     12-column rhythm. The old `> .lg:col-span-7 / -5` child split is DEAD
+     markup — and it was worse than dead: after the deck pass the panels carry
+     no `lg:col-span-*` class at all, so no child matched those rules and the
+     grid auto-placed both panels into a single 12th column. Measured on the
+     real page: 77 px panels on a 1440 px window, 59 px on a 1194 px tablet,
+     the card clipped on both sides — the "dashboard shrink ho gaya" report. */
   .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] {
     display: grid !important;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: clamp(10px, 1vw, 14px);
-    align-items: stretch;
     max-width: 1200px;
   }
   .dc-desktop-shell [data-rev-layout="dashboard"] {
     display: grid !important;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: clamp(10px, 1vw, 14px);
-    align-items: stretch;
   }
-  .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-7 {
-    grid-column: span 7;
-    display: flex;
-    flex-direction: column;
-  }
+  /* Row 1 — the deck panel: the full width of the canvas. */
+  .dc-desktop-shell [data-rev-layout="dashboard"] > [data-rev-panel="primary"],
+  .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-7,
   .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-5 {
-    grid-column: span 5;
-    display: flex;
-    flex-direction: column;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  /* Row 2 — the follow-up wrapper, keyed off its own hook so the same 5 / 7
+     split reaches the 960–1023 px landscape band, where the `lg:` variants
+     never engage. */
+  .dc-desktop-shell [data-rev-layout="dashboard"] > [data-rev-followups] {
+    grid-column: 1 / -1;
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: clamp(10px, 1vw, 14px);
+  }
+  /* …the wrapper is a grid now, so its children's `space-y` margins must not
+     offset the second card inside its own row (the gap carries the rhythm).
+     The narrow-container fallback below puts the margins back on purpose. */
+  .dc-desktop-shell [data-rev-followups] > * + * {
+    margin-top: 0 !important;
+  }
+  .dc-desktop-shell [data-rev-followups] > [data-rev-stat-grid] {
+    grid-column: span 5;
+    align-self: start;
+    min-width: 0;
+  }
+  .dc-desktop-shell [data-rev-followups] > [data-rev-panel="secondary"] {
+    grid-column: span 7;
+    align-self: start;
+    min-width: 0;
   }
   .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3281,17 +3308,23 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     padding: 16px clamp(12px, 3vw, 20px) 20px;
     gap: 12px;
   }
+  /* Tablet portrait: ONE column. The deck solves its own height from this
+     scroller and must never be squeezed sideways — a 2-up split left the deck
+     panel 381 px wide inside an 834 px tablet (the card then clipped ~23 px on
+     each side while the plate stayed a narrow strip) and pushed the
+     follow-ups into a second narrow column. Full width for every panel, the
+     deck first, the quick stats + Weak Topics + Revision Bank under it. */
   [data-rev-layout="dashboard"] {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
+  [data-rev-layout="dashboard"] > [data-rev-panel="primary"],
+  [data-rev-layout="dashboard"] > [data-rev-followups],
   [data-rev-layout="dashboard"] > .lg\:col-span-7,
   [data-rev-layout="dashboard"] > .lg\:col-span-5 {
-    grid-column: span 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    grid-column: 1 / -1;
+    min-width: 0;
   }
   [data-revision-profile-layout] {
     display: grid !important;
@@ -3371,14 +3404,35 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 10px;
   }
-  [data-rev-layout="dashboard"] > .lg\:col-span-7 {
-    grid-column: span 7;
-  }
+  /* Same deck-first layout as the desktop shell: the deck panel takes the
+     full canvas (it solves its own height from the scroller) and the quick
+     stats + follow-up cards share the row under it. The old `lg:col-span-*`
+     child split matched nothing after the deck pass and crushed the second
+     panel into a single 12th of the row. */
+  [data-rev-layout="dashboard"] > [data-rev-panel="primary"],
+  [data-rev-layout="dashboard"] > .lg\:col-span-7,
   [data-rev-layout="dashboard"] > .lg\:col-span-5 {
-    grid-column: span 5;
-    display: flex;
-    flex-direction: column;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  [data-rev-layout="dashboard"] > [data-rev-followups] {
+    grid-column: 1 / -1;
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 10px;
+  }
+  [data-rev-followups] > * + * {
+    margin-top: 0 !important;
+  }
+  [data-rev-followups] > [data-rev-stat-grid] {
+    grid-column: span 5;
+    align-self: start;
+    min-width: 0;
+  }
+  [data-rev-followups] > [data-rev-panel="secondary"] {
+    grid-column: span 7;
+    align-self: start;
+    min-width: 0;
   }
   /* Weak Topics: same 7-5 split as the desktop shell, compacted for the
      narrower landscape tablets that the desktop shell also serves (< 960 px) */
@@ -4512,7 +4566,10 @@ html[data-course-player-active="true"] {
      ~58 px strip on 960–1240 px windows (tablet landscape / small
      desktop with the side rail). */
   .dc-desktop-shell [data-revision-page-main] > [data-rev-layout="dashboard"],
+  .dc-desktop-shell [data-revision-page-main] > [data-rev-layout="dashboard"] > [data-rev-followups],
   .dc-desktop-shell [data-rev-layout="dashboard"],
+  .dc-desktop-shell [data-rev-layout="dashboard"] > [data-rev-followups],
+  .dc-desktop-shell [data-rev-followups],
   .dc-desktop-shell [data-rev-layout="progress"],
   .dc-desktop-shell [data-rev-layout="weak"],
   .dc-desktop-shell [data-revision-profile-layout] {
@@ -4524,6 +4581,7 @@ html[data-course-player-active="true"] {
 
   /* Re-introduce the vertical rhythm that `lg:space-y-0` removes on desktop. */
   .dc-desktop-shell [data-rev-layout="dashboard"] > * + *,
+  .dc-desktop-shell [data-rev-followups] > * + *,
   .dc-desktop-shell [data-rev-layout="progress"] > * + *,
   .dc-desktop-shell [data-rev-layout="weak"] > * + *,
   .dc-desktop-shell [data-revision-profile-layout] > * + * {
