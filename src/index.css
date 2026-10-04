@@ -1676,146 +1676,39 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: eq 0.8s ease-in-out infinite;
 }
 
-/* Course Player — the notes tab lives inside the right-side sheet (a slice
-   of the viewport, min(24rem, 90vw) wide), so the note grid tiles by the
-   width the sheet actually gives it instead of the fixed viewport columns:
-   a narrow phone sheet gets 2 comfortable columns, a wider one gets more. */
-[data-course-overlay] [data-course-notes-grid],
-[data-course-study-pane] [data-course-notes-grid] {
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-}
-
-/* Course Player — the MIND MAP LIBRARY (every map of the module at once) is
-   the map panel's twin of the notes grid, so it re-uses the notes grid's
-   tiling function: `grid-cols-2 sm:grid-cols-3` counts the VIEWPORT, while a
-   split sheet is only a slice of it — three columns inside a 25% sheet left
-   ~144 px cards, and inside a 10% sheet ~48 px grey slivers, which is the
-   "chhote aur grey boxes" bug the learner reported. auto-fill instead counts
-   the SPACE THE GRID ACTUALLY GOT, so a squeezed sheet drops to 2 columns,
-   then 1, and every card keeps its title, its tint and its two action
-   buttons.
-   Deliberately NOT gated on `data-split-kind` (the notes rule is): the map
-   library is the panel's HOME screen and it owns the whole sheet, so the same
-   measurement should also hold for the portrait sheet on small phones instead
-   of leaving a second, viewport-based rule in charge there.
-   No `min(160px, 100%)` guard here — the notes grid never had one, and that
-   is deliberate parity: a sheet dragged shut gets narrower than one card, and
-   the cards must then keep their 160 px floor and CLIP at the sheet edge
-   (exactly how the Note Library behaves while being dismissed) instead of
-   shrinking to a sliver with the container. */
+/* The notes and mind-map libraries measure the panel they actually occupy.
+   Narrow phone / landscape-split panels become one readable column; tablet
+   and desktop gain columns only while each card still has room for its real
+   title, curriculum context and metadata. `min(100%, …)` keeps a narrow pane
+   from creating horizontal overflow without shrinking its type. */
+[data-course-notes-grid],
 [data-course-mindmap-map-grid] {
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  align-items: stretch;
 }
 
-/* While the library is open the diagram underneath is hidden (kept in the
-   layout so React Flow's measurements survive), so the pack cards never read
-   through to node text behind the sheet. */
+@media (min-width: 1100px) {
+  [data-course-notes-grid],
+  [data-course-mindmap-map-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  }
+}
+
+/* While the map library is open the diagram underneath remains mounted for
+   React Flow measurements, but is hidden from the resource-card surface. */
 [data-course-mindmap-canvas][data-library-open="true"] > .react-flow {
   visibility: hidden;
 }
 
-/* Mind map library cards (Wave 9): the card IS the pack GlassCard (tint 0.4,
-   radius 20) — no painted gradient plate or drop shadow in either map theme.
-   The only thing the stylesheet adds is the violet ring on the map that is
-   open right now; the `background` here is transparent so nothing can paint
-   under the component's own layers. */
-[data-course-mindmap-map-card] {
-  background: transparent;
-  box-shadow: none;
-}
-
-[data-course-mindmap-map-card][data-active="true"] {
-  box-shadow: 0 0 0 1px rgb(167 139 250 / 0.6);
-}
-/* Course Player — square note cards lift off the panel with a mixed
-   blue gradient glow so the boxes stay readable against both themes.
-   `color` is pinned here (rather than inherited) so a saved note's preview
-   text is ALWAYS legible on the card in both themes — in dark mode the
-   shell hands the card white text, and a light/white card would swallow it. */
 [data-course-notes-grid] [data-course-note] {
   color: var(--course-text);
-  /* Wave 8: the card IS the pack GlassCard (tint 0.4, radius 20) — no painted
-     blue-gradient plate, border or drop shadow any more. The theme's soft
-     tone only tints the action row's hover; the focus ring stays blue. */
   --course-note-hover: var(--course-soft);
-  outline-color: rgb(37 99 235 / 0.6);
+  outline-color: rgb(245 158 11 / 0.65);
 }
 
 [data-course-notes-grid] [data-course-note]:focus-within {
   outline: 2px solid;
   outline-offset: 2px;
-}
-/* Course Player — a saved note card shows ONLY the note's first heading or
-   first line of text, in its original format, centred in the square. The
-   block keeps its formatting (a heading stays a heading, bold / colour stay
-   bold / coloured) but sizes are capped and margins zeroed so the single
-   block sits balanced in the middle of a small card instead of overflowing
-   it — that's the "centre mein thoda look kharab" adjustment: nothing drifts
-   off-centre, and a long first paragraph can never bury the action buttons. */
-.course-note-card-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  overflow: hidden;
-  text-align: center;
-  /* The card's own theme text — the preview block keeps its formatting, but
-     unstyled text must never inherit a shell colour that clashes with the
-     card surface in either theme. */
-  color: var(--course-text);
-}
-
-.course-note-card-preview > * {
-  max-width: 100%;
-  max-height: 100%;
-  margin: 0;
-  padding: 0;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.course-note-card-preview > :is(h1, h2, h3, h4, h5, h6, p, div, li, blockquote, pre, figcaption, dd, dt, td, th) {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  overflow: hidden;
-  /* Centred is the requirement — a pasted block's own inline text-align
-     must not drag the card's preview off-centre. */
-  text-align: center !important;
-}
-
-.course-note-card-preview :is(h1, h2, h3, h4, h5, h6) {
-  font-size: 1.05rem !important;
-  font-weight: 800;
-}
-
-.course-note-card-preview :is(p, div, li, td, th, figcaption, dd, dt) {
-  font-size: 0.8rem !important;
-}
-
-/* Code and quoted blocks read better left-aligned (a centered code line or a
-   quote with a left border looks broken), so they opt out of the centering —
-   they still sit vertically centred in the card. */
-.course-note-card-preview pre {
-  font-size: 0.72rem !important;
-  white-space: pre-wrap;
-  text-align: left !important;
-}
-
-.course-note-card-preview blockquote {
-  font-size: 0.8rem !important;
-  padding-left: 0.4rem;
-  border-left: 2px solid currentColor;
-  text-align: left !important;
-}
-
-.course-note-card-preview img {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  margin-inline: auto;
 }
 
 /* Course Player — overlay content swap (tab switch) */

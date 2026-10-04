@@ -194,15 +194,18 @@ test("The notes editor is a large rich-text surface", () => {
   assert.match(notesPanel, /data-course-notes-add/);
 });
 
-test("A saved note still collapses back to a square card in a grid", () => {
+test("a saved note uses the shared responsive study-resource card grid", () => {
+  const resourceCard = readSource("src/course/StudyResourceCard.tsx");
+  const cardStyles = readSource("src/course/study-resource-card.css");
   assert.match(notesPanel, /data-course-notes-list/);
   assert.match(notesPanel, /data-course-notes-grid/);
-  assert.match(notesPanel, /aspect-square/);
-  assert.match(notesPanel, /grid-cols-2/);
+  assert.match(notesPanel, /<StudyResourceCard\s+kind="note"/);
+  assert.doesNotMatch(notesPanel, /aspect-square|grid-cols-2/);
   assert.match(notesPanel, /const notePreview = \(note: CoursePlayerNote\)/);
   assert.match(notesPanel, /richTextToPlain/);
-  assert.match(styles, /\[data-course-notes-grid\] \[data-course-note\]/);
-  assert.match(styles, /rgb\(37 99 235/);
+  assert.match(resourceCard, /data-study-resource-card/);
+  assert.match(cardStyles, /min-height: 212px/);
+  assert.match(styles, /\[data-course-notes-grid\],\s*\n\[data-course-mindmap-map-grid\]/);
 });
 
 test("Pasting from anywhere keeps the exact formatting", () => {
@@ -236,7 +239,7 @@ test("Notes carry both the rich HTML and a plain-text projection", () => {
   assert.match(courseTypes, /html\?: string;/);
   assert.match(coursePlayer, /const safeHtml = sanitizeRichText\(html\)/);
   // The player sanitises and projects, then hands both to the cloud hook…
-  assert.match(coursePlayer, /notesCtl\.add\(safeHtml, \{ text: richTextToPlain\(safeHtml\) \}\)/);
+  assert.match(coursePlayer, /notesCtl\.add\(safeHtml, \{\s*text: richTextToPlain\(safeHtml\),/);
   // …which stores the pair in the Firestore document (and in the mirror).
   const cloudNotes = readSource("utils/courseNotes.js");
   assert.match(cloudNotes, /const html = flatten\(source\.html\)\.slice\(0, MAX_NOTE_HTML_LENGTH\);/);
@@ -246,7 +249,7 @@ test("Notes carry both the rich HTML and a plain-text projection", () => {
   assert.match(notesHook, /html: safeHtml, text,/);
   assert.match(notesHook, /text: richTextToPlain\(safeHtml\)/);
   // Legacy plain-text notes still render.
-  assert.match(notesPanel, /note\.html \|\| plainToRichText\(note\.text \|\| ""\)/);
+  assert.match(notesPanel, /const noteHtml = \(note: CoursePlayerNote\) => note\.html \|\| plainToRichText\(note\.text \|\| ""\)/);
 });
 
 test("The editor renders pasted formatting correctly inside the panel", () => {

@@ -947,13 +947,34 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // called unconditionally (React's rules of hooks) and treats a missing
   // module id as "nothing to load yet".
   const moduleIdByFileId = useMemo(() => collectModuleIdByFileId(modules), [modules]);
-  const activeMindMapModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] : undefined;
+  const activeMindMapModuleId = selectedFile
+    ? moduleIdByFileId[String(selectedFile.id)] || selectedFile.personalModuleId || undefined
+    : undefined;
+
+  // Personal curriculum is lazy by design. Load it only when a visible note or
+  // active personal map needs real breadcrumbs; ordinary course playback
+  // keeps its zero-request path.
+  useEffect(() => {
+    const personalNoteContextNeeded = dockTab === "notes" && notesCtl.notes.some(
+      (note) => Boolean(note.personalModuleId || note.personalResourceId),
+    );
+    const personalMapContextNeeded = dockTab === "mindmap" && Boolean(selectedFile?.personalModuleId);
+    if (personalNoteContextNeeded || personalMapContextNeeded) {
+      void personalModules.ensureLoaded();
+    }
+  }, [dockTab, notesCtl.notes, selectedFile?.personalModuleId, personalModules.ensureLoaded]);
+
   // ── Per-module Brain practice ───────────────────────────────────────────
   // The Brain tab follows the module of the lesson being watched, exactly
   // like the mind map above: same module ⇒ same practice sets, and the tab
   // can be re-scoped by hand from its own module chip row.
   const activeBrainModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] ?? null : null;
-  const activeMindMapModuleTitle = activeMindMapModuleId ? moduleTitleById[activeMindMapModuleId] || "" : "";
+  const personalMapModule = activeMindMapModuleId
+    ? personalModules.modules.find((module) => String(module.id) === String(activeMindMapModuleId))
+    : undefined;
+  const activeMindMapModuleTitle = activeMindMapModuleId
+    ? moduleTitleById[activeMindMapModuleId] || personalMapModule?.title || ""
+    : "";
   const mindMap = useCourseMindMap({
     uid: user?.id,
     productId: storageProductId,
@@ -1303,7 +1324,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // Notes are rich text. The HTML is sanitised on the way in (so a paste from
   // any site is safe) while keeping the exact formatting, and a plain-text
-  // projection is stored alongside it for the thin saved-note strip.
+  // projection is stored alongside it for safe card titles and context previews.
   //
   // Persistence itself belongs to `useCourseNotes`: every mutation below lands
   // in Firestore (`users/{uid}/notes/{noteId}`) AND in the localStorage mirror,
@@ -1314,7 +1335,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (!user) return;
     const safeHtml = sanitizeRichText(html);
     if (isEmptyRichText(safeHtml)) return;
-    const saved = notesCtl.add(safeHtml, { text: richTextToPlain(safeHtml) });
+    const selectedModuleId = selectedFile
+      ? moduleIdByFileId[String(selectedFile.id)] || selectedFile.personalModuleId
+      : undefined;
+    const saved = notesCtl.add(safeHtml, {
+      text: richTextToPlain(safeHtml),
+      ...(selectedModuleId ? { moduleId: String(selectedModuleId) } : {}),
+      ...(selectedFile ? { resourceId: String(selectedFile.id) } : {}),
+      ...(selectedFile?.personalModuleId ? { personalModuleId: String(selectedFile.personalModuleId) } : {}),
+      ...(selectedFile?.personalResourceId ? { personalResourceId: String(selectedFile.personalResourceId) } : {}),
+    });
     if (saved) playSfxAdd();
   };
 
@@ -1627,6 +1657,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       tab={dockTab}
       onTabChange={handleDockTabChange}
       modules={modules}
+      courseTitle={product.title}
+      personalModules={personalModules.modules}
       productId={String(product.id)}
       // Read tab → "Save to my module": the learner's own PDF becomes a
       // My Study Library resource through the same dialog the Player
@@ -1649,7 +1681,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
       onLinkNote={(id, links) => linkNote(id, links)}
-      notesSync={{ status: notesCtl.status, synced: notesCtl.synced }}
+      notesSync={{ status: notesCtl.status, synced: notesCtl.synced, errorMessage: notesCtl.errorMessage }}
+      onRetryNotes={notesCtl.reload}
       // The mind map editor is owned here (not inside the overlay) so its
       // Firestore hook and canvas state survive the pane being collapsed and
       // reopened — the learner never loses an unsaved branch to a tab switch.
@@ -1678,6 +1711,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onDeleteMap={mindMap.deleteMap}
           mapsLoading={mindMap.mapsLoading}
           atMapLimit={mindMap.atMapLimit}
+          courseTitle={product.title}
+          modules={modules}
+          moduleId={activeMindMapModuleId}
+          personalModules={personalModules.modules}
+          onRetryMaps={mindMap.reload}
           landscape={useLandscapeRails}
           // True only while the mind map tab is the one on screen. Within one
           // player visit the panel restores the learner's last view (library

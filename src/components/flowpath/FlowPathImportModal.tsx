@@ -139,7 +139,8 @@ export default function FlowPathImportModal({ open, uid, onClose, onCreated }: P
   if (typeof document === "undefined" || !open) return null;
 
   return createPortal(
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {open && (
         <motion.div
           className="fixed inset-0 z-[85] flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6 lg:p-8"
@@ -340,7 +341,23 @@ export default function FlowPathImportModal({ open, uid, onClose, onCreated }: P
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>,
+      </AnimatePresence>
+      <TestBankLimitGate
+        open={Boolean(bankGate)}
+        bank={bankGate}
+        onClose={() => setBankGate(null)}
+        onManageBank={() => {
+          setBankGate(null);
+          onClose();
+          window.location.hash = "#/revision/bank";
+        }}
+        onExplorePlans={() => {
+          setBankGate(null);
+          onClose();
+          window.location.hash = "#/subscription";
+        }}
+      />
+    </>,
     document.body
   );
 }

@@ -43,6 +43,8 @@ const overlay = readSource("src/course/CourseOverlay.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
+const resourceCard = readSource("src/course/StudyResourceCard.tsx");
+const resourceCardStyles = readSource("src/course/study-resource-card.css");
 const notesStore = readSource("src/course/notesStore.ts");
 const notesHook = readSource("src/course/useCourseNotes.ts");
 const notesCloud = readSource("src/course/cloudNotes.ts");
@@ -187,24 +189,25 @@ test("NotesPanel supports add, edit, and delete via a single + button", () => {
   assert.match(notesPanel, /data-course-note-edit-input/);
   assert.match(notesPanel, /data-course-note-edit-save/);
   assert.match(notesPanel, /data-course-note-edit-cancel/);
-  assert.match(notesPanel, /data-course-note-delete/);
+  assert.match(resourceCard, /data-course-note-delete/);
+  assert.match(notesPanel, /onOpen=\{\(\) => startEdit\(note\)\}/);
 });
 
-test("NotesPanel renders an empty library bare — the circular + is the only add affordance", () => {
+test("NotesPanel renders responsive study-resource cards and matching library states", () => {
   assert.match(notesPanel, /data-course-notes-list/);
   assert.match(notesPanel, /data-course-notes-grid/);
-  // Owner's direction: an EMPTY notes library renders no top instruction pill
-  // / rectangular add button at all — the page keeps only the circular "+"
-  // at the grid's bottom-right (data-course-notes-add below).
-  assert.doesNotMatch(notesPanel, /No notes yet/);
-  assert.match(notesPanel, /notes\.length > 0 \? \(/);
-  assert.match(notesPanel, /data-course-note/);
-  assert.match(notesPanel, /aspect-square/);
-  assert.match(notesPanel, /grid-cols-2/);
-  assert.match(notesPanel, /function PremiumEditIcon/);
-  assert.match(notesPanel, /function PremiumDeleteIcon/);
-  assert.doesNotMatch(notesPanel, /<Pencil /);
-  assert.doesNotMatch(notesPanel, /<Trash2 /);
+  assert.match(notesPanel, /StudyResourceCard/);
+  assert.match(notesPanel, /StudyResourceCardSkeleton/);
+  assert.match(notesPanel, /StudyLibraryEmptyState/);
+  assert.match(notesPanel, /StudyLibraryNotice/);
+  assert.match(resourceCard, /data-course-note-delete/);
+  assert.match(resourceCard, /data-course-note-open/);
+  assert.match(resourceCard, /data-study-resource-title/);
+  assert.match(resourceCardStyles, /min-height: 212px/);
+  assert.match(resourceCardStyles, /font-size: 17px/);
+  assert.doesNotMatch(notesPanel, /aspect-square/);
+  assert.doesNotMatch(notesPanel, /grid-cols-2/);
+  assert.doesNotMatch(notesPanel, /PremiumEditIcon|PremiumDeleteIcon/);
 });
 
 test("The single + button is a circular button in the panel's grid, not a header", () => {

@@ -141,7 +141,6 @@ import {
   Maximize,
   MousePointerClick,
   Network,
-  Pencil,
   Plus,
   Rows3,
   Sparkles,
@@ -169,10 +168,12 @@ import {
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
+import type { CourseModule } from "../types/course";
+import type { PersonalCourseModule } from "../types/personalCourse";
 import { GlassSurface } from "../components/ui/glass";
-import { GlassButton } from "../components/ui/glass-button";
-import { GlassCard } from "../components/ui/GlassCard";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
+import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
+import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./studyResourceContext";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 
@@ -975,6 +976,13 @@ export interface MindMapPanelProps {
   mapsLoading?: boolean;
   /** True when the module already holds the maximum number of maps. */
   atMapLimit?: boolean;
+  /** Existing course and module trees feed the library's breadcrumb. */
+  courseTitle?: string;
+  modules?: CourseModule[];
+  moduleId?: string | null;
+  personalModules?: PersonalCourseModule[];
+  /** Retry an unsuccessful library read without rebuilding its local mirror. */
+  onRetryMaps?: () => void;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
@@ -994,6 +1002,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onDeleteMap,
     mapsLoading = false,
     atMapLimit = false,
+    courseTitle = "",
+    modules = [],
+    moduleId,
+    personalModules = [],
+    onRetryMaps,
   } = props;
   /** The map library sheet (grid of this module's maps) is the HOME screen:
    *  it is open by default (fresh player entry) so the learner picks a map to
@@ -1004,8 +1017,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const [libraryOpen, setLibraryOpen] = useState(
     () => getCoursePanelSession().mindMapView !== "canvas",
   );
-  const [renamingKey, setRenamingKey] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Deletion is always gated behind a confirmation overlay — a branch (toolbar
@@ -1101,8 +1112,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     if (open && !prevOpenRef.current) {
       const resumeCanvas = getCoursePanelSession().mindMapView === "canvas";
       setLibraryOpen(!resumeCanvas);
-      setRenamingKey(null);
-      setRenameDraft("");
       if (!resumeCanvas) {
         setSelectedId(null);
         setEditingId(null);
@@ -1342,7 +1351,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const openMap = useCallback(
     (mapKey: string) => {
       if (mapKey !== activeMapKey) onSelectMap?.(mapKey);
-      setRenamingKey(null);
       setLibraryOpen(false);
       setSelectedId(null);
       setEditingId(null);
@@ -1351,19 +1359,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     },
     [activeMapKey, onSelectMap],
   );
-
-  const startRename = useCallback((entry: MindMapSummary) => {
-    setRenamingKey(entry.mapKey);
-    setRenameDraft(entry.title || entry.rootTopic || "");
-  }, []);
-
-  const commitRename = useCallback(() => {
-    const key = renamingKey;
-    const name = renameDraft.trim();
-    setRenamingKey(null);
-    setRenameDraft("");
-    if (key && name) onRenameMap?.(key, name);
-  }, [renamingKey, renameDraft, onRenameMap]);
 
   // The root can never be deleted, so the toolbar trash only arms itself for
   // a real branch selection.
@@ -1567,6 +1562,21 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const save = SAVE_COPY[status] || SAVE_COPY.idle;
   const levels = maxDepth(mind);
   const totalNodes = countNodes(mind);
+  const courseHierarchy = useMemo(
+    () => resolveCourseResourceContext(modules, moduleId),
+    [modules, moduleId],
+  );
+  const personalHierarchy = useMemo(
+    () => resolvePersonalResourceContext(personalModules, moduleId),
+    [personalModules, moduleId],
+  );
+  const isPersonalModule = courseHierarchy.modulePath.length === 0 && personalHierarchy.modulePath.length > 0;
+  const libraryContextPath = [
+    courseTitle,
+    ...(isPersonalModule ? ["My Modules", ...personalHierarchy.modulePath] : courseHierarchy.modulePath),
+  ].filter(Boolean);
+  const hasCachedMapIndex = maps.some((entry) => entry.updatedAt > 0 || entry.createdAt > 0 || entry.mapKey !== "main");
+  const showMapSkeleton = mapsLoading && !hasCachedMapIndex;
 
   return (
     <div
@@ -2006,116 +2016,81 @@ function MindMapCanvas(props: MindMapPanelProps) {
           </div>
         ) : null}
 
-        {/* ── Map library ───────────────────────────────────────────────────
-            The Notes panel keeps a grid of separate notes; a module keeps a
-            grid of separate MIND MAPS the same way. It slides over the canvas
-            (rather than living in a header) so the diagram surface stays
-            completely clean when the library is closed. Each card opens its
-            map on tap, and carries its own rename / delete actions. */}
+        {/* ── Shared study-resource library ────────────────────────────────
+            The library is the home screen for the module's saved maps. A
+            resource card opens the canvas anywhere on its surface; a
+            double-click/double-tap title gesture enters inline rename. */}
         {libraryOpen ? (
           <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
-            {/* No header — the grid starts at the very top, and the circular
-                "+" floats at the bottom-right. Tapping any card (including
-                the open one) returns to the canvas, so no close button is
-                needed. */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-16">
-              {/* While the index is still loading, show skeletons instead of a
-                  fake single card — the grid is this panel's first screen, so
-                  it should never look emptier than it really is. */}
-              {mapsLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true">
-                  {[0, 1, 2].map((index) => (
-                    <div
-                      key={index}
-                      className="aspect-square animate-pulse rounded-2xl bg-[var(--mm-soft)] ring-1 ring-[var(--mm-border)]"
-                    />
-                  ))}
-                </div>
-              ) : (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list data-course-mindmap-map-grid="true">
-                {maps.map((entry) => {
-                  const active = entry.mapKey === activeMapKey;
-                  const renaming = renamingKey === entry.mapKey;
-                  return (
-                    <li key={entry.mapKey} className="relative aspect-square min-h-[104px]">
-                    <GlassCard
-                      className="h-full w-full [&>div:last-child]:flex [&>div:last-child]:h-full [&>div:last-child]:flex-col [&>div:last-child]:p-2.5"
-                      data-course-mindmap-map-card
-                      data-map-key={entry.mapKey}
-                      data-active={active ? "true" : "false"}
-                    >
-                      {renaming ? (
-                        <input
-                          value={renameDraft}
-                          onChange={(event) => setRenameDraft(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") commitRename();
-                            if (event.key === "Escape") { setRenamingKey(null); setRenameDraft(""); }
-                          }}
-                          onBlur={commitRename}
-                          autoFocus
-                          maxLength={120}
-                          className="dc-field w-full rounded-full px-2.5 py-1 text-[11px] font-bold text-white outline-none ring-1 ring-violet-400/60"
-                          aria-label="Map ka naam"
-                          data-course-mindmap-rename-input
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openMap(entry.mapKey)}
-                          className="flex min-h-0 w-full flex-1 items-center justify-center px-1 text-center"
-                          data-course-mindmap-open-map={entry.mapKey}
-                        >
-                          {/* The card shows ONLY the map's primary (central)
-                              node text — exactly what is written on the
-                              centre box — so the library reads like the maps
-                              themselves, not their auto "Mind map 3" names. */}
-                          <p className="line-clamp-4 text-[12px] font-black leading-snug text-[var(--mm-text)]">
-                            {entry.rootTopic || entry.title || "Untitled map"}
-                          </p>
-                        </button>
-                      )}
-                      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
-                        {renaming ? (
-                          <GlassButton
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={commitRename}
-                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-emerald-300"
-                            aria-label="Naam save karein"
-                            data-course-mindmap-rename-save
-                          >
-                            <Check size={13} />
-                          </GlassButton>
-                        ) : (
-                          <GlassButton
-                            onClick={() => startRename(entry)}
-                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
-                            aria-label="Map rename karein"
-                            data-course-mindmap-rename
-                          >
-                            <Pencil size={12} />
-                          </GlassButton>
-                        )}
-                        <GlassButton
-                          onClick={() => requestMapDelete(entry.mapKey)}
-                          className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
-                          aria-label="Map delete karein"
-                          title="Yeh mind map delete karein"
-                          data-course-mindmap-delete-map
-                        >
-                          <Trash2 size={12} />
-                        </GlassButton>
-                      </div>
-                    </GlassCard>
-                    </li>
-                  );
-                })}
-              </ul>
-              )}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-16" data-course-mindmap-map-list>
+              <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+                {mapsLoading && hasCachedMapIndex ? (
+                  <StudyLibraryNotice
+                    state="loading"
+                    title="Checking your map library"
+                    message="Your saved maps stay available while cloud sync finishes."
+                  />
+                ) : null}
+                {status === "error" ? (
+                  <StudyLibraryNotice
+                    state="error"
+                    title="Mind map sync needs attention"
+                    message={errorMessage || "Your local map copy stays available. Try again when your connection is ready."}
+                    onRetry={() => { onRetryMaps?.(); onFlush?.(); }}
+                  />
+                ) : null}
+
+                {showMapSkeleton ? (
+                  <ul className="grid min-w-0 gap-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true" data-study-resource-grid aria-busy="true">
+                    {[0, 1, 2].map((index) => (
+                      <li key={index} className="min-w-0 min-h-[212px]">
+                        <StudyResourceCardSkeleton kind="mind-map" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : maps.length > 0 ? (
+                  <ul className="grid min-w-0 gap-3" data-course-mindmap-map-grid="true" data-study-resource-grid>
+                    {maps.map((entry) => {
+                      const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
+                      const rootTopic = entry.rootTopic.trim();
+                      return (
+                        <li key={entry.mapKey} className="min-w-0 min-h-[212px]">
+                          <StudyResourceCard
+                            kind="mind-map"
+                            resourceId={entry.mapKey}
+                            title={title}
+                            contextPath={libraryContextPath}
+                            topic={rootTopic && rootTopic !== title ? rootTopic : undefined}
+                            topicLabel="Root topic"
+                            metadata={[`${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`]}
+                            sourceLabel="Self"
+                            updatedAt={entry.updatedAt}
+                            createdAt={entry.createdAt}
+                            active={entry.mapKey === activeMapKey}
+                            onOpen={() => openMap(entry.mapKey)}
+                            onRename={(nextTitle) => onRenameMap?.(entry.mapKey, nextTitle)}
+                            onDelete={() => requestMapDelete(entry.mapKey)}
+                            deleteLabel={`Delete mind map ${title}`}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : status === "error" ? (
+                  <StudyLibraryEmptyState
+                    kind="mind-map"
+                    title="No cloud map could be confirmed"
+                    description="Retry sync to load your latest mind maps. Local copies remain safe on this device."
+                  />
+                ) : (
+                  <StudyLibraryEmptyState
+                    kind="mind-map"
+                    title="Choose a module to map"
+                    description="Open a course module to see its mind maps, or start a map with the + button when a module is selected."
+                  />
+                )}
+              </div>
             </div>
-            {/* The one "+" — a small circular button floating at the grid's
-                bottom-right. It starts a fresh map and drops straight onto
-                its canvas. */}
             <button
               type="button"
               onClick={() => {
@@ -2124,13 +2099,13 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 setSelectedId(null);
                 setEditingId(null);
               }}
-              disabled={atMapLimit || !onCreateMap}
-              className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40"
-              aria-label="Naya mind map banayein"
-              title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
+              disabled={atMapLimit || !onCreateMap || !moduleId}
+              className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
+              aria-label="Create a mind map"
+              title={atMapLimit ? "This module has reached its map limit" : "New mind map"}
               data-course-mindmap-new
             >
-              <Plus size={18} strokeWidth={2.8} />
+              <Plus size={19} strokeWidth={2.8} />
             </button>
           </div>
         ) : null}

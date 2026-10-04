@@ -414,21 +414,19 @@
 }
 
 /* ── 9. Notes: the notes wall ──────────────────────────────────────────────
-   Cards sit on the room's row plate with an amber hairline — the notes wall's
-   accent — and a card in focus takes the amber wash, which is how the room
-   said "this is the one you are writing in". The card's own GlassCard layers
-   stay on top; only the plate under them changes. */
-.course-player-shell [data-course-notes-grid] [data-course-note] {
+   Resource cards share a structure, with the note accent kept amber. */
+.course-player-shell [data-course-notes-grid] [data-course-note].study-resource-card {
+  --resource-accent: var(--dc-flat-amber);
+  --resource-accent-soft: var(--dc-flat-amber-wash);
+  --resource-accent-line: var(--dc-flat-amber-line);
   background-color: var(--dc-flat-row);
   box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
   outline-color: var(--dc-flat-amber-line);
 }
-.course-player-shell [data-course-notes-grid] [data-course-note]:focus-within {
-  background-color: var(--dc-flat-amber-wash);
+.course-player-shell [data-course-notes-grid] [data-course-note].study-resource-card[data-active="true"] {
   box-shadow:
     inset 0 0 0 1px var(--dc-flat-amber-line),
     0 0 24px -8px rgba(245, 158, 11, 0.6);
-  outline-color: var(--dc-flat-amber);
 }
 /* The writing surface itself is the board's near-black — the room's most
    restful plate, and the reason long notes stopped fighting the scene. */
@@ -452,11 +450,8 @@
 }
 
 /* ── 10. Mind map: the mind wall ───────────────────────────────────────────
-   The library overlay is the room's floating chooser, so it wears the
-   RoomSheet material: the two-stop navy gradient, the deep blur, the inset
-   hairline and the violet bloom behind it. The map cards keep their own
-   tinted pack material (their colours are semantic), and only the card that
-   is OPEN right now gets the violet ring the room used. */
+   The library overlay is the room's floating chooser. Its cards share the
+   study-resource layout while keeping the violet mind-map accent. */
 .course-player-shell [data-course-mindmap-library] {
   background-color: rgba(8, 11, 22, 0.96);
   background-image: var(--dc-flat-sheet);
@@ -466,12 +461,15 @@
     var(--dc-flat-sheet-shadow),
     0 0 60px -18px var(--dc-flat-violet-deep);
 }
-.course-player-shell [data-course-mindmap-map-card] {
+.course-player-shell [data-course-mindmap-map-card].study-resource-card {
+  --resource-accent: var(--dc-flat-violet);
+  --resource-accent-soft: var(--dc-flat-violet-wash);
+  --resource-accent-line: var(--dc-flat-violet-line);
   box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
 }
-.course-player-shell [data-course-mindmap-map-card][data-active="true"] {
+.course-player-shell [data-course-mindmap-map-card].study-resource-card[data-active="true"] {
   box-shadow:
-    inset 0 0 0 1px rgba(167, 139, 250, 0.6),
+    inset 0 0 0 1px var(--dc-flat-violet-line),
     0 0 22px -6px rgba(139, 92, 246, 0.55);
 }
 /* The map's node/level readout is the room's white/45 sub-ink. (It is a bare

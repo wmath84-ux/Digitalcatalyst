@@ -115,7 +115,7 @@ import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlis
 import type { PaidCourseUpdate } from "./types/course";
 import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
-import { setThemeColor, syncSystemThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
+import { syncSystemThemeColor } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit, ROUTE_HISTORY_KEY } from "./utils/routeHistory";
 import { captureExcalidrawLibraryReturn } from "../utils/excalidrawLibraryLink.js";
@@ -171,7 +171,6 @@ import {
   scheduleLocalAlarm,
   cancelLocalAlarms,
   getAndroidLargeIconForCategory,
-  getAndroidLargeIconForTag,
   type LocalAlarmItem,
 } from "./utils/capacitorBridge";
 
@@ -799,7 +798,6 @@ function RootPage(): ReactNode {
   // announcement and the dark status bar — and deliberately does NOT gate the
   // page tree on it: every screen renders underneath the opening, so the
   // reveal is instant and no re-render can abort the clip.
-  const openingVisible = useOpeningSplashVisible();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Installed app (mobile PWA or the Capacitor APK): never show the

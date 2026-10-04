@@ -17,6 +17,7 @@ import fs from "node:fs";
 
 const notesPanel = fs.readFileSync("src/course/NotesPanel.tsx", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
+const resourceCardCss = fs.readFileSync("src/course/study-resource-card.css", "utf8");
 
 test("a saved note card has no hardcoded white inline background", () => {
   // The card <li> used to carry style={{ background: "#ffffff", … }} which
@@ -40,17 +41,20 @@ test("the note card surface + text are theme-variable driven", () => {
   assert.doesNotMatch(indexCss, /data-course-theme="light"/);
 });
 
-test("the card preview pins the theme text colour", () => {
-  const preview = indexCss.match(/\.course-note-card-preview \{[\s\S]*?\}/);
-  assert.ok(preview, "the preview rule exists");
-  assert.match(preview[0], /color:\s*var\(--course-text\)/);
+test("the shared resource-card title and note accents stay readable on the player plate", () => {
+  const title = resourceCardCss.match(/\.study-resource-card__title \{[\s\S]*?\}/);
+  assert.ok(title, "the shared resource title rule exists");
+  assert.match(title[0], /color: #fff/);
+  assert.match(title[0], /font-size: clamp\(16px/);
+  assert.match(resourceCardCss, /\.study-resource-card--note \{[\s\S]*?--resource-accent: #f5ad42/);
 });
 
-test("the empty-state pill is gone — an empty library renders bare", () => {
-  // Owner's direction: the notes library's add-new-note affordance is the
-  // circular "+" alone (bottom-right of the grid). The old top instruction
-  // pill was removed, so its theme-variable (and hardcoded) variants must
-  // not come back either.
+test("empty, loading and sync-error states use the shared study-library system", () => {
+  assert.match(notesPanel, /StudyLibraryEmptyState/);
+  assert.match(notesPanel, /StudyLibraryNotice/);
+  assert.match(notesPanel, /StudyResourceCardSkeleton/);
+  assert.match(resourceCardCss, /\.study-library-empty \{/);
+  assert.match(resourceCardCss, /\.study-library-notice \{/);
   assert.doesNotMatch(notesPanel, /No notes yet/);
   assert.doesNotMatch(notesPanel, /border-\[var\(--course-border\)\]/);
   assert.doesNotMatch(notesPanel, /bg-\[var\(--course-soft\)\]/);

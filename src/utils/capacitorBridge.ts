@@ -187,10 +187,7 @@ async function renderForegroundPush(notification: PushNotificationSchema) {
     const tag = String(data.tag || notification.notification?.tag || "");
     const category = String((data as any).category || "");
     const section = String((data as any).section || "");
-    const largeIcon = (data as any).largeIcon || data.icon
-      ? getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png" ? getAndroidLargeIconForTag(tag) : getAndroidLargeIconForCategory(category, section)
-      : getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png" ? getAndroidLargeIconForTag(tag) : getAndroidLargeIconForCategory(category, section);
-    // If data.icon is brand logo, keep it as fallback but prefer contextual
+    // Prefer the contextual notification icon to any generic brand-icon fallback.
     const contextualIcon = getAndroidLargeIconForTag(tag) !== "/notif-icons/default.png"
       ? getAndroidLargeIconForTag(tag)
       : category ? getAndroidLargeIconForCategory(category, section) : getAndroidLargeIconForTag(tag);

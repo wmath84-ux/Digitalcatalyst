@@ -54,6 +54,7 @@ import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
+import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { EASE_OUT_MOTION } from "./splitMotion";
@@ -297,6 +298,9 @@ interface CourseOverlayProps {
    *  tab: the Split Deck peek-collapses the study pane (its toggleStudy). */
   onTabChange: (tab: DockTab) => void;
   modules: CourseModule[];
+  courseTitle?: string;
+  /** Already-loaded learner-owned hierarchy for personal-resource notes. */
+  personalModules?: PersonalCourseModule[];
   /** Product document id binds Read uploads and page-position storage. */
   productId?: string;
   selectedFileId?: string;
@@ -314,8 +318,13 @@ interface CourseOverlayProps {
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
   onLinkNote: (id: string, links: string[]) => void;
-  /** The notes hook's live state — drives the editor's Saving… / Synced chip. */
-  notesSync?: { status: "idle" | "loading" | "ready" | "saving" | "saved" | "error"; synced: boolean };
+  /** The notes hook's live state — drives editor sync state and library errors. */
+  notesSync?: {
+    status: "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+    synced: boolean;
+    errorMessage?: string | null;
+  };
+  onRetryNotes?: () => void;
   // Mind map wiring. The panel itself is owned by the parent (it holds the
   // Firestore hook), so the pane only hosts it — this keeps the overlay
   // presentational and lets the map survive tab switches.
@@ -871,6 +880,10 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onAdd={props.onAddNote}
           onEdit={props.onEditNote}
           onDelete={props.onDeleteNote}
+          courseTitle={props.courseTitle}
+          modules={props.modules}
+          personalModules={props.personalModules}
+          onRetrySync={props.onRetryNotes}
           syncState={props.notesSync}
         />
       }

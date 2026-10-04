@@ -33,6 +33,7 @@ const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const pnpmLock = read("pnpm-lock.yaml");
 const notesPanel = read("src/course/NotesPanel.tsx");
+const resourceCard = read("src/course/StudyResourceCard.tsx");
 const editor = read("src/course/NoteEditor.tsx");
 const toolbar = read("src/course/NoteEditorToolbar.tsx");
 const factory = read("src/course/noteEditor/editorFactory.ts");
@@ -142,7 +143,7 @@ test("the subtle status chip: Unsaved · Saving… · Saved · Synced, fed by th
   for (const label of ["Unsaved", "Saving…", "Synced", "Saved"]) assert.match(notesPanel, new RegExp(`"${label}"`));
   assert.match(notesPanel, /role="status"/);
   assert.match(overlay, /syncState=\{props\.notesSync\}/);
-  assert.match(player, /notesSync=\{\{ status: notesCtl\.status, synced: notesCtl\.synced \}\}/);
+  assert.match(player, /notesSync=\{\{ status: notesCtl\.status, synced: notesCtl\.synced, errorMessage: notesCtl\.errorMessage \}\}/);
 });
 
 // ── 3. Engine behaviour ────────────────────────────────────────────────────
@@ -204,16 +205,16 @@ test("the schema, links and paste are the player's: safe rich/plain normalizatio
   assert.match(commands, /tr\.setMeta\("addToHistory", false\)/);
 });
 
-test("KaTeX renders only at bounded math nodes and memoized note previews", () => {
-  assert.match(notesPanel, /import "katex\/dist\/katex\.min\.css"/);
-  assert.match(notesPanel, /const NoteCardPreview = memo\(/);
-  assert.match(notesPanel, /renderNoteHtmlWithMath\(html\)/);
+test("math rendering stays bounded while resource-card identity uses safe text", () => {
   assert.match(mathRendering, /katex\.renderToString/);
   assert.match(mathRendering, /trust: false/);
   assert.match(mathRendering, /maxExpand: 500/);
   assert.match(mathRendering, /CACHE_LIMIT = 256/);
   assert.match(mathRendering, /NOTE_PREVIEW_CACHE_LIMIT = 64/);
   assert.match(noteMath, /MAX_NOTE_MATH_SOURCE_LENGTH = 4096/);
+  assert.match(notesPanel, /firstRichTextBlock\(html\)/);
+  assert.match(resourceCard, /data-study-resource-topic/);
+  assert.doesNotMatch(notesPanel, /dangerouslySetInnerHTML/);
   assert.doesNotMatch(mathRendering, /renderMathInElement|renderMathInDocument/);
 });
 

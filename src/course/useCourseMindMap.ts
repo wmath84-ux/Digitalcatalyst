@@ -84,6 +84,8 @@ export interface UseCourseMindMapResult {
   lastSavedAt: number | null;
   /** Flush any pending edit immediately (used on unmount / tab close). */
   flush: () => void;
+  /** Retry failed map/index reads from the library's error state. */
+  reload: () => void;
   /** True until the first Firestore read settles, so the UI can show a skeleton. */
   loading: boolean;
   /** True when the doc was loaded from Firestore rather than started empty. */
@@ -664,6 +666,8 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     for (const key of scope.deletes) deleteRef.current(scope, key);
   }, [session, retryReads]);
 
+  const reload = useCallback(() => retryReads(session), [session, retryReads]);
+
   const selectMap = useCallback((mapKey: string) => {
     const scope = session;
     const key = sanitizeMapKey(mapKey);
@@ -787,5 +791,6 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     hasStoredMap: active.hasStoredMap, maps, activeMapKey: session.activeMapKey,
     selectMap, createMap, renameMap, deleteMap, mapsLoading: session.mapsLoading,
     atMapLimit: maps.length >= MAX_MAPS_PER_MODULE,
-  }), [session, active, version, status, maps, setMind, flush, selectMap, createMap, renameMap, deleteMap]);
+    reload,
+  }), [session, active, version, status, maps, setMind, flush, selectMap, createMap, renameMap, deleteMap, reload]);
 }

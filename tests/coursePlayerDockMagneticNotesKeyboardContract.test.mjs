@@ -479,7 +479,7 @@ test("The split surfaces are built from the player's own glass tokens", () => {
 });
 
 test("Notes, mind map and the Player panel keep their tiling inside the pane", () => {
-  assert.match(styles, /\[data-course-overlay\] \[data-course-notes-grid\],\s*\n\[data-course-study-pane\] \[data-course-notes-grid\] \{/);
+  assert.match(styles, /\[data-course-notes-grid\],\s*\n\[data-course-mindmap-map-grid\]\s*\{\s*grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, 260px\), 1fr\)\)/);
   assert.match(studyPanels, /data-solid-panel=\{solid \? "true" : "false"\}/);
   // The sketch canvas is opaque for the same reason the notes grid is: a
   // frosted pane behind a drawing surface is unreadable.

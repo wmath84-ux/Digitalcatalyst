@@ -68,7 +68,7 @@ test("the player's own keyboard shortcuts keep priority over the editor's", () =
 // ---------------------------------------------------------------------------
 
 test("Sketch is one more entry in the existing tab infrastructure", () => {
-  assert.match(overlay, /export type DockTab =[^;]*\| "sketch";/);
+  assert.match(overlay, /export type DockTab =[^;]*\| "sketch" \| "read";/);
   assert.match(overlay, /\{ key: "sketch", label: "Sketch",[\s\S]*?color: "#F97316", icon: PenLine \}/);
   // The dock items and the tab order are still derived from the ONE list.
   assert.match(overlay, /export const STUDY_TAB_ORDER: DockTab\[\] = TABS\.map\(\(\{ key \}\) => key\);/);

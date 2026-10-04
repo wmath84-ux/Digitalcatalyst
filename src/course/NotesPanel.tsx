@@ -2,18 +2,16 @@
 //
 // Course Player notes panel.
 //
-//   - The single "+" button (a small circular button floating at the
-//     grid's bottom-right) opens the note editor — a white block-document
-//     page (BlockNote, see ./NoteEditor) that fills the notes pane, so long
-//     notes are comfortable to read while writing. The panel renders no header
-//     rows in the list; while the editor is open the pane is a slim bar
-//     (status · Cancel · Save), then the page, so the writing surface gets
-//     every other pixel.
-//   - "Save" collapses the note back into a square card in a grid — the
-//     big surface is an editing affordance only, it never changes how a
-//     saved note looks in the list.
-//   - The edit icon reopens that same large editor inline.
-//   - Delete removes the note.
+//   - Saved notes use the shared premium study-resource card from
+//     ./StudyResourceCard: a single activation opens the existing BlockNote
+//     editor, while a double-click/double-tap or keyboard shortcut renames the
+//     note inline. The compact responsive grid shows real course hierarchy,
+//     note context, provenance and timestamps without truncating the identity.
+//   - The single "+" button opens the same white block-document page
+//     (BlockNote, see ./NoteEditor) that fills the notes pane. While the editor
+//     is open the pane is a slim bar (status · Cancel · Save), then the page.
+//   - Delete remains a two-step action from the card and is confirmed before
+//     the note is removed.
 //   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) is
 //     sanitised and imported as blocks; what the editor cannot hold (tables,
 //     images, …) is preserved verbatim, never dropped.
@@ -35,19 +33,19 @@
 // session — the next visit starts on the notes list, exactly like the mind
 // map restarts on its library.
 
-import { Component, Suspense, lazy, memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";
 import "katex/dist/katex.min.css";
-import { GlassButton } from "../components/ui/glass-button";
-import { GlassCard } from "../components/ui/GlassCard";
-import type { CoursePlayerNote } from "../types/course";
+import type { CourseModule, CoursePlayerNote } from "../types/course";
+import type { PersonalCourseModule } from "../types/personalCourse";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
-import { renderNoteHtmlWithMath } from "./noteEditor/mathRendering";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
+import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
+import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./studyResourceContext";
 import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
 
 // The editor (BlockNote + its stylesheet) is a separate chunk: the player and
@@ -63,6 +61,12 @@ interface NotesPanelProps {
   onAdd: (html: string) => void;
   onEdit: (id: string, html: string) => void;
   onDelete: (id: string) => void;
+  courseTitle?: string;
+  /** The existing course tree; the library resolves note ids back to real ancestors. */
+  modules?: CourseModule[];
+  /** Existing learner-owned curriculum tree, when it has already been loaded. */
+  personalModules?: PersonalCourseModule[];
+  onRetrySync?: () => void;
   /** Lets the overlay grow the sheet while the big editor is open. */
   onEditorOpenChange?: (open: boolean) => void;
   /**
@@ -75,47 +79,45 @@ interface NotesPanelProps {
    * Saving… / Synced indicator while a note is open. Optional: without it the
    * indicator only distinguishes Unsaved from Saved.
    */
-  syncState?: { status: "idle" | "loading" | "ready" | "saving" | "saved" | "error"; synced: boolean };
+  syncState?: {
+    status: "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+    synced: boolean;
+    errorMessage?: string | null;
+  };
 }
 
 // Older notes were stored as plain text. Render them through the same
-// pipeline so nothing in the list ever disappears after the upgrade.
+// pipeline so nothing in the library ever disappears after the upgrade.
 const noteHtml = (note: CoursePlayerNote) => note.html || plainToRichText(note.text || "");
 const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) || note.text || "";
 
-// A saved card shows ONLY the note's first heading (or its first line of
-// text), in its original format, centred in the square — the full note is
-// one tap away in the editor. This child is memoized so typing in another
-// note does not rerun normalization or KaTeX for every saved card.
-const NoteCardPreview = memo(function NoteCardPreview({ sourceHtml, preview }: { sourceHtml: string; preview: string }) {
-  const html = firstRichTextBlock(sourceHtml) || preview;
-  return (
-    <div
-      className="course-note-card-preview min-h-0 w-full flex-1"
-      title={preview}
-      data-course-note-preview
-      dangerouslySetInnerHTML={{ __html: renderNoteHtmlWithMath(html) }}
-    />
-  );
-});
+const noteCardTitle = (note: CoursePlayerNote) => {
+  const html = noteHtml(note);
+  const { heading } = splitFirstHeading(html);
+  const firstBlock = richTextToPlain(firstRichTextBlock(html));
+  return (heading || firstBlock || notePreview(note) || `Untitled · ${String(note.id).slice(0, 8)}`).trim().slice(0, 120);
+};
 
-/** Filled, high-contrast action marks — heavier than the old outline icons. */
-function PremiumEditIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M16.1 2.6a2.8 2.8 0 0 1 4 4L9.4 17.3l-5.2 1.5 1.5-5.2L16.1 2.6Z" />
-      <path d="M3.2 20.2h17.6v2.2H3.2z" />
-    </svg>
-  );
-}
+const noteCardTopic = (note: CoursePlayerNote, title: string) => {
+  const html = noteHtml(note);
+  const { heading, body } = splitFirstHeading(html);
+  const fullText = notePreview(note);
+  const text = heading ? richTextToPlain(body) : fullText.slice(title.length).replace(/^[\s:|·—–-]+/, "").trim();
+  return text.trim().slice(0, 220);
+};
 
-function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M9.2 2.4h5.6l1.1 2.2H21v2.4H3V4.6h5.1L9.2 2.4Zm.6 7.2h2.3v8.4H9.8V9.6Zm4.1 0h2.3v8.4h-2.3V9.6ZM5.4 7.8h13.2l-1.1 13.4H6.5L5.4 7.8Z" />
-    </svg>
-  );
-}
+const aiKindLabel = (note: CoursePlayerNote) => {
+  if (!note.aiGenerated) return "";
+  const labels: Record<string, string> = {
+    answer: "AI answer",
+    summary: "AI summary",
+    explanation: "AI explanation",
+    question: "AI question",
+    flashcard: "AI flashcard",
+    plan: "AI study plan",
+  };
+  return labels[String(note.aiKind || "")] || "AI-assisted";
+};
 
 /**
  * The editor chunk failed to load (a first-ever visit made while offline, in a
@@ -190,6 +192,10 @@ export default function NotesPanel({
   onAdd,
   onEdit,
   onDelete,
+  courseTitle = "",
+  modules = [],
+  personalModules = [],
+  onRetrySync,
   onEditorOpenChange,
   composerOpenSignal,
   syncState,
@@ -463,67 +469,119 @@ export default function NotesPanel({
 
   return (
     <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list">
-      {/* No header anywhere — the note grid starts at the very top of the
-          pane, and the circular "+" floats at the bottom-right of the grid. */}
-      {/* Note list — square cards in a grid. A saved note always collapses
-          back to a compact square; the rich formatting is preserved
-          underneath and shown again the moment the note is reopened.
-          An EMPTY library renders nothing at all: the circular "+" at the
-          grid's bottom-right is the page's only add-new-note affordance
-          (owner's direction) — no top instruction pill, no second button. */}
+      {/* The library is one responsive resource-card system: the panel owns
+          the add affordance; each resource card itself is the open target. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-      <div className="h-full overflow-y-auto p-3 pb-16">
-        {notes.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-3.5 sm:grid-cols-3" data-course-notes-list data-course-notes-grid="true">
-            {notes.map((note) => {
-              const preview = notePreview(note);
-              return (
-                <li key={note.id} className="relative aspect-square">
-                  <GlassCard
-                    className="h-full w-full overflow-visible [&>div:last-child]:h-full [&>div:last-child]:p-2.5"
-                    data-course-note
-                    data-note-id={note.id}
-                  >
-                  <div className="flex h-full flex-col overflow-hidden">
-                    <NoteCardPreview sourceHtml={noteHtml(note)} preview={preview} />
-                    <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
-                      <GlassButton
-                        onClick={() => startEdit(note)}
-                        className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
-                        aria-label="Edit note"
-                        data-course-note-edit
-                      >
-                        <PremiumEditIcon />
-                      </GlassButton>
-                      <GlassButton
-                        onClick={() => setPendingDeleteId(note.id)}
-                        className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
-                        aria-label="Delete note"
-                        data-course-note-delete
-                      >
-                        <PremiumDeleteIcon />
-                      </GlassButton>
-                    </div>
-                  </div>
-                  </GlassCard>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
+        <div className="h-full overflow-y-auto overscroll-contain p-3 pb-16" data-course-notes-list>
+          <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+            {notes.length > 0 && syncState?.status === "loading" ? (
+              <StudyLibraryNotice
+                state="loading"
+                title="Checking your library"
+                message="Your saved notes are available while cloud sync finishes."
+              />
+            ) : null}
+            {notes.length > 0 && syncState?.status === "error" ? (
+              <StudyLibraryNotice
+                state="error"
+                title="Cloud sync needs attention"
+                message={syncState.errorMessage || "Your notes stay saved on this device. Try syncing again when your connection is ready."}
+                onRetry={onRetrySync}
+              />
+            ) : null}
+
+            {notes.length > 0 ? (
+              <ul className="grid min-w-0 gap-3" data-course-notes-grid="true" data-study-resource-grid>
+                {notes.map((note) => {
+                  const title = noteCardTitle(note);
+                  const topic = noteCardTopic(note, title);
+                  const isPersonal = Boolean(note.personalModuleId || note.personalResourceId);
+                  const hierarchy = isPersonal
+                    ? resolvePersonalResourceContext(
+                        personalModules,
+                        note.personalModuleId || note.moduleId,
+                        note.personalResourceId || note.resourceId,
+                      )
+                    : resolveCourseResourceContext(modules, note.moduleId, note.resourceId);
+                  const contextPath = [
+                    courseTitle,
+                    ...(isPersonal ? ["My Modules", ...hierarchy.modulePath] : hierarchy.modulePath),
+                  ].filter(Boolean);
+                  const wordCount = notePreview(note).trim().split(/\s+/).filter(Boolean).length;
+                  const metadata = [
+                    wordCount ? `${wordCount} words` : "",
+                    note.links?.length ? `${note.links.length} linked ${note.links.length === 1 ? "note" : "notes"}` : "",
+                    aiKindLabel(note),
+                  ].filter(Boolean);
+                  return (
+                    <li key={note.id} className="min-w-0 min-h-[212px]">
+                      <StudyResourceCard
+                        kind="note"
+                        resourceId={note.id}
+                        title={title}
+                        contextPath={contextPath}
+                        contextDetail={hierarchy.resourceName ? `Lesson · ${hierarchy.resourceName}` : undefined}
+                        topic={topic || undefined}
+                        topicLabel="Note context"
+                        metadata={metadata}
+                        sourceLabel="Self"
+                        createdAt={note.createdAt}
+                        updatedAt={note.updatedAt}
+                        onOpen={() => startEdit(note)}
+                        onRename={(nextTitle) => {
+                          const html = noteHtml(note);
+                          const split = splitFirstHeading(html);
+                          // Notes without a heading keep their original body;
+                          // the new explicit title is added above it.
+                          onEdit(note.id, combineHtml(nextTitle, split.heading ? split.body : html));
+                        }}
+                        onDelete={() => setPendingDeleteId(note.id)}
+                        deleteLabel={`Delete note ${title}`}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : syncState?.status === "loading" ? (
+              <ul className="grid min-w-0 gap-3" data-course-notes-list data-course-notes-grid="true" data-study-resource-grid aria-busy="true">
+                {[0, 1, 2].map((index) => (
+                  <li key={index} className="min-w-0 min-h-[212px]">
+                    <StudyResourceCardSkeleton kind="note" />
+                  </li>
+                ))}
+              </ul>
+            ) : syncState?.status === "error" ? (
+              <>
+                <StudyLibraryNotice
+                  state="error"
+                  title="Notes could not be synced"
+                  message={syncState.errorMessage || "No cloud copy could be confirmed. Try again, or continue with notes saved on this device."}
+                  onRetry={onRetrySync}
+                />
+                <StudyLibraryEmptyState
+                  kind="note"
+                  title="Your course notes remain yours"
+                  description="Reconnect and try again to load your latest library. Anything already on this device stays safe."
+                />
+              </>
+            ) : (
+              <StudyLibraryEmptyState
+                kind="note"
+                title="Start a study note"
+                description="Capture a formula, a question, or a lesson recap. Use the + button to open the Note Editor."
+              />
+            )}
+          </div>
         </div>
-        {/* The one "+" — a small circular button floating at the grid's
-            bottom-right. It opens the same big composer the old header "+"
-            used to open. */}
         <button
           type="button"
           onClick={openComposer}
-          className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95"
+          className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
           aria-label="Add note"
           title="Add note"
           data-course-notes-add
         >
-          <Plus size={18} strokeWidth={2.8} />
+          <Plus size={19} strokeWidth={2.8} />
         </button>
       </div>
 
