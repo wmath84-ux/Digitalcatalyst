@@ -66,6 +66,11 @@ export type SiteFooterNavProps = {
    * so the footer is as smooth as the course player's.
    */
   peek?: boolean;
+  /**
+   * With `peek`: the dock is visible by default and never collapses; the line
+   * stays only as the optional drag strip (Home).
+   */
+  peekAlwaysOpen?: boolean;
 };
 
 export default function SiteFooterNav({
@@ -76,6 +81,7 @@ export default function SiteFooterNav({
   position = "absolute",
   dataAttrs,
   peek = false,
+  peekAlwaysOpen = false,
 }: SiteFooterNavProps) {
   const compact = useCompactFit();
 
@@ -86,6 +92,7 @@ export default function SiteFooterNav({
         items={items}
         onSelect={onSelect}
         compact={compact}
+        alwaysOpen={peekAlwaysOpen}
         dataAttrs={dataAttrs}
       />
     );

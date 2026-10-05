@@ -35,6 +35,8 @@ export interface SketchMeta {
   /** Optional lecture association — the resource open beside the board. */
   resourceId?: string | null;
   resourceName?: string | null;
+  /** Optional board name shown in the canvas switcher. */
+  title?: string | null;
 }
 
 export interface StoredSketch {
@@ -50,6 +52,7 @@ export interface StoredSketch {
   createdAt: number;
   resourceId?: string;
   resourceName?: string;
+  title?: string;
 }
 
 export const SKETCH_SCENE_VERSION: number;
@@ -58,6 +61,13 @@ export const SKETCH_DEFAULT_KEY: "main";
 export const MAX_SKETCH_ELEMENTS: number;
 export const MAX_SKETCH_FILE_CHARS: number;
 export const MAX_SKETCH_SCENE_CHARS: number;
+export const MAX_SKETCH_BOARDS: number;
+export const MAX_SKETCH_TITLE_CHARS: number;
+
+export function createSketchKey(takenKeys?: string[]): string;
+export function sanitizeSketchTitle(value: unknown): string;
+export function nextSketchTitle(titles?: string[]): string;
+export function mergeSketchScenes(base: unknown, live: unknown): SketchScene;
 
 export function createSketchScene(): SketchScene;
 export function isSketchScene(value: unknown): boolean;

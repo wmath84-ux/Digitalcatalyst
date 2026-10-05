@@ -86,7 +86,14 @@ test("the Read library has a course/mine toggle, compose for modules, and a stal
 
   const hook = read("src/course/useReadUploads.ts");
   assert.match(hook, /uploadBytesResumable/);
-  assert.match(hook, /uploadBytes\(target, file/);
+  // ONE upload path with real progress: the old 3.5 s "stall" fallback that
+  // cancelled the resumable task and raced a progress-less uploadBytes (the
+  // stuck-at-40 % upload) must not come back. Behaviour is proved in
+  // tests/readUploadPipelineRuntime.test.mjs.
+  assert.match(hook, /uploadBytesResumable\(target, file, \{ contentType: "application\/pdf" \}\)/);
+  assert.doesNotMatch(hook, /uploadBytes\(target, file/);
+  assert.doesNotMatch(hook, /progress: 0\.4\b/);
+  assert.match(hook, /READ_UPLOAD_STALL_MS/);
   assert.match(hook, /getIdToken\(true\)/);
   assert.match(hook, /uploadPdfs/);
   assert.match(hook, /sanitizeReadUploadSubmodule/);
@@ -95,4 +102,20 @@ test("the Read library has a course/mine toggle, compose for modules, and a stal
   assert.match(model, /sanitizeReadUploadSubmodule/);
   assert.match(model, /submodule:/);
   assert.match(model, /groupReadUploadSubmodules/);
+});
+
+test("Home's footer is always open; My Day keeps the peek; the desktop dock follows the Home route", () => {
+  const home = read("src/home/App.tsx");
+  assert.match(home, /<BottomNav[\s\S]*?\bpeek\b[\s\S]*?\bpeekAlwaysOpen\b/);
+  const myDay = read("src/MyDayApp.tsx");
+  assert.doesNotMatch(myDay, /peekAlwaysOpen/);
+  const footer = read("src/components/SitePeekFooter.tsx");
+  assert.match(footer, /const open = alwaysOpen \|\| hover \|\| pinned/);
+  assert.match(footer, /inert=\{!open\}/);
+  const dock = read("src/components/glass-dock/DesktopPeekDock.tsx");
+  assert.match(dock, /export function isHomeDockRoute/);
+  assert.match(dock, /const open = alwaysOpen \|\| hoverOpen/);
+  const shell = read("src/components/DesktopShell.tsx");
+  assert.match(shell, /data-desktop-dock-clearance=/);
+  assert.match(read("src/index.css"), /\[data-desktop-content\]\[data-desktop-dock-clearance="true"\]/);
 });

@@ -355,3 +355,20 @@ test("the annotation bridge saves the viewer's own bytes and reports the learner
   assert.match(panel, /onAnnotationApi=/);
   assert.match(panel, /recordActivity/);
 });
+
+test("isPdfHeader: the %PDF- signature anywhere in the first 1024 bytes, nothing else", async () => {
+  const { isPdfHeader, READ_UPLOAD_HEADER_BYTES } = await import("../utils/readUploads.js");
+  const enc = (value) => new TextEncoder().encode(value);
+  assert.equal(isPdfHeader(enc("%PDF-1.7\n%âãÏÓ")), true);
+  assert.equal(isPdfHeader(enc("%PDF-1.4").buffer), true, "ArrayBuffer works too");
+  const junk = new Uint8Array(900);
+  junk.set(enc("%PDF-2.0"), 600);
+  assert.equal(isPdfHeader(junk), true, "leading junk before the marker is allowed by the spec");
+  const tooLate = new Uint8Array(READ_UPLOAD_HEADER_BYTES + 20);
+  tooLate.set(enc("%PDF-1.7"), READ_UPLOAD_HEADER_BYTES + 1);
+  assert.equal(isPdfHeader(tooLate), false);
+  assert.equal(isPdfHeader(enc("<html>")), false);
+  assert.equal(isPdfHeader(enc("%PDF")), false, "truncated signature");
+  assert.equal(isPdfHeader(new Uint8Array(0)), false);
+  assert.equal(isPdfHeader(null), false);
+});

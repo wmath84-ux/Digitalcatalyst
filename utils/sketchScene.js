@@ -39,8 +39,18 @@ export const SKETCH_SCENE_VERSION = 1;
 /** Firestore subcollection under `users/{uid}` — one doc per course module. */
 export const SKETCH_COLLECTION = "sketches";
 
-/** A module holds ONE sketch board today; the key leaves room for more. */
+/**
+ * The FIRST board of a module keeps the legacy three-part document id (key
+ * `main`), so every board drawn before multi-canvas support opens untouched.
+ * Every further board (the Sketch tab's "+") gets its own generated key.
+ */
 export const SKETCH_DEFAULT_KEY = "main";
+
+/** How many boards one learner may keep per course module. */
+export const MAX_SKETCH_BOARDS = 30;
+
+/** Board titles ("Canvas 2", "Kinematics doubts") — short display text. */
+export const MAX_SKETCH_TITLE_CHARS = 80;
 
 /** Hard stop so a runaway drawing can never wedge the document. */
 export const MAX_SKETCH_ELEMENTS = 1500;
@@ -273,6 +283,83 @@ export const sanitizeSketchKey = (value) => {
 };
 
 /**
+ * A fresh, unique, STABLE board key for the "+" button. Lowercase slug only
+ * (the rules require `^[a-z0-9-]+$`, ≤ 40 chars) and never `main`, so a new
+ * board can never land on — and overwrite — an existing document.
+ */
+export const createSketchKey = (takenKeys = []) => {
+  const taken = new Set((takenKeys || []).map((key) => sanitizeSketchKey(key)));
+  taken.add(SKETCH_DEFAULT_KEY);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const key = sanitizeSketchKey(
+      `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${attempt ? `-${attempt}` : ""}`,
+    );
+    if (!taken.has(key)) return key;
+  }
+  return sanitizeSketchKey(`c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+};
+
+/** A board title, trimmed and bounded; `""` when nothing usable was given. */
+export const sanitizeSketchTitle = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_SKETCH_TITLE_CHARS);
+
+/**
+ * The next default title in a module: "Canvas 1" for the first board, then
+ * one past the highest "Canvas N" already used — so deleting or renaming a
+ * board never produces two boards with the same default name.
+ */
+export const nextSketchTitle = (titles = []) => {
+  let highest = 0;
+  for (const title of titles || []) {
+    const match = /^canvas\s+(\d{1,4})$/i.exec(String(title ?? "").trim());
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `Canvas ${Math.max(highest, (titles || []).length) + 1}`;
+};
+
+/**
+ * Union of two scenes by element id — used when the learner drew on a board
+ * BEFORE its cloud copy was known (slow/late sign-in, offline open). Neither
+ * side may be lost: every element of both survives, and for an id present in
+ * both the higher `version` wins (the live side on a tie, because that is
+ * what is on screen). The live side's appState wins; images are unioned.
+ */
+export const mergeSketchScenes = (base, live) => {
+  const a = parseSketchScene(base);
+  const b = parseSketchScene(live);
+  const byId = new Map();
+  const order = [];
+  const put = (element, preferOnTie) => {
+    const id = typeof element.id === "string" && element.id ? element.id : null;
+    if (!id) {
+      order.push({ element });
+      return;
+    }
+    const existing = byId.get(id);
+    if (!existing) {
+      const row = { element };
+      byId.set(id, row);
+      order.push(row);
+      return;
+    }
+    const current = clampNumber(existing.element.version, 0);
+    const next = clampNumber(element.version, 0);
+    if (next > current || (next === current && preferOnTie)) existing.element = element;
+  };
+  for (const element of a.elements) put(element, false);
+  for (const element of b.elements) put(element, true);
+  return {
+    version: SKETCH_SCENE_VERSION,
+    elements: sanitizeSketchElements(order.map((row) => row.element)),
+    appState: { ...a.appState, ...b.appState },
+    files: { ...a.files, ...b.files },
+  };
+};
+
+/**
  * The Firestore payload. Every field the rules validate is produced here, so
  * a write this function built can never be refused for shape — including the
  * optional resource association (which lecture the board was drawn beside).
@@ -296,5 +383,8 @@ export const toFirestoreSketch = (scene, meta = {}) => {
   if (resourceId) payload.resourceId = resourceId.slice(0, 200);
   const resourceName = String(meta.resourceName ?? "").trim();
   if (resourceName) payload.resourceName = resourceName.slice(0, 200);
+  // Optional board name — what the canvas switcher shows on every device.
+  const title = sanitizeSketchTitle(meta.title);
+  if (title) payload.title = title;
   return payload;
 };

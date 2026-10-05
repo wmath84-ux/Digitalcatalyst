@@ -5368,6 +5368,14 @@ html[data-course-player-active="true"] {
   padding-bottom: 6px;
 }
 
+/* Home (owner brief 2026-10-05): the desktop dock is always open there, so
+   the page column reserves the dock's height (capsule + lift + line) at the
+   end of its scroll. The last row of Home can always be scrolled clear of the
+   dock; nothing is reserved on pages where the dock is still a peek line. */
+.dc-desktop-shell [data-desktop-content][data-desktop-dock-clearance="true"] {
+  padding-bottom: 7.5rem;
+}
+
 /* ── Course Player peek dock ──────────────────────────────────────────────
    The desktop peek dock pattern brought into the Course Player's footer
    navigation: a thin frosted-glass line sits at the very bottom CENTRE of the

@@ -292,3 +292,55 @@ test("the signature ignores noise and changes for a real edit", () => {
   assert.equal(sketchSceneSignature(null), 0);
   assert.equal(sketchSceneSignature([null, "x"]), 2);
 });
+
+// ---------------------------------------------------------------------------
+// Multiple boards per module (the Sketch tab's "+") — 2026-10-05
+// ---------------------------------------------------------------------------
+
+const boards = await import("../utils/sketchScene.js");
+
+test("createSketchKey: unique, rule-safe, never `main`, never an existing key", () => {
+  const taken = ["main"];
+  for (let index = 0; index < 200; index += 1) {
+    const key = boards.createSketchKey(taken);
+    assert.match(key, /^[a-z0-9-]{1,40}$/, "matches the firestore.rules sketchKey pattern");
+    assert.notEqual(key, "main");
+    assert.equal(taken.includes(key), false, "never collides with an existing board");
+    assert.equal(boards.sanitizeSketchKey(key), key, "stable through sanitisation");
+    taken.push(key);
+  }
+});
+
+test("a non-default board gets its own document id — the first board's id is untouched", () => {
+  assert.equal(boards.sketchDocId("u", "p", "m"), "u__p__m");
+  assert.equal(boards.sketchDocId("u", "p", "m", "c-abc"), "u__p__m__c-abc");
+});
+
+test("nextSketchTitle numbers past the highest default name", () => {
+  assert.equal(boards.nextSketchTitle([]), "Canvas 1");
+  assert.equal(boards.nextSketchTitle(["Canvas 1"]), "Canvas 2");
+  assert.equal(boards.nextSketchTitle(["Canvas 1", "Canvas 5"]), "Canvas 6");
+  assert.equal(boards.nextSketchTitle(["Canvas 1", "Doubts", "Formulae"]), "Canvas 4");
+});
+
+test("the board title rides on the payload, bounded", () => {
+  const payload = boards.toFirestoreSketch(boards.createSketchScene(), {
+    uid: "u", productId: "p", moduleId: "m", sketchKey: "c-1", title: `  ${"x".repeat(200)}  `,
+  });
+  assert.equal(payload.title.length, boards.MAX_SKETCH_TITLE_CHARS);
+  assert.equal(payload.sketchKey, "c-1");
+  const untitled = boards.toFirestoreSketch(boards.createSketchScene(), { uid: "u", productId: "p", moduleId: "m" });
+  assert.equal("title" in untitled, false, "no empty title field is written");
+});
+
+test("mergeSketchScenes keeps every element of both sides; the newer version of a shared id wins", () => {
+  const el = (id, version) => ({ id, type: "rectangle", version, versionNonce: version });
+  const cloud = { elements: [el("a", 1), el("b", 5)], appState: { theme: "dark" }, files: { f1: { dataURL: "data:1" } } };
+  const live = { elements: [el("b", 3), el("c", 1)], appState: { theme: "light" }, files: { f2: { dataURL: "data:2" } } };
+  const merged = boards.mergeSketchScenes(cloud, live);
+  assert.deepEqual(merged.elements.map((e) => `${e.id}@${e.version}`), ["a@1", "b@5", "c@1"]);
+  assert.equal(merged.appState.theme, "light", "what is on screen keeps its view state");
+  assert.deepEqual(Object.keys(merged.files).sort(), ["f1", "f2"]);
+  // Corrupt input on either side never throws.
+  assert.deepEqual(boards.mergeSketchScenes("{nope", live).elements.map((e) => e.id), ["b", "c"]);
+});
