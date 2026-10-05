@@ -75,7 +75,9 @@ export function StudyResourceCard({
     topic ? `${topicLabel}: ${topic}` : "",
     ...metadata,
     timestamp ? `${timestampPrefix} ${timestamp.full}` : "",
-    `Open in ${kind === "note" ? "Note Editor" : "Mind Map Editor"}. Double-click or double-tap to rename; press F2 or Shift+Enter.`,
+    onRename
+      ? `Open in ${kind === "note" ? "Note Editor" : "Mind Map Editor"}. Double-click or double-tap to rename; press F2 or Shift+Enter.`
+      : `Open ${kind === "note" ? "read-only note" : "mind map"}. Rename is not available.`,
   ].filter(Boolean).join(". ");
 
   const clearOpenTimer = useCallback(() => {
@@ -180,7 +182,7 @@ export function StudyResourceCard({
     ? { "data-course-note": "", "data-note-id": resourceId }
     : { "data-course-mindmap-map-card": "", "data-map-key": resourceId };
   const openAttributes = kind === "note"
-    ? { "data-course-note-open": "", "data-course-note-edit": "" }
+    ? { "data-course-note-open": "", ...(onRename ? { "data-course-note-edit": "" } : { "data-course-master-note-open": "" }) }
     : { "data-course-mindmap-open-map": resourceId };
   const deleteAttributes = kind === "note"
     ? { "data-course-note-delete": "" }
@@ -285,12 +287,15 @@ export function StudyResourceCard({
                 ) : <span>Saved in this course</span>}
               </span>
               <span className="study-resource-card__open-hint">
-                {kind === "note" ? "Open editor" : "Open map"}
+                {kind === "note" ? (onRename ? "Open editor" : "Open note") : "Open map"}
                 <ArrowUpRight size={15} aria-hidden="true" />
               </span>
             </span>
             <span className="sr-only" data-study-resource-rename-instructions>
-              Double-click or double-tap this card to rename. On a keyboard, focus this card and press F2 or Shift plus Enter.
+              {onRename
+                ? "Double-click or double-tap this card to rename. On a keyboard, focus this card and press F2 or Shift plus Enter."
+                : "This master course note is read only. Double-click or double-tap to open it."
+              }
             </span>
           </button>
           {onDelete ? (
@@ -306,7 +311,10 @@ export function StudyResourceCard({
             </button>
           ) : null}
           <span className="sr-only" id={helpId}>
-            Double-click or double-tap to rename this {kind === "note" ? "note" : "mind map"}. Press F2 or Shift plus Enter from the card.
+            {onRename
+              ? `Double-click or double-tap to rename this ${kind === "note" ? "note" : "mind map"}. Press F2 or Shift plus Enter from the card.`
+              : "This master note is read only. Activate the full card to open it."
+            }
           </span>
         </>
       )}

@@ -192,6 +192,31 @@ test("included resource opens with full product", () => {
   assert.equal(r.resourceAccessSources["r-1"], "full_product");
 });
 
+test("canonical Admin access-level strings keep purchasable notes resource-gated", () => {
+  const product = mkProduct({
+    canonicalModules: [
+      mkModule("m-included", {
+        files: [mkResource("note-purchasable", { type: "note", accessLevel: "purchasable", individuallyPurchasable: true })],
+      }),
+      mkModule("m-purchasable", { accessLevel: "purchasable", individuallyPurchasable: true }),
+    ],
+  });
+  const locked = resolveCourseAccess({ product, now: NOW });
+  assert.equal(locked.accessibleResourceIds.has("note-purchasable"), false);
+  assert.equal(locked.resourceAccessSources["note-purchasable"], "locked");
+  assert.equal(locked.accessibleModuleIds.has("m-purchasable"), false);
+
+  const owned = resolveCourseAccess({
+    product,
+    ownedResourceIds: ["note-purchasable"],
+    ownedModuleIds: ["m-purchasable"],
+    now: NOW,
+  });
+  assert.equal(owned.accessibleResourceIds.has("note-purchasable"), true);
+  assert.equal(owned.resourceAccessSources["note-purchasable"], "resource_purchase");
+  assert.equal(owned.accessibleModuleIds.has("m-purchasable"), true);
+});
+
 // ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------

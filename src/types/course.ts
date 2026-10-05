@@ -1,4 +1,4 @@
-export type CourseAccessLevel = "included" | "paidUpdate" | "hidden";
+export type CourseAccessLevel = "included" | "purchasable" | "paidUpdate" | "hidden";
 export type CourseFileType =
   | "youtube"
   | "video"
@@ -38,12 +38,16 @@ export type CourseFileType =
  */
 export const EXPERIMENT_FILE_TYPE = "interactive" as const;
 export type CourseInteractiveFileType = typeof EXPERIMENT_FILE_TYPE;
-/** Official lesson content plus the experiment; `CourseFile.type` adds Read separately. */
-export type CourseContentFileType = CourseFileType | CourseInteractiveFileType;
+/** Official lesson content plus inline experiment and admin Block Note types. */
+export type CourseContentFileType = CourseFileType | CourseInteractiveFileType | CourseNoteResourceFileType;
 
 /** Admin-authored Read library resource; intentionally separate from lessons. */
 export const READ_RESOURCE_FILE_TYPE = "read" as const;
 export type CourseReadResourceFileType = typeof READ_RESOURCE_FILE_TYPE;
+
+/** Admin-authored BlockNote library resource; not a lesson URL/viewer file. */
+export const NOTE_RESOURCE_FILE_TYPE = "note" as const;
+export type CourseNoteResourceFileType = typeof NOTE_RESOURCE_FILE_TYPE;
 
 /** True for the learner-authored interactive experiment. */
 export const isExperimentFileType = (type?: string | null): type is CourseInteractiveFileType =>
@@ -122,6 +126,26 @@ export interface CoursePlayerNote {
   personalResourceId?: string;
 }
 
+/**
+ * Read-only projection of one admin-authored `type: "note"` product resource.
+ * It is intentionally a different type/collection from CoursePlayerNote, which
+ * remains private to the signed-in learner and is persisted under users/{uid}.
+ */
+export interface MasterCourseNote {
+  id: string;
+  resourceId: string;
+  courseId: string;
+  moduleId: string;
+  title: string;
+  bodyHtml: string;
+  modulePath: string[];
+  sortOrder: number;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  source: "master";
+}
+
 export interface CourseAccessMeta {
   accessLevel?: CourseAccessLevel;
   paidUpdateId?: string;
@@ -148,6 +172,19 @@ export interface CourseFile extends CourseAccessMeta {
   /** Original uploaded PDF filename and size, used in the Read library. */
   readFileName?: string;
   readFileSize?: number;
+  /** Resource order inside its existing parent module. */
+  sortOrder?: number;
+  /** Serialized BlockNote body (`type: "note"` only). */
+  noteHtml?: string;
+  /** Admin-master source/ownership metadata (`type: "note"` only). */
+  noteSource?: "master";
+  ownerType?: "course";
+  ownerId?: string;
+  courseId?: string;
+  moduleId?: string;
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
   /**
    * Personal Modules ("My Modules") provenance. Set ONLY when this file was
    * opened from the learner's OWN personal-content space — official course

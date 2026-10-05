@@ -12,6 +12,11 @@ const editor = fs.readFileSync("src/components/admin/products/ProductEditor.tsx"
 const modulesEditor = fs.readFileSync("src/components/admin/products/ModulesResourcesEditor.tsx", "utf8");
 const client = fs.readFileSync("src/lib/admin/client.ts", "utf8");
 const catalog = fs.readFileSync("src/context/CatalogContext.tsx", "utf8");
+const firestoreRules = fs.readFileSync("firestore.rules", "utf8");
+const notesPanel = fs.readFileSync("src/course/NotesPanel.tsx", "utf8");
+const courseOverlay = fs.readFileSync("src/course/CourseOverlay.tsx", "utf8");
+const playerApp = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
+const resourceTypes = fs.readFileSync("utils/productResourceTypes.js", "utf8");
 
 test("published status repairs the old hidden publish mismatch", () => {
   const oldBrokenCreate = {
@@ -59,7 +64,7 @@ test("module image resources reuse the product Cloudinary upload plus a custom U
   assert.match(modulesEditor, /folder="module-images"/);
   assert.match(modulesEditor, /resource\.type === "image_url"/);
   assert.match(modulesEditor, /Your image \/ embed URL/);
-  assert.match(modulesEditor, /Image \(URL or Cloudinary\)/);
+  assert.match(resourceTypes, /value: "image_url", label: "Image \(URL or Cloudinary\)"/);
   assert.match(modulesEditor, /Paste your own public or embed URL, or upload directly to Cloudinary/);
 });
 
@@ -79,4 +84,49 @@ test("publish validation takes the admin directly to the combined module editor"
   assert.match(editor, /setTab\(blocker\.tab\)/);
   assert.match(editor, /needs a valid public HTTPS URL[\s\S]*?"modules"/);
   assert.match(editor, /Cannot publish:/);
+});
+
+test("Block Note publishing uses the existing Self-note HTML cap and stores Note through the course tree", () => {
+  assert.match(editor, /MAX_NOTE_HTML_LENGTH/);
+  assert.match(editor, /r\.type === "note"/);
+  assert.match(editor, /htmlLength > MAX_NOTE_HTML_LENGTH/);
+  assert.match(editor, /noteHtml: typeof resource\.noteHtml === "string"/);
+  assert.match(editor, /noteSource: "master"/);
+  assert.match(editor, /ownerType: "course"/);
+  assert.match(editor, /courseId: ownerProductId/);
+  assert.match(editor, /moduleId: resource\.parentModuleId/);
+});
+
+test("admin save stamps course ownership and stable author timestamps on Master resources", () => {
+  assert.match(client, /collectPreviousResourceRecords/);
+  assert.match(client, /stampMasterNoteMetadata/);
+  assert.match(client, /noteSource: "master"/);
+  assert.match(client, /ownerType: "course"/);
+  assert.match(client, /ownerId: productId/);
+  assert.match(client, /createdBy,/);
+  assert.match(client, /createdAt,/);
+  assert.match(client, /updatedAt: unchanged \? Number\(old\.updatedAt/);
+  assert.match(client, /await getDoc\(ref\)/);
+});
+
+test("learners see gated Master notes in a separate read-only collection while Self CRUD stays intact", () => {
+  assert.match(playerApp, /accessibleResourceIds=\{resolution\.accessibleResourceIds\}/);
+  assert.match(courseOverlay, /accessibleResourceIds: props\.accessibleResourceIds/);
+  assert.match(courseOverlay, /masterNotes=\{masterNotes\}/);
+  assert.match(courseOverlay, /collectMasterCourseNotes/);
+  assert.match(notesPanel, /MASTER/);
+  assert.match(notesPanel, /SELF/);
+  assert.match(notesPanel, /useState<"master" \| "self">\(\(\) =>[\s\S]*?"master"/);
+  assert.match(notesPanel, /onOpen=\{\(\) => setViewingMasterNoteId\(note\.id\)\}/);
+  assert.match(notesPanel, /readOnly/);
+  assert.match(notesPanel, /onAdd\(html\)/);
+  assert.match(notesPanel, /onEdit\(editingId, html\)/);
+  assert.match(notesPanel, /onDelete\(pendingDeleteId\)/);
+  assert.match(notesPanel, /activeCollection === "self" \? \([\s\S]*?data-course-notes-add/);
+});
+
+test("Firestore authorization keeps published Master resources admin-write-only and Self notes owner-scoped", () => {
+  assert.match(firestoreRules, /match \/siteProducts\/\{productId\}[\s\S]*?allow read: if true;\s*allow write: if isAdmin\(\);/);
+  assert.match(firestoreRules, /match \/notes\/\{noteId\}[\s\S]*?allow read: if isOwner\(uid\) \|\| isAdmin\(\);[\s\S]*?allow create, update: if isOwner\(uid\)/);
+  assert.match(firestoreRules, /match \/personalCourseModules\/\{moduleId\}[\s\S]*?allow create, update, delete: if false;/);
 });

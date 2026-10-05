@@ -38,9 +38,12 @@ import {
 import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/admin/products/CloudinaryImageUploadField";
 import PracticeSetImportPanel from "@/components/admin/products/PracticeSetImportPanel";
 import AdminExperimentEditor from "@/components/admin/products/ExperimentEditor";
+import BlockNoteResourceEditor from "@/components/admin/products/BlockNoteResourceEditor";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
+import { ADMIN_PRODUCT_RESOURCE_TYPES, registerNoteResourceType } from "../../../../utils/productResourceTypes.js";
+import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
 import { getFirebaseStorage } from "../../../../firebase";
 import {
   buildReadStoragePath,
@@ -52,45 +55,14 @@ import type { PaidUpdate, ProductModule, ProductResource } from "@/lib/admin/typ
 
 type ReadUploadResult = { url: string; storagePath: string; fileName: string; fileSize: number };
 
-const RESOURCE_TYPES = [
-  "youtube",
-  "video_url",
-  "audio_url",
-  "image_url",
-  "gdrive",
-  "pdf",
-  "gdoc",
-  "gsheet",
-  "gslides",
-  "gform",
-  "ebook",
-  "github_pages",
-  "whimsical",
-  "iframe",
-  "brain",
-  "interactive",
-  "read",
-] as const;
-
-const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
-  youtube: "YouTube",
-  video_url: "Video URL (MP4/web)",
-  audio_url: "Audio URL",
-  image_url: "Image (URL or Cloudinary)",
-  gdrive: "Google Drive",
-  pdf: "PDF",
-  gdoc: "Google Doc",
-  gsheet: "Google Sheet",
-  gslides: "Google Slides",
-  gform: "Google Form",
-  ebook: "E-book",
-  github_pages: "GitHub Pages",
-  whimsical: "Whimsical",
-  iframe: "Other embed / iframe",
-  brain: "Brain · practice set",
-  interactive: "Interactive 2D experiment",
-  read: "Read · PDF / library",
-};
+// Validate / register the first-class note type against the shared data-layer
+// registry. This is idempotent even if a legacy registry already contains a
+// `block_note` / `Block Note` alias.
+const RESOURCE_TYPE_REGISTRY = registerNoteResourceType(ADMIN_PRODUCT_RESOURCE_TYPES);
+const RESOURCE_TYPES = RESOURCE_TYPE_REGISTRY.map((entry) => entry.value);
+const RESOURCE_TYPE_LABELS = Object.fromEntries(
+  RESOURCE_TYPE_REGISTRY.map((entry) => [entry.value, entry.label]),
+) as Record<string, string>;
 
 function providerForType(type: ProductResource["type"]) {
   // The Brain practice set is the ONE resource type with no external provider:
@@ -99,6 +71,7 @@ function providerForType(type: ProductResource["type"]) {
   if (type === "brain") return "Brain";
   if (type === "interactive") return "Experiment";
   if (type === "read") return "Read library";
+  if (type === "note") return "BlockNote";
   if (type === "youtube") return "YouTube";
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
@@ -832,18 +805,21 @@ function ResourceCard({
   const brainQuestions = normalizePracticeQuestions(resource.practiceQuestions);
   const brainReady = isBrain && practiceQuestionsReady(resource.practiceQuestions);
   const isExperiment = resource.type === "interactive";
+  const isNote = resource.type === "note";
+  const noteHtmlLength = String(resource.noteHtml || "").length;
+  const noteReady = isNote && Boolean(resource.name.trim()) && noteHtmlLength <= MAX_NOTE_HTML_LENGTH;
   const experimentHtml = isExperiment ? String(resource.interactiveHtml || "") : "";
   const experimentHosted = isExperiment && Boolean(cleanUrl);
   const experimentErrors = isExperiment && experimentHtml.trim() ? experimentBlockingIssues(experimentHtml) : [];
   const experimentReady = isExperiment && (Boolean(experimentHtml.trim()) || experimentHosted) && experimentErrors.length === 0;
-  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : Boolean(cleanUrl);
+  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : isNote ? noteReady : Boolean(cleanUrl);
 
   return (
     <article
       data-admin-resource-card
       data-resource-id={resource.id}
       data-resource-type={resource.type}
-      className={`space-y-3 rounded-xl border p-3 ${readyForPlayer ? "border-slate-200 bg-slate-50/60" : isBrain || isExperiment ? "border-amber-300 bg-amber-50/40" : "border-red-300 bg-red-50/30"}`}
+      className={`space-y-3 rounded-xl border p-3 ${readyForPlayer ? "border-slate-200 bg-slate-50/60" : isBrain || isExperiment || isNote ? "border-amber-300 bg-amber-50/40" : "border-red-300 bg-red-50/30"}`}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -867,6 +843,8 @@ function ResourceCard({
           </Pill>
         ) : isRead ? (
           <Pill tone={cleanUrl ? "success" : "warn"}>{cleanUrl ? "Read source ready" : "Source required"}</Pill>
+        ) : isNote ? (
+          <Pill tone={noteReady ? "success" : "warn"}>{noteReady ? "Master note ready" : noteHtmlLength > MAX_NOTE_HTML_LENGTH ? "Note too long" : "Add a title"}</Pill>
         ) : (
           <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
         )}
@@ -897,6 +875,29 @@ function ResourceCard({
                   readStoragePath: undefined,
                   readFileName: undefined,
                   readFileSize: undefined,
+                  noteHtml: undefined,
+                  noteSource: undefined,
+                  ownerType: undefined,
+                  ownerId: undefined,
+                  courseId: undefined,
+                  moduleId: undefined,
+                });
+              } else if (type === "note") {
+                onUpdate({
+                  type,
+                  provider: providerForType(type),
+                  url: "",
+                  noteSource: "master",
+                  ownerType: "course",
+                  ownerId: productId || undefined,
+                  courseId: productId || undefined,
+                  moduleId: module.id,
+                  noteHtml: resource.type === "note" ? resource.noteHtml : "",
+                  parentModuleId: module.id,
+                  readSourceKind: undefined,
+                  readStoragePath: undefined,
+                  readFileName: undefined,
+                  readFileSize: undefined,
                 });
               } else {
                 onUpdate({
@@ -906,6 +907,12 @@ function ResourceCard({
                   readStoragePath: undefined,
                   readFileName: undefined,
                   readFileSize: undefined,
+                  noteHtml: undefined,
+                  noteSource: undefined,
+                  ownerType: undefined,
+                  ownerId: undefined,
+                  courseId: undefined,
+                  moduleId: undefined,
                 });
               }
             }}
@@ -1072,6 +1079,8 @@ function ResourceCard({
             </div>
           )}
         </div>
+      ) : isNote ? (
+        <BlockNoteResourceEditor resource={resource} onChange={onUpdate} />
       ) : resource.type === "image_url" ? (
         <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
           <div>
@@ -1144,9 +1153,16 @@ function ResourceCard({
         </Field>
       )}
 
-      {!cleanUrl && !isBrain && !isExperiment ? (
+      {!cleanUrl && !isBrain && !isExperiment && !isNote ? (
         <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">
           Add a valid public URL before publishing. This resource cannot appear in the player yet.
+        </p>
+      ) : null}
+      {isNote && !noteReady ? (
+        <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800" data-admin-note-validation>
+          {noteHtmlLength > MAX_NOTE_HTML_LENGTH
+            ? `This Block Note exceeds ${MAX_NOTE_HTML_LENGTH.toLocaleString()} serialized body characters. Shorten it before saving or publishing.`
+            : "Add a title to this Block Note before saving or publishing."}
         </p>
       ) : null}
       {isBrain && !brainReady ? (

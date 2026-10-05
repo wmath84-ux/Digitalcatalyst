@@ -32,7 +32,11 @@ export type EditorResourceType =
   /** Brain practice set — the one editor type with no URL. */
   | "brain"
   /** Interactive 2D experiment — inline HTML (`interactiveHtml`) or a hosted page. */
-  | "interactive";
+  | "interactive"
+  /** Read library item — URL or uploaded PDF metadata. */
+  | "read"
+  /** Admin-authored BlockNote course resource. */
+  | "note";
 
 export interface EditorResource {
   id: string;
@@ -58,6 +62,21 @@ export interface EditorResource {
   practiceTitle?: string;
   /** Interactive 2D experiment (`type: "interactive"` only) — the inline HTML source. */
   interactiveHtml?: string;
+  /** Read source metadata (`type: "read"` only). */
+  readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
+  readStoragePath?: string;
+  readFileName?: string;
+  readFileSize?: number;
+  /** Admin-authored BlockNote document and provenance (`type: "note"` only). */
+  noteHtml?: string;
+  noteSource?: "master";
+  ownerType?: "course";
+  ownerId?: string;
+  courseId?: string;
+  moduleId?: string;
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface EditorModule {
@@ -154,6 +173,16 @@ export interface FirestoreResource extends Record<string, unknown> {
   paidUpdateCoinPrice?: number;
   practiceQuestions?: unknown[];
   practiceTitle?: string;
+  interactiveHtml?: string;
+  noteHtml?: string;
+  noteSource?: "master";
+  ownerType?: "course";
+  ownerId?: string;
+  courseId?: string;
+  moduleId?: string;
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface FirestoreModule extends Record<string, unknown> {
