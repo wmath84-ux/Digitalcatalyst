@@ -177,8 +177,12 @@ export function recallViewForPage(page: RevisionPageId): RecallViewId | null {
     case "stats":
       return "stats";
     case "settings":
-    case "profile":
       return "settings";
+    // Plan & AI is a Digitalcatalyst page, not Recall's settings view. Keeping
+    // it out of this bridge prevents Recall's view→hash sync from rewriting
+    // /profile to /settings after a click or refresh.
+    case "profile":
+      return null;
     case "import-hub":
       return "import-hub";
     case "focus-timer":

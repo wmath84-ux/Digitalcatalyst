@@ -82,18 +82,91 @@ export function toFsrsRating(rating: UnifiedRating): Grade {
 /* Conversions                                                         */
 /* ------------------------------------------------------------------ */
 
-export function toFsrsCard(scheduling: UnifiedScheduling): FsrsCard {
+function finiteNonNegative(value: number, fallback = 0): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function finiteCount(value: number): number {
+  return Math.max(0, Math.trunc(finiteNonNegative(value)));
+}
+
+function validDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/**
+ * Repair persisted FSRS rows before handing them to ts-fsrs. Old imports and
+ * legacy projections can mark a card as reviewed while leaving its memory
+ * state empty (for example difficulty 9 with stability 0). Such a row is
+ * treated as new until it has a valid FSRS memory state, rather than crashing
+ * preview/review with an invalid-memory-state exception.
+ */
+export function normalizeFsrsScheduling(
+  scheduling: UnifiedScheduling,
+  now = new Date(),
+): UnifiedScheduling {
+  const knownState = ["new", "learning", "review", "relearning"].includes(scheduling.state)
+    ? scheduling.state
+    : "new";
+  const stability = Number.isFinite(scheduling.stability) ? scheduling.stability : 0;
+  const difficulty = Number.isFinite(scheduling.difficulty) ? scheduling.difficulty : 0;
+  const reps = finiteCount(scheduling.reps);
+  const hasValidMemory = stability > 0 && difficulty >= 1 && difficulty <= 10 && reps > 0;
+  const state: UnifiedCardState =
+    knownState === "new" || !hasValidMemory ? "new" : knownState;
+  const due = validDate(scheduling.due);
+
+  if (state === "new") {
+    const wasMalformedReviewedCard = knownState !== "new" && !hasValidMemory;
+    return {
+      ...scheduling,
+      due: (wasMalformedReviewedCard ? now : due ?? now).toISOString(),
+      lastReview: null,
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      state: "new",
+      learningSteps: 0,
+    };
+  }
+
   return {
-    due: new Date(scheduling.due),
-    stability: scheduling.stability,
-    difficulty: scheduling.difficulty,
-    elapsed_days: scheduling.elapsedDays,
-    scheduled_days: scheduling.scheduledDays,
-    reps: scheduling.reps,
-    lapses: scheduling.lapses,
-    learning_steps: scheduling.learningSteps,
-    state: toFsrsState(scheduling.state),
-    last_review: scheduling.lastReview ? new Date(scheduling.lastReview) : undefined,
+    ...scheduling,
+    due: (due ?? now).toISOString(),
+    lastReview: validDate(scheduling.lastReview)?.toISOString() ?? null,
+    stability,
+    difficulty,
+    elapsedDays: finiteNonNegative(scheduling.elapsedDays),
+    scheduledDays: finiteNonNegative(scheduling.scheduledDays),
+    reps,
+    lapses: finiteCount(scheduling.lapses),
+    state,
+    learningSteps: finiteCount(scheduling.learningSteps),
+  };
+}
+
+export function toFsrsCard(scheduling: UnifiedScheduling, now = new Date()): FsrsCard {
+  const normalized = normalizeFsrsScheduling(scheduling, now);
+  return {
+    due: new Date(normalized.due),
+    stability: normalized.stability,
+    difficulty: normalized.difficulty,
+    elapsed_days: normalized.elapsedDays,
+    scheduled_days: normalized.scheduledDays,
+    reps: normalized.reps,
+    lapses: normalized.lapses,
+    learning_steps: normalized.learningSteps,
+    state: toFsrsState(normalized.state),
+    last_review: normalized.lastReview
+      ? new Date(normalized.lastReview)
+      : normalized.state === "new"
+        ? undefined
+        : now,
   };
 }
 
@@ -166,11 +239,11 @@ export interface ApplyReviewResult {
 export function applyReview(input: ApplyReviewInput): ApplyReviewResult {
   const reviewedAt = input.reviewedAt ?? new Date();
   const retention = input.desiredRetention ?? DEFAULT_RETENTION;
-  const recordLog = scheduler(retention).repeat(toFsrsCard(input.scheduling), reviewedAt);
+  const before = normalizeFsrsScheduling(input.scheduling, reviewedAt);
+  const recordLog = scheduler(retention).repeat(toFsrsCard(before, reviewedAt), reviewedAt);
   const next = recordLog[toFsrsRating(input.rating)].card;
-  const before = { ...input.scheduling };
   return {
-    scheduling: fromFsrsCard(next, input.scheduling, reviewedAt),
+    scheduling: fromFsrsCard(next, before, reviewedAt),
     before,
   };
 }
@@ -181,7 +254,7 @@ export function previewIntervals(
   desiredRetention: number = DEFAULT_RETENTION,
   now = new Date(),
 ): Record<UnifiedRating, string> {
-  const recordLog = scheduler(desiredRetention).repeat(toFsrsCard(scheduling), now);
+  const recordLog = scheduler(desiredRetention).repeat(toFsrsCard(scheduling, now), now);
   const label = (rating: UnifiedRating) =>
     formatInterval(recordLog[toFsrsRating(rating)].card.due.getTime() - now.getTime());
   return {

@@ -6,12 +6,12 @@
 // the test is created directly.
 
 import { useMemo, useState } from "react";
-import PageShell from "../components/PageShell";
-import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
-import { GlassCard } from "../../components/ui/GlassCard";
-import { GlassButton } from "../../components/ui/glass-button";
-import { BookOpenIcon, CheckIcon, ChevronRightIcon, SparklesIcon } from "../components/icons";
+import { BookOpenIcon, CheckIcon, ChevronRightIcon, SparklesIcon, XIcon } from "../components/icons";
+import { RecallBadge, RecallCard, RecallPage } from "../components/recall-ui";
 import { useExitGuard } from "../components/ExitGuardContext";
+import { Button } from "../recall/components/ui/button";
+import { Input } from "../recall/components/ui/input";
+import { Textarea } from "../recall/components/ui/textarea";
 import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
 import { createCustomTest, deleteCustomTestLocal } from "../engine/customTestService";
 import {
@@ -113,7 +113,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
       const cleanTitle = title.trim() || "My Imported Test";
       // The chapter type-in is saved with the test so the dashboard card can
       // show it as the plan's supporting information. Legacy plans without
-      // planDetails keep deriving their labels from their questions.
+      // planDetails keep deriving their labels from the questions.
       const cleanChapter = chapterName.trim();
       const created = createCustomTest(uid, {
         title: cleanTitle,
@@ -161,192 +161,244 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
   };
 
   return (
-    <PageShell route={route} title="Bulk Import" subtitle="Paste a full revision plan" backHref="#/revision/profile">
-      <div data-rev-layout="bulkimport" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
+    <RecallPage
+      title="Bulk Import"
+      subtitle="Paste a full revision plan"
+      onBack={() => navigate("#/revision/profile")}
+    >
+      <div
+        data-rev-layout="bulkimport"
+        data-revision-route={route}
+        className="mx-auto w-full max-w-[900px] space-y-4 animate-fade-in"
+      >
         {ready ? (
-          <Card className="overflow-hidden border-emerald-400/30">
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
-                <CheckIcon className="h-8 w-8" />
-              </span>
-              <div>
-                <h2 className="text-lg font-bold text-white">Test created! 🎉</h2>
-                <p className="mt-1 text-xs text-white/75">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
-                {ready.pendingSync && (
-                  <p className="mt-1 text-[11px] font-semibold text-amber-200">
-                    Saved on this device. Cloud sync will finish automatically when you are online.
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[15px] font-bold text-white transition hover:bg-emerald-500 active:scale-[0.98]"
-              >
-                Click & submit your score <ChevronRightIcon className="h-5 w-5" />
-              </button>
-              <SecondaryButton onClick={() => navigate("#/revision/bank")}>
-                <span className="text-xs text-emerald-200">Open Test Bank</span>
-              </SecondaryButton>
-              <button
-                type="button"
-                onClick={() => setReady(null)}
-                className="text-xs font-semibold text-white/55 underline-offset-2 hover:underline"
-              >
-                Import more questions
-              </button>
+          <RecallCard className="flex flex-col items-center gap-3 overflow-hidden py-6 text-center sm:py-8">
+            <span className="grid h-16 w-16 place-items-center rounded-full bg-tertiary-container text-on-tertiary-container">
+              <CheckIcon className="h-8 w-8" />
+            </span>
+            <div>
+              <h2 className="text-xl font-bold text-on-surface">Test created! 🎉</h2>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                {ready.count} questions imported — saved to your Test Bank and live on your dashboard.
+              </p>
+              {ready.pendingSync ? (
+                <p className="mt-2 text-sm font-medium text-secondary">
+                  Saved on this device. Cloud sync will finish automatically when you are online.
+                </p>
+              ) : null}
             </div>
-          </Card>
+            <div className="flex w-full flex-col justify-center gap-2 sm:w-auto sm:flex-row">
+              <Button type="button" size="lg" onClick={() => navigate("#/revision")}>
+                Start your test <ChevronRightIcon className="h-5 w-5" />
+              </Button>
+              <Button type="button" variant="outline" size="lg" onClick={() => navigate("#/revision/bank")}>
+                Open Test Bank
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-sm text-on-surface-variant"
+              onClick={() => setReady(null)}
+            >
+              Import more questions
+            </Button>
+          </RecallCard>
         ) : (
           <>
-            <Card>
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white">
+            <RecallCard className="space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-on-primary-container">
                   <BookOpenIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[15px] font-bold text-white">Paste your revision plan</h2>
-                  <p className="text-xs text-white/75">
+                  <h2 className="text-base font-bold text-on-surface">Paste your revision plan</h2>
+                  <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
                     Drop in a complete test — questions, options and correct answers. Generate them in ChatGPT,
                     Claude or anywhere else, then paste here to create a revision plan in one go.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
-                {/* Test name + Chapter name travel together: the name is what
-                    the dashboard card prints under its count, the chapter is
-                    the card's supporting information. Both are optional here —
-                    an import with no chapter keeps the old derived label. */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
-                      Test name
-                    </span>
-                    <input
-                      className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
-                      placeholder="Test name (optional)"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
-                      Chapter name
-                    </span>
-                    <input
-                      data-rev-import-chapter
-                      className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
-                      placeholder="e.g. Electrostatics"
-                      value={chapterName}
-                      onChange={(e) => setChapterName(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <textarea
+              {/* Test name + chapter name travel together: the name is what
+                  the dashboard card prints under its count, the chapter is
+                  the card's supporting information. Both are optional. */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-1.5">
+                  <span className="block text-sm font-semibold text-on-surface-variant">Test name</span>
+                  <Input
+                    className="h-11 rounded-xl"
+                    placeholder="Test name (optional)"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="block text-sm font-semibold text-on-surface-variant">Chapter name</span>
+                  <Input
+                    data-rev-import-chapter
+                    className="h-11 rounded-xl"
+                    placeholder="e.g. Electrostatics"
+                    value={chapterName}
+                    onChange={(event) => setChapterName(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-semibold text-on-surface-variant">Questions and answer key</span>
+                <Textarea
                   rows={9}
-                  className="dc-field w-full rounded-xl border p-3 font-mono text-xs leading-relaxed outline-none"
+                  className="min-h-56 resize-y rounded-xl font-mono text-xs leading-relaxed"
                   placeholder={SAMPLE}
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(event) => setText(event.target.value)}
+                  aria-label="Paste questions and answers"
                 />
-                <p className="text-[11px] leading-relaxed text-white/55">
-                  Format: “1. Question?” then “A. …”, “B. …”. Mark the right answer with ✓ / * / (correct) or an
-                  “Answer: B” line.
-                </p>
-              </div>
+              </label>
+              <p className="text-xs leading-relaxed text-on-surface-variant">
+                Format: “1. Question?” then “A. …”, “B. …”. Mark the right answer with ✓ / * / (correct) or an
+                “Answer: B” line.
+              </p>
 
-              <div className="mt-3 flex gap-2">
-                <SecondaryButton className="flex-1" onClick={parse} disabled={!text.trim()}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button type="button" variant="outline" className="flex-1" onClick={parse} disabled={!text.trim()}>
                   Parse questions
-                </SecondaryButton>
-                <PrimaryButton className="flex-1" disabled={preview.length === 0} onClick={createTest}>
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={preview.length === 0 || saving}
+                  onClick={() => void createTest()}
+                >
                   <SparklesIcon className="h-4 w-4" /> Create test ({preview.length})
-                </PrimaryButton>
+                </Button>
               </div>
 
-              {notice && (
+              {notice ? (
                 <div
-                  className={`mt-3 rounded-xl px-3 py-2.5 text-xs font-medium leading-relaxed ${
-                    noticeTone === "err" ? "bg-rose-500/15 text-rose-200" : "bg-sky-500/15 text-sky-200"
+                  role={noticeTone === "err" ? "alert" : "status"}
+                  className={`rounded-xl px-3 py-2.5 text-sm font-medium leading-relaxed ${
+                    noticeTone === "err"
+                      ? "bg-error-container text-on-error-container"
+                      : "bg-primary-soft text-on-primary-container"
                   }`}
                 >
                   {notice}
                 </div>
-              )}
-            </Card>
+              ) : null}
+            </RecallCard>
 
-            {preview.length > 0 && (
-              <Card>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white">Preview ({preview.length})</h3>
-                  <span className="text-[11px] font-medium text-white/55">Tap the correct answer where needed</span>
+            {preview.length > 0 ? (
+              <RecallCard className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg font-bold text-on-surface">Question preview</h2>
+                    <p className="mt-1 text-sm text-on-surface-variant">
+                      Review each card and tap the correct answer where needed.
+                    </p>
+                  </div>
+                  <RecallBadge tone={undetected > 0 ? "warning" : "success"}>
+                    {undetected > 0 ? `${undetected} answer${undetected === 1 ? "" : "s"} needed` : `${preview.length} ready`}
+                  </RecallBadge>
                 </div>
+
                 <div className="space-y-3">
-                  {preview.map((q, qi) => (
-                    <GlassCard key={q.key} contentClassName="p-3">
+                  {preview.map((question, questionIndex) => (
+                    <article
+                      key={question.key}
+                      className="rounded-2xl border border-outline-variant bg-surface-container-low p-3 sm:p-4"
+                    >
                       <div className="flex items-start gap-2">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-[11px] font-bold text-white">
-                          {qi + 1}
+                        <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant">
+                          {questionIndex + 1}
                         </span>
-                        <textarea
+                        <Textarea
                           rows={2}
-                          className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm font-medium text-white outline-none focus:border-white/15"
-                          value={q.prompt}
-                          onChange={(e) => patch(q.key, { prompt: e.target.value })}
+                          className="min-h-16 flex-1 resize-y border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-on-surface focus-visible:border-outline-variant"
+                          aria-label={`Question ${questionIndex + 1}`}
+                          value={question.prompt}
+                          onChange={(event) => patch(question.key, { prompt: event.target.value })}
                         />
-                        <GlassButton
+                        <Button
                           type="button"
-                          onClick={() => removeItem(q.key)}
-                          aria-label="Remove question"
-                          className="shrink-0 [&_.size-12]:size-7 text-white/70"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(question.key)}
+                          aria-label={`Remove question ${questionIndex + 1}`}
+                          className="h-9 w-9 shrink-0 text-on-surface-variant"
                         >
-                          ✕
-                        </GlassButton>
+                          <XIcon className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div className="mt-2 space-y-1.5">
-                        {q.options.map((opt, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name={`correct-${q.key}`}
-                              checked={q.correctIndex === i}
-                              onChange={() => patch(q.key, { correctIndex: i, detected: true })}
-                              className="h-4 w-4 shrink-0 accent-emerald-600"
-                            />
-                            <span className="w-5 shrink-0 text-xs font-bold text-white/75">{OPTION_LETTERS[i]}</span>
-                            <input
-                              className={`w-full rounded-lg border px-2 py-1 text-sm outline-none ${
-                                i === q.correctIndex
-                                  ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
-                                  : "dc-field"
+
+                      <div className="mt-3 space-y-2">
+                        {question.options.map((option, optionIndex) => {
+                          const isCorrect = question.correctIndex === optionIndex;
+                          return (
+                            <div
+                              key={`${question.key}-${optionIndex}`}
+                              className={`flex min-w-0 items-center gap-2 rounded-xl border p-2 ${
+                                isCorrect
+                                  ? "border-tertiary/40 bg-tertiary-container/30"
+                                  : "border-outline-variant bg-surface"
                               }`}
-                              value={opt}
-                              onChange={(e) => {
-                                const options = [...q.options];
-                                options[i] = e.target.value;
-                                patch(q.key, { options });
-                              }}
-                            />
-                          </div>
-                        ))}
+                            >
+                              <input
+                                type="radio"
+                                name={`correct-${question.key}`}
+                                checked={isCorrect}
+                                onChange={() => patch(question.key, { correctIndex: optionIndex, detected: true })}
+                                className="h-4 w-4 shrink-0 accent-primary"
+                                aria-label={`Mark option ${OPTION_LETTERS[optionIndex] ?? optionIndex + 1} as correct`}
+                              />
+                              <span className="w-5 shrink-0 text-xs font-bold text-on-surface-variant">
+                                {OPTION_LETTERS[optionIndex] ?? optionIndex + 1}
+                              </span>
+                              <Input
+                                className={`h-9 min-w-0 flex-1 rounded-lg ${
+                                  isCorrect
+                                    ? "border-transparent bg-transparent font-semibold text-on-tertiary-container"
+                                    : ""
+                                }`}
+                                aria-label={`Question ${questionIndex + 1}, option ${OPTION_LETTERS[optionIndex] ?? optionIndex + 1}`}
+                                value={option}
+                                onChange={(event) => {
+                                  const options = [...question.options];
+                                  options[optionIndex] = event.target.value;
+                                  patch(question.key, { options });
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
-                      {q.correctIndex < 0 && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
+                      {question.correctIndex < 0 ? (
+                        <p className="mt-2 text-sm font-semibold text-secondary">
                           Correct answer not detected — tap it above.
                         </p>
-                      )}
-                    </GlassCard>
+                      ) : null}
+                    </article>
                   ))}
                 </div>
-                <PrimaryButton className="mt-3" disabled={preview.length === 0 || saving} onClick={() => void createTest()}>
-                  <CheckIcon className="h-4 w-4" /> {saving ? "Saving securely…" : `Create test with ${preview.length} question${preview.length === 1 ? "" : "s"}`}
-                </PrimaryButton>
-              </Card>
-            )}
+
+                <Button
+                  type="button"
+                  disabled={preview.length === 0 || saving}
+                  onClick={() => void createTest()}
+                  className="w-full sm:w-auto"
+                >
+                  <CheckIcon className="h-4 w-4" />
+                  {saving
+                    ? "Saving securely…"
+                    : `Create test with ${preview.length} question${preview.length === 1 ? "" : "s"}`}
+                </Button>
+              </RecallCard>
+            ) : null}
           </>
         )}
       </div>
+
       <TestBankLimitGate
         open={Boolean(bankGate)}
         bank={bankGate}
@@ -354,6 +406,6 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
         onManageBank={() => navigate("#/revision/bank")}
         onExplorePlans={() => navigate("#/subscription")}
       />
-    </PageShell>
+    </RecallPage>
   );
 }

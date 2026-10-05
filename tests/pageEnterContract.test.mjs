@@ -115,11 +115,15 @@ test("RootPage wraps only the listed apps in PageEnter", () => {
   assert.doesNotMatch(slice("!hash || hash.startsWith(LANDING_HASH)", "hash.startsWith(HOME_HASH)"), /PageEnter/);
 });
 
-test("Revision inner pages animate via a path-keyed panel without remounting the app", () => {
-  assert.match(revision, /data-page-enter-panel/);
-  assert.match(revision, /key=\{path\}/);
-  assert.match(revision, /flex min-h-0 flex-1 flex-col overflow-hidden/);
-  assert.match(css, /\[data-revision-content\] \[data-page-enter-panel\] > \[data-revision-page-main\]/);
+test("Revision internal routes update inside the stable feature shell", () => {
+  assert.match(revision, /const \[route, setRoute\] = useState<RevisionRoute>/);
+  assert.match(revision, /window\.addEventListener\("hashchange", onHashChange\)/);
+  assert.match(revision, /const dcPage = useMemo<ReactNode>\(\(\) =>/);
+  assert.match(revision, /case "bank":[\s\S]{0,120}<TestBankPage/);
+  assert.match(revision, /<div key=\{syncKey\}>/);
+  assert.match(revision, /data-revision-shell/);
+  assert.match(revision, /data-revision-scroll/);
+  assert.doesNotMatch(revision, /data-page-enter-panel/);
 });
 
 test("My Day hands the route to the workspace without a second page-enter panel", () => {

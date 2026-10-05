@@ -19,6 +19,7 @@ import { RecallBadge, RecallCard, RecallError, RecallLoading, RecallPage, Recall
 import { getTestResult } from "../engine/testService";
 import { startCustomTestRetake, startSkippedQuestionsRetake } from "../engine/customTestService";
 import { ServiceError } from "../engine/store";
+import { questionModeLabel } from "../engine/questionMode";
 
 export default function TestResultPage({ uid, attemptId }: { uid: string; attemptId: number | null }) {
   const { navigate } = useRevisionRoute();
@@ -187,7 +188,7 @@ export default function TestResultPage({ uid, attemptId }: { uid: string; attemp
             </p>
             <div className="flex flex-wrap gap-2">
               <RecallBadge tone="brand">{result.planDetails.difficulty}</RecallBadge>
-              <RecallBadge>{result.planDetails.questionMode}</RecallBadge>
+                  <RecallBadge>{questionModeLabel(result.planDetails.questionMode)}</RecallBadge>
             </div>
           </RecallCard>
         </section>

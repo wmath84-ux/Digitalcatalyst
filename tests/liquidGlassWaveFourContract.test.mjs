@@ -142,15 +142,16 @@ test("Wave 4 is exercised in the glass preview page", () => {
 
 /* ── deliberate non-changes, pinned so nobody "fixes" them ───────────────── */
 
-test("revision cards ARE the pack surface (Phase A4)", () => {
-  // Phase A4 reversed the earlier "stable painted surface" decision on the
-  // owner's direction: every element is a websiteglass component. `Card` renders
-  // GlassSurface at Glass Card's values; `.rev-card` stays as a sizing hook only.
-  const ui = read("src/revision/components/ui.tsx");
-  const cardFn = ui.slice(ui.indexOf("export function Card"), ui.indexOf("export function PrimaryButton"));
-  assert.ok(cardFn.length > 40, "Card/PrimaryButton order changed — update this contract");
-  assert.match(cardFn, /<GlassSurface tint=\{0\.4\} radius=\{20\} className=\{`rev-card p-4 text-white/);
-  assert.doesNotMatch(cardFn, /dc-glass/);
+test("active Revision cards use Recall's scoped surface system", () => {
+  const revisionApp = read("src/revision/RevisionApp.tsx");
+  const recallUi = read("src/revision/components/recall-ui.tsx");
+  const dashboard = read("src/revision/recall/components/dashboard.tsx");
+  assert.match(revisionApp, /data-recall-root/);
+  assert.match(revisionApp, /bg-background/);
+  assert.match(recallUi, /export function RecallCard/);
+  assert.match(recallUi, /cardSurface\(/);
+  assert.match(dashboard, /cardSurface\(/);
+  assert.doesNotMatch(revisionApp, /dc-scene-plate/);
 });
 
 

@@ -9,12 +9,12 @@
 //     a full revision plan (questions + answers) in one go.
 
 import { useEffect, useMemo, useState } from "react";
-import PageShell from "../components/PageShell";
+import { Check, Settings2 } from "lucide-react";
 import AiConfigForm from "../components/AiConfigForm";
-import { Card } from "../components/ui";
-import { GlassTile } from "../../components/ui/glass-tile";
-import { CheckIcon } from "../components/icons";
+import { RecallCard, RecallPage, RecallTile } from "../components/recall-ui";
 import { useExitGuard } from "../components/ExitGuardContext";
+import { Button } from "../recall/components/ui/button";
+import { cn } from "../recall/lib/utils";
 import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
 import {
   blankOwnAiConfig,
@@ -50,32 +50,45 @@ function SourceOption({
   onSelect: (v: AiSource) => void;
 }) {
   return (
-    /* Wave 13: the source option is the pack GlassTile (selected state comes
-       from the pack); the radio dot is drawn on the tile, not a plate. */
-    <GlassTile
-      disabled={disabled}
+    <button
+      type="button"
       onClick={() => onSelect(value)}
+      disabled={disabled}
+      aria-pressed={selected}
       data-ai-source={value}
-      selected={selected}
-      className={`dc-tile aspect-auto w-full p-3.5 text-left [&>span]:w-full [&>span]:items-start [&>span]:justify-start [&>span]:gap-3 ${disabled ? "opacity-50" : ""}`}
+      data-selected={selected ? "true" : "false"}
+      className={cn(
+        "flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        selected
+          ? "border-primary bg-primary-soft"
+          : "border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
     >
       <span
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-indigo-500 bg-indigo-500" : "border-white/25"
-        }`}
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
+          selected ? "border-primary bg-primary" : "border-outline",
+        )}
       >
-        {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+        {selected && <span className="h-2 w-2 rounded-full bg-primary-foreground" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[13px] font-bold text-white">{title}</span>
-          {badge && (
-            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200">{badge}</span>
-          )}
+          <span className={cn("text-sm font-bold", selected ? "text-on-primary-container" : "text-on-surface")}>
+            {title}
+          </span>
+          {badge ? (
+            <span className="rounded-full bg-tertiary-container px-2 py-0.5 text-[11px] font-semibold text-on-tertiary-container">
+              {badge}
+            </span>
+          ) : null}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-white/75">{description}</span>
+        <span className="mt-1 block text-sm leading-relaxed text-on-surface-variant">{description}</span>
       </span>
-    </GlassTile>
+    </button>
   );
 }
 
@@ -174,20 +187,40 @@ export default function AiSettingsPage({ uid, route }: Props) {
         : "No AI (offline)";
 
   return (
-    <PageShell route={route} title="AI Configuration" subtitle="Set up in under a minute" backHref="#/revision/profile">
-      <div data-rev-layout="aisettings" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
-        <Card>
-          <div className="flex items-center justify-between">
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">Current setup</h3>
-            {savedFlash && (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-300">
-                <CheckIcon className="h-3.5 w-3.5" /> Saved automatically
+    <RecallPage
+      title="AI Configuration"
+      subtitle="Choose a provider, manage your API key, and control how Revision creates questions."
+      onBack={() => navigate("#/revision/profile")}
+      actions={
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate("#/revision/settings")}
+          data-ai-settings-link
+        >
+          <Settings2 aria-hidden className="h-4 w-4" />
+          Settings
+        </Button>
+      }
+    >
+      <div
+        data-rev-layout="ai-settings"
+        data-revision-route={route}
+        className="mx-auto w-full max-w-4xl animate-fade-in space-y-4 pb-6"
+      >
+        <RecallCard>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-on-surface">Current setup</h2>
+            {savedFlash ? (
+              <span role="status" className="flex items-center gap-1.5 text-sm font-semibold text-on-tertiary-container">
+                <Check aria-hidden className="h-4 w-4" /> Saved automatically
               </span>
-            )}
+            ) : null}
           </div>
-          <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
+          <RecallTile className="mt-3 flex items-center gap-3">
             <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${
+              aria-hidden="true"
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${
                 userCfg.source === "default" && schoolProvider
                   ? schoolProvider.gradient
                   : (effProvider?.gradient ?? "bg-slate-600")
@@ -196,22 +229,28 @@ export default function AiSettingsPage({ uid, route }: Props) {
               {userCfg.source === "default" && schoolProvider ? schoolProvider.mark : (effProvider?.mark ?? "▦")}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-white">{currentTitle}</p>
-              <p className="text-xs text-white/75">{currentLabel}</p>
+              <p className="break-words text-sm font-semibold text-on-surface">{currentTitle}</p>
+              <p className="mt-0.5 text-sm text-on-surface-variant">{currentLabel}</p>
             </div>
             <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                effective.config ? "bg-emerald-500/20 text-emerald-200" : "border border-white/15 text-white/75"
-              }`}
+              className={cn(
+                "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+                effective.config
+                  ? "bg-tertiary-container text-on-tertiary-container"
+                  : "bg-surface-container-high text-on-surface-variant",
+              )}
             >
               {effective.config ? "AI on" : "No AI"}
             </span>
-          </div>
-        </Card>
+          </RecallTile>
+        </RecallCard>
 
-        <Card>
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">1 · Where should AI come from?</h3>
-          <div className="mt-3 space-y-2">
+        <RecallCard>
+          <h2 className="text-base font-semibold text-on-surface">Choose an AI source</h2>
+          <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+            Pick the option that should power your Revision questions.
+          </p>
+          <div className="mt-4 grid gap-2.5">
             <SourceOption
               value="default"
               selected={userCfg.source === "default"}
@@ -225,67 +264,67 @@ export default function AiSettingsPage({ uid, route }: Props) {
               value="own"
               selected={userCfg.source === "own"}
               title="My own API key"
-              description="Blank form — paste your own key. School settings never appear here."
+              description="Use your own provider account. Your key is kept separate from school settings."
               onSelect={selectSource}
             />
             <SourceOption
               value="offline"
               selected={userCfg.source === "offline"}
               title="No AI (offline)"
-              description="Opens bulk import so you can paste a full revision plan with questions and answers."
+              description="Continue without an AI provider and add questions through Bulk Import."
               onSelect={selectSource}
             />
           </div>
-        </Card>
+        </RecallCard>
 
-        {userCfg.source === "default" && schoolReady && adminSettings && schoolProvider && (
-          <Card data-school-ai-preview>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · School AI</h3>
-            <p className="mt-1 text-xs text-white/75">
-              This is the configuration published from the admin panel. You don't need an API key.
-            </p>
-            <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${schoolProvider.gradient}`}
-              >
-                {schoolProvider.mark}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-white">{schoolProvider.name}</p>
-                <p className="truncate font-mono text-xs text-white/75">{adminSettings.model}</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-bold text-emerald-200">
-                Shared key
-              </span>
-            </div>
-          </Card>
-        )}
+        {userCfg.source === "default" && schoolReady && adminSettings && schoolProvider ? (
+          <section data-school-ai-preview>
+            <RecallCard>
+              <h2 className="text-base font-semibold text-on-surface">School AI</h2>
+              <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                Your school has published this provider. You don't need to add an API key.
+              </p>
+              <RecallTile className="mt-3 flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${schoolProvider.gradient}`}
+                >
+                  {schoolProvider.mark}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-on-surface">{schoolProvider.name}</p>
+                  <p className="mt-1 truncate font-mono text-sm text-on-surface-variant">{adminSettings.model}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-tertiary-container px-2.5 py-1 text-xs font-semibold text-on-tertiary-container">
+                  Shared key
+                </span>
+              </RecallTile>
+            </RecallCard>
+          </section>
+        ) : null}
 
-        {userCfg.source === "own" && (
-          <Card>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · Connect your provider</h3>
-            <p className="mt-1 text-xs text-white/75">
-              Pick a provider → paste your API key → models appear after the key loads. The API box starts empty.
+        {userCfg.source === "own" ? (
+          <RecallCard>
+            <h2 className="text-base font-semibold text-on-surface">Connect your provider</h2>
+            <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+              Choose a provider and paste your API key. The model list loads after your key is validated.
+              The API key field starts empty.
             </p>
-            <div className="mt-3">
+            <div className="mt-4">
               <AiConfigForm
                 card={false}
                 liveModelsOnly
-                /* The student AI Configuration page renders its two
-                   configuration actions as the brutalist provider button
-                   (Uiverse quiet-dog-6). Logo + text follow the live
-                   provider / model state; the admin panel keeps the pack
-                   capsule. */
-                actionStyle="uiverse"
+                visualStyle="recall"
+                actionStyle="recall"
                 value={ownFormValue}
                 onChange={(config: AiConfig) => updateConfig({ ...userCfg, source: "own", config })}
                 title=""
                 description=""
               />
             </div>
-          </Card>
-        )}
+          </RecallCard>
+        ) : null}
       </div>
-    </PageShell>
+    </RecallPage>
   );
 }

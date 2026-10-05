@@ -36,9 +36,9 @@ test("every serverless Revision API call is bounded by the same timeout", () => 
 
 test("hydration failures fall back to the local copy instead of blocking the app", () => {
   assert.match(appSource, /cloud hydration skipped/);
-  assert.match(appSource, /Keep the local cache usable/i);
-  assert.match(appSource, /setRevisionDataLoading\(false\)/);
-  assert.match(appSource, /setRevisionDataLoading\(uid !== "guest"\)/);
+  assert.match(appSource, /Local cache stays usable/i);
+  assert.match(appSource, /setDataLoading\(false\)/);
+  assert.match(appSource, /const \[dataLoading, setDataLoading\] = useState\(uid !== "guest"\)/);
 });
 
 test("the startup catalog pull is deadline-bounded so the page cannot hang on it", () => {

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./revision/recall-tokens.css";
 /* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
    utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
 @import "tw-animate-css";
@@ -6964,9 +6965,8 @@ html[data-course-player-active="true"] {
 [data-profile-content],
 [data-pdp-scroll] { min-width: 0 !important; width: 100% !important; }
 
-/* Recall's AppShell is Revision's only desktop chrome. When that route skips
-   the global desktop shell, release the legacy fixed-height tablet frame so
-   Recall's own page flow can scroll instead of clipping under the viewport. */
+/* Tablet portrait uses the document flow; the fixed-height mobile-frame rule
+   from the earlier PageShell generation must not constrain Recall's layout. */
 @media (min-width: 640px) and (max-width: 1023px) {
   body:not(:has(.dc-desktop-shell)) [data-recall-root][data-revision-app] {
     height: auto !important;
@@ -6975,16 +6975,39 @@ html[data-course-player-active="true"] {
     overflow: visible !important;
   }
 }
-
-.dc-desktop-shell [data-recall-root][data-revision-app] {
-  width: 100% !important;
-  min-height: 100% !important;
-  background: transparent !important;
-}
 @supports (min-height: 100dvh) {
   @media (min-width: 640px) and (max-width: 1023px) {
     body:not(:has(.dc-desktop-shell)) [data-recall-root][data-revision-app] {
       min-height: 100dvh !important;
     }
   }
+}
+
+/* DesktopShell is the sole scroll owner for hosted Revision pages. The old
+   fixed-height/overflow-hidden Revision frame clipped the Recall subtree, so
+   the shell's scroller could not reach content beyond the first viewport. Let
+   the Recall root grow naturally and reserve the overlay topbar + tabs inside
+   its own page padding. */
+.dc-desktop-shell [data-recall-root][data-revision-app] {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+  background: var(--rc-background) !important;
+}
+.dc-desktop-shell [data-recall-root][data-revision-app] > [data-revision-shell] {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: visible !important;
+}
+.dc-desktop-shell [data-revision-shell] > [data-revision-scroll],
+.dc-desktop-shell [data-recall-root][data-revision-app] > [data-revision-scroll] {
+  flex: none !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  padding-top: calc(var(--desktop-topbar-height, 64px) + 2.75rem + clamp(12px, 1.2vw, 20px)) !important;
+}
+.dc-desktop-shell [data-recall-root][data-revision-app] #main-content {
+  background: var(--rc-background);
 }

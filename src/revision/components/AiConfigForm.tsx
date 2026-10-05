@@ -23,6 +23,16 @@ import {
 import { Spinner, SecondaryButton } from "./ui";
 import { GlassButton } from "../../components/ui/glass-button";
 import AiConfigButton from "../../components/ui/AiConfigButton";
+import { Button as RecallButton } from "../recall/components/ui/button";
+import { Input as RecallInput } from "../recall/components/ui/input";
+import {
+  Select as RecallSelect,
+  SelectContent as RecallSelectContent,
+  SelectItem as RecallSelectItem,
+  SelectTrigger as RecallSelectTrigger,
+  SelectValue as RecallSelectValue,
+} from "../recall/components/ui/select";
+import { cn } from "../recall/lib/utils";
 
 export type AiConfigFormProps = {
   value: AiConfig;
@@ -40,29 +50,68 @@ export type AiConfigFormProps = {
   liveModelsOnly?: boolean;
   /**
    * Visual treatment of the two configuration actions (load models / test
-   * connection). `uiverse` = the brutalist `AiConfigButton` tiles the student
-   * "AI Configuration" page uses; `capsule` = the pack Glass capsule every
-   * other host (the admin AI panel) keeps. UI only — both styles run the
-   * exact same `refreshModels` / `runTest` behaviour, with the same disabled
-   * and loading wiring.
+   * connection). `uiverse` = the branded tile actions, `capsule` = the legacy
+   * glass buttons, and `recall` = high-contrast Recall buttons. UI only — all
+   * styles use the same model-loading and connection-test handlers.
    */
-  actionStyle?: "capsule" | "uiverse";
+  actionStyle?: "capsule" | "uiverse" | "recall";
+  /** The student page uses Recall surfaces; other hosts keep legacy glass. */
+  visualStyle?: "glass" | "recall";
 };
 
 function ProviderTile({
   meta,
   selected,
   onSelect,
+  visualStyle = "glass",
 }: {
   meta: (typeof AI_PROVIDERS)[number];
   selected: boolean;
   onSelect: () => void;
+  visualStyle?: "glass" | "recall";
 }) {
+  if (visualStyle === "recall") {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        data-ai-provider={meta.id}
+        className={cn(
+          "relative flex min-h-[104px] w-full flex-col items-start justify-between gap-3 rounded-2xl border p-3 text-left transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          selected
+            ? "border-primary bg-primary-soft"
+            : "border-outline-variant bg-surface hover:bg-surface-container-low",
+        )}
+      >
+        {selected ? (
+          <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground text-[11px] font-bold">
+            ✓
+          </span>
+        ) : null}
+        <span
+          aria-hidden="true"
+          className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg font-black text-white ${meta.gradient}`}
+        >
+          {meta.mark}
+        </span>
+        <span className="w-full min-w-0 pr-4">
+          <span className={cn("block truncate text-sm font-bold", selected ? "text-on-primary-container" : "text-on-surface")}>
+            {meta.name}
+          </span>
+          <span className="mt-1 block text-xs leading-snug text-on-surface-variant">{meta.tagline}</span>
+        </span>
+      </button>
+    );
+  }
+
   return (
     <GlassTile
       type="button"
       onClick={onSelect}
       selected={selected}
+      data-ai-provider={meta.id}
       className={`dc-tile group relative flex aspect-auto min-h-[92px] flex-col items-start justify-start gap-2 rounded-2xl p-3 text-left ${
         selected ? meta.ring : ""
       }`}
@@ -94,6 +143,7 @@ export default function AiConfigForm({
   onModelsChange,
   liveModelsOnly = false,
   actionStyle = "capsule",
+  visualStyle = "glass",
 }: AiConfigFormProps) {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -106,6 +156,7 @@ export default function AiConfigForm({
   const requestSeq = useRef(0);
 
   const provider = useMemo(() => AI_PROVIDERS.find((p) => p.id === value.provider) ?? AI_PROVIDERS[0], [value.provider]);
+  const isRecall = visualStyle === "recall";
   const hasKey = value.apiKey.trim().length > 0;
   const hasCustomEndpoint = value.provider !== "custom" || value.baseUrl.trim().length > 0;
 
@@ -116,6 +167,13 @@ export default function AiConfigForm({
     [liveOnly, models, value.provider],
   );
   const modelKnown = allModels.some((m) => m.id === value.model);
+  const modelPlaceholder = allModels.length > 0
+    ? "Select a model"
+    : hasKey
+      ? loadingModels
+        ? "Loading models…"
+        : "No models — load available models"
+      : "Add an API key to see models";
 
   const refreshModels = async (silent = false) => {
     if (!hasKey) {
@@ -186,18 +244,43 @@ export default function AiConfigForm({
     if (result.ok && models.length === 0 && result.modelCount > 0) void refreshModels(true);
   };
 
+  const visibilityIcon = showKey ? (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  ) : (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+
   return (
-    <div className={`space-y-4 ${card ? "rounded-2xl border border-white/10 p-4 " : ""}`}>
+    <div
+      data-ai-config-form={visualStyle}
+      className={cn(
+        "space-y-4",
+        card && (isRecall ? "rounded-2xl border border-outline-variant bg-surface p-4" : "rounded-2xl border border-white/10 p-4"),
+      )}
+    >
       {/* Provider picker */}
       <div>
-        {title && <p className="text-[13px] font-bold text-white">{title}</p>}
-        {description && <p className="mt-0.5 text-xs leading-relaxed text-white/55">{description}</p>}
+        {title && <p className={cn("text-[13px] font-bold", isRecall ? "text-on-surface" : "text-white")}>{title}</p>}
+        {description && (
+          <p className={cn("mt-0.5 text-xs leading-relaxed", isRecall ? "text-on-surface-variant" : "text-white/55")}>
+            {description}
+          </p>
+        )}
         <div data-ai-provider-grid className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {AI_PROVIDERS.map((p) => (
             <ProviderTile
               key={p.id}
               meta={p}
               selected={value.provider === p.id}
+              visualStyle={visualStyle}
               onSelect={() => {
                 if (p.id === value.provider) return;
                 if (p.id === "custom") {
@@ -223,53 +306,71 @@ export default function AiConfigForm({
       {/* API key */}
       <div>
         <div className="flex items-center justify-between gap-2">
-          <label className="text-xs font-semibold text-white/85">API key</label>
-          {provider.keyUrl && (
+          <label className={cn("text-sm font-semibold", isRecall ? "text-on-surface" : "text-white/85")}>API key</label>
+          {provider.keyUrl ? (
             <a
               href={provider.keyUrl}
               target="_blank"
               rel="noreferrer"
-              className={`text-[11px] font-semibold underline-offset-2 hover:underline ${provider.accentText}`}
+              className={cn(
+                "text-xs font-semibold underline-offset-2 hover:underline",
+                isRecall ? "text-primary" : provider.accentText,
+              )}
             >
               {provider.keyHint} ↗
             </a>
+          ) : (
+            <span className={cn("text-xs", isRecall ? "text-on-surface-variant" : "text-white/55")}>{provider.keyHint}</span>
           )}
-          {!provider.keyUrl && <span className="text-[11px] text-white/55">{provider.keyHint}</span>}
         </div>
         <div className="relative mt-1.5">
-          <input
-            type={showKey ? "text" : "password"}
-            className="dc-field w-full rounded-full border px-3 py-2.5 pr-11 text-sm outline-none transition"
-            placeholder={provider.keyPlaceholder}
-            value={value.apiKey}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
-          />
-          <GlassButton
-            type="button"
-            tabIndex={-1}
-            aria-label={showKey ? "Hide API key" : "Show API key"}
-            onClick={() => setShowKey((s) => !s)}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 [&_.size-12]:size-8 [&_svg]:text-white/70"
-          >
-            {showKey ? (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                <line x1="2" y1="2" x2="22" y2="22" />
-              </svg>
-            ) : (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            )}
-          </GlassButton>
+          {isRecall ? (
+            <RecallInput
+              type={showKey ? "text" : "password"}
+              className="h-11 rounded-xl pr-11"
+              placeholder={provider.keyPlaceholder}
+              value={value.apiKey}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
+            />
+          ) : (
+            <input
+              type={showKey ? "text" : "password"}
+              className="dc-field w-full rounded-full border px-3 py-2.5 pr-11 text-sm outline-none transition"
+              placeholder={provider.keyPlaceholder}
+              value={value.apiKey}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
+            />
+          )}
+          {isRecall ? (
+            <RecallButton
+              type="button"
+              variant="ghost"
+              size="icon"
+              tabIndex={-1}
+              aria-label={showKey ? "Hide API key" : "Show API key"}
+              onClick={() => setShowKey((s) => !s)}
+              className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground"
+            >
+              {visibilityIcon}
+            </RecallButton>
+          ) : (
+            <GlassButton
+              type="button"
+              tabIndex={-1}
+              aria-label={showKey ? "Hide API key" : "Show API key"}
+              onClick={() => setShowKey((s) => !s)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 [&_.size-12]:size-8 [&_svg]:text-white/70"
+            >
+              {visibilityIcon}
+            </GlassButton>
+          )}
         </div>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
-          🔒 Stored only in this browser — sent directly to {provider.name}. Never uploaded to the app's servers.
+        <p className={cn("mt-1.5 text-xs leading-relaxed", isRecall ? "text-on-surface-variant" : "text-white/55")}>
+          🔒 Stored only in this browser — sent directly to {provider.name}. Never uploaded to the app&apos;s servers.
         </p>
       </div>
 
@@ -279,7 +380,10 @@ export default function AiConfigForm({
           <button
             type="button"
             onClick={() => setShowAdvanced((s) => !s)}
-            className={`text-[11px] font-semibold underline-offset-2 hover:underline ${provider.accentText}`}
+            className={cn(
+              "text-xs font-semibold underline-offset-2 hover:underline",
+              isRecall ? "text-primary" : provider.accentText,
+            )}
           >
             {showAdvanced ? "Hide" : "Show"} API base URL (advanced)
           </button>
@@ -287,24 +391,58 @@ export default function AiConfigForm({
       )}
       {(showAdvanced || provider.id === "custom") && (
         <div>
-          <label className="text-xs font-semibold text-white/85">Base URL</label>
-          <input
-            className="dc-field mt-1.5 w-full rounded-full border px-3 py-2.5 font-mono text-xs outline-none transition"
-            placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
-            value={value.baseUrl}
-            spellCheck={false}
-            onChange={(e) => onChange({ ...value, baseUrl: e.target.value })}
-          />
-          {provider.id === "custom" ? (
-            <p className="mt-1 text-[11px] text-white/55">Required for a custom OpenAI-compatible endpoint. Starts empty.</p>
+          <label className={cn("text-sm font-semibold", isRecall ? "text-on-surface" : "text-white/85")}>Base URL</label>
+          {isRecall ? (
+            <RecallInput
+              className="mt-1.5 h-11 rounded-xl font-mono text-xs"
+              placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
+              value={value.baseUrl}
+              spellCheck={false}
+              onChange={(e) => onChange({ ...value, baseUrl: e.target.value })}
+            />
           ) : (
-            <p className="mt-1 text-[11px] text-white/55">Leave empty to use {provider.name}&apos;s default endpoint.</p>
+            <input
+              className="dc-field mt-1.5 w-full rounded-full border px-3 py-2.5 font-mono text-xs outline-none transition"
+              placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
+              value={value.baseUrl}
+              spellCheck={false}
+              onChange={(e) => onChange({ ...value, baseUrl: e.target.value })}
+            />
           )}
+          <p className={cn("mt-1.5 text-xs leading-relaxed", isRecall ? "text-on-surface-variant" : "text-white/55")}>
+            {provider.id === "custom"
+              ? "Required for a custom OpenAI-compatible endpoint. Starts empty."
+              : `Leave empty to use ${provider.name}'s default endpoint.`}
+          </p>
         </div>
       )}
 
       {/* Actions */}
-      {actionStyle === "uiverse" ? (
+      {actionStyle === "recall" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <RecallButton
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            onClick={() => void refreshModels(false)}
+            disabled={!hasKey || !hasCustomEndpoint || loadingModels}
+            data-ai-config-action="load-models"
+          >
+            {loadingModels ? <Spinner className="h-4 w-4" /> : <span aria-hidden="true">↻</span>}
+            {loadingModels ? "Loading models…" : "Load available models"}
+          </RecallButton>
+          <RecallButton
+            type="button"
+            className="h-11 w-full"
+            onClick={() => void runTest()}
+            disabled={!hasKey || !hasCustomEndpoint || testing}
+            data-ai-config-action="test-connection"
+          >
+            {testing ? <Spinner className="h-4 w-4" /> : <span aria-hidden="true">✓</span>}
+            {testing ? "Testing…" : "Test connection"}
+          </RecallButton>
+        </div>
+      ) : actionStyle === "uiverse" ? (
         /* The student "AI Configuration" page wears the brutalist provider
            button (Uiverse quiet-dog-6 port) for the same two configuration
            actions: one reusable component whose logo + both text lines follow
@@ -359,63 +497,80 @@ export default function AiConfigForm({
 
       {/* Model dropdown — every available model appears here */}
       <div>
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-white/85">Model</label>
-          {didAutoFetch && !loadingModels && (
-            <span className={`text-[11px] font-medium ${allModels.length > 0 ? "text-emerald-300" : "text-white/55"}`}>
+        <div className="flex items-center justify-between gap-2">
+          <label className={cn("text-sm font-semibold", isRecall ? "text-on-surface" : "text-white/85")}>Model</label>
+          {didAutoFetch && !loadingModels ? (
+            <span
+              className={cn(
+                "text-xs font-medium",
+                allModels.length > 0
+                  ? isRecall ? "text-on-tertiary-container" : "text-emerald-300"
+                  : isRecall ? "text-on-surface-variant" : "text-white/55",
+              )}
+            >
               {allModels.length} available
             </span>
-          )}
+          ) : null}
         </div>
-        {/* Wave 5: the model picker keeps its three empty states, the
-            "load models" gate and the (custom) fallback row — only the popup
-            changed. `disabled` moves to the trigger, the placeholder carries the
-            copy the old single-option <select> used to fake. */}
-        <GlassSelect value={value.model} onValueChange={(v) => onChange({ ...value, model: v })}>
-          <GlassSelectTrigger
-            aria-label="Model"
-            disabled={allModels.length === 0}
-            placeholder={
-              allModels.length > 0
-                ? "Select a model"
-                : hasKey
-                  ? loadingModels
-                    ? "Loading models…"
-                    : "No models — load available models"
-                  : "Add an API key to see models"
-            }
-            className="dc-glass-select mt-1.5 h-11 w-full text-sm font-medium"
-          />
-          <GlassSelectContent className="dc-glass-select-pop" aria-label="Model options">
-            {allModels.map((m) => (
-              <GlassSelectItem key={m.id} value={m.id}>
-                {m.name}
-              </GlassSelectItem>
-            ))}
-            {hasKey && value.model && !modelKnown ? (
-              <GlassSelectItem value={value.model}>{value.model} (custom)</GlassSelectItem>
-            ) : null}
-          </GlassSelectContent>
-        </GlassSelect>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
+        {isRecall ? (
+          <RecallSelect value={value.model} onValueChange={(model) => onChange({ ...value, model })}>
+            <RecallSelectTrigger aria-label="Model" disabled={allModels.length === 0} className="mt-1.5 h-11 rounded-xl">
+              <RecallSelectValue placeholder={modelPlaceholder} />
+            </RecallSelectTrigger>
+            <RecallSelectContent className="max-h-64" aria-label="Model options">
+              {allModels.map((model) => (
+                <RecallSelectItem key={model.id} value={model.id}>
+                  {model.name}
+                </RecallSelectItem>
+              ))}
+              {hasKey && value.model && !modelKnown ? (
+                <RecallSelectItem value={value.model}>{value.model} (custom)</RecallSelectItem>
+              ) : null}
+            </RecallSelectContent>
+          </RecallSelect>
+        ) : (
+          <GlassSelect value={value.model} onValueChange={(model) => onChange({ ...value, model })}>
+            <GlassSelectTrigger
+              aria-label="Model"
+              disabled={allModels.length === 0}
+              placeholder={modelPlaceholder}
+              className="dc-glass-select mt-1.5 h-11 w-full text-sm font-medium"
+            />
+            <GlassSelectContent className="dc-glass-select-pop" aria-label="Model options">
+              {allModels.map((model) => (
+                <GlassSelectItem key={model.id} value={model.id}>
+                  {model.name}
+                </GlassSelectItem>
+              ))}
+              {hasKey && value.model && !modelKnown ? (
+                <GlassSelectItem value={value.model}>{value.model} (custom)</GlassSelectItem>
+              ) : null}
+            </GlassSelectContent>
+          </GlassSelect>
+        )}
+        <p className={cn("mt-1.5 text-xs leading-relaxed", isRecall ? "text-on-surface-variant" : "text-white/55")}>
           {value.model ? `Using ${value.model} — questions are generated with this model.` : "Pick the model used for question generation."}
         </p>
       </div>
 
       {/* Status line */}
-      {status && (
+      {status ? (
         <div
-          className={`rounded-xl px-3 py-2 text-xs font-medium leading-relaxed ${
+          role={status.tone === "err" ? "alert" : "status"}
+          className={cn(
+            "rounded-xl px-3 py-2 text-sm font-medium leading-relaxed",
             status.tone === "ok"
-              ? "bg-emerald-500/15 text-emerald-200"
+              ? isRecall ? "bg-tertiary-container text-on-tertiary-container" : "bg-emerald-500/15 text-emerald-200"
               : status.tone === "err"
-                ? "bg-rose-500/15 text-rose-200"
-                : "border border-white/10 text-white/75"
-          }`}
+                ? isRecall ? "bg-error-container text-on-error-container" : "bg-rose-500/15 text-rose-200"
+                : isRecall
+                  ? "border border-outline-variant bg-surface-container-low text-on-surface-variant"
+                  : "border border-white/10 text-white/75",
+          )}
         >
           {status.text}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

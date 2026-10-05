@@ -43,30 +43,27 @@ test("revision access mirrors the My Day gate against the revision feature doc",
   assert.match(useRevisionAccess, /featureConfigured\s*=\s*snapshot\.exists\(\)\s*&&\s*data\.active\s*!==\s*false/);
 });
 
-test("RevisionApp gates paywalled actions with the floating premium gate", () => {
+test("RevisionApp gates create actions with the shared floating premium gate", () => {
   assert.match(revisionApp, /useRevisionAccess/);
-  assert.match(revisionApp, /hasRevisionAccess/);
-  assert.match(revisionApp, /revisionAccessLoading/);
+  assert.match(revisionApp, /const \{ hasAccess, loading: accessLoading/);
   assert.match(revisionApp, /data-revision-access-loading/);
-  // No upfront lock screen: the app always renders so learners can browse,
-  // and the unified PremiumGate modal (same behaviour as My Day) opens only
-  // when a paywalled action is attempted.
+  // No upfront lock screen: the shared gate opens only when a gated action is
+  // attempted, while existing tests and study sessions keep their own routes.
   assert.match(revisionApp, /<PremiumGate/);
   assert.match(revisionApp, /variant="revision"/);
   assert.match(revisionApp, /userName=\{userName\}/);
   assert.match(revisionApp, /open=\{paywallOpen\}/);
-  assert.match(revisionApp, /if \(hasRevisionAccess\) return true;/);
+  assert.match(revisionApp, /if \(hasAccess\) return true;/);
   assert.match(revisionApp, /setPaywallOpen\(true\)/);
   assert.match(revisionApp, /onRequireAccess=\{requireAccess\}/);
-  // Only new-test creation is gated. Existing player/session/result routes
-  // remain available after expiry or downgrade.
-  assert.match(revisionApp, /AiGeneratePage[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
-  assert.match(revisionApp, /BulkImportPage[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
-  assert.match(revisionApp, /Existing saved tests and in-progress attempts remain usable/);
-  assert.match(revisionApp, /Smart Revision sessions operate on existing learner-owned data/);
+  assert.match(revisionApp, /case "bank":[\s\S]{0,140}<TestBankPage uid=\{uid\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
+  assert.match(revisionApp, /case "ai-generate":[\s\S]{0,180}<AiGeneratePage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
+  assert.match(revisionApp, /case "bulk-import":[\s\S]{0,180}<BulkImportPage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
+  const testPlayerBranch = revisionApp.slice(revisionApp.indexOf('case "test-play":'), revisionApp.indexOf('case "test-result":'));
+  const studySessionBranch = revisionApp.slice(revisionApp.indexOf('case "session":'), revisionApp.indexOf('case "weak-topics":'));
+  assert.doesNotMatch(testPlayerBranch, /requireAccess|onRequireAccess/);
+  assert.doesNotMatch(studySessionBranch, /requireAccess|onRequireAccess/);
   // The gate lives on the existing route — #/revision still mounts the app.
-  // The route may be wrapped by the shared page-enter animation shell
-  // (<PageEnter>), so allow markup between the hash check and <RevisionApp />.
   assert.match(main, /hash\.startsWith\(REVISION_HASH\)\)[\s\S]{0,160}?<RevisionApp \/>/);
 });
 

@@ -232,11 +232,16 @@ test("AI and imported tests save to the cloud Test Bank with an offline local fa
   assert.match(bankSource, /pending cloud sync/);
 });
 
-test("expiry blocks only creation while saved tests and Smart Revision remain routable", () => {
-  assert.match(appSource, /Existing saved tests and in-progress attempts remain usable/);
-  assert.match(appSource, /Smart Revision sessions operate on existing learner-owned data/);
-  const sessionBranch = appSource.slice(appSource.indexOf("} else if (sessionMatch)"), appSource.indexOf("} else if (path.startsWith(\"#/revision/bank\"))"));
-  assert.doesNotMatch(sessionBranch, /hasRevisionAccess|requireAccess|PremiumGate/);
+test("expiry gates creation while saved tests and Smart Revision stay routable", () => {
+  assert.match(appSource, /const requireAccess = useCallback\(\(\) => \{/);
+  assert.match(appSource, /if \(hasAccess\) return true;/);
+  assert.match(appSource, /setPaywallOpen\(true\)/);
+  const playerBranch = appSource.slice(appSource.indexOf('case "test-play":'), appSource.indexOf('case "test-result":'));
+  const sessionBranch = appSource.slice(appSource.indexOf('case "session":'), appSource.indexOf('case "weak-topics":'));
+  assert.doesNotMatch(playerBranch, /requireAccess|onRequireAccess|PremiumGate/);
+  assert.doesNotMatch(sessionBranch, /requireAccess|onRequireAccess|PremiumGate/);
+  assert.match(appSource, /case "ai-generate":[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
+  assert.match(appSource, /case "bulk-import":[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
 });
 
 test("Test Bank UI exposes history, full/skipped retakes, durable delete, and Smart Revision", () => {

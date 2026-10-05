@@ -40,6 +40,52 @@ export function getCustomWeights(): number[] | null {
   return _customWeights;
 }
 
+function validDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function finiteNonNegative(value: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function finiteCount(value: number): number {
+  return Math.max(0, Math.trunc(finiteNonNegative(value)));
+}
+
+/**
+ * Build a safe scheduler card from persisted Recall data. Imports and older
+ * cards can have a non-new state without valid FSRS memory (e.g. stability 0,
+ * difficulty 9); normalize those rows to a clean new-card state before
+ * `repeat()` so previews and ratings cannot throw.
+ */
+function toSchedulingCard(card: Card, now: Date): FSRSCard {
+  const knownState: CardState = ["new", "learning", "review", "relearning"].includes(card.state)
+    ? card.state
+    : "new";
+  const stability = Number.isFinite(card.stability) ? card.stability : 0;
+  const difficulty = Number.isFinite(card.difficulty) ? card.difficulty : 0;
+  const reps = finiteCount(card.reps);
+  const hasValidMemory = stability > 0 && difficulty >= 1 && difficulty <= 10 && reps > 0;
+  const state: CardState = knownState === "new" || !hasValidMemory ? "new" : knownState;
+  const due = validDate(card.nextReviewDate);
+  const malformedReviewedCard = knownState !== "new" && !hasValidMemory;
+
+  return {
+    due: malformedReviewedCard ? now : due ?? now,
+    stability: state === "new" ? 0 : stability,
+    difficulty: state === "new" ? 0 : difficulty,
+    elapsed_days: state === "new" ? 0 : finiteNonNegative(card.elapsedDays),
+    scheduled_days: state === "new" ? 0 : finiteNonNegative(card.scheduledDays),
+    reps: state === "new" ? 0 : reps,
+    lapses: state === "new" ? 0 : finiteCount(card.lapses),
+    learning_steps: state === "new" ? 0 : finiteCount(card.learningSteps),
+    state: toFsrsState(state),
+    last_review: state === "new" ? undefined : validDate(card.lastReviewDate) ?? now,
+  };
+}
+
 /** Format a millisecond duration into a human-readable interval string. */
 export function formatInterval(ms: number): string {
   if (ms <= 0) return "<1m";
@@ -64,23 +110,7 @@ export function previewIntervals(
 ): { again: string; hard: string; good: string; easy: string } {
   const f = fsrs({ request_retention: desiredRetention, w: _customWeights ?? undefined });
 
-  const fsrsState = toFsrsState(card.state);
-
-  const schedulingCard: FSRSCard = {
-    due: new Date(card.nextReviewDate),
-    stability: card.stability,
-    difficulty: card.difficulty,
-    elapsed_days: card.elapsedDays,
-    scheduled_days: card.scheduledDays,
-    reps: card.reps,
-    lapses: card.lapses,
-    learning_steps: card.learningSteps,
-    state: fsrsState,
-    last_review: card.lastReviewDate
-      ? new Date(card.lastReviewDate)
-      : undefined,
-  };
-
+  const schedulingCard = toSchedulingCard(card, now);
   const recordLog = f.repeat(schedulingCard, now);
 
   const dueMs = (rating: 1 | 2 | 3 | 4): number => {
@@ -117,23 +147,7 @@ export function applyReview(card: Card, rating: ReviewRating, reviewedAt: Date, 
           ? Rating.Good
           : Rating.Easy;
 
-  const fsrsState = toFsrsState(card.state);
-
-  const schedulingCard: FSRSCard = {
-    due: new Date(card.nextReviewDate),
-    stability: card.stability,
-    difficulty: card.difficulty,
-    elapsed_days: card.elapsedDays,
-    scheduled_days: card.scheduledDays,
-    reps: card.reps,
-    lapses: card.lapses,
-    learning_steps: card.learningSteps,
-    state: fsrsState,
-    last_review: card.lastReviewDate
-      ? new Date(card.lastReviewDate)
-      : undefined,
-  };
-
+  const schedulingCard = toSchedulingCard(card, reviewedAt);
   const recordLog = f.repeat(schedulingCard, reviewedAt);
   const s = recordLog[fsrsRating].card;
 

@@ -34,7 +34,8 @@ const TABS: TabDefinition[] = [
   { id: "browser", label: { key: "nav.browser", fallback: "Cards" }, href: "#/revision/browser", pages: ["browser"] },
   { id: "weak", label: { key: "revision.tabs.weak", fallback: "Weak Topics" }, href: REVISION_DEEP_LINKS.weakTopics, pages: ["weak-topics"] },
   { id: "progress", label: { key: "revision.tabs.progress", fallback: "Progress" }, href: REVISION_DEEP_LINKS.progress, pages: ["progress", "stats"] },
-  { id: "plan", label: { key: "revision.tabs.plan", fallback: "Plan & AI" }, href: REVISION_DEEP_LINKS.profile, pages: ["profile", "settings"] },
+  { id: "plan", label: { key: "revision.tabs.plan", fallback: "Plan & AI" }, href: REVISION_DEEP_LINKS.profile, pages: ["profile", "ai-settings", "ai-generate"] },
+  { id: "settings", label: { key: "revision.tabs.settings", fallback: "Settings" }, href: REVISION_DEEP_LINKS.settings, pages: ["settings"] },
   { id: "import", label: { key: "revision.tabs.import", fallback: "Import" }, href: REVISION_DEEP_LINKS.bulkImport, pages: ["bulk-import", "import-hub"] },
 ];
 

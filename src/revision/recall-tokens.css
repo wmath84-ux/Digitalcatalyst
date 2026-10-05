@@ -1,0 +1,114 @@
+/* Recall's compile-time Tailwind surface.
+   Imported once from src/index.css so the utilities used by the lazy Revision
+   chunk are generated in the global stylesheet, while every runtime value
+   remains attached to [data-recall-root]. */
+
+/* Recall renders card copy through `prose` (upstream's tailwind.config.ts
+   registers @tailwindcss/typography). No other Digitalcatalyst surface uses
+   `prose`, so enabling the plugin is additive, not a global restyle. */
+@plugin "@tailwindcss/typography";
+
+/* Upstream sets `darkMode: ["class"]`. Scoping the variant keeps DC's own
+   media-query `dark:` utilities untouched. */
+@custom-variant recall-dark (&:where([data-recall-theme="dark"], [data-recall-theme="dark"] *));
+
+/* ── Token NAMES ──────────────────────────────────────────────────────────
+   `inline` is what makes this safe: the value is inlined into the utility, so
+   `bg-surface` compiles to `background-color: var(--rc-surface)` and no global
+   `--color-surface` is ever published for another screen to pick up.
+   Values themselves live further down, on `[data-recall-root]`. */
+@theme inline {
+  /* M3 surface tiers */
+  --color-surface: var(--rc-surface);
+  --color-surface-dim: var(--rc-surface-dim);
+  --color-surface-bright: var(--rc-surface-bright);
+  --color-surface-raised: var(--rc-surface-raised);
+  --color-surface-variant: var(--rc-surface-variant);
+  --color-surface-container-lowest: var(--rc-surface-container-lowest);
+  --color-surface-container-low: var(--rc-surface-container-low);
+  --color-surface-container: var(--rc-surface-container);
+  --color-surface-container-high: var(--rc-surface-container-high);
+  --color-surface-container-highest: var(--rc-surface-container-highest);
+  --color-on-surface: var(--rc-on-surface);
+  --color-on-surface-variant: var(--rc-on-surface-variant);
+  --color-inverse-surface: var(--rc-inverse-surface);
+  --color-inverse-on-surface: var(--rc-inverse-on-surface);
+  --color-outline: var(--rc-outline);
+  --color-outline-variant: var(--rc-outline-variant);
+  --color-border-strong: var(--rc-border-strong);
+  --color-surface-tint: var(--rc-surface-tint);
+  --color-background: var(--rc-background);
+  --color-on-background: var(--rc-on-background);
+
+  /* M3 primary */
+  --color-primary: hsl(var(--rc-shad-primary));
+  --color-on-primary: var(--rc-on-primary);
+  --color-primary-container: var(--rc-primary-container);
+  --color-on-primary-container: var(--rc-on-primary-container);
+  --color-primary-soft: var(--rc-primary-soft);
+  --color-on-primary-soft: var(--rc-primary);
+  --color-inverse-primary: var(--rc-inverse-primary);
+  --color-primary-fixed: var(--rc-primary-fixed);
+  --color-primary-fixed-dim: var(--rc-primary-fixed-dim);
+  --color-on-primary-fixed: var(--rc-on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--rc-on-primary-fixed-variant);
+
+  /* M3 secondary (motivation amber) */
+  --color-secondary: hsl(var(--rc-shad-secondary));
+  --color-on-secondary: var(--rc-on-secondary);
+  --color-secondary-container: var(--rc-secondary-container);
+  --color-on-secondary-container: var(--rc-on-secondary-container);
+  --color-secondary-fixed: var(--rc-secondary-fixed);
+  --color-secondary-fixed-dim: var(--rc-secondary-fixed-dim);
+  --color-on-secondary-fixed: var(--rc-on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--rc-on-secondary-fixed-variant);
+
+  /* M3 tertiary (success green) */
+  --color-tertiary: var(--rc-tertiary);
+  --color-on-tertiary: var(--rc-on-tertiary);
+  --color-tertiary-container: var(--rc-tertiary-container);
+  --color-on-tertiary-container: var(--rc-on-tertiary-container);
+  --color-tertiary-fixed: var(--rc-tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--rc-tertiary-fixed-dim);
+  --color-on-tertiary-fixed: var(--rc-on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--rc-on-tertiary-fixed-variant);
+
+  /* M3 error */
+  --color-error: var(--rc-error);
+  --color-on-error: var(--rc-on-error);
+  --color-error-container: var(--rc-error-container);
+  --color-on-error-container: var(--rc-on-error-container);
+
+  /* Semantic text + FSRS rating palette */
+  --color-text-primary: var(--rc-text-primary);
+  --color-text-secondary: var(--rc-text-secondary);
+  --color-review-again: var(--rc-review-again);
+  --color-review-hard: var(--rc-review-hard);
+  --color-review-good: var(--rc-review-good);
+  --color-review-easy: var(--rc-review-easy);
+
+  /* Legacy shadcn layer used by recalled `ui/` primitives. */
+  --color-border: hsl(var(--rc-shad-border));
+  --color-input: hsl(var(--rc-shad-input));
+  --color-ring: hsl(var(--rc-shad-ring));
+  --color-foreground: hsl(var(--rc-shad-foreground));
+  --color-card: hsl(var(--rc-shad-card));
+  --color-card-foreground: hsl(var(--rc-shad-card-foreground));
+  --color-muted: hsl(var(--rc-shad-muted));
+  --color-muted-foreground: hsl(var(--rc-shad-muted-foreground));
+  --color-accent: hsl(var(--rc-shad-accent));
+  --color-accent-foreground: hsl(var(--rc-shad-accent-foreground));
+  --color-destructive: hsl(var(--rc-shad-destructive));
+  --color-destructive-foreground: hsl(var(--rc-shad-destructive-foreground));
+  --color-secondary-foreground: hsl(var(--rc-shad-secondary-foreground));
+  --color-primary-foreground: hsl(var(--rc-shad-primary-foreground));
+  --color-popover: hsl(var(--rc-shad-card));
+  --color-popover-foreground: hsl(var(--rc-shad-card-foreground));
+
+  /* Recall's display/headline/body families. Names are new to this app, so
+     registering them cannot restyle an existing screen. */
+  --font-display: var(--rc-font-display);
+  --font-headline: var(--rc-font-headline);
+  --font-body: var(--rc-font-body);
+}
+

@@ -125,13 +125,13 @@ export default function ProgressPage({ uid }: { uid: string }) {
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-container-high">
                     <div
-                      className="h-full rounded-full bg-primary"
+                      className="h-full rounded-full bg-primary transition-[width] duration-300"
                       style={{ width: `${(bucket.attempted / maxAttempted) * 100}%` }}
                     />
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
                     <div
-                      className="h-full rounded-full bg-tertiary"
+                      className="h-full rounded-full bg-tertiary transition-[width] duration-300"
                       style={{ width: `${bucket.accuracy}%` }}
                     />
                   </div>

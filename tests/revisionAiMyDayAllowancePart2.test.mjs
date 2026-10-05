@@ -215,10 +215,10 @@ test("the AI allowance card has one destination on Usage Limits, not Revision Pr
   assert.match(usagePage, /import AiQuotaCard/);
   assert.match(usagePage, /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
   assert.match(usagePage, /data-school-ai-visible="true"/);
-  assert.match(revisionApp, /path\.startsWith\("#\/revision\/profile"\)[\s\S]*?<RevisionProfilePage/);
+  assert.match(revisionApp, /case "profile":[\s\S]{0,120}<RevisionProfilePage/);
   assert.doesNotMatch(revisionProfile, /AiQuotaCard/);
-  assert.match(revisionProfile, /data-revision-usage-limits-link/);
-  assert.match(revisionProfile, /navigate\("#\/usage-limits"\)/);
+  assert.equal((revisionProfile.match(/title="Usage limits"/g) ?? []).length, 1);
+  assert.match(revisionProfile, /onClick=\{\(\) => navigate\("#\/usage-limits"\)\}/);
 });
 
 test("provider metadata supports actual usage with an estimate fallback", () => {

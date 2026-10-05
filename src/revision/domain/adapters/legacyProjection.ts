@@ -109,13 +109,17 @@ function schedulingFromRevisionItem(item: RevisionItemRow | undefined, now: Date
 
   const total = item.timesCorrect + item.timesWrong;
   const accuracy = total > 0 ? item.timesCorrect / total : 0;
+  // Every seen legacy item carries a non-new state. Give it at least one day
+  // of memory even when old rows have no correct/wrong counters, otherwise
+  // ts-fsrs rejects the `state: review, stability: 0` projection.
+  const stability = state === "new" ? 0 : Math.max(1, item.successStreak, accuracy > 0 ? 1 : 0);
 
   return {
     due: due.toISOString(),
     lastReview: item.lastRevisedAt,
     // A conservative stability seed: one day per successful streak, floored at
     // 1 day once the learner has actually answered it.
-    stability: item.successStreak > 0 ? item.successStreak : accuracy > 0 ? 1 : 0,
+    stability,
     difficulty: 4 + (1 - accuracy) * 5,
     elapsedDays: 0,
     scheduledDays: state === "review" ? MASTERED_INTERVAL_DAYS : 0,

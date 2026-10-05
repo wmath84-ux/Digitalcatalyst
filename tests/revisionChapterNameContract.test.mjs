@@ -171,12 +171,14 @@ test("an import with no chapter keeps the legacy derived label (old functionalit
 /* --------------------------------------------------------------------------- */
 
 test("the import form gained a Chapter Name field beside the Test Name field", () => {
-  // One extra field, next to the existing one, keeping the shared field recipe.
+  // The title and chapter inputs use Recall's token-backed Input primitive
+  // rather than the retired dark-only `.dc-field` recipe.
   assert.match(importPage, /data-rev-import-chapter/);
   assert.match(importPage, /Chapter name/);
   assert.match(importPage, /Test name/);
   assert.match(importPage, /placeholder="e\.g\. Electrostatics"/);
-  assert.match(importPage, /className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"/);
+  assert.match(importPage, /<Input[\s\S]{0,180}?className="h-11 rounded-xl"/);
+  assert.match(importPage, /from "..\/recall\/components\/ui\/input"/);
   // …and it is the value that reaches the saved plan.
   assert.match(importPage, /const \[chapterName, setChapterName\] = useState\(""\);/);
   assert.match(importPage, /const cleanChapter = chapterName\.trim\(\);/);
