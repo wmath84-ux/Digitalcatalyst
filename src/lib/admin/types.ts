@@ -65,7 +65,13 @@ export type ProductResource = {
      * `interactiveHtml` below (a hosted https link in `url` is the fallback
      * for files too big to store).
      */
-    | "interactive";
+    | "interactive"
+    /**
+     * Mind Map resource — visual hierarchical knowledge representation.
+     * Content is stored as structured mind map data (nodes, connections, etc.)
+     * and renders in the Course Player's Mind Map viewer.
+     */
+    | "mind_map";
   url: string;
   provider: string;
   sortOrder: number;
@@ -92,6 +98,21 @@ export type ProductResource = {
    * plays offline in a sandboxed iframe. See `src/utils/experimentSpec.ts`.
    */
   interactiveHtml?: string;
+  /**
+   * Mind Map content (`type: "mind_map"` only): structured mind map data
+   * that follows the canonical mind map format from utils/mindMapTree.js.
+   * This includes the root topic, nodes, and their hierarchical relationships.
+   */
+  mindMapData?: Record<string, unknown>;
+  /**
+   * Source mode for mind map: "code_import" or "scratch_builder".
+   * Tracks how the mind map was created for analytics and UI purposes.
+   */
+  mindMapSourceMode?: "code_import" | "scratch_builder";
+  /**
+   * Root topic of the mind map, used for display and indexing.
+   */
+  mindMapRootTopic?: string;
   /** Read source metadata (`type: "read"` only). */
   readSourceKind?: "upload" | "gdrive" | "pdf_url" | "embed_url";
   readStoragePath?: string;

@@ -23,6 +23,7 @@ export const CORE_PRODUCT_RESOURCE_TYPES = Object.freeze([
   { value: "brain", label: "Brain · practice set" },
   { value: "interactive", label: "Interactive 2D experiment" },
   { value: "read", label: "Read · PDF / library" },
+  { value: "mind_map", label: "Mind Map" },
 ]);
 
 export const NOTE_RESOURCE_TYPE = Object.freeze({ value: "note", label: "Block Note" });

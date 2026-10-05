@@ -39,6 +39,7 @@ import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/a
 import PracticeSetImportPanel from "@/components/admin/products/PracticeSetImportPanel";
 import AdminExperimentEditor from "@/components/admin/products/ExperimentEditor";
 import BlockNoteResourceEditor from "@/components/admin/products/BlockNoteResourceEditor";
+import MindMapResourceEditor from "@/components/admin/products/MindMapResourceEditor";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
@@ -72,6 +73,7 @@ function providerForType(type: ProductResource["type"]) {
   if (type === "interactive") return "Experiment";
   if (type === "read") return "Read library";
   if (type === "note") return "BlockNote";
+  if (type === "mind_map") return "Mind Map";
   if (type === "youtube") return "YouTube";
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
@@ -806,13 +808,15 @@ function ResourceCard({
   const brainReady = isBrain && practiceQuestionsReady(resource.practiceQuestions);
   const isExperiment = resource.type === "interactive";
   const isNote = resource.type === "note";
+  const isMindMap = resource.type === "mind_map";
   const noteHtmlLength = String(resource.noteHtml || "").length;
   const noteReady = isNote && Boolean(resource.name.trim()) && noteHtmlLength <= MAX_NOTE_HTML_LENGTH;
+  const mindMapReady = isMindMap && Boolean(resource.name.trim()) && Boolean(resource.mindMapData);
   const experimentHtml = isExperiment ? String(resource.interactiveHtml || "") : "";
   const experimentHosted = isExperiment && Boolean(cleanUrl);
   const experimentErrors = isExperiment && experimentHtml.trim() ? experimentBlockingIssues(experimentHtml) : [];
   const experimentReady = isExperiment && (Boolean(experimentHtml.trim()) || experimentHosted) && experimentErrors.length === 0;
-  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : isNote ? noteReady : Boolean(cleanUrl);
+  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : isNote ? noteReady : isMindMap ? mindMapReady : Boolean(cleanUrl);
 
   return (
     <article
@@ -845,6 +849,8 @@ function ResourceCard({
           <Pill tone={cleanUrl ? "success" : "warn"}>{cleanUrl ? "Read source ready" : "Source required"}</Pill>
         ) : isNote ? (
           <Pill tone={noteReady ? "success" : "warn"}>{noteReady ? "Master note ready" : noteHtmlLength > MAX_NOTE_HTML_LENGTH ? "Note too long" : "Add a title"}</Pill>
+        ) : isMindMap ? (
+          <Pill tone={mindMapReady ? "success" : "warn"}>{mindMapReady ? "Mind map ready" : "Add mind map data"}</Pill>
         ) : (
           <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
         )}
@@ -898,6 +904,25 @@ function ResourceCard({
                   readStoragePath: undefined,
                   readFileName: undefined,
                   readFileSize: undefined,
+                });
+              } else if (type === "mind_map") {
+                onUpdate({
+                  type,
+                  provider: providerForType(type),
+                  url: "",
+                  mindMapData: resource.type === "mind_map" ? resource.mindMapData : undefined,
+                  mindMapSourceMode: resource.type === "mind_map" ? resource.mindMapSourceMode : undefined,
+                  mindMapRootTopic: resource.type === "mind_map" ? resource.mindMapRootTopic : undefined,
+                  readSourceKind: undefined,
+                  readStoragePath: undefined,
+                  readFileName: undefined,
+                  readFileSize: undefined,
+                  noteHtml: undefined,
+                  noteSource: undefined,
+                  ownerType: undefined,
+                  ownerId: undefined,
+                  courseId: undefined,
+                  moduleId: undefined,
                 });
               } else {
                 onUpdate({
@@ -1081,6 +1106,8 @@ function ResourceCard({
         </div>
       ) : isNote ? (
         <BlockNoteResourceEditor resource={resource} onChange={onUpdate} />
+      ) : isMindMap ? (
+        <MindMapResourceEditor resource={resource} onChange={onUpdate} />
       ) : resource.type === "image_url" ? (
         <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
           <div>
@@ -1153,7 +1180,7 @@ function ResourceCard({
         </Field>
       )}
 
-      {!cleanUrl && !isBrain && !isExperiment && !isNote ? (
+      {!cleanUrl && !isBrain && !isExperiment && !isNote && !isMindMap ? (
         <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">
           Add a valid public URL before publishing. This resource cannot appear in the player yet.
         </p>
@@ -1169,6 +1196,11 @@ function ResourceCard({
         <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
           Every practice question needs text, two options and a marked answer. The set only reaches the learner&apos;s Brain tab once it is
           complete — drafts stay saved here meanwhile.
+        </p>
+      ) : null}
+      {isMindMap && !mindMapReady ? (
+        <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
+          Add mind map data using either the code import or scratch builder. The mind map will appear in the Course Player once complete.
         </p>
       ) : null}
       {isExperiment && !experimentReady ? (
