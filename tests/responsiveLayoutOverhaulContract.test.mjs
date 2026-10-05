@@ -64,23 +64,26 @@ test("revision dashboard panels and stat grids are container-targeted", () => {
   assert.match(css, /@container dc-rev \(max-width: 479px\)[\s\S]*\[data-rev-stat-grid\][\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
-test("revision profile keeps secondary info available on compact widths", () => {
-  assert.match(profile, /data-rev-col="left"/);
-  assert.match(profile, /data-rev-col="middle"/);
-  assert.match(profile, /data-rev-col="right"/);
-  // The Quick Tips column no longer disappears below the desktop breakpoint;
-  // it flows below primary content instead.
-  assert.doesNotMatch(profile, /<div className="hidden lg:flex/);
-  assert.match(profile, /data-rev-widget-grid/);
+test("the Recall profile keeps plan, AI and account actions available at compact widths", () => {
+  assert.match(profile, /<RecallPage/);
+  assert.match(profile, /grid grid-cols-3 gap-2/);
+  assert.match(profile, /Study plan/);
+  assert.match(profile, /<SectionTitle>AI<\/SectionTitle>/);
+  assert.match(profile, /<SectionTitle>Account & data<\/SectionTitle>/);
+  assert.match(profile, /title="Usage limits"/);
+  assert.match(profile, /title="Subscription"/);
+  assert.match(profile, /<RecallRow/);
+  assert.doesNotMatch(profile, /hidden lg:flex|overflow-hidden h-screen/);
 });
 
-test("revision progress and result pages expose reflow grids", () => {
-  assert.match(progress, /data-rev-panel="primary"/);
-  assert.match(progress, /data-rev-panel="secondary"/);
-  assert.match(progress, /data-rev-total-grid/);
-  assert.match(testResult, /data-rev-result-grid/);
+test("Recall progress and result pages keep their responsive metrics and answer summaries", () => {
+  assert.match(progress, /grid grid-cols-2 gap-2 sm:grid-cols-4/);
+  assert.match(progress, /<RecallStat label="Overall accuracy"/);
+  assert.match(progress, /<RecallCard/);
+  assert.match(testResult, /grid grid-cols-2 gap-2 sm:grid-cols-4/);
+  assert.match(testResult, /<RecallStat label="Score"/);
+  assert.match(testResult, /<RecallCard/);
   assert.match(sessionResult, /data-rev-result-grid/);
-  assert.match(bank, /data-rev-result-metrics/);
 });
 
 test("AI generation controls reflow via container-width columns", () => {

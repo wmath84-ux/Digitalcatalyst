@@ -30,7 +30,7 @@ import fs from "node:fs";
 
 const read = (p) => fs.readFileSync(p, "utf8");
 
-const tabs = read("src/components/ui/PageTabs.tsx");
+const tabs = read("src/revision/components/RevisionTabs.tsx");
 const shell = read("src/components/DesktopShell.tsx");
 const topBarContext = read("src/components/TopBarTabsContext.tsx");
 const myDay = read("src/MyDayApp.tsx");
@@ -76,49 +76,45 @@ test("the header row exists only for as long as the publishing page is mounted",
   assert.match(topBarContext, /\}, \[feature, ariaLabel, items, activeId, homeLabel\]\);/);
 });
 
-test("Revision publishes its page buttons into the desktop header", () => {
-  const block = revision.slice(revision.indexOf("const REVISION_TABS"), revision.indexOf("/** Which tab"));
-  for (const href of ["#/revision", "#/revision/bank", "#/revision/weak-topics", "#/revision/progress", "#/revision/profile"]) {
-    assert.ok(block.includes(`href: "${href}"`), `missing tab route ${href}`);
-  }
-  for (const label of ["Dashboard", "Test Bank", "Weak Topics", "Progress", "Profile"]) {
-    assert.match(block, new RegExp(`label: "${label}"`), `missing "${label}" tab`);
+test("Revision publishes its page destinations into the desktop header", () => {
+  const block = revision.slice(revision.indexOf("const REVISION_TOP_BAR_ITEMS"), revision.indexOf("interface RevisionAppProps"));
+  for (const [id, label] of [
+    ["dashboard", "Dashboard"],
+    ["bank", "Test Bank"],
+    ["decks", "Decks"],
+    ["browser", "Cards"],
+    ["weak-topics", "Weak Topics"],
+    ["progress", "Progress"],
+    ["profile", "Plan & AI"],
+    ["bulk-import", "Import"],
+  ]) {
+    assert.ok(block.includes(`id: "${id}", label: "${label}"`), `missing ${label} tab`);
   }
 
-  // The same destinations are handed to the desktop header.
-  assert.match(revision, /import \{ useRegisterTopBarTabs, useTopBarTabsHost \} from "\.\.\/components\/TopBarTabsContext";/);
+  // The stable destination array is published into DesktopShell's inline row.
   assert.match(revision, /useRegisterTopBarTabs\(/);
   assert.match(revision, /feature: "revision"/);
   assert.match(revision, /ariaLabel: "Revision pages"/);
-  assert.match(revision, /items: REVISION_TABS/);
-  assert.match(revision, /activeId,/);
+  assert.match(revision, /items: REVISION_TOP_BAR_ITEMS/);
+  assert.match(revision, /activeId: route\.page/);
+  assert.match(shell, /data-desktop-topbar-tabs=\{config\.feature\}/);
 
-  // …but never on top of the in-body row: with the shell mounted the strip is
-  // skipped, so a wide screen gets the header row and nothing else.
-  assert.match(revision, /const topBarHost = useTopBarTabsHost\(\);/);
-  assert.match(revision, /if \(topBarHost \|\| focusRoute\) return null;/);
-
-  // Clicking goes through the feature's exit guard, so an in-progress test
-  // still confirms before the learner leaves it.
-  assert.match(revision, /const \{ navigate \} = useExitGuard\(\);/);
-  assert.match(revision, /if \(href && href !== path\) navigate\(href\);/);
-  assert.match(revision, /onHome: \(\) => navigate\("#\/home"\)/);
+  // The top-bar handler navigates every destination through Revision's router.
+  assert.match(revision, /onSelect: \(id\) => \{/);
+  assert.match(revision, /if \(id === "dashboard"\) navigate\("#\/revision"\)/);
+  assert.match(revision, /id === "bulk-import"\) navigate\("#\/revision\/bulk-import"\)/);
 });
 
-test("the revision tabs step out of the way on the focused test surfaces", () => {
-  // The row is skipped exactly where the feature also hides its own nav.
-  assert.match(revision, /const focusRoute = isRevisionFocusRoute\(path\);/);
-  assert.match(revision, /topBarHost && !focusRoute/);
-  assert.match(revision, /<RevisionPageTabs path=\{path\} \/>/);
-  // Un-escape the `\/` pairs inside the route regexes so the assertions below
-  // read like the routes themselves.
-  const focus = revision
-    .slice(revision.indexOf("export function isRevisionFocusRoute"), revision.indexOf("function RevisionPageTabs"))
-    .replace(/\\\//g, "/");
-  assert.match(focus, /#\/revision\/test\/play/);
-  assert.match(focus, /#\/revision\/session/);
-  // …and only while an attempt is running: results / review keep the row.
-  assert.doesNotMatch(focus, /result/);
+test("Revision tabs yield to the desktop host and focused test surfaces", () => {
+  assert.match(revision, /const isDesktopHost = Boolean\(useTopBarTabsHost\(\)\)/);
+  assert.match(revision, /const isFocused = route\.page === "test-play" \|\| route\.page === "test-play-attempt"/);
+  assert.match(revision, /!isDesktopHost && !isFocused && <RevisionTabs route=\{route\} \/>/);
+  assert.match(revision, /!isDesktopHost && !isFocused && \(\s*<BottomNav/);
+  // Results and review remain navigable from the page row; active test-taking
+  // hides it, while desktop uses the registered top-bar destinations.
+  assert.match(revision, /case "test-result":[\s\S]{0,100}<TestResultPage/);
+  assert.match(revision, /case "test-review":[\s\S]{0,100}<TestReviewPage/);
+  assert.match(revision, /data-revision-scroll/);
 });
 
 test("My Day renders no horizontal tab strip", () => {
@@ -158,31 +154,23 @@ test("the footer capsule is the ONE footer on phone + tablet, released only on d
   assert.match(css, /html\[data-tablet-landscape-desktop="true"\] \[data-site-footer-nav\]/);
   assert.match(css, /\.dc-desktop-shell \[data-site-footer-nav\]/);
 
-  // And in the 768–959 px PORTRAIT band, where the capsule is now visible, the
-  // in-body text row steps aside — one footer nav, never two stacked. Tablet
-  // landscape runs the desktop shell (capsule hidden), so the row survives
-  // there, as it does on desktop through the shell's top bar.
-  assert.match(css, /@media \(min-width: 768px\) and \(max-width: 959px\) and \(orientation: portrait\)/);
-  assert.match(css, /\[data-page-tabs\] \{\s*display: none !important/);
+  // In the active Recall port, the shared Revision row stays with the feature
+  // only when the desktop host is absent; DesktopShell supplies the inline row.
+  assert.match(revision, /!isDesktopHost && !isFocused && <RevisionTabs route=\{route\} \/>/);
+  assert.match(shell, /<TopBarTabRow config=\{topBarTabs\} \/>/);
 });
 
-test("the in-body row stays text-only, phone-hidden and revision-only", () => {
-  // `hidden … md:block` — the row cannot stack on top of the phone pill.
-  assert.match(tabs, /"dc-page-tabs hidden w-full shrink-0[^"]*md:block/);
-  // Keval text — the row renders a label and nothing else; no icon component is
-  // imported by the shared row at all.
+test("the in-body Revision row stays horizontal, text-only and feature-scoped", () => {
+  assert.match(tabs, /overflow-x-auto/);
+  assert.match(tabs, /aria-label=\{t\("revision\.tabs\.label", "Revision pages"\)\}/);
+  assert.match(tabs, /\{t\(tab\.label\.key, tab\.label\.fallback\)\}/);
   assert.doesNotMatch(tabs, /lucide-react/);
-  assert.match(tabs, /title=\{item\.hint\}/);
-  assert.match(tabs, /\{item\.label\}/);
-  // Revision is now its only consumer (tablet portrait).
-  assert.match(revision, /import PageTabs, \{ type PageTabItem \} from "\.\.\/components\/ui\/PageTabs"/);
-  assert.match(revision, /feature="revision"/);
-  // The offset has to follow whichever header is visible, which the app decides
-  // in src/index.css (768 / 960 bands + tablet landscape), not a Tailwind class.
-  assert.match(css, /\.dc-page-tabs\s*\{[^}]*position: sticky/);
-  assert.match(css, /@media \(min-width: 768px\)\s*\{\s*\.dc-page-tabs\s*\{\s*top: 80px/);
-  assert.match(css, /@media \(min-width: 960px\)\s*\{\s*\.dc-page-tabs\s*\{\s*top: 64px/);
-  assert.match(css, /html\[data-tablet-landscape-desktop="true"\] \.dc-page-tabs/);
+  assert.match(tabs, /onClick=\{\(\) => navigate\(tab\.href\)\}/);
+  // It is shown on phone/tablet when the desktop host is absent and yields to
+  // the host's published inline row or the focused test-taking view.
+  assert.match(revision, /!isDesktopHost && !isFocused && <RevisionTabs route=\{route\} \/>/);
+  assert.match(revision, /useRegisterTopBarTabs\(/);
+  assert.match(revision, /items: REVISION_TOP_BAR_ITEMS/);
 });
 
 test("the taller top bar is not clipped on tablet bands", () => {

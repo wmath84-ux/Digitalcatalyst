@@ -4,8 +4,8 @@
 // render it — AI Configuration (`#/revision/ai-settings`,
 // `#/revision/customize/ai-config`), the AI generator, Bulk Import
 // (`#/revision/bulk-import`), the test player / result / review and a Smart
-// Revision session. All of them are reached from the revision profile page and
-// all of them render `PageShell` → `AppHeader`.
+// Revision session. The legacy sub-pages still render `PageShell` → `AppHeader`;
+// Bulk Import now uses RecallPage inside the same shared Revision shell.
 //
 // The bug this locks down: `src/index.css` carried per-band sticky offsets for
 // `[data-revision-app-header]` (68 px phone / 80 px tablet portrait / 64 px
@@ -94,24 +94,18 @@ test("the header is rendered above the page scroller, not inside it", () => {
   const mainAt = pageShell.indexOf("data-revision-page-main");
   assert.ok(headerAt >= 0, "PageShell must render AppHeader");
   assert.ok(mainAt > headerAt, "AppHeader must render before the scrolling main");
-  // …and the wrapper both live in is the sticky scrollport: it clips, so the
-  // header is measured against THAT box, not against the viewport.
-  assert.match(revisionApp, /data-revision-content className="flex min-h-0 flex-1 flex-col overflow-hidden"/);
-  const contentRules = innermostRules(css).filter(
-    (rule) => rule.selector.trim() === "[data-revision-content]",
-  );
-  assert.ok(contentRules.length > 0, "expected a bare [data-revision-content] rule in index.css");
-  assert.ok(
-    contentRules.some((rule) => /min-height:\s*0/.test(rule.body)),
-    "the revision content column must stay a bounded flex child (min-height: 0)",
-  );
+  // The Recall-backed app owns a shared flex shell and marks the scrolling
+  // content explicitly; the desktop shell owns the outer scrollport.
+  assert.match(revisionApp, /data-revision-shell className="flex min-h-dvh flex-col"/);
+  assert.match(revisionApp, /data-revision-scroll/);
+  assert.match(css, /\.dc-desktop-shell \[data-revision-shell\] > \[data-revision-scroll\]/);
 
-  // The two sub-pages this report is about reach that header through PageShell
-  // with a back button and WITHOUT merging into the shared website header.
-  for (const page of [aiSettings, bulkImport]) {
-    assert.match(page, /<PageShell[\s\S]*?backHref="#\/revision\/profile"/);
-    assert.doesNotMatch(page, /mergeIntoMainHeader/);
-  }
+  // AI Settings retains its feature-local back header; Bulk Import uses the
+  // common Recall page shell and leaves the host header/navigation untouched.
+  assert.match(aiSettings, /<PageShell[\s\S]*?backHref="#\/revision\/profile"/);
+  assert.doesNotMatch(aiSettings, /mergeIntoMainHeader/);
+  assert.match(bulkImport, /<RecallPage[\s\S]*?onBack=\{\(\) => navigate\("#\/revision\/profile"\)\}/);
+  assert.doesNotMatch(bulkImport, /PageShell|AppHeader|mergeIntoMainHeader/);
 });
 
 test("AppHeader itself asks for top-0 and no hard-coded band offset", () => {
@@ -165,7 +159,7 @@ test("the Test Bank search header stays pinned to the top of the page body", () 
   // "flush under the main header" and must keep `top-0`.
   assert.match(bankPage, /mergeIntoMainHeader/);
   assert.match(bankPage, /dc-glass-toolbar sticky top-0 z-10/);
-  // The route stays a top-level tab page, so the feature header is not
-  // rendered on top of it.
-  assert.match(revisionApp, /if \(path\.startsWith\("#\/revision\/bank"\)\) return false;/);
+  // Test Bank is a first-class Recall sub-page mounted in the same route shell;
+  // its search toolbar and page header remain in the shared scroll flow.
+  assert.match(revisionApp, /case "bank":[\s\S]{0,180}<TestBankPage/);
 });

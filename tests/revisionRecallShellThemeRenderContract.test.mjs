@@ -14,6 +14,8 @@ const main = read("src/main.tsx");
 const appShell = read("src/revision/recall/components/app-shell.tsx");
 const revisionApp = read("src/revision/RevisionApp.tsx");
 const recallTheme = read("src/revision/recall-theme.css");
+const recallTokens = read("src/revision/recall-tokens.css");
+const recallStorage = read("src/revision/recall/services/storage.ts");
 const css = read("src/index.css");
 const domainTypes = read("src/revision/domain/types.ts");
 const migrations = read("src/revision/domain/migrations/index.ts");
@@ -56,13 +58,19 @@ test("Revision integrates into DesktopShell with the unified left rail and heade
   assert.doesNotMatch(host.slice(0, start), /hash\.startsWith\(REVISION_HASH\)/, "must not skip AppShell on revision");
 });
 
-test("Recall keeps its light token surface and is not distorted by legacy desktop styling", () => {
+test("Recall utilities are generated globally while runtime tokens stay scoped", () => {
   assert.match(revisionApp, /data-recall-root[\s\S]{0,120}?className="min-h-dvh bg-background/);
-  assert.match(recallTheme, /--color-background: var\(--rc-background\)/);
+  assert.match(css, /@import "\.\/revision\/recall-tokens\.css"/);
+  assert.match(recallTokens, /--color-background: var\(--rc-background\)/);
+  assert.match(recallTokens, /@custom-variant recall-dark/);
   const lightTokens = recallTheme.slice(recallTheme.indexOf("[data-recall-root] {"), recallTheme.indexOf("/* ── Dark theme"));
   assert.match(lightTokens, /--rc-background: #f7f9fb;/);
   assert.match(lightTokens, /color-scheme: light;/);
   assert.match(recallTheme, /\[data-recall-root\]\[data-recall-theme="dark"\]/);
+  assert.doesNotMatch(recallTheme.replace(/\/\*[\s\S]*?\*\//g, ""), /@theme inline/);
+  assert.match(recallStorage, /function syncPortalTheme/);
+  assert.match(recallStorage, /body\.setAttribute\("data-recall-theme"/);
+  assert.match(recallStorage, /function restorePortalTheme/);
   assert.match(
     css,
     /\[data-revision-app\]:not\(\[data-recall-root\]\) h1,[\s\S]{0,500}?\[data-revision-app\]:not\(\[data-recall-root\]\) button/,
@@ -74,6 +82,72 @@ test("standalone Recall Revision pages are not clipped by the legacy tablet view
     css,
     /body:not\(:has\(\.dc-desktop-shell\)\) \[data-recall-root\]\[data-revision-app\] \{[\s\S]{0,220}?height: auto !important;[\s\S]{0,220}?overflow: visible !important;/,
   );
+});
+
+test("desktop Revision keeps its light surface and lets the shell scroller reach all content", () => {
+  assert.match(
+    css,
+    /\.dc-desktop-shell \[data-recall-root\]\[data-revision-app\] \{[\s\S]{0,380}?height: auto !important;[\s\S]{0,240}?overflow: visible !important;[\s\S]{0,160}?background: var\(--rc-background\) !important;/,
+  );
+  assert.match(css, /\.dc-desktop-shell \[data-revision-shell\] > \[data-revision-scroll\]/);
+  assert.match(
+    css,
+    /\[data-revision-scroll\] \{[^}]*padding-top: calc\(var\(--desktop-topbar-height, 64px\) \+ 2\.75rem \+ clamp\(12px, 1\.2vw, 20px\)\) !important;/,
+  );
+});
+
+test("Radix portals inherit Recall theme tokens and restore the host body on unmount", () => {
+  const cache = path.join(process.cwd(), "node_modules", ".cache", "revision-portal-theme-runtime");
+  fs.mkdirSync(cache, { recursive: true });
+  const outfile = path.join(cache, "storage.cjs");
+  buildSync({
+    entryPoints: [path.join(process.cwd(), "src/revision/recall/services/storage.ts")],
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    outfile,
+    logLevel: "silent",
+  });
+
+  const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+  const globals = ["window", "document", "HTMLElement"];
+  const originalGlobals = new Map(globals.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement })) {
+    Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  }
+
+  try {
+    const body = dom.window.document.body;
+    body.style.setProperty("--rc-shad-card", "host-token");
+    body.setAttribute("data-recall-theme", "host-theme");
+    body.setAttribute("data-recall-contrast", "host-contrast");
+    const root = dom.window.document.createElement("div");
+    root.setAttribute("data-recall-root", "");
+    root.style.setProperty("--rc-shad-card", "0 0% 100%");
+    root.style.setProperty("--rc-background", "#f7f9fb");
+    dom.window.document.body.append(root);
+
+    const { applyTheme, registerRecallThemeRoot } = require(outfile);
+    registerRecallThemeRoot(root);
+    assert.equal(body.style.getPropertyValue("--rc-shad-card"), "0 0% 100%");
+    assert.equal(body.getAttribute("data-recall-theme"), "light");
+    applyTheme("dark");
+    assert.equal(body.getAttribute("data-recall-theme"), "dark");
+    applyTheme("high-contrast");
+    assert.equal(body.getAttribute("data-recall-contrast"), "high");
+
+    registerRecallThemeRoot(null);
+    assert.equal(body.style.getPropertyValue("--rc-shad-card"), "host-token");
+    assert.equal(body.getAttribute("data-recall-theme"), "host-theme");
+    assert.equal(body.getAttribute("data-recall-contrast"), "host-contrast");
+  } finally {
+    dom.window.close();
+    for (const key of globals) {
+      const descriptor = originalGlobals.get(key);
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
 });
 
 test("Recall light is the default and existing inherited dark settings migrate once", () => {

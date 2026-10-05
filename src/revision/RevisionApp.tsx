@@ -27,9 +27,10 @@
  *      feature visibility for the host rail, cloud persistence on
  *      `revision-db-changed`, and `ExitGuard` for in-flight tests.
  *
- * Nothing here reads or writes global CSS: `recall-theme.css` is imported here
- * (the only entry point of the Revision chunk) and every token inside it is
- * scoped to `[data-recall-root]` (§22).
+ * The compile-time Recall utility names live in `recall-tokens.css`, imported
+ * by the global stylesheet so Tailwind emits classes used by this lazy chunk.
+ * Runtime theme values and base rules remain scoped to `[data-recall-root]` in
+ * `recall-theme.css`; portals receive a temporary copy of those tokens (§22).
  */
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -39,7 +40,7 @@ import "./recall-theme.css";
 
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
+import { useRegisterTopBarTabs, useTopBarTabsHost, type TopBarTabItem } from "../components/TopBarTabsContext";
 import PremiumGate from "../components/subscription/PremiumGate";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
@@ -107,6 +108,20 @@ const BulkImportPage = lazy(() => import("./pages/BulkImportPage"));
 
 const REVISION_HASH = "#/revision";
 
+// Keep the item array referentially stable. The desktop shell publishes the
+// memoized tab config back to this tree; allocating a new array on each render
+// made the registration effect set shell state again, creating a render loop.
+const REVISION_TOP_BAR_ITEMS: TopBarTabItem[] = [
+  { id: "dashboard", label: "Dashboard", hint: "Overview & due cards" },
+  { id: "bank", label: "Test Bank", hint: "Exams & quizzes" },
+  { id: "decks", label: "Decks", hint: "Flashcard collections" },
+  { id: "browser", label: "Cards", hint: "Search all flashcards" },
+  { id: "weak-topics", label: "Weak Topics", hint: "Target weak points" },
+  { id: "progress", label: "Progress", hint: "Stats & metrics" },
+  { id: "profile", label: "Plan & AI", hint: "Study settings & AI tools" },
+  { id: "bulk-import", label: "Import", hint: "Import cards & decks" },
+];
+
 interface RevisionAppProps {
   /** Overridden in tests; production reads the signed-in learner. */
   uidOverride?: string;
@@ -154,16 +169,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
   useRegisterTopBarTabs({
     feature: "revision",
     ariaLabel: "Revision pages",
-    items: [
-      { id: "dashboard", label: "Dashboard", hint: "Overview & due cards" },
-      { id: "bank", label: "Test Bank", hint: "Exams & quizzes" },
-      { id: "decks", label: "Decks", hint: "Flashcard collections" },
-      { id: "browser", label: "Cards", hint: "Search all flashcards" },
-      { id: "weak-topics", label: "Weak Topics", hint: "Target weak points" },
-      { id: "progress", label: "Progress", hint: "Stats & metrics" },
-      { id: "profile", label: "Plan & AI", hint: "Study settings & AI tools" },
-      { id: "bulk-import", label: "Import", hint: "Import cards & decks" },
-    ],
+    items: REVISION_TOP_BAR_ITEMS,
     activeId: route.page,
     onSelect: (id) => {
       if (id === "dashboard") navigate("#/revision");
@@ -483,7 +489,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
       >
         <ExitGuardProvider onNavigate={navigate}>
           {isStudy ? (
-            <main className="min-h-dvh bg-background px-4 py-5 text-on-surface sm:px-6 lg:px-8">
+            <main data-revision-scroll className="min-h-dvh bg-background px-4 py-5 text-on-surface sm:px-6 lg:px-8">
               <Suspense fallback={<RecallLoading />}>
                 {view === "study" ? (
                   <ErrorBoundary viewName="StudyMode" onRecover={showDashboard}>
@@ -497,7 +503,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
               </Suspense>
             </main>
           ) : (
-            <div className="flex min-h-dvh flex-col">
+            <div data-revision-shell className="flex min-h-dvh flex-col">
               {/* On mobile / tablet-portrait, render the unified app header with Recall quick actions */}
               {!isDesktopHost && !isFocused && (
                 <Header
@@ -546,7 +552,8 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
 
               <main
                 id="main-content"
-                className="flex-1 w-full mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6 pb-28 lg:px-8 lg:py-6 lg:pb-12"
+                data-revision-scroll
+                className="min-h-0 flex-1 w-full mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6 pb-28 lg:px-8 lg:py-6 lg:pb-12"
                 tabIndex={-1}
               >
                 {/* On mobile / tablet-portrait, secondary tabs render below header */}

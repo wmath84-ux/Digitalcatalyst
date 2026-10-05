@@ -60,7 +60,10 @@ test("the generator page sends the full syllabus and does not silently swap in d
   assert.match(generatePage, /topicNames/);
   assert.match(generatePage, /minutes: totalMinutes/);
   assert.doesNotMatch(generatePage, /built your test with the offline engine instead/);
-  assert.match(generatePage, /Check your configuration and try again/);
+  // The Recall-backed generator blocks an unconfigured AI instead of showing a
+  // generic configuration error or silently switching to offline questions.
+  assert.match(generatePage, /No AI is configured/);
+  assert.match(generatePage, /use Bulk Import to paste a complete revision plan/);
 });
 
 test("local Vite answers /api/revision/generate with JSON instead of the SPA", () => {

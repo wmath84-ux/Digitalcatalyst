@@ -77,6 +77,6 @@ test("questionMode survives local save, cloud sanitize, migration, and result/hi
   assert.match(cloudClient, /test: structuredClone\(test\)/);
   assert.match(cloudApi, /questionMode: \["mixed", "theory", "application"\]/);
   assert.match(cloudApi, /action === "revision\.data\.create" \|\| action === "revision\.data\.migrate"/);
-  assert.match(results, /Saved Test Plan/);
-  assert.match(results, /questionModeLabel\(data\.planDetails\.questionMode\)/);
+  assert.match(results, /Generated from/);
+  assert.match(results, /questionModeLabel\(result\.planDetails\.questionMode\)/);
 });
