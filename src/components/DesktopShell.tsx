@@ -59,7 +59,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
-import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
+import DesktopPeekDock, { isHomeDockRoute } from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
@@ -323,6 +323,9 @@ export default function DesktopShell({
   // `null` on every other page, so the extra header row only exists while the
   // publishing page is mounted.
   const [topBarTabs, setTopBarTabs] = useState<TopBarTabsConfig | null>(null);
+  // Re-evaluated on every render; DesktopAppHost re-renders this shell on
+  // each hashchange, so it always follows the route.
+  const homeDockAlwaysOpen = isHomeDockRoute(active, typeof window !== "undefined" ? window.location.hash : "");
 
   // Keep the search input in sync with the page's own query when the
   // page changes the initial value. The dependency is the string so
@@ -809,6 +812,10 @@ export default function DesktopShell({
           <div
             className={`flex min-h-0 flex-1 gap-6 px-6 py-6 ${sidePanel ? "xl:px-8" : ""}`}
             data-desktop-content
+            // The always-open Home dock floats over the bottom of this column;
+            // the CSS rule keyed on this attribute reserves room for it so the
+            // last row of content can always be scrolled clear of the dock.
+            data-desktop-dock-clearance={homeDockAlwaysOpen ? "true" : undefined}
           >
             <main className="min-w-0 flex-1">
               {children}
@@ -830,6 +837,8 @@ export default function DesktopShell({
           always-on bottom footer). A thin transparent line at the
           bottom centre of the PAGE column reveals the dock; leaving
           hides it. The left rail stays visible. */}
+      {/* On Home the dock is always open (DesktopPeekDock decides from the
+          route — see isHomeDockRoute); elsewhere it keeps the peek line. */}
       <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
 
     </div>

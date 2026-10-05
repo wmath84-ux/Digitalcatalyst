@@ -73,6 +73,17 @@ const DRAG_SELECT_THRESHOLD = 12
 const CLOSE_GRACE_MS = 80
 
 
+/**
+ * The Home page itself — where the dock is always open (owner brief
+ * 2026-10-05: the Home footer is visible by default and never collapses).
+ * `active === "home"` alone is not enough: the leaderboard and unknown routes
+ * light the Home rail entry too. DesktopShell uses the same rule to reserve
+ * the dock's height at the end of the page column.
+ */
+export function isHomeDockRoute(active: DesktopRailKey, hash: string): boolean {
+  return active === 'home' && (hash === '#/home' || hash.startsWith('#/home?') || hash.startsWith('#/home/'))
+}
+
 function railToTab(active: DesktopRailKey): TabKey | null {
   // Rail entries that have no peek-dock slot of their own.
   if (
@@ -89,7 +100,11 @@ export default function DesktopPeekDock({
   active: DesktopRailKey
   purchasesBadge?: number
 }) {
-  const [open, setOpen] = useState(false)
+  // Re-read on every render: DesktopAppHost re-renders the shell (and so this
+  // dock) on each hashchange. On Home the line is only the optional
+  // press-drag strip; nothing can collapse the dock.
+  const alwaysOpen = isHomeDockRoute(active, typeof window !== 'undefined' ? window.location.hash : '')
+  const [hoverOpen, setOpen] = useState(false)
   /**
    * Touch / pen have no hover: a tap on the line PINS the dock open, and only
    * an outside tap, a selection or another tap on the line releases it. Mouse
@@ -117,6 +132,7 @@ export default function DesktopPeekDock({
   // the callback was created with.
   const pinnedRef = useRef(false)
   pinnedRef.current = pinned
+  const open = alwaysOpen || hoverOpen
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current !== null) {
@@ -288,6 +304,7 @@ export default function DesktopPeekDock({
         ref={hostRef}
         data-desktop-peek-dock=""
         data-open={open ? 'true' : 'false'}
+        data-always-open={alwaysOpen ? 'true' : undefined}
         className="fixed bottom-0 z-50 flex flex-col items-center"
         onPointerUp={(event) => {
           // A press that started on the line and ended on a button IS that
@@ -307,7 +324,7 @@ export default function DesktopPeekDock({
           if (isTap) {
             // Touch / pen: the tap toggles the dock (mouse hover already did).
             // An explicit tap-close must win over the area guard below.
-            if (pointerTypeRef.current !== 'mouse') {
+            if (pointerTypeRef.current !== 'mouse' && !alwaysOpen) {
               if (wasPinnedRef.current) close()
               else setPinned(true)
             }
@@ -341,7 +358,8 @@ export default function DesktopPeekDock({
         <div
           ref={lineRef}
           data-desktop-peek-line=""
-          aria-label="Show navigation dock"
+          aria-label={alwaysOpen ? undefined : 'Show navigation dock'}
+          aria-hidden={alwaysOpen ? true : undefined}
           onPointerEnter={(event) => {
             rememberPointer(event.clientX, event.clientY)
             show()
@@ -361,7 +379,7 @@ export default function DesktopPeekDock({
             cancelClose()
             setOpen(true)
             if (event.pointerType !== 'mouse') {
-              setPinned(true)
+              if (!alwaysOpen) setPinned(true)
               // A finger/pen drag keeps reporting to the line even when it
               // travels onto a button, so the release still lands on the item
               // the learner aimed at.

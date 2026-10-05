@@ -1831,6 +1831,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             // The personal library is the LEARNER's (users/{uid}/sketchLibraries),
             // so the panel needs to know who is signed in.
             uid={user?.id ?? null}
+            deviceSaved={sketch.deviceSaved}
+            onRetry={sketch.retry}
+            // The module's boards: switcher + "+" (new blank canvas).
+            boards={sketch.boards}
+            activeBoardKey={sketch.activeBoardKey}
+            activeBoardTitle={sketch.activeBoardTitle}
+            onSelectBoard={sketch.selectBoard}
+            onCreateBoard={sketch.createBoard}
+            canCreateBoard={sketch.canCreateBoard}
           />
         </Suspense>
       )}

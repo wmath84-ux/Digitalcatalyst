@@ -42,7 +42,7 @@
 // active tab, so resizing the deck can never recreate the canvas. Switching
 // modules DOES change the key, because that is a different board.
 
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 // Must come first: it sets window.EXCALIDRAW_ASSET_PATH before the editor's
 // font loader runs (see the file's header).
 import "./excalidrawAssets";
@@ -52,8 +52,8 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 // this panel needs from the package.
 import { useHandleLibrary } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { BookMarked, Pencil } from "lucide-react";
-import type { SketchSaveStatus } from "./useCourseSketch";
+import { BookMarked, Check, ChevronDown, Layers, Pencil, Plus, RotateCcw } from "lucide-react";
+import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
 import type { SketchScene } from "../../utils/sketchScene";
 // The learner's PERSONAL LIBRARY (the editor ships the panel but no storage —
 // see the hook's header) plus the "Add to Excalidraw" return link it installs.
@@ -231,8 +231,11 @@ export interface SketchPanelProps {
   pendingSync: boolean;
   /** False when there is no learner / module to scope a board to. */
   scoped: boolean;
-  /** Excalidraw's own `onChange` — elements, appState, files. */
-  onChange: (elements: unknown, appState: unknown, files: unknown) => void;
+  /**
+   * Excalidraw's own `onChange` — elements, appState, files — plus the
+   * `sceneKey` the editor was mounted for (stale editors are ignored).
+   */
+  onChange: (elements: unknown, appState: unknown, files: unknown, forSceneKey?: string) => void;
   /**
    * The colour this board opens with: its own saved colour, else the
    * learner's last-used device colour, else `null` (the theme default).
@@ -248,6 +251,147 @@ export interface SketchPanelProps {
    * (`users/{uid}/sketchLibraries/main`). Absent/null = no library storage.
    */
   uid?: string | null;
+  /** False when even the device copy could not be written (storage full). */
+  deviceSaved?: boolean;
+  /** Retry a failed read/write now (the save line's Retry). */
+  onRetry?: () => void;
+  /** The module's boards (canvas switcher), first board first. */
+  boards?: SketchBoardSummary[];
+  /** The board on screen. */
+  activeBoardKey?: string;
+  activeBoardTitle?: string;
+  /** Open another board of this module. */
+  onSelectBoard?: (sketchKey: string) => void;
+  /** "+" — create a fresh blank board, register it and open it. */
+  onCreateBoard?: () => string | null;
+  /** False when there is no module scope or the module is at its limit. */
+  canCreateBoard?: boolean;
+}
+
+/**
+ * The canvas switcher + the "+" (new canvas) button — the left end of the
+ * save line. The list is a small popover, so the save line keeps its one-row
+ * height on a phone; the "+" is always one tap.
+ */
+function SketchBoards({
+  boards,
+  activeBoardKey,
+  activeBoardTitle,
+  onSelectBoard,
+  onCreateBoard,
+  canCreateBoard,
+}: {
+  boards: SketchBoardSummary[];
+  activeBoardKey: string;
+  activeBoardTitle: string;
+  onSelectBoard?: (sketchKey: string) => void;
+  onCreateBoard?: () => string | null;
+  canCreateBoard: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocumentClick = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocumentClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const create = () => {
+    // The hook ignores a repeated tap inside its double-tap guard, so a
+    // double-click can never make two boards.
+    const key = onCreateBoard?.();
+    if (key) setOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative flex shrink-0 items-center gap-1" data-course-sketch-boards={boards.length}>
+      <button
+        type="button"
+        onClick={create}
+        disabled={!canCreateBoard}
+        aria-label="New canvas"
+        title={canCreateBoard ? "New canvas" : "Canvas limit reached for this module"}
+        data-course-sketch-new
+        className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-500 text-white shadow-sm shadow-black/40 transition-colors hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus aria-hidden size={15} strokeWidth={2.5} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Canvas: ${activeBoardTitle}. ${boards.length} canvas${boards.length === 1 ? "" : "es"} in this module`}
+        data-course-sketch-board-switch
+        className={`flex h-6 min-w-0 max-w-[9rem] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold transition-colors ${
+          open ? "border-white/30 bg-white/10 text-white" : "border-white/15 text-white/80 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        <Layers aria-hidden size={12} className="shrink-0 text-white/55" />
+        <span className="truncate" data-course-sketch-active-board={activeBoardKey}>{activeBoardTitle}</span>
+        {boards.length > 1 ? (
+          <span className="shrink-0 rounded bg-white/10 px-1 text-[9px] tabular-nums text-white/60">{boards.length}</span>
+        ) : null}
+        <ChevronDown aria-hidden size={12} className="shrink-0 text-white/55" />
+      </button>
+      {open ? (
+        <div
+          className="absolute left-0 top-full z-30 mt-1.5 w-60 max-w-[17rem] rounded-xl border border-white/10 bg-[#1b1b21]/95 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-md"
+          data-course-sketch-board-menu
+        >
+          <ul role="listbox" aria-label="Canvases in this module" className="max-h-64 overflow-y-auto">
+            {boards.map((board) => {
+              const active = board.sketchKey === activeBoardKey;
+              return (
+                <li key={board.sketchKey}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!active) onSelectBoard?.(board.sketchKey);
+                    }}
+                    data-course-sketch-board-option={board.sketchKey}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors ${
+                      active ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                      {active ? <Check aria-hidden size={13} className="text-orange-400" /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{board.title}</span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-white/40">
+                      {board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "Blank"}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            type="button"
+            onClick={create}
+            disabled={!canCreateBoard}
+            className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-white/10 px-2 py-1.5 text-left text-[12px] font-semibold text-orange-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus aria-hidden size={13} /> New canvas
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /** The slim save line — the only chrome this panel adds. Never a banner. */
@@ -256,12 +400,19 @@ function SketchStatus({
   pendingSync,
   errorMessage,
   boardName,
+  deviceSaved = true,
+  onRetry,
+  leading,
   children,
 }: {
   status: SketchSaveStatus;
   pendingSync: boolean;
   errorMessage: string | null;
   boardName?: string;
+  deviceSaved?: boolean;
+  onRetry?: () => void;
+  /** The canvas switcher + "+", left-aligned before the save state. */
+  leading?: React.ReactNode;
   /** The canvas-colour cluster (swatches + pencil + picker), right-aligned. */
   children?: React.ReactNode;
 }) {
@@ -269,10 +420,17 @@ function SketchStatus({
   let tone: "muted" | "ok" | "warn" = "muted";
   if (status === "loading") {
     label = "Loading sketch…";
+  } else if (status === "pending") {
+    // Edited, not written yet — never "Saved" while it is not.
+    label = "Unsaved changes…";
   } else if (status === "saving") {
     label = "Saving…";
   } else if (status === "error") {
-    label = pendingSync ? "Offline draft — saved on this device" : "Sync paused";
+    label = !deviceSaved
+      ? "Not saved yet — retrying"
+      : pendingSync
+        ? "Offline draft — saved on this device"
+        : "Sync paused";
     tone = "warn";
   } else if (status === "saved") {
     label = "Saved";
@@ -288,6 +446,7 @@ function SketchStatus({
       data-course-sketch-status={status}
       data-course-sketch-pending={pendingSync ? "true" : "false"}
     >
+      {leading}
       <span
         role="status"
         aria-live="polite"
@@ -297,10 +456,21 @@ function SketchStatus({
         <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
         <span className="truncate">{label}</span>
       </span>
+      {status === "error" && onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          title={errorMessage ?? "Retry saving to your account"}
+          data-course-sketch-retry
+          className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
+        >
+          <RotateCcw aria-hidden size={10} /> Retry
+        </button>
+      ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {children}
         {boardName ? (
-          <span className="min-w-0 max-w-32 truncate text-[10px] font-semibold text-white/35" data-course-sketch-board>
+          <span className="hidden min-w-0 max-w-32 truncate text-[10px] font-semibold text-white/35 sm:block" data-course-sketch-board>
             {boardName}
           </span>
         ) : null}
@@ -322,6 +492,14 @@ export default function SketchPanel({
   onCanvasColorChange,
   boardName,
   uid = null,
+  deviceSaved = true,
+  onRetry,
+  boards = [],
+  activeBoardKey = "main",
+  activeBoardTitle = "Canvas 1",
+  onSelectBoard,
+  onCreateBoard,
+  canCreateBoard = false,
 }: SketchPanelProps) {
   /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -445,6 +623,16 @@ export default function SketchPanel({
   };
 
   /**
+   * Every change is tagged with the scene this editor was mounted for, so a
+   * change from an editor mounted on an older scene (the cloud answered
+   * late, a merge remounted the board) can never be saved over the newer one.
+   */
+  const handleChange = useCallback(
+    (elements: unknown, appState: unknown, files: unknown) => onChange(elements, appState, files, sceneKey),
+    [onChange, sceneKey],
+  );
+
+  /**
    * Excalidraw reads `initialData` ONCE, on mount. It is therefore memoised
    * on the scene's identity — the same thing the editor is keyed by — so a
    * re-render caused by the save line (or by a divider drag) can never hand
@@ -484,7 +672,24 @@ export default function SketchPanel({
       data-course-sketch-panel
       data-sketch-scope={scoped ? "module" : "none"}
     >
-      <SketchStatus status={status} pendingSync={pendingSync} errorMessage={errorMessage} boardName={boardName}>
+      <SketchStatus
+        status={status}
+        pendingSync={pendingSync}
+        errorMessage={errorMessage}
+        boardName={boardName}
+        deviceSaved={deviceSaved}
+        onRetry={onRetry}
+        leading={scoped ? (
+          <SketchBoards
+            boards={boards}
+            activeBoardKey={activeBoardKey}
+            activeBoardTitle={activeBoardTitle}
+            onSelectBoard={onSelectBoard}
+            onCreateBoard={onCreateBoard}
+            canCreateBoard={canCreateBoard}
+          />
+        ) : null}
+      >
         {/* The learner's PERSONAL LIBRARY, at a glance: how many items their
             own library holds on this device/account, and what the "Add to
             Excalidraw" return is doing right now. The panel itself is
@@ -595,8 +800,8 @@ export default function SketchPanel({
             <Excalidraw
               key={sceneKey}
               initialData={initialData}
-              onChange={onChange}
-              name={boardName || "Sketch"}
+              onChange={handleChange}
+              name={[boardName, boards.length > 1 ? activeBoardTitle : ""].filter(Boolean).join(" — ") || "Sketch"}
               // "Browse libraries" opens libraries.excalidraw.com; it returns
               // the learner to `libraryReturnUrl` with `#addLibrary=…`, which
               // main.tsx intercepts and this panel then installs (see the

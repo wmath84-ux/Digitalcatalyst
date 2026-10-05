@@ -60,6 +60,8 @@ export function sanitizeReadUploadSubmodule(value: unknown): string;
 export function buildReadUploadStoragePath(uid: unknown, uploadId: unknown, fileName?: unknown): string;
 export function isOwnedReadUploadPath(value: unknown, uid: unknown): boolean;
 export function isReadUploadFile(file: { size?: number; type?: string; name?: string } | null | undefined): boolean;
+export const READ_UPLOAD_HEADER_BYTES: number;
+export function isPdfHeader(bytes: ArrayBuffer | ArrayBufferView | null | undefined): boolean;
 export function readUploadFileIssue(file: { size?: number; type?: string; name?: string } | null | undefined): string;
 export function toFirestoreReadUpload(input?: ReadUploadInput): Record<string, unknown>;
 export function parseReadUploadDoc(raw: Record<string, unknown> | null | undefined, uidHint?: string): ReadUpload | null;

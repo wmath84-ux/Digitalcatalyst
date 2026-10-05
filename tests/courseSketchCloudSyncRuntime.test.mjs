@@ -90,10 +90,29 @@ export async function deleteDoc(ref) {
   store.delete(asPath(ref));
 }
 
+// The board list query (users/{uid}/sketches where productId == … and
+// moduleId == …) — equality filters only, exactly what the hook issues.
+export const queries = [];
+export function where(field, op, value) { return { field, op, value }; }
+export function query(ref, ...filters) { return { type: "query", path: ref.path, filters }; }
+export async function getDocs(q) {
+  queries.push(q);
+  if (state.failReads) throw fail(state.failReads);
+  const prefix = q.path + "/";
+  const rows = [];
+  for (const [key, data] of store.entries()) {
+    if (!key.startsWith(prefix) || key.slice(prefix.length).includes("/")) continue;
+    if (!q.filters.every((f) => f.op === "==" && data[f.field] === f.value)) continue;
+    rows.push({ id: key.slice(prefix.length), data: () => data });
+  }
+  return { forEach: (fn) => rows.forEach(fn), docs: rows, size: rows.length };
+}
+
 export const reset = () => {
   store.clear();
   writes.length = 0;
   reads.length = 0;
+  queries.length = 0;
   state.failWrites = null;
   state.failReads = null;
   state.writeDelayMs = 0;

@@ -9,6 +9,15 @@
  * footer on My Day. The line, the hold-drag wave, the tap-to-pin, and the
  * "hide only when the pointer leaves the area" rule are the course dock's;
  * the plates are BottomNav's.
+ *
+ * `alwaysOpen` (owner brief 2026-10-05, Home): the dock is visible by default
+ * and never collapses — not on load, resize, rotation, keyboard or any
+ * breakpoint. Revealing it must not depend on a gesture, so the line stops
+ * being a toggle (no tap-to-pin, no hover-to-reveal state that could close
+ * it); it stays as the optional hold-drag strip for the magnification wave
+ * and drag-to-select. Because the nav is then always at its full height,
+ * `utils/footerNavSpace` publishes the real clearance and page content is
+ * never hidden behind it.
  */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
@@ -25,12 +34,15 @@ export default function SitePeekFooter({
   items,
   onSelect,
   compact = false,
+  alwaysOpen = false,
   dataAttrs,
 }: {
   label: string
   items: GlassDockItem[]
   onSelect: (id: string) => void
   compact?: boolean
+  /** Dock always visible; the line is only an optional drag strip. */
+  alwaysOpen?: boolean
   dataAttrs?: Record<string, string | undefined>
 }) {
   const [hover, setHover] = useState(false)
@@ -49,7 +61,7 @@ export default function SitePeekFooter({
   pinnedRef.current = pinned
   const pointerX: MotionValue<number> = useMotionValue(-200)
 
-  const open = hover || pinned
+  const open = alwaysOpen || hover || pinned
 
   const rememberPointer = useCallback((x: number, y: number) => {
     pointerRef.current = { x, y }
@@ -173,6 +185,7 @@ export default function SitePeekFooter({
       data-site-peek-dock=""
       data-open={open ? 'true' : 'false'}
       data-pinned={pinned ? 'true' : 'false'}
+      data-always-open={alwaysOpen ? 'true' : undefined}
       data-dock-count={String(items.length)}
       {...dataAttrs}
       className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex w-full flex-col items-center overflow-visible"
@@ -195,10 +208,13 @@ export default function SitePeekFooter({
       <div
         ref={lineRef}
         data-site-peek-line-hit=""
-        role="button"
-        tabIndex={0}
-        aria-label="Show site navigation"
-        aria-expanded={open}
+        // Always-open: the dock's own buttons are the navigation, so the line
+        // is a decorative drag strip — not a focusable toggle that does nothing.
+        role={alwaysOpen ? undefined : 'button'}
+        tabIndex={alwaysOpen ? -1 : 0}
+        aria-hidden={alwaysOpen ? true : undefined}
+        aria-label={alwaysOpen ? undefined : 'Show site navigation'}
+        aria-expanded={alwaysOpen ? undefined : open}
         onPointerEnter={show}
         onPointerLeave={hide}
         onPointerDown={(event) => {
@@ -210,7 +226,7 @@ export default function SitePeekFooter({
           rememberPointer(event.clientX, event.clientY)
           cancelClose()
           setHover(true)
-          if (event.pointerType !== 'mouse') setPinned(true)
+          if (event.pointerType !== 'mouse' && !alwaysOpen) setPinned(true)
           pointerX.set(event.clientX)
           try {
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -235,6 +251,11 @@ export default function SitePeekFooter({
           const dy = event.clientY - startYRef.current
           const isTap = Math.abs(dx) < DRAG_SELECT_THRESHOLD && Math.abs(dy) < DRAG_SELECT_THRESHOLD
           if (isTap) {
+            // Nothing to toggle when the dock never closes.
+            if (alwaysOpen) {
+              pointerX.set(-200)
+              return
+            }
             if (pointerTypeRef.current !== 'mouse') {
               if (wasPinnedRef.current) close()
               else setPinned(true)
@@ -255,6 +276,7 @@ export default function SitePeekFooter({
           draggingRef.current = false
         }}
         onKeyDown={(event) => {
+          if (alwaysOpen) return
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             setPinned((value) => !value)

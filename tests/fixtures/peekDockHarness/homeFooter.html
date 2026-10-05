@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- Test fixture for tests/homeFooterAlwaysVisibleBrowser.test.mjs: the REAL
+     site footer (src/components/BottomNav.tsx → SiteFooterNav → SitePeekFooter)
+     inside Home's own frame / main structure, with the real clearance
+     publisher (src/utils/footerNavSpace.ts). Never shipped. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Home footer harness</title>
+  </head>
+  <body style="margin:0;background:#05070d">
+    <div id="root"></div>
+    <script type="module" src="./homeFooterHarness.tsx"></script>
+  </body>
+</html>

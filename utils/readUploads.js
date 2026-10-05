@@ -170,6 +170,37 @@ export const readUploadFileIssue = (file) => {
   return "";
 };
 
+/** How many leading bytes `isPdfHeader` inspects (the PDF spec allows the
+ * `%PDF-` marker anywhere in the first 1024 bytes). */
+export const READ_UPLOAD_HEADER_BYTES = 1024;
+
+/**
+ * True when the leading bytes of a file carry the `%PDF-` signature. Pickers
+ * (Android content URIs especially) often report an empty or
+ * `application/octet-stream` type, so the name/type check alone lets a
+ * renamed image or HTML page through — it would upload fine and only fail
+ * later, inside the viewer. Accepts an ArrayBuffer or any byte view.
+ */
+export const isPdfHeader = (bytes) => {
+  let view = null;
+  if (bytes instanceof ArrayBuffer) view = new Uint8Array(bytes);
+  else if (bytes && ArrayBuffer.isView(bytes)) view = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (!view) return false;
+  const limit = Math.min(view.length, READ_UPLOAD_HEADER_BYTES) - 5;
+  for (let index = 0; index <= limit; index += 1) {
+    if (
+      view[index] === 0x25 && // %
+      view[index + 1] === 0x50 && // P
+      view[index + 2] === 0x44 && // D
+      view[index + 3] === 0x46 && // F
+      view[index + 4] === 0x2d // -
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /**
  * The Firestore payload. Every field `firestore.rules` validates is produced
  * here, so a document built by this function can never be refused for shape.

@@ -46,6 +46,7 @@ import {
   FolderPlus,
   LoaderCircle,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -62,7 +63,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import PdfJsGenericViewer, { type PdfAnnotationApi } from "./PdfJsGenericViewer";
 import CourseConfirmDialog from "./ConfirmDeleteDialog";
-import useReadUploads from "./useReadUploads";
+import useReadUploads, { type ReadUploadProgress } from "./useReadUploads";
 
 const pageStorageKey = (productId: string, resourceId: string) =>
   `digitalcatalyst:read-page:${encodeURIComponent(productId)}:${encodeURIComponent(resourceId)}`;
@@ -101,6 +102,111 @@ type AnnotationState = "idle" | "dirty" | "saving" | "saved" | "error";
  * Player — this panel only says WHICH file the learner picked.
  */
 export type ReadUploadModuleRequest = (row: ReadUpload) => void;
+
+const formatMegabytes = (bytes: number) => `${(Math.max(0, bytes) / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+
+/**
+ * The upload's honest status: what step it is on, real byte progress while
+ * bytes move (indeterminate while a step has no measurable progress), Cancel
+ * while it can still be stopped, and — after a failure — the reason with
+ * Retry / Dismiss. Rendered in the library AND inside the compose sheet (which
+ * covers the library while it is open).
+ */
+function UploadStatus({
+  uploading,
+  error,
+  canRetry,
+  onCancel,
+  onRetry,
+  onDismiss,
+  className = "",
+}: {
+  uploading: ReadUploadProgress | null;
+  error: string | null;
+  canRetry: boolean;
+  onCancel: () => void;
+  onRetry: () => void;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  if (uploading) {
+    const batch = uploading.fileCount > 1 ? ` (${uploading.fileIndex} of ${uploading.fileCount})` : "";
+    const percent = uploading.progress === null ? null : Math.round(uploading.progress * 100);
+    const label =
+      uploading.stage === "preparing"
+        ? `Preparing ${uploading.name}${batch}…`
+        : uploading.stage === "finalizing"
+          ? `Adding ${uploading.name}${batch} to your library…`
+          : uploading.waitingForNetwork
+            ? `Waiting for a connection — ${uploading.name}${batch} resumes automatically`
+            : `Uploading ${uploading.name}${batch}`;
+    return (
+      <div className={className} role="status" aria-live="polite" data-course-read-upload-progress data-stage={uploading.stage}>
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-violet-100">
+          <CloudUpload size={14} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate" data-course-read-upload-stage>{label}</span>
+          {uploading.stage === "uploading" && percent !== null ? (
+            <span className="shrink-0 tabular-nums text-violet-200/80">
+              <span className="hidden sm:inline">{formatMegabytes(uploading.bytesTransferred)} / {formatMegabytes(uploading.totalBytes)} · </span>
+              {percent}%
+            </span>
+          ) : null}
+          {uploading.stage !== "finalizing" ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold text-violet-100 hover:bg-white/10"
+              data-course-read-upload-cancel
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+        <div
+          className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10"
+          role="progressbar"
+          aria-label={label}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          {...(percent !== null ? { "aria-valuenow": percent } : {})}
+        >
+          {percent !== null ? (
+            <div className="h-full rounded-full bg-violet-400 transition-[width] duration-300" style={{ width: `${percent}%` }} />
+          ) : (
+            // No percentage exists for this step — say so instead of faking one.
+            <div className="h-full w-full animate-pulse rounded-full bg-violet-400/60" data-course-read-upload-indeterminate />
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (!error) return null;
+  return (
+    <div className={`flex items-start gap-2 ${className}`} role="alert" data-course-read-upload-error>
+      <span className="min-w-0 flex-1">{error}</span>
+      {canRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-300/20 px-2 py-0.5 font-bold text-amber-50 hover:bg-amber-300/30"
+          data-course-read-upload-retry
+        >
+          <RotateCcw size={12} aria-hidden="true" />
+          Retry
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-amber-100/80 hover:bg-white/10"
+        aria-label="Dismiss"
+        data-course-read-upload-dismiss
+      >
+        <X size={12} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 export default function ReadLibraryPanel({
   entries,
@@ -318,6 +424,18 @@ export default function ReadLibraryPanel({
     [composeModule, composeSubmodule],
   );
 
+  const retryUpload = useCallback(async () => {
+    setNotice(null);
+    const row = await readUploadsRef.current.retryUpload();
+    if (!row) return;
+    setComposeFiles([]);
+    setComposeOpen(false);
+    setNotice(`“${row.name}” is in Your annotations — annotate it and it saves to your account.`);
+    setActiveId(withKind("learner", row.id));
+  }, []);
+  const cancelUpload = useCallback(() => readUploadsRef.current.cancelUpload(), []);
+  const dismissUploadError = useCallback(() => readUploadsRef.current.clearUploadError(), []);
+
   const openUploadPicker = useCallback(() => {
     readUploadsRef.current.clearUploadError();
     setLibraryMode("mine");
@@ -332,9 +450,11 @@ export default function ReadLibraryPanel({
     }
     setNotice(null);
     const stored = await readUploadsRef.current.uploadPdfs(files, composeModule, composeSubmodule);
+    // Nothing stored (cancelled, or the only file failed): keep the sheet and
+    // the picked files, so Upload / Retry is one tap away.
+    if (!stored.length) return;
     setComposeFiles([]);
     setComposeOpen(false);
-    if (!stored.length) return;
     setNotice(
       stored.length === 1
         ? `“${stored[0].name}” is in Your annotations — annotate it and it saves to your account.`
@@ -470,23 +590,19 @@ export default function ReadLibraryPanel({
         </div>
 
         {/* Upload progress + failures: one honest line, never a silent wait. */}
-        {readUploads.uploading ? (
-          <div className="shrink-0 border-b border-white/10 px-3 py-2 sm:px-4" role="status" data-course-read-upload-progress>
-            <div className="flex items-center gap-2 text-[11px] font-semibold text-violet-100">
-              <CloudUpload size={14} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">Uploading {readUploads.uploading.name}…</span>
-              <span className="tabular-nums">{Math.round(readUploads.uploading.progress * 100)}%</span>
-            </div>
-            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-violet-400 transition-[width]" style={{ width: `${Math.round(readUploads.uploading.progress * 100)}%` }} />
-            </div>
-          </div>
-        ) : null}
-        {readUploads.uploadError ? (
-          <div className="shrink-0 border-b border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100 sm:px-4" role="alert" data-course-read-upload-error>
-            {readUploads.uploadError}
-          </div>
-        ) : null}
+        <UploadStatus
+          uploading={readUploads.uploading}
+          error={readUploads.uploadError}
+          canRetry={Boolean(readUploads.retryableName)}
+          onCancel={cancelUpload}
+          onRetry={() => void retryUpload()}
+          onDismiss={dismissUploadError}
+          className={
+            readUploads.uploading
+              ? "shrink-0 border-b border-white/10 px-3 py-2 sm:px-4"
+              : "shrink-0 border-b border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100 sm:px-4"
+          }
+        />
         {notice ? (
           <div className="shrink-0 border-b border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-semibold text-emerald-100 sm:px-4" role="status" data-course-read-notice>
             {notice}
@@ -844,6 +960,21 @@ export default function ReadLibraryPanel({
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {readUploads.uploading || readUploads.uploadError ? (
+              <UploadStatus
+                uploading={readUploads.uploading}
+                error={readUploads.uploadError}
+                canRetry={Boolean(readUploads.retryableName)}
+                onCancel={cancelUpload}
+                onRetry={() => void retryUpload()}
+                onDismiss={dismissUploadError}
+                className={
+                  readUploads.uploading
+                    ? "mb-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"
+                    : "mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100"
+                }
+              />
             ) : null}
             <button
               type="button"

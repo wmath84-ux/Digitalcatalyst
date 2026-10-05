@@ -473,9 +473,12 @@ export default function App({
           )}
         </main>
 
+        {/* Home's footer is visible by default and never collapses; the
+            course-player drag wave stays available on its line. */}
         <BottomNav
           active="home"
           peek
+          peekAlwaysOpen
           onChange={handleFooterChange}
           purchasesBadge={purchasedIds.size}
         />
