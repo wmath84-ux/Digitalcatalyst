@@ -12,6 +12,7 @@ export type CourseFileType =
   | "google_form"
   | "embed"
   | "mindmap"
+  | "mind_map"
   /**
    * The Brain practice set. Unlike every other type a `brain` resource has NO
    * url — its content IS `practiceQuestions` below, imported by the admin on
@@ -226,6 +227,19 @@ export interface CourseFile extends CourseAccessMeta {
    * A `url` MAY accompany it (a hosted page) — inline wins when both exist.
    */
   interactiveHtml?: string;
+  /**
+   * Mind Map content (type: "mind_map" only): structured mind map data
+   * that follows the canonical mind map format from utils/mindMapTree.js.
+   */
+  mindMapData?: Record<string, unknown>;
+  /**
+   * Source mode for mind map: "code_import" or "scratch_builder".
+   */
+  mindMapSourceMode?: "code_import" | "scratch_builder";
+  /**
+   * Root topic of the mind map.
+   */
+  mindMapRootTopic?: string;
 }
 
 export interface CourseModule extends CourseAccessMeta {
