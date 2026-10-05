@@ -45,24 +45,24 @@ const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undef
 
 /**
  * The access level a module or resource carries on the product
- * doc. Part 1's `canonicalModules` use `purchasable: true` to
- * flag a-la-carte items; the legacy `courseContent` tree uses
- * `accessLevel: "paidUpdate"` for the same purpose. We normalise
- * both to a single string.
+ * doc. Part 1's `canonicalModules` use `purchasable: true` while the Admin
+ * canonical mapping may persist `accessLevel: "purchasable"`; legacy
+ * `courseContent` uses `accessLevel: "paidUpdate"` and canonical schemas use
+ * `paid_update`. Normalize both vocabularies to one access string.
  */
 const moduleAccessLevel = (module) => {
   if (!isObject(module)) return "included";
   if (module.accessLevel === "hidden") return "hidden";
-  if (module.accessLevel === "paidUpdate") return "paidUpdate";
-  if (module.purchasable === true) return "purchasable";
+  if (module.accessLevel === "paidUpdate" || module.accessLevel === "paid_update") return "paidUpdate";
+  if (module.accessLevel === "purchasable" || module.purchasable === true) return "purchasable";
   return "included";
 };
 
 const resourceAccessLevel = (resource) => {
   if (!isObject(resource)) return "included";
   if (resource.accessLevel === "hidden") return "hidden";
-  if (resource.accessLevel === "paidUpdate") return "paidUpdate";
-  if (resource.purchasable === true) return "purchasable";
+  if (resource.accessLevel === "paidUpdate" || resource.accessLevel === "paid_update") return "paidUpdate";
+  if (resource.accessLevel === "purchasable" || resource.purchasable === true) return "purchasable";
   return "included";
 };
 

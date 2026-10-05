@@ -50,6 +50,7 @@ const read = (path) => readFileSync(path, "utf8");
 
 const adminTypes = read("src/lib/admin/types.ts");
 const modulesEditor = read("src/components/admin/products/ModulesResourcesEditor.tsx");
+const resourceTypes = read("utils/productResourceTypes.js");
 const productEditor = read("src/components/admin/products/ProductEditor.tsx");
 const adminPanel = read("src/components/admin/products/ExperimentEditor.tsx");
 const learnerPanel = read("src/personal-library/MyCourseExperimentEditor.tsx");
@@ -102,13 +103,13 @@ const makeModule = (resources) => ({
 test("ProductResource grows by exactly the experiment (type + inline source)", () => {
   assert.match(adminTypes, /\| "interactive";/);
   assert.match(adminTypes, /interactiveHtml\?: string;/);
-  assert.match(commerceTypes, /\| "interactive";/);
+  assert.match(commerceTypes, /\| "interactive"\n/);
   assert.match(commerceTypes, /interactiveHtml\?: string;/);
 });
 
-test("the Modules & Resources tab lists the experiment next to the other types", () => {
-  assert.match(modulesEditor, /"brain",\s*\n\s*"interactive",\s*\n\] as const;/);
-  assert.match(modulesEditor, /interactive: "Interactive 2D experiment",/);
+test("the shared resource registry offers the experiment to Modules & Resources", () => {
+  assert.match(resourceTypes, /value: "interactive", label: "Interactive 2D experiment"/);
+  assert.match(modulesEditor, /registerNoteResourceType\(ADMIN_PRODUCT_RESOURCE_TYPES\)/);
   assert.match(modulesEditor, /if \(type === "interactive"\) return "Experiment";/);
 });
 
@@ -116,13 +117,13 @@ test("the resource card treats the experiment like content, not like a link", ()
   // Ready = inline source OR a hosted page, with no blocking issues.
   assert.match(modulesEditor, /const isExperiment = resource\.type === "interactive";/);
   assert.match(modulesEditor, /const experimentReady = isExperiment && \(Boolean\(experimentHtml\.trim\(\)\) \|\| experimentHosted\) && experimentErrors\.length === 0;/);
-  assert.match(modulesEditor, /const readyForPlayer = isBrain \? brainReady : isExperiment \? experimentReady : Boolean\(cleanUrl\);/);
+  assert.match(modulesEditor, /const readyForPlayer = isBrain \? brainReady : isExperiment \? experimentReady : isNote \? noteReady : Boolean\(cleanUrl\);/);
   // Its own pill, its own amber draft state, its own hosted-link field.
   assert.match(modulesEditor, /"Source required"/);
   assert.match(modulesEditor, /"Experiment ready"/);
   assert.match(modulesEditor, /Hosted experiment link \(optional\)/);
   // The generic "add a valid public URL" warning must not fire for it…
-  assert.match(modulesEditor, /\{!cleanUrl && !isBrain && !isExperiment \?/);
+  assert.match(modulesEditor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote \?/);
   // …and an inline-only experiment offers no "Open URL" button.
   assert.match(modulesEditor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \?/);
 });

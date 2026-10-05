@@ -79,7 +79,7 @@ test("the experiment is its own union member and CourseFileType keeps its 13 off
   assert.ok(!declared.includes("interactive"), "the experiment must NOT be an official CourseFileType");
 
   assert.match(courseTypes, /export const EXPERIMENT_FILE_TYPE = "interactive" as const;/);
-  assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType;/);
+  assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType \| CourseNoteResourceFileType;/);
   assert.match(courseTypes, /export const isExperimentFileType = \(type\?: string \| null\): type is CourseInteractiveFileType =>/);
   // The two declarations of the id (types + spec) must agree.
   assert.equal(EXPERIMENT_FILE_TYPE, "interactive");
@@ -254,9 +254,9 @@ test("the Modules tab shows an experiment and gives it its own icon", () => {
 });
 
 test("the viewer stack opens experiments and never a URL-less type it cannot render", () => {
-  // `files` stays URL-backed lesson content, with Read explicitly kept out of
-  // the lesson stack (Brain and Read each open from their own dock tab)…
-  assert.match(player, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
+  // `files` stays URL-backed lesson content, with Read and Master Notes kept
+  // out of the lesson stack (they each open from their own library surface)…
+  assert.match(player, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.type !== "note" && file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
   // …while experiments join `playableFiles`, which drives the first-lesson /
   // deep-link selection, resume, and the progress denominator.
   assert.match(player, /const experimentFiles = useMemo\(\s*\n\s*\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.accessLevel !== "hidden" && isExperimentFileType\(file\.type\) && Boolean\(String\(file\.interactiveHtml \|\| ""\)\.trim\(\)\)\),/);

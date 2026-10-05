@@ -124,6 +124,7 @@ const RESOURCE_TYPE_LABEL = {
   brain: "Practice set",
   interactive: "Experiment",
   read: "Read",
+  note: "Block Note",
 };
 
 const RESOURCE_TYPE_ICON = {
@@ -142,6 +143,7 @@ const RESOURCE_TYPE_ICON = {
   brain: BrainCircuit,
   interactive: FlaskConical,
   read: FileText,
+  note: FileText,
 };
 
 // ---------------------------------------------------------------------------

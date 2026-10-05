@@ -34,6 +34,7 @@
 
 import { normalizePracticeQuestions, practiceQuestionsReady } from "./practiceSet.js";
 import { normalizeReadResourceUrl, normalizeReadSourceKind } from "./readResources.js";
+import { canonicalProductResourceType, isNoteResourceType } from "./productResourceTypes.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isString = (v) => typeof v === "string";
@@ -96,7 +97,7 @@ const normAccessLevel = (v) => {
 };
 const normVisibility = (v) => (String(v || "").trim() === "hidden" ? "hidden" : "visible");
 const normResourceType = (v) => {
-  const s = String(v || "").trim();
+  const s = canonicalProductResourceType(v);
   if (
     s === "youtube" || s === "video_url" || s === "video" ||
     s === "audio_url" || s === "audio" ||
@@ -106,7 +107,7 @@ const normResourceType = (v) => {
     s === "gform" || s === "google_form" ||
     s === "ebook" ||
     s === "github_pages" || s === "whimsical" || s === "iframe" ||
-    s === "brain" || s === "interactive" || s === "read" ||
+    s === "brain" || s === "interactive" || s === "read" || s === "note" ||
     s === "doc" || s === "sheet" || s === "embed" || s === "mindmap"
   ) return s;
   return "embed";
@@ -157,6 +158,35 @@ const readResourceUrlOf = (raw) => {
   });
 };
 
+const noteHtmlOf = (raw) => {
+  if (!raw || typeof raw !== "object") return "";
+  const candidates = [raw.noteHtml, raw.blockNoteHtml, raw.noteBodyHtml, raw.contentHtml, raw.html];
+  const body = candidates.find((value) => typeof value === "string" && value.length > 0)
+    ?? candidates.find((value) => typeof value === "string");
+  return body || "";
+};
+
+const numberOrUndefined = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : undefined;
+};
+
+/** Master-note provenance travels through both admin and player resource trees. */
+const noteMetadataOf = (raw, type) => {
+  if (type !== "note") return {};
+  return {
+    noteHtml: noteHtmlOf(raw),
+    noteSource: "master",
+    ownerType: str(raw && raw.ownerType).trim() === "course" ? "course" : undefined,
+    ownerId: str(raw && raw.ownerId).trim() || undefined,
+    courseId: str(raw && raw.courseId).trim() || undefined,
+    moduleId: str(raw && raw.moduleId).trim() || undefined,
+    createdBy: str(raw && raw.createdBy).trim() || undefined,
+    createdAt: numberOrUndefined(raw && raw.createdAt),
+    updatedAt: numberOrUndefined(raw && raw.updatedAt),
+  };
+};
+
 const isExperimentResourceType = (type) => type === "interactive";
 
 /** The inline HTML source an experiment resource carries ("" when hosted-only). */
@@ -165,6 +195,7 @@ const experimentHtmlOf = (raw) => (raw && typeof raw.interactiveHtml === "string
 /** A Brain resource is publishable when it holds a complete, answerable set. */
 const isUsableResource = (type, url, youtubeVideoId, raw) => {
   if (isBrainResourceType(type)) return practiceQuestionsReady(raw && raw.practiceQuestions);
+  if (isNoteResourceType(type)) return Boolean(noteHtmlOf(raw).trim() || str(raw && raw.name).trim());
   if (type === "read") return Boolean(readResourceUrlOf(raw));
   if (isExperimentResourceType(type)) {
     // An experiment is playable with its inline source OR a hosted page —
@@ -417,7 +448,7 @@ export const isProductPublished = (raw) => getProductPublicationStatus(raw) === 
 export const editorResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
   const type = toCanonicalResourceType(raw.type);
-  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
+  const url = type === "read" ? readResourceUrlOf(raw) : type === "note" ? "" : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   // YouTube resources are valid via their video id alone, so recover the id
   // from any pasted form (bare 11-char id, watch?v=, youtu.be, shorts, embed,
   // or a link missing its https:// scheme) instead of requiring a full https URL.
@@ -434,7 +465,7 @@ export const editorResourceToCanonical = (raw) => {
     parentModuleId: str(raw.parentModuleId),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: type === "read" ? url : url || str(raw.url),
+    url: type === "note" ? "" : type === "read" ? url : url || str(raw.url),
     provider: str(raw.provider, type === "mindmap" ? "whimsical_mindmap" : ""),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -455,6 +486,9 @@ export const editorResourceToCanonical = (raw) => {
     practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
     // Same idea for the experiment: the inline HTML IS the lesson.
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    // A Block Note is self-contained content, not a URL. Provenance stays
+    // separate from the user-owned notes collection.
+    ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
   };
 };
@@ -529,7 +563,7 @@ export const editorModulesToCanonicalTree = (flat) => {
 export const editorResourceToFirestore = (raw) => {
   if (!isObject(raw)) return null;
   const type = normResourceType(raw.type);
-  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
+  const url = type === "read" ? readResourceUrlOf(raw) : type === "note" ? "" : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
@@ -540,10 +574,10 @@ export const editorResourceToFirestore = (raw) => {
     id: str(raw.id),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: type === "read" ? url : url || str(raw.url),
-    embedUrl: pickValidUrl(raw.embedUrl) || undefined,
-    youtubeUrl: pickValidUrl(raw.youtubeUrl) || undefined,
-    youtubeVideoId: youtubeVideoId || undefined,
+    url: type === "note" ? "" : type === "read" ? url : url || str(raw.url),
+    embedUrl: type === "note" ? undefined : pickValidUrl(raw.embedUrl) || undefined,
+    youtubeUrl: type === "note" ? undefined : pickValidUrl(raw.youtubeUrl) || undefined,
+    youtubeVideoId: type === "note" ? undefined : youtubeVideoId || undefined,
     provider: str(raw.provider, type === "whimsical" ? "Whimsical" : ""),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -570,6 +604,9 @@ export const editorResourceToFirestore = (raw) => {
     // The experiment's inline source travels the same way (hosted-only
     // experiments carry nothing here — their link is `url` above).
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    // A master note is a self-contained BlockNote document and remains an
+    // admin-owned course resource throughout publishing.
+    ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
   };
   // Firestore rejects `undefined` field values outright, so the optional
@@ -713,9 +750,11 @@ export const firestoreResourceToEditor = (raw) => {
   // Read is validated by its dedicated source-kind boundary in the editor;
   // preserve its raw field so an admin can repair a malformed saved draft.
   // Other types keep the shared HTTPS URL recovery behavior.
-  const url = type === "read"
-    ? str(raw.url)
-    : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl) || str(raw.url);
+  const url = type === "note"
+    ? ""
+    : type === "read"
+      ? str(raw.url)
+      : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl) || str(raw.url);
   return {
     id: str(raw.id),
     name: str(raw.name, "Untitled resource"),
@@ -746,6 +785,9 @@ export const firestoreResourceToEditor = (raw) => {
     // re-preview the same source (gated by type, so a stale payload from an
     // earlier resource type never haunts the editor).
     interactiveHtml: isExperimentResourceType(normResourceType(raw.type)) ? experimentHtmlOf(raw) || undefined : undefined,
+    // Preserve legacy Block Note spellings and the lossless stored body while
+    // exposing the canonical `note` type in the editor.
+    ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
     parentModuleId: raw.parentModuleId === null || raw.parentModuleId === undefined || raw.parentModuleId === ""
       ? null
@@ -878,7 +920,7 @@ export const firestorePaidUpdateToEditor = (raw) => {
 export const firestoreResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
   const type = toCanonicalResourceType(raw.type);
-  const url = type === "read" ? readResourceUrlOf(raw) : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
+  const url = type === "read" ? readResourceUrlOf(raw) : type === "note" ? "" : pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const youtubeVideoId = type === "youtube"
     ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
     : str(raw.youtubeVideoId).trim();
@@ -889,7 +931,7 @@ export const firestoreResourceToCanonical = (raw) => {
     parentModuleId: str(raw.parentModuleId),
     name: str(raw.name, "Untitled resource"),
     type,
-    url: type === "read" ? url : url || str(raw.url),
+    url: type === "note" ? "" : type === "read" ? url : url || str(raw.url),
     provider: str(raw.provider, type === "mindmap" ? "whimsical_mindmap" : ""),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -906,6 +948,7 @@ export const firestoreResourceToCanonical = (raw) => {
     practiceQuestions: isBrainResourceType(type) ? practiceQuestionsOf(raw) : undefined,
     practiceTitle: isBrainResourceType(type) ? practiceTitleOf(raw) || undefined : undefined,
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
+    ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
   };
 };
@@ -1004,10 +1047,11 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     youtubeUrl: r.type === "youtube" ? str(r.url) : undefined,
     youtubeVideoId: r.type === "youtube" ? (r.youtubeVideoId || extractYoutubeVideoId(r.url)) || undefined : undefined,
     provider: str(r.provider),
-    accessLevel: r.visibility === "hidden" || r.accessLevel === "hidden" ? "hidden" : r.accessLevel === "paid_update" ? "paidUpdate" : "included",
+    accessLevel: r.visibility === "hidden" || r.accessLevel === "hidden" ? "hidden" : r.accessLevel === "paid_update" ? "paidUpdate" : r.accessLevel === "purchasable" && toPlayerResourceType(r.type) === "note" ? "purchasable" : "included",
     paidUpdateId: str(resolvedUpdateId || r.paidUpdateId || "") || undefined,
     paidUpdatePrice: r.cashPrice === null || r.cashPrice === undefined ? undefined : `₹${r.cashPrice}`,
     paidUpdateCoinPrice: numOrNull(r.coinPrice) || 0,
+    sortOrder: num(r.sortOrder),
     // The Brain tab's content: the questions the admin imported for this
     // module, carried through to the Course Player untouched.
     practiceQuestions: isBrainResourceType(toPlayerResourceType(r.type)) ? practiceQuestionsOf(r) : undefined,
@@ -1015,6 +1059,7 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     // The experiment stage's content: the admin's inline HTML, carried to the
     // player untouched (a hosted experiment arrives via `url` above instead).
     interactiveHtml: isExperimentResourceType(toPlayerResourceType(r.type)) ? experimentHtmlOf(r) || undefined : undefined,
+    ...noteMetadataOf(r, toPlayerResourceType(r.type)),
     ...readMetadataOf(r, toPlayerResourceType(r.type)),
   };
 };

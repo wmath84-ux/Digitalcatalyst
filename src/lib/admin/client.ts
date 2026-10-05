@@ -17,6 +17,8 @@ import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
 import { normalizePlanPersonalModules } from "../../../utils/personalCourse.js";
 import { normalizePlanStudyPacks } from "../../../utils/studyPacks.js";
 import { sanitizeReadUploadsForProduct } from "../../../utils/readResources.js";
+import { canonicalProductResourceType } from "../../../utils/productResourceTypes.js";
+import { MAX_NOTE_HTML_LENGTH } from "../../../utils/courseNotes.js";
 import { apiFetch } from "../../utils/apiBase";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
@@ -149,7 +151,70 @@ async function productsRequest(url: URL, init?: RequestInit) {
   const pricing=url.searchParams.get("pricing"); if(pricing) products=products.filter((p:any)=>Boolean(p.isFree)===(pricing==="free"));
   return { products };
 }
+
+function collectPreviousResourceRecords(data: any): Map<string, any> {
+  const byId = new Map<string, any>();
+  const roots = [
+    ...(Array.isArray(data?.adminProduct?.modules) ? data.adminProduct.modules : []),
+    ...(Array.isArray(data?.courseContent) ? data.courseContent : []),
+  ];
+  const visit = (modules: any[]) => {
+    for (const module of modules) {
+      if (!module || typeof module !== "object") continue;
+      const resources = Array.isArray(module.resources) && module.resources.length
+        ? module.resources
+        : Array.isArray(module.files) ? module.files : [];
+      for (const resource of resources) {
+        if (resource?.id != null) byId.set(String(resource.id), resource);
+      }
+      visit(Array.isArray(module.modules) ? module.modules : []);
+    }
+  };
+  visit(roots);
+  return byId;
+}
+
+function stampMasterNoteMetadata(modules: any[], productId: string, adminId: string, previous: Map<string, any>, now: number) {
+  return modules.map((module) => ({
+    ...module,
+    resources: (Array.isArray(module?.resources) ? module.resources : []).map((resource: any) => {
+      if (canonicalProductResourceType(resource?.type) !== "note") return resource;
+      const old = previous.get(String(resource.id || ""));
+      const createdAt = Number(old?.createdAt || resource.createdAt) || now;
+      const createdBy = String(old?.createdBy || resource.createdBy || adminId);
+      const unchanged = Boolean(old)
+        && String(old.name || "") === String(resource.name || "")
+        && String(old.noteHtml ?? old.blockNoteHtml ?? old.noteBodyHtml ?? old.contentHtml ?? old.html ?? "") === String(resource.noteHtml || "")
+        && String(old.parentModuleId || "") === String(resource.parentModuleId || "")
+        && String(old.visibility || "visible") === String(resource.visibility || "visible")
+        && String(old.accessLevel || "included") === String(resource.accessLevel || "included")
+        && Number(old.sortOrder || 0) === Number(resource.sortOrder || 0);
+      return {
+        ...resource,
+        type: "note",
+        noteSource: "master",
+        ownerType: "course",
+        ownerId: productId,
+        courseId: productId,
+        moduleId: String(resource.parentModuleId || resource.moduleId || ""),
+        createdBy,
+        createdAt,
+        updatedAt: unchanged ? Number(old.updatedAt || resource.updatedAt) || now : now,
+      };
+    }),
+  }));
+}
+
 async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
+  const oversizedNote = (Array.isArray(body.modules) ? body.modules : [])
+    .flatMap((module: any) => Array.isArray(module?.resources) ? module.resources : [])
+    .find((resource: any) => canonicalProductResourceType(resource?.type) === "note"
+      && typeof resource.noteHtml === "string"
+      && resource.noteHtml.length > MAX_NOTE_HTML_LENGTH);
+  if (oversizedNote) {
+    throw new ApiError(`Block Note “${String(oversizedNote.name || "Untitled resource")}” exceeds ${MAX_NOTE_HTML_LENGTH.toLocaleString()} serialized body characters.`, 400);
+  }
+
   // Publication status is authoritative. The previous implementation wrote
   // `status: published` into adminProduct but copied the stale hidden toggle to
   // `isVisible`, so Create & publish created a document the catalog filtered
@@ -158,9 +223,16 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
     ? String(body.status) as "draft" | "published" | "archived"
     : body.visibility === "visible" ? "published" : "draft";
   const visibility = requestedStatus === "published" ? "visible" : "hidden";
+  const existingSnapshot = await getDoc(ref);
+  const previousResources = collectPreviousResourceRecords(existingSnapshot.exists() ? existingSnapshot.data() : null);
+  const adminId = String(auth.currentUser?.uid || "");
+  const now = Date.now();
+  const normalizedModules = Array.isArray(body.modules)
+    ? stampMasterNoteMetadata(body.modules, ref.id, adminId, previousResources, now)
+    : null;
   const normalizedBody = stripUndefinedDeep({
     ...body,
-    ...(Array.isArray(body.modules) ? { modules: sanitizeReadUploadsForProduct(body.modules, ref.id) } : {}),
+    ...(normalizedModules ? { modules: sanitizeReadUploadsForProduct(normalizedModules, ref.id) } : {}),
     id: ref.id,
     status: requestedStatus,
     visibility,

@@ -69,6 +69,7 @@ const mapping = read("utils/productMapping.js");
 const courseTypes = read("src/types/course.ts");
 const adminTypes = read("src/lib/admin/types.ts");
 const editor = read("src/components/admin/products/ModulesResourcesEditor.tsx");
+const resourceTypeRegistry = read("utils/productResourceTypes.js");
 const importer = read("src/components/admin/products/PracticeSetImportPanel.tsx");
 const productEditor = read("src/components/admin/products/ProductEditor.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
@@ -257,12 +258,11 @@ test("the player builds the sets from the SAME access rule as the modules list",
 // 4. Admin — the Brain option on the Product / Course-content page
 // ---------------------------------------------------------------------------
 
-test("resource type list offers Brain · practice set", () => {
-  // `brain` joins RESOURCE_TYPES (it is no longer the last entry: the
-  // Interactive 2D experiment is its URL-less sibling — see
-  // tests/adminInteractiveExperimentsContract.test.mjs).
-  assert.match(editor, /"iframe",\s*\n\s*"brain",/, "brain joins RESOURCE_TYPES");
-  assert.match(editor, /brain: "Brain · practice set"/);
+test("resource type registry offers Brain · practice set", () => {
+  // Brain and its URL-less siblings are registered in the shared resource
+  // registry rather than a component-local selector table.
+  assert.match(resourceTypeRegistry, /value: "brain", label: "Brain · practice set"/);
+  assert.match(editor, /registerNoteResourceType\(ADMIN_PRODUCT_RESOURCE_TYPES\)/);
   assert.match(editor, /if \(type === "brain"\) return "Brain";/);
   assert.match(adminTypes, /\| "brain"/, "the editor's ProductResource type knows brain");
   assert.match(adminTypes, /export type ProductPracticeQuestion = \{/);
@@ -277,7 +277,7 @@ test("picking Brain swaps the URL fields for the importer", () => {
   // The URL-only publish rule must not fire for a type that has no URL. The
   // Interactive 2D experiment is the second such type, so both conditions name
   // it next to Brain (Brain's own behaviour is unchanged).
-  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment \? \(/);
+  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote \? \(/);
   assert.match(editor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
   // …and a ready / incomplete set is spelled out on the resource card.
   assert.match(editor, /const brainReady = isBrain && practiceQuestionsReady\(resource\.practiceQuestions\);/);
@@ -564,7 +564,7 @@ test("selecting a brain resource opens the Brain tab instead of the viewer stack
   assert.match(playerApp, /if \(first\?\.type === "brain"\) \{/);
   // `files` — the viewer stack — still requires a real URL, so the brain set
   // can never be handed to ResourceViewer through it.
-  assert.match(playerApp, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
+  assert.match(playerApp, /const files = useMemo\(\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.type !== "note" && file\.accessLevel !== "hidden" && Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\), \[modules\]\);/);
 });
 
 test("passing a set marks its resource complete exactly once and stays inside the progress maths", () => {

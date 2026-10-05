@@ -54,6 +54,7 @@ import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
+import { collectMasterCourseNotes } from "./masterNotes";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -306,7 +307,10 @@ interface CourseOverlayProps {
   selectedFileId?: string;
   ownedUpdateIds: Set<string>;
   accessibleModuleIds: Set<string>;
+  accessibleResourceIds: Set<string>;
   previewModuleIds: Set<string>;
+  /** Master library is only sourced from the official product tree. */
+  masterNotesEnabled?: boolean;
   updates: PaidCourseUpdate[];
   moduleTitleById: Record<string, string>;
   onSelectFile: (file: CourseFile) => void;
@@ -546,7 +550,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     const visible = flatModules.filter(({ module }) => unlocked.has(String(module.id)));
 
     for (const { module, depth } of visible) {
-      const files = moduleFiles(module).filter((file) => file.type !== "read" && isVisibleFile(file));
+      const files = moduleFiles(module).filter((file) => file.type !== "read" && file.type !== "note" && isVisibleFile(file));
       const moduleId = String(module.id);
       const accessible = accessibleModuleIds.has(moduleId);
       const preview = previewModuleIds.has(moduleId);
@@ -851,6 +855,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     return collectAccessibleReadResources(props.modules, unlocked, props.ownedUpdateIds, props.productId);
   }, [props.modules, props.accessibleModuleIds, props.ownedUpdateIds, props.productId]);
 
+  const masterNotes = useMemo(() => {
+    const unlocked = unlockedModuleIds(props.modules, props.accessibleModuleIds, props.ownedUpdateIds);
+    return collectMasterCourseNotes(props.modules, {
+      courseId: props.productId || "",
+      unlockedModuleIds: unlocked,
+      ownedUpdateIds: props.ownedUpdateIds,
+      accessibleResourceIds: props.accessibleResourceIds,
+      enabled: props.masterNotesEnabled,
+    });
+  }, [props.modules, props.productId, props.accessibleModuleIds, props.accessibleResourceIds, props.ownedUpdateIds, props.masterNotesEnabled]);
+
   // ── The nine tabs' rows ───────────────────────────────────────────────
   const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
@@ -877,6 +892,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         // the button to live.
         <NotesPanel
           notes={props.notes}
+          masterNotes={masterNotes}
           onAdd={props.onAddNote}
           onEdit={props.onEditNote}
           onDelete={props.onDeleteNote}

@@ -81,7 +81,9 @@ export type ResourceType =
    */
   | "interactive"
   /** Admin-managed Read library entry, not an ordinary lesson viewer file. */
-  | "read";
+  | "read"
+  /** Admin-authored rich BlockNote document shown in the Course Player MASTER library. */
+  | "note";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -117,6 +119,16 @@ export interface CanonicalCourseResource {
   readStoragePath?: string;
   readFileName?: string;
   readFileSize?: number;
+  /** Serialized BlockNote body and its master-course ownership metadata. */
+  noteHtml?: string;
+  noteSource?: "master";
+  ownerType?: "course";
+  ownerId?: string;
+  courseId?: string;
+  moduleId?: string;
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface CanonicalCourseModule {

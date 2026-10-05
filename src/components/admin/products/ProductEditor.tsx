@@ -21,6 +21,7 @@ import type { PaidUpdate, ProductImage, ProductModule } from "@/lib/admin/types"
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import ModulesResourcesEditor from "@/components/admin/products/ModulesResourcesEditor";
 import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
+import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
 import { normalizeResourceUrl, productExperimentBudget, productExperimentBudgetError } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { getFirebaseStorage } from "../../../../firebase";
@@ -256,6 +257,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
               add(`Interactive experiment “${r.name || "Untitled resource"}” in “${m.title}”: ${issue.message}`, "modules", true);
             }
           }
+        } else if (r.type === "note") {
+          const htmlLength = typeof r.noteHtml === "string" ? r.noteHtml.length : 0;
+          if (htmlLength > MAX_NOTE_HTML_LENGTH) {
+            add(`Block Note “${r.name || "Untitled resource"}” in “${m.title}” exceeds ${MAX_NOTE_HTML_LENGTH.toLocaleString()} serialized body characters.`, "modules");
+          }
         } else if (r.type === "read") {
           const readSourceKind = normalizeReadSourceKind(r.readSourceKind, r.readStoragePath);
           const readUrl = normalizeReadResourceUrl(r.url, readSourceKind, {
@@ -409,6 +415,24 @@ export function ProductEditor({ productId }: { productId?: string }) {
               fileSize: resource.readFileSize,
             }),
             readSourceKind,
+            sortOrder: index,
+            paidUpdateId,
+          };
+        }
+        if (resource.type === "note") {
+          return {
+            ...resource,
+            type: "note",
+            url: "",
+            embedUrl: "",
+            youtubeUrl: "",
+            youtubeVideoId: "",
+            noteHtml: typeof resource.noteHtml === "string" ? resource.noteHtml : "",
+            noteSource: "master",
+            ownerType: "course",
+            ownerId: ownerProductId,
+            courseId: ownerProductId,
+            moduleId: resource.parentModuleId || resource.moduleId || module.id,
             sortOrder: index,
             paidUpdateId,
           };

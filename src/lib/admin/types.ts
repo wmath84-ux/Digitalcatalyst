@@ -54,6 +54,8 @@ export type ProductResource = {
      * not the ordinary lesson viewer.
      */
     | "read"
+    /** Admin-authored rich BlockNote document shown in the player's MASTER library. */
+    | "note"
     /**
      * Interactive 2D experiment — the admin-authored twin of the Study
      * Library's experiment: ONE self-contained HTML file (usually generated
@@ -95,6 +97,17 @@ export type ProductResource = {
   readStoragePath?: string;
   readFileName?: string;
   readFileSize?: number;
+  /** BlockNote's stable, sanitized HTML body (`type: "note"` only). */
+  noteHtml?: string;
+  /** Ownership/provenance for an admin-authored master note. */
+  noteSource?: "master";
+  ownerType?: "course";
+  ownerId?: string;
+  courseId?: string;
+  moduleId?: string;
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
 };
 
 export type ProductModule = {

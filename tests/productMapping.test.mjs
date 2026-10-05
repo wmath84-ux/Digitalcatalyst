@@ -894,3 +894,107 @@ test("hidden resources and inactive modules stay hidden in the legacy player bri
   assert.equal(legacy[0].accessLevel, "hidden");
   assert.equal(legacy[0].files[0].accessLevel, "hidden");
 });
+
+test("admin-authored Block Notes round-trip through editor, Firestore, catalog and player mappings", () => {
+  const noteHtml = '<h2 data-note-type="heading">Fractions</h2><p>Equivalent ratios and <strong>simplification</strong>.</p>';
+  const noteResource = {
+    id: "note_fractions",
+    name: "Fractions",
+    type: "note",
+    url: "https://example.com/stale-lesson-link",
+    provider: "BlockNote",
+    sortOrder: 1,
+    visibility: "visible",
+    accessLevel: "included",
+    individuallyPurchasable: false,
+    cashPrice: null,
+    salePrice: null,
+    coinPrice: null,
+    paidUpdateId: null,
+    entitlementId: "note_fractions",
+    parentModuleId: "mod_1",
+    noteHtml,
+    noteSource: "master",
+    ownerType: "course",
+    ownerId: "course-doc-1",
+    courseId: "course-doc-1",
+    moduleId: "mod_1",
+    createdBy: "admin-1",
+    createdAt: 1_700_000_000_000,
+    updatedAt: 1_700_000_000_100,
+  };
+  const input = {
+    id: "course-doc-1",
+    title: "Fractions course",
+    status: "published",
+    modules: [buildBaseModule({ id: "mod_1", resources: [noteResource] })],
+    paidUpdates: [],
+  };
+
+  const firestore = editorToFirestoreBody(input);
+  const stored = firestore.courseContent[0].files[0];
+  assert.equal(stored.type, "note");
+  assert.equal(stored.url, "");
+  assert.equal(stored.noteHtml, noteHtml);
+  assert.equal(stored.noteSource, "master");
+  assert.equal(stored.ownerType, "course");
+  assert.equal(stored.ownerId, "course-doc-1");
+  assert.equal(stored.moduleId, "mod_1");
+  assert.equal(stored.createdBy, "admin-1");
+  assert.equal(stored.updatedAt, 1_700_000_000_100);
+
+  const editor = firestoreToEditorForm({ ...firestore, id: "course-doc-1", status: "published" }, "course-doc-1");
+  assert.equal(editor.modules[0].resources[0].type, "note");
+  assert.equal(editor.modules[0].resources[0].noteHtml, noteHtml);
+  assert.equal(editor.modules[0].resources[0].noteSource, "master");
+  assert.equal(editor.modules[0].resources[0].ownerId, "course-doc-1");
+
+  const catalog = firestoreToCatalogProduct({ ...firestore, id: "course-doc-1", status: "published" }, "course-doc-1");
+  const canonical = catalog.canonicalModules[0].resources[0];
+  const player = catalog.courseContent[0].files[0];
+  assert.equal(canonical.type, "note");
+  assert.equal(canonical.noteHtml, noteHtml);
+  assert.equal(canonical.moduleId, "mod_1");
+  assert.equal(player.type, "note");
+  assert.equal(player.noteHtml, noteHtml);
+  assert.equal(player.noteSource, "master");
+  assert.equal(player.accessLevel, "included");
+  assert.equal(player.url, undefined, "a Block Note is self-contained, never an ordinary URL lesson");
+});
+
+test("legacy Block Note aliases map back to the single canonical note type", () => {
+  const file = canonicalResourceToLegacyFile({
+    id: "legacy-note",
+    name: "Legacy Block Note",
+    type: "block_note",
+    url: "",
+    visibility: "visible",
+    accessLevel: "included",
+    noteHtml: "<p>Kept on upgrade.</p>",
+  });
+  assert.equal(file.type, "note");
+  assert.equal(file.noteHtml, "<p>Kept on upgrade.</p>");
+  assert.equal(file.noteSource, "master");
+});
+
+test("only Block Notes carry purchasable access into the player file type", () => {
+  const note = canonicalResourceToLegacyFile({
+    id: "private-note",
+    name: "Purchased note",
+    type: "note",
+    url: "",
+    visibility: "visible",
+    accessLevel: "purchasable",
+    noteHtml: "<p>Purchase this master note.</p>",
+  });
+  const video = canonicalResourceToLegacyFile({
+    id: "legacy-resource",
+    name: "Existing video",
+    type: "video",
+    url: "https://example.com/video.mp4",
+    visibility: "visible",
+    accessLevel: "purchasable",
+  });
+  assert.equal(note.accessLevel, "purchasable");
+  assert.equal(video.accessLevel, "included", "non-note legacy player mapping behavior is unchanged");
+});

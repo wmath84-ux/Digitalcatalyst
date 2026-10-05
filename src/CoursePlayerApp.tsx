@@ -151,6 +151,7 @@ const firstAccessibleFile = (
     const moduleLocked = inheritedLocked || !accessible.has(String(module.id));
     const file = filesInModule(module).find((item) =>
       item.type !== "read" &&
+      item.type !== "note" &&
       item.accessLevel !== "hidden" &&
       Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) &&
       !moduleLocked &&
@@ -190,6 +191,8 @@ const firstAccessibleFileInModule = (
   if (module.accessLevel === "hidden") return null;
   const moduleLocked = inheritedLocked || !accessible.has(String(module.id));
   const file = filesInModule(module).find((item) =>
+    item.type !== "read" &&
+    item.type !== "note" &&
     item.accessLevel !== "hidden" &&
     Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) &&
     !moduleLocked &&
@@ -388,7 +391,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const modules = product.courseContent || [];
   // Read resources open from the dedicated Read dock tab, not the lesson
   // stack, last-opened resume target, completion tally or progress denominator.
-  const files = useMemo(() => allFiles(modules).filter((file) => file.type !== "read" && file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
+  const files = useMemo(() => allFiles(modules).filter((file) => file.type !== "read" && file.type !== "note" && file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   /**
    * …and the ONE lesson type that is playable with no URL at all: an
    * interactive 2D experiment, whose source (`interactiveHtml`) travels inside
@@ -1667,7 +1670,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       selectedFileId={selectedFile?.id}
       ownedUpdateIds={ownedUpdateIds}
       accessibleModuleIds={resolution.accessibleModuleIds}
+      accessibleResourceIds={resolution.accessibleResourceIds}
       previewModuleIds={resolution.previewModuleIds}
+      masterNotesEnabled={!isMine}
       updates={updates}
       moduleTitleById={moduleTitleById}
       onSelectFile={selectFile}

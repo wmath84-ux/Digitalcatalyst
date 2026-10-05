@@ -29,6 +29,9 @@ import fs from "node:fs";
 
 const productEditor = fs.readFileSync("src/components/admin/products/ProductEditor.tsx", "utf8");
 const modulesEditor = fs.readFileSync("src/components/admin/products/ModulesResourcesEditor.tsx", "utf8");
+const blockNoteEditor = fs.readFileSync("src/components/admin/products/BlockNoteResourceEditor.tsx", "utf8");
+const noteEditor = fs.readFileSync("src/course/NoteEditor.tsx", "utf8");
+const productResourceTypes = fs.readFileSync("utils/productResourceTypes.js", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
 
 test("ProductEditor delegates the Modules & Resources tab to the new drill-down component", () => {
@@ -175,4 +178,16 @@ test("the plus pill in each rail auto-focuses the freshly created item", () => {
   // module. The same pattern is used for the Resources rail.
   assert.match(modulesEditor, /setActiveModuleId\(id\)/);
   assert.match(modulesEditor, /setActiveResourceId\(id\)/);
+});
+
+test("Note is registered as a real resource type and opens the shared BlockNote editor", () => {
+  assert.match(productResourceTypes, /value: "note", label: "Block Note"/);
+  assert.match(modulesEditor, /registerNoteResourceType\(ADMIN_PRODUCT_RESOURCE_TYPES\)/);
+  assert.match(modulesEditor, /if \(type === "note"\)/);
+  assert.match(modulesEditor, /<BlockNoteResourceEditor resource=\{resource\}/);
+  assert.match(blockNoteEditor, /lazy\(\(\) => import\("@\/course\/NoteEditor"\)\)/);
+  assert.match(blockNoteEditor, /data-admin-block-note-preview/);
+  assert.match(blockNoteEditor, /readOnly/);
+  assert.match(blockNoteEditor, /MAX_NOTE_HTML_LENGTH/);
+  assert.match(noteEditor, /data-note-readonly=\{readOnly \? "true" : "false"\}/);
 });

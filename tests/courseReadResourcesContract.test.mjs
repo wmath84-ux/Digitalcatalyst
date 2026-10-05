@@ -19,15 +19,16 @@ const vite = read("vite.config.ts");
 const serviceWorker = read("public/sw.js");
 const docs = read("docs/read-resources.md");
 
-test("Read is additive without changing the official CourseFileType or existing content alias", () => {
+test("Read is additive without changing the official CourseFileType or Note-aware content alias", () => {
   const official = courseTypes.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(official);
   assert.equal([...official[1].matchAll(/"([a-z_]+)"/g)].length, 13);
   assert.ok(!official[1].includes('"read"'));
-  assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType;/);
+  assert.ok(!official[1].includes('"note"'));
+  assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType \| CourseNoteResourceFileType;/);
   assert.match(courseTypes, /export type CourseReadResourceFileType = typeof READ_RESOURCE_FILE_TYPE;/);
   assert.match(courseTypes, /type: CourseContentFileType \| CourseReadResourceFileType;/);
-  assert.match(commerceTypes, /\| "read";/);
+  assert.match(commerceTypes, /\| "read"/);
 });
 
 test("Read has its own Course Player dock tab and is excluded from lesson selection, rows and progress", () => {
@@ -35,9 +36,9 @@ test("Read has its own Course Player dock tab and is excluded from lesson select
   assert.match(overlay, /\{ key: "read", label: "Read", heading: "Read library"/);
   assert.match(overlay, /collectAccessibleReadResources\(props\.modules, unlocked, props\.ownedUpdateIds, props\.productId\)/);
   assert.match(overlay, /unlockedModuleIds\(props\.modules, props\.accessibleModuleIds, props\.ownedUpdateIds\)/);
-  assert.match(overlay, /file\.type !== "read" && isVisibleFile\(file\)/);
-  assert.match(player, /allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read"/);
-  assert.match(player, /item\.type !== "read"/);
+  assert.match(overlay, /file\.type !== "read" && file\.type !== "note" && isVisibleFile\(file\)/);
+  assert.match(player, /allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.type !== "note"/);
+  assert.match(player, /item\.type !== "read" &&\s*item\.type !== "note"/);
   assert.match(embed, /if \(file\.type === "read"\) return \{ url: "", kind: "none" \}/);
   assert.match(embed, /if \(file\.type === "read"\) return \{ url: "", label: "Read library"/);
 });
@@ -76,7 +77,7 @@ test("admin and Firestore paths validate Read sources, share a finite upload lim
   assert.match(editor, /cleanupReadUploadsAfterSave\(savedProduct, modules\)/);
   assert.match(editor, /deleteReadStorageObjects\(ownedPaths\)/);
   assert.match(editor, /sanitizeReadUploadsForProduct\(form\.modules, newId\)/);
-  assert.match(api, /sanitizeReadUploadsForProduct\(body\.modules, ref\.id\)/);
+  assert.match(api, /sanitizeReadUploadsForProduct\(normalizedModules, ref\.id\)/);
   assert.match(mapping, /normalizeReadResourceUrl\(/);
   assert.match(storageRules, /match \/adminProductContent\/read\/\{productId\}\/\{fileName\}/);
   assert.match(storageRules, /request\.resource\.size < 100 \* 1024 \* 1024/);

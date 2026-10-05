@@ -36,7 +36,7 @@
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";
 import "katex/dist/katex.min.css";
-import type { CourseModule, CoursePlayerNote } from "../types/course";
+import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
@@ -57,7 +57,10 @@ const loadNoteEditor = () => import("./NoteEditor");
 const NoteEditor = lazy(loadNoteEditor);
 
 interface NotesPanelProps {
+  /** Private, learner-owned SELF notes (legacy collection and save paths). */
   notes: CoursePlayerNote[];
+  /** Read-only admin-authored MASTER resources projected from the course tree. */
+  masterNotes?: MasterCourseNote[];
   onAdd: (html: string) => void;
   onEdit: (id: string, html: string) => void;
   onDelete: (id: string) => void;
@@ -90,6 +93,7 @@ interface NotesPanelProps {
 // pipeline so nothing in the library ever disappears after the upgrade.
 const noteHtml = (note: CoursePlayerNote) => note.html || plainToRichText(note.text || "");
 const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) || note.text || "";
+const masterNotePreview = (note: MasterCourseNote) => richTextToPlain(note.bodyHtml || "");
 
 const noteCardTitle = (note: CoursePlayerNote) => {
   const html = noteHtml(note);
@@ -187,8 +191,42 @@ function NoteStatus({
   );
 }
 
+function MasterNoteViewer({ note, onClose }: { note: MasterCourseNote; onClose: () => void }) {
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-white" data-course-master-note-viewer data-course-notes-mode="master-readonly">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-indigo-600"
+          data-course-master-note-back
+        >
+          ← MASTER library
+        </button>
+        <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-indigo-700" data-master-note-readonly>
+          Read only · Master
+        </span>
+      </header>
+      <div className="min-h-0 flex-1" data-course-master-note-renderer>
+        <Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500" aria-busy="true">Loading master note…</div>}>
+          <NoteEditor
+            key={`master:${note.id}`}
+            initialTitle={note.title}
+            initialBodyHtml={note.bodyHtml}
+            readOnly
+            autoFocus={false}
+            ariaLabel={`Master course note: ${note.title}`}
+            dataAttribute="data-course-master-note-input"
+          />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+
 export default function NotesPanel({
   notes,
+  masterNotes = [],
   onAdd,
   onEdit,
   onDelete,
@@ -208,6 +246,13 @@ export default function NotesPanel({
   const sessionNotes = getCoursePanelSession().notes;
   const restoreEdit =
     sessionNotes.view === "edit" && notes.some((note) => note.id === sessionNotes.noteId);
+  const [activeCollection, setActiveCollection] = useState<"master" | "self">(() =>
+    sessionNotes.view === "compose" || restoreEdit ? "self" : "master",
+  );
+  const [viewingMasterNoteId, setViewingMasterNoteId] = useState<string | null>(null);
+  const viewingMasterNote = viewingMasterNoteId
+    ? masterNotes.find((note) => note.id === viewingMasterNoteId) || null
+    : null;
   const [composing, setComposing] = useState(sessionNotes.view === "compose");
   const [draft, setDraft] = useState(sessionNotes.view === "compose" ? sessionNotes.draft : "");
   const [draftTitle, setDraftTitle] = useState(
@@ -246,7 +291,7 @@ export default function NotesPanel({
     ? notes.find((note) => note.id === pendingDeleteId) || null
     : null;
 
-  const editorOpen = composing || Boolean(editingId);
+  const editorOpen = composing || Boolean(editingId) || Boolean(viewingMasterNote);
 
   // Keep the session in sync on every render so the current view + draft are
   // immediately available to the next mount (tab switch) and to the player's
@@ -310,6 +355,7 @@ export default function NotesPanel({
   }, []);
 
   const openComposer = () => {
+    setActiveCollection("self");
     discardingRef.current = false;
     composeCount.current += 1;
     setEditingId(null);
@@ -352,6 +398,7 @@ export default function NotesPanel({
   };
 
   const startEdit = (note: CoursePlayerNote) => {
+    setActiveCollection("self");
     discardingRef.current = false;
     setComposing(false);
     setDraft("");
@@ -379,6 +426,17 @@ export default function NotesPanel({
     setEditDraft("");
     setEditTitle("");
   };
+
+  // MASTER resources open in the same BlockNote renderer in read-only mode;
+  // they never enter the SELF editor state or the learner-note persistence hook.
+  if (viewingMasterNote) {
+    return (
+      <MasterNoteViewer
+        note={viewingMasterNote}
+        onClose={() => setViewingMasterNoteId(null)}
+      />
+    );
+  }
 
   // The composer and the inline editor both take over the whole panel so the
   // writing surface is as large as the notes area allows.
@@ -474,6 +532,70 @@ export default function NotesPanel({
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto overscroll-contain p-3 pb-16" data-course-notes-list>
           <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+            <div className="flex items-center justify-between gap-3" data-course-note-collections>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-700">Note library</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Master course material and your private notes stay separate.</p>
+              </div>
+              <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Note collection">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeCollection === "master"}
+                  data-course-note-collection="master"
+                  onClick={() => setActiveCollection("master")}
+                  className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "master" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+                >
+                  MASTER <span className="ml-1 text-[10px]">{masterNotes.length}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeCollection === "self"}
+                  data-course-note-collection="self"
+                  onClick={() => setActiveCollection("self")}
+                  className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "self" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+                >
+                  SELF <span className="ml-1 text-[10px]">{notes.length}</span>
+                </button>
+              </div>
+            </div>
+
+            {activeCollection === "master" ? (
+              masterNotes.length > 0 ? (
+                <ul className="grid min-w-0 gap-3" data-course-master-notes-grid data-study-resource-grid>
+                  {masterNotes.map((note) => {
+                    const preview = masterNotePreview(note);
+                    const wordCount = preview.trim().split(/\s+/).filter(Boolean).length;
+                    return (
+                      <li key={note.id} className="min-w-0 min-h-[212px]" data-course-master-note-card>
+                        <StudyResourceCard
+                          kind="note"
+                          resourceId={note.resourceId}
+                          title={note.title || "Untitled master note"}
+                          contextPath={[courseTitle, ...note.modulePath].filter(Boolean)}
+                          contextDetail="Admin-authored course note · read only"
+                          topic={preview || undefined}
+                          topicLabel="Master content"
+                          metadata={[wordCount ? `${wordCount} words` : ""].filter(Boolean)}
+                          sourceLabel="MASTER"
+                          createdAt={note.createdAt}
+                          updatedAt={note.updatedAt}
+                          onOpen={() => setViewingMasterNoteId(note.id)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <StudyLibraryEmptyState
+                  kind="note"
+                  title="No master notes yet"
+                  description="Course notes published by the course admin will appear here. They are read-only and do not change your SELF notes."
+                />
+              )
+            ) : (
+              <>
             {notes.length > 0 && syncState?.status === "loading" ? (
               <StudyLibraryNotice
                 state="loading"
@@ -571,8 +693,11 @@ export default function NotesPanel({
                 description="Capture a formula, a question, or a lesson recap. Use the + button to open the Note Editor."
               />
             )}
+              </>
+            )}
           </div>
         </div>
+        {activeCollection === "self" ? (
         <button
           type="button"
           onClick={openComposer}
@@ -583,6 +708,7 @@ export default function NotesPanel({
         >
           <Plus size={19} strokeWidth={2.8} />
         </button>
+        ) : null}
       </div>
 
       {/* Two-step delete confirmation. Rendered through a portal so the
