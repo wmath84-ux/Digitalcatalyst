@@ -67,6 +67,10 @@ export const NOTIFICATION_TARGET_TYPES = [
   "mayday",
   "subscription",
   "flowpath",
+  // Revision (Daily Test & Revision / Recall study) deep link. `itemId` is the
+  // feature hash route (`#/revision`, `#/revision/test/play/12`, …) so a tap
+  // lands on the exact surface the alert was about, exactly like `flowpath`.
+  "revision",
   // My Day workspace targets: a canonical Joplin object (note/to-do/notebook/
   // tag/attachment) plus the schedule row that produced the alert. The old
   // `mayday` target keeps working, so notifications already in Firestore and

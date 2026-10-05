@@ -1,29 +1,60 @@
-import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
-import PageShell from "../components/PageShell";
-import { GlassTile } from "../../components/ui/glass-tile";
+/**
+ * Smart Revision session — the legacy `#/revision/session/<id>` deep link,
+ * rendered with the ported Recall study surfaces.
+ *
+ * Smart Revision remains a first-class Digitalcatalyst capability (§5B): it is
+ * built from the learner's own revision bank, filtered by subject/topic/
+ * difficulty, resumable, and it updates the mastery state machine
+ * (learning → improving → mastered) exactly as before. The screen itself now
+ * looks and behaves like Recall: one card at a time, big tap targets, swipe on
+ * touch, keyboard 1–9 to answer, ←/→ to move, and the same progress header.
+ */
+
+import { useCallback, useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
+
+import { Button } from "../recall/components/ui/button";
+import { Progress } from "../recall/components/ui/progress";
+import { cn } from "../recall/lib/utils";
+import { cardSurface, typeClass } from "../recall/lib/surface";
+import { useTranslation } from "../recall/shims/i18n";
+import { useRevisionRoute } from "../integrations/route-context";
+import { REVISION_DEEP_LINKS } from "../integrations/routes";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { Badge, Card, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
-import { CheckIcon, ChevronRightIcon } from "../components/icons";
+import { RecallBadge, RecallCard, RecallError, RecallLoading } from "../components/recall-ui";
+import { useConfirmAction } from "../components/useConfirmAction";
 import {
   getRevisionSessionForPlayer,
   saveRevisionAnswer,
   submitRevisionSession,
   updateRevisionSessionIndex,
-  ServiceError,
 } from "../engine/revisionService";
+import { ServiceError } from "../engine/revisionService";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 type PlayerData = ReturnType<typeof getRevisionSessionForPlayer>;
 
-export default function RevisionSessionPage({ uid, route, sessionId }: { uid: string; route: string; sessionId: number }) {
-  const { navigate, setGuard } = useExitGuard();
+export default function RevisionSessionPage({ uid, sessionId }: { uid: string; sessionId: number | null }) {
+  const { t } = useTranslation();
+  const { navigate } = useRevisionRoute();
+  const { setGuard } = useExitGuard();
+  const { confirm, dialog } = useConfirmAction();
 
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [loadError, setLoadError] = useState<{ message: string; code: string | null } | null>(null);
   const [loadKey, setLoadKey] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selections, setSelections] = useState<Record<number, number | null>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const initializedRef = useRef(false);
+  const touchStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!sessionId) {
+      setLoadError({ message: "This session link is missing its id.", code: "NOT_FOUND" });
+      return;
+    }
     try {
       setPlayerData(getRevisionSessionForPlayer(uid, sessionId));
       setLoadError(null);
@@ -35,188 +66,305 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
     }
   }, [uid, sessionId, loadKey]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selections, setSelections] = useState<Record<number, number | null>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const initializedRef = useRef(false);
-  const touchStartXRef = useRef<number | null>(null);
-
   useEffect(() => {
     if (playerData && !initializedRef.current) {
       initializedRef.current = true;
       setCurrentIndex(playerData.session.currentIndex ?? 0);
-      const initSel: Record<number, number | null> = {};
-      playerData.questions.forEach((q) => {
-        initSel[q.id] = q.selectedIndex;
+      const initial: Record<number, number | null> = {};
+      playerData.questions.forEach((question) => {
+        initial[question.id] = question.selectedIndex;
       });
-      setSelections(initSel);
+      setSelections(initial);
     }
   }, [playerData]);
 
   useEffect(() => {
     setGuard({
-      message: "Your revision progress is saved. You can continue this session anytime from the Revision Bank.",
-      confirmLabel: "Exit Session",
+      message: "Your revision progress is saved. You can continue this session anytime from the Test Bank.",
+      confirmLabel: "Exit session",
     });
     return () => setGuard(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setGuard]);
 
-  if (loadError) {
-    const isInvalidState = loadError.code === "INVALID_STATE";
-    return (
-      <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
-        {isInvalidState ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <p className="dc-scene-ink text-sm text-white/75">This session has already finished.</p>
-            <PrimaryButton className="w-auto px-6" onClick={() => navigate(`#/revision/session/${sessionId}/result`)}>
-              View Results
-            </PrimaryButton>
-          </div>
-        ) : (
-          <ErrorState message={loadError.message} onRetry={() => setLoadKey((k) => k + 1)} />
-        )}
-      </PageShell>
-    );
-  }
-
-  if (!playerData) {
-    return (
-      <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
-        <FullScreenLoader label="Preparing your revision questions…" />
-      </PageShell>
-    );
-  }
-
-  const { questions } = playerData;
+  const questions = playerData?.questions ?? [];
   const total = questions.length;
   const question = questions[currentIndex];
-  const answeredCount = Object.values(selections).filter((v) => v !== null && v !== undefined).length;
 
-  function persistIndex(idx: number) {
-    setCurrentIndex(idx);
-    try {
-      updateRevisionSessionIndex(uid, sessionId, idx);
-    } catch {
-      // Best-effort — position persistence must never block navigation.
-    }
-  }
-  function selectOption(optionIdx: number) {
-    if (!question) return;
-    setSelections((prev) => ({ ...prev, [question.id]: optionIdx }));
-    try {
-      saveRevisionAnswer(uid, sessionId, question.id, optionIdx);
-      updateRevisionSessionIndex(uid, sessionId, currentIndex);
-    } catch {
-      // Answer stays in local UI state; submit treats any gap as skipped.
-    }
-  }
-  function handleSubmit() {
+  const persistIndex = useCallback(
+    (index: number) => {
+      if (!sessionId) return;
+      setCurrentIndex(index);
+      try {
+        updateRevisionSessionIndex(uid, sessionId, index);
+      } catch {
+        /* position persistence is best-effort */
+      }
+    },
+    [sessionId, uid],
+  );
+
+  const selectOption = useCallback(
+    (optionIndex: number) => {
+      if (!question || !sessionId) return;
+      setSelections((previous) => ({ ...previous, [question.id]: optionIndex }));
+      try {
+        saveRevisionAnswer(uid, sessionId, question.id, optionIndex);
+      } catch {
+        /* the answer stays in local state; submit treats gaps as skipped */
+      }
+    },
+    [question, sessionId, uid],
+  );
+
+  const submit = useCallback(async () => {
+    if (!sessionId) return;
     setSubmitting(true);
     try {
       submitRevisionSession(uid, sessionId);
       setGuard(null);
-      navigate(`#/revision/session/${sessionId}/result`);
+      navigate(REVISION_DEEP_LINKS.sessionResult(sessionId));
+    } catch (err) {
+      setNotice(err instanceof ServiceError ? err.message : "Could not submit this session.");
     } finally {
       setSubmitting(false);
     }
-  }
-  function goNext() {
-    if (currentIndex < total - 1) persistIndex(currentIndex + 1);
-    else handleSubmit();
-  }
-  function goPrev() {
-    if (currentIndex > 0) persistIndex(currentIndex - 1);
-  }
-  function onTouchStart(e: ReactTouchEvent) {
-    touchStartXRef.current = e.touches[0].clientX;
-  }
-  function onTouchEnd(e: ReactTouchEvent) {
-    if (touchStartXRef.current === null) return;
-    const delta = e.changedTouches[0].clientX - touchStartXRef.current;
+  }, [navigate, sessionId, setGuard, uid]);
+
+  /* Keyboard: 1–9 answers, ←/→ navigates — the Recall study contract. */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!question) return;
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (event.key === "ArrowRight" && currentIndex < total - 1) {
+        persistIndex(currentIndex + 1);
+        return;
+      }
+      if (event.key === "ArrowLeft" && currentIndex > 0) {
+        persistIndex(currentIndex - 1);
+        return;
+      }
+      const numeric = Number(event.key);
+      if (Number.isInteger(numeric) && numeric >= 1 && numeric <= question.options.length) {
+        event.preventDefault();
+        selectOption(numeric - 1);
+        if (currentIndex < total - 1) window.setTimeout(() => persistIndex(currentIndex + 1), 150);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentIndex, persistIndex, question, selectOption, total]);
+
+  const onTouchStart = (event: ReactTouchEvent) => {
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+  const onTouchEnd = (event: ReactTouchEvent) => {
+    const start = touchStartXRef.current;
     touchStartXRef.current = null;
+    if (start === null) return;
+    const end = event.changedTouches[0]?.clientX ?? start;
+    const delta = end - start;
     if (Math.abs(delta) < 60) return;
-    if (delta > 0) goPrev();
-    else goNext();
+    if (delta < 0 && currentIndex < total - 1) persistIndex(currentIndex + 1);
+    else if (delta > 0 && currentIndex > 0) persistIndex(currentIndex - 1);
+  };
+
+  if (loadError) {
+    const finished = loadError.code === "INVALID_STATE";
+    return (
+      <div className="mx-auto max-w-xl py-10">
+        <RecallError
+          title={finished ? "This session has already finished" : "This session can't be opened"}
+          body={finished ? "Open its result to see how you did." : loadError.message}
+          action={
+            finished && sessionId ? (
+              <Button onClick={() => navigate(REVISION_DEEP_LINKS.sessionResult(sessionId))}>View results</Button>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="outline" onClick={() => setLoadKey((key) => key + 1)}>
+                  Try again
+                </Button>
+                <Button variant="ghost" onClick={() => navigate(REVISION_DEEP_LINKS.testBank)}>
+                  Back to the Test Bank
+                </Button>
+              </div>
+            )
+          }
+        />
+      </div>
+    );
   }
+
+  if (!playerData || !question) {
+    return (
+      <div className="py-16">
+        <RecallLoading label="Preparing your revision questions…" />
+      </div>
+    );
+  }
+
+  const answeredCount = Object.values(selections).filter((value) => value !== null && value !== undefined).length;
+  const isLast = currentIndex === total - 1;
 
   return (
-    <PageShell route={route} title="Revision Session" subtitle={`Question ${currentIndex + 1} of ${total}`} backHref="#/revision/bank" hideNav>
-      <div className="flex h-full flex-col">
-        <div className="px-4 pt-3">
-          <ProgressBar value={((currentIndex + 1) / total) * 100} />
+    <div
+      className="mx-auto w-full max-w-2xl px-4 py-4 sm:px-6"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(REVISION_DEEP_LINKS.testBank)}
+          className={cn(typeClass.caption, "rounded-full px-3 py-1.5 text-on-surface-variant hover:bg-surface-container-low")}
+        >
+          ← Test Bank
+        </button>
+        <div className="flex items-center gap-2">
+          <RecallBadge tone="brand">
+            {currentIndex + 1} / {total}
+          </RecallBadge>
+          <RecallBadge>{answeredCount} answered</RecallBadge>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          {question && (
-            /* The question lives in the shared revision Card — the same pattern
-               TestReview uses — so the prompt, the answer tiles and the skip
-               action sit on the plated surface instead of bare on the scene. */
-            <Card key={question.id} className="animate-fade-in">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
-                  {question.subjectIcon} {question.subjectName} · {question.topicName}
-                </span>
-              </div>
-              <h2 className="text-[19px] font-semibold leading-snug text-white">{question.prompt}</h2>
+      </header>
 
-              <div className="mt-5 space-y-3">
-                {question.options.map((opt, idx) => {
-                  const selected = selections[question.id] === idx;
-                  return (
-                    /* Wave 13: answer options are the pack GlassTile — the
-                       selected state (ring + tint) comes from the pack; indigo
-                       ink marks the chosen answer. */
-                    <GlassTile
-                      key={idx}
-                      onClick={() => selectOption(idx)}
-                      selected={selected}
-                      className={`dc-tile aspect-auto min-h-[56px] w-full px-4 py-3 text-left text-[15px] font-medium [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
-                        selected ? "text-indigo-200" : "text-white/85"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "border border-white/20 text-white/75"
-                        }`}
-                      >
-                        {OPTION_LETTERS[idx]}
-                      </span>
-                      <span className="flex-1">{opt}</span>
-                    </GlassTile>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-white/55 active:text-white/75"
-              >
-                Skip this question
-              </button>
-            </Card>
-          )}
+      <Progress value={total === 0 ? 0 : ((currentIndex + 1) / total) * 100} className="mb-4" />
+
+      <RecallCard className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span aria-hidden>{question.subjectIcon}</span>
+          <span className={cn(typeClass.caption, "text-on-surface-variant")}>
+            {question.subjectName} · {question.topicName}
+          </span>
+          <RecallBadge
+            tone={question.difficulty === "hard" ? "danger" : question.difficulty === "medium" ? "warning" : "success"}
+          >
+            {question.difficulty}
+          </RecallBadge>
         </div>
-        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
-          <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
+
+        <p className={cn(typeClass["title-md"], "whitespace-pre-wrap")}>{question.prompt}</p>
+
+        <ul className="space-y-2">
+          {question.options.map((option, index) => {
+            const selected = selections[question.id] === index;
+            return (
+              <li key={index}>
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectOption(index)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                    selected
+                      ? "border-primary bg-primary-soft text-on-primary-container"
+                      : "border-outline-variant bg-surface hover:bg-surface-container-low",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
+                      selected ? "border-primary bg-primary text-primary-foreground" : "border-outline-variant",
+                    )}
+                  >
+                    {OPTION_LETTERS[index] ?? index + 1}
+                  </span>
+                  <span className={cn(typeClass["body-md"], "min-w-0 flex-1 whitespace-pre-wrap")}>{option}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button variant="outline" disabled={currentIndex === 0} onClick={() => persistIndex(currentIndex - 1)}>
             Previous
-          </SecondaryButton>
-          <PrimaryButton onClick={goNext} disabled={submitting} className="flex-[1.4]">
-            {submitting ? (
-              "Submitting…"
-            ) : currentIndex === total - 1 ? (
-              <>
-                <CheckIcon className="h-4 w-4" /> Finish Session
-              </>
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelections((previous) => ({ ...previous, [question.id]: null }));
+                try {
+                  if (sessionId) saveRevisionAnswer(uid, sessionId, question.id, null);
+                } catch {
+                  /* ignore */
+                }
+                if (!isLast) persistIndex(currentIndex + 1);
+              }}
+            >
+              Skip
+            </Button>
+            {!isLast ? (
+              <Button onClick={() => persistIndex(currentIndex + 1)}>Next</Button>
             ) : (
-              <>
-                Next <ChevronRightIcon className="h-4 w-4" />
-              </>
+              <Button
+                disabled={submitting}
+                onClick={() =>
+                  confirm({
+                    title: "Finish this session?",
+                    body:
+                      answeredCount < total
+                        ? `${total - answeredCount} question${total - answeredCount === 1 ? "" : "s"} unanswered will count as skipped.`
+                        : "Every question is answered.",
+                    confirmLabel: "Finish",
+                    onConfirm: submit,
+                  })
+                }
+              >
+                Finish
+              </Button>
             )}
-          </PrimaryButton>
+          </div>
         </div>
-        <p className="dc-scene-ink pb-2 text-center text-[11px] font-medium text-white/55">{answeredCount} of {total} answered</p>
+      </RecallCard>
+
+      <p className={cn(typeClass.caption, "mt-4 text-on-surface-variant")}>
+        {t("study.keyboardHint", "Press 1–4 to answer, arrow keys to move, swipe on touch screens.")}
+      </p>
+
+      {answeredCount < total ? (
+        <div className={cn(cardSurface("mt-4 flex flex-wrap gap-2 p-3"))}>
+          {questions.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={`Question ${index + 1}`}
+              onClick={() => persistIndex(index)}
+              className={cn(
+                "h-8 w-8 rounded-lg border text-xs font-semibold",
+                index === currentIndex
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : selections[item.id] !== null && selections[item.id] !== undefined
+                    ? "border-tertiary bg-tertiary-container text-on-tertiary-container"
+                    : "border-outline-variant text-on-surface-variant",
+              )}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <p className={cn(typeClass.caption, "mt-3 text-error")} role="alert">
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="mt-4 flex justify-end">
+        <Button variant="ghost" className="text-error" disabled={submitting} onClick={() => confirm({
+          title: "Finish this session?",
+          body: answeredCount < total ? `${total - answeredCount} unanswered question(s) will count as skipped.` : undefined,
+          confirmLabel: "Finish",
+          tone: "destructive",
+          onConfirm: submit,
+        })}>
+          {submitting ? "Finishing…" : "Finish session"}
+        </Button>
       </div>
-    </PageShell>
+
+      {dialog}
+    </div>
   );
 }

@@ -1,6 +1,37 @@
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/glass-dialog";
-import { SecondaryButton } from "./ui";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+/**
+ * ExitGuard — the business safeguard for an in-progress test or session.
+ *
+ * Migration brief §22 keeps this provider as the ONE place that knows how to
+ * interrupt navigation (an in-progress Daily Test must not be abandoned by a
+ * stray tap), but its dialog now renders in the ported Recall design language
+ * instead of the retired glass plate: the buttons, surface and typography come
+ * from `recall/components/ui` + `recall/lib/surface`, and the dialog is scoped
+ * to the Revision root so no global style is involved.
+ */
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+import { Button } from "../recall/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../recall/components/ui/alert-dialog";
+import { typeClass } from "../recall/lib/surface";
+import { useTranslation } from "../recall/shims/i18n";
 
 type GuardState = {
   message: string;
@@ -21,6 +52,7 @@ export function ExitGuardProvider({
   children: ReactNode;
   onNavigate: (href: string) => void;
 }) {
+  const { t } = useTranslation();
   const [guard, setGuardState] = useState<GuardState>(null);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const guardRef = useRef<GuardState>(null);
@@ -41,10 +73,10 @@ export function ExitGuardProvider({
   }, []);
 
   useEffect(() => {
-    function handler(e: BeforeUnloadEvent) {
+    function handler(event: BeforeUnloadEvent) {
       if (guardRef.current) {
-        e.preventDefault();
-        e.returnValue = "";
+        event.preventDefault();
+        event.returnValue = "";
       }
     }
     window.addEventListener("beforeunload", handler);
@@ -54,31 +86,39 @@ export function ExitGuardProvider({
   return (
     <ExitGuardContext.Provider value={{ setGuard, navigate }}>
       {children}
-      <Dialog open={Boolean(pendingHref && guard)} onOpenChange={(v) => { if (!v) setPendingHref(null); }}>
-        {guard && (
-          <DialogContent aria-label="Leave this screen?" className="dc-scene-plate">
-            <DialogTitle>Leave this screen?</DialogTitle>
-            <DialogDescription>{guard.message}</DialogDescription>
-            <DialogFooter className="mt-5 flex gap-3">
-              <SecondaryButton className="flex-1" onClick={() => setPendingHref(null)}>
-                Stay
-              </SecondaryButton>
-              <button
-                type="button"
+      <AlertDialog open={Boolean(pendingHref && guard)} onOpenChange={(open) => { if (!open) setPendingHref(null); }}>
+        <AlertDialogContent aria-label={t("exitGuard.title", "Leave this screen?")}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className={typeClass["title-md"]}>
+              {t("exitGuard.title", "Leave this screen?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className={typeClass["body-md"]}>
+              {guard?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-5 flex gap-3">
+            <AlertDialogCancel asChild>
+              <Button variant="outline" className="flex-1" onClick={() => setPendingHref(null)}>
+                {t("exitGuard.stay", "Stay")}
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                className="flex-1"
                 onClick={() => {
                   const href = pendingHref;
                   setGuard(null);
                   setPendingHref(null);
                   if (href) onNavigateRef.current(href);
                 }}
-                className="min-h-[48px] flex-1 rounded-full bg-rose-600 text-sm font-bold text-white hover:bg-rose-500 active:bg-rose-700"
               >
-                {guard.confirmLabel}
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+                {guard?.confirmLabel}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ExitGuardContext.Provider>
   );
 }

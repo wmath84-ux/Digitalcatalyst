@@ -41,6 +41,7 @@ export interface DeviceNotificationInput {
   body?: string;
   category?: string;
   target?: {
+    /** Includes `revision` — the Revision feature's own hash deep link. */
     type?: string;
     section?: string;
     itemId?: string;

@@ -42,6 +42,11 @@ export type SiteNotificationTarget =
   // Device-delivered alerts (src/lib/deviceNotificationInbox.ts) carry this
   // target so tapping one lands on the activity that fired.
   | { type: 'flowpath'; itemId?: string }
+  // Revision (Daily Test & Revision, Recall study flow) alerts. `itemId` is the
+  // feature's own hash route — `#/revision`, `#/revision/stats`,
+  // `#/revision/test/play/12` — so a revision reminder lands on the surface that
+  // produced it without inventing a second notification route table.
+  | { type: 'revision'; itemId?: string }
   | { type: 'subscription' };
 
 export interface SiteNotification {
@@ -236,6 +241,12 @@ export const getNotificationDeepLink = (notification: SiteNotification): string 
   }
   if (target.type === 'flowpath') {
     return target.itemId ? `#/flowpath?item=${encodeURIComponent(String(target.itemId))}` : '#/flowpath';
+  }
+  if (target.type === 'revision') {
+    // Revision owns its hash sub-routes; only ever hand back a `#/revision…`
+    // path so a malformed record cannot deep-link somewhere unrelated.
+    const itemId = String(target.itemId || '');
+    return itemId.startsWith('#/revision') ? itemId : '#/revision';
   }
   if (target.type === 'subscription') {
     return notification.expired ? '#/subscription?renew=1' : '#/subscription';

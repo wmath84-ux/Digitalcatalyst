@@ -1,0 +1,130 @@
+import { Eye, FileText, Plus, X } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useTranslation } from "../shims/i18n";
+import { toast } from "../shims/toast";
+import { Badge } from "./ui/badge";
+import { parseBulkCards, type BulkCardInput } from "../lib/bulk-parser";
+
+interface BulkAddDialogProps {
+  open: boolean;
+  onClose: () => void;
+  deckId: string;
+  onImport: (cards: BulkCardInput[]) => Promise<void>;
+}
+
+export function BulkAddDialog({ open, onClose, deckId: _deckId, onImport }: BulkAddDialogProps): JSX.Element | null {
+  const { t } = useTranslation();
+  const [text, setText] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const parsed = useMemo(() => parseBulkCards(text), [text]);
+
+  if (!open) return null;
+
+  // Note: example kept as a literal string (not via t()) because it demonstrates
+  // the Q:/A: syntax and contains cloze markers ({{c1::...}}) that collide with
+  // i18next interpolation. The structural markers are parser syntax, not UI copy.
+  const example = `Q: What is the powerhouse of the cell?
+	A: Mitochondria
+
+Q: {{c1::Tauri}} is a desktop framework written in {{c2::Rust}}
+Source: tauri.app
+
+---next deck: Geography---
+Q: What is the capital of Indonesia?
+A: Jakarta
+Hint: On the island of Java
+Tags: asia, capitals`;
+
+  async function handleImport(): Promise<void> {
+    if (parsed.length === 0) {
+      toast.error(t("bulkAdd.noValidCards"));
+      return;
+    }
+    setImporting(true);
+    try {
+      await onImport(parsed);
+      toast.success(t("bulkAdd.imported", { count: parsed.length }));
+      setText("");
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("bulkAdd.unknownError");
+      toast.error(t("bulkAdd.importFailed", { message }));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="bulk-add-title">
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-lg border bg-surface recall-dark:bg-surface p-6 shadow-sm animate-fade-in">
+        <button onClick={onClose} className="absolute right-4 top-4 rounded p-1 hover:bg-surface-container-high recall-dark:hover:bg-surface-container" aria-label={t("bulkAdd.close")}>
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex items-center gap-2 mb-2">
+          <FileText className="h-5 w-5 text-text-primary recall-dark:text-text-primary" />
+          <h2 id="bulk-add-title" className="text-xl font-semibold">{t("bulkAdd.title")}</h2>
+        </div>
+
+        <p className="text-sm text-on-surface-variant recall-dark:text-on-surface-variant mb-4">
+          {t("bulkAdd.instructionsPrefix")}{" "}
+          <code className="bg-surface-container recall-dark:bg-surface-container px-1 rounded">Q:</code>{" / "}
+          <code className="bg-surface-container recall-dark:bg-surface-container px-1 rounded">A:</code>{" "}
+          {t("bulkAdd.instructionsSuffix")}
+        </p>
+
+        <textarea
+          className="w-full h-48 rounded-md border bg-background p-4 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-zinc-300 recall-dark:focus:ring-zinc-600"
+          placeholder={t("bulkAdd.placeholder")}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-on-surface-variant recall-dark:text-on-surface-variant" />
+            <span className="text-sm text-on-surface-variant recall-dark:text-on-surface-variant">
+              {t("bulkAdd.cardsDetected", { count: parsed.length })}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all" onClick={() => setText(example)}>
+              {t("bulkAdd.loadExample")}
+            </button>
+            <button className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl active:scale-95 transition-all" onClick={() => void handleImport()} disabled={parsed.length === 0 || importing}>
+              <Plus className="h-4 w-4 mr-1" />
+              {importing ? t("bulkAdd.importing") : t("bulkAdd.importCards", { count: parsed.length })}
+            </button>
+          </div>
+        </div>
+
+        {/* Preview */}
+        {parsed.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-on-surface-variant recall-dark:text-on-surface-variant">{t("bulkAdd.preview")}</h3>
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {parsed.map((card, i) => (
+                <div key={i} className="rounded-md border bg-background recall-dark:bg-surface-container/50 p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-mono text-on-surface-variant recall-dark:text-on-surface-variant mt-0.5">#{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{card.front || <span className="italic text-on-surface-variant recall-dark:text-on-surface-variant">{t("bulkAdd.empty")}</span>}</div>
+                      {card.back && <div className="text-on-surface-variant recall-dark:text-on-surface-variant truncate mt-1">{card.back}</div>}
+                      {card.hint && <div className="text-xs text-on-surface-variant recall-dark:text-on-surface-variant mt-1">{t("bulkAdd.hintLabel")} {card.hint}</div>}
+                      {card.nextDeckName && (
+                        <Badge tone="warning" className="mt-1 text-xs">
+                          → {card.nextDeckName}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

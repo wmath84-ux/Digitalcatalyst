@@ -1,0 +1,148 @@
+import { Plus } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { useTranslation } from "../shims/i18n";
+import { toast } from "../shims/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Textarea } from "./ui/textarea";
+import { deckColorOptions, getDeckColorClass } from "../lib/deck-colors";
+import { cn } from "../lib/utils";
+import { useRecallStore } from "../stores/recall-store";
+import type { Deck, DeckColor } from "../types";
+
+interface DeckDialogProps {
+  deck?: Deck;
+  trigger?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function DeckDialog({ deck, trigger, open: controlledOpen, onOpenChange }: DeckDialogProps): JSX.Element {
+  const { t } = useTranslation();
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const handleOpenChange = controlledOpen !== undefined ? onOpenChange! : setInternalOpen;
+  const [name, setName] = useState(deck?.name ?? "");
+  const [description, setDescription] = useState(deck?.description ?? "");
+  const [color, setColor] = useState<DeckColor>(deck?.color ?? "blue");
+  const createDeck = useRecallStore((state) => state.createDeck);
+  const updateDeck = useRecallStore((state) => state.updateDeck);
+  const showDeck = useRecallStore((state) => state.showDeck);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(deck?.name ?? "");
+      setDescription(deck?.description ?? "");
+      setColor(deck?.color ?? "blue");
+    }
+  }, [deck, isOpen]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    if (!name.trim()) {
+      toast.error(t("deckDialog.nameEmpty"));
+      return;
+    }
+
+    try {
+      if (deck) {
+        await updateDeck(deck.id, { name: name.trim(), description, color });
+        toast.success(t("deckDialog.updated", { name: name.trim() }));
+      } else {
+        const deckId = await createDeck({ name: name.trim(), description, color });
+        showDeck(deckId);
+        toast.success(t("deckDialog.created", { name: name.trim() }));
+      }
+      handleOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("deckDialog.unknownError");
+      toast.error(t("deckDialog.saveFailed", { message }));
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        {trigger ?? (
+          <button className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl active:scale-95 transition-all">
+            <Plus className="h-4 w-4" />
+            {t("deckDialog.newDeck")}
+          </button>
+        )}
+      </DialogTrigger>
+      <DialogContent>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>{deck ? t("deckDialog.editDeckTitle") : t("deckDialog.newDeckTitle")}</DialogTitle>
+            <DialogDescription>{t("deckDialog.description")}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-secondary recall-dark:text-text-secondary">{t("deckDialog.nameLabel")}</label>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t("deckDialog.namePlaceholder")}
+                className="border-outline-variant recall-dark:border-outline-variant"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-secondary recall-dark:text-text-secondary">{t("deckDialog.descriptionLabel")}</label>
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={t("deckDialog.descriptionPlaceholder")}
+                className="border-outline-variant recall-dark:border-outline-variant"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-secondary recall-dark:text-text-secondary">{t("deckDialog.colorLabel")}</label>
+              <Select value={color} onValueChange={(value) => setColor(value as DeckColor)}>
+                <SelectTrigger className="border-outline-variant recall-dark:border-outline-variant">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {deckColorOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="flex items-center gap-2">
+                        <span className={cn("h-2.5 w-2.5 rounded-full", getDeckColorClass(option.value))} />
+                        {option.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => handleOpenChange(false)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all"
+            >
+              {t("deckDialog.cancel")}
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl hover:bg-primary-hover active:scale-95 transition-all"
+            >{deck ? t("deckDialog.saveChanges") : t("deckDialog.createDeck")}</button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
