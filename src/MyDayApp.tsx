@@ -34,6 +34,9 @@ import { JoplinWorkspaceBoundary } from "./joplin/JoplinWorkspace";
 import { trackMyDayEvent } from "./joplin/joplinAnalytics";
 import { isMigrationComplete, loadMigrationMarker, runMyDayMigrationV1, skipLegacyMigration } from "./joplin/joplinMigrationBridge";
 import BottomNav, { type TabKey } from "./components/BottomNav";
+import Header from "./components/Header";
+import { useCommerce } from "./context/CommerceContext";
+import { useBranding } from "./context/BrandingContext";
 
 /**
  * The workspace host is its own chunk.
@@ -48,6 +51,9 @@ const JoplinWorkspace = lazy(() => import("./joplin/JoplinWorkspace"));
 
 export default function MyDayApp() {
   const { user } = useAuth();
+  // The mobile header shows the real cart badge, exactly like every other route.
+  const { cartIds } = useCommerce();
+  const { appName } = useBranding();
   const myDay = useMyDayAccess();
   const [gateOpen, setGateOpen] = useState(false);
   const startedForUser = useRef<string | null>(null);
@@ -185,6 +191,30 @@ export default function MyDayApp() {
     // app is the surface while the bundle loads, and the workspace brings
     // Joplin's own canvas once it mounts (no Digitalcatalyst glass on top of it).
     className="myday-workspace-root relative flex min-h-[100dvh] w-full flex-col">
+      {/* §2 — the global app header on a phone. The workspace frame brings its
+          own header on a wide screen, so this one is phone-only and the desktop
+          layout is untouched. It is the SAME shared Header every other route
+          renders (branding, cart badge, live notification count) — no second
+          header implementation. */}
+      {!blocked ? (
+        <div className="md:hidden" data-myday-mobile-header>
+          <Header
+            cartCount={cartIds.size}
+            notifCount={0}
+            title={`${appName} Tasker`}
+            subtitle="My Day Activities"
+            onNavigateToSubscription={() => {
+              window.location.hash = "#/subscription";
+            }}
+            onNavigateToCart={() => {
+              window.location.hash = "#/cart";
+            }}
+            onNavigateToNotifications={() => {
+              window.location.hash = "#/notifications";
+            }}
+          />
+        </div>
+      ) : null}
       {blocked ? (
         <PremiumGate
           variant="myday"

@@ -334,8 +334,19 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
     return () => ro.disconnect();
   }, []);
 
+  // Every card reports its own natural height back here, so a tall card gets a
+  // taller row instead of clipping its text or overlapping the row below (§32).
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
+  const measureCard = useCallback((id: string, height: number) => {
+    const rounded = Math.ceil(height);
+    setMeasuredHeights((prev) => (prev[id] === rounded ? prev : { ...prev, [id]: rounded }));
+  }, []);
+
   const config = useMemo(() => getLayoutConfig(width, curve), [width, curve]);
-  const { rows, totalHeight } = useMemo(() => buildRows(mergedItems, config), [mergedItems, config]);
+  const { rows, totalHeight } = useMemo(
+    () => buildRows(mergedItems, config, measuredHeights),
+    [mergedItems, config, measuredHeights],
+  );
 
   const chunks = useMemo(() => chunkRows(rows, CHUNK_SIZE), [rows]);
 
@@ -681,6 +692,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
               armed={armedDeleteId === row.id}
               onNodeClick={() => handleNodeClick(row.activity!.activity.id)}
               onDelete={() => handleDelete(row.activity!.activity.id)}
+              onMeasure={measureCard}
             />
           )
         )}
@@ -840,6 +852,7 @@ function ActivityRowItem({
   armed,
   onNodeClick,
   onDelete,
+  onMeasure,
 }: {
   row: FlowRow;
   config: LayoutConfig;
@@ -852,7 +865,22 @@ function ActivityRowItem({
   armed: boolean;
   onNodeClick: () => void;
   onDelete: () => void;
+  onMeasure: (id: string, height: number) => void;
 }) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const activityId = row.activity?.activity.id;
+  // Report this card's real rendered height: a card whose content is taller
+  // than the baseline row gets a taller row, so nothing is clipped or overlapped.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !activityId) return undefined;
+    const report = () => onMeasure(activityId, el.getBoundingClientRect().height);
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    report();
+    return () => ro.disconnect();
+  }, [activityId, onMeasure]);
+
   if (!row.activity) return null;
   const { activity, status } = row.activity;
 
@@ -916,6 +944,7 @@ function ActivityRowItem({
       </div>
 
       <div
+        ref={cardRef}
         style={{
           position: "absolute",
           left: cardLeft,

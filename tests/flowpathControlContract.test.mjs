@@ -315,7 +315,13 @@ test("FlowPathView wires useFlowPathFirestore so admin-created items appear in t
   assert.match(flowpathView, /useFlowPathFirestore/);
   assert.match(flowpathView, /mergedItems/);
   assert.match(flowpathView, /firestoreItems/);
-  assert.match(flowpathView, /buildRows\(mergedItems, config\)/);
+  // The merged list still drives the rows; the third argument only lets each
+  // row grow to its card's measured height (§32).
+  assert.match(
+    flowpathView,
+    /buildRows\(\s*mergedItems,\s*config,\s*measuredHeights,?\s*\)/,
+    "rows come from the merged local + Firestore items",
+  );
 });
 
 test("FlowPathView wires useFlowPathSync so every local mutation mirrors to the server", () => {

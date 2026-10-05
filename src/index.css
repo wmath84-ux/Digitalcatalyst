@@ -5850,6 +5850,34 @@ html[data-course-player-active="true"] {
   animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
+/* ── Course progress bar — continuous shimmer (Part 2 §2 / §24) ─────────────
+   A subtle highlight sweeps along the existing fill while the player is open.
+   Purely decorative and CSS-only (no JS timer): the bar's width, thickness,
+   height, placement, alignment and the real progress value are UNCHANGED —
+   only a translucent sheen animates inside the fill. Reduced-motion users get
+   the static line and value with no animation. */
+[data-course-progress-bar] [data-course-progress-fill]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  background-size: 55% 100%;
+  background-repeat: no-repeat;
+  animation: course-progress-shimmer 2.6s ease-in-out infinite;
+}
+@keyframes course-progress-shimmer {
+  0% { background-position: -60% 0; }
+  100% { background-position: 165% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-course-progress-bar] [data-course-progress-fill]::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+
 @media (prefers-reduced-motion: reduce) {
   [data-page-enter] [data-site-header],
   [data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
@@ -7196,31 +7224,4 @@ html[data-course-player-active="true"] {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-/* ── Course progress bar — continuous shimmer (Part 2 §2 / §24) ─────────────
-   A subtle highlight sweeps along the existing fill while the player is open.
-   Purely decorative and CSS-only (no JS timer): the bar's width, thickness,
-   height, placement, alignment and the real progress value are UNCHANGED —
-   only a translucent sheen animates inside the fill. Reduced-motion users get
-   the static line and value with no animation. */
-[data-course-progress-bar] [data-course-progress-fill]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-  background-size: 55% 100%;
-  background-repeat: no-repeat;
-  animation: course-progress-shimmer 2.6s ease-in-out infinite;
-}
-@keyframes course-progress-shimmer {
-  0% { background-position: -60% 0; }
-  100% { background-position: 165% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-course-progress-bar] [data-course-progress-fill]::after {
-    animation: none;
-    opacity: 0;
-  }
 }
