@@ -30,6 +30,8 @@ interface TabDefinition {
 const TABS: TabDefinition[] = [
   { id: "dashboard", label: { key: "nav.dashboard", fallback: "Dashboard" }, href: REVISION_DEEP_LINKS.dashboard, pages: ["dashboard", "study"] },
   { id: "bank", label: { key: "revision.tabs.bank", fallback: "Test Bank" }, href: REVISION_DEEP_LINKS.testBank, pages: ["bank", "test-play", "test-play-attempt", "test-result", "test-review", "session", "session-result"] },
+  { id: "decks", label: { key: "nav.decks", fallback: "Decks" }, href: "#/revision/decks", pages: ["decks"] },
+  { id: "browser", label: { key: "nav.browser", fallback: "Cards" }, href: "#/revision/browser", pages: ["browser"] },
   { id: "weak", label: { key: "revision.tabs.weak", fallback: "Weak Topics" }, href: REVISION_DEEP_LINKS.weakTopics, pages: ["weak-topics"] },
   { id: "progress", label: { key: "revision.tabs.progress", fallback: "Progress" }, href: REVISION_DEEP_LINKS.progress, pages: ["progress", "stats"] },
   { id: "plan", label: { key: "revision.tabs.plan", fallback: "Plan & AI" }, href: REVISION_DEEP_LINKS.profile, pages: ["profile", "settings"] },

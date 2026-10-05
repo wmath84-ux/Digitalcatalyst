@@ -46,17 +46,14 @@ function callbackHook(node) {
   return "";
 }
 
-test("Revision uses Recall's own desktop chrome instead of stacking another left rail", () => {
+test("Revision integrates into DesktopShell with the unified left rail and header", () => {
   const host = main.slice(main.indexOf("function DesktopAppHost("), main.indexOf("function RootPage()"));
-  const start = host.indexOf("if (\n    !hash");
-  const end = host.indexOf("return (\n    <AppShell", start);
-  assert.ok(start >= 0 && end > start, "expected the desktop host's full-screen-route branch");
-  const skipBranch = host.slice(start, end);
+  const start = host.indexOf("return (\n    <AppShell");
+  assert.ok(start >= 0, "expected the desktop host's AppShell return");
+  const appShellBranch = host.slice(start);
 
-  assert.match(skipBranch, /hash\.startsWith\(REVISION_HASH\)/);
-  assert.match(skipBranch, /return <>\{children\}<\/>/);
-  assert.match(appShell, /fixed inset-y-0 left-0 z-40 hidden w-56 flex-col[^\n]*lg:flex/);
-  assert.match(appShell, /<main id="main-content" className="lg:pl-56"/);
+  assert.match(appShellBranch, /hash\.startsWith\(REVISION_HASH\)\s*\?\s*"Revision"/);
+  assert.doesNotMatch(host.slice(0, start), /hash\.startsWith\(REVISION_HASH\)/, "must not skip AppShell on revision");
 });
 
 test("Recall keeps its light token surface and is not distorted by legacy desktop styling", () => {

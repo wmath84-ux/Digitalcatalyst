@@ -241,6 +241,7 @@ export default function MyDayApp() {
         <BottomNav
           active="myday"
           peek
+          peekAlwaysOpen
           onChange={(tab: TabKey) => {
             if (tab === "myday") return;
             if (tab === "home") window.location.hash = "#/home";

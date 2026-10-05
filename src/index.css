@@ -5518,6 +5518,19 @@ html[data-course-player-active="true"] {
   padding-bottom: 6px;
 }
 
+[data-site-peek-dock][data-always-open="true"] [data-site-peek-line-hit] {
+  display: none !important;
+}
+
+[data-site-peek-dock][data-always-open="true"] [data-site-peek-panel] {
+  pointer-events: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  padding-bottom: 6px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    CHROME GLASS — WebsiteGlass docs sensitivity on every header
    ══════════════════════════════════════════════════════════════════════
@@ -6961,6 +6974,12 @@ html[data-course-player-active="true"] {
     max-height: none !important;
     overflow: visible !important;
   }
+}
+
+.dc-desktop-shell [data-recall-root][data-revision-app] {
+  width: 100% !important;
+  min-height: 100% !important;
+  background: transparent !important;
 }
 @supports (min-height: 100dvh) {
   @media (min-width: 640px) and (max-width: 1023px) {

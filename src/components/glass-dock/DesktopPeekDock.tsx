@@ -100,15 +100,14 @@ export default function DesktopPeekDock({
   active: DesktopRailKey
   purchasesBadge?: number
 }) {
-  // Re-read on every render: DesktopAppHost re-renders the shell (and so this
-  // dock) on each hashchange. On Home the line is only the optional
-  // press-drag strip; nothing can collapse the dock.
-  const alwaysOpen = isHomeDockRoute(active, typeof window !== 'undefined' ? window.location.hash : '')
+  // On desktop, the footer navigation defaults to minimized horizontal line
+  // and only reveals on hover or drag; it closes as soon as pointer leaves
+  // or an action is clicked/released.
+  const alwaysOpen = false
   const [hoverOpen, setOpen] = useState(false)
   /**
-   * Touch / pen have no hover: a tap on the line PINS the dock open, and only
-   * an outside tap, a selection or another tap on the line releases it. Mouse
-   * behaviour is unchanged — enter reveals, leaving the area hides.
+   * Touch / pen / drag toggle. A line tap or drag reveals the dock, and
+   * releasing on a button, clicking or leaving hides it.
    */
   const [pinned, setPinned] = useState(false)
   const closeTimerRef = useRef<number | null>(null)
@@ -185,10 +184,9 @@ export default function DesktopPeekDock({
   const navigate = useCallback((id: string) => {
     const tab = TABS.find((item) => item.key === id)
     if (!tab) return
-    // Touch / pen: the selection ends the gesture, so the pinned dock closes
-    // (the course player's peek dock behaves the same). Mouse keeps the old
-    // behaviour — the dock stays for as long as the pointer rests in it.
-    if (pointerTypeRef.current !== 'mouse') close()
+    // Selection ends the interaction and immediately re-minimizes the dock
+    // back to the horizontal line on desktop
+    close()
     window.location.hash = tab.hash
   }, [close])
 

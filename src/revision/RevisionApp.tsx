@@ -33,9 +33,13 @@
  */
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Play, Plus } from "lucide-react";
 
 import "./recall-theme.css";
 
+import Header from "../components/Header";
+import BottomNav, { type TabKey } from "../components/BottomNav";
+import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
 import PremiumGate from "../components/subscription/PremiumGate";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
@@ -58,8 +62,8 @@ import {
 import { ErrorBoundary } from "./recall/components/error-boundary";
 import { PWAUpdatePrompt } from "./recall/components/pwa-update-prompt";
 import { QuickAddDialog } from "./recall/components/quick-add";
-import { AppShell } from "./recall/components/app-shell";
 import { Dashboard } from "./recall/components/dashboard";
+import { getDueTodayCount } from "./recall/lib/stats";
 import {
   applyAccentColor,
   applyDyslexiaFont,
@@ -139,7 +143,51 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
   const showSettings = useRecallStore((state) => state.showSettings);
   const showImportHub = useRecallStore((state) => state.showImportHub);
   const showFocusTimer = useRecallStore((state) => state.showFocusTimer);
+  const startReview = useRecallStore((state) => state.startReview);
+  const cards = useRecallStore((state) => state.cards);
   const settings = useRecallStore((state) => state.settings);
+  const dueCount = useMemo(() => getDueTodayCount(cards), [cards]);
+
+  const isDesktopHost = Boolean(useTopBarTabsHost());
+
+  // Register Revision destinations directly into DesktopShell's top bar
+  useRegisterTopBarTabs({
+    feature: "revision",
+    ariaLabel: "Revision pages",
+    items: [
+      { id: "dashboard", label: "Dashboard", hint: "Overview & due cards" },
+      { id: "bank", label: "Test Bank", hint: "Exams & quizzes" },
+      { id: "decks", label: "Decks", hint: "Flashcard collections" },
+      { id: "browser", label: "Cards", hint: "Search all flashcards" },
+      { id: "weak-topics", label: "Weak Topics", hint: "Target weak points" },
+      { id: "progress", label: "Progress", hint: "Stats & metrics" },
+      { id: "profile", label: "Plan & AI", hint: "Study settings & AI tools" },
+      { id: "bulk-import", label: "Import", hint: "Import cards & decks" },
+    ],
+    activeId: route.page,
+    onSelect: (id) => {
+      if (id === "dashboard") navigate("#/revision");
+      else if (id === "bank") navigate("#/revision/bank");
+      else if (id === "decks") navigate("#/revision/decks");
+      else if (id === "browser") navigate("#/revision/browser");
+      else if (id === "weak-topics") navigate("#/revision/weak-topics");
+      else if (id === "progress") navigate("#/revision/progress");
+      else if (id === "profile") navigate("#/revision/profile");
+      else if (id === "bulk-import") navigate("#/revision/bulk-import");
+    },
+  });
+
+  useEffect(() => {
+    const handleQuickAdd = () => setShowQuickAdd(true);
+    window.addEventListener("dc-revision-quick-add", handleQuickAdd);
+    return () => window.removeEventListener("dc-revision-quick-add", handleQuickAdd);
+  }, []);
+
+  useEffect(() => {
+    const handleStartReview = () => startReview(null);
+    window.addEventListener("dc-revision-start-review", handleStartReview);
+    return () => window.removeEventListener("dc-revision-start-review", handleStartReview);
+  }, [startReview]);
 
   /* ── 1. Feature visibility for the host rail (unchanged behaviour) ─────── */
   usePublishFeatureVisibility("revision", { hidden: Boolean(hidden) });
@@ -449,45 +497,114 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
               </Suspense>
             </main>
           ) : (
-            <AppShell>
-              {/* The Digitalcatalyst destinations the ported nav does not carry.
-                  Rendered in Recall's own secondary-tab language so the feature
-                  keeps ONE chrome. Focused test-taking hides it. */}
-              {!isFocused ? <RevisionTabs route={route} /> : null}
-
-              {accessLoading || dataLoading || isLoading ? (
-                <div className="py-16" data-revision-access-loading>
-                  <RecallLoading
-                    label={
-                      accessLoading
-                        ? "Checking your membership…"
-                        : t("app.loading", "Loading your revision library…")
-                    }
-                  />
-                </div>
-              ) : (
-                <>
-                  {storeError ? (
-                    <div className="rounded-2xl border border-error/40 bg-error-container p-5 text-on-error-container">
-                      <p className="font-semibold">{t("app.couldNotLoad", "Could not load your revision data")}</p>
-                      <p className="mt-1 text-sm opacity-90">{storeError}</p>
+            <div className="flex min-h-dvh flex-col">
+              {/* On mobile / tablet-portrait, render the unified app header with Recall quick actions */}
+              {!isDesktopHost && !isFocused && (
+                <Header
+                  title="Revision"
+                  subtitle="Tests, smart recall & mastery"
+                  cartCount={cartIds.size}
+                  notifCount={1}
+                  onNavigateToSubscription={() => {
+                    window.location.hash = "#/subscription";
+                  }}
+                  onNavigateToCart={() => {
+                    window.location.hash = "#/cart";
+                  }}
+                  onNavigateToNotifications={() => {
+                    window.location.hash = "#/notifications";
+                  }}
+                  action={
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => startReview(null)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/25 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-indigo-500/35 active:scale-95 transition-all"
+                        aria-label="Quick Review"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-current text-indigo-300" />
+                        <span>Review</span>
+                        {dueCount > 0 && (
+                          <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-black">
+                            {dueCount}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickAdd(true)}
+                        className="rounded-full border border-white/15 bg-white/10 p-1.5 text-white hover:bg-white/20 active:scale-95 transition-all"
+                        aria-label="Add Card or Deck"
+                        title="Add Card or Deck"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
                     </div>
-                  ) : null}
-
-                  <div key={syncKey}>
-                    {showOnboardingRequired ? (
-                      <Suspense fallback={<RecallLoading />}>
-                        <Onboarding />
-                      </Suspense>
-                    ) : dcPage ? (
-                      <Suspense fallback={<RecallLoading />}>{dcPage}</Suspense>
-                    ) : (
-                      recallContent
-                    )}
-                  </div>
-                </>
+                  }
+                />
               )}
-            </AppShell>
+
+              <main
+                id="main-content"
+                className="flex-1 w-full mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6 pb-28 lg:px-8 lg:py-6 lg:pb-12"
+                tabIndex={-1}
+              >
+                {/* On mobile / tablet-portrait, secondary tabs render below header */}
+                {!isDesktopHost && !isFocused && <RevisionTabs route={route} />}
+
+                {accessLoading || dataLoading || isLoading ? (
+                  <div className="py-16" data-revision-access-loading>
+                    <RecallLoading
+                      label={
+                        accessLoading
+                          ? "Checking your membership…"
+                          : t("app.loading", "Loading your revision library…")
+                      }
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {storeError ? (
+                      <div className="rounded-2xl border border-error/40 bg-error-container p-5 text-on-error-container">
+                        <p className="font-semibold">{t("app.couldNotLoad", "Could not load your revision data")}</p>
+                        <p className="mt-1 text-sm opacity-90">{storeError}</p>
+                      </div>
+                    ) : null}
+
+                    <div key={syncKey}>
+                      {showOnboardingRequired ? (
+                        <Suspense fallback={<RecallLoading />}>
+                          <Onboarding />
+                        </Suspense>
+                      ) : dcPage ? (
+                        <Suspense fallback={<RecallLoading />}>{dcPage}</Suspense>
+                      ) : (
+                        recallContent
+                      )}
+                    </div>
+                  </>
+                )}
+              </main>
+
+              {/* On mobile / tablet-portrait, render the unified floating footer nav */}
+              {!isDesktopHost && !isFocused && (
+                <BottomNav
+                  active="revision"
+                  peek
+                  peekAlwaysOpen
+                  onChange={(tab: TabKey) => {
+                    if (tab === "home") window.location.hash = "#/home";
+                    else if (tab === "myday") window.location.hash = "#/my-day";
+                    else if (tab === "store") window.location.hash = "#/store";
+                    else if (tab === "purchases") window.location.hash = "#/store/purchases";
+                    else if (tab === "profile") window.location.hash = "#/profile";
+                    else if (tab === "study-library") window.location.hash = "#/study-library";
+                    else if (tab === "flowpath") window.location.hash = "#/flowpath";
+                    else if (tab === "revision") window.location.hash = "#/revision";
+                  }}
+                />
+              )}
+            </div>
           )}
 
           <PremiumGate

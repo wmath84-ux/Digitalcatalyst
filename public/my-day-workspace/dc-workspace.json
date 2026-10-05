@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceCommit": "d32307364cc5c4fc7e3a0e36d85c0a0f8722aaa7",
   "sourceTag": "v3.2.0",
-  "builtAt": "2026-10-04T18:18:15.461Z",
+  "builtAt": "2026-10-05T14:15:38.719Z",
   "buildMode": "production",
   "entry": "index.html",
   "assets": [
