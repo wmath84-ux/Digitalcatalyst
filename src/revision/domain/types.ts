@@ -444,7 +444,7 @@ export interface UnifiedStudySettings {
 }
 
 export const DEFAULT_STUDY_SETTINGS: UnifiedStudySettings = {
-  theme: "dark",
+  theme: "light",
   accentColor: "blue",
   dyslexiaFont: false,
   dailyNewCardLimit: 20,

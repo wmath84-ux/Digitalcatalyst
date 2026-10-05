@@ -4260,14 +4260,10 @@ html[data-course-player-active="true"] {
 }
 
 /* ── 2. Revision inside the desktop shell: one scroller, not two ─────────
-   `.dc-desktop-shell [data-desktop-content] > main [data-revision-app]`
-   asks for `height: 100%`, but the shell's `<main>` only ever declared
-   `min-height: 100%` — an auto height, so the percentage resolved to `auto`,
-   the revision app grew with its content and the shell's row scrolled
-   instead of the page's own `<main>`. Giving that `<main>` a real height
-   (only when it hosts Revision) makes the percentage chain resolve, so
-   `[data-revision-page-main]` is the single scroller and the header + tab row
-   stay pinned. Other pages keep the flowing `min-height: 100%` behaviour. */
+   Legacy/custom Revision pages inside `.dc-desktop-shell` use the shell's
+   `[data-desktop-content]` scroller and their own `[data-revision-page-main]`.
+   The Recall-backed Revision app now bypasses this outer shell and owns its
+   complete chrome, so these rules remain limited to pages hosted by it. */
 .dc-desktop-shell [data-desktop-content] > main:has([data-revision-app]) {
   height: 100%;
   min-height: 0;
@@ -4303,31 +4299,31 @@ html[data-course-player-active="true"] {
    for Revision and Profile. That leftover band is the "dashboard ekadam shrink
    ho gaya hai vertically" report on tablet + desktop. */
 @media (min-width: 640px) and (max-width: 1366px) {
-  [data-revision-app] h1,
+  [data-revision-app]:not([data-recall-root]) h1,
   [data-profile-page] h1 { font-size: 1.5rem !important; }
-  [data-revision-app] h2,
+  [data-revision-app]:not([data-recall-root]) h2,
   [data-profile-page] h2 { font-size: 1.25rem !important; }
-  [data-revision-app] h3,
+  [data-revision-app]:not([data-recall-root]) h3,
   [data-profile-page] h3 { font-size: 1.125rem !important; }
-  [data-revision-app] button,
+  [data-revision-app]:not([data-recall-root]) button,
   [data-profile-page] button { font-size: 0.875rem; }
-  [data-revision-app] .p-3,
+  [data-revision-app]:not([data-recall-root]) .p-3,
   [data-profile-page] .p-3 { padding: 0.75rem !important; }
-  [data-revision-app] .p-4,
+  [data-revision-app]:not([data-recall-root]) .p-4,
   [data-profile-page] .p-4 { padding: 1rem !important; }
-  [data-revision-app] .p-5,
+  [data-revision-app]:not([data-recall-root]) .p-5,
   [data-profile-page] .p-5 { padding: 1.25rem !important; }
-  [data-revision-app] .p-6,
+  [data-revision-app]:not([data-recall-root]) .p-6,
   [data-profile-page] .p-6 { padding: 1.5rem !important; }
-  [data-revision-app] .gap-3,
+  [data-revision-app]:not([data-recall-root]) .gap-3,
   [data-profile-page] .gap-3 { gap: 0.75rem !important; }
-  [data-revision-app] .gap-4,
+  [data-revision-app]:not([data-recall-root]) .gap-4,
   [data-profile-page] .gap-4 { gap: 1rem !important; }
-  [data-revision-app] .gap-6,
+  [data-revision-app]:not([data-recall-root]) .gap-6,
   [data-profile-page] .gap-6 { gap: 1.5rem !important; }
-  [data-revision-app] .rounded-2xl,
+  [data-revision-app]:not([data-recall-root]) .rounded-2xl,
   [data-profile-page] .rounded-2xl { border-radius: 1rem !important; }
-  [data-revision-app] .rounded-3xl,
+  [data-revision-app]:not([data-recall-root]) .rounded-3xl,
   [data-profile-page] .rounded-3xl { border-radius: 1.5rem !important; }
 }
 
@@ -6954,3 +6950,22 @@ html[data-course-player-active="true"] {
 [data-revision-page-main],
 [data-profile-content],
 [data-pdp-scroll] { min-width: 0 !important; width: 100% !important; }
+
+/* Recall's AppShell is Revision's only desktop chrome. When that route skips
+   the global desktop shell, release the legacy fixed-height tablet frame so
+   Recall's own page flow can scroll instead of clipping under the viewport. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  body:not(:has(.dc-desktop-shell)) [data-recall-root][data-revision-app] {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+@supports (min-height: 100dvh) {
+  @media (min-width: 640px) and (max-width: 1023px) {
+    body:not(:has(.dc-desktop-shell)) [data-recall-root][data-revision-app] {
+      min-height: 100dvh !important;
+    }
+  }
+}

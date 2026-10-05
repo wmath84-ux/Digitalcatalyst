@@ -715,11 +715,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  // Skip the shell on routes that are designed as full-screen experiences
-  // (checkout has its own payment iframe, the course player has its own
-  // immersive layout, the admin has its own shell). On those routes
-  // the mobile + tablet chrome is hidden too — keeping the desktop
-  // shell out of the way preserves the full-bleed experience.
+  // Skip the shell on routes that own their own full-screen chrome
+  // (Revision uses Recall's complete desktop/mobile AppShell; checkout has
+  // its own payment iframe, and the course player/admin have their own
+  // immersive shells). The global rail and top bar would duplicate or
+  // overlap the page's own navigation, so keep them out of the way.
   //
   // The landing page is a standalone marketing page: wrapping it in the
   // app shell squeezed the hero into a small box beside the rail, hid the
@@ -732,6 +732,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")
+    || hash.startsWith(REVISION_HASH)
     || hash.startsWith("#/course/")
     // A course the learner authored opens the SAME immersive player, so the
     // rail / top bar have to get out of its way too. The builder (…/new and
