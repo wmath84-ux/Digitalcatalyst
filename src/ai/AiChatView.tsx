@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookmarkPlus, ChevronDown, Copy, HelpCircle, Info, Lightbulb, MessageCircleQuestion,
   RotateCcw, Send, Sparkles, TriangleAlert,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { toast } from "../components/ui/glass-toast";
 import { cn } from "../utils/cn";
@@ -19,6 +21,7 @@ import {
 import { AiMarkdown } from "./AiMarkdown";
 import { saveAiNote } from "./aiNotes";
 import { mentorMarkdownToPlainText } from "../../utils/mentorAnswer";
+import { useCourseTheme } from "../course/playerPreferences";
 import type { ModuleAiController } from "./useModuleAi";
 import type { PersonalAiThreadMessage } from "./types";
 
@@ -58,6 +61,9 @@ interface Props {
 export default function AiChatView({
   ai, uid, productId, moduleId, resourceTitle, initialQuestion, onOpenUpgrade, onConfigureAi, onSavedNote, composerBottomClass,
 }: Props) {
+  // AI light/dark (§20/§21): the SAME shared, per-user theme layer the rest of
+  // the player uses — persisted, never a second theme system.
+  const aiThemeCtl = useCourseTheme("ai", uid);
   const [draft, setDraft] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [explainFor, setExplainFor] = useState<string | null>(null);
@@ -161,7 +167,7 @@ export default function AiChatView({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-module-ai-chat="">
+    <div className="flex min-h-0 flex-1 flex-col" data-module-ai-chat="" data-course-ai-panel="" data-course-ai-theme={aiThemeCtl.theme}>
       <div ref={stick.ref} className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4" data-module-ai-messages="">
         <div className="mx-auto w-full max-w-3xl space-y-3">
           <AiFailureBanner failure={ai.failure} onRetry={() => void ai.reload()} onUpgrade={onOpenUpgrade} onConfigure={onConfigureAi} />
@@ -400,6 +406,17 @@ export default function AiChatView({
                 aria-label="Ask the AI about this module"
                 className="max-h-[140px] min-h-11 flex-1 resize-none bg-transparent px-2.5 py-2.5 text-[13px] font-semibold leading-5 text-white outline-none placeholder:text-white/30 disabled:opacity-50"
               />
+              <button
+                type="button"
+                onClick={aiThemeCtl.toggleTheme}
+                aria-pressed={aiThemeCtl.theme === "light"}
+                aria-label={aiThemeCtl.theme === "light" ? "Switch AI to dark theme" : "Switch AI to light theme"}
+                title={aiThemeCtl.theme === "light" ? "Dark theme" : "Light theme"}
+                data-course-ai-theme-toggle={aiThemeCtl.theme}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300 transition hover:bg-white/[0.09] hover:text-white"
+              >
+                {aiThemeCtl.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+              </button>
               <button
                 type="button"
                 onClick={() => void send(draft)}

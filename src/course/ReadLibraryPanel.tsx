@@ -50,6 +50,8 @@ import {
   Search,
   Trash2,
   X,
+  Moon,
+  Sun,
 } from "lucide-react";
 import type { AccessibleReadResource } from "../../utils/readResources.js";
 import {
@@ -65,6 +67,7 @@ import PdfJsGenericViewer, { type PdfAnnotationApi } from "./PdfJsGenericViewer"
 import CourseConfirmDialog from "./ConfirmDeleteDialog";
 import useReadUploads, { type ReadUploadProgress } from "./useReadUploads";
 import { fetchPdfFromUrl, parseUrlList } from "./readUrlImport";
+import { useCourseTheme } from "./playerPreferences";
 
 const pageStorageKey = (productId: string, resourceId: string) =>
   `digitalcatalyst:read-page:${encodeURIComponent(productId)}:${encodeURIComponent(resourceId)}`;
@@ -220,6 +223,9 @@ export default function ReadLibraryPanel({
 }) {
   const { user } = useAuth();
   const readUploads = useReadUploads(user?.id);
+  // Read light/dark (§20/§21): the SAME shared, per-user theme layer the rest
+  // of the player uses — persisted, never a second theme system.
+  const readThemeCtl = useCourseTheme("read", user?.id ?? null);
 
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -538,7 +544,12 @@ export default function ReadLibraryPanel({
   const uploadBusy = Boolean(readUploads.uploading);
 
   return (
-    <section className="relative h-full min-h-0 overflow-hidden bg-slate-950 text-white" aria-label="Read library" data-course-read-panel>
+    <section
+      className="relative h-full min-h-0 overflow-hidden bg-slate-950 text-white"
+      aria-label="Read library"
+      data-course-read-panel
+      data-course-read-theme={readThemeCtl.theme}
+    >
       {/* Keep the searchable library mounted behind the reader. Its query and
           scroll position survive opening a PDF and returning with Back. */}
       <div className={`flex h-full min-h-0 flex-col ${activeId ? "hidden" : ""}`} aria-hidden={Boolean(activeId)} data-course-read-library>
@@ -578,6 +589,17 @@ export default function ReadLibraryPanel({
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300" aria-label={`${libraryMode === "course" ? entries.length : readUploads.uploads.length} resources`}>
               {libraryMode === "course" ? entries.length : readUploads.uploads.length}
             </span>
+            <button
+              type="button"
+              onClick={readThemeCtl.toggleTheme}
+              aria-pressed={readThemeCtl.theme === "light"}
+              aria-label={readThemeCtl.theme === "light" ? "Switch Read to dark theme" : "Switch Read to light theme"}
+              title={readThemeCtl.theme === "light" ? "Dark theme" : "Light theme"}
+              data-course-read-theme-toggle={readThemeCtl.theme}
+              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-slate-300 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              {readThemeCtl.theme === "light" ? <Moon size={15} aria-hidden="true" /> : <Sun size={15} aria-hidden="true" />}
+            </button>
             {/* The library grows here: a learner's own PDF, in one tap. */}
             <button
               type="button"
@@ -585,7 +607,7 @@ export default function ReadLibraryPanel({
               disabled={uploadBusy}
               aria-label="Upload your own PDF"
               title="Upload your own PDF"
-              className="ml-auto inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-300/30 bg-violet-400/15 px-2.5 text-[11px] font-bold text-violet-100 transition-colors hover:bg-violet-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-300/30 bg-violet-400/15 px-2.5 text-[11px] font-bold text-violet-100 transition-colors hover:bg-violet-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
               data-course-read-upload
             >
               {uploadBusy ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
