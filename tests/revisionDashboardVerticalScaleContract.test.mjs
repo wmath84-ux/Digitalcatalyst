@@ -59,8 +59,8 @@ test("the tablet-shrink undo covers the whole range the global clamp does", () =
   assert.ok(globalBlock, "expected the 'Tablet Size-Based Scaling' block");
   const globalMax = Number(globalBlock[1]);
 
-  const undoBlock = clean.match(/@media \(min-width: 640px\) and \(max-width: (\d+)px\) \{\n\s*\[data-revision-app\] h1,/);
-  assert.ok(undoBlock, "expected the Revision + Profile undo block");
+  const undoBlock = clean.match(/@media \(min-width: 640px\) and \(max-width: (\d+)px\) \{\n\s*\[data-revision-app\]:not\(\[data-recall-root\]\) h1,/);
+  assert.ok(undoBlock, "expected the legacy Revision + Profile undo block, scoped away from Recall's own UI");
   assert.equal(
     Number(undoBlock[1]),
     globalMax,

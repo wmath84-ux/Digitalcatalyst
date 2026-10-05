@@ -24,14 +24,15 @@ type Range = "daily" | "weekly" | "monthly";
 export default function ProgressPage({ uid }: { uid: string }) {
   const { navigate } = useRevisionRoute();
   const [range, setRange] = useState<Range>("daily");
-  const [error, setError] = useState<string | null>(null);
 
-  const data = useMemo(() => {
+  const { data, error } = useMemo(() => {
     try {
-      return getProgressData(uid);
+      return { data: getProgressData(uid), error: null as string | null };
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not compute your progress.");
-      return null;
+      return {
+        data: null,
+        error: err instanceof Error ? err.message : "Could not compute your progress.",
+      };
     }
   }, [uid]);
 

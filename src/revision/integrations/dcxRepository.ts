@@ -128,6 +128,22 @@ export async function initializeRevisionDomain(uid: string): Promise<UnifiedSnap
   const projected = projectLegacyDb({ db: legacyDocument });
   unified = unified ? mergeUnifiedSnapshots(projected, unified) : projected;
   unified = { ...unified, settings: settingsOrDefaults(unified.settings) };
+
+  // A remote v2 snapshot can still carry the accidental dark default. If v3
+  // ran in this boot, finish that one-time migration after cloud hydration too;
+  // otherwise a remote merge could immediately restore the old appearance.
+  const appliedLightThemeMigration = migration.ran.includes(3);
+  const migratedDarkTheme = appliedLightThemeMigration && unified.settings.study.theme === "dark";
+  if (migratedDarkTheme) {
+    unified = {
+      ...unified,
+      settings: {
+        ...unified.settings,
+        study: { ...unified.settings.study, theme: "light" },
+      },
+    };
+  }
+
   await writeUnifiedSnapshot(unified);
   cachedUnified = unified;
 
@@ -135,6 +151,7 @@ export async function initializeRevisionDomain(uid: string): Promise<UnifiedSnap
   const recall = projectUnifiedToRecall(unified);
   await writeKv(KV_RECALL, recall);
   cachedRecall = recall;
+  if (appliedLightThemeMigration && uid !== "guest") queueUnifiedCloudPersistence(uid);
 
   return unified;
 }

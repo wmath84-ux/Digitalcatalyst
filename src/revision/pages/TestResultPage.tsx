@@ -8,7 +8,7 @@
  * through the same surfaces the ported session summary uses.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "../recall/components/ui/button";
 import { cn } from "../recall/lib/utils";
@@ -22,21 +22,25 @@ import { ServiceError } from "../engine/store";
 
 export default function TestResultPage({ uid, attemptId }: { uid: string; attemptId: number | null }) {
   const { navigate } = useRevisionRoute();
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ attemptId: number | null; message: string } | null>(null);
 
-  const result = useMemo(() => {
-    if (!attemptId) return null;
+  // Loading a result is a pure render calculation. In particular, an invalid
+  // deep link must produce an error value rather than scheduling state while
+  // React is rendering this page.
+  const { result, loadError } = useMemo(() => {
+    if (!attemptId) {
+      return { result: null, loadError: "This result link is missing its attempt id." };
+    }
     try {
-      return getTestResult(uid, attemptId);
+      return { result: getTestResult(uid, attemptId), loadError: null as string | null };
     } catch (err) {
-      setError(err instanceof ServiceError ? err.message : "Could not load this result.");
-      return null;
+      return {
+        result: null,
+        loadError: err instanceof ServiceError ? err.message : "Could not load this result.",
+      };
     }
   }, [attemptId, uid]);
-
-  useEffect(() => {
-    if (!attemptId) setError("This result link is missing its attempt id.");
-  }, [attemptId]);
+  const error = actionError?.attemptId === attemptId ? actionError.message : loadError;
 
   if (error && !result) {
     return (
@@ -80,7 +84,7 @@ export default function TestResultPage({ uid, attemptId }: { uid: string; attemp
                 const attempt = startCustomTestRetake(uid, result.testId);
                 navigate(REVISION_DEEP_LINKS.testPlayAttempt(attempt.id));
               } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not start a retake.");
+                setActionError({ attemptId, message: err instanceof Error ? err.message : "Could not start a retake." });
               }
             }}
           >
@@ -118,7 +122,7 @@ export default function TestResultPage({ uid, attemptId }: { uid: string; attemp
                 const attempt = startSkippedQuestionsRetake(uid, result.testId);
                 navigate(REVISION_DEEP_LINKS.testPlayAttempt(attempt.id));
               } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not start the skipped-questions retake.");
+                setActionError({ attemptId, message: err instanceof Error ? err.message : "Could not start the skipped-questions retake." });
               }
             }}
           >

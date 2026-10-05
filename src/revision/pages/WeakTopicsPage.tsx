@@ -23,23 +23,27 @@ import { ServiceError } from "../engine/store";
 
 export default function WeakTopicsPage({ uid }: { uid: string }) {
   const { navigate } = useRevisionRoute();
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const data = useMemo(() => {
+  const { data, loadError } = useMemo(() => {
     try {
-      return getWeakTopics(uid);
+      return { data: getWeakTopics(uid), loadError: null as string | null };
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not compute your weak topics.");
-      return null;
+      return {
+        data: null,
+        loadError: err instanceof Error ? err.message : "Could not compute your weak topics.",
+      };
     }
   }, [uid]);
+  const error = actionError ?? loadError;
 
   const revise = (topicId?: number) => {
+    setActionError(null);
     try {
       const session = startRevisionSession(uid, topicId ? { topicId, limit: 10 } : { limit: 10 });
       navigate(REVISION_DEEP_LINKS.session(session.id));
     } catch (err) {
-      setError(err instanceof ServiceError ? err.message : "Could not start a revision session.");
+      setActionError(err instanceof ServiceError ? err.message : "Could not start a revision session.");
     }
   };
 

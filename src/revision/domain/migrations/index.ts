@@ -30,7 +30,7 @@ import { mergeUnifiedSnapshots, projectLegacyDb } from "../adapters/legacyProjec
 import { DEFAULT_SETTINGS, DEFAULT_USER_CUSTOM_SETTINGS, loadUserCustomSettings, type RevisionDb } from "../../engine/store";
 
 /** Current version of the unified model. Bump when a migration adds a step. */
-export const UNIFIED_SCHEMA_VERSION = 2;
+export const UNIFIED_SCHEMA_VERSION = 3;
 
 export interface MigrationState {
   version: number;
@@ -103,7 +103,7 @@ const normaliseSettings: Migration = {
     const snapshot = context.unified;
     return {
       ...snapshot,
-      version: UNIFIED_SCHEMA_VERSION,
+      version: 2,
       settings: {
         catalog: snapshot.settings?.catalog ?? context.legacy?.settings ?? { ...DEFAULT_SETTINGS },
         custom: {
@@ -132,7 +132,36 @@ const normaliseSettings: Migration = {
   },
 };
 
-export const MIGRATIONS: Migration[] = [baselineProjection, normaliseSettings];
+/**
+ * v3 — use Recall's light appearance for existing Revision profiles.
+ *
+ * The first Digitalcatalyst port accidentally made dark mode the inherited
+ * default. Existing users therefore have a stored `dark` value even though
+ * they never selected it. Migrate that one-time default to Recall's light
+ * appearance; preserve an explicit high-contrast preference. After this step,
+ * theme choices are saved normally and this migration never runs again.
+ */
+const recallLightTheme: Migration = {
+  version: 3,
+  description: "Use Recall's light theme as the Revision default",
+  async run(context) {
+    if (!context.unified) return null;
+    const snapshot = context.unified;
+    const study = { ...DEFAULT_STUDY_SETTINGS, ...(snapshot.settings?.study ?? {}) };
+    if (study.theme === "dark") study.theme = "light";
+
+    return {
+      ...snapshot,
+      version: UNIFIED_SCHEMA_VERSION,
+      settings: {
+        ...snapshot.settings,
+        study,
+      },
+    };
+  },
+};
+
+export const MIGRATIONS: Migration[] = [baselineProjection, normaliseSettings, recallLightTheme];
 
 /* ------------------------------------------------------------------ */
 /* Runner                                                             */
