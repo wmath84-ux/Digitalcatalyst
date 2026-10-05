@@ -104,11 +104,11 @@ test("the Read library has a course/mine toggle, compose for modules, and a stal
   assert.match(model, /groupReadUploadSubmodules/);
 });
 
-test("Home's footer is always open; My Day keeps the peek; the desktop dock follows the Home route", () => {
+test("Home and My Day footers are always open on mobile; the desktop dock follows the peek route", () => {
   const home = read("src/home/App.tsx");
   assert.match(home, /<BottomNav[\s\S]*?\bpeek\b[\s\S]*?\bpeekAlwaysOpen\b/);
   const myDay = read("src/MyDayApp.tsx");
-  assert.doesNotMatch(myDay, /peekAlwaysOpen/);
+  assert.match(myDay, /peekAlwaysOpen/);
   const footer = read("src/components/SitePeekFooter.tsx");
   assert.match(footer, /const open = alwaysOpen \|\| hover \|\| pinned/);
   assert.match(footer, /inert=\{!open\}/);

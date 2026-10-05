@@ -732,7 +732,6 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")
-    || hash.startsWith(REVISION_HASH)
     || hash.startsWith("#/course/")
     // A course the learner authored opens the SAME immersive player, so the
     // rail / top bar have to get out of its way too. The builder (…/new and
@@ -751,23 +750,27 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
       pageTitle={
         hash.startsWith("#/flowpath")
           ? "FlowPath"
-          : hash.startsWith(SUBSCRIPTION_HASH)
-            ? "Subscription"
-            : hash.startsWith(PRODUCT_HASH)
-              ? "Product details"
-              : hash.startsWith(STUDY_LIBRARY_HASH)
-                ? "My Study Library"
-                : hash.startsWith(USAGE_LIMITS_HASH)
-                  ? "Usage Limits"
-                  : undefined
+          : hash.startsWith(REVISION_HASH)
+            ? "Revision"
+            : hash.startsWith(SUBSCRIPTION_HASH)
+              ? "Subscription"
+              : hash.startsWith(PRODUCT_HASH)
+                ? "Product details"
+                : hash.startsWith(STUDY_LIBRARY_HASH)
+                  ? "My Study Library"
+                  : hash.startsWith(USAGE_LIMITS_HASH)
+                    ? "Usage Limits"
+                    : undefined
       }
       pageSubtitle={
         hash.startsWith("#/flowpath")
           ? "Your day. Your goals. One continuous flow."
-          : hash.startsWith(SUBSCRIPTION_HASH)
-            ? "Compare plans, add courses and features, and review before you buy"
-            : hash.startsWith(PRODUCT_HASH)
-              ? "Everything about this resource, before you buy"
+          : hash.startsWith(REVISION_HASH)
+            ? "Tests, smart recall & mastery"
+            : hash.startsWith(SUBSCRIPTION_HASH)
+              ? "Compare plans, add courses and features, and review before you buy"
+              : hash.startsWith(PRODUCT_HASH)
+                ? "Everything about this resource, before you buy"
               : hash.startsWith(STUDY_LIBRARY_HASH)
                 ? "Modules, saved resources and recent learning"
                 : hash.startsWith(USAGE_LIMITS_HASH)

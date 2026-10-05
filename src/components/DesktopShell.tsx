@@ -36,12 +36,17 @@ import useScreenSize from "@/hooks/useScreenSize";
 import {
   Bell,
   CalendarDays,
+  ChevronDown,
   Crown,
+  FolderClosed,
+  FolderOpen,
   Gauge,
   Heart,
   Home,
   Library,
   LogOut,
+  Play,
+  Plus,
   Search,
   Settings,
   ShoppingBag,
@@ -323,9 +328,8 @@ export default function DesktopShell({
   // `null` on every other page, so the extra header row only exists while the
   // publishing page is mounted.
   const [topBarTabs, setTopBarTabs] = useState<TopBarTabsConfig | null>(null);
-  // Re-evaluated on every render; DesktopAppHost re-renders this shell on
-  // each hashchange, so it always follows the route.
-  const homeDockAlwaysOpen = isHomeDockRoute(active, typeof window !== "undefined" ? window.location.hash : "");
+  // Desktop dock is minimized by default, so no clearance is reserved on desktop.
+  const homeDockAlwaysOpen = false;
 
   // Keep the search input in sync with the page's own query when the
   // page changes the initial value. The dependency is the string so
@@ -533,31 +537,45 @@ export default function DesktopShell({
             Notion / Linear / Figma — every entry tells you what the
             page does, not just where it is. */}
         <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Primary navigation">
-          <RailGroup label="Workspace">
-            {railEntries
-              .filter((entry) => entry.group === "primary")
-              .map((entry) => (
-                <RailItem
-                  key={entry.key}
-                  entry={entry}
-                  active={active === entry.key}
-                  onNavigate={handleNavigate}
-                />
-              ))}
-          </RailGroup>
+          {(() => {
+            const primaryList = railEntries.filter((entry) => entry.group === "primary");
+            const workspaceList = railEntries.filter((entry) => entry.group === "workspace");
+            return (
+              <>
+                <RailGroup
+                  id="workspace"
+                  label="Workspace"
+                  count={primaryList.length}
+                  hasActiveChild={primaryList.some((e) => active === e.key)}
+                >
+                  {primaryList.map((entry) => (
+                    <RailItem
+                      key={entry.key}
+                      entry={entry}
+                      active={active === entry.key}
+                      onNavigate={handleNavigate}
+                    />
+                  ))}
+                </RailGroup>
 
-          <RailGroup label="Account">
-            {railEntries
-              .filter((entry) => entry.group === "workspace")
-              .map((entry) => (
-                <RailItem
-                  key={entry.key}
-                  entry={entry}
-                  active={active === entry.key}
-                  onNavigate={handleNavigate}
-                />
-              ))}
-          </RailGroup>
+                <RailGroup
+                  id="account"
+                  label="Account & Settings"
+                  count={workspaceList.length}
+                  hasActiveChild={workspaceList.some((e) => active === e.key)}
+                >
+                  {workspaceList.map((entry) => (
+                    <RailItem
+                      key={entry.key}
+                      entry={entry}
+                      active={active === entry.key}
+                      onNavigate={handleNavigate}
+                    />
+                  ))}
+                </RailGroup>
+              </>
+            );
+          })()}
 
           {/* Quick stats card — gives the rail a little "personality"
               rather than a flat list of links. Shows the learner's
@@ -716,6 +734,28 @@ export default function DesktopShell({
                 that morph into an icon-and-label pill for the active route. */}
             <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
               {topBarRight}
+              {active === "revision" && !topBarRight ? (
+                <div className="flex items-center gap-1.5 mr-1">
+                  <button
+                    type="button"
+                    onClick={() => { window.location.hash = "#/revision/study"; }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-xs font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+                    title="Quick Study / Review"
+                  >
+                    <Play size={13} className="fill-current text-indigo-300" />
+                    <span>Review</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { window.dispatchEvent(new CustomEvent("dc-revision-quick-add")); }}
+                    className="inline-flex h-9 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                    title="Add Card / Deck"
+                  >
+                    <Plus size={14} />
+                    <span className="hidden sm:inline">Add</span>
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={() => handleNavigate("#/subscription")}
@@ -845,13 +885,86 @@ export default function DesktopShell({
   );
 }
 
-function RailGroup({ label, children }: { label: string; children: ReactNode }) {
+function RailGroup({
+  id,
+  label,
+  children,
+  count,
+  defaultOpen = true,
+  hasActiveChild = false,
+}: {
+  id?: string;
+  label: string;
+  children: ReactNode;
+  count?: number;
+  defaultOpen?: boolean;
+  hasActiveChild?: boolean;
+}) {
+  const folderId = id ?? label.toLowerCase().replace(/\s+/g, "-");
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === "undefined") return defaultOpen;
+    try {
+      const stored = window.localStorage.getItem(`dc.railfolder.${folderId}`);
+      return stored !== null ? stored === "1" : defaultOpen;
+    } catch {
+      return defaultOpen;
+    }
+  });
+
+  // Automatically expand folder if active route is inside it
+  useEffect(() => {
+    if (hasActiveChild && !isOpen) {
+      setIsOpen(true);
+    }
+  }, [hasActiveChild]);
+
+  const toggle = () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    try {
+      window.localStorage.setItem(`dc.railfolder.${folderId}`, next ? "1" : "0");
+    } catch {}
+  };
+
   return (
-    <div className="mt-4 first:mt-2">
-      <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
-        {label}
-      </p>
-      <div className="flex flex-col gap-0.5">{children}</div>
+    <div className="mt-3.5 first:mt-1.5 rounded-xl transition-colors">
+      <button
+        type="button"
+        onClick={toggle}
+        className="group flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/[0.06] select-none"
+        aria-expanded={isOpen}
+      >
+        <span className="flex items-center gap-2">
+          {isOpen ? (
+            <FolderOpen size={13} className="text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+          ) : (
+            <FolderClosed size={13} className="text-white/45 group-hover:text-white/70 transition-colors" />
+          )}
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60 group-hover:text-white/90 transition-colors">
+            {label}
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          {typeof count === "number" ? (
+            <span className="grid h-4 min-w-[16px] place-items-center rounded-full bg-white/[0.08] px-1 text-[9px] font-bold text-white/50">
+              {count}
+            </span>
+          ) : null}
+          <ChevronDown
+            size={12}
+            className={`text-white/45 transition-transform duration-200 ${isOpen ? "rotate-0 text-white/75" : "-rotate-90"}`}
+          />
+        </span>
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+          isOpen ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="overflow-hidden flex flex-col gap-0.5 pl-1.5 border-l border-white/10 ml-3.5 my-0.5">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

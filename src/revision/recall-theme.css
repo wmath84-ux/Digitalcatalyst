@@ -480,6 +480,18 @@
   overscroll-behavior-y: none;
 }
 
+.dc-desktop-shell [data-recall-root] {
+  background: transparent !important;
+}
+
+[data-recall-root] .bg-surface {
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+}
+
+[data-recall-root][data-recall-theme="dark"] .bg-surface {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 2px 8px -1px rgba(0, 0, 0, 0.25);
+}
+
 [data-recall-root] *,
 [data-recall-root] *::before,
 [data-recall-root] *::after {

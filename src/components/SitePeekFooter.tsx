@@ -205,88 +205,82 @@ export default function SitePeekFooter({
           <GlassDock siteFooter compact={compact} items={items} onSelect={handleSelect} pointerX={pointerX} />
         </div>
       </div>
-      <div
-        ref={lineRef}
-        data-site-peek-line-hit=""
-        // Always-open: the dock's own buttons are the navigation, so the line
-        // is a decorative drag strip — not a focusable toggle that does nothing.
-        role={alwaysOpen ? undefined : 'button'}
-        tabIndex={alwaysOpen ? -1 : 0}
-        aria-hidden={alwaysOpen ? true : undefined}
-        aria-label={alwaysOpen ? undefined : 'Show site navigation'}
-        aria-expanded={alwaysOpen ? undefined : open}
-        onPointerEnter={show}
-        onPointerLeave={hide}
-        onPointerDown={(event) => {
-          pointerTypeRef.current = event.pointerType
-          wasPinnedRef.current = pinned
-          draggingRef.current = true
-          startXRef.current = event.clientX
-          startYRef.current = event.clientY
-          rememberPointer(event.clientX, event.clientY)
-          cancelClose()
-          setHover(true)
-          if (event.pointerType !== 'mouse' && !alwaysOpen) setPinned(true)
-          pointerX.set(event.clientX)
-          try {
-            event.currentTarget.setPointerCapture(event.pointerId)
-          } catch {
-            /* capture is a nicety — the drag still works without it */
-          }
-        }}
-        onPointerMove={(event) => {
-          if (!draggingRef.current) return
-          rememberPointer(event.clientX, event.clientY)
-          pointerX.set(event.clientX)
-        }}
-        onPointerUp={(event) => {
-          if (!draggingRef.current) return
-          draggingRef.current = false
-          try {
-            event.currentTarget.releasePointerCapture?.(event.pointerId)
-          } catch {
-            /* ignore */
-          }
-          const dx = event.clientX - startXRef.current
-          const dy = event.clientY - startYRef.current
-          const isTap = Math.abs(dx) < DRAG_SELECT_THRESHOLD && Math.abs(dy) < DRAG_SELECT_THRESHOLD
-          if (isTap) {
-            // Nothing to toggle when the dock never closes.
-            if (alwaysOpen) {
-              pointerX.set(-200)
+      {!alwaysOpen ? (
+        <div
+          ref={lineRef}
+          data-site-peek-line-hit=""
+          // Drag/peek line for minimized states; completely hidden when alwaysOpen
+          role="button"
+          tabIndex={0}
+          aria-label="Show site navigation"
+          aria-expanded={open}
+          onPointerEnter={show}
+          onPointerLeave={hide}
+          onPointerDown={(event) => {
+            pointerTypeRef.current = event.pointerType
+            wasPinnedRef.current = pinned
+            draggingRef.current = true
+            startXRef.current = event.clientX
+            startYRef.current = event.clientY
+            rememberPointer(event.clientX, event.clientY)
+            cancelClose()
+            setHover(true)
+            if (event.pointerType !== 'mouse') setPinned(true)
+            pointerX.set(event.clientX)
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId)
+            } catch {
+              /* capture is a nicety — the drag still works without it */
+            }
+          }}
+          onPointerMove={(event) => {
+            if (!draggingRef.current) return
+            rememberPointer(event.clientX, event.clientY)
+            pointerX.set(event.clientX)
+          }}
+          onPointerUp={(event) => {
+            if (!draggingRef.current) return
+            draggingRef.current = false
+            try {
+              event.currentTarget.releasePointerCapture?.(event.pointerId)
+            } catch {
+              /* ignore */
+            }
+            const dx = event.clientX - startXRef.current
+            const dy = event.clientY - startYRef.current
+            const isTap = Math.abs(dx) < DRAG_SELECT_THRESHOLD && Math.abs(dy) < DRAG_SELECT_THRESHOLD
+            if (isTap) {
+              if (pointerTypeRef.current !== 'mouse') {
+                if (wasPinnedRef.current) close()
+                else setPinned(true)
+              }
               return
             }
-            if (pointerTypeRef.current !== 'mouse') {
-              if (wasPinnedRef.current) close()
-              else setPinned(true)
+            const isHorizontalDrag =
+              Math.abs(dx) >= DRAG_SELECT_THRESHOLD && Math.abs(dx) > Math.abs(dy)
+            if (!isHorizontalDrag) {
+              close()
+              return
             }
-            return
-          }
-          const isHorizontalDrag =
-            Math.abs(dx) >= DRAG_SELECT_THRESHOLD && Math.abs(dx) > Math.abs(dy)
-          if (!isHorizontalDrag) {
-            close()
-            return
-          }
-          const id = tabAtX(event.clientX)
-          if (id) handleSelect(id)
-          else close()
-        }}
-        onPointerCancel={() => {
-          draggingRef.current = false
-        }}
-        onKeyDown={(event) => {
-          if (alwaysOpen) return
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            setPinned((value) => !value)
-          }
-        }}
-      >
-        <div data-site-peek-line="">
-          <GlassMaterial radius={6} />
+            const id = tabAtX(event.clientX)
+            if (id) handleSelect(id)
+            else close()
+          }}
+          onPointerCancel={() => {
+            draggingRef.current = false
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              setPinned((value) => !value)
+            }
+          }}
+        >
+          <div data-site-peek-line="">
+            <GlassMaterial radius={6} />
+          </div>
         </div>
-      </div>
+      ) : null}
     </nav>
   )
 }
