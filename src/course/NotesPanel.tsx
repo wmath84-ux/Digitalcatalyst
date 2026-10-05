@@ -87,6 +87,12 @@ interface NotesPanelProps {
     synced: boolean;
     errorMessage?: string | null;
   };
+  /**
+   * Signal from the resource library: when set (and the note exists in
+   * masterNotes), the panel opens that master note in its read-only viewer.
+   * The count field ensures re-tapping the same note re-opens it.
+   */
+  openMasterNoteSignal?: { id: string; count: number } | null;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -237,6 +243,7 @@ export default function NotesPanel({
   onEditorOpenChange,
   composerOpenSignal,
   syncState,
+  openMasterNoteSignal,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
@@ -376,6 +383,20 @@ export default function NotesPanel({
     if (composerOpenSignal && composerOpenSignal > 0) openComposer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composerOpenSignal]);
+
+  // Signal from the resource library: open a specific master note in the
+  // read-only viewer. The `count` field ensures re-tapping the same note
+  // re-triggers the effect. The panel switches to the master collection
+  // and opens the viewer immediately.
+  useEffect(() => {
+    if (!openMasterNoteSignal) return;
+    const note = masterNotes.find((n) => n.id === openMasterNoteSignal.id);
+    if (note) {
+      setActiveCollection("master");
+      setViewingMasterNoteId(note.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openMasterNoteSignal?.count]);
 
   // What Save writes: the editor's latest content, flushed first (never the
   // debounced copy), through the same `combineHtml` the stored note always used.

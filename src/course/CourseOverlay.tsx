@@ -385,6 +385,20 @@ interface CourseOverlayProps {
    */
   brainPanel?: ReactNode;
   /**
+   * Structured resource library for the Modules tab. Shows the full course
+   * hierarchy with note, mind map, lesson and practice cards grouped by
+   * module/submodule. When provided, replaces the flat SnapList module list.
+   * Owned by the Course Player — it builds the hierarchy from the existing
+   * course tree and wires open-resource callbacks to the viewer/editor.
+   */
+  resourceLibraryPanel?: ReactNode;
+  /**
+   * Signal from the resource library: when set, the Notes panel opens the
+   * specified master note in its read-only viewer. The signal carries both
+   * the target note id and a count (so re-tapping the same note re-opens).
+   */
+  openMasterNoteSignal?: { id: string; count: number } | null;
+  /**
    * Tabs this player must NOT show. A learner-authored course (My Study
    * Library) passes `["paid"]`: there is nothing to purchase in a course the
    * learner built, so the premium tab is gone from the dock (and from the
@@ -750,6 +764,7 @@ export function StudyContent({
   aiPanel,
   brainPanel,
   sketchPanel,
+  resourceLibraryPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -770,6 +785,14 @@ export function StudyContent({
    * mounting/unmounting costs no work.
    */
   sketchPanel?: ReactNode;
+  /**
+   * Structured resource library for the Modules tab — shows the full course
+   * hierarchy (chapters → modules → submodules → resources) with note, mind
+   * map, lesson and practice cards. When provided, replaces the flat module
+   * list (SnapList) for the modules tab. Owned by the parent, which wires
+   * the open-resource callbacks to the existing viewer/editor engines.
+   */
+  resourceLibraryPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -780,6 +803,10 @@ export function StudyContent({
         // + panel state and hands it down ready-rendered, exactly like the
         // mind map and player panels below.
         personalModulesPanel
+      ) : tab === "modules" && resourceLibraryPanel ? (
+        // Structured resource library: the full course hierarchy with note,
+        // mind map, lesson and practice cards grouped by module/submodule.
+        resourceLibraryPanel
       ) : tab === "notes" ? (
         notesPanel
       ) : tab === "mindmap" ? (
@@ -901,6 +928,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           personalModules={props.personalModules}
           onRetrySync={props.onRetryNotes}
           syncState={props.notesSync}
+          openMasterNoteSignal={props.openMasterNoteSignal}
         />
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
@@ -910,6 +938,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       aiPanel={props.aiPanel}
       brainPanel={props.brainPanel}
       sketchPanel={props.sketchPanel}
+      resourceLibraryPanel={props.resourceLibraryPanel}
     />
   );
 

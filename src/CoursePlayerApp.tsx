@@ -77,6 +77,9 @@ import {
   type CoursePlaybackPatch,
   type CoursePlaybackStore,
 } from "./course/playbackState";
+import CourseResourceLibrary from "./course/CourseResourceLibrary";
+import type { MasterCourseNote } from "./types/course";
+import { collectMasterCourseNotes } from "./course/masterNotes";
 
 interface CoursePlayerProps {
   product: Product;
@@ -1649,6 +1652,78 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     />
   );
 
+  // ── Resource Library for the Modules tab ──────────────────────────────
+  // The structured resource library replaces the flat module list when the
+  // course has note/mind_map resources. It shows the full hierarchy (chapters
+  // → modules → submodules → resources) with proper cards for each type.
+  // Master notes are computed here (same pure logic as the overlay) so the
+  // library can index them without loading bodies.
+  const libraryMasterNotes = useMemo(() => {
+    const unlocked = unlockedModuleIds(modules, resolution.accessibleModuleIds, resolution.ownedUpdateIds);
+    return collectMasterCourseNotes(modules, {
+      courseId: String(product.id),
+      unlockedModuleIds: unlocked,
+      ownedUpdateIds: resolution.ownedUpdateIds,
+      accessibleResourceIds: resolution.accessibleResourceIds,
+      enabled: !isMine,
+    });
+  }, [modules, product.id, resolution.accessibleModuleIds, resolution.accessibleResourceIds, resolution.ownedUpdateIds, isMine]);
+
+  // Signal to open a specific master note in the NotesPanel. Each increment
+  // with a new id triggers the panel to switch to the master note viewer.
+  const [openMasterNoteSignal, setOpenMasterNoteSignal] = useState<{ id: string; count: number } | null>(null);
+
+  const handleOpenMasterNoteFromLibrary = useCallback((note: MasterCourseNote) => {
+    // Switch to the Notes tab and signal the panel to open this master note.
+    setDockTab("notes");
+    setOpenMasterNoteSignal({ id: note.id, count: Date.now() });
+    splitDeckRef.current?.activateStudy();
+  }, []);
+
+  const handleOpenMindMapResourceFromLibrary = useCallback((_file: CourseFile, _modulePath: string[]) => {
+    // Switch to the Mind Map tab — the existing per-module mind map panel
+    // handles the map data. For admin-authored mind_map resources, the map
+    // tab shows the module's mind map which can be edited by the learner.
+    setDockTab("mindmap");
+    splitDeckRef.current?.activateStudy();
+  }, []);
+
+  // Does the course have any structured library resources (notes, mind_maps)?
+  // If yes, the library replaces the flat module list. If no, the existing
+  // expand/collapse SnapList remains (preserving the zero-change path for
+  // courses that only have URL-based lessons).
+  const hasLibraryResources = useMemo(() => {
+    if (libraryMasterNotes.length > 0) return true;
+    const visit = (nodes: CourseModule[]): boolean => {
+      for (const module of nodes) {
+        const files = module.files || [];
+        for (const file of files) {
+          if (file.type === "note" || file.type === "mind_map") return true;
+        }
+        if (visit(module.modules || [])) return true;
+      }
+      return false;
+    };
+    return visit(modules);
+  }, [modules, libraryMasterNotes.length]);
+
+  const resourceLibraryPanel = hasLibraryResources ? (
+    <CourseResourceLibrary
+      modules={modules}
+      courseTitle={product.title}
+      selectedFileId={selectedFile?.id}
+      completedFileIds={completedIds}
+      accessibleModuleIds={resolution.accessibleModuleIds}
+      ownedUpdateIds={resolution.ownedUpdateIds}
+      previewModuleIds={resolution.previewModuleIds}
+      accessibleResourceIds={resolution.accessibleResourceIds}
+      masterNotes={libraryMasterNotes}
+      onSelectFile={selectFile}
+      onOpenMasterNote={handleOpenMasterNoteFromLibrary}
+      onOpenMindMapResource={handleOpenMindMapResourceFromLibrary}
+    />
+  ) : null;
+
   /**
    * The study pane's content — the seven tabs (Modules / Brain / Notes /
    * Mind map / AI / Paid / Player) plus the footer dock, rendered in-flow
@@ -1760,6 +1835,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         </Suspense>
       )}
       playerPanel={playerPanel}
+      // Structured resource library — replaces the flat module list when the
+      // course has note/mind_map resources. Owned here, hosted by the overlay.
+      resourceLibraryPanel={resourceLibraryPanel}
+      // Signal from the library to open a specific master note in the Notes tab.
+      openMasterNoteSignal={openMasterNoteSignal}
       // My Modules — the Modules tab swaps its official list for the
       // learner-owned manager panel (owned here, hosted by the overlay).
       personalModulesOpen={personalModulesOpen}
