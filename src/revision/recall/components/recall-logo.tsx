@@ -1,11 +1,15 @@
 import { useMemo } from "react";
 import { useRecallStore } from "../stores/recall-store";
 import type { Theme } from "../types";
+import { revisionBrandMarkUrl } from "../../../utils/publicAsset";
 
 /**
  * Recall brand logo (lettermark) from the new design system.
- * Uses the light/dark PNG assets exported from stitch. For tinted
- * contexts (on colored surfaces) use `variant="transparent"`.
+ *
+ * Resolved through the shared public-asset resolver (src/utils/publicAsset):
+ * every variant points at the single committed brand glyph, so the image
+ * loads reliably in development, production, Netlify sub-path deploys and the
+ * Capacitor WebView, with transparency preserved and no CSS colour inversion.
  */
 export function RecallLogo({
   className,
@@ -15,19 +19,14 @@ export function RecallLogo({
   variant?: "light" | "dark" | "auto" | "transparent";
 }): JSX.Element {
   const theme = useRecallStore((s) => s.settings.theme) as Theme;
-  const resolved = useMemo(() => {
-    if (variant === "light") return "Lettermark_lightmode.png";
-    if (variant === "dark") return "Lettermark_darkmode.png";
-    if (variant === "transparent") return "Lettermark_transparent.png";
-    // auto: pick based on current theme
-    return theme === "dark" || theme === "high-contrast"
-      ? "Lettermark_transparent.png"
-      : "Lettermark_lightmode.png";
-  }, [variant, theme]);
+  const resolved = useMemo(
+    () => revisionBrandMarkUrl(variant ?? (theme === "dark" || theme === "high-contrast" ? "transparent" : "light")),
+    [variant, theme],
+  );
 
   return (
     <img
-      src={`${import.meta.env.BASE_URL}${resolved}`}
+      src={resolved}
       alt="Recall"
       className={className ?? "h-8 w-8 object-contain"}
       draggable={false}

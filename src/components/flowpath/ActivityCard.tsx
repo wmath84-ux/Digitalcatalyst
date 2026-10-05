@@ -179,7 +179,7 @@ function KindFooter({ activity, color }: { activity: Activity; color: string }) 
       const dot = (activity as { color?: string }).color;
       return (
         <div className="mt-2 rounded-r-xl border-l-[3px] bg-white/[0.06] px-3 py-2" style={{ borderColor: color }}>
-          <p className="line-clamp-2 text-[12.5px] italic leading-relaxed text-slate-100">
+          <p className="text-[12.5px] italic leading-relaxed text-slate-100">
             “{body}”
           </p>
           {dot ? (
@@ -419,12 +419,12 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
             )}
           </div>
 
-          {/* Title — always fully legible, up to 2 lines */}
+          {/* Title — always fully legible; the card grows to fit it (§32) */}
           <h3
             className={`mt-2 text-[14px] font-bold leading-snug sm:text-[14.5px] ${
               isCompleted ? "text-slate-300/70 line-through decoration-slate-400/50" : "text-white"
             }`}
-            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 10px rgba(0,0,0,0.65)" }}
+            style={{ textShadow: "0 1px 10px rgba(0,0,0,0.65)" }}
           >
             {activity.title}
           </h3>
@@ -457,7 +457,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           {showDescriptionLine && (
             <p
               className="mt-1.5 text-[12.5px] leading-relaxed text-slate-100/90"
-              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
+              style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
             >
               {description}
             </p>

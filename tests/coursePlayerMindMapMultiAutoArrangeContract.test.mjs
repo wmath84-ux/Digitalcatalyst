@@ -381,6 +381,8 @@ test("map cards use the shared spacious study-resource surface and real map cont
   assert.match(resourceCardStyles, /--resource-accent: #b9a0ff/);
   assert.match(resourceCardStyles, /study-resource-card\[data-active="true"\]/);
   assert.doesNotMatch(panel, /aspect-square/);
-  // Dark only: the map has one palette, so no light-theme override exists.
-  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
+  // A light palette exists now (Part 1 §8); the shared card surface stays
+  // theme-agnostic and the light sheet re-points tokens, never inverts.
+  assert.match(styles, /data-mindmap-theme="light"/);
+  assert.doesNotMatch(styles, /filter: invert/);
 });

@@ -398,6 +398,8 @@ interface CourseOverlayProps {
    * the target note id and a count (so re-tapping the same note re-opens).
    */
   openMasterNoteSignal?: { id: string; count: number } | null;
+  /** The signed-in learner — lets Notes remember its MASTER/SELF choice. */
+  uid?: string | null;
   /**
    * Tabs this player must NOT show. A learner-authored course (My Study
    * Library) passes `["paid"]`: there is nothing to purchase in a course the
@@ -929,6 +931,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onRetrySync={props.onRetryNotes}
           syncState={props.notesSync}
           openMasterNoteSignal={props.openMasterNoteSignal}
+          uid={props.uid ?? null}
         />
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}

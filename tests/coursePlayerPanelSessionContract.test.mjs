@@ -81,13 +81,15 @@ test("the mind map restores library vs canvas from the session", () => {
   assert.match(mindMapPanel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 
-test("the mind map has no theme pick at all — per-visit or per-device", () => {
-  // Neither the session override nor the old per-device key exists any more:
-  // the map is dark like the rest of the app.
+test("the mind map theme pick is the shared persisted control, not a per-visit override", () => {
+  // Part 1 §9: a light/dark pick exists, but it is the SAME shared, per-user
+  // theme layer (persisted through the course preferences) — never the old
+  // per-visit session override nor a per-device key.
   assert.doesNotMatch(mindMapPanel, /mindMapThemeOverride/);
   assert.doesNotMatch(mindMapPanel, /setMindMapSessionTheme/);
   assert.doesNotMatch(mindMapPanel, /dc\.mindMapThemeOverride/);
-  assert.match(mindMapPanel, /const mindTheme: MindMapTheme = "dark";/);
+  assert.match(mindMapPanel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(mindMapPanel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
 });
 
 test("leaving the player resets the session and preserves an open notes draft", () => {

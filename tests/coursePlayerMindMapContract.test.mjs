@@ -220,19 +220,23 @@ test("the toolbar carries the delete: trash acts on the selected branch, never t
   assert.match(tree, /if \(String\(id\) === ROOT_ID\) return mind;/);
 });
 
-test("double-tap delete is an explicit, toggleable mode (off by default)", () => {
-  // The toggle lives in the toolbar, exposes its armed state, and persists.
-  assert.match(panel, /data-course-mindmap-dbl-delete/);
-  assert.match(panel, /aria-pressed=\{doubleTapDelete\}/);
-  assert.match(panel, /const dblTapDeleteStorageKey = "dc.mindMapDblTapDelete";/);
-  // The armed mode is opt-in: a learner who never touched the toggle can
-  // never lose a branch to a stray second tap.
-  assert.match(panel, /localStorage.getItem\(dblTapDeleteStorageKey\) === "on"/);
-  // Double-tap detection runs on pointer events (d3-drag preventDefaults
-  // touchstart, which swallows synthetic click/dblclick on many phones) and
-  // the root is exempt.
-  assert.match(panel, /const DOUBLE_TAP_MS = 350;/);
-  assert.match(panel, /if \(deleteOnDoubleTap && !isRoot\) \{/);
+test("double-tap delete is gone — deletion is an explicit control with a confirmation", () => {
+  // Part 1 §7: the double-tap-to-delete gesture (and its arm switch) is
+  // removed entirely — a stray second tap can never eat a branch. Every piece
+  // of the old gesture machinery must be absent.
+  assert.doesNotMatch(panel, /DOUBLE_TAP_MS/);
+  assert.doesNotMatch(panel, /doubleTapDelete/);
+  assert.doesNotMatch(panel, /deleteOnDoubleTap/);
+  assert.doesNotMatch(panel, /dblTapDeleteStorageKey/);
+  assert.doesNotMatch(panel, /data-course-mindmap-dbl-delete/);
+  // Deletion now runs through an explicit toolbar control that is disabled
+  // until a deletable branch is selected…
+  assert.match(panel, /data-course-mindmap-delete/);
+  assert.match(panel, /data-delete-ready=\{canDeleteSelected \? "true" : "false"\}/);
+  assert.match(panel, /requestDelete\(selectedId\)/);
+  // …and nothing is removed until the learner confirms in the dialog.
+  assert.match(panel, /<ConfirmDeleteDialog/);
+  assert.match(panel, /performDelete\(deleteTargetId\)/);
 });
 
 test("tapping + puts the new node straight into rename mode", () => {
@@ -399,21 +403,26 @@ test("every node opens the inline editor on a single tap (no separate pencil)", 
   assert.match(panel, /if \(dragMovedRef\.current\) return;/);
 });
 
-test("the mind map is dark only — no per-window theme pick, no light palette", () => {
-  // The map renders on the app's single dark palette; the shell still reports
-  // it so the scoped variables have one hook to hang off.
-  assert.match(panel, /export type MindMapTheme = "dark";/);
-  assert.match(panel, /const mindTheme: MindMapTheme = "dark";/);
+test("the mind map has a persisted light/dark pick and a genuine light palette", () => {
+  // Part 1 §8/§9: the map is no longer dark-only. A compact sun/moon control
+  // flips it between two real palettes, and the choice is the SAME shared,
+  // per-user theme layer the rest of the player uses (persisted, never a
+  // per-visit session override and never a CSS inversion).
+  assert.match(panel, /export type MindMapTheme = "dark" \| "light";/);
+  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(panel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
-  // The sun/moon toolbar button and everything that drove it are gone.
-  assert.doesNotMatch(panel, /data-course-mindmap-theme/);
+  // The toggle is on the bar, exposes its state, and reuses the shared hook.
+  assert.match(panel, /data-course-mindmap-theme-toggle=\{mindTheme\}/);
+  assert.match(panel, /mindThemeCtl\.toggleTheme/);
+  // The old per-visit / per-device override keys never came back, and the map
+  // still owns its own theme (it is not handed the player shell's theme prop).
   assert.doesNotMatch(panel, /setThemeOverride/);
   assert.doesNotMatch(panel, /playerTheme/);
-  assert.doesNotMatch(coursePlayer, /playerTheme=\{/);
-  // …and so is the light palette in the stylesheet.
-  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
-  assert.doesNotMatch(styles, /data-course-theme="light"/);
+  // A real light palette lives in the stylesheet (token swap, not invert).
+  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
+  assert.doesNotMatch(styles, /filter: invert/);
 });
 
 test("the mind map carries no close button anywhere", () => {
@@ -472,8 +481,10 @@ test("the anchor dot sits on the face that points at the parent, opposite the `+
   // Its paint is themed in the stylesheet (the bead straddles the box border,
   // so it carries a halo in the canvas colour) — never an inline one-off.
   assert.match(styles, /\[data-course-mindmap\] \[data-mind-node-anchor\]\s*\{[^}]*background: #8b5cf6/);
-  // There is no light-theme override any more — the bead has one palette.
-  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
+  // A light palette exists now (Part 1 §8); it re-points the canvas tokens and
+  // never inverts, and the bead still carries no inline paint.
+  assert.match(styles, /data-mindmap-theme="light"/);
+  assert.doesNotMatch(styles, /filter: invert/);
   assert.doesNotMatch(dot, /style=\{\{/, "the bead is themed by CSS, not inline");
 });
 
@@ -528,10 +539,10 @@ test("the toolbar is icon-only: every control is a single glyph tile, no caption
   assert.match(toolbar, /data-course-mindmap-save/);
   assert.match(toolbar, /data-course-mindmap-align/);
   assert.match(toolbar, /data-course-mindmap-fit/);
-  // The light/dark tile left the bar with the app-wide light theme.
-  assert.doesNotMatch(toolbar, /data-course-mindmap-theme/);
+  // The light/dark tile is back on the bar (Part 1 §9): one sun/moon glyph.
+  assert.match(toolbar, /data-course-mindmap-theme-toggle/);
   assert.match(toolbar, /data-course-mindmap-delete/);
-  assert.match(toolbar, /data-course-mindmap-dbl-delete/);
+  assert.doesNotMatch(toolbar, /data-course-mindmap-dbl-delete/, "double-tap arm switch is gone (§7)");
   assert.doesNotMatch(toolbar, /data-course-mindmap-close/, "no close button on the bar");
   assert.match(toolbar, /data-course-mindmap-auto-arrange/);
   for (const button of toolCluster.matchAll(/<button[\s\S]*?>/g)) {
@@ -596,7 +607,8 @@ test("the empty-map hint is gone — an empty map shows just the root", () => {
   // entirely. The double-tap-delete armed reminder stays.
   assert.doesNotMatch(panel, /branch wahin jud jayegi/);
   assert.doesNotMatch(panel, /First-run hint, shown only while the map is still just a root/);
-  assert.match(panel, /data-course-mindmap-dbl-delete-hint/);
+  // The double-tap armed reminder left with the gesture itself (§7).
+  assert.doesNotMatch(panel, /data-course-mindmap-dbl-delete-hint/);
 });
 
 test("the toolbar measures itself and sizes its tiles for phone, tablet and desktop", () => {

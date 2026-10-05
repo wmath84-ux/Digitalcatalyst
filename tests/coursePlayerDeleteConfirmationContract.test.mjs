@@ -93,9 +93,10 @@ test("the notes dialog explains the note being deleted and that it is permanent"
 // ---------------------------------------------------------------------------
 
 test("the mind-map branch delete is gated behind the confirmation overlay", () => {
-  // Toolbar trash + the node double-tap both route through requestDelete.
+  // The toolbar trash routes through requestDelete (the node double-tap path
+  // was removed in Part 1 §7, so the explicit control is the only way in).
   assert.match(mindPanel, /requestDelete\(selectedId\)/);
-  assert.match(mindPanel, /onDelete: requestDelete/);
+  assert.doesNotMatch(mindPanel, /onDelete: requestDelete/, "the double-tap delete path is gone (§7)");
   // The actual removal only happens in the confirm handler.
   assert.match(mindPanel, /performDelete\(deleteTargetId\)/);
   assert.match(mindPanel, /removeNode\(current, id\)/);

@@ -34,7 +34,7 @@
 // map restarts on its library.
 
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, Moon, Plus, Sun, X } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
@@ -42,6 +42,7 @@ import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
+import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
 import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
@@ -93,6 +94,8 @@ interface NotesPanelProps {
    * The count field ensures re-tapping the same note re-opens it.
    */
   openMasterNoteSignal?: { id: string; count: number } | null;
+  /** The signed-in learner — scopes the remembered MASTER/SELF preference. */
+  uid?: string | null;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -160,11 +163,13 @@ function NoteStatus({
   dirty,
   tooLong,
   sync,
+  dark = false,
 }: {
   editing: boolean;
   dirty: boolean;
   tooLong: boolean;
   sync: NotesPanelProps["syncState"];
+  dark?: boolean;
 }) {
   let label = "New note";
   let tone = "muted";
@@ -182,8 +187,18 @@ function NoteStatus({
     else label = "Saved";
   }
   const dot =
-    tone === "danger" ? "bg-rose-500" : tone === "warn" ? "bg-amber-500" : tone === "ok" ? "bg-emerald-500" : "bg-slate-300";
-  const text = tone === "danger" ? "text-rose-600" : tone === "warn" ? "text-amber-600" : "text-slate-500";
+    tone === "danger" ? "bg-rose-500" : tone === "warn" ? "bg-amber-500" : tone === "ok" ? "bg-emerald-500" : dark ? "bg-slate-600" : "bg-slate-300";
+  const text = dark
+    ? tone === "danger"
+      ? "text-rose-400"
+      : tone === "warn"
+        ? "text-amber-400"
+        : "text-slate-300"
+    : tone === "danger"
+      ? "text-rose-600"
+      : tone === "warn"
+        ? "text-amber-600"
+        : "text-slate-500";
   return (
     <span
       role="status"
@@ -244,6 +259,7 @@ export default function NotesPanel({
   composerOpenSignal,
   syncState,
   openMasterNoteSignal,
+  uid = null,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
@@ -253,9 +269,20 @@ export default function NotesPanel({
   const sessionNotes = getCoursePanelSession().notes;
   const restoreEdit =
     sessionNotes.view === "edit" && notes.some((note) => note.id === sessionNotes.noteId);
+  // §16 — the MASTER/SELF choice is a remembered, per-user preference (shared
+  // layer), not ephemeral state: it survives closing and reopening the player.
+  const masterSelfPref = useMasterSelfPreference("notes", uid, "master");
   const [activeCollection, setActiveCollection] = useState<"master" | "self">(() =>
-    sessionNotes.view === "compose" || restoreEdit ? "self" : "master",
+    sessionNotes.view === "compose" || restoreEdit ? "self" : masterSelfPref.mode,
   );
+  const selectCollection = (mode: "master" | "self") => {
+    setActiveCollection(mode);
+    masterSelfPref.setMode(mode);
+  };
+  // Note-editor Light/Dark toggle (Part 2 small update): the SAME shared theme
+  // layer the rest of the player uses (persisted per user, no inversion). The
+  // paper defaults to light; the header's compact sun/moon flips it to dark.
+  const noteThemeCtl = useCourseTheme("notes", uid, "light");
   const [viewingMasterNoteId, setViewingMasterNoteId] = useState<string | null>(null);
   const viewingMasterNote = viewingMasterNoteId
     ? masterNotes.find((note) => note.id === viewingMasterNoteId) || null
@@ -270,6 +297,10 @@ export default function NotesPanel({
   );
   const [editDraft, setEditDraft] = useState(restoreEdit ? sessionNotes.draft : "");
   const [editTitle, setEditTitle] = useState(restoreEdit ? sessionNotes.title : "");
+  // Part 1 §14 — a saved note opens in VIEW (the same BlockNote document, read
+  // only) with a single "Edit" action; tapping Edit flips the SAME document to
+  // editable and the same slot becomes "Save". No separate preview renderer.
+  const [selfReadOnly, setSelfReadOnly] = useState(true);
 
   // The editor is UNCONTROLLED: it is opened once from this seed (restored
   // from the session, or the stored note, or blank) and owns its content from
@@ -369,6 +400,7 @@ export default function NotesPanel({
     setEditDraft("");
     setEditTitle("");
     setComposing(true);
+    setSelfReadOnly(false);
     setDraft("");
     setDraftTitle("");
     setSeed({ key: `compose:${composeCount.current}`, title: "", body: "" });
@@ -430,6 +462,7 @@ export default function NotesPanel({
     setEditingId(note.id);
     setEditTitle(heading);
     setEditDraft(body);
+    setSelfReadOnly(true); // §14 — open the saved note as a read-only view
     setSeed({ key: `edit:${note.id}`, title: heading, body });
     setEditorEmpty(isEmptyRichText(combineHtml(heading, body)));
     setDirty(false);
@@ -442,10 +475,16 @@ export default function NotesPanel({
       if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return; }
       discardingRef.current = true;
       onEdit(editingId, html);
+      // §14 — after a successful save the SAME note stays open as a read-only
+      // view, so the action slot reads "Edit" again (not back to the list).
+      const { heading, body } = splitFirstHeading(html);
+      setEditTitle(heading);
+      setEditDraft(body);
+      setSeed({ key: `edit:${editingId}`, title: heading, body });
+      setSelfReadOnly(true);
+      setDirty(false);
+      setTooLong(false);
     }
-    setEditingId(null);
-    setEditDraft("");
-    setEditTitle("");
   };
 
   // MASTER resources open in the same BlockNote renderer in read-only mode;
@@ -473,20 +512,67 @@ export default function NotesPanel({
       else { setComposing(false); setDraft(""); setDraftTitle(""); }
     };
     const empty = legacyFallback ? isEmptyRichText(combineHtml(titleValue, value)) : editorEmpty;
+    const darkNote = noteThemeCtl.theme === "dark";
     return (
-      <div className="flex h-full flex-col overflow-hidden bg-white" data-course-notes-panel data-course-notes-mode={editing ? "edit" : "compose"}>
-        {/* The pane is exactly: a slim bar (status · Cancel · Save), then the
-            white page. No card, no frame — the page IS the pane. */}
+      <div
+        className={`flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}
+        data-course-notes-panel
+        data-course-notes-mode={editing ? "edit" : "compose"}
+        data-notes-theme={noteThemeCtl.theme}
+      >
+        {/* The pane is exactly: a slim bar (status · theme · Cancel · Save),
+            then the page. No card, no frame — the page IS the pane. */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
           <div
-            className="flex shrink-0 items-center justify-between gap-2 bg-white py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
+            className={`flex shrink-0 items-center justify-between gap-2 py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] ${darkNote ? "bg-slate-950" : "bg-white"}`}
             data-course-notes-bar
           >
-            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} />
+            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} />
             <div className="flex shrink-0 items-center gap-1">
+              {/* Compact Light/Dark control inside the editor header (Part 2).
+                  Reuses the shared persisted theme state — no second system. */}
               <button
                 type="button"
-                onClick={cancel}
+                onClick={noteThemeCtl.toggleTheme}
+                aria-pressed={darkNote}
+                aria-label={darkNote ? "Switch note editor to light theme" : "Switch note editor to dark theme"}
+                title={darkNote ? "Light editor" : "Dark editor"}
+                data-course-note-theme-toggle={noteThemeCtl.theme}
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${
+                  darkNote ? "text-slate-300 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                {darkNote ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              {/* §14 — one action slot: a saved note that is merely being
+                  VIEWED shows "Edit"; while EDITING that exact slot becomes
+                  "Save" (plus Cancel). Compose always shows Cancel + Save. */}
+              {editing && selfReadOnly ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={cancel}
+                    aria-label="Close note"
+                    title="Close note"
+                    className="flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    data-course-note-view-close
+                  >
+                    <X size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelfReadOnly(false)}
+                    className="flex h-10 items-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    data-course-note-edit
+                  >
+                    Edit
+                  </button>
+                </>
+              ) : (
+                <>
+              <button
+                type="button"
+                onClick={editing ? () => setSelfReadOnly(true) : cancel}
                 className="flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
               >
@@ -501,6 +587,8 @@ export default function NotesPanel({
               >
                 <Check size={15} /> Save
               </button>
+                </>
+              )}
             </div>
           </div>
           <div className="relative min-h-0 flex-1">
@@ -528,15 +616,18 @@ export default function NotesPanel({
                   ref={editorRef}
                   initialTitle={seed.title}
                   initialBodyHtml={seed.body}
+                  // §13/§14 — the SAME BlockNote document is the view and the
+                  // editor: viewing is just the document rendered read-only.
+                  readOnly={Boolean(editing && selfReadOnly)}
                   // A fresh note lands in the title; a note that already has words
                   // (an edit, or a draft restored from the session) in the body.
-                  autoFocus={editing || seed.title || seed.body ? "body" : "title"}
-                  ariaLabel={editing ? "Edit note" : "New note"}
+                  autoFocus={editing && selfReadOnly ? false : (editing || seed.title || seed.body ? "body" : "title")}
+                  ariaLabel={editing ? (selfReadOnly ? "View note" : "Edit note") : "New note"}
                   dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
                   onDraftChange={handleDraftChange}
                   onEmptyChange={setEditorEmpty}
                   onDirtyChange={setDirty}
-                  onSaveShortcut={editing ? submitEdit : submitAdd}
+                  onSaveShortcut={editing && !selfReadOnly ? submitEdit : editing ? undefined : submitAdd}
                 />
               </Suspense>
             </EditorBoundary>
@@ -564,7 +655,7 @@ export default function NotesPanel({
                   role="tab"
                   aria-selected={activeCollection === "master"}
                   data-course-note-collection="master"
-                  onClick={() => setActiveCollection("master")}
+                  onClick={() => selectCollection("master")}
                   className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "master" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
                 >
                   MASTER <span className="ml-1 text-[10px]">{masterNotes.length}</span>
@@ -574,7 +665,7 @@ export default function NotesPanel({
                   role="tab"
                   aria-selected={activeCollection === "self"}
                   data-course-note-collection="self"
-                  onClick={() => setActiveCollection("self")}
+                  onClick={() => selectCollection("self")}
                   className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "self" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
                 >
                   SELF <span className="ml-1 text-[10px]">{notes.length}</span>

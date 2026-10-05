@@ -67,7 +67,7 @@
 // still checkpoints).
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import {
   MAX_SKETCH_BOARDS,
@@ -200,6 +200,12 @@ export interface UseCourseSketchResult {
   createBoard: () => string | null;
   /** False when there is no scope or the module is at `MAX_SKETCH_BOARDS`. */
   canCreateBoard: boolean;
+  /**
+   * Delete ONE board (never the guaranteed first, never the last). Returns
+   * true when a board was removed; the active Canvas is reopened on the first
+   * board when it was the one deleted. Part 1 §30.
+   */
+  deleteBoard: (sketchKey: string) => boolean;
 }
 
 /** Quiet window before the cloud write. Long enough to coalesce a stroke. */
@@ -1254,6 +1260,47 @@ export default function useCourseSketch({
     return key;
   }, [persistLocal]);
 
+  /**
+   * Delete ONE board (Part 1 §30) — the active Canvas — without ever touching
+   * the rest of the library. The guaranteed first board (`SKETCH_DEFAULT_KEY`)
+   * is never deletable, and a module that would be left with no boards refuses,
+   * so the library can never be emptied by this action. The board's device
+   * mirror + outbox are removed and its cloud document deleted; if the deleted
+   * board was the one on screen the first board is reopened (the lifecycle
+   * effect flushes the outgoing scope, so nothing in flight is lost).
+   * Returns true when a board was actually removed.
+   */
+  const deleteBoard = useCallback((sketchKey: string): boolean => {
+    const idx = indexRef.current;
+    const key = sanitizeSketchKey(sketchKey);
+    if (!idx.scoped) return false;
+    if (key === SKETCH_DEFAULT_KEY) return false;
+    if (idx.boards.length <= 1) return false;
+    if (!idx.boards.some((row) => row.sketchKey === key)) return false;
+    // Flush whatever the current board has pending before we mutate the index.
+    const outgoing = scopeRef.current;
+    if (outgoing.scoped && (outgoing.dirty || outgoing.pendingSync)) {
+      persistLocal(outgoing);
+      persistRef.current(outgoing);
+    }
+    idx.boards = withDefaultBoard(idx.boards.filter((row) => row.sketchKey !== key));
+    idx.fresh.delete(key);
+    idx.version += 1;
+    writeIndex(idx);
+    // Drop the device mirror + outbox for the deleted board only.
+    try { localStorage.removeItem(localKey(idx.uid, idx.productId, idx.moduleId, key)); } catch { /* private mode */ }
+    try { localStorage.removeItem(outboxKey(idx.uid, idx.productId, idx.moduleId, key)); } catch { /* private mode */ }
+    // Remove the cloud copy; ownership is enforced by the Firestore rules.
+    void deleteDoc(doc(db, "users", idx.uid, SKETCH_COLLECTION, sketchDocId(idx.uid, idx.productId, idx.moduleId, key))).catch(() => { /* offline: index + local are already gone */ });
+    // If the deleted board was on screen, reopen the first board.
+    if (key === idx.activeKey) {
+      idx.activeKey = SKETCH_DEFAULT_KEY;
+      writeActiveBoard(idx);
+    }
+    bump();
+    return true;
+  }, [persistLocal]);
+
   const generation = session.generation;
   const indexVersion = index.version;
   return useMemo<UseCourseSketchResult>(
@@ -1295,12 +1342,13 @@ export default function useCourseSketch({
         boardsLoading: index.scoped && index.listLoading,
         selectBoard,
         createBoard,
+        deleteBoard,
         canCreateBoard: index.scoped && index.boards.length < MAX_SKETCH_BOARDS,
       };
     },
     // `bump()` drives this recompute: every field above is read off the
     // session / index objects, which mutate in place by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, index, generation, indexVersion, session.status, session.loaded, session.pendingSync, session.errorMessage, session.localOk, updateScene, setCanvasColor, flush, retry, getScene, selectBoard, createBoard],
+    [session, index, generation, indexVersion, session.status, session.loaded, session.pendingSync, session.errorMessage, session.localOk, updateScene, setCanvasColor, flush, retry, getScene, selectBoard, createBoard, deleteBoard],
   );
 }

@@ -470,10 +470,10 @@ test("The split surfaces are built from the player's own glass tokens", () => {
   assert.match(studyPanels, /boxShadow: "var\(--dc-chrome-glass-rim\)"/);
   // The study pane keeps its tint at ≤ 0.35 so text stays readable.
   assert.match(studyPanels, /tint=\{0\.3\}/);
-  // Blur is static and cheaper on touch — never animated. The player is dark
-  // only, so the light-theme re-scope is gone with it.
+  // Blur is static and cheaper on touch — never animated. (Part 1 §6 adds a
+  // scoped light palette, but it re-points colour tokens only — the glass blur
+  // stays exactly as published here.)
   assert.match(styles, /\.course-player-shell \{\s*--dc-chrome-glass-blur: blur\(18px\) saturate\(1\.4\);/);
-  assert.doesNotMatch(styles, /data-course-theme="light"/);
   assert.match(styles, /@media \(pointer: coarse\) \{[\s\S]*?--dc-chrome-glass-blur: blur\(12px\) saturate\(1\.2\);/);
   assert.doesNotMatch(studyPanels, /transition[^;]*backdrop-filter/);
 });

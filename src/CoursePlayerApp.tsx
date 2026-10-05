@@ -47,6 +47,7 @@ import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
+import { useCourseTheme, usePersistedBooleanPreference } from "./course/playerPreferences";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -596,6 +597,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Player settings → "Always-visible footer dock"), OFF = the bottom-centre
   // peek dock.
   const [legacyFooterDock, setLegacyFooterDock] = useState<boolean>(loadLegacyFooterDock);
+  // Part 1 §6 / §25 — the player's genuine light/dark appearance and the
+  // Sketch "Clean / Optimised Look" are BOTH remembered, per-user preferences
+  // from the shared course-player preference layer (never CSS inversion).
+  const playerThemeCtl = useCourseTheme("player", user?.id ?? null);
+  const sketchCleanLookCtl = usePersistedBooleanPreference("sketchCleanLook", user?.id ?? null, false);
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -1638,6 +1644,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }}
       legacyFooterDock={legacyFooterDock}
       onLegacyFooterDockChange={setLegacyFooterDock}
+      playerTheme={playerThemeCtl.theme}
+      onPlayerThemeChange={playerThemeCtl.setTheme}
+      sketchCleanLook={sketchCleanLookCtl.value}
+      onSketchCleanLookChange={sketchCleanLookCtl.setValue}
       /**
        * The learner's OWN course: "Add to My Module", "Save for later" and
        * "Gate personal access" are all about OFFICIAL course resources (copy
@@ -1668,6 +1678,27 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       enabled: !isMine,
     });
   }, [modules, product.id, resolution.accessibleModuleIds, resolution.accessibleResourceIds, resolution.ownedUpdateIds, isMine]);
+
+  // Part 1 §10 — MASTER mind maps are the course-published mind-map resources
+  // (embedded Whimsical maps + mindmap files), projected read-only. They reuse
+  // the existing course tree (no new store); SELF stays the learner's own maps.
+  const masterMindMaps = useMemo(() => {
+    if (isMine) return [] as { mapKey: string; title: string; rootTopic: string; nodeCount: number; updatedAt: number; createdAt: number }[];
+    const out: { mapKey: string; title: string; rootTopic: string; nodeCount: number; updatedAt: number; createdAt: number }[] = [];
+    const walk = (mods: CourseModule[]) => {
+      for (const m of mods) {
+        if (m.embedContentTypeId === "whimsical_mindmap" && m.embedContentUrl) {
+          out.push({ mapKey: `master-${m.id}`, title: m.title || "Master mind map", rootTopic: m.title || "", nodeCount: 0, updatedAt: 0, createdAt: 0 });
+        }
+        for (const f of m.files || []) {
+          if (f.type === "mindmap") out.push({ mapKey: `master-${f.id}`, title: f.name || "Master mind map", rootTopic: f.name || "", nodeCount: 0, updatedAt: 0, createdAt: 0 });
+        }
+        walk(m.modules || []);
+      }
+    };
+    walk(modules);
+    return out;
+  }, [modules, isMine]);
 
   // Signal to open a specific master note in the NotesPanel. Each increment
   // with a new id triggers the panel to switch to the master note viewer.
@@ -1738,6 +1769,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       courseTitle={product.title}
       personalModules={personalModules.modules}
       productId={String(product.id)}
+      uid={user?.id ?? null}
       // Read tab → "Save to my module": the learner's own PDF becomes a
       // My Study Library resource through the same dialog the Player
       // settings use.
@@ -1796,6 +1828,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           moduleId={activeMindMapModuleId}
           personalModules={personalModules.modules}
           onRetryMaps={mindMap.reload}
+          uid={user?.id ?? null}
+          masterMaps={masterMindMaps}
           landscape={useLandscapeRails}
           // True only while the mind map tab is the one on screen. Within one
           // player visit the panel restores the learner's last view (library
@@ -1839,7 +1873,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             activeBoardTitle={sketch.activeBoardTitle}
             onSelectBoard={sketch.selectBoard}
             onCreateBoard={sketch.createBoard}
+            onDeleteActive={() => sketch.deleteBoard(sketch.activeBoardKey)}
+            canDeleteActive={sketch.boards.length > 1}
             canCreateBoard={sketch.canCreateBoard}
+            cleanLook={sketchCleanLookCtl.value}
           />
         </Suspense>
       )}
@@ -1944,6 +1981,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       ref={playerShellRef}
       className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-col overflow-hidden text-[var(--course-text)]"
       data-course-player
+      data-course-theme={playerThemeCtl.theme}
       data-orientation={useLandscapeRails ? "landscape" : "portrait"}
       {...(useLandscapeRails
         ? {
@@ -1951,7 +1989,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             "data-course-statusbar-hidden": courseFullscreen ? "true" : "false",
           }
         : {})}
-      style={{ colorScheme: browserColorScheme }}
+      style={{ colorScheme: playerThemeCtl.theme === "light" ? "light" : browserColorScheme }}
     >
       {/* ── TOP PROGRESS LINE — the application-level progress indicator ──
           Always visible while the player is open: portrait, landscape, split,
@@ -1986,7 +2024,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" />
           <span
             aria-hidden
-            className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full transition-[width] duration-300 ease-out"
+            data-course-progress-fill
+            className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full transition-[width] duration-300 ease-out"
             style={{
               width: `${progress}%`,
               background: "linear-gradient(90deg, #38bdf8, #a78bfa)",

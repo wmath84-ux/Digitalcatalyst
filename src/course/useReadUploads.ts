@@ -456,7 +456,14 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         // 4. The bytes — one resumable task, real progress, a watchdog that
         // only fires when nothing moves, paused while the device is offline.
         if (!stored) {
-          show({ stage: "uploading", progress: 0 });
+          // `progress: null`, never 0. Nothing has been confirmed on the wire
+          // yet, so there is no measurable percentage to show — and a small PDF
+          // can finish in a single request without the SDK ever emitting an
+          // intermediate snapshot. Seeding a literal 0 here is what pinned the
+          // bar at "0%" for fast uploads: the UI claimed a measured value it
+          // did not have. The bar stays indeterminate until the first real
+          // progress event lands, then shows the true percentage.
+          show({ stage: "uploading", progress: null });
           await step(
             new Promise<void>((resolve, reject) => {
               const task = uploadBytesResumable(target, file, { contentType: "application/pdf" });

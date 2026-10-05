@@ -45,9 +45,12 @@ test("there is no theme state left in the Course Player at all", () => {
   assert.ok(!coursePlayer.includes('theme === "light" ? "white"'), "no white step remains in the cycle");
 });
 
-test("no light or white theme state remains in the Course Player palette", () => {
+test("the Course Player palette is dark-by-default with a scoped light variant (no white, no three-state)", () => {
   assert.ok(!styles.includes('data-course-theme="white"'), "no white palette block in the stylesheet");
-  assert.ok(!styles.includes('data-course-theme="light"'), "no light palette block either");
+  // Part 1 §6/§23: a genuine light palette is allowed, scoped to the shell
+  // attribute and never a CSS inversion; dark stays the default.
+  assert.ok(styles.includes('.course-player-shell[data-course-theme="light"]'), "the light palette is scoped to the shell");
+  assert.ok(!styles.includes("filter: invert"), "the light theme is a real palette swap, never an inversion");
   assert.ok(!coursePlayer.includes('"dark" | "light" | "white"'), "no three-state theme type");
   assert.ok(styles.includes(".course-player-shell {"), "the dark palette block is still there");
 });

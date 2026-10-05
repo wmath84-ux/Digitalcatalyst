@@ -139,11 +139,12 @@ import {
   Columns3,
   Layers,
   Maximize,
-  MousePointerClick,
+  Moon,
   Network,
   Plus,
   Rows3,
   Sparkles,
+  Sun,
   Trash2,
   TriangleAlert,
   Type,
@@ -172,23 +173,19 @@ import type { CourseModule } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import { GlassSurface } from "../components/ui/glass";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
+import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
+import MasterSelfControl from "./MasterSelfControl";
 import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
 import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./studyResourceContext";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 
-/** Dark is the only palette the map (and the app) has. */
-export type MindMapTheme = "dark";
-
-/** Double-tap delete is a knife the learner chooses to pick up. Off by default. */
-const dblTapDeleteStorageKey = "dc.mindMapDblTapDelete";
-const loadDblTapDelete = (): boolean => {
-  try {
-    return localStorage.getItem(dblTapDeleteStorageKey) === "on";
-  } catch {
-    return false;
-  }
-};
+/**
+ * The map's palette (Part 1 §8/§9): genuine dark AND light. Light mode paints
+ * a WHITE canvas with a zoom-participating grid; dark keeps the existing dark
+ * Course Player treatment. This is a real palette switch — no CSS inversion.
+ */
+export type MindMapTheme = "dark" | "light";
 
 // ── Box alignment + text fit ──────────────────────────────────────────────
 //
@@ -257,10 +254,7 @@ interface MindNodeData extends Record<string, unknown> {
    * the same rule, so the reserved space always matches what is painted.
    */
   textFit: MindMapTextFit;
-  /** True while the toolbar's double-tap delete mode is armed. */
-  deleteOnDoubleTap: boolean;
   onAddChild: (id: string) => void;
-  onDelete: (id: string) => void;
   onOpenEditor: (id: string) => void;
   onCloseEditor: (id: string) => void;
   onCommitTopic: (id: string, topic: string) => void;
@@ -268,8 +262,6 @@ interface MindNodeData extends Record<string, unknown> {
 
 /** A pointer that travelled further than this many px was a drag, not a tap. */
 const TAP_SLOP_PX = 4;
-/** Two taps on the same node within this window count as a double-tap. */
-const DOUBLE_TAP_MS = 350;
 /**
  * Below this strip width the toolbar drops to its compact tile and the map
  * name collapses to the map icon, so every tool stays on the bar even in a
@@ -330,9 +322,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     editing,
     theme,
     textFit,
-    deleteOnDoubleTap,
     onAddChild,
-    onDelete,
     onOpenEditor,
     onCloseEditor,
     onCommitTopic,
@@ -343,7 +333,6 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   // Pointer bookkeeping for tap-vs-drag + double-tap detection (see the
   // header comment for why this cannot rely on click events).
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lastTapRef = useRef(0);
   // Draft safety net: node dragging makes d3-drag preventDefault the
   // mousedown, so tapping ANOTHER node (or closing the sheet) swaps editors
   // without this input ever blurring — its draft would be lost. The refs
@@ -456,21 +445,11 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     const travelled = Math.hypot(event.clientX - start.x, event.clientY - start.y);
     if (travelled > TAP_SLOP_PX) {
       // The tail of a drag — React Flow has already moved the node.
-      lastTapRef.current = 0;
       return;
     }
-    if (deleteOnDoubleTap && !isRoot) {
-      const now = Date.now();
-      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-        lastTapRef.current = 0;
-        onDelete(id);
-        return;
-      }
-      lastTapRef.current = now;
-    }
     // A single tap opens the editor (the rename trigger — there is no
-    // separate pencil). In double-tap-delete mode the first tap still opens
-    // the editor; the second tap of a quick pair deletes the branch.
+    // separate pencil). Part 1 §7 removed double-tap deletion: a tap can now
+    // never delete; deleting a branch is only the toolbar trash.
     onOpenEditor(id);
   };
 
@@ -564,7 +543,6 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       onPointerUp={handlePointerUp}
       onPointerCancel={() => {
         pressStartRef.current = null;
-        lastTapRef.current = 0;
       }}
     >
       {/* Invisible connection handles — required by React Flow to route edges */}
@@ -983,6 +961,10 @@ export interface MindMapPanelProps {
   personalModules?: PersonalCourseModule[];
   /** Retry an unsuccessful library read without rebuilding its local mirror. */
   onRetryMaps?: () => void;
+  /** The signed-in learner — scopes the remembered MASTER/SELF + theme prefs. */
+  uid?: string | null;
+  /** Course/admin-provided MASTER mind maps (Part 1 §10). Read-only here. */
+  masterMaps?: MindMapSummary[];
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
@@ -1007,6 +989,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
     moduleId,
     personalModules = [],
     onRetryMaps,
+    uid = null,
+    masterMaps = [],
   } = props;
   /** The map library sheet (grid of this module's maps) is the HOME screen:
    *  it is open by default (fresh player entry) so the learner picks a map to
@@ -1034,10 +1018,15 @@ function MindMapCanvas(props: MindMapPanelProps) {
       setDeleteMapKey(null);
     }
   }, [open]);
-  const [doubleTapDelete, setDoubleTapDelete] = useState<boolean>(loadDblTapDelete);
+  // Part 1 §8/§11 — the map's daylight/light-dark switch and its MASTER/SELF
+  // filter, both remembered per user through the shared preference layer
+  // (never ephemeral React state, never a CSS inversion).
+  const mindThemeCtl = useCourseTheme("mindMap", uid ?? null);
+  const mindTheme: MindMapTheme = mindThemeCtl.theme;
+  const masterSelfCtl = useMasterSelfPreference("mindMap", uid ?? null, "master");
   // ── Align-menu choices (box arrangement + how a long label fits) ───────
-  // Views, not data: they are remembered per device like the double-tap
-  // switch, and never written to Firestore.
+  // Views, not data: they are remembered per device and never written to
+  // Firestore.
   const [arrangement, setArrangement] = useState<MindMapArrangement>(loadArrangement);
   const [textFit, setTextFit] = useState<MindMapTextFit>(loadTextFit);
   // Which tool drop-down is open. Only one at a time, and both are portalled
@@ -1070,20 +1059,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
     moving: Set<string>;
   } | null>(null);
 
-  // One palette, no switch: the map is dark like everything else.
-  const mindTheme: MindMapTheme = "dark";
-
   useEffect(() => {
     setMindMapSessionView(libraryOpen ? "library" : "canvas");
   }, [libraryOpen]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(dblTapDeleteStorageKey, doubleTapDelete ? "on" : "off");
-    } catch {
-      /* ignore */
-    }
-  }, [doubleTapDelete]);
 
   useEffect(() => {
     try {
@@ -1419,9 +1397,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
         editing: editingId === placed.id,
         theme: mindTheme,
         textFit,
-        deleteOnDoubleTap: doubleTapDelete,
         onAddChild: handleAddChild,
-        onDelete: requestDelete,
         onOpenEditor: handleOpenEditor,
         onCloseEditor: handleCloseEditor,
         onCommitTopic: handleCommitTopic,
@@ -1436,7 +1412,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     editingId,
     mindTheme,
     textFit,
-    doubleTapDelete,
     handleAddChild,
     requestDelete,
     handleOpenEditor,
@@ -1852,22 +1827,20 @@ function MindMapCanvas(props: MindMapPanelProps) {
             <Trash2 />
           </button>
 
-          {/* ── Double-tap delete arm switch ────────────────────────────
-              While ON, a quick double-tap on any node deletes it (never
-              the root). OFF by default so an accidental double-tap can
-              never cost a branch; the lit violet state doubles as the
-              mode's "this is armed" reminder. */}
+          {/* ── Daylight / light-dark switch (Part 1 §8) ────────────────
+              Compact sun/moon control: flips the map between its genuine
+              dark and light palettes and remembers the choice per user.
+              It replaces the removed double-tap-delete arm switch (§7). */}
           <button
             type="button"
-            onClick={() => setDoubleTapDelete((armed) => !armed)}
-            aria-pressed={doubleTapDelete}
-            className={`mm-tool ${doubleTapDelete ? "mm-tool-violet" : ""}`}
-            aria-label={doubleTapDelete ? "Double-tap delete band karein" : "Double-tap delete chaalu karein"}
-            title={doubleTapDelete ? "Double-tap delete ON — band karne ke liye dabayein" : "Double-tap delete — node par double-tap, phir Confirm"}
-            data-course-mindmap-dbl-delete
-            data-active={doubleTapDelete ? "true" : "false"}
+            onClick={mindThemeCtl.toggleTheme}
+            aria-pressed={mindTheme === "light"}
+            className={`mm-tool ${mindTheme === "light" ? "mm-tool-violet" : ""}`}
+            aria-label={mindTheme === "light" ? "Switch mind map to dark theme" : "Switch mind map to light theme"}
+            title={mindTheme === "light" ? "Dark theme" : "Light (daylight) theme"}
+            data-course-mindmap-theme-toggle={mindTheme}
           >
-            <MousePointerClick />
+            {mindTheme === "light" ? <Moon /> : <Sun />}
           </button>
 
         </div>
@@ -1990,31 +1963,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
             }, 0);
           }}
         >
+          {/* Part 1 §9: in LIGHT mode the canvas is WHITE with a visible grid.
+              The grid is React Flow's own <Background>, so it participates in
+              the viewport transform — zoom IN and the squares read smaller,
+              zoom OUT and they read larger. Dark keeps the existing look. */}
           <Background
             variant={BackgroundVariant.Dots}
             gap={22}
-            size={1}
-            color="rgba(255,255,255,0.07)"
+            size={mindTheme === "light" ? 1.5 : 1}
+            color={mindTheme === "light" ? "rgba(15,23,42,0.16)" : "rgba(255,255,255,0.07)"}
+            bgColor={mindTheme === "light" ? "#ffffff" : "transparent"}
           />
         </ReactFlow>
-
-        {/* The old first-run "kisi bhi node par + dabayein" hint is gone on the
-            owner's direction — an empty map shows just the root, nothing else.
-            What stays is the armed-state reminder: destructive mode is on, so
-            the learner can always see why a second quick tap removed a branch. */}
-        {mind.nodes.length > 0 && doubleTapDelete ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-            <div
-              className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-200 ring-1 ring-rose-400/30"
-              data-course-mindmap-dbl-delete-hint
-            >
-              <Trash2 size={11} />
-              <p className="text-center text-[11px] font-semibold">
-                Double-tap delete ON — node par double-tap, phir Confirm dabayein
-              </p>
-            </div>
-          </div>
-        ) : null}
 
         {/* ── Shared study-resource library ────────────────────────────────
             The library is the home screen for the module's saved maps. A
@@ -2024,6 +1984,54 @@ function MindMapCanvas(props: MindMapPanelProps) {
           <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-16" data-course-mindmap-map-list>
               <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+                {/* Part 1 §10/§11 — MASTER/SELF filter, remembered per user. */}
+                <div className="flex items-center justify-between gap-3" data-course-mindmap-collections>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Map library</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course maps and your own maps stay separate.</p>
+                  </div>
+                  <MasterSelfControl
+                    feature="mindMap"
+                    ariaLabel="Mind map collection"
+                    mode={masterSelfCtl.mode}
+                    onChange={masterSelfCtl.setMode}
+                    masterCount={masterMaps.length}
+                    selfCount={maps.length}
+                  />
+                </div>
+                {masterSelfCtl.mode === "master" ? (
+                  masterMaps.length > 0 ? (
+                    <ul className="grid min-w-0 gap-3" data-course-mindmap-master-grid data-study-resource-grid>
+                      {masterMaps.map((entry) => {
+                        const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
+                        return (
+                          <li key={entry.mapKey} className="min-w-0 min-h-[212px]">
+                            <StudyResourceCard
+                              kind="mind-map"
+                              resourceId={entry.mapKey}
+                              title={title}
+                              contextPath={libraryContextPath}
+                              metadata={[`${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`]}
+                              sourceLabel="MASTER"
+                              updatedAt={entry.updatedAt}
+                              createdAt={entry.createdAt}
+                              onOpen={() => {
+                                /* Master maps are read-only in this pass. */
+                              }}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <StudyLibraryEmptyState
+                      kind="mind-map"
+                      title="No master mind maps yet"
+                      description="Course-published mind maps will appear here. They are read-only and never mix with your SELF maps."
+                    />
+                  )
+                ) : (
+                <>
                 {mapsLoading && hasCachedMapIndex ? (
                   <StudyLibraryNotice
                     state="loading"
@@ -2089,8 +2097,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
                     description="Open a course module to see its mind maps, or start a map with the + button when a module is selected."
                   />
                 )}
+                </>
+                )}
               </div>
             </div>
+            {masterSelfCtl.mode === "self" ? (
             <button
               type="button"
               onClick={() => {
@@ -2107,6 +2118,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             >
               <Plus size={19} strokeWidth={2.8} />
             </button>
+            ) : null}
           </div>
         ) : null}
       </div>

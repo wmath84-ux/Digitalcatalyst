@@ -1,5 +1,6 @@
 import type { Attachment, GeneratedImage, InteractiveQuiz, QuizQuestion, ResponseFormat } from "./types";
 import { detectMentorFormat } from "../../../utils/mentorAnswer";
+import { publicAssetUrl } from "../../utils/publicAsset";
 
 export interface GenerationSpec {
   steps: { label: string; detail?: string }[];
@@ -85,7 +86,7 @@ const T_PHOTO: Topic = {
   ],
   pitfall: "Writing that the Calvin cycle is the 'dark reaction' and therefore happens *at night*. It runs in daylight too — it simply doesn't need photons itself.",
   image: {
-    src: "/images/gen-photosynthesis.png",
+    src: publicAssetUrl("/images/gen-photosynthesis.png"),
     alt: "Diagram of photosynthesis showing the light reactions in the thylakoid stack feeding ATP and NADPH into the Calvin cycle",
     caption: "The two stages of photosynthesis and the carriers that link them.",
     prompt: "photosynthesis in a chloroplast — light reactions feeding ATP and NADPH into the Calvin cycle",
@@ -148,7 +149,7 @@ const T_BINARY: Topic = {
   },
   pitfall: "Writing `while lo < hi`. When `lo == hi` there is still one unchecked candidate, so that version silently misses targets sitting at the final position.",
   image: {
-    src: "/images/binary-search-slide.png",
+    src: publicAssetUrl("/images/binary-search-slide.png"),
     alt: "Diagram of a sorted array with lo, mid, and hi pointers marking the binary search bounds",
     caption: "One probe on eleven elements: the mid comparison discards half the array.",
     prompt: "sorted array with lo, mid and hi pointers illustrating one binary search probe",
@@ -204,7 +205,7 @@ h'(x) = e^(cos(x²)) · (-sin(x²)) · 2x
   },
   pitfall: "Dropping a middle layer in a three-deep composite — the most common lost mark on this topic. Write each layer on its own line before multiplying.",
   image: {
-    src: "/images/gen-chainrule.png",
+    src: publicAssetUrl("/images/gen-chainrule.png"),
     alt: "Diagram of nested function layers illustrating the chain rule worked from the outside in",
     caption: "Nested layers of `e^(cos(x²))` — one factor per layer, multiplied together.",
     prompt: "nested function layers showing the chain rule applied outside-in",
@@ -255,7 +256,7 @@ const T_REVO: Topic = {
   ],
   pitfall: "Treating 'the Revolution' as one continuous government. Naming the specific regime in each sentence is the fastest way to raise an essay grade on this topic.",
   image: {
-    src: "/images/gen-timeline.png",
+    src: publicAssetUrl("/images/gen-timeline.png"),
     alt: "Timeline of the French Revolution marking the milestone years from 1789 to 1799",
     caption: "The revolutionary decade, 1789–1799, marked by its five regime changes.",
     prompt: "timeline of the French Revolution from 1789 to 1799 with milestone markers",
@@ -294,7 +295,7 @@ const T_GENERIC: Topic = {
   },
   pitfall: "Studying by re-reading. Retrieval beats review every time — ask me to quiz you instead.",
   image: {
-    src: "/images/gen-concept.png",
+    src: publicAssetUrl("/images/gen-concept.png"),
     alt: "Abstract concept map illustration with a central node connected to five satellite nodes",
     caption: "A concept map of the idea and its connected parts.",
     prompt: "abstract concept map of a topic and its related ideas",

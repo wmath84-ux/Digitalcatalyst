@@ -224,7 +224,11 @@ test("progress is the SDK's own byte ratio; upload and finishing are separate st
   await untilTask();
   assert.equal(task().metadata.contentType, "application/pdf");
   assert.equal(ctl().uploading.stage, "uploading");
-  assert.equal(ctl().uploading.progress, 0);
+  // No byte has been confirmed on the wire yet, so there is NO measurable
+  // percentage — the bar is indeterminate, not a fake 0 %. (Seeding 0 here is
+  // exactly what pinned fast uploads at "0%": a small PDF can finish in one
+  // request without the SDK ever emitting an intermediate snapshot.)
+  assert.equal(ctl().uploading.progress, null, "nothing measured yet → indeterminate, never a fake 0 %");
 
   task().progress(1 * MB);
   await settle();
@@ -267,7 +271,11 @@ test("a slow first chunk (no progress for many seconds) is NOT cancelled or swap
     assert.equal(task().cancelled, false);
     assert.equal(storage.tasks.length, 1);
     assert.equal(storage.calls.uploadBytes, 0);
-    assert.equal(ctl().uploading.progress, 0, "still the true 0 %, not a made-up number");
+    assert.equal(
+      ctl().uploading.progress,
+      null,
+      "still nothing measured after 20 s — indeterminate, and definitely not a made-up number",
+    );
     task().progress(2 * MB);
     await settle();
     assert.equal(ctl().uploading.progress, 0.5);

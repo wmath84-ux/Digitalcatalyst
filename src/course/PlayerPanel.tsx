@@ -42,6 +42,8 @@ const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: b
   viewport: { color: "#06D6A0", delay: 0.15, divider: true },
   fullscreen: { color: "#B388FF", delay: 0.2, divider: true },
   footerDock: { color: "#FFBE0B", delay: 0.25, divider: true },
+  lightTheme: { color: "#8ECAE6", delay: 0.3, divider: true },
+  sketchClean: { color: "#F97316", delay: 0.35, divider: true },
 };
 
 const notifySetting = (label: string, next: boolean) => {
@@ -177,6 +179,12 @@ export interface PlayerPanelProps {
    */
   legacyFooterDock: boolean;
   onLegacyFooterDockChange: (next: boolean) => void;
+  /** Genuine light/dark Course Player appearance (shared theme tokens). */
+  playerTheme?: "dark" | "light";
+  onPlayerThemeChange?: (next: "dark" | "light") => void;
+  /** Sketch "Clean / Optimised Look" — default OFF, persisted per user. */
+  sketchCleanLook?: boolean;
+  onSketchCleanLookChange?: (next: boolean) => void;
   /** P1: Gate personal access — the file the learner is currently viewing */
   gateFile?: { id?: string | null; url?: string | null; name?: string | null } | null;
   productId?: string | null;
@@ -217,6 +225,10 @@ export default function PlayerPanel({
   onHideStatusBarChange,
   legacyFooterDock,
   onLegacyFooterDockChange,
+  playerTheme = "dark",
+  onPlayerThemeChange,
+  sketchCleanLook = false,
+  onSketchCleanLookChange,
   gateFile = null,
   productId = null,
   moduleId = null,
@@ -414,6 +426,12 @@ export default function PlayerPanel({
             OFF = the newer bottom-centre peek dock (line → tap opens → swipe
             to select). Remembered per device. */}
         {settingsRow("Always-visible footer dock", legacyFooterDock, (next) => onLegacyFooterDockChange(next), "footerDock")}
+        {/* Genuine light/dark palette (Part 1 §6) — a real token switch, never
+            a CSS colour inversion. */}
+        {onPlayerThemeChange ? settingsRow("Light appearance", playerTheme === "light", (next) => onPlayerThemeChange(next ? "light" : "dark"), "lightTheme") : null}
+        {/* Sketch "Clean / Optimised Look" (Part 1 §25) — OFF by default and
+            remembered per user. Re-arranges the Sketch workspace only. */}
+        {onSketchCleanLookChange ? settingsRow("Sketch Clean / Optimised Look", sketchCleanLook, (next) => onSketchCleanLookChange(next), "sketchClean") : null}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
         </p>

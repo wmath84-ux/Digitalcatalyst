@@ -373,7 +373,11 @@ test("the app-wide glass token keeps its published material", () => {
   // tests/storeChromeDockDragScrollContract.test.mjs.)
   assert.match(indexCss, /--dc-chrome-glass: rgba\(60, 62, 68, 0\.105\)/);
   assert.match(indexCss, /\.course-player-shell \{[^}]*--course-bg/s, "the player's own palette block survives in index.css");
-  assert.doesNotMatch(indexCss, /data-course-theme="light"/, "the light palette is gone");
+  // Part 1 §6/§23: a genuine light palette now exists, but it is SCOPED to the
+  // player shell attribute — it never re-points the app-wide glass token, and
+  // it is a real palette swap, never a CSS inversion.
+  assert.match(indexCss, /\.course-player-shell\[data-course-theme="light"\]/, "the light palette is scoped to the player shell");
+  assert.doesNotMatch(indexCss, /filter: invert/);
 });
 
 /* ── 5. Every selector really exists in the flat player ─────────────────── */

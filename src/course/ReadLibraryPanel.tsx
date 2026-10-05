@@ -50,6 +50,8 @@ import {
   Search,
   Trash2,
   X,
+  Moon,
+  Sun,
 } from "lucide-react";
 import type { AccessibleReadResource } from "../../utils/readResources.js";
 import {
@@ -64,6 +66,8 @@ import { useAuth } from "../context/AuthContext";
 import PdfJsGenericViewer, { type PdfAnnotationApi } from "./PdfJsGenericViewer";
 import CourseConfirmDialog from "./ConfirmDeleteDialog";
 import useReadUploads, { type ReadUploadProgress } from "./useReadUploads";
+import { fetchPdfFromUrl, parseUrlList } from "./readUrlImport";
+import { useCourseTheme } from "./playerPreferences";
 
 const pageStorageKey = (productId: string, resourceId: string) =>
   `digitalcatalyst:read-page:${encodeURIComponent(productId)}:${encodeURIComponent(resourceId)}`;
@@ -219,6 +223,9 @@ export default function ReadLibraryPanel({
 }) {
   const { user } = useAuth();
   const readUploads = useReadUploads(user?.id);
+  // Read light/dark (§20/§21): the SAME shared, per-user theme layer the rest
+  // of the player uses — persisted, never a second theme system.
+  const readThemeCtl = useCourseTheme("read", user?.id ?? null);
 
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -234,6 +241,13 @@ export default function ReadLibraryPanel({
   const [composeModule, setComposeModule] = useState("");
   const [composeSubmodule, setComposeSubmodule] = useState("");
   const [composeFiles, setComposeFiles] = useState<File[]>([]);
+  // ── Add PDFs from a link (Part 2 §5–§13) ─────────────────────────────────
+  // Links are fetched and validated here; the bytes then join `composeFiles`,
+  // so the upload itself is the SAME path a locally chosen PDF takes.
+  const [urlDraft, setUrlDraft] = useState("");
+  const [urlBusy, setUrlBusy] = useState(false);
+  const [urlRows, setUrlRows] = useState<{ raw: string; stage: "fetching" | "ready" | "error"; detail?: string }[]>([]);
+  const urlAbortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composeInputRef = useRef<HTMLInputElement | null>(null);
   const annotationApiRef = useRef<PdfAnnotationApi | null>(null);
@@ -436,6 +450,52 @@ export default function ReadLibraryPanel({
   const cancelUpload = useCallback(() => readUploadsRef.current.cancelUpload(), []);
   const dismissUploadError = useCallback(() => readUploadsRef.current.clearUploadError(), []);
 
+  // Never leave a link fetch running after the panel goes away.
+  useEffect(
+    () => () => {
+      urlAbortRef.current?.abort();
+      urlAbortRef.current = null;
+    },
+    [],
+  );
+
+  /**
+   * Fetch every pasted link, one at a time, keeping each result separate: a
+   * link that fails never hides behind the ones that worked, and a link that
+   * worked is never lost because its neighbour failed.
+   */
+  const importFromUrls = useCallback(async () => {
+    const targets = parseUrlList(urlDraft);
+    if (!targets.length) {
+      setUrlRows([]);
+      return;
+    }
+    const controller = new AbortController();
+    urlAbortRef.current = controller;
+    setUrlBusy(true);
+    setUrlRows(targets.map((target) => ({ raw: target.raw, stage: "fetching" as const })));
+
+    const fetched: File[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      if (controller.signal.aborted) break;
+      const result = await fetchPdfFromUrl(targets[i], controller.signal);
+      setUrlRows((prev) =>
+        prev.map((row, idx) =>
+          idx === i
+            ? result.ok
+              ? { raw: row.raw, stage: "ready" as const, detail: result.pdf.file.name }
+              : { raw: row.raw, stage: "error" as const, detail: result.error.message }
+            : row,
+        ),
+      );
+      if (result.ok) fetched.push(result.pdf.file);
+    }
+
+    if (fetched.length) setComposeFiles((prev) => [...prev, ...fetched]);
+    setUrlBusy(false);
+    urlAbortRef.current = null;
+  }, [urlDraft]);
+
   const openUploadPicker = useCallback(() => {
     readUploadsRef.current.clearUploadError();
     setLibraryMode("mine");
@@ -484,7 +544,12 @@ export default function ReadLibraryPanel({
   const uploadBusy = Boolean(readUploads.uploading);
 
   return (
-    <section className="relative h-full min-h-0 overflow-hidden bg-slate-950 text-white" aria-label="Read library" data-course-read-panel>
+    <section
+      className="relative h-full min-h-0 overflow-hidden bg-slate-950 text-white"
+      aria-label="Read library"
+      data-course-read-panel
+      data-course-read-theme={readThemeCtl.theme}
+    >
       {/* Keep the searchable library mounted behind the reader. Its query and
           scroll position survive opening a PDF and returning with Back. */}
       <div className={`flex h-full min-h-0 flex-col ${activeId ? "hidden" : ""}`} aria-hidden={Boolean(activeId)} data-course-read-library>
@@ -524,6 +589,17 @@ export default function ReadLibraryPanel({
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300" aria-label={`${libraryMode === "course" ? entries.length : readUploads.uploads.length} resources`}>
               {libraryMode === "course" ? entries.length : readUploads.uploads.length}
             </span>
+            <button
+              type="button"
+              onClick={readThemeCtl.toggleTheme}
+              aria-pressed={readThemeCtl.theme === "light"}
+              aria-label={readThemeCtl.theme === "light" ? "Switch Read to dark theme" : "Switch Read to light theme"}
+              title={readThemeCtl.theme === "light" ? "Dark theme" : "Light theme"}
+              data-course-read-theme-toggle={readThemeCtl.theme}
+              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-slate-300 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              {readThemeCtl.theme === "light" ? <Moon size={15} aria-hidden="true" /> : <Sun size={15} aria-hidden="true" />}
+            </button>
             {/* The library grows here: a learner's own PDF, in one tap. */}
             <button
               type="button"
@@ -531,7 +607,7 @@ export default function ReadLibraryPanel({
               disabled={uploadBusy}
               aria-label="Upload your own PDF"
               title="Upload your own PDF"
-              className="ml-auto inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-300/30 bg-violet-400/15 px-2.5 text-[11px] font-bold text-violet-100 transition-colors hover:bg-violet-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-300/30 bg-violet-400/15 px-2.5 text-[11px] font-bold text-violet-100 transition-colors hover:bg-violet-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
               data-course-read-upload
             >
               {uploadBusy ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
@@ -961,6 +1037,58 @@ export default function ReadLibraryPanel({
                 ))}
               </ul>
             ) : null}
+            {/* ── Or add them from a link (Part 2 §5–§13) ───────────────────
+                Same overlay, same upload path: each link is fetched, its bytes
+                are proven to be a real PDF, then it joins the list above and
+                goes up through the very same `uploadPdfs` call. */}
+            <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-course-read-url-import>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                Or paste PDF links
+                <textarea
+                  value={urlDraft}
+                  onChange={(event) => setUrlDraft(event.currentTarget.value)}
+                  rows={2}
+                  placeholder={"https://example.com/notes.pdf\nOne link per line"}
+                  className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-[12px] text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/70"
+                  data-course-read-url-input
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void importFromUrls()}
+                disabled={urlBusy || !urlDraft.trim()}
+                className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/10 text-[11px] font-bold text-emerald-100 hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                data-course-read-url-add
+              >
+                {urlBusy ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <FileText size={14} aria-hidden="true" />}
+                {urlBusy ? "Checking links…" : "Fetch from links"}
+              </button>
+              {urlRows.length ? (
+                <ul className="mt-2 space-y-1 text-[11px]" data-course-read-url-results>
+                  {urlRows.map((row) => (
+                    <li
+                      key={row.raw}
+                      className={
+                        row.stage === "error"
+                          ? "rounded-lg border border-rose-400/20 bg-rose-400/10 px-2 py-1 text-rose-100"
+                          : row.stage === "ready"
+                            ? "rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-100"
+                            : "px-2 py-1 text-slate-300"
+                      }
+                    >
+                      <span className="block truncate font-semibold">{row.raw}</span>
+                      {row.stage === "fetching" ? <span className="block text-slate-400">Fetching…</span> : null}
+                      {row.stage === "ready" ? <span className="block">Ready — {row.detail}</span> : null}
+                      {row.stage === "error" ? <span className="block">{row.detail}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+                The site hosting the file has to allow the app to read it. Private or sign-in links
+                will not work — download that file and use Choose PDFs instead.
+              </p>
+            </div>
             {readUploads.uploading || readUploads.uploadError ? (
               <UploadStatus
                 uploading={readUploads.uploading}

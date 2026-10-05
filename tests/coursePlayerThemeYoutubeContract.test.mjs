@@ -21,9 +21,12 @@ test("The Player tab has no theme toggle — the app is dark only", () => {
   assert.match(coursePlayer, /const browserColorScheme = "dark" as const;/);
 });
 
-test("Course Player palette is scoped and dark only", () => {
+test("Course Player palette is scoped to the shell (dark default + genuine light)", () => {
   assert.match(styles, /\.course-player-shell\s*\{/);
-  assert.doesNotMatch(styles, /data-course-theme="light"/);
+  // Part 1 §6/§23: a real light palette exists, scoped to the shell attribute
+  // (never a CSS inversion); dark stays the default.
+  assert.match(styles, /\.course-player-shell\[data-course-theme="light"\]/);
+  assert.doesNotMatch(styles, /filter: invert/);
   for (const variable of ["--course-bg", "--course-surface", "--course-panel", "--course-text", "--course-muted", "--course-border"]) {
     assert.match(styles, new RegExp(variable), `missing ${variable}`);
   }

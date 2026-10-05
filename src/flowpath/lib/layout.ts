@@ -88,7 +88,19 @@ export interface BuiltLayout {
   totalHeight: number;
 }
 
-export function buildRows(items: ActivityWithStatus[], config: LayoutConfig): BuiltLayout {
+/**
+ * Breathing room added on top of a card's measured natural height so two
+ * consecutive cards never touch. The row slot is the card's real height plus
+ * this gap, which is what stops a tall card from clipping its own text or
+ * overlapping the row below it.
+ */
+const MEASURED_ROW_GAP = 16;
+
+export function buildRows(
+  items: ActivityWithStatus[],
+  config: LayoutConfig,
+  measuredHeights?: Record<string, number>,
+): BuiltLayout {
   const rows: FlowRow[] = [];
   let y = config.topPad;
   let index = 0;
@@ -127,18 +139,26 @@ export function buildRows(items: ActivityWithStatus[], config: LayoutConfig): Bu
 
   items.forEach((item, i) => {
     const side: "left" | "right" = config.singleSide ? "right" : i % 2 === 0 ? "right" : "left";
+    // The row grows to the card's real height when the card needs more room
+    // than the config's baseline — the baseline stays the floor, so nothing
+    // ever gets shorter (and therefore never clips or overlaps).
+    const measured = measuredHeights?.[item.activity.id];
+    const rowHeight =
+      measured && measured + MEASURED_ROW_GAP > config.activityHeight
+        ? measured + MEASURED_ROW_GAP
+        : config.activityHeight;
     rows.push({
       id: item.activity.id,
       kind: "activity",
       index,
       y,
-      height: config.activityHeight,
+      height: rowHeight,
       x: curveX(config, index),
       side,
       activity: item,
       afterId: item.activity.id,
     });
-    y += config.activityHeight;
+    y += rowHeight;
     index++;
 
     rows.push({
