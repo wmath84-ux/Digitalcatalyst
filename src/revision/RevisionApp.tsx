@@ -57,6 +57,7 @@ import {
   hashForRecallView,
   parseRevisionRoute,
   recallViewForPage,
+  type RevisionPageId,
   type RevisionRoute,
 } from "./integrations/routes";
 
@@ -118,9 +119,23 @@ const REVISION_TOP_BAR_ITEMS: TopBarTabItem[] = [
   { id: "browser", label: "Cards", hint: "Search all flashcards" },
   { id: "weak-topics", label: "Weak Topics", hint: "Target weak points" },
   { id: "progress", label: "Progress", hint: "Stats & metrics" },
-  { id: "profile", label: "Plan & AI", hint: "Study settings & AI tools" },
+  { id: "profile", label: "Plan & AI", hint: "Study plan & AI tools" },
+  { id: "settings", label: "Settings", hint: "Review preferences, theme & notifications" },
   { id: "bulk-import", label: "Import", hint: "Import cards & decks" },
 ];
+
+const REVISION_TOP_BAR_ACTIVE_IDS: Partial<Record<RevisionPageId, string>> = {
+  study: "dashboard",
+  tags: "browser",
+  stats: "progress",
+  "test-play": "bank",
+  "test-play-attempt": "bank",
+  "test-result": "bank",
+  "test-review": "bank",
+  "ai-settings": "profile",
+  "ai-generate": "profile",
+  "import-hub": "bulk-import",
+};
 
 interface RevisionAppProps {
   /** Overridden in tests; production reads the signed-in learner. */
@@ -170,7 +185,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
     feature: "revision",
     ariaLabel: "Revision pages",
     items: REVISION_TOP_BAR_ITEMS,
-    activeId: route.page,
+    activeId: REVISION_TOP_BAR_ACTIVE_IDS[route.page] ?? route.page,
     onSelect: (id) => {
       if (id === "dashboard") navigate("#/revision");
       else if (id === "bank") navigate("#/revision/bank");
@@ -179,6 +194,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
       else if (id === "weak-topics") navigate("#/revision/weak-topics");
       else if (id === "progress") navigate("#/revision/progress");
       else if (id === "profile") navigate("#/revision/profile");
+      else if (id === "settings") navigate("#/revision/settings");
       else if (id === "bulk-import") navigate("#/revision/bulk-import");
     },
   });
@@ -300,9 +316,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
         showTags();
         break;
       case "settings":
-        // The ported settings screen is the Revision profile (§5).
-        if (route.page === "profile") showSettings();
-        else showSettings();
+        showSettings();
         break;
       case "import-hub":
         showImportHub();

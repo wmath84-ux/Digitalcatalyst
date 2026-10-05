@@ -86,6 +86,7 @@ test("Revision publishes its page destinations into the desktop header", () => {
     ["weak-topics", "Weak Topics"],
     ["progress", "Progress"],
     ["profile", "Plan & AI"],
+    ["settings", "Settings"],
     ["bulk-import", "Import"],
   ]) {
     assert.ok(block.includes(`id: "${id}", label: "${label}"`), `missing ${label} tab`);
@@ -96,7 +97,8 @@ test("Revision publishes its page destinations into the desktop header", () => {
   assert.match(revision, /feature: "revision"/);
   assert.match(revision, /ariaLabel: "Revision pages"/);
   assert.match(revision, /items: REVISION_TOP_BAR_ITEMS/);
-  assert.match(revision, /activeId: route\.page/);
+  assert.match(revision, /activeId: REVISION_TOP_BAR_ACTIVE_IDS\[route\.page\] \?\? route\.page/);
+  assert.match(revision, /id === "settings"\) navigate\("#\/revision\/settings"\)/);
   assert.match(shell, /data-desktop-topbar-tabs=\{config\.feature\}/);
 
   // The top-bar handler navigates every destination through Revision's router.
