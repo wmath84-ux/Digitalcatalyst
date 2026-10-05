@@ -1,164 +1,208 @@
-import { useMemo, useState } from "react";
-import { ListRestart, RotateCcw } from "lucide-react";
-import PageShell from "../components/PageShell";
-import { Card, ErrorState, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
-import { CheckIcon, ClockIcon, SparklesIcon, XIcon } from "../components/icons";
-import { useExitGuard } from "../components/ExitGuardContext";
+/**
+ * Test result — the exam-mode scorecard, in the ported Recall design language.
+ *
+ * Preserves every number the retired glass result page showed (§5A): score,
+ * accuracy, correct / wrong / skipped, time spent, the per-topic breakdown and
+ * the attempt's plan (class, subjects, chapters, topics, difficulty, question
+ * mode). Adds what Recall already gives its learners — a clear next action —
+ * through the same surfaces the ported session summary uses.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+
+import { Button } from "../recall/components/ui/button";
+import { cn } from "../recall/lib/utils";
+import { typeClass } from "../recall/lib/surface";
+import { useRevisionRoute } from "../integrations/route-context";
+import { REVISION_DEEP_LINKS } from "../integrations/routes";
+import { RecallBadge, RecallCard, RecallError, RecallLoading, RecallPage, RecallProgress, RecallStat, SectionTitle } from "../components/recall-ui";
 import { getTestResult } from "../engine/testService";
 import { startCustomTestRetake, startSkippedQuestionsRetake } from "../engine/customTestService";
-import { questionModeLabel } from "../engine/questionMode";
 import { ServiceError } from "../engine/store";
 
-function formatDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s}s`;
-}
+export default function TestResultPage({ uid, attemptId }: { uid: string; attemptId: number | null }) {
+  const { navigate } = useRevisionRoute();
+  const [error, setError] = useState<string | null>(null);
 
-function scoreMessage(score: number) {
-  if (score >= 90) return "Outstanding work! 🎉";
-  if (score >= 70) return "Great job today! 👏";
-  if (score >= 50) return "Good effort, keep going! 💪";
-  return "Every test makes you sharper. Let's revise! 📘";
-}
-
-export default function TestResultPage({ uid, route, attemptId }: { uid: string; route: string; attemptId: number }) {
-  const { navigate } = useExitGuard();
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const { data, error } = useMemo(() => {
+  const result = useMemo(() => {
+    if (!attemptId) return null;
     try {
-      return { data: getTestResult(uid, attemptId), error: null as string | null };
+      return getTestResult(uid, attemptId);
     } catch (err) {
-      return { data: null, error: err instanceof ServiceError ? err.message : "Could not load your result." };
+      setError(err instanceof ServiceError ? err.message : "Could not load this result.");
+      return null;
     }
-  }, [uid, attemptId]);
+  }, [attemptId, uid]);
 
-  const startRetake = (skippedOnly: boolean) => {
-    if (!data?.isCustom) return;
-    setActionError(null);
-    try {
-      const attempt = skippedOnly
-        ? startSkippedQuestionsRetake(uid, data.testId)
-        : startCustomTestRetake(uid, data.testId);
-      navigate(`#/revision/test/play-attempt/${attempt.id}`);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Could not start another attempt.");
-    }
-  };
+  useEffect(() => {
+    if (!attemptId) setError("This result link is missing its attempt id.");
+  }, [attemptId]);
+
+  if (error && !result) {
+    return (
+      <RecallPage title="Result" onBack={() => navigate(REVISION_DEEP_LINKS.testBank)}>
+        <RecallError
+          title="Could not load this result"
+          body={error}
+          action={
+            <Button variant="outline" onClick={() => navigate(REVISION_DEEP_LINKS.testBank)}>
+              Back to the Test Bank
+            </Button>
+          }
+        />
+      </RecallPage>
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="py-16">
+        <RecallLoading />
+      </div>
+    );
+  }
+
+  const minutes = Math.max(1, Math.round(result.timeSpentSeconds / 60));
 
   return (
-    <PageShell route={route} title="Test Result" backHref="#/revision">
-      {error && <ErrorState message={error} />}
-      {data && (
-        <div data-rev-layout="testresult" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
-          <Card data-rev-score-card className="bg-indigo-600 text-center text-white">
-            <p className="line-clamp-1 text-xs font-semibold text-indigo-100">{data.testTitle}</p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-200">{data.attemptKind === "skipped" ? "Skipped-question attempt" : "Full attempt"}</p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-100">Your Score</p>
-            <p className="mt-1 text-5xl font-extrabold">{data.score}%</p>
-            <p className="mt-1 text-sm text-indigo-100">{scoreMessage(data.score)}</p>
-            <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-indigo-100">
-              <ClockIcon className="h-4 w-4" /> Completed in {formatDuration(data.timeSpentSeconds)}
-            </div>
-          </Card>
+    <RecallPage
+      title={result.testTitle}
+      subtitle={`${result.testDate} · ${result.totalQuestions} questions · ${minutes} min`}
+      onBack={() => navigate(REVISION_DEEP_LINKS.testBank)}
+      actions={
+        <>
+          <Button variant="outline" onClick={() => navigate(REVISION_DEEP_LINKS.testReview(result.attemptId))}>
+            Review answers
+          </Button>
+          <Button
+            onClick={() => {
+              try {
+                const attempt = startCustomTestRetake(uid, result.testId);
+                navigate(REVISION_DEEP_LINKS.testPlayAttempt(attempt.id));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not start a retake.");
+              }
+            }}
+          >
+            Retake
+          </Button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <RecallStat label="Score" value={`${result.score}%`} tone="brand" />
+        <RecallStat label="Correct" value={result.correctCount} tone="success" />
+        <RecallStat label="Wrong" value={result.wrongCount} />
+        <RecallStat label="Skipped" value={result.skippedCount} />
+      </div>
 
-          {/* The result chips sit in the shared revision Card — the same pattern
-              the dashboard's Revision Bank grid uses — so the meaning washes
-              tint the plated surface instead of the bare scene. */}
-          <Card className="p-3">
-          <div data-rev-result-grid className="grid grid-cols-3 gap-3">
-            <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-300" />} label="Correct" value={data.correctCount} tone="bg-emerald-500/20" />
-            <ResultChip icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Wrong" value={data.wrongCount} tone="bg-rose-500/20" />
-            <ResultChip icon={<SparklesIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="border border-white/15" />
-          </div>
-          </Card>
-
-          {data.planDetails && (
-            <Card>
-              <h2 className="mb-3 text-[15px] font-bold text-white">Saved Test Plan</h2>
-              <div className="space-y-1.5 rounded-2xl border border-white/10 p-3 text-xs text-white/85">
-                {data.planDetails.classNames.length > 0 && <PlanDetail label="Class" value={displayList(data.planDetails.classNames, "")} />}
-                <PlanDetail label="Subject" value={displayList(data.planDetails.subjectNames, "Subject not labelled")} />
-                <PlanDetail label="Chapter" value={displayList(data.planDetails.chapterNames, "Chapter not labelled")} />
-                <PlanDetail label="Topics" value={displayList(data.planDetails.topicNames, "All selected chapter topics")} />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-indigo-500/20 px-2.5 py-1 text-[11px] font-bold text-indigo-200">{questionModeLabel(data.planDetails.questionMode)}</span>
-                <span className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-bold capitalize text-white/85">{data.planDetails.difficulty} difficulty</span>
-              </div>
-            </Card>
-          )}
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-white">Accuracy</h2>
-              <span className="text-sm font-bold text-indigo-300">{data.accuracy}%</span>
-            </div>
-            <ProgressBar value={data.accuracy} className="mt-2" />
-            <p className="mt-2 text-xs font-medium text-white/55">
-              {data.correctCount} correct out of {data.totalQuestions} questions
-            </p>
-          </Card>
-
-          <Card>
-            <h2 className="mb-3 text-[15px] font-bold text-white">Topic Breakdown</h2>
-            <div className="space-y-3">
-              {data.topicBreakdown
-                .sort((a, b) => a.accuracy - b.accuracy)
-                .map((t) => (
-                  <div key={t.topicId} className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-lg">
-                      {t.subjectIcon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-medium text-white/85">{t.topicName}</p>
-                        <span className="ml-2 text-xs font-semibold text-white/75">
-                          {t.correct}/{t.total} · {t.accuracy}%
-                        </span>
-                      </div>
-                      <ProgressBar value={t.accuracy} className="mt-1.5" />
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </Card>
-
-          <div className="space-y-3 pt-1">
-            <PrimaryButton onClick={() => navigate(`#/revision/test/review/${attemptId}`)}>Review Answers</PrimaryButton>
-            {data.isCustom && (
-              <div className="grid grid-cols-2 gap-2">
-                <SecondaryButton onClick={() => startRetake(false)}><RotateCcw className="h-4 w-4" /> Revise Again</SecondaryButton>
-                <SecondaryButton disabled={data.skippedCount === 0} onClick={() => startRetake(true)}><ListRestart className="h-4 w-4" /> Revise Skipped</SecondaryButton>
-              </div>
-            )}
-            {actionError && <p className="dc-scene-ink rounded-xl bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-200">{actionError}</p>}
-            <SecondaryButton onClick={() => navigate("#/revision/bank")}>Open Test Bank & History</SecondaryButton>
-          </div>
+      <RecallCard className="mt-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn(typeClass["label-lg"])}>Accuracy</span>
+          <span className={cn(typeClass["title-md"])}>{result.accuracy}%</span>
         </div>
-      )}
-    </PageShell>
-  );
-}
+        <RecallProgress value={result.accuracy} />
+        <div className="flex flex-wrap items-center gap-2">
+          <RecallBadge>{result.isCustom ? "Saved test" : "Daily Test"}</RecallBadge>
+          {result.attemptKind === "skipped" ? <RecallBadge tone="warning">Skipped questions only</RecallBadge> : null}
+          <RecallBadge>
+            {result.startedAt ? new Date(result.startedAt).toLocaleString() : ""}
+          </RecallBadge>
+        </div>
+        {result.skippedCount > 0 && result.attemptKind !== "skipped" ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              try {
+                const attempt = startSkippedQuestionsRetake(uid, result.testId);
+                navigate(REVISION_DEEP_LINKS.testPlayAttempt(attempt.id));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not start the skipped-questions retake.");
+              }
+            }}
+          >
+            Retake the {result.skippedCount} skipped question{result.skippedCount === 1 ? "" : "s"}
+          </Button>
+        ) : null}
+      </RecallCard>
 
-function displayList(items: string[], fallback: string) {
-  if (items.length === 0) return fallback;
-  if (items.length <= 2) return items.join(" · ");
-  return `${items.slice(0, 2).join(" · ")} +${items.length - 2}`;
-}
+      <section className="mt-6">
+        <SectionTitle hint={`${result.topicBreakdown.length} topics`}>Topic breakdown</SectionTitle>
+        {result.topicBreakdown.length === 0 ? (
+          <RecallCard>
+            <p className={cn(typeClass["body-md"], "text-on-surface-variant")}>
+              No topic data for this attempt.
+            </p>
+          </RecallCard>
+        ) : (
+          <ul className="space-y-2">
+            {result.topicBreakdown
+              .slice()
+              .sort((a, b) => a.accuracy - b.accuracy)
+              .map((topic) => (
+                <li key={topic.topicId}>
+                  <RecallCard className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={cn(typeClass["label-lg"], "min-w-0 truncate")}>
+                        {topic.subjectIcon} {topic.topicName}
+                      </span>
+                      <span
+                        className={cn(
+                          typeClass["label-lg"],
+                          topic.accuracy >= 70 ? "text-tertiary" : topic.accuracy >= 40 ? "text-secondary" : "text-error",
+                        )}
+                      >
+                        {topic.accuracy}%
+                      </span>
+                    </div>
+                    <RecallProgress value={topic.accuracy} />
+                    <p className={cn(typeClass.caption, "text-on-surface-variant")}>
+                      {topic.subjectName} · {topic.correct}/{topic.total} correct
+                    </p>
+                  </RecallCard>
+                </li>
+              ))}
+          </ul>
+        )}
+      </section>
 
-function PlanDetail({ label, value }: { label: string; value: string }) {
-  return <p className="line-clamp-1"><span className="font-bold text-white/75">{label}:</span> <span>{value}</span></p>;
-}
+      {result.planDetails ? (
+        <section className="mt-6">
+          <SectionTitle>Generated from</SectionTitle>
+          <RecallCard className="space-y-2">
+            <p className={cn(typeClass["body-md"])}>
+              {[
+                result.planDetails.classNames.join(", "),
+                result.planDetails.subjectNames.join(", "),
+                result.planDetails.chapterNames.join(", "),
+                result.planDetails.topicNames.join(", "),
+              ]
+                .filter(Boolean)
+                .join(" › ") || "Your saved plan"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <RecallBadge tone="brand">{result.planDetails.difficulty}</RecallBadge>
+              <RecallBadge>{result.planDetails.questionMode}</RecallBadge>
+            </div>
+          </RecallCard>
+        </section>
+      ) : null}
 
-function ResultChip({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: string }) {
-  return (
-    <div className={`flex flex-col items-center gap-1 rounded-2xl py-3 ${tone}`}>
-      {icon}
-      <span className="text-lg font-bold text-white">{value}</span>
-      <span className="text-[10px] font-medium text-white/55">{label}</span>
-    </div>
+      {error ? (
+        <p className={cn(typeClass.caption, "mt-4 text-error")} role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => navigate(REVISION_DEEP_LINKS.weakTopics)}>
+          Open Weak Topics
+        </Button>
+        <Button variant="ghost" onClick={() => navigate(REVISION_DEEP_LINKS.dashboard)}>
+          Back to the dashboard
+        </Button>
+      </div>
+    </RecallPage>
   );
 }

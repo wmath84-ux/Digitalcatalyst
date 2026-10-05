@@ -1,0 +1,194 @@
+import { Search, Trash2, CheckSquare, Square, X, FileText, Plus, BookOpen } from "lucide-react";
+import { useTranslation } from "../../shims/i18n";
+import { Input } from "../ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../ui/alert-dialog";
+import { CardDialog } from "../card-dialog";
+import { CardRow } from "./card-row";
+import { cn } from "../../lib/utils";
+import type { Card } from "../../types";
+
+interface CardListSectionProps {
+  deckId: string;
+  filteredCards: Card[];
+  deckCards: Card[];
+  search: string;
+  setSearch: (value: string) => void;
+  selectedTag: string | null;
+  setSelectedTag: (tag: string | null) => void;
+  allTags: string[];
+  selectedCardIds: Set<string>;
+  toggleCardSelection: (cardId: string) => void;
+  toggleSelectAll: () => void;
+  onBulkDelete: () => Promise<void>;
+  onBulkAdd: () => void;
+}
+
+export function CardListSection({
+  deckId,
+  filteredCards,
+  deckCards,
+  search,
+  setSearch,
+  selectedTag,
+  setSelectedTag,
+  allTags,
+  selectedCardIds,
+  toggleCardSelection,
+  toggleSelectAll,
+  onBulkDelete,
+  onBulkAdd,
+}: CardListSectionProps): JSX.Element {
+  const { t } = useTranslation();
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">{t("deckDetail.cards")}</h2>
+          <p className="text-sm text-muted-foreground">
+            {t("deckDetail.cardsDescription")}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <CardDialog
+            deckId={deckId}
+            trigger={
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl active:scale-95 transition-all">
+                <Plus className="h-4 w-4" />
+                {t("cardDialog.addCard")}
+              </button>
+            }
+          />
+          <button className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all" onClick={onBulkAdd}>
+            <FileText className="h-4 w-4" />
+            {t("deckDetail.bulkAdd")}
+          </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("deckDetail.searchCards")}
+        />
+      </div>
+
+      {/* Bulk selection bar - sticky while scrolling long card lists */}
+      {filteredCards.length > 0 && (
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-lg bg-background/95 backdrop-blur py-2">
+          <button className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all" onClick={toggleSelectAll}>
+            {selectedCardIds.size === filteredCards.length ? (
+              <CheckSquare className="h-4 w-4" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            {selectedCardIds.size === filteredCards.length ? t("deckDetail.deselectAll") : t("deckDetail.selectAll")}
+          </button>
+          {selectedCardIds.size > 0 && (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {t("deckDetail.selectedCount", { count: selectedCardIds.size })}
+              </span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-all">
+                    <Trash2 className="h-4 w-4" />
+                    {t("deckDetail.deleteSelected")}
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("deckDetail.deleteSelectedTitle")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("deckDetail.deleteSelectedDescription", { count: selectedCardIds.size })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("confirmAction.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <button className="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-all" onClick={() => void onBulkDelete()}>
+                        {t("deckDetail.delete")}
+                      </button>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">{t("deckDetail.filterByTag")}</span>
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                selectedTag === tag
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-transparent bg-muted text-muted-foreground hover:bg-muted/80",
+              )}
+            >
+              {tag}
+              {selectedTag === tag ? <X className="h-3 w-3" /> : null}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Card list / empty states */}
+      {filteredCards.length === 0 ? (
+        deckCards.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 px-6 py-16 text-center">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
+              <BookOpen className="h-8 w-8 text-muted-foreground/60" />
+            </div>
+            <h3 className="text-lg font-semibold">{t("deckDetail.deckEmpty")}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              {t("deckDetail.deckEmptyDescription")}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 px-6 py-16 text-center">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
+              <Search className="h-8 w-8 text-muted-foreground/60" />
+            </div>
+            <h3 className="text-lg font-semibold">{t("deckDetail.noMatches")}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              {t("deckDetail.noMatchesDescription")}
+            </p>
+          </div>
+        )
+      ) : (
+        <div className="grid gap-3">
+          {filteredCards.map((card) => (
+            <CardRow
+              key={card.id}
+              card={card}
+              deckId={deckId}
+              isSelected={selectedCardIds.has(card.id)}
+              onToggle={toggleCardSelection}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}

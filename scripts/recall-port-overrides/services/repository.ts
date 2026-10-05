@@ -1,0 +1,842 @@
+/**
+ * @module repository
+ * @description DB abstraction layer. Supports Dexie (browser) and Rusqlite (Tauri).
+ * @entryPoints saveSnapshot, saveSettings, loadAppData, replaceDataFromImport, mergeDataFromImport, resetToSeedData
+ * @secrets NEVER include syncCode/syncRelayUrl/syncEnabled from imports — use preserveDeviceSyncSettings().
+ * @backup Backups via buildExportPayload — include device on-disk backup creation before destructive ops.
+ */
+import {
+  cardFromRow,
+  cardToRow,
+  deckFromRow,
+  deckToRow,
+  reviewLogFromRow,
+  reviewLogToRow,
+  settingsFromRows,
+  settingsToRows,
+  studySessionFromRow,
+  studySessionToRow,
+  type CardRow,
+  type DeckRow,
+  type ReviewLogRow,
+  type SettingRow,
+  type StudySessionRow,
+} from "../db/mappers";
+import { getTauriSqlExecutor, isTauriRuntime, type SqlExecutor } from "../db/client";
+import { createSeedSnapshot } from "../data/seed";
+import { isCardState, isCardType, isDeckColor, isReviewRating } from "../lib/domain";
+import { normalizeName } from "../lib/utils";
+import { mergeImportPayload } from "./import-export";
+import { DEFAULT_SHORTCUTS } from "../lib/shortcuts";
+import { isWrappedSyncCode, sealSettingsSecrets, unsealSettingsSecrets } from "./sync-secret";
+import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession, Theme } from "../types";
+
+const STORAGE_KEY = "recall.snapshot.v1";
+
+type UnsealedLoad = {
+  snapshot: RecallStateSnapshot;
+  /** True when disk held legacy plaintext syncCode that should be rewritten sealed. */
+  needsSealMigration: boolean;
+};
+
+/** Decrypt device-local secrets after reading from disk. */
+async function unsealSnapshot(snapshot: RecallStateSnapshot): Promise<UnsealedLoad> {
+  const raw = snapshot.settings.syncCode;
+  const needsSealMigration = !!raw && !isWrappedSyncCode(raw);
+  const settings = await unsealSettingsSecrets(snapshot.settings);
+  if (settings === snapshot.settings) {
+    return { snapshot, needsSealMigration };
+  }
+  return { snapshot: { ...snapshot, settings }, needsSealMigration };
+}
+
+/**
+ * Clone snapshot with syncCode wrapped for disk write.
+ * Does not mutate the in-memory (plaintext) snapshot callers keep using.
+ */
+async function sealSnapshotForDisk(snapshot: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+  const settings = await sealSettingsSecrets(snapshot.settings);
+  if (settings === snapshot.settings) return snapshot;
+  return { ...snapshot, settings };
+}
+
+/** Rewrite legacy plaintext syncCode once (in-memory is already plaintext). */
+async function migratePlaintextSyncCode(
+  repo: Pick<RecallRepository, "saveSettings">,
+  snapshot: RecallStateSnapshot,
+  needsSealMigration: boolean,
+): Promise<void> {
+  if (!needsSealMigration || !snapshot.settings.syncCode) return;
+  await repo.saveSettings(snapshot.settings, snapshot);
+}
+
+export interface RecallRepository {
+  loadAppData(): Promise<RecallStateSnapshot>;
+  saveSnapshot(snapshot: RecallStateSnapshot): Promise<void>;
+    recordReview(updatedCard: Card, reviewLog: ReviewLog, session: StudySession | null): Promise<void>;
+    resetToSeedData(): Promise<RecallStateSnapshot>;
+  replaceDataFromImport(payload: RecallExportPayload): Promise<RecallStateSnapshot>;
+  mergeDataFromImport(current: RecallStateSnapshot, payload: RecallExportPayload): Promise<RecallStateSnapshot>;
+  saveTheme(theme: Theme, current: RecallStateSnapshot): Promise<RecallStateSnapshot>;
+  saveSettings(settings: RecallStateSnapshot["settings"], current: RecallStateSnapshot): Promise<RecallStateSnapshot>;
+  /** Load review logs, optionally filtered to entries on or after `since` (ISO date). */
+  loadReviewLogs(since?: string): Promise<ReviewLog[]>;
+  /** Count total review logs (for data-health indicators). */
+  countReviewLogs(): Promise<number>;
+  // Targeted entity operations (incremental persistence)
+  upsertDeck(deck: Deck): Promise<void>;
+  upsertCard(card: Card): Promise<void>;
+  deleteDeck(deckId: string): Promise<void>;
+  deleteCard(cardId: string): Promise<void>;
+  deleteCards(cardIds: string[]): Promise<void>;
+  moveCards(cardIds: string[], deckId: string): Promise<void>;
+  upsertCards(cards: Card[]): Promise<void>;
+  queryCards(filters: { deckId?: string; state?: string; search?: string; sortField: string; sortDir: string; limit: number; offset: number }): Promise<{ cards: Card[]; total: number }>;
+}
+
+let cachedRepository: Promise<RecallRepository> | null = null;
+
+/* ── Digitalcatalyst port patch ─────────────────────────────────────────────
+   Upstream chose its repository from the runtime: SQLite under Tauri, a
+   `localStorage` document in the browser. The port must instead use the
+   Digitalcatalyst local-first store (IndexedDB via Dexie, see
+   `integrations/dcxRepository.ts`), which is also where the unified Revision
+   domain lives and where Firebase hydration/sync hooks in (§13/§14).
+
+   The override is a REGISTRATION HOOK rather than an import, so this vendored
+   module keeps no compile-time dependency on Digitalcatalyst code and a future
+   re-sync of the upstream file only has to keep this small block. The host
+   registers its implementation in `integrations/bootstrap.ts`; a unit test in
+   `tests/revisionRecallPort.test.mjs` asserts this hook still exists.
+
+   IMPORTANT: this file is a port override. Edit
+   `scripts/recall-port-overrides/services/repository.ts`, never the vendored
+   copy — the codemod re-applies overrides on every vendoring run.          */
+type RecallRepositoryFactory = () => Promise<RecallRepository>;
+
+let repositoryFactory: RecallRepositoryFactory | null = null;
+
+/** Register the host application's repository implementation. */
+export function setRecallRepositoryFactory(factory: RecallRepositoryFactory | null): void {
+  repositoryFactory = factory;
+  cachedRepository = null;
+}
+
+export async function getRecallRepository(): Promise<RecallRepository> {
+  cachedRepository ??= repositoryFactory ? repositoryFactory() : createRecallRepository();
+  return cachedRepository;
+}
+
+export function createSqliteRepository(executor: SqlExecutor): RecallRepository {
+  return new SqliteRecallRepository(executor);
+}
+
+/** Maximum allowed import payload size (10MB JSON stringified). */
+const MAX_IMPORT_SIZE_BYTES = 10 * 1024 * 1024;
+
+export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
+  const sizeCheck = JSON.stringify(snapshot).length;
+  if (sizeCheck > MAX_IMPORT_SIZE_BYTES) {
+    throw new Error(`Import too large (${(sizeCheck / 1024 / 1024).toFixed(1)}MB). Maximum is 10MB.`);
+  }
+
+  const deckIds = new Set<string>();
+  const deckNames = new Set<string>();
+
+  for (const deck of snapshot.decks) {
+    const deckName = normalizeName(deck.name).toLowerCase();
+    if (!deck.name.trim()) {
+      throw new Error("Deck name is required");
+    }
+    if (deckIds.has(deck.id)) {
+      throw new Error("Duplicate deck id");
+    }
+    if (deckNames.has(deckName)) {
+      throw new Error("Duplicate deck name");
+    }
+    if (!isDeckColor(deck.color)) {
+      throw new Error("Invalid deck color");
+    }
+    deckIds.add(deck.id);
+    deckNames.add(deckName);
+  }
+
+  const cardIds = new Set<string>();
+  for (const card of snapshot.cards) {
+    if (!deckIds.has(card.deckId)) {
+      throw new Error("Card references missing deck");
+    }
+    if (!card.front.trim()) {
+          throw new Error("Card front is required");
+        }
+        const isCloze = /\{\{c\d+::[^}]+\}\}/.test(card.front);
+        const isImageOcclusion = card.cardType === "image-occlusion";
+        if (!card.back.trim() && !isCloze && !isImageOcclusion) {
+          throw new Error("Card back is required");
+        }
+    if (cardIds.has(card.id)) {
+      throw new Error("Duplicate card id");
+    }
+    if (!isCardState(card.state)) {
+      throw new Error("Invalid card state");
+    }
+    if (!isCardType(card.cardType)) {
+      throw new Error("Invalid card type");
+    }
+    // Numeric field validation: reject NaN, Infinity, negative counters
+    for (const [field, value] of [
+      ["stability", card.stability],
+      ["difficulty", card.difficulty],
+      ["elapsedDays", card.elapsedDays],
+      ["scheduledDays", card.scheduledDays],
+      ["reps", card.reps],
+      ["lapses", card.lapses],
+    ] as const) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(`Card ${card.id}: ${field} must be a finite number`);
+      }
+      if (["reps", "lapses"].includes(field) && value < 0) {
+        throw new Error(`Card ${card.id}: ${field} cannot be negative`);
+      }
+    }
+    // Date validation: nextReviewDate must be valid ISO
+    if (card.nextReviewDate && isNaN(Date.parse(card.nextReviewDate))) {
+      throw new Error(`Card ${card.id}: invalid nextReviewDate`);
+    }
+    if (card.lastReviewDate && isNaN(Date.parse(card.lastReviewDate))) {
+      throw new Error(`Card ${card.id}: invalid lastReviewDate`);
+    }
+    // Tag count limit
+    if (card.tags.length > 50) {
+      throw new Error(`Card ${card.id}: too many tags (max 50)`);
+    }
+    // Field length limits
+    if (card.front.length > 10000) {
+      throw new Error(`Card ${card.id}: front content exceeds 10,000 characters`);
+    }
+    if (card.back.length > 10000) {
+      throw new Error(`Card ${card.id}: back content exceeds 10,000 characters`);
+    }
+    cardIds.add(card.id);
+  }
+
+  const sessionIds = new Set<string>();
+  for (const session of snapshot.studySessions) {
+    if (session.deckId !== null && !deckIds.has(session.deckId)) {
+      throw new Error("Session references missing deck");
+    }
+    if (sessionIds.has(session.id)) {
+      throw new Error("Duplicate session id");
+    }
+    sessionIds.add(session.id);
+  }
+
+  for (const reviewLog of snapshot.reviewLogs) {
+    if (!cardIds.has(reviewLog.cardId)) {
+      throw new Error("Review log references missing card");
+    }
+    if (!isReviewRating(reviewLog.rating)) {
+      throw new Error("Invalid review rating");
+    }
+  }
+}
+
+async function createRecallRepository(): Promise<RecallRepository> {
+  const executor = await getTauriSqlExecutor();
+  return executor ? createSqliteRepository(executor) : new LocalStorageRecallRepository();
+}
+
+class SqliteRecallRepository implements RecallRepository {
+  constructor(private readonly executor: SqlExecutor) {}
+
+  async loadAppData(): Promise<RecallStateSnapshot> {
+      // Load ALL review logs - pruning older logs causes silent data loss
+      // when saveSnapshot() re-inserts only what's in memory.
+      const [deckRows, cardRows, sessionRows, reviewLogRows, settingRows] = await Promise.all([
+        this.executor.select<DeckRow>("SELECT * FROM decks ORDER BY created_at ASC"),
+        this.executor.select<CardRow>("SELECT * FROM cards ORDER BY created_at ASC"),
+        this.executor.select<StudySessionRow>("SELECT * FROM study_sessions ORDER BY started_at ASC"),
+        this.executor.select<ReviewLogRow>(
+          "SELECT * FROM review_logs ORDER BY review_date ASC",
+        ),
+        this.executor.select<SettingRow>("SELECT * FROM settings ORDER BY key ASC"),
+      ]);
+
+      if (deckRows.length === 0) {
+        // Only restore seed data if there are NO settings either.
+        // If settings exist (e.g. user chose "Start Fresh"), respect empty state.
+        if (settingRows.length === 0) {
+          return this.resetToSeedData();
+        }
+        const { snapshot, needsSealMigration } = await unsealSnapshot({
+          decks: [],
+          cards: [],
+          studySessions: [],
+          reviewLogs: [],
+          settings: settingsFromRows(settingRows),
+        });
+        // ponytail: migration rewrite is best-effort; next saveSettings also seals
+        void migratePlaintextSyncCode(this, snapshot, needsSealMigration);
+        return snapshot;
+      }
+
+      const { snapshot, needsSealMigration } = await unsealSnapshot({
+        decks: deckRows.map(deckFromRow),
+        cards: cardRows.map(cardFromRow),
+        studySessions: sessionRows.map(studySessionFromRow),
+        reviewLogs: reviewLogRows.map(reviewLogFromRow),
+        settings: settingsFromRows(settingRows),
+      });
+      validateImportSnapshot(snapshot);
+      void migratePlaintextSyncCode(this, snapshot, needsSealMigration);
+      return snapshot;
+    }
+
+    async loadReviewLogs(since?: string): Promise<ReviewLog[]> {
+      const sql = since
+        ? "SELECT * FROM review_logs WHERE review_date >= ? ORDER BY review_date ASC"
+        : "SELECT * FROM review_logs ORDER BY review_date ASC";
+      const params = since ? [since] : [];
+      const rows = await this.executor.select<ReviewLogRow>(sql, params);
+      return rows.map(reviewLogFromRow);
+    }
+
+    async countReviewLogs(): Promise<number> {
+      const rows = await this.executor.select<{ cnt: number }>(
+        "SELECT COUNT(*) AS cnt FROM review_logs",
+      );
+      return rows[0]?.cnt ?? 0;
+    }
+
+    async saveSnapshot(snapshot: RecallStateSnapshot): Promise<void> {
+      validateImportSnapshot(snapshot);
+      const disk = await sealSnapshotForDisk(snapshot);
+
+      // Tauri runtime: Use Rust atomic command (no fallback - must be atomic for data integrity)
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("save_snapshot_atomic", {
+          data: {
+            decks: disk.decks.map(deckToRow),
+            cards: disk.cards.map(cardToRow),
+            study_sessions: disk.studySessions.map(studySessionToRow),
+            review_logs: disk.reviewLogs.map(reviewLogToRow),
+            settings: settingsToRows(disk.settings),
+          },
+        });
+        return;
+      }
+
+      // Browser/preview mode only: JS transaction (non-atomic, for localStorage/compat)
+      await this.executor.transaction(async (tx) => {
+        await tx.execute("DELETE FROM review_logs");
+        await tx.execute("DELETE FROM study_sessions");
+        await tx.execute("DELETE FROM cards");
+        await tx.execute("DELETE FROM decks");
+        await tx.execute("DELETE FROM settings");
+
+        for (const deck of disk.decks.map(deckToRow)) {
+          await tx.execute(
+            "INSERT INTO decks (id, name, description, color, exam_deadline, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [deck.id, deck.name, deck.description, deck.color, deck.exam_deadline, deck.created_at, deck.updated_at],
+          );
+        }
+
+        for (const card of disk.cards.map(cardToRow)) {
+          await tx.execute(
+            "INSERT INTO cards (id, deck_id, front, back, hint, source, tags, card_type, state, last_review_date, next_review_date, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, learning_steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+              card.id,
+              card.deck_id,
+              card.front,
+              card.back,
+              card.hint,
+              card.source,
+              card.tags,
+              card.card_type,
+              card.state,
+              card.last_review_date,
+              card.next_review_date,
+              card.stability,
+              card.difficulty,
+              card.elapsed_days,
+              card.scheduled_days,
+              card.reps,
+              card.lapses,
+              card.learning_steps,
+              card.created_at,
+              card.updated_at,
+            ],
+          );
+        }
+
+        for (const session of disk.studySessions.map(studySessionToRow)) {
+          await tx.execute(
+            "INSERT INTO study_sessions (id, deck_id, started_at, ended_at, cards_studied) VALUES (?, ?, ?, ?, ?)",
+            [
+              session.id,
+              session.deck_id,
+              session.started_at,
+              session.ended_at,
+              session.cards_studied,
+            ],
+          );
+        }
+
+        for (const reviewLog of disk.reviewLogs.map(reviewLogToRow)) {
+          await tx.execute(
+            "INSERT INTO review_logs (id, card_id, rating, review_date, stability, difficulty, elapsed_days, scheduled_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [reviewLog.id, reviewLog.card_id, reviewLog.rating, reviewLog.review_date, reviewLog.stability, reviewLog.difficulty, reviewLog.elapsed_days, reviewLog.scheduled_days],
+          );
+        }
+
+        for (const setting of settingsToRows(disk.settings)) {
+          await tx.execute("INSERT INTO settings (key, value) VALUES (?, ?)", [setting.key, setting.value]);
+        }
+      });
+    }
+
+    async recordReview(updatedCard: Card, reviewLog: ReviewLog, session: StudySession | null): Promise<void> {
+      const cardRow = cardToRow(updatedCard);
+      const logRow = reviewLogToRow(reviewLog);
+
+      // Tauri runtime: Use Rust atomic command (no fallback - must be atomic for data integrity)
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        const sessionRow = session ? studySessionToRow(session) : null;
+        await invoke("record_review_atomic", {
+          data: {
+            card_id: cardRow.id,
+            state: cardRow.state,
+            last_review_date: cardRow.last_review_date,
+            next_review_date: cardRow.next_review_date,
+            stability: cardRow.stability,
+            difficulty: cardRow.difficulty,
+            elapsed_days: cardRow.elapsed_days,
+            scheduled_days: cardRow.scheduled_days,
+            reps: cardRow.reps,
+            lapses: cardRow.lapses,
+            learning_steps: cardRow.learning_steps,
+            updated_at: cardRow.updated_at,
+            review_log_id: logRow.id,
+            review_card_id: logRow.card_id,
+            rating: logRow.rating,
+            review_date: logRow.review_date,
+            review_stability: logRow.stability,
+            review_difficulty: logRow.difficulty,
+            review_elapsed_days: logRow.elapsed_days,
+            review_scheduled_days: logRow.scheduled_days,
+            session: sessionRow,
+          },
+        });
+        return;
+      }
+
+      // Browser/preview mode only: JS transaction (non-atomic, for localStorage/compat)
+      await this.executor.transaction(async (tx) => {
+        await tx.execute(
+          `UPDATE cards SET state=?, last_review_date=?, next_review_date=?,
+           stability=?, difficulty=?, elapsed_days=?, scheduled_days=?,
+           reps=?, lapses=?, learning_steps=?, updated_at=? WHERE id=?`,
+          [cardRow.state, cardRow.last_review_date, cardRow.next_review_date,
+           cardRow.stability, cardRow.difficulty, cardRow.elapsed_days,
+           cardRow.scheduled_days, cardRow.reps, cardRow.lapses,
+           cardRow.learning_steps, cardRow.updated_at, cardRow.id],
+        );
+        await tx.execute(
+          `INSERT INTO review_logs (id, card_id, rating, review_date,
+           stability, difficulty, elapsed_days, scheduled_days)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [logRow.id, logRow.card_id, logRow.rating, logRow.review_date,
+           logRow.stability, logRow.difficulty, logRow.elapsed_days, logRow.scheduled_days],
+        );
+        if (session) {
+          const sessionRow = studySessionToRow(session);
+          await tx.execute(
+            `INSERT INTO study_sessions (id, deck_id, started_at, ended_at, cards_studied)
+             VALUES (?, ?, ?, ?, ?)`,
+            [sessionRow.id, sessionRow.deck_id, sessionRow.started_at,
+             sessionRow.ended_at, sessionRow.cards_studied],
+          );
+        }
+      });
+    }
+
+    async resetToSeedData(): Promise<RecallStateSnapshot> {
+      const snapshot = createSeedSnapshot();
+      await this.saveSnapshot(snapshot);
+      return snapshot;
+    }
+
+    async replaceDataFromImport(payload: RecallExportPayload): Promise<RecallStateSnapshot> {
+      const snapshot = exportPayloadToSnapshot(payload);
+      validateImportSnapshot(snapshot);
+      // Keep the device's own sync credentials — never trust an import file.
+      const device = await this.loadAppData();
+      snapshot.settings = preserveDeviceSyncSettings(snapshot.settings, device.settings);
+
+      // Create safety backup before destructive import
+      if (isTauriRuntime()) {
+        try {
+          const { invoke } = await import("../shims/tauri");
+          const backupPath = await invoke<string>("create_safety_backup");
+          console.info("Safety backup created:", backupPath);
+        } catch (error) {
+          console.warn("Safety backup failed (continuing with import):", error);
+        }
+      }
+
+      await this.saveSnapshot(snapshot);
+      return snapshot;
+    }
+
+    async mergeDataFromImport(current: RecallStateSnapshot, payload: RecallExportPayload): Promise<RecallStateSnapshot> {
+      validateImportSnapshot(exportPayloadToSnapshot(payload));
+      const snapshot = mergeImportPayload(current, payload);
+      // mergeImportPayload already returns current.settings, but stay defensive.
+      snapshot.settings = preserveDeviceSyncSettings(snapshot.settings, current.settings);
+      validateImportSnapshot(snapshot);
+      await this.saveSnapshot(snapshot);
+      return snapshot;
+    }
+
+    async saveTheme(theme: Theme, current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+      const snapshot = { ...current, settings: { ...current.settings, theme } };
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("upsert_setting_atomic", { setting: { key: "theme", value: theme } });
+      } else {
+        await this.saveSnapshot(snapshot);
+      }
+      return snapshot;
+    }
+
+    async saveSettings(settings: RecallStateSnapshot["settings"], current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+      // In-memory snapshot keeps plaintext syncCode; disk write seals.
+      const snapshot = { ...current, settings };
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        const sealed = await sealSettingsSecrets(settings);
+        const settingRows = settingsToRows(sealed);
+        for (const row of settingRows) {
+          await invoke("upsert_setting_atomic", { setting: row });
+        }
+      } else {
+        await this.saveSnapshot(snapshot);
+      }
+      return snapshot;
+    }
+
+    async upsertDeck(deck: Deck): Promise<void> {
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("upsert_deck_atomic", { deck: deckToRow(deck) });
+      }
+    }
+
+    async upsertCard(card: Card): Promise<void> {
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("upsert_card_atomic", { card: cardToRow(card) });
+      }
+    }
+
+    async deleteDeck(deckId: string): Promise<void> {
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("delete_deck_atomic", { deckId });
+      }
+    }
+
+    async deleteCard(cardId: string): Promise<void> {
+      if (isTauriRuntime()) {
+        const { invoke } = await import("../shims/tauri");
+        await invoke("delete_card_atomic", { cardId });
+      }
+    }
+
+  async deleteCards(cardIds: string[]): Promise<void> {
+    if (cardIds.length === 0) return;
+    if (isTauriRuntime()) {
+      const { invoke } = await import("../shims/tauri");
+      await invoke("delete_cards_atomic", { cardIds });
+    }
+  }
+
+  async moveCards(cardIds: string[], deckId: string): Promise<void> {
+    if (cardIds.length === 0) return;
+    if (isTauriRuntime()) {
+      const { invoke } = await import("../shims/tauri");
+      await invoke("move_cards_to_deck", { cardIds, deckId });
+    }
+  }
+
+  async updateCardsTags(cardIds: string[], tags: string): Promise<void> {
+    if (cardIds.length === 0) return;
+    if (isTauriRuntime()) {
+      const { invoke } = await import("../shims/tauri");
+      await invoke("update_cards_tags", { cardIds, tags });
+    }
+  }
+
+  async updateCardsState(cardIds: string[], state: string): Promise<void> {
+    if (cardIds.length === 0) return;
+    if (isTauriRuntime()) {
+      const { invoke } = await import("../shims/tauri");
+      await invoke("update_cards_state", { cardIds, state });
+    }
+  }
+
+  async upsertCards(cards: Card[]): Promise<void> {
+    if (cards.length === 0) return;
+    if (isTauriRuntime()) {
+      const { invoke } = await import("../shims/tauri");
+      await invoke("upsert_cards_batch", { cards: cards.map(cardToRow) });
+    }
+  }
+
+    async queryCards(filters: { deckId?: string; state?: string; search?: string; sortField: string; sortDir: string; limit: number; offset: number }): Promise<{ cards: Card[]; total: number }> {
+      if (!isTauriRuntime()) {
+        return { cards: [], total: 0 };
+      }
+      const { invoke } = await import("../shims/tauri");
+      const result = await invoke<[Array<Record<string, unknown>>, number]>("query_cards", {
+        deckId: filters.deckId ?? null,
+        state: filters.state ?? null,
+        search: filters.search ?? null,
+        sortField: filters.sortField,
+        sortDir: filters.sortDir,
+        limit: filters.limit,
+        offset: filters.offset,
+      });
+      const [rows, total] = result;
+      const cards = rows.map((row) => cardFromRow(row as unknown as import("../db/mappers").CardRow));
+      return { cards, total };
+    }
+  }
+
+class LocalStorageRecallRepository implements RecallRepository {
+  async recordReview(_updatedCard: Card, _reviewLog: ReviewLog, _session: StudySession | null): Promise<void> {
+    // localStorage can't do targeted updates; only used in tests
+  }
+
+  async loadReviewLogs(since?: string): Promise<ReviewLog[]> {
+    return this.loadAppData().then((s) => {
+      if (!since) return s.reviewLogs;
+      return s.reviewLogs.filter((l) => l.reviewDate >= since);
+    });
+  }
+
+  async countReviewLogs(): Promise<number> {
+    return this.loadAppData().then((s) => s.reviewLogs.length);
+  }
+
+  async loadAppData(): Promise<RecallStateSnapshot> {
+    const existing = loadLocalSnapshot();
+    if (existing) {
+      const { snapshot, needsSealMigration } = await unsealSnapshot(existing);
+      void migratePlaintextSyncCode(this, snapshot, needsSealMigration);
+      return snapshot;
+    }
+
+    return this.resetToSeedData();
+  }
+
+  async saveSnapshot(snapshot: RecallStateSnapshot): Promise<void> {
+    validateImportSnapshot(snapshot);
+    if (typeof localStorage !== "undefined") {
+      const disk = await sealSnapshotForDisk(snapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(disk));
+    }
+  }
+
+  async resetToSeedData(): Promise<RecallStateSnapshot> {
+    const snapshot = createSeedSnapshot();
+    await this.saveSnapshot(snapshot);
+    return snapshot;
+  }
+
+  async replaceDataFromImport(payload: RecallExportPayload): Promise<RecallStateSnapshot> {
+    const snapshot = exportPayloadToSnapshot(payload);
+    validateImportSnapshot(snapshot);
+    await this.saveSnapshot(snapshot);
+    return snapshot;
+  }
+
+  async mergeDataFromImport(current: RecallStateSnapshot, payload: RecallExportPayload): Promise<RecallStateSnapshot> {
+    validateImportSnapshot(exportPayloadToSnapshot(payload));
+    const snapshot = mergeImportPayload(current, payload);
+    validateImportSnapshot(snapshot);
+    await this.saveSnapshot(snapshot);
+    return snapshot;
+  }
+
+  async saveTheme(theme: Theme, current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+    const snapshot = { ...current, settings: { ...current.settings, theme } };
+    await this.saveSnapshot(snapshot);
+    return snapshot;
+  }
+
+  async saveSettings(settings: RecallStateSnapshot["settings"], current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+    const snapshot = { ...current, settings };
+    await this.saveSnapshot(snapshot);
+    return snapshot;
+  }
+
+  // LocalStorage targeted ops: read-modify-write full snapshot (browser/dev mode)
+  async upsertDeck(deck: Deck): Promise<void> {
+    const snapshot = await this.loadAppData();
+    const idx = snapshot.decks.findIndex((d) => d.id === deck.id);
+    if (idx >= 0) snapshot.decks[idx] = deck;
+    else snapshot.decks.push(deck);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async upsertCard(card: Card): Promise<void> {
+    const snapshot = await this.loadAppData();
+    const idx = snapshot.cards.findIndex((c) => c.id === card.id);
+    if (idx >= 0) snapshot.cards[idx] = card;
+    else snapshot.cards.push(card);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async deleteDeck(deckId: string): Promise<void> {
+    const snapshot = await this.loadAppData();
+    snapshot.decks = snapshot.decks.filter((d) => d.id !== deckId);
+    snapshot.cards = snapshot.cards.filter((c) => c.deckId !== deckId);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async deleteCard(cardId: string): Promise<void> {
+    const snapshot = await this.loadAppData();
+    snapshot.cards = snapshot.cards.filter((c) => c.id !== cardId);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async deleteCards(cardIds: string[]): Promise<void> {
+    const idSet = new Set(cardIds);
+    const snapshot = await this.loadAppData();
+    snapshot.cards = snapshot.cards.filter((c) => !idSet.has(c.id));
+    await this.saveSnapshot(snapshot);
+  }
+
+  async moveCards(cardIds: string[], deckId: string): Promise<void> {
+    const idSet = new Set(cardIds);
+    const snapshot = await this.loadAppData();
+    snapshot.cards = snapshot.cards.map((c) => idSet.has(c.id) ? { ...c, deckId } : c);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async upsertCards(cards: Card[]): Promise<void> {
+    const snapshot = await this.loadAppData();
+    const map = new Map(cards.map((c) => [c.id, c]));
+    snapshot.cards = snapshot.cards.map((c) => map.get(c.id) ?? c);
+    await this.saveSnapshot(snapshot);
+  }
+
+  async queryCards(_filters: { deckId?: string; state?: string; search?: string; sortField: string; sortDir: string; limit: number; offset: number }): Promise<{ cards: Card[]; total: number }> {
+    // LocalStorage can't do DB-side queries; fallback to client-side
+    const all = await this.loadAppData();
+    return { cards: all.cards, total: all.cards.length };
+  }
+}
+
+function exportPayloadToSnapshot(payload: RecallExportPayload): RecallStateSnapshot {
+  return {
+    decks: payload.decks,
+    cards: payload.cards,
+    studySessions: payload.studySessions,
+    reviewLogs: payload.reviewLogs,
+    settings: migrateSettings(payload.settings),
+  };
+}
+
+// Sync credentials are per-device secrets — syncCode IS the E2E key.
+// Never let an imported file override them: a crafted .recall could set syncCode
+// + syncRelayUrl + syncEnabled and redirect the user's data to an attacker relay.
+const SYNC_SECRET_KEYS = [
+  "syncFolder",
+  "syncEnabled",
+  "syncCode",
+  "syncRelayUrl",
+  "syncLastAt",
+  "syncAutoInterval",
+] as const satisfies readonly (keyof RecallStateSnapshot["settings"])[];
+
+export function preserveDeviceSyncSettings(
+  imported: RecallStateSnapshot["settings"],
+  device: RecallStateSnapshot["settings"],
+): RecallStateSnapshot["settings"] {
+  const next = { ...imported };
+  for (const key of SYNC_SECRET_KEYS) {
+    // @ts-expect-error indexed copy of known same-typed keys
+    next[key] = device[key];
+  }
+  return next;
+}
+
+function migrateSettings(settings: Partial<RecallStateSnapshot["settings"]> & { theme: string; seededAt: string }): RecallStateSnapshot["settings"] {
+  // If user has existing data (seededAt exists) but no onboardingComplete field,
+  // they're an existing user upgrading - don't show onboarding again
+  const hasExistingData = !!settings.seededAt;
+  const defaultOnboardingComplete = hasExistingData ? true : false;
+
+  return {
+    theme: (settings.theme === "dark" || settings.theme === "light") ? settings.theme : "light",
+    accentColor: (settings.accentColor === "zinc" || settings.accentColor === "blue" || settings.accentColor === "green" || settings.accentColor === "rose" || settings.accentColor === "amber" || settings.accentColor === "violet") ? settings.accentColor : "zinc",
+    dyslexiaFont: typeof settings.dyslexiaFont === "boolean" ? settings.dyslexiaFont : false,
+    seededAt: settings.seededAt,
+    dailyNewCardLimit: typeof settings.dailyNewCardLimit === "number" ? settings.dailyNewCardLimit : 20,
+    leechThreshold: typeof settings.leechThreshold === "number" ? settings.leechThreshold : 5,
+    onboardingComplete: typeof settings.onboardingComplete === "boolean" ? settings.onboardingComplete : defaultOnboardingComplete,
+    xp: typeof settings.xp === "number" ? settings.xp : 0,
+    achievements: Array.isArray(settings.achievements) ? settings.achievements : [],
+    dailyGoal: typeof settings.dailyGoal === "number" ? settings.dailyGoal : 20,
+    notificationsEnabled: typeof settings.notificationsEnabled === "boolean" ? settings.notificationsEnabled : false,
+        soundVolume: typeof settings.soundVolume === "number" ? settings.soundVolume : 100,
+    allowHtml: typeof settings.allowHtml === "boolean" ? settings.allowHtml : false,
+    desiredRetention: typeof settings.desiredRetention === "number" && settings.desiredRetention >= 0.7 && settings.desiredRetention <= 0.99 ? settings.desiredRetention : 0.9,
+        backupFolder: typeof settings.backupFolder === "string" ? settings.backupFolder : null,
+        backupSchedule: (settings.backupSchedule === "daily" || settings.backupSchedule === "weekly") ? settings.backupSchedule : "never",
+                lastBackupAt: typeof settings.lastBackupAt === "string" ? settings.lastBackupAt : null,
+                syncFolder: typeof settings.syncFolder === "string" ? settings.syncFolder : null,
+                syncEnabled: typeof settings.syncEnabled === "boolean" ? settings.syncEnabled : false,
+    syncCode: typeof settings.syncCode === "string" ? settings.syncCode : null,
+    syncRelayUrl: typeof settings.syncRelayUrl === "string" ? settings.syncRelayUrl : null,
+    syncLastAt: typeof settings.syncLastAt === "string" ? settings.syncLastAt : null,
+    syncAutoInterval: typeof settings.syncAutoInterval === "number" ? settings.syncAutoInterval : 0,
+    ttsEnabled: typeof settings.ttsEnabled === "boolean" ? settings.ttsEnabled : false,
+    ttsAutoRead: typeof settings.ttsAutoRead === "boolean" ? settings.ttsAutoRead : false,
+    ttsSpeed: typeof settings.ttsSpeed === "number" && settings.ttsSpeed >= 0.5 && settings.ttsSpeed <= 2.0 ? settings.ttsSpeed : 1.0,
+    fsrsWeights: Array.isArray(settings.fsrsWeights) ? settings.fsrsWeights : null,
+    voiceInputEnabled: typeof settings.voiceInputEnabled === "boolean" ? settings.voiceInputEnabled : true,
+    swipeGestures: typeof settings.swipeGestures === "boolean" ? settings.swipeGestures : true,
+    colorBlindMode: typeof settings.colorBlindMode === "boolean" ? settings.colorBlindMode : false,
+    shortcuts: settings.shortcuts && typeof settings.shortcuts === "object" ? { ...DEFAULT_SHORTCUTS, ...settings.shortcuts } : { ...DEFAULT_SHORTCUTS },
+      };
+}
+
+function loadLocalSnapshot(): RecallStateSnapshot | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const snapshot = JSON.parse(raw) as RecallStateSnapshot;
+        validateImportSnapshot(snapshot);
+        // Migrate settings to fill in fields added after the user's last save
+        snapshot.settings = migrateSettings(snapshot.settings);
+        return snapshot;
+  } catch (error) {
+    // CRITICAL: Don't silently delete corrupted data - user loses everything
+    console.error("Failed to load localStorage data:", error);
+    // Keep corrupted data in localStorage for potential recovery
+    // Return null to trigger seed data load, but user can export/import backup
+    return null;
+  }
+}

@@ -1,11 +1,34 @@
-import { GlassSurface } from "../../components/ui/glass";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
-import PageShell from "../components/PageShell";
-import { GlassTile } from "../../components/ui/glass-tile";
+/**
+ * Daily Test / saved-test player — exam mode in the ported Recall language.
+ *
+ * The business flow is the same one the retired glass player implemented
+ * (migration brief §5A), because it is the flow the backend expects:
+ *
+ *   resume      `#/revision/test/play-attempt/<attemptId>`  → the exact attempt
+ *   saved test  `#/revision/test/play/<testId>`             → start or resume
+ *   daily test  `#/revision/test/play`                      → today's next slot
+ *   completed   → redirects to the result screen
+ *
+ * Answers are persisted per question (`saveTestAnswer`) exactly like before, so
+ * a refresh, a crash or a killed WebView never loses progress; `ExitGuard`
+ * interrupts navigation with the Recall-styled dialog. The learner-facing
+ * presentation is Recall's (its card surfaces, tokens and typography) with the
+ * focused, chrome-free layout the brief asks for on test screens.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
+
+import { Button } from "../recall/components/ui/button";
+import { Progress } from "../recall/components/ui/progress";
+import { cn } from "../recall/lib/utils";
+import { typeClass } from "../recall/lib/surface";
+import { cardSurface } from "../recall/lib/surface";
+import { useTranslation } from "../recall/shims/i18n";
+import { useRevisionRoute } from "../integrations/route-context";
+import { REVISION_DEEP_LINKS } from "../integrations/routes";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { Card, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton, Badge } from "../components/ui";
-import { CheckIcon, ChevronRightIcon, XIcon } from "../components/icons";
-import { lockBodyScroll, unlockBodyScroll, useOverlayBox, type OverlayBoundsRef } from "../../components/ui/overlayBounds";
+import { RecallBadge, RecallCard, RecallError, RecallLoading } from "../components/recall-ui";
+import { useConfirmAction } from "../components/useConfirmAction";
 import {
   getAttemptForPlayer,
   getTodayTestState,
@@ -16,6 +39,7 @@ import {
 } from "../engine/testService";
 import { getCustomTestAttempt, startCustomTestAttempt } from "../engine/customTestService";
 import { ServiceError } from "../engine/store";
+import { refreshRevisionStoreFromLegacy } from "../integrations/storeBridge";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -23,22 +47,30 @@ type PlayerData = ReturnType<typeof getAttemptForPlayer>;
 
 export default function TestPlayerPage({
   uid,
-  route,
   testId = null,
   attemptId: requestedAttemptId = null,
 }: {
   uid: string;
-  route: string;
   testId?: number | null;
   attemptId?: number | null;
 }) {
-  const { navigate, setGuard } = useExitGuard();
+  const { t } = useTranslation();
+  const { navigate } = useRevisionRoute();
+  const { setGuard } = useExitGuard();
+  const { confirm, dialog } = useConfirmAction();
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [redirectAttemptId, setRedirectAttemptId] = useState<number | null>(null);
   const [loadKey, setLoadKey] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selections, setSelections] = useState<Record<number, number | null>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const initializedAttemptRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
+  /* ── Load: resolve the attempt exactly like the legacy player ─────────── */
   useEffect(() => {
     try {
       if (requestedAttemptId) {
@@ -47,7 +79,6 @@ export default function TestPlayerPage({
         return;
       }
       if (testId) {
-        // Custom (user-generated) test: play this exact test.
         const existing = getCustomTestAttempt(uid, testId);
         if (existing?.status === "completed") {
           setRedirectAttemptId(existing.id);
@@ -66,422 +97,312 @@ export default function TestPlayerPage({
       const attempt = startOrResumeAttempt(uid);
       setPlayerData(getAttemptForPlayer(uid, attempt.id));
       setLoadError(null);
-    } catch (err) {
-      setLoadError(err instanceof ServiceError ? err.message : "We couldn't load the test. Please try again.");
+    } catch (error) {
+      setLoadError(
+        error instanceof ServiceError ? error.message : "We couldn't load the test. Please try again.",
+      );
     }
   }, [uid, loadKey, requestedAttemptId, testId]);
 
   useEffect(() => {
-    if (redirectAttemptId) {
-      navigate(`#/revision/test/result/${redirectAttemptId}`);
-    }
+    if (redirectAttemptId) navigate(REVISION_DEEP_LINKS.testResult(redirectAttemptId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redirectAttemptId]);
 
-  const attemptId = playerData?.attempt.id;
-
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selections, setSelections] = useState<Record<number, number | null>>({});
-  const [mode, setMode] = useState<"question" | "review">("question");
-  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const initializedAttemptRef = useRef<number | null>(null);
-  const touchStartXRef = useRef<number | null>(null);
-
   useEffect(() => {
-    if (playerData && initializedAttemptRef.current !== playerData.attempt.id) {
-      initializedAttemptRef.current = playerData.attempt.id;
-      setCurrentIndex(playerData.attempt.currentIndex ?? 0);
-      const initSel: Record<number, number | null> = {};
-      playerData.questions.forEach((q) => {
-        initSel[q.id] = q.selectedIndex;
-      });
-      setSelections(initSel);
-    }
+    if (!playerData) return;
+    if (initializedAttemptRef.current === playerData.attempt.id) return;
+    initializedAttemptRef.current = playerData.attempt.id;
+    setCurrentIndex(playerData.attempt.currentIndex ?? 0);
+    const initial: Record<number, number | null> = {};
+    playerData.questions.forEach((question) => {
+      initial[question.id] = question.selectedIndex;
+    });
+    setSelections(initial);
   }, [playerData]);
 
+  /* ── The business safeguard, rendered in Recall style ─────────────────── */
   useEffect(() => {
     setGuard({
-      message: "Your progress is saved automatically. You can continue this test anytime from the dashboard.",
-      confirmLabel: "Exit Test",
+      message: "Your progress is saved automatically. You can continue this test anytime from the Test Bank.",
+      confirmLabel: "Exit test",
     });
     return () => setGuard(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setGuard]);
 
-  const questions = useMemo(() => playerData?.questions ?? [], [playerData]);
+  const questions = playerData?.questions ?? [];
   const total = questions.length;
   const question = questions[currentIndex];
-  const answeredCount = Object.values(selections).filter((v) => v !== null && v !== undefined).length;
-  const unansweredCount = total - answeredCount;
+  const answeredCount = Object.values(selections).filter((value) => value !== null && value !== undefined).length;
+
+  const persistSelection = useCallback(
+    (questionId: number, selectedIndex: number | null) => {
+      if (!playerData) return;
+      try {
+        saveTestAnswer(uid, playerData.attempt.id, questionId, selectedIndex);
+      } catch (error) {
+        console.warn("[revision] could not save answer", error);
+      }
+    },
+    [playerData, uid],
+  );
+
+  const goTo = useCallback(
+    (index: number) => {
+      if (!playerData) return;
+      const clamped = Math.max(0, Math.min(total - 1, index));
+      setCurrentIndex(clamped);
+      try {
+        updateAttemptIndex(uid, playerData.attempt.id, clamped);
+      } catch (error) {
+        console.warn("[revision] could not save index", error);
+      }
+    },
+    [playerData, total, uid],
+  );
+
+  const submit = useCallback(async () => {
+    if (!playerData) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      submitTestAttempt(uid, playerData.attempt.id);
+      // A finished test feeds the revision bank + Weak Topics; refresh the
+      // ported store so the change is visible without a reload.
+      void refreshRevisionStoreFromLegacy(uid);
+      navigate(REVISION_DEEP_LINKS.testResult(playerData.attempt.id));
+    } catch (error) {
+      setSubmitError(error instanceof ServiceError ? error.message : "Could not submit the test.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [navigate, playerData, uid]);
+
+  const onTouchStart = (event: ReactTouchEvent) => {
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+  const onTouchEnd = (event: ReactTouchEvent) => {
+    const start = touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (start === null) return;
+    const end = event.changedTouches[0]?.clientX ?? start;
+    const delta = end - start;
+    if (Math.abs(delta) < 60) return;
+    if (delta < 0) goTo(currentIndex + 1);
+    else goTo(currentIndex - 1);
+  };
+
+  const unanswered = useMemo(
+    () => questions.filter((item) => selections[item.id] === null || selections[item.id] === undefined).length,
+    [questions, selections],
+  );
 
   if (redirectAttemptId) {
     return (
-      <PageShell route={route} title="Daily Test" backHref="#/revision" hideNav>
-        <FullScreenLoader label="Loading your results…" />
-      </PageShell>
+      <div className="py-16">
+        <RecallLoading label="Opening your result…" />
+      </div>
     );
   }
 
   if (loadError) {
     return (
-      <PageShell route={route} title="Daily Test" backHref="#/revision" hideNav>
-        <ErrorState message={loadError} onRetry={() => setLoadKey((k) => k + 1)} />
-      </PageShell>
-    );
-  }
-
-  if (!playerData) {
-    return (
-      <PageShell route={route} title="Daily Test" backHref="#/revision" hideNav>
-        <FullScreenLoader label="Preparing today's test…" />
-      </PageShell>
-    );
-  }
-
-  const { dailyTest } = playerData;
-
-  function persistIndex(idx: number) {
-    setCurrentIndex(idx);
-    if (attemptId) {
-      try {
-        updateAttemptIndex(uid, attemptId, idx);
-      } catch {
-        // Best-effort — position persistence must never block navigation.
-      }
-    }
-  }
-
-  function selectOption(optionIdx: number) {
-    if (!question || !attemptId) return;
-    setSelections((prev) => ({ ...prev, [question.id]: optionIdx }));
-    try {
-      saveTestAnswer(uid, attemptId, question.id, optionIdx);
-      updateAttemptIndex(uid, attemptId, currentIndex);
-    } catch {
-      // Answer stays in local UI state; submit fills any gap as skipped.
-    }
-  }
-
-  function goNext() {
-    if (currentIndex < total - 1) {
-      persistIndex(currentIndex + 1);
-    } else {
-      setMode("review");
-    }
-  }
-
-  function goPrev() {
-    if (currentIndex > 0) persistIndex(currentIndex - 1);
-  }
-
-  function handleSubmit() {
-    if (!attemptId) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      submitTestAttempt(uid, attemptId);
-      setGuard(null);
-      navigate(`#/revision/test/result/${attemptId}`);
-    } catch {
-      setSubmitError("Could not submit your test. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function onTouchStart(e: ReactTouchEvent) {
-    touchStartXRef.current = e.touches[0].clientX;
-  }
-  function onTouchEnd(e: ReactTouchEvent) {
-    if (touchStartXRef.current === null) return;
-    const delta = e.changedTouches[0].clientX - touchStartXRef.current;
-    touchStartXRef.current = null;
-    if (Math.abs(delta) < 60) return;
-    if (delta > 0) goPrev();
-    else goNext();
-  }
-
-  if (mode === "review") {
-    return (
-      <PageShell route={route} title="Review & Submit" subtitle={`${answeredCount} of ${total} answered`} backHref="#/revision" hideNav>
-        <ReviewBeforeSubmit
-          questions={questions}
-          selections={selections}
-          onJump={(idx) => {
-            setCurrentIndex(idx);
-            setMode("question");
-          }}
-          onBack={() => setMode("question")}
-          onSubmit={() => setShowSubmitConfirm(true)}
+      <div className="mx-auto max-w-xl py-10">
+        <RecallError
+          title="This test can't be opened"
+          body={loadError}
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onClick={() => setLoadKey((key) => key + 1)}>
+                Try again
+              </Button>
+              <Button variant="ghost" onClick={() => navigate(REVISION_DEEP_LINKS.testBank)}>
+                Back to the Test Bank
+              </Button>
+            </div>
+          }
         />
-        {showSubmitConfirm && (
-          <SubmitConfirmModal
-            unansweredCount={unansweredCount}
-            submitting={submitting}
-            errorMessage={submitError}
-            onCancel={() => setShowSubmitConfirm(false)}
-            onConfirm={handleSubmit}
-          />
-        )}
-      </PageShell>
+      </div>
     );
   }
 
-  return (
-    <PageShell route={route} title={dailyTest.title} subtitle={`Question ${currentIndex + 1} of ${total}`} backHref="#/revision" hideNav>
-      <div className="flex h-full flex-col">
-        <div className="px-4 pt-3">
-          <ProgressBar value={((currentIndex + 1) / total) * 100} />
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          {question && (
-            /* The question lives in the shared revision Card — the same pattern
-               TestReview uses — so the prompt, the answer tiles and the skip
-               action sit on the plated surface instead of bare on the scene. */
-            <Card key={question.id} className="animate-fade-in">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
-                  {question.subjectIcon} {question.subjectName} · {question.topicName}
-                </span>
-              </div>
-              <h2 className="text-[19px] font-semibold leading-snug text-white">{question.prompt}</h2>
-
-              <div className="mt-5 space-y-3">
-                {question.options.map((opt, idx) => {
-                  const selected = selections[question.id] === idx;
-                  return (
-                    /* Wave 13: answer options are the pack GlassTile — the
-                       selected state (ring + tint) comes from the pack; indigo
-                       ink marks the chosen answer. */
-                    <GlassTile
-                      key={idx}
-                      onClick={() => selectOption(idx)}
-                      selected={selected}
-                      className={`dc-tile aspect-auto min-h-[56px] w-full px-4 py-3 text-left text-[15px] font-medium [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
-                        selected ? "text-indigo-200" : "text-white/85"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "border border-white/20 text-white/75"
-                        }`}
-                      >
-                        {OPTION_LETTERS[idx]}
-                      </span>
-                      <span className="flex-1">{opt}</span>
-                    </GlassTile>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-white/55 active:text-white/75"
-              >
-                Skip this question
-              </button>
-            </Card>
-          )}
-        </div>
-
-        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
-          <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
-            Previous
-          </SecondaryButton>
-          <PrimaryButton onClick={goNext} className="flex-[1.4]">
-            {currentIndex === total - 1 ? "Review & Submit" : "Next"}
-            <ChevronRightIcon className="h-4 w-4" />
-          </PrimaryButton>
-        </div>
+  if (!playerData || !question) {
+    return (
+      <div className="py-16">
+        <RecallLoading label="Preparing your test…" />
       </div>
-    </PageShell>
-  );
-}
+    );
+  }
 
-function ReviewBeforeSubmit({
-  questions,
-  selections,
-  onJump,
-  onBack,
-  onSubmit,
-}: {
-  questions: PlayerData["questions"];
-  selections: Record<number, number | null>;
-  onJump: (idx: number) => void;
-  onBack: () => void;
-  onSubmit: () => void;
-}) {
+  const progressPercent = total === 0 ? 0 : ((currentIndex + 1) / total) * 100;
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {/* The review grid lives in the shared revision Card, so the answer map
-            and its legend sit on the plated surface instead of bare on the scene. */}
-        <Card>
-        <p className="mb-4 text-sm text-white/75">
-          Tap any question to jump back and change your answer before you submit.
-        </p>
-        <div className="grid grid-cols-5 gap-2.5">
-          {questions.map((q, idx) => {
-            const answered = selections[q.id] !== null && selections[q.id] !== undefined;
+    <div className="mx-auto w-full max-w-2xl px-4 py-4 sm:px-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {/* Focused test header: no app chrome while a test is open (§22). */}
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(REVISION_DEEP_LINKS.testBank)}
+          className={cn(typeClass.caption, "rounded-full px-3 py-1.5 text-on-surface-variant hover:bg-surface-container-low")}
+        >
+          ← Test Bank
+        </button>
+        <div className="flex items-center gap-2">
+          <RecallBadge tone="brand">
+            {currentIndex + 1} / {total}
+          </RecallBadge>
+          <RecallBadge>{answeredCount} answered</RecallBadge>
+        </div>
+      </header>
+
+      <Progress value={progressPercent} className="mb-4" />
+
+      <RecallCard className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {question.subjectIcon ? <span aria-hidden>{question.subjectIcon}</span> : null}
+          <span className={cn(typeClass.caption, "text-on-surface-variant")}>
+            {question.subjectName} · {question.topicName}
+          </span>
+          <RecallBadge
+            tone={question.difficulty === "hard" ? "danger" : question.difficulty === "medium" ? "warning" : "success"}
+          >
+            {question.difficulty}
+          </RecallBadge>
+        </div>
+
+        <p className={cn(typeClass["title-md"], "whitespace-pre-wrap")}>{question.prompt}</p>
+
+        <ul className="space-y-2">
+          {question.options.map((option, index) => {
+            const selected = selections[question.id] === index;
             return (
-              <GlassTile
-                key={q.id}
-                onClick={() => onJump(idx)}
-                className={`dc-tile aspect-auto h-12 rounded-xl text-sm font-bold ${
-                  answered
-                    ? "ring-1 ring-indigo-400/50 text-indigo-200"
-                    : "ring-1 ring-amber-400/50 text-amber-200"
-                }`}
+              <li key={index}>
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    const next = selected ? null : index;
+                    setSelections((previous) => ({ ...previous, [question.id]: next }));
+                    persistSelection(question.id, next);
+                  }}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                    selected
+                      ? "border-primary bg-primary-soft text-on-primary-container"
+                      : "border-outline-variant bg-surface hover:bg-surface-container-low",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
+                      selected ? "border-primary bg-primary text-primary-foreground" : "border-outline-variant",
+                    )}
+                  >
+                    {OPTION_LETTERS[index] ?? index + 1}
+                  </span>
+                  <span className={cn(typeClass["body-md"], "min-w-0 flex-1 whitespace-pre-wrap")}>{option}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button variant="outline" disabled={currentIndex === 0} onClick={() => goTo(currentIndex - 1)}>
+            Previous
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelections((previous) => ({ ...previous, [question.id]: null }));
+                persistSelection(question.id, null);
+              }}
+            >
+              Skip
+            </Button>
+            {currentIndex < total - 1 ? (
+              <Button onClick={() => goTo(currentIndex + 1)}>Next</Button>
+            ) : (
+              <Button
+                onClick={() =>
+                  confirm({
+                    title: "Submit this test?",
+                    body:
+                      unanswered > 0
+                        ? `${unanswered} question${unanswered === 1 ? "" : "s"} unanswered will be marked skipped.`
+                        : "Every question is answered.",
+                    confirmLabel: "Submit",
+                    onConfirm: submit,
+                  })
+                }
               >
-                {idx + 1}
-              </GlassTile>
+                Submit
+              </Button>
+            )}
+          </div>
+        </div>
+      </RecallCard>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className={cn(typeClass.caption, "text-on-surface-variant")}>
+          {t("study.swipeHint", "Swipe left or right to move between questions.")}
+        </p>
+        <Button
+          variant="ghost"
+          className="text-error"
+          disabled={submitting}
+          onClick={() =>
+            confirm({
+              title: "Submit early?",
+              body: unanswered > 0 ? `${unanswered} unanswered question(s) will be marked skipped.` : undefined,
+              confirmLabel: "Submit",
+              tone: "destructive",
+              onConfirm: submit,
+            })
+          }
+        >
+          {submitting ? "Submitting…" : "Submit test"}
+        </Button>
+      </div>
+
+      {submitError ? (
+        <p className={cn(typeClass.caption, "mt-3 text-error")} role="alert">
+          {submitError}
+        </p>
+      ) : null}
+
+      {/* Question jump grid — the old player's index strip, in Recall chips. */}
+      <details className="mt-5">
+        <summary className={cn(typeClass.caption, "cursor-pointer text-on-surface-variant")}>
+          Jump to a question
+        </summary>
+        <div className={cn(cardSurface("mt-2 flex flex-wrap gap-2 p-3"))}>
+          {questions.map((item, index) => {
+            const answered = selections[item.id] !== null && selections[item.id] !== undefined;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={`Question ${index + 1}`}
+                onClick={() => goTo(index)}
+                className={cn(
+                  "h-8 w-8 rounded-lg border text-xs font-semibold",
+                  index === currentIndex
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : answered
+                      ? "border-tertiary bg-tertiary-container text-on-tertiary-container"
+                      : "border-outline-variant text-on-surface-variant",
+                )}
+              >
+                {index + 1}
+              </button>
             );
           })}
         </div>
-        <div className="mt-5 flex items-center gap-4 text-xs font-medium text-white/75">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Answered
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Unanswered
-          </span>
-        </div>
-        </Card>
-      </div>
-        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
-        <SecondaryButton onClick={onBack} className="flex-1">
-          Back
-        </SecondaryButton>
-        <PrimaryButton onClick={onSubmit} className="flex-1">
-          Submit Test
-        </PrimaryButton>
-      </div>
-    </div>
-  );
-}
+      </details>
 
-function SubmitConfirmModal({
-  unansweredCount,
-  submitting,
-  errorMessage,
-  onCancel,
-  onConfirm,
-}: {
-  unansweredCount: number;
-  submitting: boolean;
-  errorMessage: string | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const boundsRef = useRef<HTMLElement | null>(null);
-  const [boundsReady, setBoundsReady] = useState(false);
-
-  // Resolve the column the overlay must stay inside (the page's own
-  // scroller, falling back to the revision content column). Re-queried on
-  // every mount — and retried one frame later when the page shell has not
-  // committed its <main> yet — so a missing element can never silently
-  // downgrade the overlay to the full-window fallback on tablet/desktop.
-  useLayoutEffect(() => {
-    const resolve = () => {
-      boundsRef.current =
-        document.querySelector<HTMLElement>("[data-revision-page-main]") ??
-        document.querySelector<HTMLElement>("[data-revision-content]") ??
-        null;
-      return boundsRef.current !== null;
-    };
-    if (!resolve()) {
-      const raf = requestAnimationFrame(() => {
-        resolve();
-        setBoundsReady(true);
-      });
-      return () => cancelAnimationFrame(raf);
-    }
-    setBoundsReady(true);
-  }, []);
-
-  const { scoped, box } = useOverlayBox(boundsReady, boundsRef as OverlayBoundsRef);
-  const isScoped = scoped && box !== null;
-
-  useEffect(() => {
-    lockBodyScroll();
-    return () => unlockBodyScroll();
-  }, []);
-
-  // Defensive clamp: even if a measurement is stale or degenerate, the
-  // overlay must never extend below the visible viewport — the dialog
-  // stays fully on screen without any scrolling on every tablet and
-  // desktop size.
-  const overlayHeight =
-    isScoped && box
-      ? Math.max(0, Math.min(box.height, window.innerHeight - box.top))
-      : undefined;
-
-  return (
-    <div
-      data-rev-submit-overlay
-      className={
-        isScoped && box
-          ? "fixed z-[90] flex items-center justify-center p-3 sm:p-4"
-          : "fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4"
-      }
-      style={
-        isScoped && box
-          ? { top: box.top, left: box.left, width: box.width, height: overlayHeight }
-          : undefined
-      }
-    >
-      <div
-        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] ${isScoped ? "rounded-[1.5rem]" : ""}`}
-        onClick={submitting ? undefined : onCancel}
-        aria-hidden="true"
-      />
-      <GlassSurface
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="rev-submit-title"
-        data-rev-submit-dialog
-        tint={0.5}
-        radius={24}
-        className="dc-scene-plate custom-scrollbar relative w-full max-w-[min(100%,26rem)] overflow-hidden text-white"
-        contentClassName="flex flex-col p-5 sm:p-6"
-        style={{
-          maxHeight: isScoped && box ? "100%" : undefined,
-          paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
-        }}
-      >
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/30 sm:hidden" />
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-300">
-          <CheckIcon className="h-7 w-7" />
-        </div>
-        <h3 id="rev-submit-title" className="text-center text-base font-semibold text-white sm:text-lg">Submit your test?</h3>
-        {unansweredCount > 0 ? (
-          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
-            You have <span className="font-semibold text-amber-300">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
-            that will be marked as skipped. This can&apos;t be undone.
-          </p>
-        ) : (
-          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
-            All questions are answered. Once submitted, you can&apos;t change your answers.
-          </p>
-        )}
-        {errorMessage && (
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-rose-300">
-            <XIcon className="h-3.5 w-3.5" /> {errorMessage}
-          </p>
-        )}
-        <div className="mt-5 flex min-w-0 gap-3">
-          <SecondaryButton onClick={onCancel} disabled={submitting} className="min-w-0 flex-1">
-            Keep Reviewing
-          </SecondaryButton>
-          <PrimaryButton onClick={onConfirm} disabled={submitting} className="min-w-0 flex-1">
-            {submitting ? "Submitting…" : "Submit"}
-          </PrimaryButton>
-        </div>
-      </GlassSurface>
+      {dialog}
     </div>
   );
 }

@@ -1,172 +1,190 @@
+/**
+ * Progress — the score/accuracy report over time.
+ *
+ * `statsService.getProgressData` is unchanged: totals, daily/weekly/monthly
+ * buckets, the accuracy trend across the last 15 completed tests and the
+ * activity history. Rendered in the ported Recall language (stat surfaces,
+ * progress bars, list rows) and linked to the ported Stats screen, which covers
+ * the memory side (retention, heatmap, workload forecast) that this report does
+ * not.
+ */
+
 import { useMemo, useState } from "react";
-import PageShell from "../components/PageShell";
-import { Card, EmptyState } from "../components/ui";
-import { GlassCard } from "../../components/ui/GlassCard";
-import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
-import { ChartIcon, CheckIcon, FlameIcon, SparklesIcon, TrophyIcon, XIcon } from "../components/icons";
+
+import { Button } from "../recall/components/ui/button";
+import { cn } from "../recall/lib/utils";
+import { typeClass } from "../recall/lib/surface";
+import { useRevisionRoute } from "../integrations/route-context";
+import { REVISION_DEEP_LINKS } from "../integrations/routes";
+import { RecallBadge, RecallCard, RecallEmpty, RecallPage, RecallProgress, RecallRow, RecallStat, SectionTitle } from "../components/recall-ui";
 import { getProgressData } from "../engine/statsService";
 
-type RangeTab = "daily" | "weekly" | "monthly";
+type Range = "daily" | "weekly" | "monthly";
 
-const RANGE_TABS: { value: RangeTab; label: string }[] = [
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-];
+export default function ProgressPage({ uid }: { uid: string }) {
+  const { navigate } = useRevisionRoute();
+  const [range, setRange] = useState<Range>("daily");
+  const [error, setError] = useState<string | null>(null);
 
-function BarChart({ data }: { data: { label: string; accuracy: number; attempted: number }[] }) {
-  const hasAny = data.some((d) => d.attempted > 0);
-  if (!hasAny) {
+  const data = useMemo(() => {
+    try {
+      return getProgressData(uid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not compute your progress.");
+      return null;
+    }
+  }, [uid]);
+
+  if (!data) {
     return (
-      <div className="py-6 text-center">
-        <p className="text-sm font-medium text-white/55">No attempts in this period yet.</p>
-        <p className="mt-0.5 text-[11px] text-white/55">Complete a test or revision session to see your activity bars.</p>
-      </div>
+      <RecallPage title="Progress" onBack={() => navigate(REVISION_DEEP_LINKS.dashboard)}>
+        <RecallCard>
+          <p className={cn(typeClass["body-md"], "text-on-surface-variant")}>
+            {error ?? "Could not compute your progress yet."}
+          </p>
+        </RecallCard>
+      </RecallPage>
     );
   }
-  const max = Math.max(...data.map((d) => d.attempted), 1);
-  return (
-    <div className="flex h-40 items-end gap-1.5 sm:gap-2">
-      {data.map((d, i) => {
-        const heightPct = d.attempted === 0 ? 4 : Math.max(8, (d.attempted / max) * 100);
-        return (
-          <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
-            <div className="flex h-32 w-full items-end">
-              <div
-                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "border border-white/15" : "bg-indigo-600"}`}
-                style={{ height: `${heightPct}%` }}
-                title={`${d.attempted} attempted · ${d.accuracy}% accuracy`}
-              />
-            </div>
-            <span className="w-full truncate text-center text-[9px] font-medium text-white/55">{d.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
-function Sparkline({ points }: { points: { date: string; score: number }[] }) {
-  const safe = points.filter((p) => Number.isFinite(Number(p.score)));
-  if (safe.length === 0) {
-    return (
-      <div className="py-6 text-center">
-        <p className="text-sm font-medium text-white/55">No completed tests yet.</p>
-        <p className="mt-0.5 text-[11px] text-white/55">Your score trend will appear here after your first test.</p>
+  const buckets = range === "daily" ? data.daily : range === "weekly" ? data.weekly : data.monthly;
+  const maxAttempted = Math.max(1, ...buckets.map((bucket) => bucket.attempted));
+
+  return (
+    <RecallPage
+      title="Progress"
+      subtitle="Scores and accuracy across your daily tests and revision sessions."
+      onBack={() => navigate(REVISION_DEEP_LINKS.dashboard)}
+      actions={
+        <>
+          <Button variant="outline" onClick={() => navigate(REVISION_DEEP_LINKS.stats)}>
+            Recall stats
+          </Button>
+          <Button variant="ghost" onClick={() => navigate(REVISION_DEEP_LINKS.weakTopics)}>
+            Weak Topics
+          </Button>
+        </>
+      }
+    >
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <RecallStat label="Overall accuracy" value={`${data.totals.overallAccuracy}%`} tone="brand" />
+        <RecallStat label="Tests completed" value={data.totals.testsCompleted} />
+        <RecallStat label="Questions answered" value={data.totals.questionsAttempted} />
+        <RecallStat label="Day streak" value={data.totals.currentStreak} tone="motivation" />
       </div>
-    );
-  }
-  const width = 300;
-  const height = 80;
-  const stepX = safe.length > 1 ? width / (safe.length - 1) : 0;
-  const coords = safe.map((p, i) => {
-    const x = safe.length > 1 ? i * stepX : width / 2;
-    const y = height - (Math.max(0, Math.min(100, Number(p.score))) / 100) * height;
-    return `${x},${y}`;
-  });
-  return (
-    <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full overflow-visible">
-        <polyline points={coords.join(" ")} fill="none" stroke="#4f46e5" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {safe.map((p, i) => {
-          const x = safe.length > 1 ? i * stepX : width / 2;
-          const y = height - (Math.max(0, Math.min(100, Number(p.score))) / 100) * height;
-          return <circle key={i} cx={x} cy={y} r={3} fill="#4f46e5" />;
-        })}
-      </svg>
-      <div className="mt-1 flex justify-between text-[10px] font-medium text-white/55">
-        <span>{safe[0]?.date}</span>
-        <span>{safe[safe.length - 1]?.date}</span>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <RecallStat label="Correct" value={data.totals.questionsCorrect} tone="success" />
+        <RecallStat label="Incorrect" value={data.totals.questionsIncorrect} />
+        <RecallStat label="Sessions" value={data.totals.revisionSessionsCompleted} />
+        <RecallStat label="Mastered questions" value={data.totals.masteredCount} tone="success" />
       </div>
-    </div>
-  );
-}
 
-export default function ProgressPage({ uid, route }: { uid: string; route: string }) {
-  const [range, setRange] = useState<RangeTab>("daily");
-  const data = useMemo(() => getProgressData(uid), [uid]);
-
-  const chartData = range === "daily" ? data.daily : range === "weekly" ? data.weekly : data.monthly;
-
-  return (
-    <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
-      <div data-rev-layout="progress" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
-        <div data-rev-panel="primary" className="lg:col-span-4 lg:space-y-3"><div data-rev-total-grid className="grid grid-cols-2 gap-2.5 lg:gap-2">
-          <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-300" />} label="Tests Completed" value={data.totals.testsCompleted} />
-          <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-300" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
-          <TotalCard icon={<SparklesIcon className="h-5 w-5 text-sky-300" />} label="Questions Attempted" value={data.totals.questionsAttempted} />
-          <TotalCard icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Incorrect Answers" value={data.totals.questionsIncorrect} />
-          <TotalCard icon={<TrophyIcon className="h-5 w-5 text-amber-300" />} label="Mastered" value={data.totals.masteredCount} />
-          <TotalCard icon={<FlameIcon className="h-5 w-5 text-orange-300" />} label="Current Streak" value={`${data.totals.currentStreak}d`} />
-        </div></div>
-
-        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-8 lg:space-y-3">
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Activity</h2>
-            <GlassToggleGroup value={range} onValueChange={(next) => setRange(next as RangeTab)} aria-label="Activity range" className="dc-segment dc-scene-plate text-xs font-semibold">
-              {RANGE_TABS.map((r) => (
-                <GlassToggleItem key={r.value} value={r.value} className="min-h-[30px] px-3">
-                  {r.label}
-                </GlassToggleItem>
-              ))}
-            </GlassToggleGroup>
-          </div>
-          {/* `key={range}` remounts the chart on tab change so the exit/enter
-              of swapped bars can't flicker on mobile compositing. */}
-          <div key={range} className="animate-fade-in">
-            <BarChart data={chartData} />
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-2 text-[15px] font-bold text-white">Recent Test Score Trend</h2>
-          <Sparkline points={data.accuracyTrend} />
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 text-[15px] font-bold text-white">Activity History</h2>
-          {data.activityHistory.length === 0 ? (
-            <EmptyState title="No activity yet" description="Complete a test or revision session to see it here." />
-          ) : (
-            <div className="space-y-3">
-              {data.activityHistory.map((a, idx) => (
-                <div key={`${a.type}-${a.refId}-${idx}`} className="flex items-start gap-3">
-                  <div
-                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl  ${
-                      a.type === "test" ? "bg-indigo-500/20 text-indigo-200" : "bg-emerald-500/20 text-emerald-200"
-                    }`}
-                  >
-                    {a.type === "test" ? <ChartIcon className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
+      {data.totals.questionsAttempted === 0 ? (
+        <RecallEmpty
+          icon="📈"
+          title="Nothing to chart yet"
+          body="Your first Daily Test is enough to start this report."
+          action={<Button onClick={() => navigate(REVISION_DEEP_LINKS.testPlay())}>Start today's test</Button>}
+        />
+      ) : (
+        <>
+          <section>
+            <SectionTitle
+              hint={
+                <span className="flex gap-1">
+                  {(["daily", "weekly", "monthly"] as Range[]).map((candidate) => (
+                    <button
+                      key={candidate}
+                      type="button"
+                      onClick={() => setRange(candidate)}
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-xs font-semibold capitalize",
+                        range === candidate
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-surface-container-high text-on-surface-variant",
+                      )}
+                    >
+                      {candidate}
+                    </button>
+                  ))}
+                </span>
+              }
+            >
+              Activity
+            </SectionTitle>
+            <RecallCard className="space-y-3">
+              {buckets.map((bucket) => (
+                <div key={bucket.date} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn(typeClass.caption, "text-on-surface-variant")}>{bucket.label}</span>
+                    <span className={cn(typeClass.caption, "tabular-nums")}>
+                      {bucket.correct}/{bucket.attempted} · {bucket.accuracy}%
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white/85">{a.title}</p>
-                    <p className="text-xs text-white/55">{a.detail}</p>
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${(bucket.attempted / maxAttempted) * 100}%` }}
+                    />
                   </div>
-                  <span className="shrink-0 text-[11px] font-semibold text-white/55">
-                    {a.date ? new Date(a.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
-                  </span>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+                    <div
+                      className="h-full rounded-full bg-tertiary"
+                      style={{ width: `${bucket.accuracy}%` }}
+                    />
+                  </div>
                 </div>
               ))}
-            </div>
-          )}
-        </Card>
-        </div>
-      </div>
-    </PageShell>
-  );
-}
+            </RecallCard>
+          </section>
 
-function TotalCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
-  return (
-    /* Wave 13: `.rev-card` paints nothing on its own — the total tile is the
-       pack GlassCard. */
-    <GlassCard className="rev-card dc-rev-glass" contentClassName="flex items-center gap-3 p-3 lg:p-2.5">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <span className="block truncate text-lg font-bold leading-tight text-white">{value}</span>
-        <span className="block truncate text-[11px] font-medium text-white/55">{label}</span>
+          <section className="mt-6">
+            <SectionTitle hint="last 15 completed tests">Accuracy trend</SectionTitle>
+            <RecallCard className="space-y-2">
+              {data.accuracyTrend.length === 0 ? (
+                <p className={cn(typeClass["body-md"], "text-on-surface-variant")}>No completed tests yet.</p>
+              ) : (
+                data.accuracyTrend.map((point, index) => (
+                  <div key={`${point.date}-${index}`} className="flex items-center gap-3">
+                    <span className={cn(typeClass.caption, "w-14 shrink-0 text-on-surface-variant")}>{point.date}</span>
+                    <span className="flex-1">
+                      <RecallProgress value={point.score} />
+                    </span>
+                    <span className={cn(typeClass.caption, "w-10 shrink-0 text-right tabular-nums")}>{point.score}%</span>
+                  </div>
+                ))
+              )}
+            </RecallCard>
+          </section>
+
+          <section className="mt-6">
+            <SectionTitle hint={`${data.activityHistory.length} entries`}>Recent activity</SectionTitle>
+            <ul className="space-y-2">
+              {data.activityHistory.map((entry) => (
+                <li key={`${entry.type}-${entry.refId}`}>
+                  <RecallRow
+                    icon={entry.type === "test" ? "📝" : "🔁"}
+                    title={entry.title}
+                    meta={`${new Date(entry.date).toLocaleDateString()} · ${entry.detail}`}
+                    onClick={() =>
+                      navigate(
+                        entry.type === "test"
+                          ? REVISION_DEEP_LINKS.testResult(entry.refId)
+                          : REVISION_DEEP_LINKS.sessionResult(entry.refId),
+                      )
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+
+      <div className="mt-6">
+        <RecallBadge>Data stays on your device and syncs to your account</RecallBadge>
       </div>
-    </GlassCard>
+    </RecallPage>
   );
 }

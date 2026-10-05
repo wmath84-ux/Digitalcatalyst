@@ -1,0 +1,118 @@
+import { Download, Upload, Check } from "lucide-react";
+import { useRef } from "react";
+import { useTranslation } from "../../shims/i18n";
+import { toast } from "../../shims/toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { SettingsCard } from "./settings-card";
+import { useRecallStore } from "../../stores/recall-store";
+import { parseImportPayload } from "../../services/import-export";
+import { openImportPayload, saveExportPayload } from "../../services/native-files";
+import { isTauriRuntime } from "../../db/client";
+import type { RecallExportPayload } from "../../types";
+
+type ImportMode = "merge" | "replace";
+
+export function ImportExportSection({
+  importMode,
+  setImportMode,
+  setPendingReplace,
+  lastAction,
+  setLastAction,
+}: {
+  importMode: ImportMode;
+  setImportMode: (mode: ImportMode) => void;
+  setPendingReplace: (payload: RecallExportPayload | null) => void;
+  lastAction: { type: string; time: string } | null;
+  setLastAction: (action: { type: string; time: string } | null) => void;
+}): JSX.Element {
+  const { t } = useTranslation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportData = useRecallStore((state) => state.exportData);
+  const mergeData = useRecallStore((state) => state.mergeData);
+
+  async function handleExport(): Promise<void> {
+    try {
+      const payload = exportData();
+      const saved = await saveExportPayload(payload);
+      if (saved) {
+        toast.success(t("settings.dataExportedSuccess"));
+        setLastAction({ type: t("settings.exportedBackup"), time: new Date().toLocaleTimeString() });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(t("settings.dataExportFailed", { message }));
+    }
+  }
+
+  async function processImportPayload(raw: string): Promise<void> {
+    const payload = parseImportPayload(raw);
+    if (importMode === "replace") {
+      setPendingReplace(payload);
+      return;
+    }
+    await mergeData(payload);
+    toast.success(t("settings.dataImportedMergedSuccess"));
+    setLastAction({ type: t("settings.importedAndMerged"), time: new Date().toLocaleTimeString() });
+  }
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      await processImportPayload(await file.text());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(t("settings.invalidImportFile", { message }));
+    }
+  }
+
+  async function handleNativeImport(): Promise<void> {
+    try {
+      const raw = await openImportPayload();
+      if (!raw) {
+        if (!isTauriRuntime()) fileInputRef.current?.click();
+        return;
+      }
+      await processImportPayload(raw);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(t("settings.invalidImportFile", { message }));
+    }
+  }
+
+  return (
+    <SettingsCard title={t("settings.importExport")}>
+      <div className="flex items-center gap-2">
+        <Select value={importMode} onValueChange={(v) => setImportMode(v as ImportMode)}>
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="merge">{t("settings.merge")}</SelectItem>
+            <SelectItem value="replace">{t("settings.replace")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <button
+          onClick={() => void handleNativeImport()}
+          className="flex items-center gap-1.5 rounded-md border border-outline-variant px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:bg-background recall-dark:border-outline recall-dark:text-on-surface-variant recall-dark:hover:bg-surface-container/50"
+        >
+          <Upload className="h-3.5 w-3.5" /> {t("settings.importData")}
+        </button>
+        <button
+          onClick={() => void handleExport()}
+          className="flex items-center gap-1.5 rounded-md bg-primary-hover px-3 py-1.5 text-sm font-medium text-on-primary hover:bg-primary recall-dark:bg-primary-container recall-dark:text-on-primary recall-dark:hover:bg-primary-container"
+        >
+          <Download className="h-3.5 w-3.5" /> {t("settings.exportData")}
+        </button>
+      </div>
+      <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImport} />
+      {lastAction && (
+        <div className="mt-3 flex items-center gap-2 rounded-md bg-review-easy/10 px-3 py-2 text-xs text-review-easy">
+          <Check className="h-3.5 w-3.5" />
+          <span>{lastAction.type} {t("settings.at")} {lastAction.time}</span>
+        </div>
+      )}
+    </SettingsCard>
+  );
+}
