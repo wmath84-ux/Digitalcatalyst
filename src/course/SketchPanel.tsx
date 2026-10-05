@@ -51,14 +51,19 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 // line's exact text, and the editor's library hook is the only other symbol
 // this panel needs from the package.
 import { useHandleLibrary } from "@excalidraw/excalidraw";
+// A third line for the menu / sidebar surface the Course Player customises in
+// Clean / Optimised Look (and to drop Excalidraw's "Excalidraw links" social
+// group — GitHub / Follow Us / Discord — per Part 1 §24).
+import { MainMenu, Sidebar } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { BookMarked, Check, ChevronDown, Layers, Pencil, Plus, RotateCcw } from "lucide-react";
+import { BookMarked, Check, ChevronDown, Layers, Moon, Pencil, Plus, RotateCcw, Sun, Trash2 } from "lucide-react";
 import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
 import type { SketchScene } from "../../utils/sketchScene";
 // The learner's PERSONAL LIBRARY (the editor ships the panel but no storage —
 // see the hook's header) plus the "Add to Excalidraw" return link it installs.
 import { useSketchLibrary } from "./useSketchLibrary";
 import { isAllowedExcalidrawLibraryUrl } from "../../utils/excalidrawLibraryLink.js";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 
 /**
  * The editor's imperative API, derived from the component's own props type
@@ -266,6 +271,13 @@ export interface SketchPanelProps {
   onCreateBoard?: () => string | null;
   /** False when there is no module scope or the module is at its limit. */
   canCreateBoard?: boolean;
+  /** Delete the active canvas (Part 1 §30); returns whether one was removed. */
+  onDeleteActive?: () => boolean;
+  /** True when the active module holds more than one canvas. */
+  canDeleteActive?: boolean;
+  /** "Clean / Optimised Look" (Part 1 §26): header hidden, toolbar on top,
+   *  useful header actions in the left sidebar, canvas maximised. */
+  cleanLook?: boolean;
 }
 
 /**
@@ -280,6 +292,8 @@ function SketchBoards({
   onSelectBoard,
   onCreateBoard,
   canCreateBoard,
+  onDeleteActive,
+  canDeleteActive,
 }: {
   boards: SketchBoardSummary[];
   activeBoardKey: string;
@@ -287,6 +301,9 @@ function SketchBoards({
   onSelectBoard?: (sketchKey: string) => void;
   onCreateBoard?: () => string | null;
   canCreateBoard: boolean;
+  /** Delete the CURRENTLY ACTIVE canvas (Part 1 §30). Only when one can be. */
+  onDeleteActive?: () => void;
+  canDeleteActive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -316,17 +333,21 @@ function SketchBoards({
 
   return (
     <div ref={rootRef} className="relative flex shrink-0 items-center gap-1" data-course-sketch-boards={boards.length}>
-      <button
-        type="button"
-        onClick={create}
-        disabled={!canCreateBoard}
-        aria-label="New canvas"
-        title={canCreateBoard ? "New canvas" : "Canvas limit reached for this module"}
-        data-course-sketch-new
-        className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-500 text-white shadow-sm shadow-black/40 transition-colors hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Plus aria-hidden size={15} strokeWidth={2.5} />
-      </button>
+      {/* §29: the standalone "+" is GONE — New Canvas lives ONLY inside the
+          Canvas dropdown below. §30: its old spot now hosts the single
+          "delete the active canvas" action, visible only when one exists. */}
+      {canDeleteActive ? (
+        <button
+          type="button"
+          onClick={onDeleteActive}
+          aria-label={`Delete active canvas "${activeBoardTitle}"`}
+          title={`Delete active canvas "${activeBoardTitle}"`}
+          data-course-sketch-delete-active
+          className="flex h-6 w-6 items-center justify-center rounded-md border border-rose-400/40 text-rose-300 transition-colors hover:bg-rose-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-300"
+        >
+          <Trash2 aria-hidden size={14} />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -391,6 +412,136 @@ function SketchBoards({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The canvas-colour cluster (theme swatch, white swatch, pencil → full RGB).
+ * Extracted so the SAME controls live in the normal save line AND in the Clean
+ * Look's left sidebar without a second implementation (Part 1 §26C).
+ */
+function SketchColourCluster({
+  canvasColour,
+  onPick,
+}: {
+  canvasColour: string | null;
+  onPick: (hex: string | null, commit: boolean) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const isCustomColour = canvasColour !== null && canvasColour.toLowerCase() !== "#ffffff";
+
+  useEffect(() => {
+    if (!pickerOpen) return undefined;
+    const onDocumentClick = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener("mousedown", onDocumentClick);
+    return () => document.removeEventListener("mousedown", onDocumentClick);
+  }, [pickerOpen]);
+
+  return (
+    <div className="flex items-center gap-1.5" data-course-sketch-colour-cluster>
+      <button
+        type="button"
+        aria-label="Dark canvas (theme default)"
+        aria-pressed={canvasColour === null}
+        onClick={() => onPick(null, true)}
+        data-course-sketch-swatch="theme"
+        className={`h-4 w-4 rounded-full border border-white/25 bg-[#141416] transition-shadow ${
+          canvasColour === null ? "ring-2 ring-white/70 ring-offset-1 ring-offset-[#0c0c12]" : "hover:ring-1 hover:ring-white/40"
+        }`}
+      />
+      <button
+        type="button"
+        aria-label="White canvas"
+        aria-pressed={canvasColour?.toLowerCase() === "#ffffff"}
+        onClick={() => onPick("#ffffff", true)}
+        data-course-sketch-swatch="white"
+        className={`h-4 w-4 rounded-full border border-white/40 bg-white transition-shadow ${
+          canvasColour?.toLowerCase() === "#ffffff" ? "ring-2 ring-white/70 ring-offset-1 ring-offset-[#0c0c12]" : "hover:ring-1 hover:ring-white/40"
+        }`}
+      />
+      <div ref={pickerRef} className="relative">
+        <button
+          type="button"
+          aria-label="Custom canvas colour (RGB)"
+          aria-pressed={pickerOpen}
+          onClick={() => setPickerOpen((open) => !open)}
+          data-course-sketch-pen
+          style={
+            isCustomColour
+              ? { background: canvasColour, color: isLightColour(canvasColour) ? "#141416" : "#ffffff" }
+              : undefined
+          }
+          className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+            isCustomColour
+              ? "border-white/40"
+              : pickerOpen
+                ? "border-transparent bg-white/15 text-white"
+                : "border-transparent text-white/70 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          <Pencil aria-hidden size={12} />
+        </button>
+        {pickerOpen ? <SketchColourPicker initial={canvasColour} onPick={onPick} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** The personal-library read-out pill (shared by the save line and the Clean
+ *  Look sidebar). Never a second library UI — just a count + import state. */
+function SketchLibraryPill({ library }: { library: ReturnType<typeof useSketchLibrary> }) {
+  return (
+    <span
+      data-course-sketch-library={library.state}
+      data-course-sketch-library-count={library.itemCount}
+      title={
+        library.importError ||
+        library.error ||
+        "Your personal library — saved to your account and synced to your other devices"
+      }
+      className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
+        library.importState === "importing"
+          ? "border-white/25 text-white/70"
+          : library.importError || library.error
+            ? "border-amber-400/40 text-amber-300"
+            : "border-white/15 text-white/55"
+      }`}
+    >
+      {library.importState === "importing" ? (
+        <span aria-hidden className="block h-2.5 w-2.5 animate-spin rounded-full border border-white/25 border-t-white/80" />
+      ) : (
+        <BookMarked aria-hidden size={11} />
+      )}
+      <span className="tabular-nums">
+        {library.importState === "importing"
+          ? "Adding library…"
+          : library.importState === "imported"
+            ? "Library added"
+            : library.itemCount > 0
+              ? `Library ${library.itemCount}`
+              : "Library"}
+      </span>
+    </span>
+  );
+}
+
+/** A compact daylight / light-dark control for the board (Part 1 §26C). */
+function SketchDaylightToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={isDark ? "Switch board to light theme" : "Switch board to dark theme"}
+      aria-pressed={!isDark}
+      title={isDark ? "Light board" : "Dark board"}
+      data-course-sketch-daylight={isDark ? "dark" : "light"}
+      className="flex h-6 w-6 items-center justify-center rounded-md border border-white/15 text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-300"
+    >
+      {isDark ? <Sun aria-hidden size={13} /> : <Moon aria-hidden size={13} />}
+    </button>
   );
 }
 
@@ -500,6 +651,9 @@ export default function SketchPanel({
   onSelectBoard,
   onCreateBoard,
   canCreateBoard = false,
+  onDeleteActive,
+  canDeleteActive = false,
+  cleanLook = false,
 }: SketchPanelProps) {
   /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -513,8 +667,9 @@ export default function SketchPanel({
   const library = useSketchLibrary({ uid });
   /** The canvas colour as the learner currently sees it (null = theme). */
   const [canvasColour, setCanvasColour] = useState<string | null>(canvasColor);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement | null>(null);
+  /** §30 deletion is a two-step act: the trash opens this confirmation, which
+   *  names the actual canvas, and only the red confirm removes it. */
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   /**
    * Where libraries.excalidraw.com sends the browser back to. A STABLE value
@@ -567,11 +722,6 @@ export default function SketchPanel({
     void library.importPending(excalidrawApi);
   }, [excalidrawApi, library]);
 
-  // A "custom" colour is any saved colour that is neither the theme default
-  // (null) nor the white swatch — the pencil chip shows it.
-  const isCustomColour =
-    canvasColour !== null && canvasColour.toLowerCase() !== "#ffffff";
-
   // The board (or a late cloud copy of it) is the source of truth for the
   // colour while the editor is open; the learner's own picks update this
   // state directly and persist through the hook.
@@ -580,18 +730,6 @@ export default function SketchPanel({
     setCanvasColour(canvasColor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneKey, loading]);
-
-  // Close the picker on a click outside the colour cluster.
-  useEffect(() => {
-    if (!pickerOpen) return undefined;
-    const onDocumentClick = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDocumentClick);
-    return () => document.removeEventListener("mousedown", onDocumentClick);
-  }, [pickerOpen]);
 
   /**
    * Apply a canvas colour: update the LIVE editor through its API (so the
@@ -618,8 +756,18 @@ export default function SketchPanel({
     }
     if (commit) {
       onCanvasColorChange(color);
-      if (color === null) setPickerOpen(false);
     }
+  };
+
+  /**
+   * Daylight / light-dark control (Part 1 §26C): flips the Excalidraw board
+   * between its dark and light theme WITHOUT touching the learner's chosen
+   * canvas colour any more than necessary. Dark = the theme default (null);
+   * light = a white/light board. Persisted like any other canvas colour.
+   */
+  const isDarkBoard = canvasColour === null;
+  const toggleDaylight = () => {
+    applyCanvasColour(isDarkBoard ? "#ffffff" : null, true);
   };
 
   /**
@@ -671,7 +819,12 @@ export default function SketchPanel({
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden"
       data-course-sketch-panel
       data-sketch-scope={scoped ? "module" : "none"}
+      data-sketch-clean={cleanLook ? "true" : "false"}
     >
+      {/* §26A: in Clean / Optimised Look the whole header disappears and the
+          canvas reclaims its vertical space; the useful actions move into the
+          editor's left sidebar (rendered below with the Excalidraw host). */}
+      {cleanLook ? null : (
       <SketchStatus
         status={status}
         pendingSync={pendingSync}
@@ -687,102 +840,15 @@ export default function SketchPanel({
             onSelectBoard={onSelectBoard}
             onCreateBoard={onCreateBoard}
             canCreateBoard={canCreateBoard}
+            canDeleteActive={canDeleteActive}
+            onDeleteActive={() => setConfirmDeleteOpen(true)}
           />
         ) : null}
       >
-        {/* The learner's PERSONAL LIBRARY, at a glance: how many items their
-            own library holds on this device/account, and what the "Add to
-            Excalidraw" return is doing right now. The panel itself is
-            Excalidraw's own (the book icon in its toolbar) — this is a
-            read-out, never a second library UI. */}
-        <span
-          data-course-sketch-library={library.state}
-          data-course-sketch-library-count={library.itemCount}
-          title={
-            library.importError ||
-            library.error ||
-            "Your personal library — saved to your account and synced to your other devices"
-          }
-          className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
-            library.importState === "importing"
-              ? "border-white/25 text-white/70"
-              : library.importError || library.error
-                ? "border-amber-400/40 text-amber-300"
-                : "border-white/15 text-white/55"
-          }`}
-        >
-          {library.importState === "importing" ? (
-            <span
-              aria-hidden
-              className="block h-2.5 w-2.5 animate-spin rounded-full border border-white/25 border-t-white/80"
-            />
-          ) : (
-            <BookMarked aria-hidden size={11} />
-          )}
-          <span className="tabular-nums">
-            {library.importState === "importing"
-              ? "Adding library…"
-              : library.importState === "imported"
-                ? "Library added"
-                : library.itemCount > 0
-                  ? `Library ${library.itemCount}`
-                  : "Library"}
-          </span>
-        </span>
-        {/* Canvas colour: the theme default (dark, what the player always
-            opened with), white, and the pencil → full-RGB custom colour.
-            The choice persists with the board AND as the learner's device
-            preference, so the next open shows the same canvas. */}
-        <button
-          type="button"
-          aria-label="Dark canvas (theme default)"
-          aria-pressed={canvasColour === null}
-          onClick={() => applyCanvasColour(null, true)}
-          data-course-sketch-swatch="theme"
-          className={`h-4 w-4 rounded-full border border-white/25 bg-[#141416] transition-shadow ${
-            canvasColour === null ? "ring-2 ring-white/70 ring-offset-1 ring-offset-[#0c0c12]" : "hover:ring-1 hover:ring-white/40"
-          }`}
-        />
-        <button
-          type="button"
-          aria-label="White canvas"
-          aria-pressed={canvasColour?.toLowerCase() === "#ffffff"}
-          onClick={() => applyCanvasColour("#ffffff", true)}
-          data-course-sketch-swatch="white"
-          className={`h-4 w-4 rounded-full border border-white/40 bg-white transition-shadow ${
-            canvasColour?.toLowerCase() === "#ffffff" ? "ring-2 ring-white/70 ring-offset-1 ring-offset-[#0c0c12]" : "hover:ring-1 hover:ring-white/40"
-          }`}
-        />
-        <div ref={pickerRef} className="relative">
-          <button
-            type="button"
-            aria-label="Custom canvas colour (RGB)"
-            aria-pressed={pickerOpen}
-            onClick={() => setPickerOpen((open) => !open)}
-            data-course-sketch-pen
-            style={
-              isCustomColour
-                ? {
-                    background: canvasColour,
-                    color: isLightColour(canvasColour) ? "#141416" : "#ffffff",
-                  }
-                : undefined
-            }
-            className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
-              isCustomColour
-                ? "border-white/40"
-                : pickerOpen
-                  ? "border-transparent bg-white/15 text-white"
-                  : "border-transparent text-white/70 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <Pencil aria-hidden size={12} />
-          </button>
-          {pickerOpen ? (
-            <SketchColourPicker initial={canvasColour} onPick={applyCanvasColour} />
-          ) : null}
-        </div>
+        <SketchLibraryPill library={library} />
+        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
       </SketchStatus>
+      )}
 
       {/* The canvas host: a positioned, flex-sized box. The editor is its
           absolutely-filled child, so its width and height always resolve from
@@ -818,7 +884,70 @@ export default function SketchPanel({
                 apiRef.current = api;
                 setExcalidrawApi(api);
               }}
-            />
+            >
+              {/* The Course Player's OWN main menu. Rendering one replaces
+                  Excalidraw's default (which ships an "Excalidraw links" group
+                  — GitHub / Follow Us / Discord) so those three links are gone
+                  (Part 1 §24) while every useful editor action stays. */}
+              <MainMenu>
+                <MainMenu.DefaultItems.LoadScene />
+                <MainMenu.DefaultItems.SaveToActiveFile />
+                <MainMenu.DefaultItems.Export />
+                <MainMenu.DefaultItems.SaveAsImage />
+                <MainMenu.DefaultItems.SearchMenu />
+                <MainMenu.DefaultItems.Help />
+                <MainMenu.DefaultItems.ClearCanvas />
+                <MainMenu.Separator />
+                <MainMenu.DefaultItems.ToggleTheme allowSystemTheme={false} />
+                <MainMenu.DefaultItems.ChangeCanvasBackground />
+              </MainMenu>
+              {cleanLook ? (
+                /* §26C: in Clean / Optimised Look the removed header's useful
+                   actions live in the editor's LEFT sidebar (docked): canvas
+                   switcher + delete, daylight toggle, save state + retry, the
+                   library read-out and the colour cluster. No socials, no
+                   duplicate toolbar. */
+                <Sidebar docked name="course-sketch-clean">
+                  <div className="flex flex-col gap-2 p-2 text-white" data-course-sketch-clean-sidebar>
+                    {scoped ? (
+                      <SketchBoards
+                        boards={boards}
+                        activeBoardKey={activeBoardKey}
+                        activeBoardTitle={activeBoardTitle}
+                        onSelectBoard={onSelectBoard}
+                        onCreateBoard={onCreateBoard}
+                        canCreateBoard={canCreateBoard}
+                        canDeleteActive={canDeleteActive}
+                        onDeleteActive={() => setConfirmDeleteOpen(true)}
+                      />
+                    ) : null}
+                    <SketchDaylightToggle isDark={canvasColour === null} onToggle={toggleDaylight} />
+                    <SketchLibraryPill library={library} />
+                    <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className="text-[11px] font-semibold text-white/60"
+                      data-course-sketch-clean-status={status}
+                      title={errorMessage ?? undefined}
+                    >
+                      {status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
+                    </span>
+                    {status === "error" && onRetry ? (
+                      <button
+                        type="button"
+                        onClick={onRetry}
+                        title={errorMessage ?? "Retry saving to your account"}
+                        data-course-sketch-retry
+                        className="flex items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
+                      >
+                        <RotateCcw aria-hidden size={10} /> Retry
+                      </button>
+                    ) : null}
+                  </div>
+                </Sidebar>
+              ) : null}
+            </Excalidraw>
           </div>
         )}
         {!scoped && !loading ? (
@@ -830,6 +959,23 @@ export default function SketchPanel({
           </div>
         ) : null}
       </div>
+
+      {/* §30 — deleting the ACTIVE canvas is a two-step act that names the
+          actual canvas. Only the red confirm removes it; Cancel / backdrop /
+          Escape never do. The rest of the library is untouched. */}
+      <ConfirmDeleteDialog
+        open={confirmDeleteOpen}
+        title="Delete this Canvas?"
+        message={`Delete Canvas "${activeBoardTitle}"?`}
+        detail="This will permanently delete this Canvas. Your other Canvases are kept."
+        confirmLabel="Delete Canvas"
+        confirmTitle="Delete Canvas"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          onDeleteActive?.();
+        }}
+      />
     </div>
   );
 }

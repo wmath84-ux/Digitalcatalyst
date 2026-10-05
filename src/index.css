@@ -2025,6 +2025,28 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   color: var(--mm-text);
   transition: color 180ms ease;
 }
+/* Part 1 §8/§9 — the genuine LIGHT mind-map palette. A WHITE canvas with a
+   visible zoom-participating grid (the React Flow <Background> reads --mm-dot
+   for its dots and the shell paints white underneath). Real tokens, no CSS
+   colour inversion; node borders, toolbar tiles and edge strokes all follow. */
+.course-mindmap-shell[data-mindmap-theme="light"] {
+  --mm-bg: #ffffff;
+  --mm-surface: rgb(255 255 255 / 0.9);
+  --mm-surface-blur: blur(14px) saturate(140%);
+  --mm-surface-rim:
+    inset 0 1px 1px rgb(255 255 255 / 0.7),
+    inset 0 0 0 1px rgb(15 23 42 / 0.08);
+  --mm-border: rgb(15 23 42 / 0.14);
+  --mm-text: #0b1220;
+  --mm-muted: rgb(11 18 32 / 0.62);
+  --mm-soft: rgb(15 23 42 / 0.05);
+  --mm-soft-hover: rgb(15 23 42 / 0.1);
+  --mm-dot: rgb(15 23 42 / 0.16);
+  --mm-edge-left: rgb(124 58 237 / 0.6);
+  --mm-edge-right: rgb(79 70 229 / 0.6);
+  color: var(--mm-text);
+  background-color: #ffffff;
+}
 .course-player-shell :is(button, a, textarea):focus-visible {
   outline: 2px solid #8b5cf6;
   outline-offset: 2px;
@@ -7010,4 +7032,195 @@ html[data-course-player-active="true"] {
 }
 .dc-desktop-shell [data-recall-root][data-revision-app] #main-content {
   background: var(--rc-background);
+}
+
+/* ── Course Player light theme + Sketch clean-mode chrome ──────────────────
+   Moved out of flatPlayerChrome.css, which is contractually paint-only and
+   scoped to the player shell (coursePlayerClassroomPanelLookContract). The
+   genuine light palette and the Sketch clean-mode toolbar reposition are real
+   features that need token swaps and layout, so they live here instead. */
+/* ── 17. The genuine LIGHT theme (Part 1, §6 / §23) ────────────────────────
+   Real palette switching — NO CSS colour inversion of any kind. The
+   shell flips a single attribute, `data-course-theme="light"`, and every
+   surface that reads the `--dc-flat-*` / `--course-*` tokens re-skins itself
+   from a true light palette declared here. Dark stays the default; the two
+   palettes are siblings, never a transformation of each other.
+
+   Scope: the shell attribute only affects tokens the player re-points at its
+   own surfaces. Third-party media (YouTube's black, a PDF's white, Excalidraw
+   content, PNG/SVG assets) is never recoloured, so real documents keep their
+   original appearance. The course-progress bar (§11) is deliberately NOT
+   listed here — its paint is untouched in this pass. */
+.course-player-shell[data-course-theme="light"] {
+  /* Plates — paper, not board */
+  --dc-flat-board: #f5f6fa;
+  --dc-flat-board-head: #eceef6;
+  --dc-flat-wall-head: #f0f1f8;
+  --dc-flat-desk-top: #f2f3fa;
+  --dc-flat-desk-bottom: #e9ebf4;
+  --dc-flat-box: rgba(15, 23, 42, 0.035);
+
+  /* Furniture glass → light frosted paper */
+  --dc-flat-glass: rgba(255, 255, 255, 0.72);
+  --dc-flat-glass-deep: rgba(255, 255, 255, 0.78);
+
+  /* The floating chooser (RoomSheet) → a white plate */
+  --dc-flat-sheet: linear-gradient(180deg, #ffffff, #f4f5fb);
+  --dc-flat-sheet-shadow:
+    0 40px 90px rgba(15, 23, 42, 0.16),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --dc-flat-scrim: radial-gradient(120% 80% at 50% 45%, rgba(244, 245, 251, 0.4), rgba(232, 234, 244, 0.7));
+
+  /* Hairlines */
+  --dc-flat-line: rgba(15, 23, 42, 0.12);
+  --dc-flat-line-soft: rgba(15, 23, 42, 0.09);
+  --dc-flat-line-strong: rgba(15, 23, 42, 0.18);
+
+  /* Ink — dark on light, with WCAG-conscious contrast */
+  --dc-flat-ink: #0b1220;
+  --dc-flat-ink-title: rgba(11, 18, 32, 0.95);
+  --dc-flat-ink-body: rgba(11, 18, 32, 0.86);
+  --dc-flat-ink-sub: rgba(11, 18, 32, 0.62);
+  --dc-flat-ink-label: rgba(11, 18, 32, 0.58);
+
+  /* Rows */
+  --dc-flat-row: rgba(15, 23, 42, 0.04);
+  --dc-flat-row-hover: rgba(15, 23, 42, 0.08);
+  --dc-flat-row-line: rgba(15, 23, 42, 0.1);
+  --dc-flat-row-line-hover: rgba(15, 23, 42, 0.2);
+
+  /* Accent inks re-tinted for contrast on a light ground */
+  --dc-flat-sky-ink: #0369a1;
+  --dc-flat-cyan-ink: #0e7490;
+  --dc-flat-violet-ink: #6d28d9;
+  --dc-flat-amber-ink: #b45309;
+
+  /* Re-pointed player palette for this theme */
+  --course-bg: var(--dc-flat-board);
+  --course-surface: var(--dc-flat-glass);
+  --course-surface-translucent: var(--dc-flat-glass);
+  --course-panel: var(--dc-flat-glass);
+  --course-text: var(--dc-flat-ink);
+  --course-muted: rgba(11, 18, 32, 0.66);
+  --course-border: var(--dc-flat-line);
+  --course-soft: var(--dc-flat-row);
+  --course-soft-hover: var(--dc-flat-row-hover);
+  --course-strong: rgba(15, 23, 42, 0.24);
+  --course-loading: rgba(244, 245, 251, 0.8);
+
+  --dc-chrome-glass: var(--dc-flat-glass);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+
+  scrollbar-color: rgba(15, 23, 42, 0.25) transparent;
+}
+.course-player-shell[data-course-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.25);
+}
+
+/* The light backdrop: two soft glows over paper, mirroring the dark key. */
+.course-player-shell[data-course-theme="light"] {
+  background-color: #eef0f8;
+  background-image:
+    radial-gradient(circle at 18% -10%, rgba(56, 189, 248, 0.14) 0, transparent 52%),
+    radial-gradient(circle at 84% -6%, rgba(139, 92, 246, 0.12) 0, transparent 50%),
+    linear-gradient(to bottom, #f6f7fc 0%, #eef0f8 46%, #e8eaf4 100%);
+}
+.course-player-shell[data-course-theme="light"] [data-course-lesson-pane] {
+  background-color: var(--dc-flat-board);
+  background-image: linear-gradient(180deg, #fbfcff 0%, var(--dc-flat-board) 34%);
+  box-shadow:
+    inset 0 0 0 1px var(--dc-flat-line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.course-player-shell[data-course-theme="light"] [data-course-study-pane] {
+  background-color: var(--dc-flat-desk-bottom);
+  background-image: linear-gradient(180deg, var(--dc-flat-desk-top) 0%, var(--dc-flat-desk-bottom) 100%);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-line);
+}
+.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+  background-color: rgba(250, 251, 254, 0.96);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 245, 251, 0.97) 100%);
+}
+/* Light-mode confirmation chooser (portaled to <body>, addressed directly). */
+[data-course-confirm-backdrop][data-course-theme="light"] {
+  background: var(--dc-flat-scrim);
+}
+[data-course-confirm-card][data-course-theme="light"] {
+  background-color: #ffffff;
+  background-image: linear-gradient(180deg, #ffffff, #f4f5fb);
+  box-shadow:
+    0 40px 90px rgba(15, 23, 42, 0.2),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 0 60px -18px rgba(244, 63, 94, 0.3);
+}
+[data-course-confirm-title][data-course-theme="light"] { color: var(--dc-flat-ink); }
+[data-course-confirm-message][data-course-theme="light"] { color: rgba(11, 18, 32, 0.7); }
+[data-course-confirm-detail][data-course-theme="light"] {
+  background-color: var(--dc-flat-row);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
+  color: rgba(11, 18, 32, 0.75);
+}
+
+/* ── 18. Sketch "Clean / Optimised Look" (Part 1 §26-28) ───────────────────
+   The Course Player's custom Sketch layout, driven by the persisted
+   `Clean / Optimised Look` preference (Player settings, default OFF). When ON
+   (`data-sketch-clean="true"` on the panel root):
+
+     A. the host header is not rendered at all (React), so the canvas host —
+        a `flex-1` child — reclaims the freed vertical space; there is no
+        leftover header gap because nothing reserves it;
+     B. Excalidraw's OWN bottom toolbar is repositioned to the TOP of the
+        workspace by flipping its anchor (it stays the single toolbar — no
+        duplicate, no zen mode);
+     C. the removed header's useful actions live in the editor's docked LEFT
+        sidebar (rendered by SketchPanel), which keeps its own width and never
+        collapses the canvas on phones (the sidebar is Excalidraw's responsive
+        one, and the controls stack vertically).
+
+   Only the anchor flips; widths, paddings and pointer behaviour are left to
+   Excalidraw, so touch/pen/keyboard interaction is untouched. */
+[data-course-sketch-panel][data-sketch-clean="true"] [data-course-sketch-host] .App-bottom-bar {
+  bottom: auto;
+  top: calc(env(safe-area-inset-top, 0px) + 0.25rem);
+}
+/* Keep the corner chrome (main-menu trigger, top-right controls) above the
+   repositioned toolbar so nothing becomes untappable on narrow screens. */
+[data-course-sketch-panel][data-sketch-clean="true"] [data-course-sketch-host] .excalidraw-ui-top-left,
+[data-course-sketch-panel][data-sketch-clean="true"] [data-course-sketch-host] .excalidraw-ui-top-right {
+  z-index: calc(var(--zIndex-ui-bottom) + 1);
+}
+/* The docked clean-look sidebar is player chrome: readable dark plate. */
+[data-course-sketch-panel][data-sketch-clean="true"] [data-course-sketch-clean-sidebar] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Course progress bar — continuous shimmer (Part 2 §2 / §24) ─────────────
+   A subtle highlight sweeps along the existing fill while the player is open.
+   Purely decorative and CSS-only (no JS timer): the bar's width, thickness,
+   height, placement, alignment and the real progress value are UNCHANGED —
+   only a translucent sheen animates inside the fill. Reduced-motion users get
+   the static line and value with no animation. */
+[data-course-progress-bar] [data-course-progress-fill]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  background-size: 55% 100%;
+  background-repeat: no-repeat;
+  animation: course-progress-shimmer 2.6s ease-in-out infinite;
+}
+@keyframes course-progress-shimmer {
+  0% { background-position: -60% 0; }
+  100% { background-position: 165% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-course-progress-bar] [data-course-progress-fill]::after {
+    animation: none;
+    opacity: 0;
+  }
 }

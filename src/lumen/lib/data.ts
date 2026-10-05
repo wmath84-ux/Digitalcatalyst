@@ -1,4 +1,5 @@
 import type { AIModel, Attachment, Chat, Message, ResponseFormat } from "./types";
+import { publicAssetUrl } from "../../utils/publicAsset";
 
 export const MODELS: AIModel[] = [
   { id: "default", name: "School AI", short: "School", desc: "The AI your institute publishes", badge: "Default" },
@@ -9,7 +10,7 @@ const seedAttachment: Attachment = {
   id: "att-seed-1",
   kind: "upload",
   name: "lecture-4.2-slide.png",
-  src: "/images/binary-search-slide.png",
+  src: publicAssetUrl("/images/binary-search-slide.png"),
   w: 1536,
   h: 1024,
   size: 612_000,
@@ -169,7 +170,7 @@ Photosynthesis converts light energy into chemical energy in two linked stages â
         followUps: ["Explain this diagram step by step", "Quiz me on this", "Give me the short version"],
         image: {
           prompt: "diagram showing how the light reactions connect to the Calvin cycle",
-          src: "/images/gen-photosynthesis.png",
+          src: publicAssetUrl("/images/gen-photosynthesis.png"),
           alt: "Diagram of photosynthesis showing the light reactions in the thylakoid stack feeding ATP and NADPH into the Calvin cycle",
           caption: "The two stages of photosynthesis and the carriers that link them.",
           aspect: "3 / 2",

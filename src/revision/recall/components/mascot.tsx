@@ -1,6 +1,7 @@
 import { useRecallStore } from "../stores/recall-store";
 import { cn } from "../lib/utils";
 import type { Theme } from "../types";
+import { revisionBrandMarkUrl } from "../../../utils/publicAsset";
 
 /**
  * Recall mascot - the friendly "brain" mark used for motivation surfaces
@@ -20,7 +21,7 @@ export function Mascot({
   const isHC = theme === "high-contrast";
   return (
     <img
-      src={`${import.meta.env.BASE_URL}Lettermark_transparent.png`}
+      src={revisionBrandMarkUrl("transparent")}
       alt="Recall mascot"
       aria-hidden="true"
       className={cn(

@@ -647,3 +647,58 @@
 @media (prefers-reduced-motion: reduce) {
   .dc-note .bn-side-menu { transition: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Note Editor — Dark variant (Part 2 small update)
+   The header's compact Sun/Moon sets `data-notes-theme="dark"` on the pane.
+   Only the palette changes: the paper, ink, rules and BlockNote's own
+   variables are re-pointed at dark values — a genuine dark scheme, never a
+   `filter: invert`. Colours transition; layout, content and the toolbar's
+   structure do not.
+   ──────────────────────────────────────────────────────────────────────── */
+[data-notes-theme="dark"] .dc-note {
+  --dc-note-paper: #0b1120;
+  --dc-note-ink: #e5e7eb;
+  --dc-note-ink-soft: #cbd5e1;
+  --dc-note-ink-faint: #94a3b8;
+  --dc-note-rule: #243244;
+  --dc-note-hover: #16202f;
+  --dc-note-accent: #818cf8;
+  --dc-note-accent-soft: #1e2a44;
+  --dc-note-danger: #fb7185;
+
+  --bn-colors-menu-background: #111a2b;
+  --bn-colors-tooltip-background: #e5e7eb;
+  --bn-colors-tooltip-text: #0b1120;
+  --bn-colors-selected-text: #0b1120;
+  --bn-colors-shadow: rgba(0, 0, 0, 0.55);
+  --bn-shadow-light: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --bn-shadow-medium: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(148, 163, 184, 0.14);
+
+  color-scheme: dark;
+}
+/* The floating formatting toolbar is hard-set white in the light sheet; give
+   it a dark surface here. The dock toolbar already uses --dc-note-paper. */
+[data-notes-theme="dark"] .dc-note .bn-toolbar,
+[data-notes-theme="dark"] .dc-note .bn-ak-toolbar {
+  background: #111a2b;
+}
+/* Colour-only transitions: the palette eases over ~160ms, layout never moves. */
+.dc-note,
+.dc-note .dc-note-dock,
+.dc-note .dc-note-title,
+.dc-note .bn-editor,
+.dc-note .bn-toolbar,
+.dc-note .bn-ak-toolbar {
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-note,
+  .dc-note .dc-note-dock,
+  .dc-note .dc-note-title,
+  .dc-note .bn-editor,
+  .dc-note .bn-toolbar,
+  .dc-note .bn-ak-toolbar {
+    transition: none;
+  }
+}
