@@ -4,6 +4,7 @@
 // Optimized for mobile, tablet, desktop — flexible responsive grid.
 
 import { GlassCard } from "../../components/ui/GlassCard";
+import { SimplePanel } from "../../components/ui/SimplePanel";
 import { GlassButton } from "../../components/ui/glass-button";
 import {
   ArrowRight,
@@ -58,7 +59,8 @@ export default function ActiveMemberView({
         tint={0.62}
         tintColor="173,216,255"
         blur={0}
-        className="dc-store-glass dc-scene-ink lg:col-span-12"
+        data-important-membership
+        className="dc-membership-summary lg:col-span-12"
       >
         <div className="relative">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -154,12 +156,7 @@ export default function ActiveMemberView({
         )}
 
         {/* Unlocked features */}
-        <GlassCard
-          tint={0.62}
-          tintColor="173,216,255"
-          blur={0}
-          className="dc-store-glass dc-scene-ink"
-        >
+        <SimplePanel className="dc-membership-section" contentClassName="p-5">
           <header className="mb-3 flex items-center justify-between gap-2 md:mb-4">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30 md:h-9 md:w-9">
@@ -203,16 +200,11 @@ export default function ActiveMemberView({
               ))}
             </ul>
           )}
-        </GlassCard>
+        </SimplePanel>
 
         {/* Included courses */}
         {unlockedProductTitles.length > 0 ? (
-          <GlassCard
-            tint={0.62}
-            tintColor="173,216,255"
-            blur={0}
-            className="dc-store-glass dc-scene-ink"
-          >
+          <SimplePanel className="dc-membership-section" contentClassName="p-5">
             <header className="mb-3 flex items-center gap-2 md:mb-4">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30 md:h-9 md:w-9">
                 <Package className="h-4 w-4" />
@@ -233,18 +225,13 @@ export default function ActiveMemberView({
                 </li>
               ))}
             </ul>
-          </GlassCard>
+          </SimplePanel>
         ) : null}
       </div>
 
       {/* RIGHT COLUMN — manage actions (sticky on desktop) */}
       <div className="flex flex-col gap-4 lg:col-span-4 lg:gap-4 xl:col-span-4">
-        <GlassCard
-          tint={0.62}
-          tintColor="173,216,255"
-          blur={0}
-          className="dc-store-glass dc-scene-ink"
-        >
+        <SimplePanel className="dc-membership-section" contentClassName="p-5">
           <header className="mb-3 flex items-center gap-2 md:mb-4">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 text-white/70 ring-1 ring-white/15 md:h-9 md:w-9">
               <Settings2 className="h-4 w-4" />
@@ -297,7 +284,7 @@ export default function ActiveMemberView({
               Renewal needs your confirmation. Your current access stays active till expiry.
             </p>
           </div>
-        </GlassCard>
+        </SimplePanel>
 
         {/* Help / trust */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-white/55 md:p-4 md:text-xs md:leading-6">

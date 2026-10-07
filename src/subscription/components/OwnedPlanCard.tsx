@@ -7,6 +7,7 @@
 
 import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { SimplePanel } from "../../components/ui/SimplePanel";
 import { GlassButton } from "../../components/ui/glass-button";
 import type { OwnedPlanSummary } from "../../../utils/subscriptionOwnership";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
@@ -40,7 +41,8 @@ export default function OwnedPlanCard({
         tint={0.62}
         tintColor="173,216,255"
         blur={0}
-        className="dc-store-glass dc-scene-ink lg:col-span-12"
+        data-important-membership
+        className="dc-membership-summary lg:col-span-12"
       >
         <div className="relative">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -112,7 +114,7 @@ export default function OwnedPlanCard({
         </section>
 
         {/* What the plan gives */}
-        <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink">
+        <SimplePanel className="dc-membership-section" contentClassName="p-5">
           <header className="mb-3 flex items-center justify-between gap-2 md:mb-4">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30 md:h-9 md:w-9">
@@ -170,14 +172,14 @@ export default function OwnedPlanCard({
               </ul>
             </>
           ) : null}
-        </GlassCard>
+        </SimplePanel>
       </div>
 
       {/* RIGHT COLUMN — actions + trust */}
       <div className="flex flex-col gap-4 lg:col-span-4 lg:gap-4 xl:col-span-4">
         {/* Add more */}
         {onAddMore ? (
-          <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink">
+          <SimplePanel className="dc-membership-section" contentClassName="p-5">
             <GlassButton
               type="button"
               variant="capsule"
@@ -197,12 +199,12 @@ export default function OwnedPlanCard({
                 </span>
               </span>
             </GlassButton>
-          </GlassCard>
+          </SimplePanel>
         ) : null}
 
         {/* Switch plan */}
         {otherPlanNames.length > 0 ? (
-          <GlassCard tint={0.62} tintColor="173,216,255" blur={0} className="dc-store-glass dc-scene-ink">
+          <SimplePanel className="dc-membership-section" contentClassName="p-5">
             <GlassButton
               variant="capsule"
               type="button"
@@ -222,7 +224,7 @@ export default function OwnedPlanCard({
                 </span>
               </span>
             </GlassButton>
-          </GlassCard>
+          </SimplePanel>
         ) : null}
 
         {/* Trust / help */}

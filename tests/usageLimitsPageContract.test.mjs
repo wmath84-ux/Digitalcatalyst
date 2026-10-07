@@ -51,8 +51,8 @@ test("the page uses a centered, responsive content column instead of stretching 
   const page = read("src/usage/UsageLimitsPage.tsx");
   const css = read("src/index.css");
 
-  assert.match(page, /className="mx-auto flex w-full max-w-6xl flex-col gap-5 md:gap-6"/);
-  assert.match(page, /max-w-6xl grid-cols-1 items-start gap-5 xl:grid-cols-\[minmax\(0,0\.92fr\)_minmax\(0,1\.08fr\)\]/);
+  assert.match(page, /className="mx-auto flex w-full max-w-4xl flex-col gap-6"/);
+  assert.match(page, /max-w-4xl grid-cols-1 items-start gap-5 xl:grid-cols-\[minmax\(0,0\.92fr\)_minmax\(0,1\.08fr\)\]/);
   assert.match(page, /data-usage-limits-content/);
   assert.match(css, /\.dc-desktop-shell \[data-usage-limits-page\]/);
   assert.match(css, /\.dc-desktop-shell \[data-usage-limits-content\]/);

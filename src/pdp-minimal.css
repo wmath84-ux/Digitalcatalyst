@@ -1,0 +1,30 @@
+/* Reading first, purchasing second: a quiet gallery and editorial sections,
+   one visual anchor for the purchase/upgrade decision. Controls retain glass. */
+[data-pdp-root] { text-shadow: none; }
+[data-pdp-root] [data-pdp-loose],
+[data-pdp-root] .dc-scene-ink { text-shadow: none; }
+[data-pdp-root] .dc-simple-panel { border-radius: 16px; }
+[data-pdp-gallery] > .dc-simple-panel { border: 0; background: transparent; }
+[data-pdp-root] [data-pdp-hero-img] { display: block; width: 100%; aspect-ratio: 4/3; height: auto; object-fit: cover; }
+[data-pdp-root] [data-pdp-thumbs] img { width: 100%; height: 100%; object-fit: cover; }
+[data-pdp-root] [data-pdp-meta] { border: 0; border-block: 1px solid rgba(255,255,255,.1); border-radius: 0; background: none; }
+[data-pdp-root] [data-pdp-details],
+[data-pdp-root] [data-pdp-reviews],
+[data-pdp-root] [data-pdp-related] { border: 0; border-top: 1px solid rgba(255,255,255,.1); border-radius: 0; background: transparent; }
+[data-pdp-root] .dc-pdp-flat,
+[data-pdp-root] .dc-pdp-review { border: 0; background: transparent; box-shadow: none; }
+[data-pdp-root] .dc-pdp-review { border-bottom: 1px solid rgba(255,255,255,.08); border-radius: 0; }
+[data-pdp-root] [data-pdp-tabbar] { background: #111827; box-shadow: none; border-radius: 0; }
+[data-pdp-root] [data-pdp-curriculum-module] { background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.1); border-radius: 0; }
+[data-pdp-root] [data-pdp-curriculum-module] > div[aria-hidden] { display: none; }
+[data-pdp-root] [data-pdp-curriculum-module][data-paid="true"] { border-color: rgba(251,191,36,.3); }
+[data-pdp-root] [data-pdp-related-list] > .dc-simple-panel { border: 0; border-bottom: 1px solid rgba(255,255,255,.1); border-radius: 0; background: transparent; }
+[data-pdp-root] [data-pdp-related-list] img { width: 112px; height: 96px; object-fit: cover; }
+[data-pdp-root] h2 { font-size: 18px !important; line-height: 1.45; font-weight: 600; }
+[data-pdp-root] h3 { font-size: 15px !important; line-height: 1.45; font-weight: 600; }
+[data-pdp-root] [data-pdp-buy] > .dc-scene-plate { text-shadow: none; }
+[data-pdp-root] [data-pdp-buy] > .dc-scene-plate > div[aria-hidden]:nth-of-type(3),
+[data-pdp-root] [data-pdp-buy] > .dc-scene-plate > div[aria-hidden]:nth-of-type(4) { opacity: .25; }
+[data-pdp-root] [data-pdp-purchase-builder] .dc-simple-panel { border: 0; border-top: 1px solid rgba(255,255,255,.1); border-radius: 0; background: transparent; }
+[data-pdp-root] [data-pdp-resource],
+[data-pdp-root] [data-pdp-update] { padding-block: 8px; }

@@ -1,0 +1,35 @@
+/* Mirrors ProfileLayout's max-w-4xl page, 16px quiet frames and simple rows.
+   No display counters are invented here: all allowance hooks stay authoritative. */
+[data-usage-limits-layout] { max-width: 896px; padding-block: 8px 24px; text-shadow: none; }
+[data-usage-limits-page] h1 { font-size: 24px !important; font-weight: 700; line-height: 1.3; }
+[data-usage-limits-page] h2 { font-size: 18px !important; font-weight: 600; line-height: 1.4; }
+[data-usage-limits-page] h3 { font-size: 15px !important; font-weight: 600; line-height: 1.45; }
+[data-usage-limits-page] [data-usage-limits-grid] { gap: 24px; align-items: start !important; }
+/* Only the outer telemetry surfaces, not their nested glass action buttons. */
+[data-usage-limits-page] [data-ai-quota-card],
+[data-usage-limits-page] [data-myday-allowance-card] > div,
+[data-usage-limits-page] .dc-profile-card {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px !important;
+  background: rgba(255,255,255,.02);
+  box-shadow: none;
+  text-shadow: none;
+}
+[data-usage-limits-page] [data-ai-quota-card] > div[aria-hidden],
+[data-usage-limits-page] [data-myday-allowance-card] > div > div[aria-hidden],
+[data-usage-limits-page] .dc-profile-card > div[aria-hidden] { display: none; }
+[data-usage-limits-page] [data-ai-quota-card] > div:last-child,
+[data-usage-limits-page] [data-myday-allowance-card] > div > div:last-child,
+[data-usage-limits-page] .dc-profile-card > div:last-child { padding: 24px; height: auto; }
+[data-usage-limits-page] .dc-profile-subpanel { background: none; border: 0; border-radius: 0; padding-inline: 0; }
+[data-usage-limits-page] .dc-profile-card-meta { font-size: 12px; font-weight: 400; line-height: 1.6; color: rgba(255,255,255,.65); }
+[data-usage-limits-page] .dc-profile-card-accent { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 500; color: rgba(255,255,255,.7); }
+.dc-usage-guidance { border-top: 1px solid rgba(255,255,255,.1); padding-top: 24px; }
+.dc-usage-guidance p { margin-top: 8px; font-size: 12px; line-height: 1.7; color: rgba(255,255,255,.65); }
+@media (min-width: 900px) { [data-usage-limits-grid] { grid-template-columns: repeat(2,minmax(0,1fr)) !important; } }
+@media (max-width: 479px) {
+  [data-usage-limits-page] [data-ai-quota-card] > div:last-child,
+  [data-usage-limits-page] [data-myday-allowance-card] > div > div:last-child,
+  [data-usage-limits-page] .dc-profile-card > div:last-child { padding: 16px; }
+}
+html[data-glass="on"] [data-usage-limits-page] .dc-profile-card { box-shadow: none; }

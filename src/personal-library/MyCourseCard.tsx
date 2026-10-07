@@ -2,10 +2,9 @@
 //
 // One learner-authored course in the Study Library grid.
 //
-// It is drawn with the SAME material and geometry as the store's product card
-// (src/home/components/ProductCard.tsx — `dc-scene-plate`, radius 24, 4:3
-// artwork, title underneath), so a course the learner built sits in the
-// library exactly like a course they bought.
+// Uses the shared collection-card surface and compact spacing, with a 4:3
+// cover and natural-height copy. Scoped CSS protects images and actions from
+// viewport-wide tablet overrides without changing the course controls.
 //
 // Owner brief (2026-09-29): a self-created course can be deleted straight from
 // its card — the row under the title carries Play, Edit AND Delete (Delete
@@ -18,6 +17,7 @@ import { GlassSurface } from "../components/ui/glass";
 import { countModules, countResources } from "../lib/myCourseClient";
 import { fallbackCoverImage } from "../lib/myCourseCovers";
 import type { MyCourse } from "../types/myCourse";
+import "../components/collection-cards.css";
 
 interface MyCourseCardProps {
   course: MyCourse;
@@ -37,11 +37,11 @@ export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCou
       radius={24}
       tint={0.25}
       blur={0}
-      className="dc-scene-plate group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98]"
+      className="dc-scene-plate dc-collection-card group"
       contentClassName="flex flex-col"
       data-my-course-card={course.id}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
+      <div className="dc-collection-media relative aspect-[4/3] w-full overflow-hidden">
         <img
           src={cover}
           alt={course.title || "Course cover"}
@@ -86,18 +86,17 @@ export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCou
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <h4 className="line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-white/85" data-my-course-title>
+      <div className="dc-collection-body">
+        <h4 className="dc-collection-title" title={course.title || "Untitled course"} data-my-course-title>
           {course.title || "Untitled course"}
         </h4>
         {course.description ? (
-          <p className="line-clamp-2 text-[11px] leading-4 text-white/50">{course.description}</p>
+          <p className="dc-collection-meta line-clamp-2">{course.description}</p>
         ) : (
-          <p className="text-[11px] text-white/40">Tap play to open the Course Player</p>
+          <p className="dc-collection-meta">Tap play to open the Course Player</p>
         )}
-        {/* The action row is fluid: the buttons wrap rather than overflow on a
-            narrow card, and Play keeps the leftover space. */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        {/* Actions wrap to the card width and keep 44px touch targets. */}
+        <div className="dc-collection-actions">
           <button
             type="button"
             onClick={() => onPlay(course)}

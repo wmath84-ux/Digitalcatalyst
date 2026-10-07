@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { GlassButton } from "@/components/ui/glass-button";
+import "../../components/collection-cards.css";
 
 interface CartItemCardProps {
   product: Product;
@@ -12,54 +12,41 @@ interface CartItemCardProps {
 
 export default function CartItemCard({ product, onRemove, onOpen }: CartItemCardProps) {
   return (
-    /* Wave 3 (commerce): the row is a `glass-card` — the pack's surface already
-       paints the specular sheen this file was faking with its own gradient div. */
     <GlassCard
-      contentClassName="flex gap-3 p-2.5"
-      className="group relative overflow-hidden"
+      contentClassName="p-0"
+      className="dc-collection-card dc-cart-card"
+      data-cart-card={product.id}
     >
       <button
         type="button"
         onClick={() => onOpen?.(product.id)}
-        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] ring-1 ring-white/10"
+        className="dc-collection-media"
         aria-label={`View ${product.title}`}
       >
-        <img
-          src={product.image}
-          alt={product.title}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
+        <img src={product.image} alt={product.title} loading="lazy" decoding="async" />
       </button>
-      <div className="relative flex min-w-0 flex-1 flex-col justify-between py-0.5">
-        <div>
-          <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-300">
-              {product.category}
-            </span>
-            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
-              {product.title}
-            </h3>
-            <p className="text-[11px] text-white/55">{product.author}</p>
-          </button>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-[14px] font-extrabold text-white">
-              {formatINR(product.price)}
-            </span>
-            <span className="text-[10px] text-white/55 line-through">
-              {formatINR(product.originalPrice)}
-            </span>
+      <div className="dc-collection-body">
+        <button type="button" onClick={() => onOpen?.(product.id)} className="dc-collection-link">
+          <span className="dc-collection-category">{product.category}</span>
+          <h3 className="dc-collection-title" title={product.title}>{product.title}</h3>
+        </button>
+        <p className="dc-collection-meta">{product.author}</p>
+        <div className="dc-cart-footer">
+          <div className="dc-collection-prices">
+            <span className="dc-collection-price">{formatINR(product.price)}</span>
+            {product.originalPrice > product.price && (
+              <span className="line-through">{formatINR(product.originalPrice)}</span>
+            )}
           </div>
-          <GlassButton
+          <button
+            type="button"
             onClick={() => onRemove(product.id)}
-            className="[&_.size-12]:size-8 [&_svg]:text-rose-300"
-            aria-label="Remove item"
+            className="dc-cart-remove"
+            aria-label={`Remove ${product.title} from cart`}
+            title="Remove item"
           >
-            <Trash2 size={15} />
-          </GlassButton>
+            <Trash2 size={18} />
+          </button>
         </div>
       </div>
     </GlassCard>

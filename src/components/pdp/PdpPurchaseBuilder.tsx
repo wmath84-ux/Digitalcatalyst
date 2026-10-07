@@ -42,7 +42,7 @@ import ModuleSelectTrigger from "./ModuleSelectTrigger";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
 import { PaymentButton } from "../ui/PaymentButton";
-import { GlassCard } from "../ui/GlassCard";
+import { SimplePanel } from "../ui/SimplePanel";
 import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
 import {
@@ -472,7 +472,7 @@ function FullCoursePanel({
       ? Math.round(((fullCourse.regularPrice - fullCourse.effectivePrice) / fullCourse.regularPrice) * 100)
       : 0;
   return (
-    <GlassSurface radius={24} className="text-white" contentClassName="p-4 sm:p-5">
+    <SimplePanel className="text-white" contentClassName="p-4 sm:p-5">
       {isProductOwned ? (
         <div className="flex items-start gap-2 rounded-2xl bg-emerald-500/15 p-3 text-sm text-emerald-200 ring-1 ring-emerald-400/30">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -514,7 +514,7 @@ function FullCoursePanel({
           ) : null}
         </ul>
       </div>
-    </GlassSurface>
+    </SimplePanel>
   );
 }
 
@@ -533,9 +533,9 @@ function ResourceSelector({
 }) {
   if (resources.length === 0) {
     return (
-      <GlassSurface radius={24} className="text-white/55" contentClassName="p-4 text-sm">
+      <SimplePanel className="text-white/55" contentClassName="p-4 text-sm">
         No resources are sold individually for this course.
-      </GlassSurface>
+      </SimplePanel>
     );
   }
   return (
@@ -551,7 +551,7 @@ function ResourceSelector({
         const sale = r.salePrice;
         const TypeIcon = RESOURCE_TYPE_ICON[r.type] || Package;
         return (
-          <GlassCard
+          <SimplePanel
             key={r.id}
             data-pdp-resource
             data-resource-id={r.id}
@@ -599,7 +599,7 @@ function ResourceSelector({
 
               </div>
             </div>
-          </GlassCard>
+          </SimplePanel>
         );
       })}
     </div>
@@ -617,9 +617,9 @@ function PaidUpdateSelector({
 }) {
   if (updates.length === 0) {
     return (
-      <GlassSurface radius={24} className="text-white/55" contentClassName="p-4 text-sm">
+      <SimplePanel className="text-white/55" contentClassName="p-4 text-sm">
         No paid updates are available for this course right now.
-      </GlassSurface>
+      </SimplePanel>
     );
   }
   return (
@@ -628,7 +628,7 @@ function PaidUpdateSelector({
       {updates.map((u) => {
         const isSelected = selectedId === u.id;
         return (
-          <GlassCard
+          <SimplePanel
             key={u.id}
             role="checkbox"
             aria-checked={isSelected}
@@ -666,7 +666,7 @@ function PaidUpdateSelector({
                 ) : null}
               </div>
             </div>
-          </GlassCard>
+          </SimplePanel>
         );
       })}
     </div>

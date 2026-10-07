@@ -171,9 +171,9 @@ test("cart and favourites rows are glass rows with glass actions", () => {
     assert.match(source, /<GlassCard\b/);
     assert.doesNotMatch(source, /from-white\/40|from-white\/35/, "no hand-painted sheen left in either card");
   }
-  assert.match(cartRow, /contentClassName="flex gap-3 p-2.5"/, "the row keeps its exact padding");
+  assert.match(cartRow, /dc-collection-card dc-cart-card/, "cart geometry is scoped against tablet overrides");
   assert.match(cartRow, /aria-label=\{`View \$\{product\.title\}`\}/);
-  assert.match(cartRow, /aria-label="Remove item"/);
+  assert.match(cartRow, /aria-label=\{`Remove \$\{product\.title\} from cart`\}/);
   assert.match(favRow, /disabled=\{inCart\}/, "the In-Cart state is a disabled action, not a colour swap");
   assert.match(favRow, /<LiquidMetalButton\b/g);
   assert.match(favRow, /formatINR\(product\.price\)/);
