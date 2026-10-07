@@ -36,6 +36,42 @@ The panel shows them as a numbered flow, so an admin never has to guess:
 3. **Add question manually.** A blank card for hand-written questions, with the
    same fields the importer produces.
 
+## The learner's own sets — Brain → SELF
+
+The MASTER/SELF control at the top of the Brain tab switches between the admin's
+sets and the learner's own. SELF lists the sets **created from the player**
+(`selfPracticeSetsFromCourses`, `utils/selfPracticeSets.js`), and the `+` beside
+the control — rendered only while SELF is showing — opens
+`src/course/SelfPracticeSetComposer.tsx`, the learner-facing twin of the admin
+panel, drawn as the Read page's own sheet (a slate-900 card over the dimmed
+practice list):
+
+- **Step 1 — the same CMD.** `buildPracticeAiPrompt()` from
+  `src/utils/practicePrompt.ts`, with the same editable **Topic** and
+  **Class / level** slots, the same format pills and the same “Explanation:”
+  line demanded on every question; **Copy CMD** copies it into any AI tool.
+- **Step 2 — paste & create.** The reply goes through the same parser as the
+  admin importer (`parseQuestionText`) and is previewed live (how many
+  questions, how many with a marked answer and an explanation); **Create**
+  saves the set immediately — no separate “save” step.
+- **Write it yourself** — the same sheet's hand-written path: question text,
+  2–6 options with the answer marked by tapping its letter, and a required
+  explanation per question.
+
+Where a created set lives, and why:
+
+| Piece | Value |
+| --- | --- |
+| Library course | `users/{uid}/myCourses/my-practice-sets` — “My practice sets”, created on first use |
+| Module | the module the learner was watching, else the course title |
+| Resource | `type: "brain"`, `practiceTitle` + `practiceQuestions` (the admin's own shape), and `practiceSourceProductId` = the player's scope (`String(product.id)`, or `mine-<courseId>` for a learner-authored course) |
+
+So the set syncs to every device on the Study Library shelf, is editable there
+with the learner's own Brain editor (`src/personal-library/
+MyCourseBrainEditor.tsx`), and appears in the Brain tab's SELF list only for the
+course it was made in. Create is refused until every question passes
+`practiceQuestionIssues()` — the explanation included.
+
 ## The explanation is never optional
 
 Every question carries an explanation, and the rule has one definition —
@@ -80,3 +116,8 @@ loses a set that is already live.
   the never-optional explanation (rule, publish gate, counter) and the real
   panel driven in jsdom (typing rewrites the CMD, copy works, a blank question
   is flagged, the CMD's example imports ready).
+- `tests/courseBrainSelfSetContract.test.mjs` — the SELF shelf (course and
+  module placement, the per-course scope tag, the `+` only while SELF shows,
+  the composer reusing the shared CMD and parser, Create refusing an
+  unexplained question) and the player wiring:
+  `selfSets` → `onCreateSelfSet` → `myLibrary.save`.

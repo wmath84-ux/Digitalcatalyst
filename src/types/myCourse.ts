@@ -59,6 +59,16 @@ export interface MyCourseResource {
   /** Brain practice-set questions (type "brain" only). */
   practiceQuestions?: MyCourseQuestion[];
   /**
+   * Brain practice set created from the Course Player's Brain tab (type
+   * "brain" only): the player scope it belongs to — `String(product.id)` for a
+   * purchased course, `mine-<courseId>` for the learner's own. The Brain page
+   * lists a set in SELF only when this equals the course being opened
+   * (`selfPracticeSetsFromCourses`, utils/selfPracticeSets.js). Resources
+   * saved from a course carry no tag, so “saved” and “created here” never
+   * blur together.
+   */
+  practiceSourceProductId?: string;
+  /**
    * Read resource origin (type "read" only). A learner's own annotatable PDF:
    * `upload` when it lives in their `userReadUploads/{uid}/…` tree, or one of
    * the public source kinds. Read by

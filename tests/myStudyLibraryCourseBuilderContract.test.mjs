@@ -220,8 +220,11 @@ test("Brain (MCQ) creation mirrors the admin: bulk paste AND hand-written questi
   assert.match(brain, /Explanation \(shown after answering\)/);
   assert.match(brain, /MAX_PRACTICE_OPTIONS/);
   assert.match(brain, /MIN_PRACTICE_OPTIONS/);
-  // Readiness rule: prompt + ≥2 options + a marked answer.
-  assert.match(brain, /no answer marked/);
+  // Readiness rule: the SHARED per-question rule (practiceQuestionIssues) —
+  // prompt, ≥2 options, a marked answer and its explanation, which is never
+  // optional anywhere the learner or the admin touches a set.
+  assert.match(brain, /practiceQuestionIssues/);
+  assert.match(brain, /export const myQuestionIssues = \(question: MyCourseQuestion\): string\[\] => practiceQuestionIssues\(question\);/);
 });
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,11 @@ import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
+import {
+  SELF_PRACTICE_SETS_COURSE_ID,
+  placeSelfPracticeSet,
+  selfPracticeSetsFromCourses,
+} from "../utils/selfPracticeSets.js";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
 // The mind map canvas is the single heaviest thing in the player: the panel
@@ -40,7 +45,7 @@ import { usePersonalModules } from "./hooks/usePersonalModules";
 import { useMyCourses } from "./hooks/useMyCourses";
 import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from "./lib/myCourseClient";
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
-import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
+import type { MyCourse, MyCourseModule, MyCourseQuestion, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
 import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
@@ -555,6 +560,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     [modules, resolution.accessibleModuleIds, resolution.ownedUpdateIds],
   );
 
+
+
   /**
    * Open a Brain practice set: pin it for the panel, switch the study pane to
    * the Brain tab and make sure the split is showing it. Used by the Modules
@@ -644,6 +651,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // page and the self-authored Course Player read, so anything saved here is
   // visible on the library shelf the moment Firestore confirms it.
   const myLibrary = useMyCourses();
+  /**
+   * SELF practice sets — the learner's OWN sets for this course, read from the
+   * “My practice sets” course on the Study Library shelf through this same
+   * live listener. A set created from the Brain tab's “+” is written there and
+   * shows up here (and on every other device) the moment Firestore confirms it.
+   */
+  const selfBrainSets = useMemo(
+    () => selfPracticeSetsFromCourses(myLibrary.courses, storageProductId),
+    [myLibrary.courses, storageProductId],
+  );
+  /** The product's class/level — only when it reads like one (“Class 10”). */
+  const selfSetLevelSeed = useMemo(() => {
+    const value = String(product.classLevel || "").trim();
+    return /class|grade|jee|neet|college|year|board|sem|foundation/i.test(value) ? value : "";
+  }, [product.classLevel]);
   // Course entry is lazy: ordinary lesson playback performs zero personal
   // library requests. The manager/add dialog calls ensureLoaded on demand.
   const personalModules = usePersonalModules(user?.id, product.id, {
@@ -983,6 +1005,63 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // like the mind map above: same module ⇒ same practice sets, and the tab
   // can be re-scoped by hand from its own module chip row.
   const activeBrainModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] ?? null : null;
+
+  /**
+   * Create a practice set from the Brain tab's “+” and put it on the Study
+   * Library shelf — the SELF half of MASTER/SELF. Everything lands in ONE
+   * library course (“My practice sets”, created on first use through the same
+   * `myCourseClient` builders the rest of the shelf uses), so the set syncs to
+   * every device and opens in the existing Brain editor there. The resource is
+   * tagged with this player's scope (`storageProductId`), which is what makes
+   * it show in THIS course's SELF list and nowhere else.
+   *
+   * The live shelf may not have resolved yet: like “Save for later”, an
+   * unloaded list is read once from Firestore instead of guessing it is empty
+   * (a guess would overwrite the learner's other saved sets).
+   */
+  const createSelfBrainSet = useCallback(
+    async ({
+      title,
+      questions,
+    }: {
+      title: string;
+      questions: MyCourseQuestion[];
+    }): Promise<{ ok: boolean; message?: string }> => {
+      if (!user?.id) return { ok: false, message: "Please sign in to save practice sets." };
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SELF_PRACTICE_SETS_COURSE_ID) || null;
+      const placed = placeSelfPracticeSet(
+        {
+          course: existing,
+          uid: user.id,
+          productId: storageProductId,
+          courseTitle: product.title,
+          moduleTitle: activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "",
+          name: title,
+          questions,
+        },
+        {
+          createCourse: (ownerUid, courseTitle) => createMyCourse(ownerUid, courseTitle),
+          createModule: (moduleTitle) => createMyModule(moduleTitle),
+          createResource: (type) => createMyResource(type),
+        },
+      );
+      if (!placed.course) return { ok: false, message: placed.issues[0] || "Could not build the practice set." };
+      const result = await myLibrary.save(placed.course);
+      if (!result.ok) return { ok: false, message: result.message };
+      trackFeatureEvent("brain_self_set_created", { questions: questions.length });
+      toast({
+        title: "Practice set created",
+        description: `“${title}” is saved to My Study Library.`,
+        variant: "success",
+      });
+      return { ok: true };
+    },
+    [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
+  );
+
   const personalMapModule = activeMindMapModuleId
     ? personalModules.modules.find((module) => String(module.id) === String(activeMindMapModuleId))
     : undefined;
@@ -1941,6 +2020,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <CourseBrainPanel
           productId={storageProductId}
           sets={brainSets}
+          // The learner's own sets (the “+” composer writes them to the Study
+          // Library shelf; the live listener feeds them back here).
+          selfSets={selfBrainSets}
+          onCreateSelfSet={createSelfBrainSet}
+          selfSetPrompt={{
+            topic: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
+            level: selfSetLevelSeed,
+            defaultName: `${(activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title} — practice set`,
+          }}
           activeModuleId={activeBrainModuleId}
           completedFileIds={completedIds}
           openSetId={brainOpenSetId}
@@ -1948,6 +2036,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onPass={(fileId) => {
             void markFileComplete(fileId);
           }}
+          uid={user?.id ?? null}
         />
       }
       aiPanel={

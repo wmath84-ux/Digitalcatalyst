@@ -179,6 +179,9 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
     size: Number.isFinite(Number(source.size)) && source.size != null ? Number(source.size) : undefined,
     source: source.source === "upload" ? "upload" : "link",
     practiceTitle: typeof source.practiceTitle === "string" ? source.practiceTitle : undefined,
+    // The scope a set created from the Brain tab belongs to — without it the
+    // Course Player would either lose the set or show it in every course.
+    practiceSourceProductId: typeof source.practiceSourceProductId === "string" ? source.practiceSourceProductId : undefined,
     // Read resources (the learner's own annotatable PDFs): the library fields
     // travel with the resource, or the player would show an empty Read row.
     readSourceKind: READ_SOURCE_KINDS.includes(String(source.readSourceKind))

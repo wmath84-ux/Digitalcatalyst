@@ -19,7 +19,12 @@ import {
   CheckCircle2, ClipboardPaste, Plus, Sparkles, Trash2, Wand2,
 } from "lucide-react";
 import { parseQuestionText } from "@/revision/engine/bulkParser";
-import { MAX_PRACTICE_OPTIONS, MAX_PRACTICE_QUESTIONS, MIN_PRACTICE_OPTIONS } from "../../utils/practiceSet.js";
+import {
+  MAX_PRACTICE_OPTIONS,
+  MAX_PRACTICE_QUESTIONS,
+  MIN_PRACTICE_OPTIONS,
+  practiceQuestionIssues,
+} from "../../utils/practiceSet.js";
 import type { MyCourseQuestion } from "../types/myCourse";
 import { createMyQuestion } from "../lib/myCourseClient";
 
@@ -44,16 +49,14 @@ C. Carbon dioxide *
 D. Hydrogen
 Explanation: Plants take in CO₂ and release O₂.`;
 
-/** What is still missing on one question — mirrors the player's own rule. */
-export const myQuestionIssues = (question: MyCourseQuestion): string[] => {
-  const issues: string[] = [];
-  if (!question.prompt.trim()) issues.push("no question text");
-  if (question.options.map((option) => option.trim()).filter(Boolean).length < MIN_PRACTICE_OPTIONS) {
-    issues.push(`needs ${MIN_PRACTICE_OPTIONS} options`);
-  }
-  if (!(question.correctIndex >= 0 && question.correctIndex < question.options.length)) issues.push("no answer marked");
-  return issues;
-};
+/**
+ * What is still missing on one question — the SHARED rule
+ * (`practiceQuestionIssues`, utils/practiceSet.js), so the learner's editor,
+ * the Brain composer in the Course Player and the admin's importer/publish
+ * gate can never disagree about a set. The explanation is part of it: it is
+ * never optional, here either.
+ */
+export const myQuestionIssues = (question: MyCourseQuestion): string[] => practiceQuestionIssues(question);
 
 export const myQuestionsReadyCount = (questions: MyCourseQuestion[] = []): number =>
   questions.filter((question) => myQuestionIssues(question).length === 0).length;

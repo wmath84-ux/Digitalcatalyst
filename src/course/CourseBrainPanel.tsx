@@ -69,14 +69,16 @@
 // belong to their module, not to the revision Test Bank.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Brain, RotateCcw } from "lucide-react";
+import { Brain, Plus, RotateCcw } from "lucide-react";
 import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
 import { BRAIN, BrainBadge, BrainPill, BrainProgress, BrainSurface } from "./BrainCards";
 import BrainQuestionDeck, { type BrainDeckItem } from "./BrainQuestionDeck";
 import MasterSelfControl from "./MasterSelfControl";
+import SelfPracticeSetComposer from "./SelfPracticeSetComposer";
 import { useMasterSelfPreference } from "./playerPreferences";
 import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
+import type { MyCourseQuestion } from "../types/myCourse";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 /** The score that marks the module's Brain resource complete in the player. */
@@ -101,10 +103,20 @@ export interface CourseBrainPanelProps {
   /** Every practice set this learner may open, across the whole course. */
   sets: BrainPracticeSet[];
   /**
-   * Learner-created practice sets (from the personal library / MyCourseBrainEditor).
-   * Same shape as admin sets — they share the answering UI and scoring.
+   * Learner-created practice sets for THIS course — the SELF side of the
+   * MASTER/SELF control. Built by `selfPracticeSetsFromCourses`
+   * (utils/selfPracticeSets.js) from the “My practice sets” library course, so
+   * a set made here is on the Study Library shelf too.
    */
   selfSets?: BrainPracticeSet[];
+  /**
+   * Saves a set the learner built in the composer (the “+” in SELF mode) and
+   * resolves once the library write has finished. Omitted → no “+”, and SELF
+   * stays read-only.
+   */
+  onCreateSelfSet?: (input: { title: string; questions: MyCourseQuestion[] }) => Promise<{ ok: boolean; message?: string }>;
+  /** Seeds for the composer's CMD and name field (module being watched, class). */
+  selfSetPrompt?: { topic?: string; level?: string; defaultName?: string };
   /**
    * The module the learner is currently watching. The Brain tab follows it —
    * "practice for the module I am in" — exactly like the notes and mind map
@@ -206,8 +218,11 @@ export default function CourseBrainPanel({
   openSetId = null,
   onOpenedSet,
   uid,
+  onCreateSelfSet,
+  selfSetPrompt,
 }: CourseBrainPanelProps) {
   const [scores, setScores] = useState<Record<string, BrainPracticeScore>>(() => loadScores(productId));
+  const [composerOpen, setComposerOpen] = useState(false);
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"question" | "review" | "result" | "answers">("question");
   const [selections, setSelections] = useState<Record<number, number>>({});
@@ -247,6 +262,12 @@ export default function CourseBrainPanel({
 
   // MASTER/SELF preference — remembered per learner, per feature (Brain).
   const masterSelfCtl = useMasterSelfPreference("brain", uid ?? null, "master");
+
+  // The “+” composer belongs to SELF mode: switching back to MASTER closes it,
+  // so a half-written set never floats over a list it cannot appear in.
+  useEffect(() => {
+    if (masterSelfCtl.mode !== "self") setComposerOpen(false);
+  }, [masterSelfCtl.mode]);
 
   useEffect(() => {
     setScores(loadScores(productId));
@@ -449,26 +470,46 @@ export default function CourseBrainPanel({
     return (
       <div
         ref={fitRef}
-        className="flex h-full min-h-0 flex-col px-3 py-3"
+        className="relative flex h-full min-h-0 flex-col px-3 py-3"
         data-course-brain-panel=""
         data-brain-screen="library"
         style={{ fontSize: S(16) }}
       >
         {/* MASTER / SELF segmented control — same contract as Notes & Mind Map.
             MASTER = admin-imported practice sets from the course tree.
-            SELF   = learner-created sets from the personal library. */}
+            SELF   = the learner's own sets, made here or in the Study Library. */}
         <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
           <div>
             <p className="text-[11px] font-black uppercase tracking-wide text-white/50">Practice sets</p>
           </div>
-          <MasterSelfControl
-            feature="brain"
-            ariaLabel="Brain collection"
-            mode={masterSelfCtl.mode}
-            onChange={masterSelfCtl.setMode}
-            masterCount={sets.length}
-            selfCount={selfSets.length}
-          />
+          <div className="flex items-center" style={{ gap: S(8) }}>
+            {/* The “+” exists ONLY while SELF is the open filter (owner brief,
+                2026-10-07) — MASTER sets are the admin's, not the learner's to
+                extend. It opens the creation overlay; the set it makes lands in
+                “My practice sets” on the Study Library shelf and shows up in
+                this very list. */}
+            {masterSelfCtl.mode === "self" && onCreateSelfSet ? (
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                aria-label="Create your own practice set"
+                title="Create your own practice set"
+                data-brain-self-add=""
+                className="grid shrink-0 place-items-center rounded-lg text-white ring-1 ring-white/20 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+                style={{ height: S(34), width: S(34) }}
+              >
+                <Plus style={{ height: S(16), width: S(16) }} />
+              </button>
+            ) : null}
+            <MasterSelfControl
+              feature="brain"
+              ariaLabel="Brain collection"
+              mode={masterSelfCtl.mode}
+              onChange={masterSelfCtl.setMode}
+              masterCount={sets.length}
+              selfCount={selfSets.length}
+            />
+          </div>
         </div>
         {masterSelfCtl.mode === "master" && practiceModules.length > 0 ? (
           <div className="flex items-center gap-2 overflow-x-auto pb-1" data-brain-module-row>
@@ -518,7 +559,9 @@ export default function CourseBrainPanel({
                     Your Practice Sets
                   </p>
                   <p className="font-semibold" style={{ fontSize: S(11), color: BRAIN.inkSoft }}>
-                    Create practice sets in your Study Library and they'll appear here for quick practice.
+                    {onCreateSelfSet
+                      ? "Tap + in the header to create your own set — let an AI write the questions or write them yourself. It is saved to My Study Library and appears here for quick practice."
+                      : "Create practice sets in your Study Library and they'll appear here for quick practice."}
                   </p>
                 </div>
               </BrainSurface>
@@ -648,6 +691,18 @@ export default function CourseBrainPanel({
             </div>
           )}
         </div>
+        {/* The creation overlay (SELF mode's “+”), mounted inside this screen
+            so it dims the practice list exactly like the Read page's compose
+            sheet dims its library — not the whole split deck. */}
+        {composerOpen && onCreateSelfSet ? (
+          <SelfPracticeSetComposer
+            topic={selfSetPrompt?.topic || ""}
+            level={selfSetPrompt?.level || ""}
+            defaultName={selfSetPrompt?.defaultName || "Practice set"}
+            onClose={() => setComposerOpen(false)}
+            onCreate={onCreateSelfSet}
+          />
+        ) : null}
       </div>
     );
   }
