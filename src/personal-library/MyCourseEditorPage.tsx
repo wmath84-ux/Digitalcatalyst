@@ -666,7 +666,7 @@ function ModuleNodeEditor({
         </div>
       </div>
 
-      {open ? (
+      {open && (
         <div className="space-y-3 pl-9">
           {/* Description */}
           <textarea
@@ -792,11 +792,6 @@ function ModuleNodeEditor({
             />
           ))}
         </div>
-      ) : (
-        <p className="mt-2 truncate text-[11px] font-semibold text-white/40">
-          {module.resources.length} resource{module.resources.length === 1 ? "" : "s"}
-          {module.modules.length ? ` · ${module.modules.length} sub-module${module.modules.length === 1 ? "" : "s"}` : ""}
-        </p>
       )}
     </article>
   );
