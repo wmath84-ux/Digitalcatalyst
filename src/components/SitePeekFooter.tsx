@@ -199,9 +199,48 @@ export default function SitePeekFooter({
         inert={!open}
         onPointerEnter={show}
         onPointerLeave={hide}
-        className="pointer-events-none"
+        onPointerDown={alwaysOpen ? (event) => {
+          // When alwaysOpen, enable drag-to-select directly on the panel
+          pointerTypeRef.current = event.pointerType
+          draggingRef.current = true
+          startXRef.current = event.clientX
+          startYRef.current = event.clientY
+          rememberPointer(event.clientX, event.clientY)
+          pointerX.set(event.clientX)
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId)
+          } catch {
+            /* capture is a nicety */
+          }
+        } : undefined}
+        onPointerMove={alwaysOpen ? (event) => {
+          if (!draggingRef.current) return
+          rememberPointer(event.clientX, event.clientY)
+          pointerX.set(event.clientX)
+        } : undefined}
+        onPointerUp={alwaysOpen ? (event) => {
+          if (!draggingRef.current) return
+          draggingRef.current = false
+          try {
+            event.currentTarget.releasePointerCapture?.(event.pointerId)
+          } catch {
+            /* ignore */
+          }
+          const dx = event.clientX - startXRef.current
+          const dy = event.clientY - startYRef.current
+          const isHorizontalDrag =
+            Math.abs(dx) >= DRAG_SELECT_THRESHOLD && Math.abs(dx) > Math.abs(dy)
+          if (isHorizontalDrag) {
+            const id = tabAtX(event.clientX)
+            if (id) handleSelect(id)
+          }
+        } : undefined}
+        onPointerCancel={alwaysOpen ? () => {
+          draggingRef.current = false
+        } : undefined}
+        className={`pointer-events-none ${alwaysOpen ? 'pointer-events-auto' : ''}`}
       >
-        <div className="pointer-events-auto mx-auto w-max max-w-full">
+        <div className={`pointer-events-auto mx-auto w-max max-w-full ${alwaysOpen ? 'cursor-grab active:cursor-grabbing' : ''}`}>
           <GlassDock siteFooter compact={compact} items={items} onSelect={handleSelect} pointerX={pointerX} />
         </div>
       </div>

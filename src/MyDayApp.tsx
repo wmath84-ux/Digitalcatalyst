@@ -183,7 +183,45 @@ export default function MyDayApp() {
   const blocked = !myDay.loading && !myDay.unlimited && !myDay.paid && !myDay.canCreate;
 
   if (myDay.loading && !myDay.unlimited && !myDay.paid) {
-    return <WorkspaceNotice title="Opening My Day…" body="Checking your access and preparing your workspace." />;
+    return (
+      <div className="myday-workspace-root relative flex min-h-[100dvh] w-full flex-col">
+        {/* Header visible during loading for seamless experience */}
+        <div className="sticky top-0 z-50 md:hidden" data-myday-mobile-header>
+          <Header
+            cartCount={cartIds.size}
+            notifCount={0}
+            title={`${appName} Tasker`}
+            subtitle="My Day Activities"
+            onNavigateToSubscription={() => {
+              window.location.hash = "#/subscription";
+            }}
+            onNavigateToCart={() => {
+              window.location.hash = "#/cart";
+            }}
+            onNavigateToNotifications={() => {
+              window.location.hash = "#/notifications";
+            }}
+          />
+        </div>
+        <WorkspaceNotice title="Opening My Day…" body="Checking your access and preparing your workspace." />
+        {/* Footer navigation visible during loading for seamless experience */}
+        <BottomNav
+          active="myday"
+          peek
+          peekAlwaysOpen
+          onChange={(tab: TabKey) => {
+            if (tab === "myday") return;
+            if (tab === "home") window.location.hash = "#/home";
+            else if (tab === "store") window.location.hash = "#/store";
+            else if (tab === "purchases") window.location.hash = "#/store/purchases";
+            else if (tab === "profile") window.location.hash = "#/profile";
+            else if (tab === "study-library") window.location.hash = "#/study-library";
+            else if (tab === "revision") window.location.hash = "#/revision";
+            else if (tab === "flowpath") window.location.hash = "#/flowpath";
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -197,7 +235,7 @@ export default function MyDayApp() {
           renders (branding, cart badge, live notification count) — no second
           header implementation. */}
       {!blocked ? (
-        <div className="md:hidden" data-myday-mobile-header>
+        <div className="sticky top-0 z-50 md:hidden" data-myday-mobile-header>
           <Header
             cartCount={cartIds.size}
             notifCount={0}

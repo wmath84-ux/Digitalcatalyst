@@ -7280,3 +7280,51 @@ html[data-course-player-active="true"] {
 [data-course-ai-panel][data-course-ai-theme="light"] .text-white { color: #0f172a; }
 [data-course-ai-panel][data-course-ai-theme="light"] .text-slate-300 { color: #334155; }
 [data-course-ai-panel][data-course-ai-theme="light"] .text-slate-400 { color: #475569; }
+
+/* ── Classic Module List Style ──────────────────────────────────────────────
+   The "classic" (old) module listing style — a simple, traditional list
+   without magnifying icons or dock-style motion effects. This is the DEFAULT.
+   The "modern" style uses the full dock-style magnification wave.
+   
+   The classic style:
+   · Disables the icon magnification effect (pointerY tracking)
+   · Uses simpler, more traditional button styling
+   · No motion animations on hover/press
+   · Smaller, more compact rows
+───────────────────────────────────────────────────────────────────────────── */
+
+.classic-module-list [data-course-sheet-row] {
+  /* Disable the magnification transform — icons stay fixed size */
+  transform: none !important;
+}
+
+.classic-module-list [data-course-sheet-row] > span:first-child > span {
+  /* Icon plate stays fixed size, no spring animation */
+  transform: none !important;
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.classic-module-list [data-course-sheet-row] {
+  /* Simpler hover — just background color, no scale */
+  transition: background-color 0.15s ease;
+}
+
+.classic-module-list [data-course-sheet-row]:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.classic-module-list [data-course-sheet-row]:active {
+  transform: scale(0.98);
+}
+
+/* Compact the rows slightly in classic mode */
+.classic-module-list [data-course-sheet-row] {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+/* The icon plate border-radius is slightly smaller in classic mode */
+.classic-module-list [data-course-sheet-row] > span:first-child > span {
+  border-radius: 10px !important;
+}

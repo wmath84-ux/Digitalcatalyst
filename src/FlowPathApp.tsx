@@ -32,13 +32,14 @@ export default function FlowPathApp({
   const { user } = useAuth();
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(true);
   // The header settings gear → the SAME CurveSettingsModal the dock's gear
   // opens. FlowPathView fills this handle with its own opener (the curve
   // state and modal are owned there), so there is no duplicate settings page.
   const openCurveRef = useRef<(() => void) | null>(null);
 
   return (
-    <div className="flowpath-app relative min-h-screen text-fp-text">
+    <div className={`flowpath-app relative min-h-screen ${isDarkMode ? "text-fp-text" : "text-slate-900"}`}>
       {/* A8 (Wave 13c): the page fill (`--fp-bg-0`) and the ambient layer
           (radial gradients, grid, orbs, particles) are gone — FlowPath sits on
           the app's single blurred backdrop like every other page. */}
@@ -62,11 +63,13 @@ export default function FlowPathApp({
           onOpenNotifications={onOpenNotifications}
           onOpenSettings={() => openCurveRef.current?.()}
           headerVariant="flow"
+          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+          isDarkMode={isDarkMode}
         />
       </div>
 
       <div className="relative z-10">
-        <FlowPathView onNavigateToHome={onNavigateToHome} openCurveRef={openCurveRef} />
+        <FlowPathView onNavigateToHome={onNavigateToHome} openCurveRef={openCurveRef} isDarkMode={isDarkMode} />
       </div>
     </div>
   );

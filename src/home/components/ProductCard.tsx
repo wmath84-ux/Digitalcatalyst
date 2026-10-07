@@ -1,5 +1,5 @@
 import type { Product } from "../types";
-import { GlassSurface } from "../../components/ui/glass";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassButton } from "../../components/ui/glass-button";
 
 interface ProductCardProps {
@@ -28,18 +28,15 @@ export default function ProductCard({
   const meta = typeMeta[product.type];
 
   return (
-    <GlassSurface
+    <GlassCard
       onClick={() => onOpen?.(product)}
-      radius={24}
-      tint={0.25}
+      contentClassName="p-0"
+      tint={0.62}
+      tintColor="173,216,255"
       blur={0}
-      /* `dc-scene-plate` — the shared contrast plate (glass.css) the review
-         cards already wear. A tile's copy sits under its artwork, and the
-         scene's snow shows straight through a 10% tint, so the title / author
-         / price need the same dark backing to read. Same pinned sensitivity
-         (tint 0.25 · blur 0 · radius 24); only the material's paint changes. */
-      className={`dc-scene-plate group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
-      contentClassName="flex flex-col"
+      radius={22}
+      /* Match Store page card styling: same glass material, same ratio, same background */
+      className={`dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col ${className}`}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         <img
@@ -47,8 +44,11 @@ export default function ProductCard({
           alt={product.title}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
+        {/* Bottom scrim for text readability */}
+        <div aria-hidden className="dc-store-card-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
+        
         <span
           className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white ${meta.color}`}
         >
@@ -75,7 +75,7 @@ export default function ProductCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3">
-        <h4 className="line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-white/85">
+        <h4 className="dc-store-card-title line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-white/85">
           {product.title}
         </h4>
         <p className="text-[11px] text-white/55">{product.author}</p>
@@ -93,6 +93,6 @@ export default function ProductCard({
           <span className="text-[10px] font-bold text-emerald-300">{discount}% off</span>
         </div>
       </div>
-    </GlassSurface>
+    </GlassCard>
   );
 }

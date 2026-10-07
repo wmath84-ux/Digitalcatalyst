@@ -44,6 +44,7 @@ const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: b
   footerDock: { color: "#FFBE0B", delay: 0.25, divider: true },
   lightTheme: { color: "#8ECAE6", delay: 0.3, divider: true },
   sketchClean: { color: "#F97316", delay: 0.35, divider: true },
+  moduleStyle: { color: "#FF6BF5", delay: 0.4, divider: true },
 };
 
 const notifySetting = (label: string, next: boolean) => {
@@ -185,6 +186,9 @@ export interface PlayerPanelProps {
   /** Sketch "Clean / Optimised Look" — default OFF, persisted per user. */
   sketchCleanLook?: boolean;
   onSketchCleanLookChange?: (next: boolean) => void;
+  /** Module listing style — classic (simple list) vs modern (magnifying icons). */
+  moduleListingStyle?: "classic" | "modern";
+  onModuleListingStyleChange?: (next: "classic" | "modern") => void;
   /** P1: Gate personal access — the file the learner is currently viewing */
   gateFile?: { id?: string | null; url?: string | null; name?: string | null } | null;
   productId?: string | null;
@@ -229,6 +233,8 @@ export default function PlayerPanel({
   onPlayerThemeChange,
   sketchCleanLook = false,
   onSketchCleanLookChange,
+  moduleListingStyle = "classic",
+  onModuleListingStyleChange,
   gateFile = null,
   productId = null,
   moduleId = null,
@@ -432,6 +438,9 @@ export default function PlayerPanel({
         {/* Sketch "Clean / Optimised Look" (Part 1 §25) — OFF by default and
             remembered per user. Re-arranges the Sketch workspace only. */}
         {onSketchCleanLookChange ? settingsRow("Sketch Clean / Optimised Look", sketchCleanLook, (next) => onSketchCleanLookChange(next), "sketchClean") : null}
+        {/* Module listing style — classic (simple list, DEFAULT) vs modern
+            (magnifying dock-style icons). Remembered per user. */}
+        {onModuleListingStyleChange ? settingsRow("Modern module listing", moduleListingStyle === "modern", (next) => onModuleListingStyleChange(next ? "modern" : "classic"), "moduleStyle") : null}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
         </p>

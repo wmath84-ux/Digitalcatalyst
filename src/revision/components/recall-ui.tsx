@@ -261,7 +261,7 @@ export function RecallEmpty({
 
 export function RecallLoading({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16" role="status" aria-live="polite">
+    <div className="flex w-full flex-col items-center justify-center gap-3 py-8" role="status" aria-live="polite">
       <span className="h-8 w-8 animate-spin rounded-full border-2 border-outline-variant border-t-primary" />
       <span className={cn(typeClass["body-md"], "text-on-surface-variant")}>{label}</span>
     </div>

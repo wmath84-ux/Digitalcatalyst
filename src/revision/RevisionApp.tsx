@@ -567,14 +567,17 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
               <main
                 id="main-content"
                 data-revision-scroll
-                className="min-h-0 flex-1 w-full mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6 pb-28 lg:px-8 lg:py-6 lg:pb-12"
+                className="min-h-0 flex-1 w-full mx-auto max-w-6xl overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 pb-28 lg:px-8 lg:py-6 lg:pb-12"
                 tabIndex={-1}
               >
                 {/* On mobile / tablet-portrait, secondary tabs render below header */}
                 {!isDesktopHost && !isFocused && <RevisionTabs route={route} />}
 
                 {accessLoading || dataLoading || isLoading ? (
-                  <div className="py-16" data-revision-access-loading>
+                  <div
+                    className="flex min-h-[max(50vh,360px)] w-full flex-col items-center justify-center gap-4"
+                    data-revision-access-loading
+                  >
                     <RecallLoading
                       label={
                         accessLoading
@@ -582,6 +585,18 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                           : t("app.loading", "Loading your revision library…")
                       }
                     />
+                    {/* Structural skeleton — mirrors the dashboard layout so the
+                        page never renders as a thin vertical strip. Width follows
+                        the container; height fills meaningful space. */}
+                    <div className="mt-2 w-full space-y-3" aria-hidden="true">
+                      <div className="h-32 w-full animate-pulse rounded-2xl bg-surface-container-high/60" />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="h-16 animate-pulse rounded-xl bg-surface-container-high/50" />
+                        <div className="h-16 animate-pulse rounded-xl bg-surface-container-high/50" />
+                        <div className="h-16 animate-pulse rounded-xl bg-surface-container-high/50" />
+                      </div>
+                      <div className="h-20 w-full animate-pulse rounded-2xl bg-surface-container-high/40" />
+                    </div>
                   </div>
                 ) : (
                   <>

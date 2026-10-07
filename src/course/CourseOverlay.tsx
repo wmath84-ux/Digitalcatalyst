@@ -62,7 +62,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch" | "read";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -259,10 +259,12 @@ function SnapList({
   rows,
   empty,
   dataAttrs,
+  moduleListingStyle = "classic",
 }: {
   rows: SheetRowSpec[];
   empty?: ReactNode;
   dataAttrs?: Record<string, string | number | undefined>;
+  moduleListingStyle?: "classic" | "modern";
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const pointerY = useMotionValue(-10000);
@@ -278,7 +280,7 @@ function SnapList({
   return (
     <div
       ref={listRef}
-      className="h-full snap-y snap-proximity overflow-y-auto overscroll-contain px-2 py-3"
+      className={`h-full snap-y snap-proximity overflow-y-auto overscroll-contain px-2 py-3 ${moduleListingStyle === "classic" ? "classic-module-list" : ""}`}
       onPointerMove={(event) => pointerY.set(event.clientY)}
       onPointerLeave={() => pointerY.set(-10000)}
       {...dataAttrs}
@@ -311,6 +313,8 @@ interface CourseOverlayProps {
   previewModuleIds: Set<string>;
   /** Master library is only sourced from the official product tree. */
   masterNotesEnabled?: boolean;
+  /** Module listing style — classic (simple list) vs modern (magnifying icons). */
+  moduleListingStyle?: "classic" | "modern";
   updates: PaidCourseUpdate[];
   moduleTitleById: Record<string, string>;
   onSelectFile: (file: CourseFile) => void;
@@ -429,10 +433,10 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // functionality lands later). Its glyph is a custom mark, not a stock icon.
   { key: "ai", label: "AI", heading: "AI", hint: "AI study buddy — jald aa raha hai", color: "#22D3EE", icon: AiTabIcon },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", color: "#C9A96E", icon: ShoppingBag },
-  // The footer dock's own settings button. Everything the player header and
-  // the ⚙ popover used to offer — course details, progress, mark-complete,
-  // the ACTIVE file's buttons and every player preference — lives here.
-  { key: "player", label: "Player", heading: "Player settings", hint: "Course, active file aur controls — sab ek list mein", color: "#FF6BF5", icon: Settings },
+  // Part 20: Live Experiment replaces Settings in footer dock. Settings is now
+  // accessible via the combined Progress + Settings rail at the top (Part 19).
+  // This slot shows interactive 2D experiments (MASTER/SELF).
+  { key: "experiment", label: "Experiment", heading: "Live Experiment", hint: "Interactive 2D experiments — MASTER & SELF", color: "#FF6BF5", icon: FlaskConical },
   // The drawing board — the official Excalidraw editor, hosted in the study
   // pane beside the lecture (src/course/SketchPanel.tsx). It sits last so no
   // existing tab's dock position (or ⌘/Ctrl+N shortcut) moves; pulling it up
@@ -767,6 +771,7 @@ export function StudyContent({
   brainPanel,
   sketchPanel,
   resourceLibraryPanel,
+  moduleListingStyle = "classic",
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -780,21 +785,9 @@ export function StudyContent({
   personalModulesPanel?: ReactNode;
   aiPanel?: ReactNode;
   brainPanel?: ReactNode;
-  /**
-   * The Excalidraw board. Rendered ONLY while its tab is active, so the
-   * editor's chunk is never downloaded — let alone mounted — for a learner
-   * who does not draw. The scene itself lives in the player's hook, so this
-   * mounting/unmounting costs no work.
-   */
   sketchPanel?: ReactNode;
-  /**
-   * Structured resource library for the Modules tab — shows the full course
-   * hierarchy (chapters → modules → submodules → resources) with note, mind
-   * map, lesson and practice cards. When provided, replaces the flat module
-   * list (SnapList) for the modules tab. Owned by the parent, which wires
-   * the open-resource callbacks to the existing viewer/editor engines.
-   */
   resourceLibraryPanel?: ReactNode;
+  moduleListingStyle?: "classic" | "modern";
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -855,10 +848,12 @@ export function StudyContent({
         <SnapList
           rows={rows}
           empty={empty}
+          moduleListingStyle={moduleListingStyle}
           dataAttrs={{
             "data-course-overlay-list": "",
             ...(listModeAttr ? { "data-mode": listModeAttr } : null),
             ...(tab === "paid" ? { "data-course-overlay-paid": "" } : null),
+            "data-module-listing-style": moduleListingStyle,
           }}
         />
       )}
@@ -915,6 +910,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       rows={listRows}
       empty={emptyMessage}
       listModeAttr={listModeAttr}
+      moduleListingStyle={props.moduleListingStyle ?? "classic"}
       notesPanel={
         // The panel owns its own circular "+" (bottom-right of the grid) —
         // the pane carries no header at all, so there is nowhere else for

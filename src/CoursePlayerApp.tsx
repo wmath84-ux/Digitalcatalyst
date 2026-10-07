@@ -47,7 +47,7 @@ import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
-import { useCourseTheme, usePersistedBooleanPreference } from "./course/playerPreferences";
+import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle } from "./course/playerPreferences";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -81,6 +81,7 @@ import {
 import CourseResourceLibrary from "./course/CourseResourceLibrary";
 import type { MasterCourseNote } from "./types/course";
 import { collectMasterCourseNotes } from "./course/masterNotes";
+import { Settings } from "lucide-react";
 
 interface CoursePlayerProps {
   product: Product;
@@ -602,6 +603,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // from the shared course-player preference layer (never CSS inversion).
   const playerThemeCtl = useCourseTheme("player", user?.id ?? null);
   const sketchCleanLookCtl = usePersistedBooleanPreference("sketchCleanLook", user?.id ?? null, false);
+  const moduleListingStyleCtl = useModuleListingStyle(user?.id ?? null, "classic");
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -1012,6 +1014,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     resourceId: selectedFile ? String(selectedFile.id) : null,
     resourceName: selectedFile?.name ?? null,
   });
+
+  // ── Part 17: Structural Readiness Gate ─────────────────────────────────
+  // Wait for ALL critical data before showing the player. This prevents
+  // broken UI, flickering, and race conditions between Product A → B or
+  // Module A → B transitions.
+  const readinessStages = useMemo(() => ({
+    access: !accessState.loading,
+    notes: !notesCtl.loading,
+    mindMap: !mindMap.loading,
+    sketch: !sketch.loading,
+    playback: playbackReady,
+  }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
+  
+  const isReady = Object.values(readinessStages).every(Boolean);
+  const failedStage = Object.entries(readinessStages).find(([_, ready]) => !ready)?.[0];
 
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as
@@ -1648,6 +1665,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onPlayerThemeChange={playerThemeCtl.setTheme}
       sketchCleanLook={sketchCleanLookCtl.value}
       onSketchCleanLookChange={sketchCleanLookCtl.setValue}
+      moduleListingStyle={moduleListingStyleCtl.style}
+      onModuleListingStyleChange={moduleListingStyleCtl.setStyle}
       /**
        * The learner's OWN course: "Add to My Module", "Save for later" and
        * "Gate personal access" are all about OFFICIAL course resources (copy
@@ -1788,6 +1807,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // A learner-authored course has nothing to sell: the Paid ("premium")
       // tab is removed from the footer dock and from the ⌘/Ctrl+1… shortcuts.
       hiddenTabs={hiddenTabs}
+      moduleListingStyle={moduleListingStyleCtl.style}
       notes={notes}
       onAddNote={(text) => saveNote(text)}
       onEditNote={(id, text) => editNote(id, text)}
@@ -1877,6 +1897,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             canDeleteActive={sketch.boards.length > 1}
             canCreateBoard={sketch.canCreateBoard}
             cleanLook={sketchCleanLookCtl.value}
+            productId={product.id}
+            moduleId={activeMindMapModuleId}
+            resourceId={selectedFile?.id || null}
+            resourceName={selectedFile?.name || null}
           />
         </Suspense>
       )}
@@ -1977,6 +2001,47 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   return (
     <CourseKeyboardProvider scopeRef={playerShellRef}>
     <>
+    {/* ── Part 17: Readiness Gate ─────────────────────────────────────────
+        Show a staged loading UI until all critical data is ready. This
+        prevents broken UI, flickering, and race conditions. */}
+    {!isReady && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]">
+        <div className="flex flex-col items-center gap-4 px-6">
+          {/* Animated loading indicator */}
+          <div className="relative h-16 w-16">
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-white/10 border-t-violet-500" />
+            <div className="absolute inset-2 animate-spin rounded-full border-4 border-white/10 border-t-sky-400" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+          </div>
+          
+          {/* Stage indicators */}
+          <div className="flex flex-col items-center gap-2 text-sm text-white/70">
+            <div className="font-semibold text-white">Loading course...</div>
+            <div className="flex flex-wrap justify-center gap-2 text-xs">
+              {Object.entries(readinessStages).map(([stage, ready]) => (
+                <span
+                  key={stage}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
+                    ready ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40'
+                  }`}
+                >
+                  {ready ? (
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
+                  )}
+                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    
+    {/* ── Main Player UI (only render when ready) ──────────────────────── */}
+    {isReady && (
     <div
       ref={playerShellRef}
       className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-col overflow-hidden text-[var(--course-text)]"
@@ -1991,21 +2056,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         : {})}
       style={{ colorScheme: playerThemeCtl.theme === "light" ? "light" : browserColorScheme }}
     >
-      {/* ── TOP PROGRESS LINE — the application-level progress indicator ──
-          Always visible while the player is open: portrait, landscape, split,
-          hidden-footer peek mode, collapsed panes — every state. It renders
-          the SAME canonical progress number the Player tab summarises
-          (completedIds / totalEligibleFiles — one source of truth), updates
-          the moment completion changes, and is the tap target for the
-          reversible mark-complete interaction (the big center control
-          below). Personal-module files are never completable, so the bar
-          stays a plain indicator for them. */}
+      {/* ── TOP PROGRESS + SETTINGS RAIL — Part 19 ─────────────────────────
+          Combined control: 2W wide (double the original progress bar width).
+          LEFT 50%: Real progress indicator with Runway loader animation
+          RIGHT 50%: Settings trigger button
+          The progress percentage and calculation remain unchanged. The Runway
+          effect is purely visual (continuous animation overlay). Settings
+          trigger opens the existing Player settings surface. */}
       <div
-        className="relative z-[75] flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#0a0c12]/85 px-3 pb-[3px] pt-[max(env(safe-area-inset-top),3px)]"
+        className="relative z-[75] flex shrink-0 items-stretch border-b border-white/10 bg-[#0a0c12]/85 pt-[max(env(safe-area-inset-top),3px)]"
         data-course-progress-summary
         data-course-top-progress
         data-progress-value={progress}
       >
+        {/* LEFT HALF: Progress Bar with Runway Animation */}
         <button
           type="button"
           onClick={handleTopProgressActivate}
@@ -2016,34 +2080,79 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               : `Course progress ${progress}%`
           }
           title={canMarkCompleteTop ? (isDone ? "Tap to mark as not complete" : "Mark this lesson complete") : undefined}
-          className="relative h-3 min-w-0 flex-1 cursor-pointer outline-none disabled:cursor-default"
+          className="relative flex w-1/2 cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default"
           data-course-progress-bar
           data-progress-value={progress}
         >
-          {/* The thin line itself: a 4px track + the progress fill. */}
-          <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" />
+          {/* Progress track and fill */}
+          <div className="relative h-3 min-w-0 flex-1">
+            <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" />
+            <span
+              aria-hidden
+              data-course-progress-fill
+              className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full transition-[width] duration-300 ease-out"
+              style={{
+                width: `${progress}%`,
+                background: "linear-gradient(90deg, #38bdf8, #a78bfa)",
+                boxShadow: "0 0 10px rgba(139, 92, 246, 0.45)",
+              }}
+            />
+            {/* Runway loader animation overlay - continuous shimmer effect */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 overflow-hidden rounded-full opacity-60"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                backgroundSize: "200% 100%",
+                animation: "runwayShimmer 2s linear infinite",
+              }}
+            />
+          </div>
           <span
             aria-hidden
-            data-course-progress-fill
-            className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full transition-[width] duration-300 ease-out"
-            style={{
-              width: `${progress}%`,
-              background: "linear-gradient(90deg, #38bdf8, #a78bfa)",
-              boxShadow: "0 0 10px rgba(139, 92, 246, 0.45)",
-            }}
-          />
+            className="shrink-0 text-[9px] font-black leading-none tabular-nums text-white/60"
+            data-course-progress-label
+          >
+            {progress}%
+          </span>
+          <span role="status" aria-live="polite" className="sr-only">
+            {isDone ? "Lesson completed" : "Lesson not completed"}
+          </span>
         </button>
-        <span
+
+        {/* DIVIDER between progress and settings */}
+        <div
           aria-hidden
-          className="shrink-0 text-[9px] font-black leading-none tabular-nums text-white/60"
-          data-course-progress-label
+          className="w-px self-stretch bg-white/20"
+          data-course-progress-divider
+        />
+
+        {/* RIGHT HALF: Settings Trigger */}
+        <button
+          type="button"
+          onClick={() => {
+            // Switch to player tab to open settings
+            handleDockTabChange("player");
+          }}
+          aria-label="Open Player settings"
+          title="Player settings"
+          className="flex w-1/2 cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5"
+          data-course-settings-trigger
         >
-          {progress}%
-        </span>
-        <span role="status" aria-live="polite" className="sr-only">
-          {isDone ? "Lesson completed" : "Lesson not completed"}
-        </span>
+          <Settings className="h-3.5 w-3.5 text-white/70" />
+          <span className="text-[9px] font-black uppercase tracking-wide text-white/60">
+            Settings
+          </span>
+        </button>
       </div>
+      
+      {/* Runway animation keyframes */}
+      <style>{`
+        @keyframes runwayShimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
       {/* The stage: portrait = lesson above the study pane (column), landscape
           = lesson left of the study pane (row) — the split always activates
           from the RIGHT in landscape, never from the bottom. */}
@@ -2118,6 +2227,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           open animation in full, then closes back into icon form. */}
       <ModuleFolderBurst />
     </div>
+    )}
     {addOfficialOpen ? (
       <Suspense fallback={null}>
         <AddOfficialResourceDialog

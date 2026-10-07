@@ -524,7 +524,7 @@ export default function NotesPanel({
             then the page. No card, no frame — the page IS the pane. */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
           <div
-            className={`flex shrink-0 items-center justify-between gap-2 py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] ${darkNote ? "bg-slate-950" : "bg-white"}`}
+            className={`flex shrink-0 items-center justify-between gap-2 border-b py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] ${darkNote ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"}`}
             data-course-notes-bar
           >
             <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} />
@@ -677,8 +677,7 @@ export default function NotesPanel({
               masterNotes.length > 0 ? (
                 <ul className="grid min-w-0 gap-3" data-course-master-notes-grid data-study-resource-grid>
                   {masterNotes.map((note) => {
-                    const preview = masterNotePreview(note);
-                    const wordCount = preview.trim().split(/\s+/).filter(Boolean).length;
+                    const wordCount = (note.bodyHtml || "").trim().split(/\s+/).filter(Boolean).length;
                     return (
                       <li key={note.id} className="min-w-0 min-h-[212px]" data-course-master-note-card>
                         <StudyResourceCard
@@ -687,8 +686,6 @@ export default function NotesPanel({
                           title={note.title || "Untitled master note"}
                           contextPath={[courseTitle, ...note.modulePath].filter(Boolean)}
                           contextDetail="Admin-authored course note · read only"
-                          topic={preview || undefined}
-                          topicLabel="Master content"
                           metadata={[wordCount ? `${wordCount} words` : ""].filter(Boolean)}
                           sourceLabel="MASTER"
                           createdAt={note.createdAt}

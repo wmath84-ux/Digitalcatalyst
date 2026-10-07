@@ -8,6 +8,7 @@ import Features from "./components/landing/Features";
 import CtaBanner from "./components/landing/CtaBanner";
 import Footer from "./components/landing/Footer";
 import LandingOverlays from "./components/landing/LandingOverlays";
+import GradientWaves from "./components/GradientWaves";
 import { OPEN_APP_EVENT } from "@/utils/pwaInstall";
 
 /** Hash that routes to the main HomeApp inside Root (src/main.tsx). */
@@ -42,14 +43,26 @@ export default function LandingApp() {
           initial={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -60, scale: 0.96 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="min-h-screen"
+          className="relative min-h-screen overflow-hidden"
         >
-          <Header />
-          <Hero />
-          <Features />
-          <CtaBanner />
-          <Footer />
-          <LandingOverlays />
+          <GradientWaves
+            horizonColor="#5227FF"
+            waveColor="#FF9FFC"
+            crestColor="#FFFFFF"
+            speed={0.3}
+            amplitude={2.0}
+            opacity={0.15}
+            grain={true}
+            grainIntensity={0.03}
+          />
+          <div className="relative z-10">
+            <Header />
+            <Hero />
+            <Features />
+            <CtaBanner />
+            <Footer />
+            <LandingOverlays />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
