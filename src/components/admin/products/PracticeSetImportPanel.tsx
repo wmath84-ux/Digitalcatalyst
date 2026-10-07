@@ -30,10 +30,21 @@
 // and the panel's pills name what is still missing.
 
 import { useMemo, useRef, useState } from "react";
-import { CheckCircle2, FileText, ListPlus, Sparkles, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Copy, FileText, ListPlus, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { Field, Pill, SecondaryButton, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
 import { parseQuestionText } from "@/revision/engine/bulkParser";
-import { MAX_PRACTICE_OPTIONS, MAX_PRACTICE_QUESTIONS, MIN_PRACTICE_OPTIONS } from "../../../../utils/practiceSet.js";
+import {
+  MAX_PRACTICE_OPTIONS,
+  MAX_PRACTICE_QUESTIONS,
+  MIN_PRACTICE_OPTIONS,
+  practiceQuestionIssues,
+} from "../../../../utils/practiceSet.js";
+import {
+  PRACTICE_PROMPT_LANGUAGES,
+  PRACTICE_PROMPT_LEVELS,
+  PRACTICE_PROMPT_RULES,
+  buildPracticeAiPrompt,
+} from "@/utils/practicePrompt";
 import type { ProductPracticeQuestion } from "@/lib/admin/types";
 
 const DIFFICULTIES: ProductPracticeQuestion["difficulty"][] = ["easy", "medium", "hard"];
@@ -63,14 +74,25 @@ const blankQuestion = (index: number): ProductPracticeQuestion => ({
   topic: "",
 });
 
-/** Per-question readiness — mirrors what the ProductEditor validation blocks on. */
-const questionIssues = (question: ProductPracticeQuestion): string[] => {
-  const issues: string[] = [];
-  if (!question.prompt.trim()) issues.push("no question text");
-  if (question.options.map((option) => option.trim()).filter(Boolean).length < MIN_PRACTICE_OPTIONS) issues.push("needs 2 options");
-  if (!(question.correctIndex >= 0 && question.correctIndex < question.options.length)) issues.push("no answer marked");
-  return issues;
-};
+/**
+ * Per-question readiness — the SAME rule the publish validation and the
+ * resource card read (`practiceQuestionIssues`), so "Ready" here always means
+ * "publishable". The explanation is part of it: it is never optional.
+ */
+const questionIssues = (question: ProductPracticeQuestion): string[] => practiceQuestionIssues(question);
+
+/** Clipboard with an honest failure path (some WebViews refuse the API). */
+async function copyToClipboard(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    /* fall through to the manual path below */
+  }
+  return false;
+}
 
 /** Assign stable, unique ids without ever dropping a draft question. */
 const withIds = (list: ProductPracticeQuestion[]): ProductPracticeQuestion[] => {
@@ -111,6 +133,32 @@ export default function PracticeSetImportPanel({
   const [importNote, setImportNote] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // ── Step 1 · the AI CMD (copy-paste prompt) ──────────────────────────────
+  const [aiOpen, setAiOpen] = useState(questions.length === 0);
+  const [aiTopic, setAiTopic] = useState(resourceName);
+  const [aiClass, setAiClass] = useState("");
+  const [aiCount, setAiCount] = useState("10");
+  const [aiLanguage, setAiLanguage] = useState(PRACTICE_PROMPT_LANGUAGES[0]);
+  const [aiPromptEdit, setAiPromptEdit] = useState("");
+  const [aiCopyNote, setAiCopyNote] = useState<string | null>(null);
+
+  const generatedPrompt = useMemo(
+    () => buildPracticeAiPrompt({ topic: aiTopic, level: aiClass, count: Number(aiCount), language: aiLanguage }),
+    [aiTopic, aiClass, aiCount, aiLanguage],
+  );
+  // The CMD is editable: typing in the box wins, editing a field above rebuilds it.
+  const promptText = aiPromptEdit || generatedPrompt;
+  const resetPromptEdit = () => setAiPromptEdit("");
+
+  const copyPrompt = async () => {
+    const ok = await copyToClipboard(promptText);
+    setAiCopyNote(
+      ok
+        ? "CMD copied — paste it into ChatGPT / Gemini / Claude, then paste the reply into “Paste questions” below and press Import."
+        : "Clipboard blocked — select the CMD text in the box and copy it manually.",
+    );
+  };
 
   const problems = questions.reduce((total, question) => total + questionIssues(question).length, 0);
   const ready = questions.length > 0 && problems === 0;
@@ -233,15 +281,153 @@ export default function PracticeSetImportPanel({
         />
       </Field>
 
-      {/* ── Bulk import (the revision profile page's importer) ───────────── */}
+      {/* ── Step 1 · the AI CMD (copy-paste prompt) ─────────────────────── */}
+      <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3" data-practice-ai-prompt>
+        <button
+          type="button"
+          onClick={() => setAiOpen((value) => !value)}
+          className="flex w-full items-center gap-2 text-left"
+          data-practice-ai-prompt-toggle
+        >
+          <Wand2 className="h-3.5 w-3.5 text-violet-600" />
+          <span className="flex-1 text-xs font-bold uppercase tracking-wide text-violet-800">
+            Step 1 · Let an AI write the questions (copy this CMD)
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-violet-400">{aiOpen ? "Hide" : "Open"}</span>
+        </button>
+        {aiOpen ? (
+          <div className="mt-3 space-y-2">
+            <p className="text-[11px] leading-5 text-violet-900">
+              Fill the topic and class, copy the CMD below and paste it into ChatGPT / Gemini / Claude. Paste the reply straight into
+              “Paste questions” in Step 2 and press Import — nothing to reformat by hand.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label="Topic" hint="What the questions must test — this goes into the CMD.">
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Photosynthesis, Quadratic equations"
+                  value={aiTopic}
+                  onChange={(event) => {
+                    setAiTopic(event.target.value);
+                    resetPromptEdit();
+                  }}
+                  data-practice-ai-topic
+                />
+              </Field>
+              <Field label="Class / level" hint="Who the questions are for — this goes into the CMD.">
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Class 10 (CBSE), JEE foundation"
+                  value={aiClass}
+                  onChange={(event) => {
+                    setAiClass(event.target.value);
+                    resetPromptEdit();
+                  }}
+                  data-practice-ai-class
+                />
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {PRACTICE_PROMPT_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => {
+                    setAiClass(level);
+                    resetPromptEdit();
+                  }}
+                  className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200 active:bg-violet-100"
+                  data-practice-ai-level={level}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label="How many questions">
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_PRACTICE_QUESTIONS}
+                  className={inputClass}
+                  value={aiCount}
+                  onChange={(event) => {
+                    setAiCount(event.target.value);
+                    resetPromptEdit();
+                  }}
+                  data-practice-ai-count
+                />
+              </Field>
+              <Field label="Language of the questions">
+                <select
+                  className={selectClass}
+                  value={aiLanguage}
+                  onChange={(event) => {
+                    setAiLanguage(event.target.value);
+                    resetPromptEdit();
+                  }}
+                  data-practice-ai-language
+                >
+                  {PRACTICE_PROMPT_LANGUAGES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PRACTICE_PROMPT_RULES.map((rule) => (
+                <span key={rule} className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                  {rule}
+                </span>
+              ))}
+            </div>
+            <Field
+              label="CMD — copy this into the AI"
+              hint="Editable: the topic, class, count and language you typed above are already written in. The explanation line is part of the format — never delete it."
+            >
+              <textarea
+                className={`${textareaClass} min-h-[220px] bg-white font-mono !text-[11px] leading-relaxed`}
+                value={promptText}
+                onChange={(event) => setAiPromptEdit(event.target.value)}
+                aria-label="CMD for the AI"
+                data-practice-ai-prompt-text
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void copyPrompt()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-xs font-bold text-white active:bg-violet-700"
+                data-practice-ai-copy
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy CMD for AI
+              </button>
+              {aiPromptEdit ? (
+                <SecondaryButton className="h-9 px-3 text-xs" onClick={() => setAiPromptEdit("")}>
+                  Reset to the standard CMD
+                </SecondaryButton>
+              ) : null}
+            </div>
+            {aiCopyNote ? (
+              <p className="rounded-lg bg-violet-100 p-2 text-[11px] font-semibold text-violet-900" data-practice-ai-copy-note>
+                {aiCopyNote}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {/* ── Step 2 · bulk import (the revision profile page's importer) ──── */}
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
         <div className="flex items-center gap-1.5">
           <FileText className="h-3.5 w-3.5 text-slate-500" />
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Bulk import</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Step 2 · Paste &amp; import</p>
         </div>
         <Field
           label="Paste questions"
-          hint="Same plain-text format as the revision bulk importer: numbered prompts, A./B./C. options, an answer marker (✓ ✔ √ * ✅ (correct) **bold**) or an “Answer: B” line, plus an optional “Explanation:” line."
+          hint="Same plain-text format as the revision bulk importer: numbered prompts, A./B./C. options, an answer marker (✓ ✔ √ * ✅ (correct) **bold**) or an “Answer: B” line, and an “Explanation:” line — which is required on every question, not optional."
         >
           <textarea
             className={`${textareaClass} min-h-[150px] font-mono text-[12px] leading-5`}
@@ -285,7 +471,8 @@ export default function PracticeSetImportPanel({
           <p className="rounded-lg bg-emerald-100/70 p-2 text-[11px] font-medium text-emerald-900" data-practice-preview>
             Detected {preview.length} question{preview.length === 1 ? "" : "s"} ·{" "}
             {preview.filter((question) => question.correctIndex >= 0).length} with a marked answer ·{" "}
-            {preview.filter((question) => question.explanation).length} with an explanation. Importing appends them below.
+            {preview.filter((question) => question.explanation).length} with an explanation (required on every question). Importing
+            appends them below.
           </p>
         ) : null}
         {importError ? (
@@ -423,7 +610,7 @@ export default function PracticeSetImportPanel({
                 </Field>
               </div>
 
-              <Field label="Explanation" hint="Shown on the review screen after submitting.">
+              <Field label="Explanation" required hint="Required — the learner reads it on the review screen after answering, so it is never optional.">
                 <textarea
                   className={`${textareaClass} min-h-[56px]`}
                   placeholder="Why the marked option is right."
@@ -438,7 +625,7 @@ export default function PracticeSetImportPanel({
 
       <p className="text-[11px] leading-5 text-slate-500">
         Saving the product publishes this set to the Course Player&apos;s Brain tab for the module you are editing. Every question needs text,
-        two options and a marked answer before the product can be published — drafts are kept in the editor meanwhile.
+        two options, a marked answer AND an explanation before the product can be published — drafts are kept in the editor meanwhile.
       </p>
     </div>
   );
