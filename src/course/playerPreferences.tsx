@@ -28,7 +28,7 @@ export type MasterSelfMode = "master" | "self";
 export type ModuleListingStyle = "classic" | "modern";
 
 /** The features that carry a MASTER/SELF filter. */
-export type MasterSelfFeature = "notes" | "mindMap" | "brain";
+export type MasterSelfFeature = "notes" | "mindMap" | "brain" | "experiment";
 /** The features that carry a remembered light/dark choice. */
 export type ThemedFeature = "player" | "mindMap" | "read" | "ai" | "sketch" | "notes";
 

@@ -89,6 +89,16 @@ export interface MyCourseResource {
    * the course document, so it plays offline in a sandboxed iframe.
    */
   interactiveHtml?: string;
+  /**
+   * Interactive 2D experiment created from the Course Player's Experiment page
+   * (type "interactive" only): the player scope it belongs to — the
+   * `storageProductId` of the course it was made in. The Experiment page lists
+   * an experiment in SELF only when this equals the course being opened
+   * (`selfExperimentsFromCourses`, src/utils/selfExperiments.ts). Resources
+   * made in the Study Library carry no tag, so “made here” and “kept in the
+   * library” never blur together.
+   */
+  experimentSourceProductId?: string;
   createdAt: number;
   updatedAt: number;
 }

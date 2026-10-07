@@ -182,6 +182,10 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
     // The scope a set created from the Brain tab belongs to — without it the
     // Course Player would either lose the set or show it in every course.
     practiceSourceProductId: typeof source.practiceSourceProductId === "string" ? source.practiceSourceProductId : undefined,
+    // …and the same tag for an experiment created from the Experiment page
+    // (src/utils/selfExperiments.ts). A re-read must keep it, or the
+    // experiment would disappear from the course it was made in.
+    experimentSourceProductId: typeof source.experimentSourceProductId === "string" ? source.experimentSourceProductId : undefined,
     // Read resources (the learner's own annotatable PDFs): the library fields
     // travel with the resource, or the player would show an empty Read row.
     readSourceKind: READ_SOURCE_KINDS.includes(String(source.readSourceKind))

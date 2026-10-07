@@ -389,6 +389,15 @@ interface CourseOverlayProps {
    */
   brainPanel?: ReactNode;
   /**
+   * The Experiment tab's Live Experiment panel. Owned by the Course Player
+   * (it reads the course tree's `interactive` resources AND the learner's own
+   * “My experiments” shelf, and owns the “+” save) and handed down
+   * ready-rendered, same ownership pattern as the Brain panel. Absent → a
+   * titled placeholder instead of the empty list this tab used to fall
+   * through to.
+   */
+  experimentPanel?: ReactNode;
+  /**
    * Structured resource library for the Modules tab. Shows the full course
    * hierarchy with note, mind map, lesson and practice cards grouped by
    * module/submodule. When provided, replaces the flat SnapList module list.
@@ -730,7 +739,7 @@ function ComingSoonPanel({
   color: string;
   title: string;
   subtitle: string;
-  panelAttr: "data-course-brain-panel" | "data-course-ai-panel";
+  panelAttr: "data-course-brain-panel" | "data-course-ai-panel" | "data-course-experiment-panel";
 }) {
   return (
     <div
@@ -769,6 +778,7 @@ export function StudyContent({
   personalModulesPanel,
   aiPanel,
   brainPanel,
+  experimentPanel,
   sketchPanel,
   resourceLibraryPanel,
   moduleListingStyle = "classic",
@@ -785,6 +795,8 @@ export function StudyContent({
   personalModulesPanel?: ReactNode;
   aiPanel?: ReactNode;
   brainPanel?: ReactNode;
+  /** Live Experiment — the course's experiments + the learner's own (SELF). */
+  experimentPanel?: ReactNode;
   sketchPanel?: ReactNode;
   resourceLibraryPanel?: ReactNode;
   moduleListingStyle?: "classic" | "modern";
@@ -829,6 +841,21 @@ export function StudyContent({
             title="Brain"
             subtitle="Practice sets load with the Course Player"
             panelAttr="data-course-brain-panel"
+          />
+        )
+      ) : tab === "experiment" ? (
+        // Live Experiment — the course's own 2D experiments (MASTER) and the
+        // learner's own (SELF), with the “+” that builds a new one. The parent
+        // owns the panel (it reads the course tree AND the Study Library
+        // shelf), so a missing slot keeps a titled placeholder instead of a
+        // blank surface — the tab used to fall through to an empty list.
+        experimentPanel ?? (
+          <ComingSoonPanel
+            icon={FlaskConical}
+            color="#FF6BF5"
+            title="Live Experiment"
+            subtitle="Interactive 2D experiments — MASTER & SELF"
+            panelAttr="data-course-experiment-panel"
           />
         )
       ) : tab === "ai" ? (
@@ -936,6 +963,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       personalModulesPanel={props.personalModulesPanel}
       aiPanel={props.aiPanel}
       brainPanel={props.brainPanel}
+      experimentPanel={props.experimentPanel}
       sketchPanel={props.sketchPanel}
       resourceLibraryPanel={props.resourceLibraryPanel}
     />
