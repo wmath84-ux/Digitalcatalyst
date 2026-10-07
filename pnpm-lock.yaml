@@ -137,12 +137,18 @@ importers:
       matter-js:
         specifier: ^0.20.0
         version: 0.20.0
+      ogl:
+        specifier: ^1.0.11
+        version: 1.0.11
       pdfjs-dist:
         specifier: 6.3.289
         version: 6.3.289
       pdfjs-viewer-element:
         specifier: 4.1.1
         version: 4.1.1
+      perfect-freehand:
+        specifier: ^1.2.3
+        version: 1.2.3
       react:
         specifier: 19.2.6
         version: 19.2.6
@@ -4823,6 +4829,9 @@ packages:
     resolution: {integrity: sha512-RSn9F68PjH9HqtltsSnqYC1XXoWe9Bju5+213R98cNGttag9q9yAOTzdbsqvIa7aNm5WffBZFpWYr2aWrklWAw==}
     engines: {node: '>= 6'}
 
+  ogl@1.0.11:
+    resolution: {integrity: sha512-kUpC154AFfxi16pmZUK4jk3J+8zxwTWGPo03EoYA8QPbzikHoaC82n6pNTbd+oEaJonaE8aPWBlX7ad9zrqLsA==}
+
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
@@ -4892,6 +4901,9 @@ packages:
 
   perfect-freehand@1.2.0:
     resolution: {integrity: sha512-h/0ikF1M3phW7CwpZ5MMvKnfpHficWoOEyr//KVNTxV4F6deRK1eYMtHyBKEAKFK0aXIEUK9oBvlF6PNXMDsAw==}
+
+  perfect-freehand@1.2.3:
+    resolution: {integrity: sha512-bHZSfqDHGNlPpgH2yxXgPHlQSPpEbo+qg7li0M78J9vNAi2yjwLeA4x79BEQhX44lEWpCLSFCeRZwpw0niiXPA==}
 
   pica@7.1.1:
     resolution: {integrity: sha512-WY73tMvNzXWEld2LicT9Y260L43isrZ85tPuqRyvtkljSDLmnNFQmZICt4xUJMVulmcc6L9O7jbBrtx3DOz/YQ==}
@@ -10941,6 +10953,8 @@ snapshots:
 
   object-hash@3.0.0: {}
 
+  ogl@1.0.11: {}
+
   once@1.4.0:
     dependencies:
       wrappy: 1.0.2
@@ -11012,6 +11026,8 @@ snapshots:
   pend@1.2.0: {}
 
   perfect-freehand@1.2.0: {}
+
+  perfect-freehand@1.2.3: {}
 
   pica@7.1.1:
     dependencies:
