@@ -1,84 +1,100 @@
 // src/course/usePerfectFreehandSketch.ts
 //
-// Per-student PERFECT-FREEHAND SKETCH persistence for the Course Player —
-// the state half of the Quick Sketch mode (the editor itself is
+// Per-student QUICK SKETCH persistence for the Course Player — the state half
+// of the Sketch tab's freehand canvas (the editor itself is
 // `src/components/PerfectFreehandSketch.tsx`).
 //
 // Storage: `users/{uid}/quickSketches/{uid}__{productId}__{moduleId}` for the
 // FIRST canvas of a module and `…__{sketchKey}` for every further canvas — one
 // document per learner + course + module + canvas, owner-only per
-// firestore.rules. The id is the same composite shape `useCourseSketch` uses.
+// firestore.rules, whose `quickSketches` block mirrors this file's numbers. The
+// id is the same composite shape `useCourseSketch` (the Excalidraw boards) uses,
+// and both live under `users/{uid}` so one learner can never write into
+// another's namespace.
 //
 // ── Scope: the MODULE, exactly like the Excalidraw sketch ─────────────────
-// Boards are scoped to the MODULE. Switching lessons inside one module keeps
+// Canvases are scoped to the MODULE. Switching lessons inside one module keeps
 // the same canvas; switching modules opens that module's own canvases.
 //
 // ── Many canvases per module ──────────────────────────────────────────────
 // This hook owns:
-//   1. the INDEX of the module's canvases (key, title, stroke count, timestamps)
+//   1. the INDEX of the module's canvases (key, title, stroke count, stamps)
 //   2. the ACTIVE canvas's strokes
 //
-// The first canvas keeps key `main`. "+" generates a fresh unique key.
+// The first canvas keeps key `main`. "New canvas" generates a fresh unique key
+// (never `main`, never an existing key), so a new canvas can never overwrite a
+// saved one, and which canvas was open is remembered per module.
 //
-// ── Two layers (Firestore + localStorage) ─────────────────────────────────
-// Firestore is source of truth; localStorage mirrors every save for offline.
+// ── Two layers, deliberately (the Excalidraw boards' pattern) ─────────────
+//   1. Firestore is the source of truth, so the same learner sees the same
+//      canvases on every device.
+//   2. localStorage mirrors every save (and the canvas index). A refused or
+//      failed write must never strand a drawing: the mirror is read back on the
+//      next open and pushed up when the cloud answers again.
 //
-// ── Data structure ────────────────────────────────────────────────────────
-// Each stroke: { id, points[], color, size, isEraser }
-// Stored as JSON in Firestore and localStorage.
+// ── Why a stroke can never vanish ─────────────────────────────────────────
+// `updateStrokes()` puts the new list in React STATE (and the ref the debounce
+// reads). It used to only touch the ref, so the canvas — which renders the
+// hook's state — kept drawing the list from before the stroke was finished,
+// and every stroke disappeared the moment the learner lifted their finger.
+// With the list in state, a stroke is on screen the instant it is written.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { useCallback, useEffect, useReducer, useRef } from "react";
+import { collection, deleteDoc, doc, getDocs, getDoc, query, setDoc, where } from "firebase/firestore";
+import { db } from "../../firebase";
+import {
+  MAX_QUICK_SKETCH_BOARDS,
+  MAX_QUICK_SKETCH_STROKES,
+  QUICK_SKETCH_COLLECTION,
+  QUICK_SKETCH_DEFAULT_KEY,
+  clearQuickSketchDraft,
+  createQuickSketchKey,
+  nextQuickSketchTitle,
+  quickSketchActiveKey,
+  quickSketchDocId,
+  quickSketchIndexKey,
+  quickSketchLocalKey,
+  quickSketchStrokesFrom,
+  readQuickSketchDraft,
+  sanitizeQuickSketchKey,
+  toFirestoreQuickSketch,
+  writeQuickSketchDraft,
+  type QuickSketchBoardDoc,
+  type QuickSketchBoardSummary,
+  type QuickSketchDraft,
+  type QuickSketchStroke,
+} from "../utils/quickSketch";
 
-// ── Types ─────────────────────────────────────────────────────────────────
-
-export interface StrokePoint {
-  x: number;
-  y: number;
-  pressure: number;
-}
-
-export interface Stroke {
-  id: string;
-  points: StrokePoint[];
-  color: string;
-  size: number;
-  isEraser: boolean;
-}
-
+/** `pending` = edited, not written yet; `saving` = a write is in flight;
+ *  `saved` = the cloud acknowledged the latest edit; `error` = the last attempt
+ *  failed (the device copy still holds the work — see `deviceSaved`). */
 export type QuickSketchSaveStatus = "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
-
-export interface QuickSketchBoardSummary {
-  sketchKey: string;
-  title: string;
-  strokeCount: number;
-  updatedAt: number;
-  createdAt: number;
-}
 
 export interface UsePerfectFreehandSketchInput {
   uid?: string | null;
   productId?: string | number | null;
+  /** The module the canvas belongs to; canvases are scoped to it. */
   moduleId?: string | number | null;
   resourceId?: string | null;
   resourceName?: string | null;
+  /** Milliseconds of quiet before a pending edit reaches Firestore. */
   debounceMs?: number;
 }
 
 export interface UsePerfectFreehandSketchResult {
-  strokes: Stroke[];
-  getStrokes: () => Stroke[];
-  sceneKey: string;
+  strokes: QuickSketchStroke[];
+  /** The live list, read at call time (never a stale render's copy). */
+  getStrokes: () => QuickSketchStroke[];
   scoped: boolean;
   loading: boolean;
   status: QuickSketchSaveStatus;
   errorMessage: string | null;
   pendingSync: boolean;
+  /** False when even the device copy could not be written (storage full). */
   deviceSaved: boolean;
   lastSavedAt: number | null;
-  strokeCount: number;
-  updateStrokes: (strokes: Stroke[], forSceneKey?: string) => void;
+  /** Pass a new list; it is drawn immediately and saved when the learner pauses. */
+  updateStrokes: (strokes: QuickSketchStroke[]) => void;
   flush: () => void;
   retry: () => void;
   boards: QuickSketchBoardSummary[];
@@ -91,72 +107,21 @@ export interface UsePerfectFreehandSketchResult {
   deleteBoard: (sketchKey: string) => boolean;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
 const DEFAULT_DEBOUNCE_MS = 1100;
 const MAX_WAIT_MS = 6000;
 const LOCAL_MIRROR_MS = 350;
-const OPEN_GRACE_MS = 2500;
 const MAX_ATTEMPTS = 8;
 const CREATE_GUARD_MS = 800;
-const MAX_BOARDS = 12;
-const QUICK_SKETCH_COLLECTION = "quickSketches";
-const DEFAULT_KEY = "main";
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-const createSketchKey = () => `sk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-
-const sanitizeSketchKey = (key: string) => key.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || createSketchKey();
-
-const nextSketchTitle = (boards: QuickSketchBoardSummary[]) => {
-  const used = new Set(boards.map((b) => b.title));
-  for (let i = 1; i < 100; i++) {
-    const title = `Sketch ${i}`;
-    if (!used.has(title)) return title;
-  }
-  return `Sketch ${Date.now()}`;
-};
-
-const sketchDocId = (uid: string, productId: string, moduleId: string, sketchKey: string = DEFAULT_KEY) =>
-  `${uid}__${productId}__${moduleId}${sketchKey === DEFAULT_KEY ? "" : `__${sketchKey}`}`;
-
-const localKey = (uid: string, productId: string, moduleId: string, sketchKey: string = DEFAULT_KEY) =>
-  sketchKey === DEFAULT_KEY
-    ? `dc.quickSketch.v1.${uid}.${productId}.${moduleId}`
-    : `dc.quickSketch.v1.${uid}.${productId}.${moduleId}.${sketchKey}`;
-
-const outboxKey = (uid: string, productId: string, moduleId: string, sketchKey: string = DEFAULT_KEY) =>
-  sketchKey === DEFAULT_KEY
-    ? `dc.quickSketchOutbox.v1.${uid}.${productId}.${moduleId}`
-    : `dc.quickSketchOutbox.v1.${uid}.${productId}.${moduleId}.${sketchKey}`;
-
-const indexKey = (uid: string, productId: string, moduleId: string) =>
-  `dc.quickSketchIndex.v1.${uid}.${productId}.${moduleId}`;
-
-const activeBoardStorageKey = (uid: string, productId: string, moduleId: string) =>
-  `dc.quickSketchActive.v1.${uid}.${productId}.${moduleId}`;
-
-interface BoardDoc {
-  sketchKey: string;
-  title: string;
-  strokes: Stroke[];
-  resourceId?: string | null;
-  resourceName?: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
 
 // ── State machine ─────────────────────────────────────────────────────────
 
 interface State {
-  strokes: Stroke[];
+  strokes: QuickSketchStroke[];
   status: QuickSketchSaveStatus;
   errorMessage: string | null;
   pendingSync: boolean;
   deviceSaved: boolean;
   lastSavedAt: number | null;
-  sceneKey: string;
   loading: boolean;
   boards: QuickSketchBoardSummary[];
   activeBoardKey: string;
@@ -165,7 +130,7 @@ interface State {
 }
 
 type Action =
-  | { type: "SET_STROKES"; strokes: Stroke[]; sceneKey: string }
+  | { type: "SET_STROKES"; strokes: QuickSketchStroke[] }
   | { type: "SET_STATUS"; status: QuickSketchSaveStatus; errorMessage?: string | null }
   | { type: "SET_PENDING_SYNC"; pending: boolean }
   | { type: "SET_DEVICE_SAVED"; saved: boolean }
@@ -173,12 +138,13 @@ type Action =
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_BOARDS"; boards: QuickSketchBoardSummary[] }
   | { type: "SET_ACTIVE_BOARD"; key: string; title: string }
-  | { type: "SET_BOARDS_LOADING"; loading: boolean };
+  | { type: "SET_BOARDS_LOADING"; loading: boolean }
+  | { type: "SET_BOARD_STATS"; key: string; strokeCount: number; updatedAt: number };
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "SET_STROKES":
-      return { ...state, strokes: action.strokes, sceneKey: action.sceneKey };
+      return { ...state, strokes: action.strokes };
     case "SET_STATUS":
       return { ...state, status: action.status, errorMessage: action.errorMessage ?? null };
     case "SET_PENDING_SYNC":
@@ -195,8 +161,34 @@ const reducer = (state: State, action: Action): State => {
       return { ...state, activeBoardKey: action.key, activeBoardTitle: action.title };
     case "SET_BOARDS_LOADING":
       return { ...state, boardsLoading: action.loading };
+    case "SET_BOARD_STATS": {
+      const boards = state.boards.map((board) =>
+        board.sketchKey === action.key
+          ? { ...board, strokeCount: action.strokeCount, updatedAt: action.updatedAt }
+          : board,
+      );
+      return { ...state, boards };
+    }
     default:
       return state;
+  }
+};
+
+/** Which canvas of the module was open last time (the first one by default). */
+const rememberedBoardKey = (uid: string, productId: string, moduleId: string): string => {
+  try {
+    return localStorage.getItem(quickSketchActiveKey(uid, productId, moduleId)) || QUICK_SKETCH_DEFAULT_KEY;
+  } catch {
+    return QUICK_SKETCH_DEFAULT_KEY;
+  }
+};
+
+const readLocalBoard = (key: string): QuickSketchBoardDoc | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as QuickSketchBoardDoc) : null;
+  } catch {
+    return null;
   }
 };
 
@@ -212,15 +204,22 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     pendingSync: false,
     deviceSaved: true,
     lastSavedAt: null,
-    sceneKey: "",
     loading: true,
     boards: [],
-    activeBoardKey: DEFAULT_KEY,
+    activeBoardKey: QUICK_SKETCH_DEFAULT_KEY,
     activeBoardTitle: "Sketch 1",
     boardsLoading: true,
   });
 
-  const strokesRef = useRef<Stroke[]>([]);
+  /** The list the debounced save writes — the live canvas's own truth. */
+  const strokesRef = useRef<QuickSketchStroke[]>([]);
+  /** The active canvas's own identity + creation time (kept across saves). */
+  const boardRef = useRef<{ key: string; title: string; createdAt: number }>({
+    key: QUICK_SKETCH_DEFAULT_KEY,
+    title: "Sketch 1",
+    createdAt: 0,
+  });
+  const scopeRef = useRef<string>("");
   const debounceTimerRef = useRef<number | null>(null);
   const maxWaitTimerRef = useRef<number | null>(null);
   const localMirrorTimerRef = useRef<number | null>(null);
@@ -228,318 +227,484 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
   const createGuardRef = useRef(0);
 
   const scoped = Boolean(uid && productId && moduleId);
-  const scopeKey = useMemo(() => `${uid}__${productId}__${moduleId}`, [uid, productId, moduleId]);
+  const scopeKey = `${uid || ""}__${String(productId ?? "")}__${String(moduleId ?? "")}`;
 
-  // ── Load board on scope change ────────────────────────────────────────
+  const clearTimers = useCallback(() => {
+    if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    if (maxWaitTimerRef.current) window.clearTimeout(maxWaitTimerRef.current);
+    if (localMirrorTimerRef.current) window.clearTimeout(localMirrorTimerRef.current);
+    debounceTimerRef.current = null;
+    maxWaitTimerRef.current = null;
+    localMirrorTimerRef.current = null;
+  }, []);
 
-  useEffect(() => {
-    if (!scoped) {
-      dispatch({ type: "SET_LOADING", loading: false });
-      dispatch({ type: "SET_BOARDS_LOADING", loading: false });
-      return;
-    }
+  // ── The board document ────────────────────────────────────────────────
 
-    const loadBoard = async () => {
-      dispatch({ type: "SET_LOADING", loading: true });
-      dispatch({ type: "SET_STATUS", status: "loading" });
-
-      const activeKey = localStorage.getItem(activeBoardStorageKey(uid!, String(productId), String(moduleId))) || DEFAULT_KEY;
-      const docId = sketchDocId(uid!, String(productId), String(moduleId), activeKey);
-
-      try {
-        const snap = await getDoc(doc(db, QUICK_SKETCH_COLLECTION, docId));
-        if (snap.exists()) {
-          const data = snap.data() as BoardDoc;
-          strokesRef.current = data.strokes || [];
-          dispatch({ type: "SET_STROKES", strokes: data.strokes || [], sceneKey: `${scopeKey}__${activeKey}__${Date.now()}` });
-          dispatch({ type: "SET_ACTIVE_BOARD", key: activeKey, title: data.title || "Sketch 1" });
-          dispatch({ type: "SET_STATUS", status: "ready" });
-        } else {
-          // Try localStorage fallback
-          const localData = localStorage.getItem(localKey(uid!, String(productId), String(moduleId), activeKey));
-          if (localData) {
-            const parsed = JSON.parse(localData) as BoardDoc;
-            strokesRef.current = parsed.strokes || [];
-            dispatch({ type: "SET_STROKES", strokes: parsed.strokes || [], sceneKey: `${scopeKey}__${activeKey}__${Date.now()}` });
-            dispatch({ type: "SET_ACTIVE_BOARD", key: activeKey, title: parsed.title || "Sketch 1" });
-            dispatch({ type: "SET_STATUS", status: "ready" });
-            dispatch({ type: "SET_PENDING_SYNC", pending: true });
-          } else {
-            strokesRef.current = [];
-            dispatch({ type: "SET_STROKES", strokes: [], sceneKey: `${scopeKey}__${activeKey}__${Date.now()}` });
-            dispatch({ type: "SET_ACTIVE_BOARD", key: activeKey, title: "Sketch 1" });
-            dispatch({ type: "SET_STATUS", status: "ready" });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load quick sketch:", err);
-        dispatch({ type: "SET_STATUS", status: "error", errorMessage: "Failed to load sketch" });
-      } finally {
-        dispatch({ type: "SET_LOADING", loading: false });
-      }
-    };
-
-    loadBoard();
-  }, [scopeKey, scoped, uid, productId, moduleId]);
-
-  // ── Load board index ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!scoped) return;
-
-    const loadIndex = async () => {
-      dispatch({ type: "SET_BOARDS_LOADING", loading: true });
-
-      try {
-        const q = query(
-          collection(db, QUICK_SKETCH_COLLECTION),
-          where("uid", "==", uid),
-          where("productId", "==", String(productId)),
-          where("moduleId", "==", String(moduleId))
-        );
-        const snap = await getDocs(q);
-        const boards: QuickSketchBoardSummary[] = [];
-        snap.forEach((doc) => {
-          const data = doc.data() as BoardDoc & { uid: string; productId: string; moduleId: string };
-          boards.push({
-            sketchKey: data.sketchKey,
-            title: data.title,
-            strokeCount: data.strokes?.length || 0,
-            updatedAt: data.updatedAt,
-            createdAt: data.createdAt,
-          });
-        });
-        boards.sort((a, b) => a.createdAt - b.createdAt);
-        dispatch({ type: "SET_BOARDS", boards });
-
-        // Mirror to localStorage
-        localStorage.setItem(indexKey(uid!, String(productId), String(moduleId)), JSON.stringify(boards));
-      } catch (err) {
-        console.error("Failed to load board index:", err);
-        // Try localStorage fallback
-        const localIndex = localStorage.getItem(indexKey(uid!, String(productId), String(moduleId)));
-        if (localIndex) {
-          dispatch({ type: "SET_BOARDS", boards: JSON.parse(localIndex) });
-        }
-      } finally {
-        dispatch({ type: "SET_BOARDS_LOADING", loading: false });
-      }
-    };
-
-    loadIndex();
-  }, [scopeKey, scoped, uid, productId, moduleId]);
-
-  // ── Save logic ────────────────────────────────────────────────────────
-
-  const saveToFirestore = useCallback(async () => {
-    if (!scoped) return;
-
-    const docId = sketchDocId(uid!, String(productId), String(moduleId), state.activeBoardKey);
-    const board: BoardDoc & { uid: string; productId: string; moduleId: string } = {
-      uid: uid!,
-      productId: String(productId),
-      moduleId: String(moduleId),
-      sketchKey: state.activeBoardKey,
-      title: state.activeBoardTitle,
+  const boardDocument = useCallback((): QuickSketchBoardDoc => {
+    const now = Date.now();
+    return toFirestoreQuickSketch({
+      uid: uid || "",
+      productId: String(productId ?? ""),
+      moduleId: String(moduleId ?? ""),
+      sketchKey: boardRef.current.key,
+      title: boardRef.current.title,
       strokes: strokesRef.current,
       resourceId: resourceId || null,
       resourceName: resourceName || null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+      createdAt: boardRef.current.createdAt || now,
+      updatedAt: now,
+    });
+  }, [moduleId, productId, resourceId, resourceName, uid]);
 
-    dispatch({ type: "SET_STATUS", status: "saving" });
+  // ── Save: Firestore (debounced) + the device mirror ───────────────────
 
+  const saveToLocalStorage = useCallback(() => {
+    if (!uid) return;
+    // No module open: there is no board document to address, so the drawing
+    // goes to the DEVICE draft instead of nowhere. It is still the learner's
+    // own work on the learner's own device — and the hook hands it to the
+    // first board that opens (see `takeDraftForBoard`).
+    if (!scoped) {
+      const saved = writeQuickSketchDraft(uid, productId, {
+        title: boardRef.current.title,
+        strokes: strokesRef.current,
+        createdAt: boardRef.current.createdAt,
+      });
+      dispatch({ type: "SET_DEVICE_SAVED", saved });
+      return;
+    }
     try {
-      await setDoc(doc(db, QUICK_SKETCH_COLLECTION, docId), board);
+      const board = boardDocument();
+      localStorage.setItem(quickSketchLocalKey(uid, board.productId, board.moduleId, board.sketchKey), JSON.stringify(board));
+      dispatch({ type: "SET_DEVICE_SAVED", saved: true });
+    } catch {
+      dispatch({ type: "SET_DEVICE_SAVED", saved: false });
+    }
+  }, [boardDocument, productId, scoped, uid]);
+
+  /**
+   * The device mirror, a beat after the pen stops. It is what survives a
+   * refused cloud write — and, with no module open, it is the ONLY copy.
+   */
+  const scheduleLocalMirror = useCallback(() => {
+    if (localMirrorTimerRef.current) window.clearTimeout(localMirrorTimerRef.current);
+    localMirrorTimerRef.current = window.setTimeout(() => {
+      localMirrorTimerRef.current = null;
+      saveToLocalStorage();
+    }, LOCAL_MIRROR_MS);
+  }, [saveToLocalStorage]);
+
+  const saveToFirestore = useCallback(async () => {
+    if (!scoped) return;
+    const board = boardDocument();
+    dispatch({ type: "SET_STATUS", status: "saving" });
+    try {
+      // `users/{uid}/quickSketches/…`, exactly like the Excalidraw boards:
+      // inside the learner's own namespace, and covered by the matching
+      // `match /quickSketches/{sketchId}` block in firestore.rules.
+      await setDoc(
+        doc(db, "users", board.uid, QUICK_SKETCH_COLLECTION, quickSketchDocId(board.uid, board.productId, board.moduleId, board.sketchKey)),
+        board,
+      );
       dispatch({ type: "SET_STATUS", status: "saved" });
       dispatch({ type: "SET_PENDING_SYNC", pending: false });
       dispatch({ type: "SET_LAST_SAVED", at: Date.now() });
+      dispatch({ type: "SET_BOARD_STATS", key: board.sketchKey, strokeCount: board.strokes.length, updatedAt: board.updatedAt });
       attemptsRef.current = 0;
-
-      // Clear outbox
-      localStorage.removeItem(outboxKey(uid!, String(productId), String(moduleId), state.activeBoardKey));
-    } catch (err) {
-      console.error("Failed to save quick sketch:", err);
-      attemptsRef.current++;
+    } catch {
+      attemptsRef.current += 1;
       if (attemptsRef.current >= MAX_ATTEMPTS) {
-        dispatch({ type: "SET_STATUS", status: "error", errorMessage: "Failed to save sketch" });
+        dispatch({ type: "SET_STATUS", status: "error", errorMessage: "Failed to save your drawing" });
       } else {
         dispatch({ type: "SET_STATUS", status: "pending" });
         dispatch({ type: "SET_PENDING_SYNC", pending: true });
       }
     }
-  }, [scoped, uid, productId, moduleId, state.activeBoardKey, state.activeBoardTitle, resourceId, resourceName]);
+  }, [boardDocument, moduleId, productId, scoped, uid]);
 
-  const saveToLocalStorage = useCallback(() => {
-    if (!scoped) return;
+  // ── Opening a canvas ──────────────────────────────────────────────────
 
-    const board: BoardDoc = {
-      sketchKey: state.activeBoardKey,
-      title: state.activeBoardTitle,
-      strokes: strokesRef.current,
-      resourceId: resourceId || null,
-      resourceName: resourceName || null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  /**
+   * The draft this board should adopt, or null.
+   *
+   * A drawing made before a lesson was open has no board of its own, so it
+   * waits in the device draft. The first EMPTY board that opens afterwards
+   * takes it — that is what stops "I drew something, then picked a lesson"
+   * from looking like the drawing vanished. A board that already has strokes
+   * is never overwritten by a draft.
+   */
+  const takeDraftForBoard = useCallback(() => {
+    if (!uid) return null;
+    const draft = readQuickSketchDraft(uid, productId);
+    if (!draft || draft.strokes.length === 0) return null;
+    return draft;
+  }, [productId, uid]);
 
-    try {
-      localStorage.setItem(
-        localKey(uid!, String(productId), String(moduleId), state.activeBoardKey),
-        JSON.stringify(board)
-      );
-      dispatch({ type: "SET_DEVICE_SAVED", saved: true });
-    } catch (err) {
-      console.error("Failed to save to localStorage:", err);
-      dispatch({ type: "SET_DEVICE_SAVED", saved: false });
-    }
-  }, [scoped, uid, productId, moduleId, state.activeBoardKey, state.activeBoardTitle, resourceId, resourceName]);
-
-  // ── Update strokes ────────────────────────────────────────────────────
-
-  const updateStrokes = useCallback(
-    (strokes: Stroke[], forSceneKey?: string) => {
-      if (forSceneKey && forSceneKey !== state.sceneKey) return;
-
-      strokesRef.current = strokes;
-      dispatch({ type: "SET_STATUS", status: "pending" });
-      dispatch({ type: "SET_PENDING_SYNC", pending: true });
-
-      // Debounce Firestore write
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = window.setTimeout(() => {
-        saveToFirestore();
-      }, debounceMs);
-
-      // Max wait for continuous drawing
-      if (!maxWaitTimerRef.current) {
-        maxWaitTimerRef.current = window.setTimeout(() => {
-          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-          saveToFirestore();
-          maxWaitTimerRef.current = null;
-        }, MAX_WAIT_MS);
+  /**
+   * Hand an adopted draft to the board that just opened: the board's OWN
+   * device copy is written first (so a refused write, a crash or a closed tab
+   * can never take the strokes with it), then the draft is cleared, then the
+   * cloud is asked to take it. Called once per adopted draft.
+   */
+  const adoptDraft = useCallback(
+    (draft: QuickSketchDraft, where: { product: string; module: string; localKey: string; sketchKey: string }) => {
+      if (!uid) return;
+      const board = toFirestoreQuickSketch({
+        uid,
+        productId: where.product,
+        moduleId: where.module,
+        sketchKey: where.sketchKey,
+        title: boardRef.current.title || draft.title,
+        strokes: strokesRef.current,
+        resourceId: resourceId || null,
+        resourceName: resourceName || null,
+        createdAt: boardRef.current.createdAt || draft.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      });
+      try {
+        localStorage.setItem(where.localKey, JSON.stringify(board));
+        dispatch({ type: "SET_DEVICE_SAVED", saved: true });
+      } catch {
+        // The device refused the copy: keep the draft until it can be written.
+        dispatch({ type: "SET_DEVICE_SAVED", saved: false });
+        return;
       }
-
-      // Local mirror (faster)
-      if (localMirrorTimerRef.current) clearTimeout(localMirrorTimerRef.current);
-      localMirrorTimerRef.current = window.setTimeout(() => {
-        saveToLocalStorage();
-      }, LOCAL_MIRROR_MS);
+      clearQuickSketchDraft(uid, where.product);
+      void saveToFirestore();
     },
-    [state.sceneKey, debounceMs, saveToFirestore, saveToLocalStorage]
+    [resourceId, resourceName, saveToFirestore, uid],
   );
 
-  // ── Board management ──────────────────────────────────────────────────
-
-  const selectBoard = useCallback(
-    async (sketchKey: string) => {
-      if (!scoped || sketchKey === state.activeBoardKey) return;
-
-      // Flush current board
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      if (maxWaitTimerRef.current) clearTimeout(maxWaitTimerRef.current);
-      await saveToFirestore();
-      saveToLocalStorage();
-
-      // Load new board
+  const openBoard = useCallback(
+    async (sketchKey: string, options: { flushCurrent?: boolean } = {}) => {
+      if (!scoped) return;
+      if (options.flushCurrent !== false && sketchKey !== boardRef.current.key) {
+        clearTimers();
+        await saveToFirestore();
+        saveToLocalStorage();
+      }
       dispatch({ type: "SET_LOADING", loading: true });
-      const docId = sketchDocId(uid!, String(productId), String(moduleId), sketchKey);
-
+      const product = String(productId);
+      const module = String(moduleId);
+      const localKey = quickSketchLocalKey(uid!, product, module, sketchKey);
       try {
-        const snap = await getDoc(doc(db, QUICK_SKETCH_COLLECTION, docId));
-        if (snap.exists()) {
-          const data = snap.data() as BoardDoc;
-          strokesRef.current = data.strokes || [];
-          dispatch({ type: "SET_STROKES", strokes: data.strokes || [], sceneKey: `${scopeKey}__${sketchKey}__${Date.now()}` });
-          dispatch({ type: "SET_ACTIVE_BOARD", key: sketchKey, title: data.title });
-          dispatch({ type: "SET_STATUS", status: "ready" });
+        const snap = await getDoc(
+          doc(db, "users", uid!, QUICK_SKETCH_COLLECTION, quickSketchDocId(uid!, product, module, sketchKey)),
+        );
+        const cloud = snap.exists() ? (snap.data() as QuickSketchBoardDoc) : null;
+        const local = readLocalBoard(localKey);
+        // The NEWER of the two wins (the cloud on a tie): a save that never
+        // reached Firestore is still on the device, and reopening the canvas
+        // must show the work the learner actually did.
+        const source =
+          cloud && local
+            ? (local.updatedAt || 0) > (cloud.updatedAt || 0)
+              ? local
+              : cloud
+            : cloud || local;
+        // An EMPTY board adopts the pre-lesson draft; a board with strokes of
+        // its own never does. See `takeDraftForBoard`.
+        const strokesFromBoard = quickSketchStrokesFrom(source?.strokes);
+        const draft = strokesFromBoard.length === 0 ? takeDraftForBoard() : null;
+        const strokes = draft ? draft.strokes : strokesFromBoard;
+        strokesRef.current = strokes;
+        boardRef.current = {
+          key: sketchKey,
+          title: draft?.title || source?.title || (sketchKey === QUICK_SKETCH_DEFAULT_KEY ? "Sketch 1" : sketchKey),
+          createdAt: (draft?.createdAt || source?.createdAt) || Date.now(),
+        };
+        dispatch({ type: "SET_STROKES", strokes });
+        dispatch({ type: "SET_ACTIVE_BOARD", key: boardRef.current.key, title: boardRef.current.title });
+        dispatch({ type: "SET_STATUS", status: draft ? "pending" : "ready" });
+        dispatch({ type: "SET_PENDING_SYNC", pending: Boolean(draft) || Boolean(source === local && local) });
+        dispatch({ type: "SET_BOARD_STATS", key: sketchKey, strokeCount: strokes.length, updatedAt: source?.updatedAt || Date.now() });
+        if (draft) adoptDraft(draft, { product, module, localKey, sketchKey });
+        try {
+          localStorage.setItem(quickSketchActiveKey(uid!, product, module), sketchKey);
+        } catch {
+          // A device that cannot remember which canvas was open still opens
+          // the first one — the drawing itself is never at risk.
         }
-        localStorage.setItem(activeBoardStorageKey(uid!, String(productId), String(moduleId)), sketchKey);
-      } catch (err) {
-        console.error("Failed to load board:", err);
-        dispatch({ type: "SET_STATUS", status: "error", errorMessage: "Failed to load sketch" });
+      } catch {
+        // A refused READ must never blank the canvas: the device copy stands.
+        const local = readLocalBoard(localKey);
+        const strokesFromBoard = quickSketchStrokesFrom(local?.strokes);
+        const draft = strokesFromBoard.length === 0 ? takeDraftForBoard() : null;
+        const strokes = draft ? draft.strokes : strokesFromBoard;
+        strokesRef.current = strokes;
+        boardRef.current = {
+          key: sketchKey,
+          title: draft?.title || local?.title || "Sketch 1",
+          createdAt: (draft?.createdAt || local?.createdAt) || Date.now(),
+        };
+        dispatch({ type: "SET_STROKES", strokes });
+        dispatch({ type: "SET_ACTIVE_BOARD", key: boardRef.current.key, title: boardRef.current.title });
+        dispatch({
+          type: "SET_STATUS",
+          status: draft ? "pending" : local ? "pending" : "error",
+          errorMessage: draft || local ? null : "Failed to load your drawing",
+        });
+        if (draft) adoptDraft(draft, { product, module, localKey, sketchKey });
       } finally {
         dispatch({ type: "SET_LOADING", loading: false });
       }
     },
-    [scoped, state.activeBoardKey, uid, productId, moduleId, scopeKey, saveToFirestore, saveToLocalStorage]
+    [adoptDraft, clearTimers, moduleId, productId, saveToFirestore, saveToLocalStorage, scoped, takeDraftForBoard, uid],
+  );
+
+  // ── Opening the module: the remembered canvas, then its index ─────────
+  // ONE effect owns both, in this order, so the canvas the learner sees is
+  // already the remembered one when the switcher's list arrives, and a scope
+  // change can never race itself.
+  useEffect(() => {
+    if (!scoped) {
+      scopeRef.current = "";
+      // No module open: the canvas has no board, but it does have THIS
+      // device's draft. Seeding from it is what makes a drawing survive a tab
+      // switch (or a reload) even before a lesson is open.
+      const draft = uid ? readQuickSketchDraft(uid, productId) : null;
+      const strokes = draft ? draft.strokes : [];
+      strokesRef.current = strokes;
+      boardRef.current = {
+        key: QUICK_SKETCH_DEFAULT_KEY,
+        title: draft?.title || "Sketch 1",
+        createdAt: draft?.createdAt || 0,
+      };
+      dispatch({ type: "SET_STROKES", strokes });
+      dispatch({ type: "SET_ACTIVE_BOARD", key: QUICK_SKETCH_DEFAULT_KEY, title: boardRef.current.title });
+      dispatch({
+        type: "SET_BOARDS",
+        boards: draft
+          ? [{
+              sketchKey: QUICK_SKETCH_DEFAULT_KEY,
+              title: boardRef.current.title,
+              strokeCount: strokes.length,
+              updatedAt: draft.updatedAt,
+              createdAt: draft.createdAt,
+            }]
+          : [],
+      });
+      dispatch({ type: "SET_LOADING", loading: false });
+      dispatch({ type: "SET_BOARDS_LOADING", loading: false });
+      dispatch({ type: "SET_STATUS", status: "idle" });
+      return undefined;
+    }
+    if (scopeRef.current === scopeKey) return undefined;
+    scopeRef.current = scopeKey;
+    clearTimers();
+    let cancelled = false;
+    const product = String(productId);
+    const module = String(moduleId);
+
+    const loadIndex = async () => {
+      dispatch({ type: "SET_BOARDS_LOADING", loading: true });
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, "users", uid!, QUICK_SKETCH_COLLECTION),
+            where("productId", "==", product),
+            where("moduleId", "==", module),
+          ),
+        );
+        if (cancelled) return;
+        const boards: QuickSketchBoardSummary[] = [];
+        snap.forEach((row) => {
+          const data = row.data() as QuickSketchBoardDoc;
+          boards.push({
+            sketchKey: data.sketchKey,
+            title: data.title,
+            strokeCount: Array.isArray(data.strokes) ? data.strokes.length : 0,
+            updatedAt: data.updatedAt || 0,
+            createdAt: data.createdAt || 0,
+          });
+        });
+        boards.sort((a, b) => a.createdAt - b.createdAt);
+        if (!boards.some((board) => board.sketchKey === boardRef.current.key)) {
+          boards.unshift({
+            sketchKey: boardRef.current.key,
+            title: boardRef.current.title,
+            strokeCount: strokesRef.current.length,
+            updatedAt: Date.now(),
+            createdAt: boardRef.current.createdAt || Date.now(),
+          });
+        }
+        dispatch({ type: "SET_BOARDS", boards });
+        try {
+          localStorage.setItem(quickSketchIndexKey(uid!, product, module), JSON.stringify(boards));
+        } catch {
+          // Mirror only.
+        }
+      } catch {
+        if (cancelled) return;
+        try {
+          const raw = localStorage.getItem(quickSketchIndexKey(uid!, product, module));
+          const boards = raw ? (JSON.parse(raw) as QuickSketchBoardSummary[]) : [];
+          if (boards.length > 0) dispatch({ type: "SET_BOARDS", boards });
+        } catch {
+          // The canvas still draws; only the switcher's list is thin.
+        }
+      } finally {
+        if (!cancelled) dispatch({ type: "SET_BOARDS_LOADING", loading: false });
+      }
+    };
+
+    void openBoard(rememberedBoardKey(uid!, product, module)).then(() => {
+      if (!cancelled) void loadIndex();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey, scoped]);
+
+  // ── Drawing: the one write path ───────────────────────────────────────
+
+  const updateStrokes = useCallback(
+    (strokes: QuickSketchStroke[]) => {
+      // Identity is preserved when the list is already within the ceiling: the
+      // canvas compares the array it wrote with the array this hook renders (to
+      // tell its own write from a board load), and a fresh array every time
+      // would make every write look like a load.
+      const next = strokes.length > MAX_QUICK_SKETCH_STROKES ? strokes.slice(0, MAX_QUICK_SKETCH_STROKES) : strokes;
+      strokesRef.current = next;
+      // THE fix: the canvas renders this state, so the list it draws always
+      // contains what the learner just drew.
+      dispatch({ type: "SET_STROKES", strokes: next });
+      // Signed out: nowhere at all to put it (the panel says so out loud).
+      if (!uid) return;
+      if (!scoped) {
+        // No module open: there is no cloud board to address, but the drawing
+        // is still mirrored on this learner's device — so unmounting the tab
+        // (or picking a lesson, which moves the canvas on) cannot lose it.
+        scheduleLocalMirror();
+        return;
+      }
+      dispatch({ type: "SET_STATUS", status: "pending" });
+      dispatch({ type: "SET_PENDING_SYNC", pending: true });
+
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = window.setTimeout(() => {
+        void saveToFirestore();
+      }, debounceMs);
+
+      // A long continuous drawing still checkpoints.
+      if (!maxWaitTimerRef.current) {
+        maxWaitTimerRef.current = window.setTimeout(() => {
+          maxWaitTimerRef.current = null;
+          if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+          void saveToFirestore();
+        }, MAX_WAIT_MS);
+      }
+
+      // The device mirror is faster, and it is what survives a failed write.
+      scheduleLocalMirror();
+    },
+    [debounceMs, saveToFirestore, scheduleLocalMirror, scoped, uid],
+  );
+
+  // ── Canvases ──────────────────────────────────────────────────────────
+
+  const selectBoard = useCallback(
+    (sketchKey: string) => {
+      if (!scoped || sketchKey === boardRef.current.key) return;
+      void openBoard(sketchKey);
+    },
+    [openBoard, scoped],
   );
 
   const createBoard = useCallback(() => {
-    if (!scoped || state.boards.length >= MAX_BOARDS) return null;
+    if (!scoped || state.boards.length >= MAX_QUICK_SKETCH_BOARDS) return null;
     if (Date.now() - createGuardRef.current < CREATE_GUARD_MS) return null;
     createGuardRef.current = Date.now();
-
-    const newKey = sanitizeSketchKey(createSketchKey());
-    const newTitle = nextSketchTitle(state.boards);
-
-    const newBoard: QuickSketchBoardSummary = {
-      sketchKey: newKey,
-      title: newTitle,
-      strokeCount: 0,
-      updatedAt: Date.now(),
-      createdAt: Date.now(),
-    };
-
-    dispatch({ type: "SET_BOARDS", boards: [...state.boards, newBoard] });
-    selectBoard(newKey);
-    return newKey;
-  }, [scoped, state.boards, selectBoard]);
+    const key = sanitizeQuickSketchKey(createQuickSketchKey());
+    const title = nextQuickSketchTitle(state.boards);
+    const stamp = Date.now();
+    dispatch({
+      type: "SET_BOARDS",
+      boards: [...state.boards, { sketchKey: key, title, strokeCount: 0, updatedAt: stamp, createdAt: stamp }],
+    });
+    // A brand-new canvas is born empty: no read, no flush of the old one.
+    strokesRef.current = [];
+    boardRef.current = { key, title, createdAt: stamp };
+    dispatch({ type: "SET_STROKES", strokes: [] });
+    dispatch({ type: "SET_ACTIVE_BOARD", key, title });
+    dispatch({ type: "SET_STATUS", status: "pending" });
+    dispatch({ type: "SET_PENDING_SYNC", pending: true });
+    try {
+      localStorage.setItem(quickSketchActiveKey(uid!, String(productId), String(moduleId)), key);
+    } catch {
+      // Mirror only.
+    }
+    void saveToFirestore();
+    return key;
+  }, [moduleId, productId, saveToFirestore, scoped, state.boards, uid]);
 
   const deleteBoard = useCallback(
-    async (sketchKey: string) => {
-      if (!scoped || sketchKey === DEFAULT_KEY || state.boards.length <= 1) return false;
-
+    (sketchKey: string) => {
+      if (!scoped || sketchKey === QUICK_SKETCH_DEFAULT_KEY || state.boards.length <= 1) return false;
+      const product = String(productId);
+      const module = String(moduleId);
       try {
-        const docId = sketchDocId(uid!, String(productId), String(moduleId), sketchKey);
-        await deleteDoc(doc(db, QUICK_SKETCH_COLLECTION, docId));
-        localStorage.removeItem(localKey(uid!, String(productId), String(moduleId), sketchKey));
-
-        const newBoards = state.boards.filter((b) => b.sketchKey !== sketchKey);
-        dispatch({ type: "SET_BOARDS", boards: newBoards });
-
-        if (state.activeBoardKey === sketchKey) {
-          selectBoard(newBoards[0].sketchKey);
-        }
-
-        return true;
-      } catch (err) {
-        console.error("Failed to delete board:", err);
-        return false;
+        localStorage.removeItem(quickSketchLocalKey(uid!, product, module, sketchKey));
+      } catch {
+        // The cloud delete below is the real one.
       }
+      const remaining = state.boards.filter((board) => board.sketchKey !== sketchKey);
+      dispatch({ type: "SET_BOARDS", boards: remaining });
+      void deleteDoc(doc(db, "users", uid!, QUICK_SKETCH_COLLECTION, quickSketchDocId(uid!, product, module, sketchKey))).catch(() => {
+        // A failed cloud delete is reported by the switcher the next time the
+        // module's index loads; the local canvas is already gone.
+      });
+      if (boardRef.current.key === sketchKey) {
+        void openBoard(remaining[0].sketchKey, { flushCurrent: false });
+      }
+      return true;
     },
-    [scoped, uid, productId, moduleId, state.boards, state.activeBoardKey, selectBoard]
+    [moduleId, openBoard, productId, scoped, state.boards, uid],
   );
 
-  // ── Flush & retry ─────────────────────────────────────────────────────
+  // ── Flush / retry / teardown ──────────────────────────────────────────
 
+  /** Everything pending, now — used by "Retry" and on the way out. */
   const flush = useCallback(() => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    if (maxWaitTimerRef.current) clearTimeout(maxWaitTimerRef.current);
-    saveToFirestore();
+    if (!uid) return;
+    if (!scoped) {
+      // Nothing pending in the cloud, but the last few strokes are still in
+      // the debounce — get them onto the device before the tab goes away.
+      clearTimers();
+      saveToLocalStorage();
+      return;
+    }
+    clearTimers();
     saveToLocalStorage();
-  }, [saveToFirestore, saveToLocalStorage]);
+    void saveToFirestore();
+  }, [clearTimers, saveToFirestore, saveToLocalStorage, scoped, uid]);
 
   const retry = useCallback(() => {
     attemptsRef.current = 0;
-    saveToFirestore();
-  }, [saveToFirestore]);
-
-  // ── Cleanup on unmount ────────────────────────────────────────────────
-
-  useEffect(() => {
-    return () => {
-      flush();
-    };
+    flush();
   }, [flush]);
 
-  // ── Return API ────────────────────────────────────────────────────────
+  /**
+   * Leaving the canvas (a tab switch, the player unmounting) is not a reason
+   * to lose the last few seconds of drawing: whatever is still in the
+   * debounce has already been mirrored on the device and is now pushed too.
+   */
+  const flushRef = useRef(flush);
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+  useEffect(
+    () => () => {
+      flushRef.current();
+    },
+    [],
+  );
 
   return {
     strokes: state.strokes,
     getStrokes: () => strokesRef.current,
-    sceneKey: state.sceneKey,
     scoped,
     loading: state.loading,
     status: state.status,
@@ -547,7 +712,6 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     pendingSync: state.pendingSync,
     deviceSaved: state.deviceSaved,
     lastSavedAt: state.lastSavedAt,
-    strokeCount: state.strokes.length,
     updateStrokes,
     flush,
     retry,
@@ -557,7 +721,9 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     boardsLoading: state.boardsLoading,
     selectBoard,
     createBoard,
-    canCreateBoard: scoped && state.boards.length < MAX_BOARDS,
+    canCreateBoard: scoped && state.boards.length < MAX_QUICK_SKETCH_BOARDS,
     deleteBoard,
   };
 }
+
+export default usePerfectFreehandSketch;

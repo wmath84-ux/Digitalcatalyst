@@ -6,7 +6,9 @@ import {
   buildReadStoragePath,
   collectAccessibleReadResources,
   collectReadUploadPaths,
+  getReadResourcePresentation,
   googleDrivePdfUrl,
+  googleDrivePreviewUrl,
   isOwnedReadUploadPath,
   normalizeReadResourceUrl,
   normalizeReadSourceKind,
@@ -39,6 +41,72 @@ test("Read sources accept safe HTTPS URLs and normalize Google Drive shares only
   assert.equal(normalizeReadResourceUrl(`https://drive.google.com.evil.example/file/d/${driveId}/view`, "gdrive"), "");
   assert.equal(normalizeReadResourceUrl("https://docs.google.com/document/d/abcdefghijk/edit", "gdrive"), "");
   assert.equal(normalizeReadResourceUrl("https://drive.google.com/file/d/short-id/view", "gdrive"), "");
+});
+
+test("a Google Drive Read resource opens in Drive's own viewer, never in the local PDF.js reader", () => {
+  // Regression (owner report 2026-10-07): a Drive share URL picked as the
+  // "Google Drive PDF" Read source was handed to the bundled PDF.js viewer as
+  // `https://drive.google.com/uc?export=download&id=…`. Drive answers that URL
+  // with a redirect to *.googleusercontent.com and no CORS header, so the
+  // browser fetch was blocked and the reader showed an empty 0-page document.
+  const share = `https://drive.google.com/file/d/${driveId}/view?usp=sharing`;
+  const presentation = getReadResourcePresentation({
+    id: "res_drive",
+    name: "Physics notes",
+    type: "read",
+    url: share,
+    readSourceKind: "gdrive",
+    accessLevel: "included",
+  });
+
+  assert.equal(presentation.kind, "drive", "Drive must not be presented as a PDF.js document");
+  assert.equal(presentation.sourceKind, "gdrive");
+  assert.equal(presentation.sourceUrl, `https://drive.google.com/file/d/${driveId}/preview`);
+  assert.equal(presentation.originalUrl, `https://drive.google.com/file/d/${driveId}/view`);
+  assert.equal(presentation.label, "Google Drive PDF");
+  // The bytes URL exists for downloads/exports, and the reader must not use it:
+  // it is a different URL from the one the frame loads.
+  assert.equal(googleDrivePdfUrl(share), `https://drive.google.com/uc?export=download&id=${driveId}`);
+  assert.notEqual(presentation.sourceUrl, googleDrivePdfUrl(share));
+  assert.equal(googleDrivePreviewUrl(`https://drive.google.com/open?id=${driveId}`), `https://drive.google.com/file/d/${driveId}/preview`);
+  assert.equal(googleDrivePreviewUrl("https://docs.google.com/document/d/abcdefghijk/edit"), "");
+  assert.equal(
+    getReadResourcePresentation({ id: "r", type: "read", url: "https://drive.google.com.evil.example/file/d/" + driveId + "/view", readSourceKind: "gdrive" }),
+    null,
+  );
+
+  // Direct PDFs keep the local viewer.
+  assert.equal(
+    getReadResourcePresentation({ id: "r", type: "read", url: "https://public.example.org/notes.pdf", readSourceKind: "pdf_url" }).kind,
+    "pdfjs",
+  );
+  // …but the same Drive link saved under any other kind still reaches Drive's
+  // viewer instead of an unreadable 0-page PDF.js document.
+  for (const wrongKind of ["pdf_url", undefined]) {
+    const upgraded = getReadResourcePresentation({
+      id: "r",
+      type: "read",
+      url: `https://drive.google.com/uc?export=download&id=${driveId}`,
+      readSourceKind: wrongKind,
+    });
+    assert.equal(upgraded.kind, "drive", `a Drive link saved as ${wrongKind ?? "nothing"} must still open in Drive`);
+    assert.equal(upgraded.sourceUrl, `https://drive.google.com/file/d/${driveId}/preview`);
+    assert.equal(upgraded.originalUrl, `https://drive.google.com/file/d/${driveId}/view`);
+    assert.equal(upgraded.label, "Google Drive PDF");
+  }
+  // …and the Drive entry still reaches the Read tab of an unlocked module.
+  const modules = [
+    {
+      id: "mod_drive",
+      title: "Chapter 1",
+      accessLevel: "included",
+      files: [{ id: "res_drive", name: "Physics notes", type: "read", url: share, readSourceKind: "gdrive" }],
+      modules: [],
+    },
+  ];
+  const entries = collectAccessibleReadResources(modules, new Set(["mod_drive"]), new Set(), "product_1");
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].presentation.kind, "drive");
 });
 
 test("Read URL validation rejects unsafe schemes, credentials, local hosts, IP literals and HTML", () => {

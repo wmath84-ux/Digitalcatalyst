@@ -19,6 +19,10 @@
 //   {
 //     id: "q1",                        // stable within its set
 //     prompt: "What is 2 + 2?",
+//     // NOTE: `explanation` is REQUIRED to publish (owner rule, 2026-10-07) —
+//     // `practiceQuestionsReady` stays the lenient runtime rule so a set that
+//     // was already published keeps playing; the admin's publish gate is
+//     // `practiceQuestionsExplained` + `practiceQuestionIssues` below.
 //     options: ["3", "4", "5", "6"],   // 2–6 options
 //     correctIndex: 1,                 // -1 = not marked yet (admin must fix)
 //     explanation: "2 + 2 = 4",
@@ -99,11 +103,64 @@ export const normalizePracticeQuestions = (value) => {
   return out;
 };
 
-/** True when every question has a detected correct answer (publish-ready). */
+/**
+ * Every rule ONE question must satisfy, as a list of human-readable reasons.
+ *
+ * ONE definition for all three admin surfaces — the per-question pill, the
+ * resource card's "readiness" and the publish validation — so they can never
+ * disagree about what is missing.
+ *
+ * `explanation` is part of the rule (owner rule, 2026-10-07): a question
+ * without its "why" teaches nothing on the review screen, so it is never
+ * optional — not in the importer, not in the hand-written form, not at publish.
+ */
+export const practiceQuestionIssues = (question) => {
+  if (!isObject(question)) return ["not a question"];
+  const issues = [];
+  if (!toText(question.prompt)) issues.push("no question text");
+  const options = Array.isArray(question.options) ? question.options : [];
+  const filled = options.filter((option) => toText(isObject(option) ? option.text ?? option.label : option));
+  if (filled.length < MIN_PRACTICE_OPTIONS) issues.push(`needs ${MIN_PRACTICE_OPTIONS} options`);
+  const index = Number(question.correctIndex);
+  if (!(Number.isFinite(index) && index >= 0 && Math.trunc(index) < options.length)) issues.push("no answer marked");
+  if (!toText(question.explanation)) issues.push("no explanation");
+  return issues;
+};
+
+/**
+ * The RUNTIME rule — what the Course Player needs to run a set: at least one
+ * question and every question with a prompt, options and a marked answer.
+ *
+ * Deliberately looser than the admin's publish rule below. `isUsableResource`
+ * (utils/productMapping.js) reads THIS, so a set that went live before
+ * explanations became mandatory keeps playing for the learners who own it; the
+ * next admin save is what moves it onto the stricter rule.
+ */
 export const practiceQuestionsReady = (value) => {
   const questions = normalizePracticeQuestions(value);
   return questions.length > 0 && questions.every((question) => question.correctIndex >= 0);
 };
+
+/**
+ * The PUBLISH rule on top of the runtime one — every question also carries its
+ * explanation. Read by the admin panel and ProductEditor's publish validation,
+ * never by the mapping layer (see above).
+ */
+export const practiceQuestionsExplained = (value) => {
+  const questions = normalizePracticeQuestions(value);
+  return questions.length > 0 && questions.every((question) => Boolean(toText(question.explanation)));
+};
+
+/**
+ * How many questions still need work before publishing — the publish
+ * validation's own counter (a draft that cannot even become a question counts
+ * too, so the number never under-reports).
+ */
+export const countIncompletePracticeQuestions = (value) =>
+  (Array.isArray(value) ? value : []).filter((raw) => {
+    const question = normalizePracticeQuestion(raw, 0);
+    return !question || practiceQuestionIssues(question).length > 0;
+  }).length;
 
 /**
  * Every practice set a learner may open, in curriculum order — the course

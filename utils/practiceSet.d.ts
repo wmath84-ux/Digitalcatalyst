@@ -18,7 +18,17 @@ export declare const normalizePracticeQuestion: (
   index?: number,
 ) => NormalizedPracticeQuestion | null;
 export declare const normalizePracticeQuestions: (value: unknown) => NormalizedPracticeQuestion[];
+/** The runtime rule: the Course Player can play the set (a marked answer each). */
 export declare const practiceQuestionsReady: (value: unknown) => boolean;
+/**
+ * The publish rule on top of the runtime one — every question also carries its
+ * explanation. `explanation` is never optional in the admin editor.
+ */
+export declare const practiceQuestionsExplained: (value: unknown) => boolean;
+/** Every rule ONE question must satisfy — `[]` means publish-ready. */
+export declare const practiceQuestionIssues: (question: unknown) => string[];
+/** How many questions still need work before publishing (drafts included). */
+export declare const countIncompletePracticeQuestions: (value: unknown) => number;
 export declare const countUnmarkedPracticeQuestions: (value: unknown) => number;
 
 /** One practice set the learner may open (a `brain` resource in the tree). */

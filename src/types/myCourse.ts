@@ -59,6 +59,16 @@ export interface MyCourseResource {
   /** Brain practice-set questions (type "brain" only). */
   practiceQuestions?: MyCourseQuestion[];
   /**
+   * Brain practice set created from the Course Player's Brain tab (type
+   * "brain" only): the player scope it belongs to — `String(product.id)` for a
+   * purchased course, `mine-<courseId>` for the learner's own. The Brain page
+   * lists a set in SELF only when this equals the course being opened
+   * (`selfPracticeSetsFromCourses`, utils/selfPracticeSets.js). Resources
+   * saved from a course carry no tag, so “saved” and “created here” never
+   * blur together.
+   */
+  practiceSourceProductId?: string;
+  /**
    * Read resource origin (type "read" only). A learner's own annotatable PDF:
    * `upload` when it lives in their `userReadUploads/{uid}/…` tree, or one of
    * the public source kinds. Read by
@@ -79,6 +89,16 @@ export interface MyCourseResource {
    * the course document, so it plays offline in a sandboxed iframe.
    */
   interactiveHtml?: string;
+  /**
+   * Interactive 2D experiment created from the Course Player's Experiment page
+   * (type "interactive" only): the player scope it belongs to — the
+   * `storageProductId` of the course it was made in. The Experiment page lists
+   * an experiment in SELF only when this equals the course being opened
+   * (`selfExperimentsFromCourses`, src/utils/selfExperiments.ts). Resources
+   * made in the Study Library carry no tag, so “made here” and “kept in the
+   * library” never blur together.
+   */
+  experimentSourceProductId?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -1,5 +1,13 @@
 # Gradient Waves Background + Perfect-Freehand Sketch Integration
 
+> **Update (2026-10-07, later branch):** § 1 below describes the first pass — a
+> hand-rolled three-sine WebGL approximation, mounted inside the hero-height
+> container at `opacity 0.15`. It has been **replaced** by the official React
+> Bits component applied page-wide (documented defaults, fixed full-viewport
+> layer, window-level pointer parallax). See
+> [`LANDING_GRADIENT_WAVES_FULL_PAGE_REPORT.md`](./LANDING_GRADIENT_WAVES_FULL_PAGE_REPORT.md).
+> § 2 (perfect-freehand sketch tool) is unaffected.
+
 ## ✅ Completed Tasks
 
 ### 1. Gradient Waves Background on Landing Page

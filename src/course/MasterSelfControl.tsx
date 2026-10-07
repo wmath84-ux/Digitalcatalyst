@@ -24,7 +24,7 @@ interface MasterSelfControlProps {
   /** Accessible group label, e.g. "Note collection". */
   ariaLabel: string;
   /** Hook for the shared contract test + per-feature CSS. */
-  feature: "notes" | "mindMap" | "brain";
+  feature: "notes" | "mindMap" | "brain" | "experiment";
 }
 
 export default function MasterSelfControl({

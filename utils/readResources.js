@@ -148,10 +148,34 @@ const googleDriveFileId = (value) => {
   }
 };
 
-/** Canonical PDF bytes URL for a public Google Drive file (no API token). */
+/**
+ * Canonical PDF BYTES url for a public Google Drive file (no API token).
+ *
+ * For downloads, exports and server-side fetchers only. A browser-side PDF.js
+ * fetch of this URL can never succeed: Drive answers it with a redirect to
+ * `*.googleusercontent.com` and that hop carries no
+ * `Access-Control-Allow-Origin` header, so the reader is stopped by CORS before
+ * a single byte arrives (the viewer then sits at 0 pages). The in-app reader
+ * therefore uses `googleDrivePreviewUrl` below.
+ */
 export const googleDrivePdfUrl = (value) => {
   const id = googleDriveFileId(value);
   return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : "";
+};
+
+/**
+ * The EMBEDDABLE Google Drive viewer URL for a public Drive file.
+ *
+ * `/preview` is the one Drive URL that renders the real, paginated document
+ * with no CORS involved at all: Google's own servers fetch the file and the
+ * frame paints it. It is the same rendering the Course Player already uses for
+ * `drive` files (`src/utils/courseEmbed.ts`), it needs no credentials, and it
+ * works on every target the app ships on — including the packaged Android app,
+ * where `/api/*` routes do not exist and a proxy could not help.
+ */
+export const googleDrivePreviewUrl = (value) => {
+  const id = googleDriveFileId(value);
+  return id ? `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview` : "";
 };
 
 /**
@@ -195,8 +219,19 @@ export const readSourceLabel = (sourceKind) => {
 };
 
 /**
- * Resolve how a Read row is opened. Real PDFs always go through the local
- * PDF.js Generic Viewer; only the explicitly selected generic source is framed.
+ * Resolve how a Read row is opened.
+ *
+ *   · upload / pdf_url → the local PDF.js Generic Viewer (a same-origin
+ *     Storage object, or a host that permits browser reads).
+ *   · gdrive           → Google Drive's own embeddable viewer. Drive refuses
+ *     browser-side reads of its download URL (see `googleDrivePdfUrl`), so
+ *     PDF.js could only ever show an empty 0-page document — the file opens
+ *     in the frame Drive actually serves.
+ *   · embed_url        → the sandboxed iframe.
+ *
+ * A Drive link is detected by its URL, not only by its declared kind, so a row
+ * saved as `pdf_url` (or with no kind at all) still opens in Drive's viewer
+ * instead of an unreadable 0-page PDF.js document.
  */
 export const getReadResourcePresentation = (resource, options = {}) => {
   if (!resource || resource.type !== "read") return null;
@@ -217,12 +252,30 @@ export const getReadResourcePresentation = (resource, options = {}) => {
       label: readSourceLabel(sourceKind),
     };
   }
-  const pdfUrl = sourceKind === "gdrive" ? googleDrivePdfUrl(sourceUrl) : sourceUrl;
-  if (!pdfUrl) return null;
+  // Drive keeps its bytes behind a redirect this app cannot follow (see
+  // `googleDrivePdfUrl`), so Google's own viewer renders every Drive link in a
+  // Read row — declared as "Google Drive PDF" or pasted under "Direct PDF
+  // URL". The row's own kind is preserved for the admin editor; only what the
+  // learner sees changes.
+  const driveId = sourceKind === "upload" ? "" : googleDriveFileId(sourceUrl);
+  if (driveId) {
+    const previewUrl = googleDrivePreviewUrl(sourceUrl);
+    if (!previewUrl) return null;
+    return {
+      kind: "drive",
+      sourceKind,
+      sourceUrl: previewUrl,
+      // The canonical `/file/d/{id}/view` share link — the learner-facing
+      // escape hatch when Drive refuses the embed (a file that is not shared
+      // with the link shows Google's own "request access" page there).
+      originalUrl: `https://drive.google.com/file/d/${driveId}/view`,
+      label: readSourceLabel("gdrive"),
+    };
+  }
   return {
     kind: "pdfjs",
     sourceKind,
-    sourceUrl: pdfUrl,
+    sourceUrl,
     originalUrl: sourceUrl,
     label: readSourceLabel(sourceKind),
   };

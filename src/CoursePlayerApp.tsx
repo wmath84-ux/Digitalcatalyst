@@ -7,6 +7,21 @@ import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
+import {
+  SELF_PRACTICE_SETS_COURSE_ID,
+  placeSelfPracticeSet,
+  selfPracticeSetsFromCourses,
+} from "../utils/selfPracticeSets.js";
+// SELF experiments — the Experiment page's own “+” writes into the Study
+// Library through the same `myCourses` shelf (src/utils/selfExperiments.ts).
+import {
+  SELF_EXPERIMENTS_COURSE_ID,
+  placeSelfExperiment,
+  selfExperimentCourseFile,
+  selfExperimentsFromCourses,
+} from "./utils/selfExperiments";
+import ExperimentPanel, { type PlayerExperiment } from "./course/ExperimentPanel";
+import { experimentHasSource } from "./utils/experimentSpec";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
 // The mind map canvas is the single heaviest thing in the player: the panel
@@ -40,7 +55,7 @@ import { usePersonalModules } from "./hooks/usePersonalModules";
 import { useMyCourses } from "./hooks/useMyCourses";
 import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from "./lib/myCourseClient";
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
-import type { MyCourse, MyCourseModule, MyCourseResource } from "./types/myCourse";
+import type { MyCourse, MyCourseModule, MyCourseQuestion, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
 import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
@@ -555,6 +570,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     [modules, resolution.accessibleModuleIds, resolution.ownedUpdateIds],
   );
 
+
+
   /**
    * Open a Brain practice set: pin it for the panel, switch the study pane to
    * the Brain tab and make sure the split is showing it. Used by the Modules
@@ -644,6 +661,73 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // page and the self-authored Course Player read, so anything saved here is
   // visible on the library shelf the moment Firestore confirms it.
   const myLibrary = useMyCourses();
+  /**
+   * SELF practice sets — the learner's OWN sets for this course, read from the
+   * “My practice sets” course on the Study Library shelf through this same
+   * live listener. A set created from the Brain tab's “+” is written there and
+   * shows up here (and on every other device) the moment Firestore confirms it.
+   */
+  const selfBrainSets = useMemo(
+    () => selfPracticeSetsFromCourses(myLibrary.courses, storageProductId),
+    [myLibrary.courses, storageProductId],
+  );
+  /**
+   * SELF experiments — the learner's OWN 2D experiments for this course, read
+   * from “My experiments” on the Study Library shelf through the same live
+   * listener. Created from the Experiment page's “+”, they appear here (and on
+   * every other device) the moment Firestore confirms the write.
+   */
+  const selfExperimentItems = useMemo<PlayerExperiment[]>(
+    () =>
+      selfExperimentsFromCourses(myLibrary.courses, storageProductId).map((experiment) => ({
+        id: experiment.id,
+        title: experiment.title,
+        moduleTitle: experiment.moduleTitle,
+        file: selfExperimentCourseFile(experiment),
+      })),
+    [myLibrary.courses, storageProductId],
+  );
+  /**
+   * MASTER experiments — every `interactive` resource of THIS course, in
+   * curriculum order, carrying its module's own access state: an experiment in
+   * a locked (paid or not-yet-granted) module is listed with its lock instead
+   * of opening. Same visibility rule the Modules tab uses — inline source or a
+   * hosted page — so the page can never list something the viewer cannot run.
+   */
+  const masterExperimentItems = useMemo<PlayerExperiment[]>(() => {
+    const items: PlayerExperiment[] = [];
+    const visit = (nodes: CourseModule[]) => {
+      for (const module of nodes) {
+        if (module.accessLevel === "hidden") continue;
+        const moduleId = String(module.id);
+        const moduleLocked =
+          !resolution.accessibleModuleIds.has(moduleId) ||
+          (module.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(module.paidUpdateId || module.id)));
+        for (const file of module.files || []) {
+          if (file.accessLevel === "hidden") continue;
+          if (!isExperimentFileType(file.type)) continue;
+          if (!experimentHasSource(file.interactiveHtml, file.url)) continue;
+          items.push({
+            id: String(file.id),
+            title: String(file.name || "Experiment"),
+            moduleTitle: String(module.title || ""),
+            locked:
+              moduleLocked ||
+              (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(file.paidUpdateId || file.id))),
+            file,
+          });
+        }
+        visit(module.modules || []);
+      }
+    };
+    visit(modules);
+    return items;
+  }, [modules, resolution, ownedUpdateIds]);
+  /** The product's class/level — only when it reads like one (“Class 10”). */
+  const selfSetLevelSeed = useMemo(() => {
+    const value = String(product.classLevel || "").trim();
+    return /class|grade|jee|neet|college|year|board|sem|foundation/i.test(value) ? value : "";
+  }, [product.classLevel]);
   // Course entry is lazy: ordinary lesson playback performs zero personal
   // library requests. The manager/add dialog calls ensureLoaded on demand.
   const personalModules = usePersonalModules(user?.id, product.id, {
@@ -983,6 +1067,124 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // like the mind map above: same module ⇒ same practice sets, and the tab
   // can be re-scoped by hand from its own module chip row.
   const activeBrainModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] ?? null : null;
+
+  /**
+   * Create a practice set from the Brain tab's “+” and put it on the Study
+   * Library shelf — the SELF half of MASTER/SELF. Everything lands in ONE
+   * library course (“My practice sets”, created on first use through the same
+   * `myCourseClient` builders the rest of the shelf uses), so the set syncs to
+   * every device and opens in the existing Brain editor there. The resource is
+   * tagged with this player's scope (`storageProductId`), which is what makes
+   * it show in THIS course's SELF list and nowhere else.
+   *
+   * The live shelf may not have resolved yet: like “Save for later”, an
+   * unloaded list is read once from Firestore instead of guessing it is empty
+   * (a guess would overwrite the learner's other saved sets).
+   */
+  const createSelfBrainSet = useCallback(
+    async ({
+      title,
+      questions,
+    }: {
+      title: string;
+      questions: MyCourseQuestion[];
+    }): Promise<{ ok: boolean; message?: string }> => {
+      if (!user?.id) return { ok: false, message: "Please sign in to save practice sets." };
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SELF_PRACTICE_SETS_COURSE_ID) || null;
+      const placed = placeSelfPracticeSet(
+        {
+          course: existing,
+          uid: user.id,
+          productId: storageProductId,
+          courseTitle: product.title,
+          moduleTitle: activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "",
+          name: title,
+          questions,
+        },
+        {
+          createCourse: (ownerUid, courseTitle) => createMyCourse(ownerUid, courseTitle),
+          createModule: (moduleTitle) => createMyModule(moduleTitle),
+          createResource: (type) => createMyResource(type),
+        },
+      );
+      if (!placed.course) return { ok: false, message: placed.issues[0] || "Could not build the practice set." };
+      const result = await myLibrary.save(placed.course);
+      if (!result.ok) return { ok: false, message: result.message };
+      trackFeatureEvent("brain_self_set_created", { questions: questions.length });
+      toast({
+        title: "Practice set created",
+        description: `“${title}” is saved to My Study Library.`,
+        variant: "success",
+      });
+      return { ok: true };
+    },
+    [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
+  );
+
+  /**
+   * Create a 2D experiment from the Experiment page's “+” (behind its
+   * dropdown) and put it on the Study Library shelf — the SELF half of that
+   * page's MASTER/SELF filter, exactly like the Brain tab's sets above.
+   * Everything lands in ONE library course (“My experiments”, created on first
+   * use through the same `myCourseClient` builders the rest of the shelf
+   * uses), so the experiment syncs to every device and opens in the existing
+   * Study Library editor there. The resource is tagged with this player's
+   * scope (`storageProductId`), which is what makes it show in THIS course's
+   * SELF list and nowhere else.
+   *
+   * The live shelf may not have resolved yet: like “Save for later”, an
+   * unloaded list is read once from Firestore instead of guessing it is empty
+   * (a guess would overwrite the learner's other experiments).
+   */
+  const createSelfExperiment = useCallback(
+    async ({
+      name,
+      html,
+      url,
+    }: {
+      name: string;
+      html: string;
+      url?: string;
+    }): Promise<{ ok: boolean; message?: string }> => {
+      if (!user?.id) return { ok: false, message: "Please sign in to save experiments." };
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SELF_EXPERIMENTS_COURSE_ID) || null;
+      const placed = placeSelfExperiment(
+        {
+          course: existing,
+          uid: user.id,
+          productId: storageProductId,
+          courseTitle: product.title,
+          moduleTitle: activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "",
+          name,
+          html,
+          url,
+        },
+        {
+          createCourse: (ownerUid, courseTitle) => createMyCourse(ownerUid, courseTitle),
+          createModule: (moduleTitle) => createMyModule(moduleTitle),
+          createResource: (type) => createMyResource(type),
+        },
+      );
+      if (!placed.course) return { ok: false, message: placed.issues[0] || "Could not build the experiment." };
+      const result = await myLibrary.save(placed.course);
+      if (!result.ok) return { ok: false, message: result.message };
+      trackFeatureEvent("experiment_created", { surface: "course_player" });
+      toast({
+        title: "Experiment created",
+        description: `“${name}” is saved to My Study Library.`,
+        variant: "success",
+      });
+      return { ok: true };
+    },
+    [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
+  );
+
   const personalMapModule = activeMindMapModuleId
     ? personalModules.modules.find((module) => String(module.id) === String(activeMindMapModuleId))
     : undefined;
@@ -1941,6 +2143,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <CourseBrainPanel
           productId={storageProductId}
           sets={brainSets}
+          // The learner's own sets (the “+” composer writes them to the Study
+          // Library shelf; the live listener feeds them back here).
+          selfSets={selfBrainSets}
+          onCreateSelfSet={createSelfBrainSet}
+          selfSetPrompt={{
+            topic: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
+            level: selfSetLevelSeed,
+            defaultName: `${(activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title} — practice set`,
+          }}
           activeModuleId={activeBrainModuleId}
           completedFileIds={completedIds}
           openSetId={brainOpenSetId}
@@ -1948,6 +2159,29 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onPass={(fileId) => {
             void markFileComplete(fileId);
           }}
+          uid={user?.id ?? null}
+        />
+      }
+      // ── Experiment tab: the course's own 2D experiments (MASTER) and the
+      // learner's own (SELF). The parent owns the panel because it reads BOTH
+      // the course tree and the Study Library shelf — and owns the “+” save,
+      // so a created experiment is already on the shelf before the sheet
+      // closes. MASTER opens through `selectFile` (official progress);
+      // SELF through `selectPersonalFile`, which deliberately leaves course
+      // progress alone.
+      experimentPanel={
+        <ExperimentPanel
+          masterExperiments={masterExperimentItems}
+          selfExperiments={selfExperimentItems}
+          onCreateSelfExperiment={createSelfExperiment}
+          selfExperimentSeed={{
+            name: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
+          }}
+          onOpen={(experiment, source) => {
+            if (source === "self") selectPersonalFile(experiment.file);
+            else selectFile(experiment.file);
+          }}
+          uid={user?.id ?? null}
         />
       }
       aiPanel={

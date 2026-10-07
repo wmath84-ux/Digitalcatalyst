@@ -42,7 +42,12 @@ import BlockNoteResourceEditor from "@/components/admin/products/BlockNoteResour
 import MindMapResourceEditor from "@/components/admin/products/MindMapResourceEditor";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
-import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
+import {
+  countIncompletePracticeQuestions,
+  normalizePracticeQuestions,
+  practiceQuestionsExplained,
+  practiceQuestionsReady,
+} from "../../../../utils/practiceSet.js";
 import { ADMIN_PRODUCT_RESOURCE_TYPES, registerNoteResourceType } from "../../../../utils/productResourceTypes.js";
 import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
 import { getFirebaseStorage } from "../../../../firebase";
@@ -805,7 +810,12 @@ function ResourceCard({
   // keeps the URL-ready rule.
   const isBrain = resource.type === "brain";
   const brainQuestions = normalizePracticeQuestions(resource.practiceQuestions);
+  // Two rules, on purpose: `brainReady` is what the Course Player can run,
+  // `brainExplained` is the admin's publish rule on top of it — an explanation
+  // on every question is NEVER optional (owner rule, 2026-10-07).
   const brainReady = isBrain && practiceQuestionsReady(resource.practiceQuestions);
+  const brainExplained = brainReady && practiceQuestionsExplained(resource.practiceQuestions);
+  const brainIncomplete = isBrain ? countIncompletePracticeQuestions(resource.practiceQuestions) : 0;
   const isExperiment = resource.type === "interactive";
   const isNote = resource.type === "note";
   const isMindMap = resource.type === "mind_map";
@@ -816,7 +826,7 @@ function ResourceCard({
   const experimentHosted = isExperiment && Boolean(cleanUrl);
   const experimentErrors = isExperiment && experimentHtml.trim() ? experimentBlockingIssues(experimentHtml) : [];
   const experimentReady = isExperiment && (Boolean(experimentHtml.trim()) || experimentHosted) && experimentErrors.length === 0;
-  const readyForPlayer = isBrain ? brainReady : isExperiment ? experimentReady : isNote ? noteReady : isMindMap ? mindMapReady : Boolean(cleanUrl);
+  const readyForPlayer = isBrain ? brainExplained : isExperiment ? experimentReady : isNote ? noteReady : isMindMap ? mindMapReady : Boolean(cleanUrl);
 
   return (
     <article
@@ -830,12 +840,12 @@ function ResourceCard({
           Resource {index + 1} · {module.title || "Untitled module"}
         </p>
         {isBrain ? (
-          <Pill tone={brainReady ? "success" : "warn"}>
+          <Pill tone={brainExplained ? "success" : "warn"}>
             {brainQuestions.length === 0
               ? "Questions required"
-              : brainReady
+              : brainExplained
                 ? `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} ready`
-                : `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} · answer missing`}
+                : `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} · ${Math.max(brainIncomplete, 1)} to fix`}
           </Pill>
         ) : isExperiment ? (
           <Pill tone={experimentReady ? "success" : experimentErrors.length ? "danger" : "warn"}>
@@ -1074,7 +1084,7 @@ function ResourceCard({
                 label={readSourceKind === "gdrive" ? "Google Drive share URL" : readSourceKind === "pdf_url" ? "Direct PDF URL" : "Generic embed URL"}
                 required
                 hint={readSourceKind === "gdrive"
-                  ? "Use a drive.google.com file share link and make it accessible to learners."
+                  ? "Paste a drive.google.com share link and set its access to “Anyone with the link”. Drive blocks direct browser reads of its files, so learners view it in Google Drive's own viewer inside the Read tab."
                   : readSourceKind === "pdf_url"
                     ? "The host must allow browser CORS access for PDF.js to read the PDF."
                     : "Enter a URL only, not iframe HTML. It will open in a sandboxed frame."}

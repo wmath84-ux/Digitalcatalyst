@@ -155,3 +155,52 @@ test("the Sketch personal library is one owner-only document per learner", async
   await assertFails(setDoc(ref, { ...payload, role: "admin" }));
   await assertSucceeds(deleteDoc(ref));
 });
+
+test("the Quick Sketch canvas is one owner-only document per learner, module and canvas", async () => {
+  const { quickSketchDocId, toFirestoreQuickSketch } = await import("../src/utils/quickSketch.ts");
+  const payload = toFirestoreQuickSketch({
+    uid,
+    productId: "p1",
+    moduleId: "mod-1",
+    sketchKey: "main",
+    title: "Sketch 1",
+    strokes: [{ id: "s1", points: [{ x: 10.25, y: 20.5, pressure: 0.5 }] }],
+    resourceId: null,
+    resourceName: null,
+    createdAt: 10,
+    updatedAt: 11,
+  });
+
+  // The default canvas keeps the three-part id; a named canvas gets its own key.
+  const mainRef = doc(owner, "users", uid, "quickSketches", quickSketchDocId(uid, "p1", "mod-1"));
+  await assertSucceeds(setDoc(mainRef, payload));
+  assert.equal((await assertSucceeds(getDoc(mainRef))).data().strokes.length, 1);
+  const secondRef = doc(owner, "users", uid, "quickSketches", quickSketchDocId(uid, "p1", "mod-1", "sk_second"));
+  await assertSucceeds(setDoc(secondRef, { ...payload, sketchKey: "sk_second", title: "Sketch 2" }));
+
+  // Somebody else can never read or write it, and the ids cannot be borrowed.
+  await assertFails(getDoc(doc(stranger, "users", uid, "quickSketches", quickSketchDocId(uid, "p1", "mod-1"))));
+  await assertFails(setDoc(doc(stranger, "users", uid, "quickSketches", quickSketchDocId(uid, "p1", "mod-1")), payload));
+  await assertFails(setDoc(mainRef, { ...payload, uid: "different-owner" }));
+  // The key inside the document has to match the key in the id.
+  await assertFails(setDoc(mainRef, { ...payload, sketchKey: "sk_wrong" }));
+  await assertFails(setDoc(secondRef, { ...payload, sketchKey: "main", title: "Sketch 2" }));
+  await assertFails(setDoc(doc(owner, "users", uid, "quickSketches", "anything-at-all"), payload));
+
+  // The ceilings are enforced, not just advertised (MAX_QUICK_SKETCH_STROKES).
+  await assertFails(
+    setDoc(mainRef, { ...payload, strokes: Array.from({ length: 601 }, (_, i) => ({ id: `s${i}`, points: [{ x: i, y: i, pressure: 0.5 }] })) }),
+  );
+  await assertFails(setDoc(mainRef, { ...payload, title: "" }));
+  await assertFails(setDoc(mainRef, { ...payload, title: "x".repeat(121) }));
+  await assertFails(setDoc(mainRef, { ...payload, strokes: { id: "s1" } }));
+  // Privileged fields stay out of a learner write.
+  await assertFails(setDoc(mainRef, { ...payload, role: "admin" }));
+
+  // …and the legitimate update (a longer drawing) still lands, then clears.
+  await assertSucceeds(
+    setDoc(mainRef, { ...payload, strokes: [...payload.strokes, { id: "s2", points: [{ x: 1, y: 1, pressure: 0.5 }] }], updatedAt: 12 }),
+  );
+  await assertSucceeds(deleteDoc(mainRef));
+  await assertSucceeds(deleteDoc(secondRef));
+});

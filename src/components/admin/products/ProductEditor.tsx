@@ -20,7 +20,12 @@ import { adminFetch } from "@/lib/admin/client";
 import type { PaidUpdate, ProductImage, ProductModule } from "@/lib/admin/types";
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import ModulesResourcesEditor from "@/components/admin/products/ModulesResourcesEditor";
-import { normalizePracticeQuestions, practiceQuestionsReady } from "../../../../utils/practiceSet.js";
+import {
+  countIncompletePracticeQuestions,
+  normalizePracticeQuestions,
+  practiceQuestionsExplained,
+  practiceQuestionsReady,
+} from "../../../../utils/practiceSet.js";
 import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
 import { normalizeResourceUrl, productExperimentBudget, productExperimentBudgetError } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
@@ -228,14 +233,16 @@ export function ProductEditor({ productId }: { productId?: string }) {
           // The Brain practice set is the ONE resource type that is valid
           // WITHOUT a URL — its content is the imported question list. A set
           // the learner can see must be complete: every question needs text,
-          // two options and a marked answer, otherwise it would silently never
-          // reach the player's Brain tab.
+          // two options, a marked answer AND an explanation (never optional —
+          // owner rule, 2026-10-07), otherwise it would either never reach the
+          // player's Brain tab or reach it without the teaching half of the
+          // question.
           const questions = Array.isArray(r.practiceQuestions) ? r.practiceQuestions : [];
           if (questions.length === 0) {
             add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has no questions yet — import or add at least one.`, "modules", learnerVisible);
-          } else if (!practiceQuestionsReady(questions)) {
-            const incomplete = questions.filter((q) => !String(q?.prompt || "").trim() || (q?.options || []).map((o) => String(o || "").trim()).filter(Boolean).length < 2 || !(Number(q?.correctIndex) >= 0 && Number(q?.correctIndex) < (q?.options || []).length)).length;
-            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each needs text, two options and a marked answer.`, "modules", learnerVisible);
+          } else if (!practiceQuestionsReady(questions) || !practiceQuestionsExplained(questions)) {
+            const incomplete = countIncompletePracticeQuestions(questions);
+            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each needs text, two options, a marked answer and an explanation.`, "modules", learnerVisible);
           }
         } else if (r.type === "interactive") {
           // An experiment is playable with its inline HTML OR a hosted page —

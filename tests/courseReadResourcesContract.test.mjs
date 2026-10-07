@@ -10,6 +10,7 @@ const player = read("src/CoursePlayerApp.tsx");
 const embed = read("src/utils/courseEmbed.ts");
 const reader = read("src/course/PdfJsGenericViewer.tsx");
 const library = read("src/course/ReadLibraryPanel.tsx");
+const readSources = read("utils/readResources.js");
 const admin = read("src/components/admin/products/ModulesResourcesEditor.tsx");
 const editor = read("src/components/admin/products/ProductEditor.tsx");
 const api = read("src/lib/admin/client.ts");
@@ -64,6 +65,33 @@ test("Read viewer is the lazy local PDF.js Generic Viewer, not a hosted or nativ
   assert.ok(serviceWorker.includes("pdfjs-(?:viewer|data)"));
   assert.ok(serviceWorker.includes("6\\.3\\.289"));
   assert.match(docs, /PDF\.js Generic Viewer/);
+});
+
+test("a Google Drive Read resource is framed by Drive's own viewer, not handed to PDF.js", () => {
+  // Owner report 2026-10-07: a Drive share URL chosen as the "Google Drive PDF"
+  // Read source opened as an empty 0-page document, because Drive's
+  // `/uc?export=download` URL redirects to *.googleusercontent.com with no CORS
+  // header and the browser-side PDF.js fetch was blocked. The Read path now
+  // presents Drive through Google's embeddable viewer.
+  assert.match(readSources, /export const googleDrivePreviewUrl/);
+  assert.match(readSources, /https:\/\/drive\.google\.com\/file\/d\/\$\{encodeURIComponent\(id\)\}\/preview/);
+  assert.match(readSources, /kind: "drive"/);
+  assert.match(readSources, /const driveId = sourceKind === "upload" \? "" : googleDriveFileId\(sourceUrl\)/);
+  assert.match(readSources, /const previewUrl = googleDrivePreviewUrl\(sourceUrl\)/);
+  // The PDF.js presentation must no longer be reachable from the gdrive branch:
+  // the download URL stays exported for downloads/exports only.
+  assert.doesNotMatch(readSources, /sourceKind === "gdrive" \? googleDrivePdfUrl\(sourceUrl\)/);
+
+  // The panel keeps the local viewer for real PDFs and adds a Drive frame with
+  // the permissions Google's viewer needs (no allow-same-origin = blank frame).
+  assert.match(library, /activeEntry\.presentation\.kind === "pdfjs" \? \(\s*<PdfJsGenericViewer/);
+  assert.match(library, /activeEntry\.presentation\.kind === "drive" \? \(/);
+  assert.match(library, /data-course-read-drive/);
+  assert.match(library, /sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"/);
+  assert.match(library, /data-course-read-open-drive/);
+  // The generic embed frame keeps its tighter sandbox untouched.
+  assert.match(library, /sandbox="allow-scripts allow-forms allow-popups allow-downloads"/);
+  assert.match(library, /entry\.presentation\.kind === "drive"\s*\?\s*"Open in Drive"/);
 });
 
 test("admin and Firestore paths validate Read sources, share a finite upload limit and clean only after writes", () => {
