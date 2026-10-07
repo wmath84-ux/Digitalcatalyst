@@ -1,0 +1,577 @@
+/* src/components/quickSketch/quickSketch.css
+ *
+ * The Quick Sketch canvas's own chrome — a faithful port of the
+ * perfect-freehand editor (perfectfreehand.com / github.com/steveruizok/
+ * perfect-freehand, packages/dev): the collapsible white panel of option rows
+ * on the left, the "Draw" button bottom-left, "Undo · Redo · Clear"
+ * bottom-right, and the 40px white controls above them.
+ *
+ * Ported rather than imported because the original ships as CSS modules with a
+ * 'Recursive' webfont and radix primitives; the values below (gainsboro /
+ * dodgerblue accents, the 96px–1fr–auto grid on 32px rows, the 3px track with
+ * a 12px ball, the 16px radius on the panel's bottom-right corner, the bleed
+ * of the separators) are the original's own, so the design is the same one the
+ * site teaches. Everything is scoped to `.dc-qsk` — this must never leak into
+ * the Course Player or Excalidraw.
+ *
+ * Two deliberate adaptations, both invisible on a wide pane:
+ *   · the labels' font is the app's own stack, not 'Recursive' (no new
+ *     webfont just for a toolbar);
+ *   · the bottom bars' 40px side padding collapses to 16px when the pane is
+ *     narrow (a container query), because the sketch pane on a phone is a
+ *     third of the width the site assumes.
+ */
+
+.dc-qsk {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #000000;
+  font-family: inherit;
+  font-size: 13px;
+  user-select: none;
+  container-type: inline-size;
+}
+
+.dc-qsk *,
+.dc-qsk *::before,
+.dc-qsk *::after {
+  box-sizing: border-box;
+}
+
+/* ── Canvas ─────────────────────────────────────────────────────────────── */
+
+.dc-qsk-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.dc-qsk[data-tool="erase"] .dc-qsk-canvas {
+  cursor: pointer;
+}
+
+.dc-qsk-stroke {
+  pointer-events: none;
+}
+
+/* ── The 40px control buttons (top-left menu, bottom bars) ──────────────── */
+
+.dc-qsk-corner {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  width: fit-content;
+  user-select: none;
+}
+
+.dc-qsk-corner--top-left {
+  top: 0;
+  left: 0;
+}
+
+.dc-qsk-corner--top-right {
+  top: 0;
+  right: 0;
+}
+
+.dc-qsk-corner--top-center {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 100%;
+}
+
+.dc-qsk-corner--bottom-left {
+  bottom: 0;
+  left: 0;
+}
+
+.dc-qsk-corner--bottom-right {
+  bottom: 0;
+  right: 0;
+}
+
+.dc-qsk-icon-button,
+.dc-qsk-text-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border: none;
+  background-color: #ffffff;
+  color: #000000;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-shadow:
+    1px 1px 2px rgba(255, 255, 255, 1),
+    1px 1px 3px rgba(255, 255, 255, 1),
+    1px 1px 8px rgba(255, 255, 255, 1);
+}
+
+.dc-qsk-icon-button {
+  width: 40px;
+}
+
+.dc-qsk-text-button {
+  min-width: 40px;
+  padding: 16px 16px;
+}
+
+.dc-qsk-text-button:hover,
+.dc-qsk-icon-button:hover,
+.dc-qsk-corner button[data-active="true"],
+.dc-qsk-corner a:hover {
+  color: dodgerblue;
+  background-color: #ffffff;
+}
+
+.dc-qsk-text-button:disabled,
+.dc-qsk-icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dc-qsk-text-button:disabled:hover,
+.dc-qsk-icon-button:disabled:hover {
+  color: #000000;
+}
+
+@container (min-width: 560px) {
+  .dc-qsk-text-button {
+    padding: 16px 40px;
+  }
+}
+
+/* ── Top-centre chip: the canvas's name, its save state, its switcher ───── */
+
+.dc-qsk-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  max-width: 100%;
+  padding: 0 10px;
+  background: #ffffff;
+  box-shadow: 0 0 8px -4px rgba(0, 0, 0, 0.16);
+}
+
+.dc-qsk-chip-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #000000;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dc-qsk-chip-button:hover {
+  color: dodgerblue;
+}
+
+.dc-qsk-chip-status {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #6b7280;
+}
+
+.dc-qsk-chip-status[data-state="saved"] {
+  color: #15803d;
+}
+
+.dc-qsk-chip-status[data-state="pending"],
+.dc-qsk-chip-status[data-state="saving"] {
+  color: #b45309;
+}
+
+.dc-qsk-chip-status[data-state="error"] {
+  color: #b91c1c;
+}
+
+.dc-qsk-canvas-menu {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  min-width: 220px;
+  max-width: min(90vw, 320px);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 0 36px 0 rgba(0, 0, 0, 0.18);
+}
+
+.dc-qsk-canvas-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dc-qsk-canvas-row:hover {
+  background: #f3f4f6;
+}
+
+.dc-qsk-canvas-row[data-active="true"] {
+  color: dodgerblue;
+  font-weight: 700;
+}
+
+.dc-qsk-canvas-row small {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dc-qsk-canvas-trash {
+  margin-left: auto;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.dc-qsk-canvas-trash:hover {
+  color: #b91c1c;
+}
+
+/* ── The options panel ──────────────────────────────────────────────────── */
+
+.dc-qsk-panel {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 100;
+  width: min(100%, 320px);
+  max-height: calc(100% - 96px);
+  overflow-y: auto;
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-bottom-right-radius: 16px;
+  box-shadow:
+    0 0 8px -4px rgba(0, 0, 0, 0.16),
+    0 0 36px 0 rgba(0, 0, 0, 0.08);
+  transform: translate(-100%, 0);
+  transition: transform 0.2s;
+}
+
+.dc-qsk-panel[data-open="true"] {
+  transform: translate(0, 0);
+}
+
+.dc-qsk-panel-body {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  grid-auto-rows: 32px;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.dc-qsk-label {
+  user-select: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dc-qsk-hr {
+  grid-column: 1 / span 3;
+  height: 1px;
+  border: none;
+  background-color: gainsboro;
+  width: calc(100% + 24px);
+  margin-left: -12px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* ── Slider ─────────────────────────────────────────────────────────────── */
+
+.dc-qsk-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 200px;
+  height: 16px;
+  margin: 0;
+  flex-grow: 1;
+  flex-shrink: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.dc-qsk-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 5px;
+  background: linear-gradient(
+    to right,
+    dodgerblue var(--dc-qsk-fill, 0%),
+    gainsboro var(--dc-qsk-fill, 0%)
+  );
+}
+
+.dc-qsk-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 5px;
+  background: gainsboro;
+}
+
+.dc-qsk-slider::-moz-range-progress {
+  height: 3px;
+  border-radius: 5px;
+  background: dodgerblue;
+}
+
+.dc-qsk-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 2px solid dodgerblue;
+  border-radius: 100%;
+  background: #ffffff;
+  transition: background-color 0.12s;
+}
+
+.dc-qsk-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid dodgerblue;
+  border-radius: 100%;
+  background: #ffffff;
+}
+
+.dc-qsk-slider:focus-visible::-webkit-slider-thumb,
+.dc-qsk-slider:active::-webkit-slider-thumb {
+  background: dodgerblue;
+}
+
+.dc-qsk-slider:focus-visible::-moz-range-thumb,
+.dc-qsk-slider:active::-moz-range-thumb {
+  background: dodgerblue;
+}
+
+/* ── Number field ───────────────────────────────────────────────────────── */
+
+.dc-qsk-number {
+  width: 40px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: #000000;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: right;
+}
+
+.dc-qsk-number::-webkit-outer-spin-button,
+.dc-qsk-number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dc-qsk-number {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.dc-qsk-number:focus {
+  border-radius: 2px;
+  outline: 2px solid dodgerblue;
+}
+
+/* ── Select ─────────────────────────────────────────────────────────────── */
+
+.dc-qsk-select {
+  grid-column: 2 / span 2;
+  position: relative;
+}
+
+.dc-qsk-select select {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  padding: 0 18px 0 0;
+  border: 2px solid transparent;
+  background: transparent;
+  color: #000000;
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 2px center;
+}
+
+.dc-qsk-select select:focus {
+  border-color: dodgerblue;
+}
+
+/* ── Checkbox ───────────────────────────────────────────────────────────── */
+
+.dc-qsk-checkbox {
+  position: relative;
+  grid-column: 2 / span 2;
+  justify-self: start;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid gainsboro;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.dc-qsk-checkbox:checked {
+  border-color: dodgerblue;
+  background-color: dodgerblue;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-4.9' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.dc-qsk-checkbox:focus {
+  outline: 2px solid dodgerblue;
+}
+
+.dc-qsk-checkbox:disabled {
+  border-color: gainsboro;
+  background-color: gainsboro;
+  cursor: not-allowed;
+}
+
+/* ── Colours ────────────────────────────────────────────────────────────── */
+
+.dc-qsk-colors {
+  display: flex;
+  grid-column: span 2;
+  margin-left: -4px;
+}
+
+.dc-qsk-color {
+  flex-grow: 2;
+  width: 100%;
+  height: 24px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+
+.dc-qsk-color[data-selected="true"] {
+  border-bottom: 5px solid dodgerblue;
+}
+
+/* ── Panel buttons ──────────────────────────────────────────────────────── */
+
+.dc-qsk-row-buttons {
+  display: flex;
+  height: 40px;
+}
+
+.dc-qsk-row-button {
+  flex-grow: 2;
+  border: 2px solid transparent;
+  background-color: transparent;
+  color: #000000;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dc-qsk-row-button:hover {
+  color: dodgerblue;
+}
+
+.dc-qsk-row-button:focus {
+  outline: none;
+  border-color: dodgerblue;
+}
+
+/* ── Notes / empty states ───────────────────────────────────────────────── */
+
+.dc-qsk-hint {
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.dc-qsk-scoped-note {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.dc-qsk-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  z-index: 30;
+}
+
+.dc-qsk-loading span {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: dodgerblue;
+  border-radius: 999px;
+  animation: dc-qsk-spin 0.8s linear infinite;
+}
+
+@keyframes dc-qsk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

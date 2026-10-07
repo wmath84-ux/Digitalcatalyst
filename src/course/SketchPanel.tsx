@@ -689,6 +689,13 @@ export default function SketchPanel({
    * state intact, so the learner can pop back with their work preserved.
    */
   const [mode, setMode] = useState<"editor" | "quick-sketch">("editor");
+  /**
+   * The same fact as a boolean, deliberately: inside the Excalidraw branch
+   * TypeScript has already narrowed `mode` to `"editor"`, so comparing it to
+   * `"quick-sketch"` there is an impossible comparison. A boolean keeps the
+   * shared chrome readable from both branches.
+   */
+  const quickMode = mode === "quick-sketch";
 
   /**
    * Where libraries.excalidraw.com sends the browser back to. A STABLE value
@@ -833,6 +840,28 @@ export default function SketchPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneKey]);
 
+  /**
+   * The Quick Sketch / Full Editor switch — the ONE control both chrome bars
+   * share. Quick Sketch is the perfect-freehand canvas (perfectfreehand.com's
+   * own design, with its options panel, its eraser and its undo history);
+   * the full editor is the official Excalidraw component.
+   */
+  const modeToggle = (
+    <button
+      type="button"
+      onClick={() => setMode(quickMode ? "editor" : "quick-sketch")}
+      className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+        quickMode
+          ? "bg-orange-500 text-white"
+          : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+      }`}
+      data-course-sketch-mode={mode}
+      title={quickMode ? "Switch to Full Editor (Excalidraw)" : "Switch to Quick Sketch (pressure-sensitive pen)"}
+    >
+      {quickMode ? "✏️ Quick Sketch" : "Full Editor"}
+    </button>
+  );
+
   return (
     <div
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden"
@@ -842,8 +871,22 @@ export default function SketchPanel({
     >
       {/* §26A: in Clean / Optimised Look the whole header disappears and the
           canvas reclaims its vertical space; the useful actions move into the
-          editor's left sidebar (rendered below with the Excalidraw host). */}
-      {cleanLook ? null : (
+          editor's left sidebar (rendered below with the Excalidraw host).
+          Quick Sketch keeps this one slim bar even in Clean Look: that sidebar
+          is Excalidraw's, so without the bar the way back to the full editor
+          would have nowhere to live. */}
+      {cleanLook && !quickMode ? null : quickMode ? (
+        /* Quick Sketch owns its own chrome on the canvas (its save state and
+           its canvas switcher live in the chip), so this bar keeps only the
+           way back to the full editor — no Excalidraw state, no library pill,
+           no second canvas list. */
+        <div
+          className="flex shrink-0 items-center justify-end border-b border-white/10 px-3 py-1"
+          data-course-sketch-quick-bar
+        >
+          {modeToggle}
+        </div>
+      ) : (
       <SketchStatus
         status={status}
         pendingSync={pendingSync}
@@ -864,27 +907,13 @@ export default function SketchPanel({
           />
         ) : null}
       >
-        {/* Quick Sketch toggle: switches between the full Excalidraw editor
-            and a lightweight perfect-freehand canvas for quick notes,
-            calculations, and diagrams during lectures. */}
-        <button
-          type="button"
-          onClick={() => setMode(mode === "editor" ? "quick-sketch" : "editor")}
-          className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
-            mode === "quick-sketch"
-              ? "bg-orange-500 text-white"
-              : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-          }`}
-          title={mode === "editor" ? "Switch to Quick Sketch (pressure-sensitive pen)" : "Switch to Full Editor (Excalidraw)"}
-        >
-          {mode === "quick-sketch" ? "✏️ Quick Sketch" : "Full Editor"}
-        </button>
-        {mode === "editor" ? (
+        {modeToggle}
+        {quickMode ? null : (
           <>
             <SketchLibraryPill library={library} />
             <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
           </>
-        ) : null}
+        )}
       </SketchStatus>
       )}
 
@@ -899,10 +928,10 @@ export default function SketchPanel({
               className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-orange-400"
             />
           </div>
-        ) : mode === "quick-sketch" ? (
-          /* Quick Sketch mode: lightweight pressure-sensitive canvas using
-             perfect-freehand. The full Excalidraw editor remains mounted in
-             state (not DOM) so switching back preserves the learner's work. */
+        ) : quickMode ? (
+          /* Quick Sketch: the perfect-freehand canvas (its own design, its own
+             canvases, its own save line — see the component). Switching back
+             to the full editor loses nothing: both halves persist separately. */
           <PerfectFreehandSketch
             uid={uid}
             productId={productId}
@@ -971,24 +1000,13 @@ export default function SketchPanel({
                       />
                     ) : null}
                     <SketchDaylightToggle isDark={canvasColour === null} onToggle={toggleDaylight} />
-                    <button
-                      type="button"
-                      onClick={() => setMode(mode === "editor" ? "quick-sketch" : "editor")}
-                      className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
-                        mode === "quick-sketch"
-                          ? "bg-orange-500 text-white"
-                          : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-                      }`}
-                      title={mode === "editor" ? "Switch to Quick Sketch" : "Switch to Full Editor"}
-                    >
-                      {mode === "quick-sketch" ? "✏️ Quick Sketch" : "Full Editor"}
-                    </button>
-                    {mode === "editor" ? (
+                    {modeToggle}
+                    {quickMode ? null : (
                       <>
                         <SketchLibraryPill library={library} />
                         <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
                       </>
-                    ) : null}
+                    )}
                     <span
                       role="status"
                       aria-live="polite"

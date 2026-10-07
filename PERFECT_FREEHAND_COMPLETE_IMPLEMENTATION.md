@@ -1,5 +1,18 @@
 # Perfect Freehand Sketch — Complete Implementation Report
 
+> **Correction — 2026-10-07.** Two things this report claimed were not true of
+> the running app, and the owner reported both: a stroke **vanished the moment
+> the finger lifted**, and **nothing was ever saved**. The cause of the first was
+> a write path that never reached React state; the cause of the second was that
+> saves went to a root-level `quickSketches` collection with no `match` block in
+> `firestore.rules` — a collection with no rule is denied, so every write was
+> refused. The canvas is now the perfect-freehand editor's own design (its
+> options panel, its Draw / Undo · Redo · Clear chrome) and writes to
+> `users/{uid}/quickSketches/…`, which the rules cover.
+>
+> **The current documentation is `docs/course-player-quick-sketch.md`**; the
+> sections below are kept as the original report of the first implementation.
+
 ## ✅ Status: FULLY IMPLEMENTED
 
 The Perfect Freehand Sketch tool is now a **production-ready feature** with complete persistence, multi-canvas support, and export capabilities.

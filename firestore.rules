@@ -651,6 +651,58 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
+      // Course Player → Quick Sketch (the perfect-freehand canvas in the
+      // Sketch tab). One document per learner per course MODULE per canvas,
+      // written straight from the client like the Excalidraw boards above, and
+      // with the same id shape so the two can never collide: the default
+      // canvas keeps `{uid}__{productId}__{moduleId}`, every other canvas
+      // `…__{sketchKey}`. Both are re-derived here, so a learner cannot choose
+      // an id that lands in somebody else's namespace, and the key inside the
+      // document must match the key in the id.
+      //
+      // Unlike the Excalidraw scene, the strokes are stored as DATA: a stroke
+      // is `{ id, points: [{ x, y, pressure }] }`, and a list of maps is
+      // Firestore-safe (the nested coordinate arrays Excalidraw needs are what
+      // the boards above have to hide in a JSON string). The rules validate
+      // the envelope and the ceilings — mirroring MAX_QUICK_SKETCH_STROKES /
+      // MAX_QUICK_SKETCH_TITLE / the 2-decimal coordinates in
+      // src/utils/quickSketch.ts — so one runaway canvas can never creep up on
+      // the 1 MB document limit and start failing every write.
+      //
+      // This block is why the feature could not save before it existed: a
+      // collection with no `match` is denied outright, so every Quick Sketch
+      // write was refused by Firestore and the drawing only ever lived in the
+      // tab's own memory.
+      match /quickSketches/{sketchId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.productId is string
+          && request.resource.data.moduleId is string
+          && request.resource.data.productId.size() > 0
+          && request.resource.data.moduleId.size() > 0
+          && request.resource.data.sketchKey is string
+          && request.resource.data.sketchKey.size() > 0
+          && request.resource.data.sketchKey.size() <= 64
+          && request.resource.data.sketchKey.matches('^[A-Za-z0-9_-]+$')
+          && (
+            (request.resource.data.sketchKey == 'main'
+              && sketchId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId)
+            || sketchId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId + '__' + request.resource.data.sketchKey
+          )
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 120
+          && request.resource.data.strokes is list
+          && request.resource.data.strokes.size() <= 600
+          && (request.resource.data.createdAt is number || request.resource.data.createdAt is int)
+          && (request.resource.data.updatedAt is number || request.resource.data.updatedAt is int)
+          && (!request.resource.data.keys().hasAny(['resourceId']) || request.resource.data.resourceId == null || (request.resource.data.resourceId is string && request.resource.data.resourceId.size() <= 200))
+          && (!request.resource.data.keys().hasAny(['resourceName']) || request.resource.data.resourceName == null || (request.resource.data.resourceName is string && request.resource.data.resourceName.size() <= 200))
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       // Course Player → Sketch PERSONAL LIBRARY. ONE document per learner
       // (`users/{uid}/sketchLibraries/main`) holding the Excalidraw library
       // items as a JSON string — same nested-array reasoning as the boards
