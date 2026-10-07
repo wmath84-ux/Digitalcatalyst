@@ -97,12 +97,16 @@ an open relay for a learner-supplied URL.
   * `tests/readUrlImportContract.test.mjs` — runtime check that a Drive URL is refused with
     `retryable: false` and **zero** fetch attempts.
 * **Full suite** `node --test tests/*.test.mjs`:
-  * with this change — **3252 tests, 3119 pass, 57 fail**
+  * with this change — **3253 tests, 3120 pass, 57 fail**
   * without it — 3250 tests, 3117 pass, **the identical 57 failures**
-  → the two new passing tests are the only delta; the 57 pre-existing failures (profile/store/
-  revision/Android contracts) are byte-for-byte the same set.
+  → the three new passing tests are the only delta (the failure set is byte-for-byte the same:
+  pre-existing profile / store / revision / Android contract failures).
 * **Types**: `npx tsc --noEmit` → 52 pre-existing errors, **none** in the touched files.
 * **Build**: `node scripts/vite-build.mjs` → successful production build.
+* **Dev server**: `utils/readResources.js`, `src/course/readUrlImport.ts` and
+  `src/course/ReadLibraryPanel.tsx` all transform and serve cleanly through Vite, so the fix is
+  live on the preview server (no `/api/*` route is involved in this path, so it behaves the same
+  in the packaged Android build).
 * **Limit of this environment**: the sandbox cannot reach `drive.google.com`, so the Drive frame
   itself could not be screenshotted here. The URL is Google's documented embeddable viewer and the
   exact rendering the Course Player already uses for Drive files; the fix is verified at the URL,
