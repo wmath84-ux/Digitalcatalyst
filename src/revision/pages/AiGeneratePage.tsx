@@ -1,28 +1,3 @@
-import { GlassButton } from "../../components/ui/glass-button";
-import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
-import { GlassTile } from "../../components/ui/glass-tile";
-import { GlassSurface } from "../../components/ui/glass";
-import { GlassCheckbox } from "../../components/ui/glass-checkbox";
-import { GlassCard } from "../../components/ui/GlassCard";
-import FatZebraButton from "../../components/ui/FatZebraButton";
-// Student-facing AI test generator.
-//
-// The learner picks Class → Subject → Chapter → Topic from four cascading
-// multi-select dropdowns (checkboxes + "select all"), sets difficulty, the
-// number of questions and the total time, and hits Generate. Every selection
-// is sent to the configured AI, a live generating animation plays while the
-// model works, and the finished exam lands on the dashboard as a ready-to-take
-// test.
-//
-// Difficulty and question type are separate planning settings. Question type
-// defaults to Mixed and switches the AI's style — Mixed (theory + application),
-// Theory only (definitions/concepts/formulas/units), or Application only
-// (numerical/problem-based/situational questions). The choice is sent to the
-// server, which instructs the model with an exact per-type quota and a
-// mandatory per-question type tag, then deterministically verifies every
-// returned question and regenerates any wrong-type ones before the test is
-// delivered (see utils/questionTypeGuard.js).
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageShell from "../components/PageShell";
 import { Card, SecondaryButton } from "../components/ui";
@@ -139,32 +114,44 @@ function PickerButton({
   onClick: () => void;
 }) {
   return (
-    /* Wave 13: pack GlassTile — `open` is the pack's selected state; a
-       non-empty pick keeps an indigo meaning ring. */
-    <GlassTile
+    <button
+      type="button"
       disabled={disabled}
       onClick={onClick}
-      selected={open}
       aria-expanded={open}
-      className={`dc-tile aspect-auto min-h-[54px] rounded-xl px-1 py-1.5 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
-        !open && count > 0 ? "ring-1 ring-indigo-400/40" : ""
-      } ${disabled ? "opacity-40" : ""}`}
+      className={`flex aspect-auto min-h-[54px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center transition ${
+        open
+          ? "border-indigo-400 bg-indigo-500/15"
+          : !open && count > 0
+          ? "border-indigo-400/40 bg-white/5"
+          : "border-white/10 bg-white/5 hover:bg-white/10"
+      } ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
     >
       <span className="text-[11px] font-bold text-white/85">{label}</span>
       <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-200" : "text-white/55"}`}>
         {count > 0 ? `${count}/${total}` : "Select ▾"}
       </span>
-    </GlassTile>
+    </button>
   );
 }
 
 function CheckBox({ checked, partial }: { checked: boolean; partial?: boolean }) {
-  /* Wave 13: the pack GlassCheckbox, purely presentational inside the row
-     button (the row itself toggles), so it is inert for pointer + a11y. */
   return (
     <span className="relative flex shrink-0 items-center" aria-hidden>
-      <GlassCheckbox checked={checked || Boolean(partial)} tabIndex={-1} className="pointer-events-none" />
-      {!checked && partial && <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded bg-white" />}
+      <span
+        className={`flex h-5 w-5 items-center justify-center rounded border-2 transition ${
+          checked || partial
+            ? "border-indigo-500 bg-indigo-500"
+            : "border-white/30 bg-transparent"
+        }`}
+      >
+        {checked && (
+          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+        {!checked && partial && <span className="h-0.5 w-2.5 rounded bg-white" />}
+      </span>
     </span>
   );
 }
@@ -189,7 +176,7 @@ function PickerPanel({
   const allSelected = options.length > 0 && options.every((o) => selected.has(o.key));
   const someSelected = options.some((o) => selected.has(o.key));
   return (
-    <GlassSurface radius={20} className="animate-fade-in mt-2 ring-1 ring-indigo-400/30" contentClassName="overflow-hidden p-0">
+    <div className="animate-fade-in mt-2 overflow-hidden rounded-xl border border-indigo-400/30 bg-slate-900/95 shadow-xl backdrop-blur-md">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
         <span className="text-xs font-bold uppercase tracking-wide text-white/75">{title}</span>
         <button type="button" onClick={onDone} className="rounded-full bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-indigo-500 active:scale-95">
@@ -227,7 +214,7 @@ function PickerPanel({
           ))}
         </div>
       )}
-    </GlassSurface>
+    </div>
   );
 }
 
@@ -652,30 +639,32 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="AI Revision Generator" subtitle="Build a focused revision plan" backHref="#/revision/profile">
       <div data-rev-layout="aigenerate" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {/* Provider strip */}
-        <GlassCard contentClassName="flex items-center gap-3 p-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
-            <SparklesIcon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold text-white">
-              {activeConfig ? `${providerMeta?.name} · ${activeConfig.model}` : "No AI connected"}
-            </p>
-            <p className="truncate text-[11px] text-white/75">
-              {effective.mode === "own"
-                ? "Your provider account is used · school/plan AI allowance is not deducted"
-                : effective.mode === "default"
-                  ? "One complete test uses one school-AI generation and any enabled model-cost allowance"
-                  : "Questions will use the built-in engine — connect AI for better results"}
-            </p>
+        <Card>
+          <div className="flex items-center gap-3 p-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+              <SparklesIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-white">
+                {activeConfig ? `${providerMeta?.name} · ${activeConfig.model}` : "No AI connected"}
+              </p>
+              <p className="truncate text-[11px] text-white/75">
+                {effective.mode === "own"
+                  ? "Your provider account is used · school/plan AI allowance is not deducted"
+                  : effective.mode === "default"
+                    ? "One complete test uses one school-AI generation and any enabled model-cost allowance"
+                    : "Questions will use the built-in engine — connect AI for better results"}
+              </p>
+            </div>
+            <SecondaryButton
+              onClick={() => navigate("#/revision/ai-settings")}
+              size="sm"
+              className="shrink-0"
+            >
+              Configure
+            </SecondaryButton>
           </div>
-          <GlassButton
-            variant="capsule"
-            onClick={() => navigate("#/revision/ai-settings")}
-            className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-bold"
-          >
-            Configure
-          </GlassButton>
-        </GlassCard>
+        </Card>
 
         {phase !== "ready" && (
           <>
@@ -717,16 +706,15 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       School-provided key or paste your own
                     </span>
                   </button>
-                  <GlassButton
-                    variant="capsule"
+                  <SecondaryButton
                     onClick={() => navigate("#/revision/bulk-import")}
-                    className="w-full [&>span>div]:h-auto [&>span>div]:min-h-[56px] [&>span>div]:w-full [&>span>div]:justify-start [&>span>div]:px-4 [&>span>div]:py-2"
+                    className="w-full"
                   >
                     <span className="flex flex-col items-start gap-0.5 text-left text-emerald-200">
                       <span className="text-[13px] font-bold">Use Bulk Import →</span>
                       <span className="text-[10px] font-medium text-emerald-300">Paste a full revision plan with answers</span>
                     </span>
-                  </GlassButton>
+                  </SecondaryButton>
                 </div>
                 <p className="mt-3 text-[11px] leading-relaxed text-white/55">
                   After configuration, come back here and your saved selections (class, subject,
@@ -822,21 +810,23 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               </p>
               <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">
                 {DIFFICULTY_OPTIONS.map((d) => (
-                  <GlassTile
+                  <button
                     key={d.value}
+                    type="button"
                     disabled={phase === "generating"}
                     onClick={() => setDifficulty(d.value)}
-                    selected={difficulty === d.value}
-                    className={`dc-tile aspect-auto min-h-[58px] rounded-xl px-1 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
-                      phase === "generating" ? "opacity-40" : ""
-                    }`}
+                    className={`flex aspect-auto min-h-[58px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center transition ${
+                      difficulty === d.value
+                        ? "border-indigo-400 bg-indigo-500/15"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    } ${phase === "generating" ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
                   >
                     <span className="text-sm">{d.emoji}</span>
                     <span className={`text-[11px] font-bold ${difficulty === d.value ? "text-indigo-200" : "text-white/75"}`}>
                       {d.label}
                     </span>
                     <span className="line-clamp-1 text-[9px] font-medium text-white/55">{d.desc}</span>
-                  </GlassTile>
+                  </button>
                 ))}
               </div>
 
@@ -853,25 +843,22 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   </span>
                 </div>
                 <div data-rev-question-mode-grid className="mt-3 grid grid-cols-3 gap-1.5">
-                  {/* Wave 4: selectable cells -> registry glass-tile (frost, press gel,
-                      shared selected ring); aria-pressed comes from the pack. */}
                   {QUESTION_MODE_OPTIONS.map((m) => (
-                    <GlassTile
+                    <button
                       key={m.value}
                       type="button"
                       disabled={phase === "generating"}
                       onClick={() => setQuestionMode(m.value)}
-                      selected={questionMode === m.value}
-                      className={`dc-tile min-h-[72px] aspect-auto rounded-xl px-2 py-2 text-center ${
-                        phase === "generating" ? "opacity-40" : ""
-                      }`}
+                      className={`flex min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-center transition ${
+                        questionMode === m.value
+                          ? "border-indigo-400 bg-indigo-500/15"
+                          : "border-white/10 bg-white/5 hover:bg-white/10"
+                      } ${phase === "generating" ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
                     >
-                      <span className="flex flex-col items-center gap-1">
-                        <span className="text-base">{m.emoji}</span>
-                        <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
-                        <span className="line-clamp-2 text-[9px] font-medium leading-tight text-white/55">{m.desc}</span>
-                      </span>
-                    </GlassTile>
+                      <span className="text-base">{m.emoji}</span>
+                      <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
+                      <span className="line-clamp-2 text-[9px] font-medium leading-tight text-white/55">{m.desc}</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -893,13 +880,22 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <GlassToggleGroup className="dc-segment dc-scene-plate mt-2 flex w-full" data-stretch value={String(totalQuestions)} onValueChange={(v) => setTotalQuestions(Number(v))} aria-label="Question presets">
+                  <div className="mt-2 flex w-full gap-1" role="group" aria-label="Question presets">
                     {QUESTION_PRESETS.map((n) => (
-                      <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setTotalQuestions(n)}
+                        className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
+                          totalQuestions === n
+                            ? "border-indigo-400 bg-indigo-500/20 text-indigo-200"
+                            : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                        }`}
+                      >
                         {n}
-                      </GlassToggleItem>
+                      </button>
                     ))}
-                  </GlassToggleGroup>
+                  </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
@@ -915,13 +911,22 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <GlassToggleGroup className="dc-segment dc-scene-plate mt-2 flex w-full" data-stretch value={String(totalMinutes)} onValueChange={(v) => setTotalMinutes(Number(v))} aria-label="Time presets">
+                  <div className="mt-2 flex w-full gap-1" role="group" aria-label="Time presets">
                     {TIME_PRESETS.map((n) => (
-                      <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setTotalMinutes(n)}
+                        className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
+                          totalMinutes === n
+                            ? "border-indigo-400 bg-indigo-500/20 text-indigo-200"
+                            : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                        }`}
+                      >
                         {n}m
-                      </GlassToggleItem>
+                      </button>
                     ))}
-                  </GlassToggleGroup>
+                  </div>
                 </div>
               </div>
             </Card>

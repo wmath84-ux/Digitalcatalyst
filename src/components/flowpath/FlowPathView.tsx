@@ -239,9 +239,10 @@ interface FlowPathViewProps {
    * and the modal stay owned here, so no duplicate settings surface exists.
    */
   openCurveRef?: { current: (() => void) | null };
+  isDarkMode?: boolean;
 }
 
-export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewProps = {}) {
+export function FlowPathView({ onNavigateToHome, openCurveRef, isDarkMode = true }: FlowPathViewProps = {}) {
   const {
     items,
     currentId,
@@ -645,7 +646,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
   );
 
   return (
-    <div className="relative">
+    <div className={`relative transition-colors duration-300 ${isDarkMode ? "bg-slate-950" : "bg-white"}`}>
       {/* The old fixed FLOWPATH title bar is gone — its controls (theme
           toggle + flow-curve settings) now live behind the Settings gear
           in the bottom dock, so the home-style header above stays the
@@ -656,7 +657,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
         className="relative mx-auto w-full max-w-3xl px-4 pt-6 pb-44 sm:px-8 sm:pt-8"
         style={{ minHeight: totalHeight }}
       >
-        <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} />
+        <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} isDarkMode={isDarkMode} />
 
         {isEmpty && <EmptyState />}
 
@@ -693,6 +694,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef }: FlowPathViewPro
               onNodeClick={() => handleNodeClick(row.activity!.activity.id)}
               onDelete={() => handleDelete(row.activity!.activity.id)}
               onMeasure={measureCard}
+              isDarkMode={isDarkMode}
             />
           )
         )}
@@ -853,6 +855,7 @@ function ActivityRowItem({
   onNodeClick,
   onDelete,
   onMeasure,
+  isDarkMode,
 }: {
   row: FlowRow;
   config: LayoutConfig;
@@ -866,6 +869,7 @@ function ActivityRowItem({
   onNodeClick: () => void;
   onDelete: () => void;
   onMeasure: (id: string, height: number) => void;
+  isDarkMode?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const activityId = row.activity?.activity.id;
@@ -962,6 +966,7 @@ function ActivityRowItem({
           onEdit={onEdit}
           onUncomplete={onUncomplete}
           completing={completing}
+          isDarkMode={isDarkMode}
         />
       </div>
     </motion.div>

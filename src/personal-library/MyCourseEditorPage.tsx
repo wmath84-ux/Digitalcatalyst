@@ -37,7 +37,6 @@ import type { ComponentType } from "react";
 import Header from "../components/Header";
 import { toast } from "../components/ui/glass-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { GlassSurface } from "../components/ui/glass";
 import { useAuth } from "../context/AuthContext";
 import { useMyCourses } from "../hooks/useMyCourses";
 import {
@@ -383,19 +382,21 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
 
             {/* Two panels, one fluid grid: stacked on a phone and a portrait
                 tablet, side by side from 1280px on a desktop. */}
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
               {/* ── 1. Course identity ─────────────────────────────────── */}
-              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Course</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
-                <p className="mt-1 text-xs font-medium leading-5 text-white/50">
-                  Cover, modules, lessons aur apne MCQ — sab kuch aap design karein. Save ke baad Play se Course Player khulega.
-                </p>
+              <section className="space-y-4 text-white" data-my-course-meta>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Course</p>
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
+                  <p className="mt-1 text-sm leading-relaxed text-white/70">
+                    Cover, modules, lessons aur apne MCQ — sab kuch aap design karein. Save ke baad Play se Course Player khulega.
+                  </p>
+                </div>
 
-                <div className="mt-4 grid gap-4 sm:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-1">
-                  <div>
+                <div className="grid gap-4 sm:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-1">
+                  <div className="space-y-3">
                     <span className={labelClass}>Cover image</span>
-                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-white/10 bg-black/20">
                       <img
                         src={previewCover}
                         alt="Course cover"
@@ -404,7 +405,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                         data-my-course-cover-source={String(draft.coverImage || "").trim() ? "own" : "random"}
                       />
                       {coverUploading ? (
-                        <span className="absolute inset-0 grid place-items-center bg-black/55">
+                        <span className="absolute inset-0 grid place-items-center bg-black/50">
                           <LoaderCircle className="h-6 w-6 animate-spin text-white" />
                         </span>
                       ) : null}
@@ -413,17 +414,17 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                           type="button"
                           onClick={() => patch({ coverImage: "" })}
                           aria-label="Remove cover image"
-                          className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white ring-1 ring-white/20"
+                          className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white"
                         >
                           <X size={14} />
                         </button>
                       ) : (
-                        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/75 ring-1 ring-white/15" data-my-course-cover-auto>
-                          Auto cover · saves with the course
+                        <span className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] font-semibold text-white/80" data-my-course-cover-auto>
+                          Auto cover
                         </span>
                       )}
                     </div>
-                    <label className="mt-2 flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3 text-[11px] font-black text-white/70 transition hover:border-violet-400/50 hover:bg-white/[0.06]">
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-sm text-white/70 transition hover:border-white/40 hover:text-white">
                       <input
                         type="file"
                         accept="image/*"
@@ -436,17 +437,17 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                         }}
                         data-my-course-cover-input
                       />
-                      {coverUploading ? "Uploading…" : <><Upload size={13} /> Upload cover</>}
+                      <Upload size={14} />
+                      {coverUploading ? "Uploading…" : "Upload cover"}
                     </label>
                     <input
                       value={draft.coverImage?.startsWith("data:") ? "" : draft.coverImage || ""}
                       onChange={(event) => patch({ coverImage: event.target.value })}
-                      placeholder="…or paste an image URL"
-                      className={`${inputClass} mt-2`}
+                      placeholder="…or paste image URL"
+                      className={inputClass}
                       aria-label="Cover image URL"
                     />
-                    <p className="mt-1.5 text-[10px] font-semibold leading-4 text-white/40" data-my-course-cover-hint>
-                      {draft.coverImage
+                  </div>
                         ? "Apna cover lag gaya — save par yahi rahega."
                         : "Koi cover nahi — ek random image apne aap set ho kar save ho jayegi."}
                     </p>
@@ -478,29 +479,30 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                     </label>
                   </div>
                 </div>
-              </GlassSurface>
+              </section>
 
               {/* ── 2. Modules ────────────────────────────────────────── */}
-              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules>
-                <div className="flex flex-wrap items-center justify-between gap-2">
+              <section className="space-y-4 text-white" data-my-course-modules>
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Structure</p>
-                    <h2 className="mt-0.5 text-lg font-black">Modules & resources</h2>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Structure</p>
+                    <h2 className="mt-0.5 text-xl font-bold">Modules & resources</h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => addModule(null)}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-violet-600 px-4 text-[11px] font-black transition hover:bg-violet-500"
+                    className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold transition hover:bg-violet-500"
                     data-my-course-add-module
                   >
-                    <FolderPlus size={14} /> Add module
+                    <FolderPlus size={16} />
+                    <span>Add module</span>
                   </button>
                 </div>
-                <p className="mt-1 text-[11px] font-medium leading-5 text-white/45">
+                <p className="text-sm leading-relaxed text-white/70">
                   Har module ke andar resources (video, PDF, link, Brain MCQ) aur nested sub-modules — jaise admin course banata hai.
                 </p>
 
-                <div className="mt-3 space-y-3">
+                <div className="space-y-4">
                   {draft.modules.map((module, index) => (
                     <ModuleNodeEditor
                       key={module.id}
@@ -517,18 +519,18 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                       onAddResource={(type) => addResource(module.id, type)}
                     />
                   ))}
-                  {draft.modules.length === 0 ? (
+                  {draft.modules.length === 0 && (
                     <button
                       type="button"
                       onClick={() => addModule(null)}
-                      className="w-full rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 text-center text-[12px] font-black text-white/55 transition hover:bg-white/[0.05]"
+                      className="w-full rounded-lg border border-dashed border-white/20 px-4 py-8 text-center text-sm text-white/60 transition hover:border-white/40 hover:text-white"
                     >
-                      <Plus className="mx-auto mb-2 h-6 w-6 text-white/35" />
+                      <Plus className="mx-auto mb-2 h-6 w-6 text-white/40" />
                       Add your first module
                     </button>
-                  ) : null}
+                  )}
                 </div>
-              </GlassSurface>
+              </section>
             </div>{/* /fluid panel grid */}
 
             {error ? (
@@ -539,50 +541,51 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
           </div>
         </main>
 
-        {/* ── Sticky action bar — the same bare Profile glass as the panels
-            (radius 0: it is an edge-to-edge bar), so it reads as part of the
-            overlay instead of a dark slab ── */}
-        <GlassSurface
-          radius={0}
-          className="sticky bottom-0 z-30 border-t border-white/15 text-white"
-          contentClassName="px-3 py-3 sm:px-5"
+        {/* ── Sticky action bar ── */}
+        <div
+          className="sticky bottom-0 z-30 border-t border-white/10 bg-black/80 backdrop-blur-md text-white"
           data-my-course-editor-actions
         >
-          <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-2">
-            {!isNew ? (
+          <div className="mx-auto flex w-full max-w-[1280px] items-center gap-3 px-3 py-3 sm:px-5">
+            {!isNew && (
               <button
                 type="button"
                 onClick={() => setDeleteOpen(true)}
                 disabled={busy}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[11px] font-black text-rose-300 ring-1 ring-rose-400/25 transition hover:bg-rose-500/10 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-rose-300 transition hover:bg-rose-500/10 disabled:opacity-40"
                 data-my-course-delete
               >
-                <Trash2 size={13} /> Delete
+                <Trash2 size={16} />
+                <span>Delete</span>
               </button>
-            ) : null}
-            <span className="ml-auto hidden text-[11px] font-semibold text-white/40 sm:block">
-              {myCourses.saving ? "Saving…" : dirtyRef.current ? "Unsaved changes" : "Saved"}
-            </span>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={busy}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/10 disabled:opacity-40"
-              data-my-course-save
-            >
-              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check size={15} />} Save
-            </button>
-            <button
-              type="button"
-              onClick={() => void save({ thenPlay: true })}
-              disabled={busy}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-violet-600 px-5 text-sm font-black transition hover:bg-violet-500 disabled:opacity-40"
-              data-my-course-save-play
-            >
-              <Play size={15} /> Save & play
-            </button>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="hidden text-sm text-white/60 sm:block">
+                {myCourses.saving ? "Saving…" : dirtyRef.current ? "Unsaved changes" : "Saved"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={busy}
+                className="flex items-center justify-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-40"
+                data-my-course-save
+              >
+                {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check size={16} />}
+                <span>Save</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void save({ thenPlay: true })}
+                disabled={busy}
+                className="flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold transition hover:bg-violet-500 disabled:opacity-40"
+                data-my-course-save-play
+              >
+                <Play size={16} />
+                <span>Save & play</span>
+              </button>
+            </div>
           </div>
-        </GlassSurface>
+        </div>
       </div>
 
       {/* The delete confirmation wears the exact glass of the Profile page's
@@ -624,17 +627,18 @@ function ModuleNodeEditor({
 
   return (
     <article
-      className={`rounded-2xl border p-3 ${depth === 1 ? "border-white/12 bg-white/[0.035]" : "border-white/10 bg-black/20"}`}
+      className="space-y-3 border-b border-white/5 pb-4"
       data-my-module={module.id}
       data-my-module-depth={depth}
-      style={depth > 1 ? { marginLeft: Math.min((depth - 1) * 14, 42) } : undefined}
+      style={depth > 1 ? { marginLeft: Math.min((depth - 1) * 12, 36) } : undefined}
     >
+      {/* Module Header */}
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-[11px] font-black text-violet-200 ring-1 ring-violet-400/25"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-violet-500/20 text-xs font-bold text-violet-200"
           data-my-module-toggle
         >
           {index + 1}
@@ -643,37 +647,38 @@ function ModuleNodeEditor({
           value={module.title}
           onChange={(event) => onUpdate((current) => ({ ...current, title: event.target.value }))}
           maxLength={MY_MODULE_TITLE_MAX}
-          placeholder={`Module ${index + 1} title`}
-          className={`${inputClass} flex-1`}
+          placeholder={`Module ${index + 1}`}
+          className={`${inputClass} flex-1 text-base font-semibold`}
           aria-label={`Module ${index + 1} title`}
           data-my-module-title
         />
-        <IconButton label="Move module up" onClick={() => onMove(-1)} disabled={index === 0}>
-          <ArrowUp size={14} />
-        </IconButton>
-        <IconButton label="Move module down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
-          <ArrowDown size={14} />
-        </IconButton>
-        <IconButton label="Delete module" onClick={onRemove} tone="danger">
-          <Trash2 size={14} />
-        </IconButton>
+        <div className="flex items-center gap-1">
+          <IconButton label="Move up" onClick={() => onMove(-1)} disabled={index === 0}>
+            <ArrowUp size={14} />
+          </IconButton>
+          <IconButton label="Move down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
+            <ArrowDown size={14} />
+          </IconButton>
+          <IconButton label="Delete" onClick={onRemove} tone="danger">
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
       </div>
 
-      {open ? (
-        <div className="mt-3 space-y-3">
-          <label className="block">
-            <span className={labelClass}>Description (optional)</span>
-            <textarea
-              value={module.description || ""}
-              onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value }))}
-              maxLength={MY_MODULE_DESC_MAX}
-              rows={2}
-              placeholder="What is this module about?"
-              className={`${inputClass} resize-y py-2`}
-            />
-          </label>
+      {open && (
+        <div className="space-y-3 pl-9">
+          {/* Description */}
+          <textarea
+            value={module.description || ""}
+            onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value }))}
+            maxLength={MY_MODULE_DESC_MAX}
+            rows={2}
+            placeholder="Description (optional)"
+            className={`${inputClass} resize-y text-sm`}
+          />
 
-          <div className="space-y-2">
+          {/* Resources */}
+          <div className="space-y-3">
             {module.resources.map((resource) => (
               <ResourceEditor
                 key={resource.id}
@@ -711,35 +716,36 @@ function ModuleNodeEditor({
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wide text-white/45">Add resource</span>
+          {/* Add Resource/Sub-module Actions */}
+          <div className="flex items-center gap-2 pt-2">
             <select
               value=""
               onChange={(event) => {
                 const value = event.target.value as MyCourseResourceType;
                 if (value) onAddResource(value);
               }}
-              className={`${inputClass} w-auto min-w-[168px] appearance-none py-1.5 text-[11px]`}
-              aria-label="Resource type to add"
+              className={`${inputClass} flex-1 text-sm`}
+              aria-label="Add resource"
               data-my-resource-type-picker
             >
-              <option value="" className="bg-slate-900">Choose a type…</option>
+              <option value="" className="bg-slate-900">+ Add resource…</option>
               {TYPE_OPTIONS.map((option) => (
                 <option key={option.id} value={option.id} className="bg-slate-900">
                   {option.label}
                 </option>
               ))}
             </select>
-            {canNest ? (
+            {canNest && (
               <button
                 type="button"
                 onClick={onAddChild}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-black text-cyan-200 ring-1 ring-cyan-400/25 transition hover:bg-cyan-500/10"
+                className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10"
                 data-my-module-add-child
               >
-                <FolderPlus size={12} /> Sub-module
+                <FolderPlus size={14} />
+                <span>Sub-module</span>
               </button>
-            ) : null}
+            )}
           </div>
 
           {module.modules.map((child, childIndex) => (
@@ -854,15 +860,14 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
 
   return (
     <div
-      className={`rounded-2xl border p-3 ${ready ? "border-white/10 bg-black/25" : "border-amber-400/30 bg-amber-500/[0.06]"}`}
+      className="space-y-3 border-b border-white/5 pb-3"
       data-my-resource={resource.id}
       data-my-resource-type={resource.type}
       data-my-resource-ready={ready ? "true" : "false"}
     >
+      {/* Header: Icon + Name + Actions */}
       <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500/12 text-cyan-200 ring-1 ring-cyan-400/20">
-          <Icon size={16} />
-        </span>
+        <Icon size={18} className="shrink-0 text-white/50" />
         <input
           value={resource.name}
           onChange={(event) => onUpdate((current) => ({ ...current, name: event.target.value }))}
@@ -872,95 +877,91 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
           aria-label="Resource name"
           data-my-resource-name
         />
-        <select
-          value={resource.type}
-          onChange={(event) => {
-            const type = event.target.value as MyCourseResourceType;
-            onUpdate((current) => ({
-              ...current,
-              type,
-              ...(type === "brain"
-                ? { practiceQuestions: current.practiceQuestions?.length ? current.practiceQuestions : [createMyQuestion()], practiceTitle: current.practiceTitle || current.name }
-                : { practiceQuestions: undefined, practiceTitle: undefined }),
-              updatedAt: Date.now(),
-            }));
-          }}
-          className={`${inputClass} w-auto min-w-[150px] appearance-none py-1.5 text-[11px]`}
-          aria-label="Resource type"
-          data-my-resource-type-select
-        >
-          {TYPE_OPTIONS.map((type) => (
-            <option key={type.id} value={type.id} className="bg-slate-900">
-              {type.label}
-            </option>
-          ))}
-        </select>
-        <IconButton label="Move resource up" onClick={() => onMove(-1)} disabled={index === 0}>
-          <ArrowUp size={14} />
-        </IconButton>
-        <IconButton label="Move resource down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
-          <ArrowDown size={14} />
-        </IconButton>
-        <IconButton label="Delete resource" onClick={onRemove} tone="danger">
-          <Trash2 size={14} />
-        </IconButton>
+        <div className="flex items-center gap-1">
+          <IconButton label="Move up" onClick={() => onMove(-1)} disabled={index === 0}>
+            <ArrowUp size={14} />
+          </IconButton>
+          <IconButton label="Move down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
+            <ArrowDown size={14} />
+          </IconButton>
+          <IconButton label="Delete" onClick={onRemove} tone="danger">
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
       </div>
 
-      <div className="mt-3 space-y-3">
-        {!isBrain ? (
-          <div className="space-y-2">
-            <label className="block">
-              <span className={labelClass}>
-                {isExperiment
-                  ? "Hosted link (optional — only for experiments too big to store)"
-                  : `${option.upload ? "Link or upload" : "Link"} ${option.hint ? `— ${option.hint}` : ""}`}
-              </span>
-              <div className="flex items-center gap-2">
-                <Link2 size={14} className="shrink-0 text-white/35" />
-                <input
-                  value={resource.url || ""}
-                  onChange={(event) => onUpdate((current) => ({ ...current, url: event.target.value, source: "link", updatedAt: Date.now() }))}
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="https://…"
-                  className={inputClass}
-                  aria-label="Resource link"
-                  data-my-resource-url
-                />
-              </div>
-            </label>
-            {option.upload ? (
-              <label className="flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3 text-[11px] font-black text-white/70 transition hover:border-violet-400/50 hover:bg-white/[0.06]">
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void handleFile(file);
-                  }}
-                  data-my-resource-file
-                />
-                {uploading ? "Uploading…" : <><Upload size={13} /> Upload file{resource.fileName ? ` — ${resource.fileName}` : ""}</>}
-              </label>
-            ) : null}
-          </div>
-        ) : null}
+      {/* Type Selector */}
+      <select
+        value={resource.type}
+        onChange={(event) => {
+          const type = event.target.value as MyCourseResourceType;
+          onUpdate((current) => ({
+            ...current,
+            type,
+            ...(type === "brain"
+              ? { practiceQuestions: current.practiceQuestions?.length ? current.practiceQuestions : [createMyQuestion()], practiceTitle: current.practiceTitle || current.name }
+              : { practiceQuestions: undefined, practiceTitle: undefined }),
+            updatedAt: Date.now(),
+          }));
+        }}
+        className={`${inputClass} w-full text-sm`}
+        aria-label="Resource type"
+        data-my-resource-type-select
+      >
+        {TYPE_OPTIONS.map((type) => (
+          <option key={type.id} value={type.id} className="bg-slate-900">
+            {type.label}
+          </option>
+        ))}
+      </select>
 
-        <label className="block">
-          <span className={labelClass}>Details (optional)</span>
-          <textarea
-            value={resource.description || ""}
-            onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value, updatedAt: Date.now() }))}
-            maxLength={MY_RESOURCE_DESC_MAX}
-            rows={2}
-            placeholder="A note about this resource"
-            className={`${inputClass} resize-y py-2`}
-          />
-        </label>
+      {/* Link/Upload Section */}
+      {!isBrain && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Link2 size={14} className="shrink-0 text-white/40" />
+            <input
+              value={resource.url || ""}
+              onChange={(event) => onUpdate((current) => ({ ...current, url: event.target.value, source: "link", updatedAt: Date.now() }))}
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder={isExperiment ? "Hosted link (optional)" : option.hint || "https://…"}
+              className={inputClass}
+              aria-label="Resource link"
+              data-my-resource-url
+            />
+          </div>
+          {option.upload && (
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-sm text-white/70 transition hover:border-white/40 hover:text-white">
+              <input
+                type="file"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void handleFile(file);
+                }}
+                data-my-resource-file
+              />
+              <Upload size={14} />
+              {uploading ? "Uploading…" : resource.fileName ? resource.fileName : "Upload file"}
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Description */}
+      <textarea
+        value={resource.description || ""}
+        onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value, updatedAt: Date.now() }))}
+        maxLength={MY_RESOURCE_DESC_MAX}
+        rows={2}
+        placeholder="Description (optional)"
+        className={`${inputClass} resize-y text-sm`}
+      />
 
         {isExperiment ? (
           <MyCourseExperimentEditor

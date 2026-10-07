@@ -23,6 +23,7 @@ interface ActivityCardProps {
    * Wired to the green tick on a completed card so a single tap re-opens it.
    */
   onUncomplete?: () => void;
+  isDarkMode?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -38,41 +39,57 @@ interface ActivityCardProps {
 
 type KindCardStyle = {
   chipShape: string;
-  wash: (color: string) => string;
+  wash: (color: string, isDarkMode: boolean) => string;
 };
 
 const KIND_CARD_STYLE: Record<string, KindCardStyle> = {
   task: {
     chipShape: "rounded-lg",
-    wash: (c) => `linear-gradient(135deg, ${c}30 0%, rgba(9,12,26,0.95) 58%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(135deg, ${c}30 0%, rgba(9,12,26,0.95) 58%)`
+      : `linear-gradient(135deg, ${c}20 0%, rgba(255,255,255,0.98) 58%)`,
   },
   reminder: {
     chipShape: "rounded-full border-2",
-    wash: (c) => `linear-gradient(225deg, ${c}36 0%, rgba(9,12,26,0.95) 62%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(225deg, ${c}36 0%, rgba(9,12,26,0.95) 62%)`
+      : `linear-gradient(225deg, ${c}25 0%, rgba(255,255,255,0.98) 62%)`,
   },
   schedule: {
     chipShape: "rounded-xl",
-    wash: (c) => `linear-gradient(180deg, ${c}2b 0%, rgba(9,12,26,0.95) 68%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(180deg, ${c}2b 0%, rgba(9,12,26,0.95) 68%)`
+      : `linear-gradient(180deg, ${c}1f 0%, rgba(255,255,255,0.98) 68%)`,
   },
   note: {
     chipShape: "rounded-md",
-    wash: (c) => `linear-gradient(120deg, rgba(20,16,36,0.96) 0%, ${c}2e 130%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(120deg, rgba(20,16,36,0.96) 0%, ${c}2e 130%)`
+      : `linear-gradient(120deg, rgba(249,250,251,0.98) 0%, ${c}20 130%)`,
   },
   revision: {
     chipShape: "rounded-lg",
-    wash: (c) => `linear-gradient(90deg, ${c}2b 0%, rgba(9,12,26,0.95) 72%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(90deg, ${c}2b 0%, rgba(9,12,26,0.95) 72%)`
+      : `linear-gradient(90deg, ${c}1f 0%, rgba(255,255,255,0.98) 72%)`,
   },
   mcq: {
     chipShape: "rounded-full",
-    wash: (c) => `radial-gradient(130% 150% at 100% 0%, ${c}33 0%, rgba(9,12,26,0.95) 58%)`,
+    wash: (c, dark) => dark
+      ? `radial-gradient(130% 150% at 100% 0%, ${c}33 0%, rgba(9,12,26,0.95) 58%)`
+      : `radial-gradient(130% 150% at 100% 0%, ${c}25 0%, rgba(255,255,255,0.98) 58%)`,
   },
   lecture: {
     chipShape: "rounded-xl",
-    wash: (c) => `linear-gradient(200deg, ${c}30 0%, rgba(9,12,26,0.95) 60%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(200deg, ${c}30 0%, rgba(9,12,26,0.95) 60%)`
+      : `linear-gradient(200deg, ${c}20 0%, rgba(255,255,255,0.98) 60%)`,
   },
   other: {
     chipShape: "rounded-lg",
-    wash: (c) => `linear-gradient(150deg, ${c}28 0%, rgba(9,12,26,0.95) 62%)`,
+    wash: (c, dark) => dark
+      ? `linear-gradient(150deg, ${c}28 0%, rgba(9,12,26,0.95) 62%)`
+      : `linear-gradient(150deg, ${c}1c 0%, rgba(255,255,255,0.98) 62%)`,
   },
 };
 
@@ -130,7 +147,7 @@ function KindFooter({ activity, color }: { activity: Activity; color: string }) 
             {priority} priority
           </span>
           {subject ? (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-100 ring-1 ring-inset ring-white/20">
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${isDarkMode ? "bg-white/10 text-slate-100 ring-white/20" : "bg-slate-900/10 text-slate-700 ring-slate-300"}`}>
               {subject}
             </span>
           ) : null}
@@ -166,7 +183,7 @@ function KindFooter({ activity, color }: { activity: Activity; color: string }) 
             </span>
           )}
           {scheduleType ? (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-100 ring-1 ring-inset ring-white/20">
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${isDarkMode ? "bg-white/10 text-slate-100 ring-white/20" : "bg-slate-900/10 text-slate-700 ring-slate-300"}`}>
               {scheduleType}
             </span>
           ) : null}
@@ -179,11 +196,11 @@ function KindFooter({ activity, color }: { activity: Activity; color: string }) 
       const dot = (activity as { color?: string }).color;
       return (
         <div className="mt-2 rounded-r-xl border-l-[3px] bg-white/[0.06] px-3 py-2" style={{ borderColor: color }}>
-          <p className="text-[12.5px] italic leading-relaxed text-slate-100">
+          <p className={`text-[12.5px] italic leading-relaxed ${textSecondary}`}>
             “{body}”
           </p>
           {dot ? (
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-300/80">
+            <p className={`mt-1 text-[10px] font-bold uppercase tracking-wider ${textFaint}`}>
               {dot} note
             </p>
           ) : null}
@@ -265,7 +282,7 @@ function KindFooter({ activity, color }: { activity: Activity; color: string }) 
   }
 }
 
-export function ActivityCard({ activity, status, onComplete, completing, onEdit, onUncomplete }: ActivityCardProps) {
+export function ActivityCard({ activity, status, onComplete, completing, onEdit, onUncomplete, isDarkMode = true }: ActivityCardProps) {
   // Display metadata comes from the original server kind when present
   // (so merged lecture docs show "Lecture" + their cyan styling) and
   // always falls back safely — never undefined — for unknown kinds.
@@ -279,6 +296,12 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
   const { date, time } = formatCardDateTime(activity.datetime);
   const day = relativeDay(activity.timeLabel);
   const description = activity.description?.trim() || "";
+
+  // Text color helpers for light/dark mode
+  const textPrimary = isDarkMode ? "text-white" : "text-slate-900";
+  const textSecondary = isDarkMode ? "text-slate-100" : "text-slate-700";
+  const textMuted = isDarkMode ? "text-slate-200" : "text-slate-600";
+  const textFaint = isDarkMode ? "text-slate-300/80" : "text-slate-500";
   // Notes render their body inside the quote-style footer; every other kind
   // shows the scheduling-time description as its own always-visible line.
   const showDescriptionLine = description.length > 0 && activity.type !== "note";
@@ -329,7 +352,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
         className={`group transition duration-300 hover:-translate-y-0.5 ${isCurrent ? "ring-1 ring-violet-300/60" : ""} ${isOverdue ? "ring-1 ring-rose-400/50" : ""}`}
         contentClassName="overflow-hidden"
         style={{
-          background: style.wash(meta.color),
+          background: style.wash(meta.color, isDarkMode),
           border: `1px solid ${meta.color}59`,
           boxShadow: `0 14px 34px -14px rgba(0,0,0,0.85), 0 0 22px -6px ${meta.glow}`,
         }}
@@ -351,7 +374,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
               className={`grid h-7 w-7 shrink-0 place-items-center ${style.chipShape}`}
               style={{
                 background: `${meta.color}30`,
-                color: "#fff",
+                color: isDarkMode ? "#fff" : meta.color,
                 borderColor: `${meta.color}88`,
               }}
             >
@@ -359,7 +382,11 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
             </span>
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest"
-              style={{ background: `${meta.color}2e`, color: meta.color, textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}
+              style={{
+                background: `${meta.color}2e`,
+                color: meta.color,
+                textShadow: isDarkMode ? "0 1px 6px rgba(0,0,0,0.7)" : "none",
+              }}
             >
               {meta.label}
             </span>
@@ -401,7 +428,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
                     />
                   </motion.svg>
                 ) : (
-                  <Circle className="h-3 w-3 text-slate-200/80 group-hover:text-emerald-300" />
+                  <Circle className={`h-3 w-3 ${isDarkMode ? "text-slate-200/80" : "text-slate-600"} group-hover:text-emerald-300`} />
                 )}
               </GlassButton>
             ) : (
@@ -422,16 +449,20 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           {/* Title — always fully legible; the card grows to fit it (§32) */}
           <h3
             className={`mt-2 text-[14px] font-bold leading-snug sm:text-[14.5px] ${
-              isCompleted ? "text-slate-300/70 line-through decoration-slate-400/50" : "text-white"
+              isCompleted
+                ? isDarkMode
+                  ? "text-slate-300/70 line-through decoration-slate-400/50"
+                  : "text-slate-500/70 line-through decoration-slate-400/50"
+                : textPrimary
             }`}
-            style={{ textShadow: "0 1px 10px rgba(0,0,0,0.65)" }}
+            style={{ textShadow: isDarkMode ? "0 1px 10px rgba(0,0,0,0.65)" : "none" }}
           >
             {activity.title}
           </h3>
 
           {/* Scheduled date + time — the "when" is never hidden */}
           {(date || time || activity.timeLabel) && (
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] font-semibold text-slate-200">
+            <p className={`mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] font-semibold ${textMuted}`}>
               <CalendarDays className="h-3.5 w-3.5 shrink-0 opacity-80" style={{ color: meta.color }} />
               {date && <span style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>{date}</span>}
               {time && (
@@ -456,8 +487,8 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           {/* Scheduling-time description — visible on every kind */}
           {showDescriptionLine && (
             <p
-              className="mt-1.5 text-[12.5px] leading-relaxed text-slate-100/90"
-              style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
+              className={`mt-1.5 text-[12.5px] leading-relaxed ${textSecondary}`}
+              style={{ textShadow: isDarkMode ? "0 1px 8px rgba(0,0,0,0.6)" : "none" }}
             >
               {description}
             </p>

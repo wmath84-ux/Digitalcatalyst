@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Gauge, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
+import { Bell, Gauge, Heart, Moon, Search, Settings, Sun, Trophy, UserRound, X } from "lucide-react";
 import ExpandingTabs, { type ExpandingTabItem } from "../../components/ui/ExpandingTabs";
 import MobileHeaderMenu from "../../components/MobileHeaderMenu";
 import { GlassSurface } from "../../components/ui/glass";
@@ -36,6 +36,12 @@ interface HeaderProps {
    * are rendered to prevent greeting shrinkage from too many icons. Default 'default' shows all actions.
    */
   headerVariant?: 'default' | 'flow';
+  /**
+   * Theme toggle — when provided, renders a sun/moon button in the action cluster.
+   * Used by FlowPath page to switch between light and dark canvas themes.
+   */
+  onToggleTheme?: () => void;
+  isDarkMode?: boolean;
 }
 
 const typeLabel: Record<string, string> = {
@@ -67,7 +73,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings, headerVariant = 'default' },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings, headerVariant = 'default', onToggleTheme, isDarkMode = true },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -255,6 +261,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
+          {onToggleTheme && (
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              title={isDarkMode ? "Light mode" : "Dark mode"}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 active:scale-95 min-[390px]:h-10 min-[390px]:w-10"
+            >
+              {isDarkMode ? <Sun className="h-4 w-4 min-[390px]:h-5 min-[390px]:w-5" /> : <Moon className="h-4 w-4 min-[390px]:h-5 min-[390px]:w-5" />}
+            </button>
+          )}
           {isPhoneLayout ? (
             <MobileHeaderMenu
               items={phoneMenuItems}

@@ -5,10 +5,10 @@ interface RibbonProps {
   width: number;
   height: number;
   visibleChunks: Point[][];
+  isDarkMode?: boolean;
 }
 
-// Dark palette only — the light branch is gone with the app-wide light theme.
-function RibbonInner({ width, height, visibleChunks }: RibbonProps) {
+function RibbonInner({ width, height, visibleChunks, isDarkMode = true }: RibbonProps) {
   if (width <= 0 || height <= 0) return null;
 
   return (
@@ -21,12 +21,12 @@ function RibbonInner({ width, height, visibleChunks }: RibbonProps) {
     >
       <defs>
         <linearGradient id="fp-core-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={"#8b7bff"} stopOpacity={"0.85"} />
-          <stop offset="45%" stopColor={"#5eead4"} stopOpacity={"0.7"} />
-          <stop offset="100%" stopColor={"#8b7bff"} stopOpacity={"0.85"} />
+          <stop offset="0%" stopColor={isDarkMode ? "#8b7bff" : "#6366f1"} stopOpacity={isDarkMode ? "0.85" : "0.75"} />
+          <stop offset="45%" stopColor={isDarkMode ? "#5eead4" : "#06b6d4"} stopOpacity={isDarkMode ? "0.7" : "0.65"} />
+          <stop offset="100%" stopColor={isDarkMode ? "#8b7bff" : "#6366f1"} stopOpacity={isDarkMode ? "0.85" : "0.75"} />
         </linearGradient>
         <filter id="fp-glow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation={"7"} result="blur" />
+          <feGaussianBlur stdDeviation={isDarkMode ? "7" : "5"} result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />

@@ -24,6 +24,7 @@ import { makeScreenshotAttachment, uid } from "./lib/utils";
 import { PERF, perf } from "./lib/perf";
 import { productionThinkingSpec, runProductionAssistant, type LumenAiScope } from "./productionAi";
 import { isValidPersonalId } from "../../utils/personalCourse";
+import { useCourseTheme } from "../course/playerPreferences";
 import type { CourseFile, CoursePlayerNote } from "../types/course";
 
 export interface LumenChatProps {
@@ -102,6 +103,9 @@ function LumenChatInner({
 }: LumenChatProps) {
   const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
+
+  // Light/Dark theme — reuses the Course Player's shared, per-user theme layer.
+  const lumenThemeCtl = useCourseTheme("ai", learnerUid, "light");
   // Cloud-backed chat history. Before this hook the whole conversation list
   // lived in React state and vanished the moment the player unmounted — the
   // reported "course player ke andar jo AI chats hote hain vah save nahin ho
@@ -672,7 +676,7 @@ function LumenChatInner({
   /* ── layout ────────────────────────────────────────────── */
 
   return (
-    <div ref={rootRef} className="lumen-root">
+    <div ref={rootRef} className={lumenThemeCtl.theme === "dark" ? "lumen-root lumen-dark" : "lumen-root"} data-lumen-theme={lumenThemeCtl.theme}>
       <div ref={frameRef} className="relative flex h-full min-h-0 min-w-0 w-full bg-[--bg]">
         {dockSidebar && (
           <div className="h-full flex-none">
@@ -705,6 +709,8 @@ function LumenChatInner({
             syncState={chatSyncStatus}
             syncError={chatSyncError}
             onRetrySync={() => { flushChats(); reloadChats(); }}
+            theme={lumenThemeCtl.theme}
+            onToggleTheme={lumenThemeCtl.toggleTheme}
           />
 
           {/* A failed cloud save must never be a silent state: say what

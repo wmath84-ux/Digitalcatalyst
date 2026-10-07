@@ -677,8 +677,7 @@ export default function NotesPanel({
               masterNotes.length > 0 ? (
                 <ul className="grid min-w-0 gap-3" data-course-master-notes-grid data-study-resource-grid>
                   {masterNotes.map((note) => {
-                    const preview = masterNotePreview(note);
-                    const wordCount = preview.trim().split(/\s+/).filter(Boolean).length;
+                    const wordCount = (note.bodyHtml || "").trim().split(/\s+/).filter(Boolean).length;
                     return (
                       <li key={note.id} className="min-w-0 min-h-[212px]" data-course-master-note-card>
                         <StudyResourceCard
@@ -687,8 +686,6 @@ export default function NotesPanel({
                           title={note.title || "Untitled master note"}
                           contextPath={[courseTitle, ...note.modulePath].filter(Boolean)}
                           contextDetail="Admin-authored course note · read only"
-                          topic={preview || undefined}
-                          topicLabel="Master content"
                           metadata={[wordCount ? `${wordCount} words` : ""].filter(Boolean)}
                           sourceLabel="MASTER"
                           createdAt={note.createdAt}

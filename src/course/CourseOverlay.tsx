@@ -62,7 +62,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "sketch" | "read";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -429,10 +429,10 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // functionality lands later). Its glyph is a custom mark, not a stock icon.
   { key: "ai", label: "AI", heading: "AI", hint: "AI study buddy — jald aa raha hai", color: "#22D3EE", icon: AiTabIcon },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", color: "#C9A96E", icon: ShoppingBag },
-  // The footer dock's own settings button. Everything the player header and
-  // the ⚙ popover used to offer — course details, progress, mark-complete,
-  // the ACTIVE file's buttons and every player preference — lives here.
-  { key: "player", label: "Player", heading: "Player settings", hint: "Course, active file aur controls — sab ek list mein", color: "#FF6BF5", icon: Settings },
+  // Part 20: Live Experiment replaces Settings in footer dock. Settings is now
+  // accessible via the combined Progress + Settings rail at the top (Part 19).
+  // This slot shows interactive 2D experiments (MASTER/SELF).
+  { key: "experiment", label: "Experiment", heading: "Live Experiment", hint: "Interactive 2D experiments — MASTER & SELF", color: "#FF6BF5", icon: FlaskConical },
   // The drawing board — the official Excalidraw editor, hosted in the study
   // pane beside the lecture (src/course/SketchPanel.tsx). It sits last so no
   // existing tab's dock position (or ⌘/Ctrl+N shortcut) moves; pulling it up

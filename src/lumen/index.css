@@ -82,6 +82,64 @@
   font-feature-settings: "cv11", "ss01";
 }
 
+/* ─────────────────────────────────────────────────────────────
+   LUMEN · Dark theme override
+   Applied via .lumen-dark alongside .lumen-root. Reuses the
+   SAME token names — just swaps the values for a dark palette.
+   No filter: invert() or theme-inversion hack.
+   ───────────────────────────────────────────────────────────── */
+.lumen-root.lumen-dark {
+  /* surfaces */
+  --bg: #1a1a1f;
+  --bg-2: #141418;
+  --surface: #242429;
+  --hover: #2a2a30;
+  --active: #32323a;
+  --user-bubble: #2a2a35;
+  --user-bubble-border: #3a3a45;
+
+  /* ink */
+  --ink: #e8e8ec;
+  --ink-2: #b0b0b8;
+  --ink-3: #7a7a85;
+  --ink-4: #55555f;
+
+  /* borders */
+  --border: #3a3a42;
+  --border-2: #4a4a52;
+
+  /* accent — iris (brighter for dark) */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-press: #a5b4fc;
+  --accent-soft: #2a2a45;
+  --accent-soft-2: #3a3a55;
+  --accent-ink: #a5b4fc;
+  --ring: rgba(99, 102, 241, 0.25);
+  --ring-strong: rgba(99, 102, 241, 0.5);
+
+  /* status */
+  --ok: #4ade80;
+  --ok-bg: #1a2e1f;
+  --warn: #fbbf24;
+  --warn-bg: #2e2a1a;
+  --err: #f87171;
+  --err-bg: #2e1a1a;
+  --err-border: #4a2a2a;
+
+  /* code */
+  --code-bg: #0f0f14;
+  --code-ink: #e8e8ec;
+  --code-mut: #7a7a85;
+  --inline-code-bg: #2a2a30;
+
+  /* shadows — deeper for dark */
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 36px -14px rgba(0, 0, 0, 0.6);
+  --sh-frame: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 24px 60px -32px rgba(0, 0, 0, 0.7);
+}
+
 @supports (height: 100dvh) {
   .lumen-root { --app-h: 100%; }
 }
