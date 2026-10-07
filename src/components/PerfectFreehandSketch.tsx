@@ -692,7 +692,7 @@ export default function PerfectFreehandSketch({
 
       {!sketch.scoped && !sketch.loading ? (
         <div className="dc-qsk-scoped-note" data-quick-sketch-unscoped="">
-          Open a lesson to save this drawing with its module
+          Kept on this device — open a lesson to save it with the module
         </div>
       ) : null}
     </div>

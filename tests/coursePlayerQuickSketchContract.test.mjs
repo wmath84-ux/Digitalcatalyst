@@ -26,6 +26,9 @@ import {
   MAX_QUICK_SKETCH_STROKES,
   QUICK_SKETCH_COLLECTION,
   canAddQuickSketchStroke,
+  clearQuickSketchDraft,
+  quickSketchDraftKey,
+  readQuickSketchDraft,
   eraseRadiusFor,
   eraseStrokesAt,
   distanceToSegment,
@@ -37,6 +40,7 @@ import {
   sanitizeQuickSketchKey,
   strokeHitByPoint,
   toFirestoreQuickSketch,
+  writeQuickSketchDraft,
 } from "../src/utils/quickSketch.ts";
 import {
   DEFAULT_QUICK_SKETCH_STYLE,
@@ -61,6 +65,17 @@ import {
   quickSketchSvgDocument,
   strokeSimulatesPressure,
 } from "../src/utils/quickSketchSvg.ts";
+
+/* ── the device ───────────────────────────────────────────────────────────── */
+// `localStorage` is a browser fact; node has none, so the draft (and everything
+// else the canvas remembers on the device) is exercised against this.
+const device = new Map();
+globalThis.localStorage = {
+  getItem: (key) => (device.has(key) ? device.get(key) : null),
+  setItem: (key, value) => { device.set(key, String(value)); },
+  removeItem: (key) => { device.delete(key); },
+  clear: () => device.clear(),
+};
 
 const read = (path) => readFileSync(path, "utf8");
 
@@ -138,9 +153,14 @@ test("updateStrokes puts the drawing in state — the fix for vanishing strokes"
   assert.match(body, /dispatch\(\{ type: "SET_STROKES", strokes: next \}\);/);
   assert.match(body, /strokesRef\.current = next;/);
   assert.match(body, /void saveToFirestore\(\)/);
-  assert.match(body, /saveToLocalStorage\(\)/);
-  // Drawing works before there is anywhere to save it.
-  assert.match(body, /if \(!scoped\) return;/);
+  // The device mirror is its own step (one tail for both branches)…
+  assert.match(body, /scheduleLocalMirror\(\)/);
+  // …and drawing works before there is anywhere to save it: a signed-in
+  // learner with no module open still gets the device draft, a signed-out one
+  // only gets the canvas.
+  assert.match(body, /if \(!uid\) return;/);
+  assert.match(body, /if \(!scoped\) \{/);
+  assert.match(hook, /writeQuickSketchDraft\(uid, productId, \{/);
 });
 
 /* ── 2. the document a save writes, and what survives a load ──────────────── */
@@ -226,6 +246,65 @@ test("the eraser removes the strokes it touches and leaves the others alone", ()
   assert.equal(eraseStrokesAt(strokes, { x: 1000, y: 1000 }, 6), strokes);
   assert.equal(eraseRadiusFor(16), 10);
   assert.equal(eraseRadiusFor(2), 6);
+});
+
+/* ── 4b. the device draft: a drawing made before a lesson is open ────────── */
+// The board's identity needs a module, so an unscoped canvas has no document
+// to write and no key in the module index — it used to store NOTHING, which is
+// the "I draw, I let go, it vanishes" half of the report. It now writes this
+// draft, in a namespace of its own, and the first EMPTY board adopts it.
+
+test("the draft lives in its own namespace: one key per learner per course", () => {
+  const key = quickSketchDraftKey("u1", "p1");
+  assert.equal(key, "dc.quickSketchDraft.v1.u1.p1");
+  assert.notEqual(key, quickSketchLocalKey("u1", "p1", "m1"), "never mistakable for a board's copy");
+  assert.notEqual(key, quickSketchDraftKey("u1", "p2"), "another course is another draft");
+  assert.notEqual(key, quickSketchDraftKey("u2", "p1"), "another learner is another draft");
+  assert.equal(quickSketchDraftKey("u1", null), "dc.quickSketchDraft.v1.u1.-");
+  assert.match(key, /^dc\.quickSketchDraft\./);
+});
+
+test("a draft round-trips through the device — and junk in it is dropped, never drawn", () => {
+  device.clear();
+  assert.equal(readQuickSketchDraft("u1", "p1"), null, "no draft, no drawing");
+
+  assert.equal(
+    writeQuickSketchDraft("u1", "p1", { title: "Before the lesson", strokes: [line(), { id: "junk", points: [{ x: "no" }] }] }),
+    true,
+  );
+  const draft = readQuickSketchDraft("u1", "p1");
+  assert.equal(draft.title, "Before the lesson");
+  assert.equal(draft.strokes.length, 1, "the junk stroke is not a stroke");
+  assert.equal(draft.strokes[0].id, "s0");
+  assert.ok(draft.updatedAt > 0);
+  assert.equal(readQuickSketchDraft("u1", "p2"), null, "and it is this course's draft only");
+
+  // An over-long draft is capped here, so adopting it can never write a
+  // document the rules would refuse.
+  writeQuickSketchDraft("u1", "p1", { title: "t", strokes: Array.from({ length: MAX_QUICK_SKETCH_STROKES + 5 }, (_, index) => line(index)) });
+  assert.equal(readQuickSketchDraft("u1", "p1").strokes.length, MAX_QUICK_SKETCH_STROKES);
+
+  // A draft with nothing drawable in it is no draft at all.
+  device.set(quickSketchDraftKey("u1", "p1"), "{ not json");
+  assert.equal(readQuickSketchDraft("u1", "p1"), null, "a corrupt draft opens as an empty canvas");
+});
+
+test("the draft is handed over exactly once", () => {
+  device.clear();
+  writeQuickSketchDraft("u1", "p1", { title: "Sketch 1", strokes: [line()] });
+  assert.equal(readQuickSketchDraft("u1", "p1").strokes.length, 1);
+  clearQuickSketchDraft("u1", "p1");
+  assert.equal(readQuickSketchDraft("u1", "p1"), null);
+  // The hook adopts, writes the board's own device copy, THEN clears —
+  // the order that means a crash during adoption cannot lose the strokes.
+  const adopt = hook.slice(hook.indexOf("const adoptDraft = useCallback"));
+  const body = adopt.slice(0, adopt.indexOf("const openBoard"));
+  assert.match(body, /localStorage\.setItem\(where\.localKey/);
+  assert.match(body, /clearQuickSketchDraft\(uid, where\.product\)/);
+  assert.ok(
+    body.indexOf("localStorage.setItem") < body.indexOf("clearQuickSketchDraft"),
+    "the board's copy lands before the draft is dropped",
+  );
 });
 
 /* ── 4. the style: the editor's options, exactly ──────────────────────────── */

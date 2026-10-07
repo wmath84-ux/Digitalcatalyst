@@ -47,6 +47,7 @@ import {
   MAX_QUICK_SKETCH_STROKES,
   QUICK_SKETCH_COLLECTION,
   QUICK_SKETCH_DEFAULT_KEY,
+  clearQuickSketchDraft,
   createQuickSketchKey,
   nextQuickSketchTitle,
   quickSketchActiveKey,
@@ -54,10 +55,13 @@ import {
   quickSketchIndexKey,
   quickSketchLocalKey,
   quickSketchStrokesFrom,
+  readQuickSketchDraft,
   sanitizeQuickSketchKey,
   toFirestoreQuickSketch,
+  writeQuickSketchDraft,
   type QuickSketchBoardDoc,
   type QuickSketchBoardSummary,
+  type QuickSketchDraft,
   type QuickSketchStroke,
 } from "../utils/quickSketch";
 
@@ -255,15 +259,40 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
   // ── Save: Firestore (debounced) + the device mirror ───────────────────
 
   const saveToLocalStorage = useCallback(() => {
-    if (!scoped) return;
+    if (!uid) return;
+    // No module open: there is no board document to address, so the drawing
+    // goes to the DEVICE draft instead of nowhere. It is still the learner's
+    // own work on the learner's own device — and the hook hands it to the
+    // first board that opens (see `takeDraftForBoard`).
+    if (!scoped) {
+      const saved = writeQuickSketchDraft(uid, productId, {
+        title: boardRef.current.title,
+        strokes: strokesRef.current,
+        createdAt: boardRef.current.createdAt,
+      });
+      dispatch({ type: "SET_DEVICE_SAVED", saved });
+      return;
+    }
     try {
       const board = boardDocument();
-      localStorage.setItem(quickSketchLocalKey(uid!, board.productId, board.moduleId, board.sketchKey), JSON.stringify(board));
+      localStorage.setItem(quickSketchLocalKey(uid, board.productId, board.moduleId, board.sketchKey), JSON.stringify(board));
       dispatch({ type: "SET_DEVICE_SAVED", saved: true });
     } catch {
       dispatch({ type: "SET_DEVICE_SAVED", saved: false });
     }
-  }, [boardDocument, moduleId, productId, scoped, uid]);
+  }, [boardDocument, productId, scoped, uid]);
+
+  /**
+   * The device mirror, a beat after the pen stops. It is what survives a
+   * refused cloud write — and, with no module open, it is the ONLY copy.
+   */
+  const scheduleLocalMirror = useCallback(() => {
+    if (localMirrorTimerRef.current) window.clearTimeout(localMirrorTimerRef.current);
+    localMirrorTimerRef.current = window.setTimeout(() => {
+      localMirrorTimerRef.current = null;
+      saveToLocalStorage();
+    }, LOCAL_MIRROR_MS);
+  }, [saveToLocalStorage]);
 
   const saveToFirestore = useCallback(async () => {
     if (!scoped) return;
@@ -295,6 +324,57 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
 
   // ── Opening a canvas ──────────────────────────────────────────────────
 
+  /**
+   * The draft this board should adopt, or null.
+   *
+   * A drawing made before a lesson was open has no board of its own, so it
+   * waits in the device draft. The first EMPTY board that opens afterwards
+   * takes it — that is what stops "I drew something, then picked a lesson"
+   * from looking like the drawing vanished. A board that already has strokes
+   * is never overwritten by a draft.
+   */
+  const takeDraftForBoard = useCallback(() => {
+    if (!uid) return null;
+    const draft = readQuickSketchDraft(uid, productId);
+    if (!draft || draft.strokes.length === 0) return null;
+    return draft;
+  }, [productId, uid]);
+
+  /**
+   * Hand an adopted draft to the board that just opened: the board's OWN
+   * device copy is written first (so a refused write, a crash or a closed tab
+   * can never take the strokes with it), then the draft is cleared, then the
+   * cloud is asked to take it. Called once per adopted draft.
+   */
+  const adoptDraft = useCallback(
+    (draft: QuickSketchDraft, where: { product: string; module: string; localKey: string; sketchKey: string }) => {
+      if (!uid) return;
+      const board = toFirestoreQuickSketch({
+        uid,
+        productId: where.product,
+        moduleId: where.module,
+        sketchKey: where.sketchKey,
+        title: boardRef.current.title || draft.title,
+        strokes: strokesRef.current,
+        resourceId: resourceId || null,
+        resourceName: resourceName || null,
+        createdAt: boardRef.current.createdAt || draft.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      });
+      try {
+        localStorage.setItem(where.localKey, JSON.stringify(board));
+        dispatch({ type: "SET_DEVICE_SAVED", saved: true });
+      } catch {
+        // The device refused the copy: keep the draft until it can be written.
+        dispatch({ type: "SET_DEVICE_SAVED", saved: false });
+        return;
+      }
+      clearQuickSketchDraft(uid, where.product);
+      void saveToFirestore();
+    },
+    [resourceId, resourceName, saveToFirestore, uid],
+  );
+
   const openBoard = useCallback(
     async (sketchKey: string, options: { flushCurrent?: boolean } = {}) => {
       if (!scoped) return;
@@ -322,18 +402,23 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
               ? local
               : cloud
             : cloud || local;
-        const strokes = quickSketchStrokesFrom(source?.strokes);
+        // An EMPTY board adopts the pre-lesson draft; a board with strokes of
+        // its own never does. See `takeDraftForBoard`.
+        const strokesFromBoard = quickSketchStrokesFrom(source?.strokes);
+        const draft = strokesFromBoard.length === 0 ? takeDraftForBoard() : null;
+        const strokes = draft ? draft.strokes : strokesFromBoard;
         strokesRef.current = strokes;
         boardRef.current = {
           key: sketchKey,
-          title: source?.title || (sketchKey === QUICK_SKETCH_DEFAULT_KEY ? "Sketch 1" : sketchKey),
-          createdAt: source?.createdAt || Date.now(),
+          title: draft?.title || source?.title || (sketchKey === QUICK_SKETCH_DEFAULT_KEY ? "Sketch 1" : sketchKey),
+          createdAt: (draft?.createdAt || source?.createdAt) || Date.now(),
         };
         dispatch({ type: "SET_STROKES", strokes });
         dispatch({ type: "SET_ACTIVE_BOARD", key: boardRef.current.key, title: boardRef.current.title });
-        dispatch({ type: "SET_STATUS", status: "ready" });
-        dispatch({ type: "SET_PENDING_SYNC", pending: Boolean(source === local && local) });
+        dispatch({ type: "SET_STATUS", status: draft ? "pending" : "ready" });
+        dispatch({ type: "SET_PENDING_SYNC", pending: Boolean(draft) || Boolean(source === local && local) });
         dispatch({ type: "SET_BOARD_STATS", key: sketchKey, strokeCount: strokes.length, updatedAt: source?.updatedAt || Date.now() });
+        if (draft) adoptDraft(draft, { product, module, localKey, sketchKey });
         try {
           localStorage.setItem(quickSketchActiveKey(uid!, product, module), sketchKey);
         } catch {
@@ -343,21 +428,28 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       } catch {
         // A refused READ must never blank the canvas: the device copy stands.
         const local = readLocalBoard(localKey);
-        const strokes = quickSketchStrokesFrom(local?.strokes);
+        const strokesFromBoard = quickSketchStrokesFrom(local?.strokes);
+        const draft = strokesFromBoard.length === 0 ? takeDraftForBoard() : null;
+        const strokes = draft ? draft.strokes : strokesFromBoard;
         strokesRef.current = strokes;
         boardRef.current = {
           key: sketchKey,
-          title: local?.title || "Sketch 1",
-          createdAt: local?.createdAt || Date.now(),
+          title: draft?.title || local?.title || "Sketch 1",
+          createdAt: (draft?.createdAt || local?.createdAt) || Date.now(),
         };
         dispatch({ type: "SET_STROKES", strokes });
         dispatch({ type: "SET_ACTIVE_BOARD", key: boardRef.current.key, title: boardRef.current.title });
-        dispatch({ type: "SET_STATUS", status: local ? "pending" : "error", errorMessage: local ? null : "Failed to load your drawing" });
+        dispatch({
+          type: "SET_STATUS",
+          status: draft ? "pending" : local ? "pending" : "error",
+          errorMessage: draft || local ? null : "Failed to load your drawing",
+        });
+        if (draft) adoptDraft(draft, { product, module, localKey, sketchKey });
       } finally {
         dispatch({ type: "SET_LOADING", loading: false });
       }
     },
-    [clearTimers, moduleId, productId, saveToFirestore, saveToLocalStorage, scoped, uid],
+    [adoptDraft, clearTimers, moduleId, productId, saveToFirestore, saveToLocalStorage, scoped, takeDraftForBoard, uid],
   );
 
   // ── Opening the module: the remembered canvas, then its index ─────────
@@ -367,6 +459,31 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
   useEffect(() => {
     if (!scoped) {
       scopeRef.current = "";
+      // No module open: the canvas has no board, but it does have THIS
+      // device's draft. Seeding from it is what makes a drawing survive a tab
+      // switch (or a reload) even before a lesson is open.
+      const draft = uid ? readQuickSketchDraft(uid, productId) : null;
+      const strokes = draft ? draft.strokes : [];
+      strokesRef.current = strokes;
+      boardRef.current = {
+        key: QUICK_SKETCH_DEFAULT_KEY,
+        title: draft?.title || "Sketch 1",
+        createdAt: draft?.createdAt || 0,
+      };
+      dispatch({ type: "SET_STROKES", strokes });
+      dispatch({ type: "SET_ACTIVE_BOARD", key: QUICK_SKETCH_DEFAULT_KEY, title: boardRef.current.title });
+      dispatch({
+        type: "SET_BOARDS",
+        boards: draft
+          ? [{
+              sketchKey: QUICK_SKETCH_DEFAULT_KEY,
+              title: boardRef.current.title,
+              strokeCount: strokes.length,
+              updatedAt: draft.updatedAt,
+              createdAt: draft.createdAt,
+            }]
+          : [],
+      });
       dispatch({ type: "SET_LOADING", loading: false });
       dispatch({ type: "SET_BOARDS_LOADING", loading: false });
       dispatch({ type: "SET_STATUS", status: "idle" });
@@ -454,9 +571,15 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       // THE fix: the canvas renders this state, so the list it draws always
       // contains what the learner just drew.
       dispatch({ type: "SET_STROKES", strokes: next });
-      // Signed out / no module open: the drawing still happens on screen, it
-      // just has nowhere to go yet (the panel says so out loud).
-      if (!scoped) return;
+      // Signed out: nowhere at all to put it (the panel says so out loud).
+      if (!uid) return;
+      if (!scoped) {
+        // No module open: there is no cloud board to address, but the drawing
+        // is still mirrored on this learner's device — so unmounting the tab
+        // (or picking a lesson, which moves the canvas on) cannot lose it.
+        scheduleLocalMirror();
+        return;
+      }
       dispatch({ type: "SET_STATUS", status: "pending" });
       dispatch({ type: "SET_PENDING_SYNC", pending: true });
 
@@ -475,12 +598,9 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       }
 
       // The device mirror is faster, and it is what survives a failed write.
-      if (localMirrorTimerRef.current) window.clearTimeout(localMirrorTimerRef.current);
-      localMirrorTimerRef.current = window.setTimeout(() => {
-        saveToLocalStorage();
-      }, LOCAL_MIRROR_MS);
+      scheduleLocalMirror();
     },
-    [debounceMs, saveToFirestore, saveToLocalStorage, scoped],
+    [debounceMs, saveToFirestore, scheduleLocalMirror, scoped, uid],
   );
 
   // ── Canvases ──────────────────────────────────────────────────────────
@@ -548,11 +668,18 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
 
   /** Everything pending, now — used by "Retry" and on the way out. */
   const flush = useCallback(() => {
-    if (!scoped) return;
+    if (!uid) return;
+    if (!scoped) {
+      // Nothing pending in the cloud, but the last few strokes are still in
+      // the debounce — get them onto the device before the tab goes away.
+      clearTimers();
+      saveToLocalStorage();
+      return;
+    }
     clearTimers();
     saveToLocalStorage();
     void saveToFirestore();
-  }, [clearTimers, saveToFirestore, saveToLocalStorage, scoped]);
+  }, [clearTimers, saveToFirestore, saveToLocalStorage, scoped, uid]);
 
   const retry = useCallback(() => {
     attemptsRef.current = 0;

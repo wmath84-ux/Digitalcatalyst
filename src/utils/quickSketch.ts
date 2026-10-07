@@ -132,6 +132,84 @@ export function quickSketchStyleStorageKey(uid: string | null | undefined): stri
   return `dc.quickSketchStyle.v1.${uid || "anon"}`;
 }
 
+/**
+ * The DEVICE-only draft of a drawing made before a lesson was open.
+ *
+ * A board's identity is `{uid, productId, moduleId, sketchKey}`, so a canvas
+ * with no module has no board to save into — there is no document id the rules
+ * could accept and no key in the module's index. Refusing to store anything at
+ * all meant such a drawing was only ever in the tab's memory: it was gone the
+ * moment the Sketch tab unmounted, which is exactly the "I draw, I let go, it
+ * vanishes" report the canvas has to answer for. So an unscoped canvas writes
+ * this draft instead — the learner's own device, one key per learner per
+ * course, never the cloud — and the hook hands it to the first board that
+ * opens afterwards. It is deliberately NOT under a `dc.quickSketch.v1.*` key:
+ * nothing else may mistake it for a real board.
+ */
+export function quickSketchDraftKey(uid: string, productId?: string | number | null): string {
+  return `dc.quickSketchDraft.v1.${uid || "anon"}.${String(productId ?? "") || "-"}`;
+}
+
+/** The draft as stored (its own title, its own creation time). */
+export interface QuickSketchDraft {
+  title: string;
+  strokes: QuickSketchStroke[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** The device's draft for this learner + course, or null when there is none. */
+export function readQuickSketchDraft(
+  uid: string,
+  productId?: string | number | null,
+): QuickSketchDraft | null {
+  try {
+    const raw = localStorage.getItem(quickSketchDraftKey(uid, productId));
+    if (!raw) return null;
+    const row = JSON.parse(raw) as Record<string, unknown>;
+    const strokes = quickSketchStrokesFrom(row?.strokes);
+    if (strokes.length === 0) return null;
+    return {
+      title: typeof row?.title === "string" && row.title ? row.title.slice(0, MAX_QUICK_SKETCH_TITLE) : "Sketch 1",
+      strokes,
+      createdAt: typeof row?.createdAt === "number" ? row.createdAt : 0,
+      updatedAt: typeof row?.updatedAt === "number" ? row.updatedAt : 0,
+    };
+  } catch {
+    // A corrupt draft is "no draft": the board opens empty instead of crashing.
+    return null;
+  }
+}
+
+/** Returns false when the device refused the write (quota, private mode). */
+export function writeQuickSketchDraft(
+  uid: string,
+  productId: string | number | null | undefined,
+  draft: { title: string; strokes: QuickSketchStroke[]; createdAt?: number; updatedAt?: number },
+): boolean {
+  try {
+    const payload: QuickSketchDraft = {
+      title: (draft.title || "Sketch 1").slice(0, MAX_QUICK_SKETCH_TITLE),
+      strokes: quickSketchStrokesFrom(draft.strokes),
+      createdAt: Math.round(draft.createdAt || Date.now()),
+      updatedAt: Math.round(draft.updatedAt || Date.now()),
+    };
+    localStorage.setItem(quickSketchDraftKey(uid, productId), JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The draft has been handed to a real board — it must not be adopted twice. */
+export function clearQuickSketchDraft(uid: string, productId?: string | number | null): void {
+  try {
+    localStorage.removeItem(quickSketchDraftKey(uid, productId));
+  } catch {
+    /* private mode — an unreadable device has no draft either */
+  }
+}
+
 export function createQuickSketchKey(): string {
   return `sk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }

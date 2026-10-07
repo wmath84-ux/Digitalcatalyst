@@ -224,7 +224,16 @@ const all = (attr, root = window.document) => Array.from(root.querySelectorAll(s
 
 /** Fresh world: empty cloud, empty device, a new host; keeps the last mount. */
 let mounted = null;
-function freshWorld({ uid = UID } = {}) {
+/** A brand-new host element with the canvas mounted on it. */
+function mountHost(props = {}) {
+  const target = window.document.createElement("div");
+  target.id = "host";
+  window.document.body.replaceChildren(target);
+  mounted = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: MODULE, debounceMs: DEBOUNCE, ...props });
+  return target;
+}
+
+function freshWorld({ uid = UID, productId = PRODUCT, moduleId = MODULE } = {}) {
   // Unmount FIRST: leaving the previous canvas flushes its last edits, and the
   // reset below is what makes the new world's cloud empty.
   mounted?.unmount?.();
@@ -232,16 +241,7 @@ function freshWorld({ uid = UID } = {}) {
   fsx.reset();
   window.localStorage.clear();
   clipboard.length = 0;
-  const target = window.document.createElement("div");
-  target.id = "host";
-  window.document.body.replaceChildren(target);
-  mounted = fixture.mount(target, {
-    uid,
-    productId: PRODUCT,
-    moduleId: MODULE,
-    debounceMs: DEBOUNCE,
-  });
-  return target;
+  return mountHost({ uid, productId, moduleId });
 }
 
 /** Type into a React-controlled input the way a keyboard would. */
@@ -525,6 +525,79 @@ test("an unscoped board still draws — it just says the drawing has nowhere to 
   assert.equal(strokeCount(), 1, "drawing works without a learner to save to");
   assert.ok(el("data-quick-sketch-unscoped"), "and the canvas says so");
   assert.equal(fsx.writes.length, 0, "nothing was written anywhere");
+  // A signed-out canvas has nobody to keep a draft for, so there is none.
+  assert.equal(window.localStorage.length, 0, "and no device draft was left behind");
+});
+
+test("with no lesson open the drawing is kept on this device, and comes back when the tab reopens", async () => {
+  // A signed-in learner whose Sketch tab is not scoped to a lesson yet: there
+  // is no board document to address, so the drawing goes to the DEVICE draft
+  // rather than nowhere. This is the "I draw, I let go, it vanishes" report.
+  freshWorld({ moduleId: null });
+  await settle();
+  assert.equal(el("data-quick-sketch-unscoped").textContent.trim(), "Kept on this device — open a lesson to save it with the module");
+  await drawLine(line());
+  await settle(500);
+  assert.equal(strokeCount(), 1, "the stroke is on the canvas");
+  assert.equal(fsx.writes.length, 0, "and nothing went to the cloud — there is no board");
+  const draft = JSON.parse(window.localStorage.getItem(`dc.quickSketchDraft.v1.${UID}.${PRODUCT}`) || "null");
+  assert.equal(draft?.strokes?.length, 1, "the device holds the draft");
+
+  // The tab is closed and reopened — the lesson is still not open.
+  mounted.unmount();
+  mounted = null;
+  mountHost({ moduleId: null });
+  await settle();
+  assert.equal(strokeCount(), 1, "and reopening the canvas brings it back");
+  assert.equal(fsx.writes.length, 0, "still nothing in the cloud");
+});
+
+test("a drawing made before the lesson was open lands in the lesson's board", async () => {
+  freshWorld({ moduleId: null });
+  await settle();
+  await drawLine(line());
+  await settle(500);
+  assert.equal(strokeCount(), 1);
+
+  // The learner opens a lesson: the module arrives and the canvas becomes
+  // scoped. The draft must move onto the module's own board — NOT be lost to
+  // the board load, which is what the canvas shows the moment this happens.
+  mounted.unmount();
+  mounted = null;
+  mountHost({ moduleId: MODULE });
+  await settle(120);
+  assert.equal(strokeCount(), 1, "the draft moved onto the module's canvas");
+  assert.equal(fsx.docAt(UID, PRODUCT, MODULE).strokes.length, 1, "and the cloud has it");
+  assert.equal(window.localStorage.getItem(`dc.quickSketchDraft.v1.${UID}.${PRODUCT}`), null, "the draft was handed over, not copied");
+  assert.ok(window.localStorage.getItem(`dc.quickSketch.v1.${UID}.${PRODUCT}.${MODULE}`), "and written to the module's own device copy");
+
+  // …and it is a normal board from here on: a second stroke joins it.
+  await drawLine(line(120));
+  await settle(200);
+  assert.equal(strokeCount(), 2);
+  assert.equal(fsx.docAt(UID, PRODUCT, MODULE).strokes.length, 2);
+});
+
+test("a board that already has strokes is never overwritten by a draft", async () => {
+  freshWorld();
+  await settle();
+  await drawLine(line());
+  await settle(200);
+  assert.equal(fsx.docAt(UID, PRODUCT, MODULE).strokes.length, 1, "the board has its own work");
+  mounted.unmount();
+  mounted = null;
+  // A draft survives from an earlier unscoped session…
+  window.localStorage.setItem(
+    `dc.quickSketchDraft.v1.${UID}.${PRODUCT}`,
+    JSON.stringify({ title: "Sketch 1", strokes: [{ id: "draft-1", points: [{ x: 1, y: 1, pressure: 0.5 }, { x: 9, y: 9, pressure: 0.5 }] }], createdAt: Date.now(), updatedAt: Date.now() }),
+  );
+  // …and opening the board must keep the board's own drawing.
+  mountHost();
+  await settle(120);
+  assert.equal(strokeCount(), 1, "the board's own stroke is what is drawn");
+  assert.equal(fsx.docAt(UID, PRODUCT, MODULE).strokes.length, 1);
+  assert.equal(fsx.docAt(UID, PRODUCT, MODULE).strokes[0].id.startsWith("draft"), false, "the draft did not take it over");
+  assert.ok(window.localStorage.getItem(`dc.quickSketchDraft.v1.${UID}.${PRODUCT}`), "and the draft is still waiting for an empty board");
 });
 
 test("history belongs to one canvas: switching cannot undo across canvases", async () => {

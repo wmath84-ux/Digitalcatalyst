@@ -227,6 +227,22 @@ const localKey = (uid: string, productId: string, moduleId: string, sketchKey: s
     ? `dc.sketch.v1.${uid}.${productId}.${moduleId}`
     : `dc.sketch.v1.${uid}.${productId}.${moduleId}.${sketchKey}`;
 
+/**
+ * The DEVICE-only draft of a sketch drawn before a lesson was open.
+ *
+ * A board's identity is `{uid, productId, moduleId, sketchKey}`, so a Sketch
+ * tab with no module has no document the rules could accept and no key in the
+ * module's index. Dropping the scene in that state meant it lived only in the
+ * editor's memory, and the editor unmounts whenever the tab switches or the
+ * scope moves on — the "I draw, I let go, it vanishes" report. So the scene
+ * goes to this device-level key instead, in exactly the same format as a
+ * board's device copy, and the first board that opens EMPTY adopts it (see
+ * `reconcile`). Never the cloud, never the module's index, never shared
+ * between learners.
+ */
+const draftKey = (uid: string, productId: string) =>
+  `dc.sketchDraft.v1.${uid || "guest"}.${productId || "-"}`;
+
 /** Durable "this device has work the cloud has not acknowledged" marker. */
 const outboxKey = (uid: string, productId: string, moduleId: string, sketchKey: string = SKETCH_DEFAULT_KEY) =>
   sketchKey === SKETCH_DEFAULT_KEY
@@ -359,6 +375,15 @@ const writeLocal = (key: string, scene: SketchScene, updatedAt: number, createdA
     return true;
   } catch {
     return false;
+  }
+};
+
+/** Drop a device copy that has been handed over (used for the draft). */
+const removeLocal = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* private mode — an unreadable device has nothing to clear */
   }
 };
 
@@ -518,6 +543,9 @@ interface SketchSession {
   sketchKey: string;
   title: string;
   scoped: boolean;
+  /** Signed in but with no module open: the scene lives on this device only. */
+  draft: boolean;
+  draftKey: string;
   docId: string;
   localKey: string;
   outboxKey: string;
@@ -577,9 +605,13 @@ const createSession = (
   const key = sanitizeSketchKey(sketchKey);
   const lKey = scoped ? localKey(uid, productId, moduleId, key) : "";
   const oKey = scoped ? outboxKey(uid, productId, moduleId, key) : "";
+  // A learner with no lesson open still gets a canvas — it is kept as this
+  // device's DRAFT rather than dropped (see `draftKey`).
+  const draft = !scoped && Boolean(uid);
+  const dKey = draft ? draftKey(uid, productId) : "";
   // The device copy is read SYNCHRONOUSLY so a cold open (or an offline one)
   // already has the learner's board in hand before the first paint.
-  const local = scoped ? readLocal(lKey) : null;
+  const local = scoped ? readLocal(lKey) : draft ? readLocal(dKey) : null;
   const scene = local?.scene ?? createSketchScene();
   const fresh = Boolean(scoped && options.fresh);
   return {
@@ -589,6 +621,8 @@ const createSession = (
     sketchKey: key,
     title: sanitizeSketchTitle(options.title),
     scoped,
+    draft,
+    draftKey: dKey,
     docId: scoped ? sketchDocId(uid, productId, moduleId, key) : "",
     localKey: lKey,
     outboxKey: oKey,
@@ -611,7 +645,7 @@ const createSession = (
     localOk: true,
     createdAt: local?.createdAt || 0,
     updatedAt: local?.updatedAt || 0,
-    status: scoped ? "loading" : "idle",
+    status: scoped ? "loading" : draft ? "ready" : "idle",
     errorMessage: null,
     pendingSync: scoped ? readOutbox(oKey) : false,
     lastSavedAt: null,
@@ -730,6 +764,17 @@ export default function useCourseSketch({
   }, []);
 
   const persistLocal = useCallback((scope: SketchSession) => {
+    // No module open: the device draft IS the whole save. Same format as a
+    // board's device copy, different key — and never the board index, which
+    // is per module (`syncSummary` is deliberately skipped).
+    if (scope.draft) {
+      if (scope.localTimer) { clearTimeout(scope.localTimer); scope.localTimer = null; }
+      if (!scope.createdAt) scope.createdAt = Date.now();
+      scope.updatedAt = Date.now();
+      scope.localOk = writeLocal(scope.draftKey, scope.scene, scope.updatedAt, scope.createdAt);
+      if (scope.localOk) scope.hasLocal = true;
+      return;
+    }
     if (!scope.scoped) return;
     if (scope.localTimer) { clearTimeout(scope.localTimer); scope.localTimer = null; }
     if (!scope.createdAt) scope.createdAt = Date.now();
@@ -834,7 +879,7 @@ export default function useCourseSketch({
 
   const scheduleSave = useCallback(
     (scope: SketchSession) => {
-      if (!scope.scoped) return;
+      if (!scope.scoped && !scope.draft) return;
       // Device mirror: a short tail, so a crash/refresh a moment after the
       // last stroke still finds the drawing on this device. It is also the
       // moment the save line says "unsaved changes" — once per burst, never
@@ -846,6 +891,13 @@ export default function useCourseSketch({
           persistLocal(scope);
           if (scope.dirty && scope.status !== "saving" && scope.status !== "error") setStatus(scope, "pending");
         }, LOCAL_MIRROR_MS);
+      }
+      // A draft has no cloud board to write to: the device copy above is the
+      // whole save, so there is nothing to debounce and nothing to retry.
+      if (scope.draft) {
+        scope.maxWaitAt = null;
+        if (scope.cloudTimer) { clearTimeout(scope.cloudTimer); scope.cloudTimer = null; }
+        return;
       }
       // Cloud: debounce the tail, but never postpone forever — a long,
       // continuous drawing checkpoints every MAX_WAIT_MS.
@@ -910,13 +962,31 @@ export default function useCourseSketch({
         // Nothing in the cloud yet but work on this device → upload it.
         scope.dirty = true;
         scheduleSave(scope);
+      } else {
+        // An EMPTY board (nothing in the cloud, nothing on this device) adopts
+        // the draft the learner drew before a lesson was open. A board with
+        // work of its own is never overwritten — see `draftKey`.
+        const draft = readLocal(draftKey(scope.uid, scope.productId));
+        if (draft && draft.scene.elements.length > 0) {
+          scope.scene = draft.scene;
+          scope.signature = sketchSceneSignature(draft.scene.elements);
+          scope.createdAt = draft.createdAt || scope.createdAt;
+          scope.revision += 1;
+          if (scope.loaded) scope.generation += 1;
+          // The board's own device copy is written FIRST, so the draft can be
+          // dropped without putting the strokes at risk; the upload follows.
+          persistLocal(scope);
+          removeLocal(draftKey(scope.uid, scope.productId));
+          scope.dirty = true;
+          scheduleSave(scope);
+        }
       }
       markLoaded(scope);
       syncSummary(scope);
       setStatus(scope, scope.pendingSync || scope.dirty ? "pending" : "ready");
       notify(scope);
     },
-    [notify, scheduleSave, setStatus, syncSummary],
+    [notify, persistLocal, scheduleSave, setStatus, syncSummary],
   );
 
   /** Read the board's cloud copy (once the session is verifiable). */
@@ -987,6 +1057,12 @@ export default function useCourseSketch({
     session.disposed = false;
     const flushSession = () => {
       if (session.disposed) return;
+      if (session.draft) {
+        // Nothing waits on the cloud here: get the last strokes onto the
+        // device before the tab is hidden or goes away.
+        if (session.revision > 0) persistLocal(session);
+        return;
+      }
       if (!session.remoteChecked) readRef.current(session);
       if (session.dirty || session.pendingSync) persistRef.current(session);
     };
@@ -1005,7 +1081,9 @@ export default function useCourseSketch({
       window.removeEventListener("pagehide", flushSession);
       document.removeEventListener("visibilitychange", onVisibility);
       // Final flush for the OUTGOING scope, then stop every timer it owns.
-      if (session.dirty || session.pendingSync) {
+      if (session.draft) {
+        if (session.revision > 0) persistLocal(session);
+      } else if (session.dirty || session.pendingSync) {
         persistLocal(session);
         persistRef.current(session);
       }
@@ -1137,7 +1215,7 @@ export default function useCourseSketch({
   const updateScene = useCallback(
     (elements: unknown, appState: unknown, files: unknown, forSceneKey?: string) => {
       const scope = scopeRef.current;
-      if (!scope.scoped || !scope.loaded || scope.disposed) return;
+      if ((!scope.scoped && !scope.draft) || !scope.loaded || scope.disposed) return;
       // An editor mounted on an OLDER scene of this board (the cloud answered
       // late, a merge happened) must never write that older scene back.
       if (typeof forSceneKey === "string" && forSceneKey !== sessionSceneKey(scope)) return;
@@ -1156,10 +1234,18 @@ export default function useCourseSketch({
       if (signature === scope.signature) return;
       scope.signature = signature;
       scope.revision += 1;
+      if (scope.draft) {
+        // No lesson open: there is no cloud board for this scene, so the
+        // device mirror is the save. `dirty` stays false — nothing is waiting
+        // on Firestore, and the panel says "kept on this device" out loud.
+        scheduleSave(scope);
+        setStatus(scope, "ready");
+        return;
+      }
       scope.dirty = true;
       scheduleSave(scope);
     },
-    [scheduleSave],
+    [scheduleSave, setStatus],
   );
 
   // ── Canvas colour ──────────────────────────────────────────────────────

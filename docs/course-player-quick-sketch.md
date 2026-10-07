@@ -85,9 +85,33 @@ third of the width the site assumes.
   the doc id from the payload, so one learner can never write into another's
   namespace, and they mirror the ceilings above.
 
-### The two bugs this feature had
+### A canvas with no lesson open — the device draft
 
-Both were real, both are fixed, and both are pinned by tests:
+A board's identity is `{uid, productId, moduleId, sketchKey}`. Open the Sketch
+tab before a lesson is selected and there is no module, so there is no document
+the rules would accept and no key in the module's index — and the first version
+of this feature stored **nothing at all** in that state. A drawing then lived
+only in the tab's memory and was gone the moment the tab unmounted, which is
+exactly the "I draw, I let go, it vanishes" report.
+
+- **Quick Sketch** writes `dc.quickSketchDraft.v1.{uid}.{productId}` (device
+  only) and seeds the canvas from it on mount, so a tab switch or a reload
+  brings the drawing back. The canvas says so: *"Kept on this device — open a
+  lesson to save it with the module."*
+- **The Full Editor** does the same under `dc.sketchDraft.v1.{uid}.{productId}`,
+  in exactly the format of a board's device copy, and its save line reads
+  *"Kept on this device"*.
+- **The first EMPTY board that opens adopts the draft.** Draw before picking a
+  lesson, pick one, and the drawing is already on the lesson's canvas: the
+  board's own device copy is written first, then the draft is cleared, then the
+  cloud takes it. A board that has any work of its own is never overwritten by
+  a draft.
+- Nothing in this path touches the cloud: while unscoped there is no board to
+  write, so the only thing that happens is a device write.
+
+### The three faults this feature had
+
+All three were real, all three are fixed, and all three are pinned by tests:
 
 1. **A stroke vanished the instant the finger lifted.** `updateStrokes()` wrote
    the new list into a ref but never into React state, and the canvas renders
@@ -98,6 +122,8 @@ Both were real, both are fixed, and both are pinned by tests:
    `match` block in `firestore.rules` — and a collection with no rule is denied
    outright, so every write was refused. The hook now writes
    `users/{uid}/quickSketches/…` and the rules cover it.
+3. **An unscoped Sketch tab kept nothing** (see the draft above) — in *either*
+   canvas, which is why the Full Editor looked broken for the same reason.
 
 ## Tests
 
@@ -107,8 +133,11 @@ Both were real, both are fixed, and both are pinned by tests:
   reopening shows it again (cloud, then the device mirror); undo / redo / clear
   / erase move the screen *and* the document; the panel is the editor's; a style
   change restyles every stroke as one undo step; Copy Options and Copy to SVG
-  produce the editor's own text; an unscoped board still draws; a second canvas
-  is its own document.
+  produce the editor's own text; an unscoped board still draws **and keeps its
+  draft on the device**; a second canvas is its own document.
+- `tests/courseSketchCloudSyncRuntime.test.mjs` — the Full Editor's hook: an
+  unscoped tab keeps the scene as a device draft, a later lesson's empty board
+  adopts it, and a board with work of its own never takes it.
 - `tests/coursePlayerQuickSketchContract.test.mjs` — the rules block and the
   save path, the document a save writes, tolerant loads, the eraser's geometry,
   the style's ranges and easings, the options text, the SVG export, and the

@@ -561,6 +561,7 @@ function SketchStatus({
   errorMessage,
   boardName,
   deviceSaved = true,
+  scoped,
   onRetry,
   leading,
   children,
@@ -570,6 +571,8 @@ function SketchStatus({
   errorMessage: string | null;
   boardName?: string;
   deviceSaved?: boolean;
+  /** False when no module is open — the scene is a device draft then. */
+  scoped?: boolean;
   onRetry?: () => void;
   /** The canvas switcher + "+", left-aligned before the save state. */
   leading?: React.ReactNode;
@@ -578,7 +581,11 @@ function SketchStatus({
 }) {
   let label = "Sketch";
   let tone: "muted" | "ok" | "warn" = "muted";
-  if (status === "loading") {
+  if (scoped === false) {
+    // No module open: there is no cloud board, so "Saved" would be a lie and
+    // "Ready" says nothing. The scene is kept on this device (the draft).
+    label = "Kept on this device";
+  } else if (status === "loading") {
     label = "Loading sketch…";
   } else if (status === "pending") {
     // Edited, not written yet — never "Saved" while it is not.
@@ -890,6 +897,7 @@ export default function SketchPanel({
       <SketchStatus
         status={status}
         pendingSync={pendingSync}
+        scoped={scoped}
         errorMessage={errorMessage}
         boardName={boardName}
         deviceSaved={deviceSaved}
@@ -1014,7 +1022,9 @@ export default function SketchPanel({
                       data-course-sketch-clean-status={status}
                       title={errorMessage ?? undefined}
                     >
-                      {status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
+                      {!scoped
+                        ? "Kept on this device"
+                        : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
                     </span>
                     {status === "error" && onRetry ? (
                       <button
@@ -1038,7 +1048,7 @@ export default function SketchPanel({
             className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-max rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold text-white/60"
             data-course-sketch-unscoped
           >
-            Open a lesson to save this sketch with its module
+            Kept on this device — open a lesson to save it with the module
           </div>
         ) : null}
       </div>

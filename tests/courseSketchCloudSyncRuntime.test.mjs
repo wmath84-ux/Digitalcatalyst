@@ -303,6 +303,9 @@ function draw(elements, appState = { theme: "dark" }, files = {}) {
   });
 }
 
+/** The live scene's element ids, read from the session (not from a render). */
+const sceneIds = () => fixture.latest.ctl.getScene().elements.map((e) => e.id).join(",");
+
 const sketchPath = (uid, productId, moduleId) =>
   `users/${uid}/sketches/${fixture.sketchDocId(uid, productId, moduleId)}`;
 
@@ -538,16 +541,79 @@ test("a uid the session cannot verify never writes into anybody's namespace", as
   app.unmount();
 });
 
-test("with no module (or no learner) the hook is inert, and says it is unscoped", async () => {
+test("with no module the board is unscoped — and the drawing is kept on the device, not dropped", async () => {
   const target = freshWorld();
   const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: null, debounceMs: DEBOUNCE });
   await settle(60);
   assert.equal(text("scoped"), "false");
   assert.equal(text("loading"), "false", "an unscoped board must not spin forever");
   draw([stroke("s1")]);
-  await settle(120);
+  // 350 ms is the device mirror's own tail — give it room to fire.
+  await settle(450);
+  assert.deepEqual(fsx.paths(), [], "no cloud board can be addressed without a module");
+  assert.equal(sceneIds(), "s1", "and the scene is on screen");
+  // The learner's work is NOT thrown away in the meantime: there is no board
+  // document, so this device holds the draft instead.
+  const draft = JSON.parse(window.localStorage.getItem(`dc.sketchDraft.v1.${UID}.${PRODUCT}`) || "null");
+  assert.equal(fixture.parseSketchScene(draft?.scene)?.elements?.length, 1, "the device kept the draft");
+  assert.equal(text("status"), "ready");
+
+  // A tab switch (unmount, then remount with no lesson open) keeps it.
+  app.unmount();
+  const again = fixture.mount(newHost(), { uid: UID, productId: PRODUCT, moduleId: null, debounceMs: DEBOUNCE });
+  await settle(60);
+  assert.equal(sceneIds(), "s1", "reopening the canvas brings the draft back");
+  again.unmount();
+});
+
+test("a sketch drawn before a lesson was open joins the first empty board", async () => {
+  const target = freshWorld();
+  const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: null, debounceMs: DEBOUNCE });
+  await settle(60);
+  draw([stroke("before-1"), stroke("before-2")]);
+  await settle(450);
   assert.deepEqual(fsx.paths(), []);
   app.unmount();
+
+  // The learner picks a lesson: the module arrives, the board loads — and it
+  // is empty, so it takes the draft. Nothing the learner drew is lost.
+  const scopedHost = fixture.mount(newHost(), { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle(200);
+  assert.equal(sceneIds(), "before-1,before-2", "the draft moved onto the module's board");
+  const uploaded = cloudScene(UID, PRODUCT, MODULE_A);
+  assert.equal(uploaded?.elements?.length, 2, "and reached the cloud as the module's board");
+  assert.equal(
+    window.localStorage.getItem(`dc.sketchDraft.v1.${UID}.${PRODUCT}`),
+    null,
+    "the draft was handed over, not copied",
+  );
+  assert.ok(
+    window.localStorage.getItem(`dc.sketch.v1.${UID}.${PRODUCT}.${MODULE_A}`),
+    "and written to the board's own device copy",
+  );
+  scopedHost.unmount();
+});
+
+test("a board that already has work never takes the draft", async () => {
+  const target = freshWorld();
+  const app = fixture.mount(target, { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle(120);
+  draw([stroke("mine")]);
+  await settle(150);
+  app.unmount();
+  assert.equal(sceneIds(), "mine");
+
+  // A draft left over from an unscoped session…
+  window.localStorage.setItem(
+    `dc.sketchDraft.v1.${UID}.${PRODUCT}`,
+    JSON.stringify({ scene: JSON.stringify({ ...fixture.createSketchScene(), elements: [stroke("draft")] }), updatedAt: Date.now(), createdAt: Date.now() }),
+  );
+  // …must not overwrite the board's own drawing.
+  const again = fixture.mount(newHost(), { uid: UID, productId: PRODUCT, moduleId: MODULE_A, debounceMs: DEBOUNCE });
+  await settle(200);
+  assert.equal(sceneIds(), "mine", "the board keeps its own work");
+  assert.ok(window.localStorage.getItem(`dc.sketchDraft.v1.${UID}.${PRODUCT}`), "and the draft is still waiting for an empty board");
+  again.unmount();
 });
 
 /* ── 9. a second device ───────────────────────────────────────────────────── */
