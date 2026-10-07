@@ -25,6 +25,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type CoursePlayerTheme = "dark" | "light";
 export type MasterSelfMode = "master" | "self";
+export type ModuleListingStyle = "classic" | "modern";
 
 /** The features that carry a MASTER/SELF filter. */
 export type MasterSelfFeature = "notes" | "mindMap" | "brain";
@@ -167,4 +168,45 @@ export function useMasterSelfPreference(
   );
 
   return { mode, setMode };
+}
+
+// ── Module Listing Style (classic vs modern) ───────────────────────────
+
+export const loadModuleListingStyle = (
+  uid?: string | null,
+  fallback: ModuleListingStyle = "classic",
+): ModuleListingStyle => {
+  const stored = safeGet(prefKey("moduleStyle", "listing", uid));
+  return stored === "classic" || stored === "modern" ? stored : fallback;
+};
+
+export const persistModuleListingStyle = (
+  style: ModuleListingStyle,
+  uid?: string | null,
+) => {
+  safeSet(prefKey("moduleStyle", "listing", uid), style);
+};
+
+/** Live, persisted module listing style preference (classic = simple list, modern = magnifying icons). */
+export function useModuleListingStyle(
+  uid?: string | null,
+  fallback: ModuleListingStyle = "classic",
+) {
+  const [style, setStyleState] = useState<ModuleListingStyle>(() =>
+    loadModuleListingStyle(uid, fallback),
+  );
+  useEffect(() => {
+    setStyleState(loadModuleListingStyle(uid, fallback));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  const setStyle = useCallback(
+    (next: ModuleListingStyle) => {
+      setStyleState(next);
+      persistModuleListingStyle(next, uid);
+    },
+    [uid],
+  );
+
+  return { style, setStyle };
 }

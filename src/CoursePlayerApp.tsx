@@ -47,7 +47,7 @@ import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
-import { useCourseTheme, usePersistedBooleanPreference } from "./course/playerPreferences";
+import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle } from "./course/playerPreferences";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -603,6 +603,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // from the shared course-player preference layer (never CSS inversion).
   const playerThemeCtl = useCourseTheme("player", user?.id ?? null);
   const sketchCleanLookCtl = usePersistedBooleanPreference("sketchCleanLook", user?.id ?? null, false);
+  const moduleListingStyleCtl = useModuleListingStyle(user?.id ?? null, "classic");
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -1664,6 +1665,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onPlayerThemeChange={playerThemeCtl.setTheme}
       sketchCleanLook={sketchCleanLookCtl.value}
       onSketchCleanLookChange={sketchCleanLookCtl.setValue}
+      moduleListingStyle={moduleListingStyleCtl.style}
+      onModuleListingStyleChange={moduleListingStyleCtl.setStyle}
       /**
        * The learner's OWN course: "Add to My Module", "Save for later" and
        * "Gate personal access" are all about OFFICIAL course resources (copy
@@ -1804,6 +1807,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // A learner-authored course has nothing to sell: the Paid ("premium")
       // tab is removed from the footer dock and from the ⌘/Ctrl+1… shortcuts.
       hiddenTabs={hiddenTabs}
+      moduleListingStyle={moduleListingStyleCtl.style}
       notes={notes}
       onAddNote={(text) => saveNote(text)}
       onEditNote={(id, text) => editNote(id, text)}
@@ -1893,6 +1897,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             canDeleteActive={sketch.boards.length > 1}
             canCreateBoard={sketch.canCreateBoard}
             cleanLook={sketchCleanLookCtl.value}
+            productId={product.id}
+            moduleId={activeMindMapModuleId}
+            resourceId={selectedFile?.id || null}
+            resourceName={selectedFile?.name || null}
           />
         </Suspense>
       )}

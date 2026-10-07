@@ -447,7 +447,8 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                       className={inputClass}
                       aria-label="Cover image URL"
                     />
-                  </div>
+                    <p className="text-[11px] text-white/50">
+                      {draft.coverImage
                         ? "Apna cover lag gaya — save par yahi rahega."
                         : "Koi cover nahi — ek random image apne aap set ho kar save ho jayegi."}
                     </p>
@@ -665,7 +666,7 @@ function ModuleNodeEditor({
         </div>
       </div>
 
-      {open && (
+      {open ? (
         <div className="space-y-3 pl-9">
           {/* Description */}
           <textarea

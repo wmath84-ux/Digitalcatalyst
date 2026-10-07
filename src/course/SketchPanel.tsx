@@ -64,6 +64,7 @@ import type { SketchScene } from "../../utils/sketchScene";
 import { useSketchLibrary } from "./useSketchLibrary";
 import { isAllowedExcalidrawLibraryUrl } from "../../utils/excalidrawLibraryLink.js";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
+import PerfectFreehandSketch from "../components/PerfectFreehandSketch";
 
 /**
  * The editor's imperative API, derived from the component's own props type
@@ -278,6 +279,14 @@ export interface SketchPanelProps {
   /** "Clean / Optimised Look" (Part 1 §26): header hidden, toolbar on top,
    *  useful header actions in the left sidebar, canvas maximised. */
   cleanLook?: boolean;
+  /** Product ID for Quick Sketch persistence */
+  productId?: string | number | null;
+  /** Module ID for Quick Sketch persistence */
+  moduleId?: string | number | null;
+  /** Resource ID for Quick Sketch association */
+  resourceId?: string | null;
+  /** Resource name for Quick Sketch association */
+  resourceName?: string | null;
 }
 
 /**
@@ -654,6 +663,10 @@ export default function SketchPanel({
   onDeleteActive,
   canDeleteActive = false,
   cleanLook = false,
+  productId = null,
+  moduleId = null,
+  resourceId = null,
+  resourceName = null,
 }: SketchPanelProps) {
   /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -670,6 +683,12 @@ export default function SketchPanel({
   /** §30 deletion is a two-step act: the trash opens this confirmation, which
    *  names the actual canvas, and only the red confirm removes it. */
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  /**
+   * Quick Sketch mode (perfect-freehand) vs Full Editor (Excalidraw). The
+   * two coexist: switching to Quick Sketch hides the editor but keeps its
+   * state intact, so the learner can pop back with their work preserved.
+   */
+  const [mode, setMode] = useState<"editor" | "quick-sketch">("editor");
 
   /**
    * Where libraries.excalidraw.com sends the browser back to. A STABLE value
@@ -845,8 +864,27 @@ export default function SketchPanel({
           />
         ) : null}
       >
-        <SketchLibraryPill library={library} />
-        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+        {/* Quick Sketch toggle: switches between the full Excalidraw editor
+            and a lightweight perfect-freehand canvas for quick notes,
+            calculations, and diagrams during lectures. */}
+        <button
+          type="button"
+          onClick={() => setMode(mode === "editor" ? "quick-sketch" : "editor")}
+          className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+            mode === "quick-sketch"
+              ? "bg-orange-500 text-white"
+              : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          }`}
+          title={mode === "editor" ? "Switch to Quick Sketch (pressure-sensitive pen)" : "Switch to Full Editor (Excalidraw)"}
+        >
+          {mode === "quick-sketch" ? "✏️ Quick Sketch" : "Full Editor"}
+        </button>
+        {mode === "editor" ? (
+          <>
+            <SketchLibraryPill library={library} />
+            <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+          </>
+        ) : null}
       </SketchStatus>
       )}
 
@@ -861,6 +899,17 @@ export default function SketchPanel({
               className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-orange-400"
             />
           </div>
+        ) : mode === "quick-sketch" ? (
+          /* Quick Sketch mode: lightweight pressure-sensitive canvas using
+             perfect-freehand. The full Excalidraw editor remains mounted in
+             state (not DOM) so switching back preserves the learner's work. */
+          <PerfectFreehandSketch
+            uid={uid}
+            productId={productId}
+            moduleId={moduleId}
+            resourceId={resourceId}
+            resourceName={resourceName}
+          />
         ) : (
           <div className="absolute inset-0" data-course-sketch-host>
             <Excalidraw
@@ -922,8 +971,24 @@ export default function SketchPanel({
                       />
                     ) : null}
                     <SketchDaylightToggle isDark={canvasColour === null} onToggle={toggleDaylight} />
-                    <SketchLibraryPill library={library} />
-                    <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+                    <button
+                      type="button"
+                      onClick={() => setMode(mode === "editor" ? "quick-sketch" : "editor")}
+                      className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+                        mode === "quick-sketch"
+                          ? "bg-orange-500 text-white"
+                          : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                      title={mode === "editor" ? "Switch to Quick Sketch" : "Switch to Full Editor"}
+                    >
+                      {mode === "quick-sketch" ? "✏️ Quick Sketch" : "Full Editor"}
+                    </button>
+                    {mode === "editor" ? (
+                      <>
+                        <SketchLibraryPill library={library} />
+                        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+                      </>
+                    ) : null}
                     <span
                       role="status"
                       aria-live="polite"
