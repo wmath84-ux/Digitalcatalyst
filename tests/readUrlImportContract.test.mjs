@@ -116,6 +116,37 @@ test("with no header the URL pathname is used, then a fallback", () => {
   assert.equal(pickFilename(responseWith({}), "https://a.test/"), "document.pdf");
 });
 
+test("a Google Drive link is refused up front — the browser never even asks Drive", async () => {
+  // Drive answers its download URL with a redirect to *.googleusercontent.com
+  // and no Access-Control-Allow-Origin header, so this fetch is blocked every
+  // time. The learner gets Drive's own reason immediately instead of a generic
+  // network error after a 60s timeout.
+  assert.equal(mod.isGoogleDriveUrl("https://drive.google.com/file/d/ABC123/view"), true);
+  assert.equal(mod.isGoogleDriveUrl("https://drive.usercontent.google.com/download?id=ABC123&export=download"), true);
+  assert.equal(mod.isGoogleDriveUrl("https://drive.google.com.evil.example/file/d/ABC123/view"), false);
+  assert.equal(mod.isGoogleDriveUrl("https://docs.google.com/document/d/ABC123/edit"), false);
+
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    throw new Error("Drive must not be requested at all");
+  };
+  try {
+    const result = await mod.fetchPdfFromUrl({
+      raw: "https://drive.google.com/file/d/ABC123/view",
+      url: "https://drive.google.com/uc?export=download&id=ABC123",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.retryable, false, "retrying the same URL can never succeed");
+    assert.match(result.error.message, /Google Drive cannot be read through a link/);
+    assert.match(result.error.message, /Upload PDF/);
+    assert.equal(calls, 0, "no request is attempted for a host that always blocks it");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("hostile filenames are sanitised but never emptied", () => {
   // The security property first: whatever comes off the network, the result can
   // never carry a separator or a traversal run into a Storage object path.

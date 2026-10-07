@@ -5,11 +5,13 @@
 ## Sources
 
 - **PDF upload** — stored at `adminProductContent/read/{productId}/{resourceId}-{uploadId}.pdf`; the resource records its source kind, Storage object path, original filename and byte size. The resource/product identity in the path is checked before saving or deleting an object.
-- **Google Drive PDF** — accepts a `drive.google.com/file/d/{id}/view`, `/open?id=…`, or `/uc?id=…` file link. The locally bundled PDF.js viewer reads the public download URL; no Drive credentials, API tokens or proxy are used.
+- **Google Drive PDF** — accepts a `drive.google.com/file/d/{id}/view`, `/open?id=…`, or `/uc?id=…` file link. The file opens in **Google Drive's own embeddable viewer** (`drive.google.com/file/d/{id}/preview`) inside the Read tab, with an *Open in Drive* escape hatch beside the title. No Drive credentials, API tokens or application proxy are used.
+
+  Drive is deliberately **not** read by the bundled PDF.js viewer: the only bytes URL Google offers for a Drive file (`/uc?export=download&id=…`) answers with a redirect to `*.googleusercontent.com` that carries no `Access-Control-Allow-Origin` header, so a browser-side fetch is blocked before any byte arrives and the viewer sat at *0 pages*. Drive's `/preview` needs no CORS at all — Google's servers fetch the file and the frame renders the real, paginated document — and it works on every target the app ships on, including the packaged Android app where `/api/*` routes do not exist. This matches the Course Player, which already renders `drive` files the same way (`src/utils/courseEmbed.ts`). A file that is not shared with the link shows Google's own *request access* page inside the frame, so the sharing setting stays visible instead of failing silently.
 - **Direct PDF URL** — public HTTPS URL opened by the bundled PDF.js Generic Viewer.
 - **Generic embed URL** — public HTTPS URL loaded in a sandboxed iframe. It is not parsed as HTML and is never sent through an application URL proxy.
 
-Only public HTTPS URLs are accepted for remote sources. IP literals (public or private), internal/local hostnames and common private-address wildcard-DNS aliases are rejected, as are non-standard ports, credentials and active/unsafe schemes. External PDF servers must permit browser cross-origin reads (CORS) for PDF.js; if they do not, upload the PDF or use a host that allows CORS. Google Drive sharing/download behavior is controlled by Google and may also prevent direct PDF.js access.
+Only public HTTPS URLs are accepted for remote sources. IP literals (public or private), internal/local hostnames and common private-address wildcard-DNS aliases are rejected, as are non-standard ports, credentials and active/unsafe schemes. External PDF servers must permit browser cross-origin reads (CORS) for PDF.js; if they do not, upload the PDF or use a host that allows CORS. Google Drive is the one host the app never asks PDF.js to read — it is shown through Drive's own viewer instead (see above), so a Drive link only needs to be shared with the link.
 
 ## Upload limit and Storage rules
 
@@ -37,6 +39,14 @@ requires the document's `storagePath` to resolve inside that same folder), so a
 hand-written document can never point at another learner's object. Every write is
 owner-only, PDF-only and inside the same **100 MiB** ceiling the instructor-side
 uploads use.
+
+The same picker also accepts a **link**: the PDF is fetched in the browser and
+checked for real PDF bytes and a PDF type/filename before anything is stored, so
+an HTML error page can never be saved as a document. A Google Drive link is
+refused here on purpose, with the reason spelled out — Drive answers its download
+URL with a CORS-blocked redirect, so the learner is told to download the file and
+use **Upload PDF**, or to open it from a course's Read tab when a course provides
+it.
 
 A learner PDF opens in the **same** bundled PDF.js Generic Viewer as a course
 PDF, and the reader chrome adds the one thing a course PDF cannot offer: saving.

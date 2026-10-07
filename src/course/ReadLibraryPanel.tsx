@@ -859,7 +859,11 @@ export default function ReadLibraryPanel({
                       </span>
                     </span>
                     <span className="shrink-0 text-[10px] font-semibold text-slate-400 group-hover:text-violet-200">
-                      {entry.presentation.kind === "pdfjs" ? "Read PDF" : "Open"}
+                      {entry.presentation.kind === "pdfjs"
+                        ? "Read PDF"
+                        : entry.presentation.kind === "drive"
+                          ? "Open in Drive"
+                          : "Open"}
                     </span>
                   </button>
                 </li>
@@ -921,9 +925,27 @@ export default function ReadLibraryPanel({
                   ) : null}
                 </>
               ) : (
-                <span className="hidden shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-semibold text-slate-300 sm:inline-flex">
-                  {activeEntry?.presentation.label}
-                </span>
+                <>
+                  <span className="hidden shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-semibold text-slate-300 sm:inline-flex">
+                    {activeEntry?.presentation.label}
+                  </span>
+                  {/* Drive decides whether its viewer may be framed (a file
+                      that is not shared with the link shows Google's own
+                      "request access" page). This is the same escape hatch
+                      every other Drive surface in the player offers. */}
+                  {activeEntry?.presentation.kind === "drive" ? (
+                    <a
+                      href={activeEntry.presentation.originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[11px] font-semibold text-white hover:bg-white/10"
+                      data-course-read-open-drive
+                    >
+                      <ExternalLink size={13} aria-hidden="true" />
+                      <span className="hidden sm:inline">Open in Drive</span>
+                    </a>
+                  ) : null}
+                </>
               )}
             </div>
 
@@ -976,6 +998,32 @@ export default function ReadLibraryPanel({
                   resourceId={activeEntry.id}
                   initialPage={activePage}
                   onPageChange={reportCoursePage}
+                />
+              ) : activeEntry && activeEntry.presentation.kind === "drive" ? (
+                /*
+                  Google Drive PDF. Drive never lets a browser read the file's
+                  bytes (its download URL redirects to googleusercontent.com
+                  without a CORS header), so PDF.js used to open an empty
+                  0-page document. Drive's own embeddable viewer is the frame
+                  Google actually serves, and it is the same rendering the
+                  Course Player already uses for Drive files — see
+                  `getReadResourcePresentation` in utils/readResources.js.
+                */
+                <iframe
+                  key={activeEntry.id}
+                  title={`${activeEntry.resource.name || "Read resource"} — Google Drive viewer`}
+                  src={activeEntry.presentation.sourceUrl}
+                  className="h-full w-full border-0 bg-white"
+                  // Drive's viewer needs its scripts, its cookies/storage
+                  // (allow-same-origin) and the share/print/download flows;
+                  // the identical list guards the player's Drive previews in
+                  // src/course/ResourceViewer.tsx.
+                  sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"
+                  allow="fullscreen; clipboard-write"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  loading="lazy"
+                  data-course-read-drive
                 />
               ) : activeEntry ? (
                 <iframe

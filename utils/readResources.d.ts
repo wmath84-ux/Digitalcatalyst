@@ -10,7 +10,10 @@ export function buildReadStoragePath(productId: string, resourceId: string, uplo
 export function isOwnedReadUploadPath(value: unknown, productId?: string | null, resourceId?: string | null): boolean;
 /** The learner's own Memory tree: `userReadUploads/{uid}/{uploadId}-{slug}.pdf`. */
 export function isOwnedLearnerReadUploadPath(value: unknown): boolean;
+/** PDF bytes URL for a Drive file — downloads/exports only (never the reader). */
 export function googleDrivePdfUrl(value: unknown): string;
+/** Drive's embeddable `/preview` viewer URL, used by the Read reader. */
+export function googleDrivePreviewUrl(value: unknown): string;
 export function normalizeReadResourceUrl(
   value: unknown,
   sourceKind?: ReadSourceKind | string | null,
@@ -18,7 +21,7 @@ export function normalizeReadResourceUrl(
 ): string;
 export function readSourceLabel(sourceKind?: ReadSourceKind | string | null): string;
 export type ReadResourcePresentation = {
-  kind: "pdfjs" | "embed";
+  kind: "pdfjs" | "embed" | "drive";
   sourceKind: ReadSourceKind;
   sourceUrl: string;
   originalUrl: string;

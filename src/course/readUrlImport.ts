@@ -13,15 +13,24 @@
 //   Storage directly, and no second upload/annotation/dedupe system exists.
 //
 // WHY A BROWSER-SIDE FETCH (and why the errors are honest about it)
-//   This app ships no server: there is no `functions/` directory and no
-//   deployed endpoint that could fetch on the learner's behalf. Admin Product
+//   The app's serverless routes (`api/*`) exist for first-party jobs — push,
+//   billing, the AI readers, the GitHub embed proxy — and none of them may be
+//   turned into an open relay for a URL a learner supplies. Admin Product
 //   Customization only ever stores a LINK (`ModulesResourcesEditor.tsx` — a
 //   Drive share link or a cleaned iframe embed); it never downloads bytes. So
-//   there is no server-side mechanism to reuse, and inventing a public write
+//   there is no server-side mechanism to reuse, and inventing a public fetch
 //   path or weakening Storage rules to get around CORS is explicitly out of
 //   bounds. The browser fetch is therefore the only route, and it only works
 //   when the host allows a cross-origin read. When it does not, we say exactly
 //   that and point at the local upload — we never pretend it succeeded.
+//
+//   Google Drive is the one host we can rule out BEFORE fetching: Drive answers
+//   its download URL with a redirect to *.googleusercontent.com that carries no
+//   `Access-Control-Allow-Origin` header, so the browser blocks the request
+//   every single time. That case gets its own message (`fetchPdfFromUrl`)
+//   instead of a generic network error. Course-provided Drive PDFs are not
+//   affected — the Read tab renders those in Drive's own viewer, see
+//   `getReadResourcePresentation` in utils/readResources.js.
 
 /** One pasted line, resolved to something fetchable. */
 export interface ResolvedPdfUrl {
@@ -228,6 +237,21 @@ export interface FetchPdfError {
 }
 
 /**
+ * Every host a Drive file link can point at: the share host, the download
+ * endpoint and the `usercontent` host Google redirects to.
+ */
+const DRIVE_HOST = /^([a-z0-9-]+\.)*drive(\.usercontent)?\.google\.com$/i;
+
+/** True when this URL is a Google Drive file/download link. */
+export function isGoogleDriveUrl(value: string): boolean {
+  try {
+    return DRIVE_HOST.test(new URL(String(value || "").trim()).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch one URL and prove the result is a PDF.
  *
  * Every failure comes back as a specific, retryable-or-not reason. A CORS
@@ -239,6 +263,23 @@ export async function fetchPdfFromUrl(
   target: ResolvedPdfUrl,
   signal?: AbortSignal,
 ): Promise<FetchPdfResult | FetchPdfError> {
+  // Drive blocks every browser-side read of its files (the download redirect
+  // to *.googleusercontent.com has no CORS header), so this request can only
+  // ever fail. Say what the learner can actually do instead of spending 60s
+  // and then blaming their connection.
+  if (isGoogleDriveUrl(target.url)) {
+    return {
+      ok: false,
+      error: {
+        raw: target.raw,
+        url: target.url,
+        message:
+          "Google Drive cannot be read through a link — Drive blocks browser downloads. Download the file and use Upload PDF instead, or open it from your course's Read tab when the course provides it.",
+        retryable: false,
+      },
+    };
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   // A caller-initiated abort must win over our own timeout.

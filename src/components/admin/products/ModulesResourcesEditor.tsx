@@ -1074,7 +1074,7 @@ function ResourceCard({
                 label={readSourceKind === "gdrive" ? "Google Drive share URL" : readSourceKind === "pdf_url" ? "Direct PDF URL" : "Generic embed URL"}
                 required
                 hint={readSourceKind === "gdrive"
-                  ? "Use a drive.google.com file share link and make it accessible to learners."
+                  ? "Paste a drive.google.com share link and set its access to “Anyone with the link”. Drive blocks direct browser reads of its files, so learners view it in Google Drive's own viewer inside the Read tab."
                   : readSourceKind === "pdf_url"
                     ? "The host must allow browser CORS access for PDF.js to read the PDF."
                     : "Enter a URL only, not iframe HTML. It will open in a sandboxed frame."}
