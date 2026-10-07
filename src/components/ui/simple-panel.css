@@ -1,0 +1,9 @@
+.dc-simple-panel {
+  min-width: 0;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  background: rgba(255,255,255,.02);
+  box-shadow: none;
+  text-shadow: none;
+}

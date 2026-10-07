@@ -33,7 +33,8 @@ import Header from "./components/Header";
 import { GlassSurface } from "./components/ui/glass";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { GlassButton } from "./components/ui/glass-button";
-import { GlassCard } from "./components/ui/GlassCard";
+import { SimplePanel } from "./components/ui/SimplePanel";
+import "./pdp-minimal.css";
 import { PopoverItem } from "./components/ui/glass-popover";
 import { GlassAccordion, GlassAccordionContent, GlassAccordionItem, GlassAccordionTrigger } from "./components/ui/glass-accordion";
 import BottomNav, { type TabKey } from "./components/BottomNav";
@@ -541,7 +542,7 @@ function PremiumProductContent({
             exactly the mobile order (gallery → buy → everything else). */}
         <div data-pdp-body className="flex flex-col gap-6 px-4 pb-8 pt-4">
           <section data-pdp-gallery className="flex flex-col gap-3">
-            <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate group relative overflow-hidden" contentClassName="relative">
+            <SimplePanel className="group relative overflow-hidden" contentClassName="relative">
               <img data-pdp-hero-img src={selectedImage} alt={product.title} loading="eager" fetchPriority="high" decoding="async" className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
               <div className="dc-scene-plate dc-scene-plate--bar absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
@@ -558,7 +559,7 @@ function PremiumProductContent({
                 </GlassButton>
               </div>
               <div className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
-            </GlassSurface>
+            </SimplePanel>
             {gallery.length > 1 && (
               <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
@@ -589,12 +590,12 @@ function PremiumProductContent({
               </div>
             </div>
 
-            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
+            <SimplePanel data-pdp-meta className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
               <Meta icon={BadgeCheck} text={`${modulesCount} modules`} />
-            </GlassSurface>
+            </SimplePanel>
 
             {isProductOwned ? (
               availablePaidUpdates.length > 0 ? (
@@ -722,7 +723,7 @@ function PremiumProductContent({
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white" contentClassName="p-4">
+              <SimplePanel className="text-white" contentClassName="p-4">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -733,7 +734,7 @@ function PremiumProductContent({
                   onApply={handleApplyCoupon}
                   onRemove={handleRemoveCoupon}
                 />
-              </GlassSurface>
+              </SimplePanel>
             )}
 
           </section>
@@ -821,7 +822,7 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   // scroll box — an `overflow-hidden` ancestor traps `position: sticky`,
   // which is why the magnet tab bar below never seated under the header.
   return (
-    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="dc-scene-plate overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
+    <SimplePanel data-pdp-details className="overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
@@ -854,12 +855,12 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
           <div className="space-y-4">
             <p className="text-sm leading-relaxed text-white/85">{product.description || `Complete information for ${product.title}.`}</p>
             {highlights.length > 0 && (
-              <GlassCard contentClassName="p-4">
+              <SimplePanel className="dc-pdp-flat" contentClassName="p-4">
                 <p className="mb-3 text-sm font-semibold text-white">What's included</p>
                 <ul className="space-y-2.5">
                   {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-white/85"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
                 </ul>
-              </GlassCard>
+              </SimplePanel>
             )}
           </div>
         )}
@@ -884,7 +885,7 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
         )}
         {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">{initials(product.instructor)}</div><div><p className="font-bold text-white">{product.instructor}</p><p className="text-xs text-white/55">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-white/55">Instructor information is synced from this live product's catalog record.</p></div></div>}
       </div>
-    </GlassSurface>
+    </SimplePanel>
   );
 }
 
@@ -966,18 +967,18 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="dc-scene-plate scroll-mt-36 text-white" contentClassName="p-5">
+    <SimplePanel data-pdp-reviews id="product-reviews" className="scroll-mt-36 text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
       </div>
-      <GlassCard className="mt-5" contentClassName="flex items-center gap-5 p-5">
+      <SimplePanel className="dc-pdp-flat mt-5" contentClassName="flex items-center gap-5 p-5">
         <div className="text-center"><span className="text-4xl font-extrabold text-white">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
         <div className="h-14 w-px bg-white/[0.12]" />
         <div><p className="text-sm font-semibold text-white/85">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-white/55">Live aggregate from the product catalog</p></div>
-      </GlassCard>
+      </SimplePanel>
       {composerOpen && (
-        <GlassCard className="mt-4" contentClassName="p-4">
+        <SimplePanel className="mt-4" contentClassName="p-4">
           {canReview ? (
             <>
               <p className="text-xs font-semibold text-white/85">Your rating</p>
@@ -986,13 +987,13 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
             </>
           ) : <p className="text-xs leading-relaxed text-white/55">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
-        </GlassCard>
+        </SimplePanel>
       )}
       {notice && <p className="mt-3 rounded-xl bg-indigo-500/15 p-3 text-xs font-medium text-indigo-200">{notice}</p>}
       {reviews.length > 0 ? (
         <div data-pdp-review-list className="mt-4 space-y-3">
           {visibleReviews.map((review) => (
-            <GlassCard key={review.id} contentClassName="p-4">
+            <SimplePanel className="dc-pdp-review" key={review.id} contentClassName="p-4">
               <article>
               <div className="flex items-center gap-3">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
@@ -1001,7 +1002,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               </div>
               <p className="mt-3 text-sm leading-relaxed text-white/85">“{review.comment}”</p>
               </article>
-            </GlassCard>
+            </SimplePanel>
           ))}
           {remaining > 0 ? (
             <GlassButton
@@ -1016,16 +1017,16 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
           ) : null}
         </div>
       ) : <p className="mt-4 text-center text-xs text-white/55">Published written reviews will appear here when available.</p>}
-    </GlassSurface>
+    </SimplePanel>
   );
 }
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
-    <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-5">
+    <SimplePanel data-pdp-related className="text-white" contentClassName="p-5">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
-      <div data-pdp-related-list className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} loading="lazy" decoding="async" width={112} height={96} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
-    </GlassSurface>
+      <div data-pdp-related-list className="space-y-3">{products.map((item) => <SimplePanel key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} loading="lazy" decoding="async" width={112} height={96} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></SimplePanel>)}</div>
+    </SimplePanel>
   );
 }
 
@@ -1034,7 +1035,7 @@ function RatingStars({ rating, className = "" }: { rating: number; className?: s
 }
 
 function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-white/55" /><span className="truncate">{text}</span></div>; }
-function EmptyDetail({ text }: { text: string }) { return <GlassCard contentClassName="flex flex-col items-center py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></GlassCard>; }
+function EmptyDetail({ text }: { text: string }) { return <SimplePanel contentClassName="flex flex-col items-center py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></SimplePanel>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
 const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<string>): CurriculumModule | null => {

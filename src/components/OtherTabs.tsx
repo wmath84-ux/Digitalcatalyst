@@ -7,6 +7,7 @@ import { GlassCard } from "./ui/GlassCard";
 import { GlassSurface } from "./ui/glass";
 import { EmptyState } from "./ui/EmptyState";
 import { WatchActionButton } from "./ui/WatchActionButton";
+import "./collection-cards.css";
 
 function accessLabel(product: Product): string {
   return product.category === "Notes" || product.category === "PDF" || product.category === "E-book"
@@ -14,18 +15,7 @@ function accessLabel(product: Product): string {
     : "Watch Now";
 }
 
-/**
- * One purchased product on the My Purchases page.
- *
- * Owner brief (2026-09-24): the card is the STORE's square-grid card
- * (`data-store-grid` columns + the exact ProductCard material —
- * `dc-store-glass` light-blue lens, 4:3 artwork, radius 22) but it carries
- * ONLY the thumbnail, the title and the My Purchases "Watch Now" button
- * (src/components/ui/WatchActionButton.tsx — the uiverse "spicy-liger-32"
- * control the owner had built for this page). No price, rating, instructor,
- * category chip, "Owned" pill or wishlist control: everything else a store
- * card shows is deliberately absent here.
- */
+/** A compact library tile: cover, title and the existing access action. */
 function PurchasedProductCard({
   item,
   onOpenCourse,
@@ -34,58 +24,30 @@ function PurchasedProductCard({
   onOpenCourse: (course: { id: string; title: string }) => void;
 }) {
   const label = accessLabel(item);
+  const openCourse = () => onOpenCourse({ id: item.id, title: item.title });
   return (
     <GlassCard
-      onClick={() => onOpenCourse({ id: item.id, title: item.title })}
       contentClassName="p-0"
-      /* Same light-blue lens as the store grid card (owner brief: "card ka
-         design vaise hi rakho jaise store page ka Card hai"). */
-      tint={0.62}
-      tintColor="173,216,255"
-      blur={0}
       radius={22}
-      /* The pack's content wrapper must become the flex column — same fix the
-         store's ProductCard ships (see the comment there): the wrapper is a
-         BLOCK box, so without it the copy never hugs the artwork. */
-      className="dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col"
+      className="dc-collection-card group"
       data-purchase-entry={item.id}
     >
-      {/* Artwork — the store card's exact 4:3 box. `absolute inset-0` keeps
-          the <img> cropped: index.css's unlayered `img { height: auto }`
-          (640–1366px) would beat a Tailwind `h-full`. */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
-        <img
-          src={item.image}
-          alt={item.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
-        <div aria-hidden className="dc-store-card-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
+      <div className="dc-collection-media">
+        <button type="button" className="dc-collection-media-link" onClick={openCourse} aria-label={`${label} — ${item.title}`}>
+          <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
+        </button>
       </div>
-
-      {/* Copy stack — title + the Watch Now button, NOTHING else. */}
-      <div className="relative z-20 flex flex-1 flex-col gap-2 p-3">
-        <h3 className="dc-store-card-title line-clamp-2">{item.title}</h3>
-        <div className="mt-auto">
-          <WatchActionButton
-            label={label}
-            ariaLabel={`${label} — ${item.title}`}
-            /* The reference control is authored in `em`, so one font-size
-               scales the whole button (shell, padding, goo layers, press) as
-               a single unit — here down to the store card's CTA size. The
-               size rides an inline style on purpose: watch-action-button.css
-               is unlayered author CSS, so a Tailwind `text-[11px]` utility
-               (layered) could never beat its 18px default. */
-            style={{ fontSize: "11px" }}
-            className="w-full"
-            data-purchase-access={item.id}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenCourse({ id: item.id, title: item.title });
-            }}
-          />
-        </div>
+      <div className="dc-collection-body">
+        <button type="button" onClick={openCourse} className="dc-collection-link">
+          <h3 className="dc-collection-title" title={item.title}>{item.title}</h3>
+        </button>
+        <WatchActionButton
+          label={label}
+          ariaLabel={`${label} — ${item.title}`}
+          className="dc-collection-watch"
+          data-purchase-access={item.id}
+          onClick={openCourse}
+        />
       </div>
     </GlassCard>
   );
@@ -211,11 +173,7 @@ export function PurchasesTab({
           <p className="mt-1 text-xs text-white/45">Try a different search — e.g. course title or instructor.</p>
         </div>
       ) : (
-        /* The STORE's square grid, verbatim: same container attribute
-           (`data-store-grid`, so index.css's tablet/desktop auto-fill rules
-           keep the tiles in lockstep with the store) and same mobile
-           column/gap rhythm (2-up, gap-3). */
-        <div data-store-grid data-purchases-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+        <div data-collection-grid data-purchases-grid className="mt-4">
           {items.map((item) => (
             <PurchasedProductCard key={item.id} item={item} onOpenCourse={onOpenCourse} />
           ))}

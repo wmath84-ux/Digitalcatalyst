@@ -1,0 +1,224 @@
+/* Library, favourites and cart only. Keep card geometry independent of the
+   viewport-wide tablet h3/img/spacing overrides in index.css. */
+[data-collection-grid] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 359px) {
+  [data-collection-grid] { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (min-width: 640px) {
+  [data-collection-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+    gap: 16px;
+  }
+}
+
+.dc-collection-card.dc-glass-card,
+.dc-collection-card.dc-scene-plate {
+  min-width: 0;
+  width: 100%;
+  align-self: start;
+  overflow: hidden;
+  color: #f8fafc;
+  background: #152235;
+  border: 1px solid rgba(186, 205, 230, 0.16);
+  box-shadow: 0 4px 14px rgba(3, 10, 24, 0.14);
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+/* A single quiet surface, not four stacked highlights behind small text.
+   Only the CARD layers are removed; nested action surfaces are untouched. */
+.dc-collection-card > div[aria-hidden] { display: none; }
+
+.dc-collection-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.dc-collection-card .dc-collection-media {
+  position: relative;
+  flex: none;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #21334b;
+}
+
+.dc-collection-media > .dc-collection-media-link {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* height:auto on every tablet img was letterboxing wide covers and
+   overflowing portrait covers. Size the replaced element, not only its box. */
+.dc-collection-card .dc-collection-media img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dc-collection-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+}
+
+.dc-collection-card .dc-collection-title {
+  margin: 0;
+  min-height: 0;
+  /* !important is local to the heading: tablet's global h3 rule uses it. */
+  font-size: 15px !important;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: #f8fafc;
+  text-shadow: none;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.dc-collection-link {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+
+.dc-collection-category {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #b5c8ff;
+  overflow-wrap: anywhere;
+}
+
+.dc-collection-meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b9c6d8;
+  overflow-wrap: anywhere;
+}
+
+.dc-collection-prices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b9c6d8;
+}
+
+.dc-collection-price { font-size: 16px; font-weight: 700; color: #f8fafc; }
+.dc-collection-discount { color: #86efac; font-weight: 600; }
+
+.dc-collection-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 90px), 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dc-collection-actions > button {
+  min-width: 0;
+  min-height: 44px;
+}
+
+/* The shared action's default 20px inset does not fit two labels in a
+   tablet card. Change only its content inset, not the global button API. */
+.dc-collection-actions .liquid-metal-button > span > div > div:last-child {
+  padding-inline: 10px;
+}
+
+.dc-collection-actions .liquid-metal-button span { font-size: 12px; }
+.dc-collection-actions svg { flex-shrink: 0; }
+
+.dc-collection-card .dc-collection-watch {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 12px;
+  border: 1px solid rgba(165, 180, 252, 0.25);
+  background: #4f46e5;
+  color: #fff;
+  box-shadow: none;
+  text-shadow: none;
+}
+.dc-collection-watch .uzw-btn__label {
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.dc-collection-watch::before, .dc-collection-watch::after { display: none; }
+.dc-collection-card .dc-collection-watch:hover { background: #4338ca; color: #fff; }
+.dc-collection-card .dc-collection-watch[data-uzw-press="true"] { background: #3730a3; color: #fff; box-shadow: none; }
+
+.dc-collection-card button:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: -3px;
+}
+
+[data-cart-items] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Use the available content width, not the viewport (desktop rails can
+   leave a landscape tablet with a much narrower central column). */
+.dc-cart-card { container-type: inline-size; }
+.dc-cart-card > div:last-child {
+  display: grid;
+  grid-template-columns: clamp(88px, 24%, 160px) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 14px;
+}
+.dc-cart-card .dc-collection-media { border-radius: 12px; }
+.dc-cart-card .dc-collection-body { padding: 0; }
+.dc-cart-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dc-cart-remove {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  background: rgba(251, 113, 133, 0.1);
+  color: #fda4af;
+}
+.dc-cart-remove:hover { background: rgba(251, 113, 133, 0.2); }
+
+@container (max-width: 359px) {
+  .dc-cart-card > div:last-child { grid-template-columns: 80px minmax(0, 1fr); padding: 12px; gap: 12px; }
+}
+
+@media (min-width: 1200px) {
+  [data-cart-items] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+}

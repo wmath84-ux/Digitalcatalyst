@@ -5,6 +5,7 @@ import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
 import { GlassButton } from "@/components/ui/glass-button";
+import "../../components/collection-cards.css";
 
 interface FavoriteCardProps {
   product: Product;
@@ -22,20 +23,21 @@ export default function FavoriteCard({
   onOpen,
 }: FavoriteCardProps) {
   const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
-  const discount = Math.round(
-    ((product.originalPrice - product.price) / product.originalPrice) * 100
-  );
+  const discount = product.originalPrice > product.price
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    : 0;
 
   return (
     <GlassCard
       contentClassName="p-0"
-      className="group relative flex flex-col overflow-hidden"
+      className="dc-collection-card group"
+      data-favorite-card={product.id}
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden">
+      <div className="dc-collection-media">
         <button
           type="button"
           onClick={() => onOpen?.(product.id)}
-          className="h-full w-full"
+          className="dc-collection-media-link"
           aria-label={`View ${product.title}`}
         >
           <img
@@ -49,46 +51,38 @@ export default function FavoriteCard({
         <EmojiBurstLayer particles={likeParticles} />
         <GlassButton
           onClick={() => { likeBurst(); onRemove(product.id); }}
-          className="absolute right-2 top-2 [&_.size-12]:size-8"
+          className="absolute right-2 top-2 [&_.size-12]:size-11"
           aria-label="Remove from favorites"
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
         </GlassButton>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[9px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[11px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {product.hours} • {product.lessons} lessons
         </span>
       </div>
-      <div className="relative flex flex-1 flex-col gap-1.5 p-3">
-        <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300">
+      <div className="dc-collection-body">
+        <button type="button" onClick={() => onOpen?.(product.id)} className="dc-collection-link">
+          <span className="dc-collection-category">
             {product.category}
           </span>
-          <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
+          <h3 className="dc-collection-title" title={product.title}>
             {product.title}
           </h3>
         </button>
-        <p className="text-[11px] text-white/55">{product.author}</p>
-        <div className="flex items-center gap-1 text-[11px] text-white/55">
+        <p className="dc-collection-meta">{product.author}</p>
+        <div className="dc-collection-meta flex items-center gap-1">
           <Star size={12} className="fill-amber-400 text-amber-400" />
           <span className="font-semibold text-white/85">{product.rating}</span>
           <span>({product.reviewsCount.toLocaleString("en-IN")})</span>
         </div>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <span className="text-[15px] font-extrabold text-white">
-            {formatINR(product.price)}
-          </span>
-          <span className="text-[11px] text-white/55 line-through">
-            {formatINR(product.originalPrice)}
-          </span>
-          <span className="text-[11px] font-semibold text-emerald-300">
-            {discount}% off
-          </span>
+        <div className="dc-collection-prices">
+          <span className="dc-collection-price">{formatINR(product.price)}</span>
+          {product.originalPrice > product.price && (
+            <span className="line-through">{formatINR(product.originalPrice)}</span>
+          )}
+          {discount > 0 && <span className="dc-collection-discount">{discount}% off</span>}
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          {/* Both actions are glass buttons now, so they share one height and one
-              press. `disabled` is the pack's own dimming rather than a second
-              colour scheme — "In Cart" reads as an unavailable action, not as a
-              different kind of button. */}
+        <div className="dc-collection-actions">
           <LiquidMetalButton
             tone="silver"
             className="flex-1"

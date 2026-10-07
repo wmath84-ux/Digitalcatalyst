@@ -56,6 +56,7 @@ import LiveSelectionCard from "./LiveSelectionCard";
 import GlassModal from "../../components/ui/glass-modal";
 import ActiveMemberView from "./ActiveMemberView";
 import OwnedPlanCard from "./OwnedPlanCard";
+import "../subscription-minimal.css";
 import {
   buildOwnedPlanSummary,
   evaluatePlanChange,
