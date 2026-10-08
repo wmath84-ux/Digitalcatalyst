@@ -82,14 +82,20 @@ test("normalizeBanner degrades broken links to none", () => {
   assert.match(bannerGradients, /linkType === "module" && productId && moduleId/);
 });
 
-test("home page loads live admin banners with built-in fallback", () => {
+test("Home prefers live admin banners and falls back to a featured catalog product", () => {
   assert.match(homeBannerHook, /export const HOME_BANNERS_DOC_ID = "homeBanners"/);
   assert.match(homeBannerHook, /onSnapshot\(/);
   assert.match(homeBannerHook, /builtInBanners/);
   assert.match(homeBannerHook, /normalizeBanner/);
   assert.match(homeApp, /import \{ useHomeBanners \} from "\.\/hooks\/useHomeBanners"/);
-  assert.match(homeApp, /const \{ banners \} = useHomeBanners\(\)/);
-  assert.match(homeApp, /<HeroCarousel banners=\{banners\} onOpen=\{handleBannerOpen\} \/>/);
+  assert.match(homeApp, /const \{ banners: configuredBanners, usingCustom \} = useHomeBanners\(\)/);
+  assert.match(homeApp, /if \(usingCustom\) return configuredBanners/);
+  assert.match(homeApp, /catalogProducts\.find\(\(product\) => product\.tags\.includes\("FEATURED"\)\)/);
+  assert.match(homeApp, /catalogProducts\.find\(\(product\) => product\.tags\.includes\("TRENDING"\)\)/);
+  assert.match(homeApp, /if \(!featured\) return \[\]/);
+  assert.match(homeApp, /countCourseModules\(modules\)/);
+  assert.match(homeApp, /collectCourseResources\(modules\)\.length/);
+  assert.match(homeApp, /<HeroCarousel banners=\{homeBanners\} onOpen=\{handleBannerOpen\} \/>/);
 });
 
 test("home banner tap routes to product page or specific module", () => {

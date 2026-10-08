@@ -1,33 +1,31 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./components/Header";
 import HeroCarousel from "./components/HeroCarousel";
+import HeroSkeleton from "./components/HeroSkeleton";
 import CategoryNav from "./components/CategoryNav";
 import ProductCard from "./components/ProductCard";
 import ProductCardSkeleton from "./components/ProductCardSkeleton";
 import ContinueLearning from "./components/ContinueLearning";
-import PublicPacksRail from "../personal-library/PublicPacksRail";
 import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
+import HomeSectionHeader from "./components/HomeSectionHeader";
+import FeedbackSection from "./components/FeedbackSection";
+import FeedbackExperiencePage from "./components/FeedbackExperiencePage";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import DeferredVisible from "../components/DeferredVisible";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BookOpenIcon } from "../components/icons";
-import SocialProfileCard from "./components/SocialProfileCard";
-import { useBranding } from "../context/BrandingContext";
-// Bottom-of-page feedback wall: matter.js physics + its own chunk, mounted
-// lazily by DeferredVisible below (see the section near the end of the page).
-const StickerWall = lazy(() => import("../components/StickerWall"));
-import { createUserQuery } from "../utils/userQueries";
-import { prefetchRoute } from "../utils/lazyRoute";
 import { categories, reviews as fallbackReviews } from "./data/mockData";
+import { calculateCourseProgress, findCurrentLesson } from "./data/homeDashboardData";
 import type { Banner, Product } from "./types";
+import type { CanonicalCourseModule, CanonicalCourseResource } from "../types/commerce";
 import { useCatalog } from "../context/CatalogContext";
 import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 import { useHomeBanners } from "./hooks/useHomeBanners";
 import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/webPush";
+import "./home.css";
 
 /**
  * Maximum number of courses the home page "Continue Learning" section shows.
@@ -36,6 +34,40 @@ import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/
  * most recently opened are kept on screen.
  */
 const CONTINUE_LEARNING_LIMIT = 2;
+const HOME_PRODUCT_LIMIT = 4;
+
+interface HomeProgressRecord {
+  productId: string;
+  completedFileIds: string[];
+  lastOpenedFileId?: string;
+  updatedAt: number;
+}
+
+const GENERIC_CATALOG_LABELS = new Set(["digital learning", "course", "pdf", "notes", "e-book", "live", "lifetime access"]);
+
+function collectCourseResources(modules: CanonicalCourseModule[] = []): Array<{ moduleTitle: string; resource: CanonicalCourseResource }> {
+  const orderedModules = [...modules].sort((left, right) => left.sortOrder - right.sortOrder);
+  return orderedModules.flatMap((module) => {
+    const ownResources = [...(module.resources || [])]
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((resource) => ({ moduleTitle: module.title.trim(), resource }));
+    return [...ownResources, ...collectCourseResources(module.modules || [])];
+  });
+}
+
+function countCourseModules(modules: CanonicalCourseModule[] = []): number {
+  return modules.reduce((total, module) => total + 1 + countCourseModules(module.modules || []), 0);
+}
+
+function usefulCatalogValue(value?: string): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized || GENERIC_CATALOG_LABELS.has(normalized.toLowerCase())) return undefined;
+  return normalized;
+}
+
+function productRatingScore(product: Product): number {
+  return product.ratingCount > 0 && Number.isFinite(product.rating) ? product.rating : 0;
+}
 
 interface AppProps {
   onNavigateToStore: () => void;
@@ -65,15 +97,11 @@ export default function App({
   onToggleFavorite,
 }: AppProps) {
   const { user } = useAuth();
-  // The bottom social profile card is fed by the SAME admin Branding
-  // settings the rest of the app uses (logo / app name / tagline + the
-  // new social URL) — one source of truth, no card-local values.
-  const branding = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading, error: catalogError } = useCatalog();
-  // Hero slides are admin-editable (Admin → Home · Hero Slides). Live
-  // Firestore list; falls back to the built-in slides until the admin
-  // saves their own.
-  const { banners } = useHomeBanners();
+  // Admin-managed banners remain the source when configured. Otherwise the
+  // featured slide is built from a real catalog product below, so the Home
+  // page never presents invented course counts or promotional claims.
+  const { banners: configuredBanners, usingCustom } = useHomeBanners();
   const products = useMemo<Product[]>(() => catalogProducts.map((product) => ({
     id: product.id,
     title: product.title,
@@ -86,14 +114,65 @@ export default function App({
     ratingCount: product.reviews,
     image: product.image,
     searchKeywords: product.searchKeywords,
-    trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
+    trending: product.tags.includes("TRENDING") || (product.reviews > 0 && product.rating >= 4.5),
+    classLevel: product.classLevel,
+    subject: product.subject,
+    isFree: product.isFree,
+    description: product.description,
   })), [catalogProducts]);
+  const homeBanners = useMemo<Banner[]>(() => {
+    if (usingCustom) return configuredBanners;
+    const featured = catalogProducts.find((product) => product.tags.includes("FEATURED"))
+      || catalogProducts.find((product) => product.tags.includes("TRENDING"))
+      || [...catalogProducts].sort((left, right) => {
+        const rightRating = right.reviews > 0 && Number.isFinite(right.rating) ? right.rating : 0;
+        const leftRating = left.reviews > 0 && Number.isFinite(left.rating) ? left.rating : 0;
+        return rightRating - leftRating || right.reviews - left.reviews;
+      })[0];
+    if (!featured) return [];
+
+    const categoryLabel = featured.category === "Course"
+      ? "Video course"
+      : featured.category === "PDF" || featured.category === "Notes"
+        ? "PDF"
+        : featured.category === "E-book"
+          ? "E-book"
+          : featured.category === "Live"
+            ? "Live class"
+            : "Learning resource";
+    const modules = featured.canonicalModules || [];
+    const moduleCount = countCourseModules(modules);
+    const resourceCount = collectCourseResources(modules).length;
+    const metadata = [
+      categoryLabel,
+      moduleCount > 0 ? `${moduleCount} ${moduleCount === 1 ? "module" : "modules"}` : undefined,
+      resourceCount > 0 ? `${resourceCount} ${resourceCount === 1 ? "resource" : "resources"}` : undefined,
+      usefulCatalogValue(featured.classLevel),
+      usefulCatalogValue(featured.subject),
+    ].filter((value): value is string => Boolean(value)).slice(0, 3);
+    const description = usefulCatalogValue(String(featured.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+
+    return [{
+      id: `catalog-featured-${featured.id}`,
+      image: featured.image,
+      eyebrow: "FEATURED",
+      title: featured.title,
+      subtitle: description || `Explore this ${categoryLabel.toLowerCase()}.`,
+      cta: featured.category === "Course" ? "Explore course" : "Explore resource",
+      metadata,
+      gradient: "bg-indigo-500/20",
+      linkType: "product",
+      productId: featured.id,
+    }];
+  }, [catalogProducts, configuredBanners, usingCustom]);
   const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
-  // A profile can contain repeated spaces or a very long full name. The home
-  // greeting intentionally shows only its first non-empty word so the compact
-  // mobile header never turns the name into a second line.
+  const publishedHomepageReviews = useMemo(
+    () => homepageReviews.filter((review) => review.source === "live" && Number.isFinite(review.rating) && review.rating >= 1 && review.rating <= 5),
+    [homepageReviews],
+  );
+  // Keep the compact greeting in the approved Header on one line.
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
-  const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
+  const [progressRecords, setProgressRecords] = useState<HomeProgressRecord[]>([]);
   const [progressLoading, setProgressLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -116,7 +195,12 @@ export default function App({
         const data = item.data() || {};
         const stamp = data.lastOpenedAt || data.updatedAt;
         const updatedAt = stamp && typeof stamp.toMillis === "function" ? stamp.toMillis() : Number(stamp || 0);
-        return { productId: String(data.productId || item.id), completedFileIds: Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : [], updatedAt };
+        return {
+          productId: String(data.productId || item.id),
+          completedFileIds: Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : [],
+          lastOpenedFileId: typeof data.lastOpenedFileId === "string" ? data.lastOpenedFileId : undefined,
+          updatedAt,
+        };
       }));
       // With the persistent Firestore cache the first callback is usually
       // the cached snapshot; either way progress is known now.
@@ -126,32 +210,29 @@ export default function App({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
+  const homeScrollRef = useRef<HTMLElement>(null);
 
-  // "Continue Learning" rule (kept data-driven so future products need no code
-  // change): every course the learner has actually opened — i.e. has a real
-  // `users/{uid}/courseProgress` record for — is a candidate, most recently
-  // opened first, and only the newest CONTINUE_LEARNING_LIMIT are rendered.
-  // A product that is removed from the catalog, or a stale progress record for
-  // a product that no longer exists, drops out automatically.
-  const continueLearningEntries = useMemo(() => {
-    const countResources = (modules: (typeof catalogProducts)[number]["canonicalModules"] = []): number =>
-      (modules || []).reduce((total, module) => total + (module.resources?.length || 0) + countResources(module.modules || []), 0);
+  // Continue Learning is derived from the learner's live course-progress
+  // documents. Titles, last-opened lesson and completion are all catalog data.
+  const continueLearningEntries = useMemo(() => [...progressRecords]
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .map((record) => {
+      const item = products.find((product) => product.id === record.productId);
+      const catalogProduct = catalogProducts.find((product) => product.id === record.productId);
+      if (!item || !catalogProduct) return null;
 
-    return [...progressRecords]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((record) => {
-        const item = products.find((product) => product.id === record.productId);
-        const catalogProduct = catalogProducts.find((product) => product.id === record.productId);
-        if (!item || !catalogProduct) return null;
-        const totalResources = countResources(catalogProduct.canonicalModules);
-        const progress = totalResources > 0
-          ? Math.min(100, Math.round((record.completedFileIds.length / totalResources) * 100))
-          : 0;
-        return { item, progress };
-      })
-      .filter((entry): entry is { item: Product; progress: number } => entry !== null)
-      .slice(0, CONTINUE_LEARNING_LIMIT);
-  }, [catalogProducts, products, progressRecords]);
+      const resources = collectCourseResources(catalogProduct.canonicalModules || []);
+      const progress = calculateCourseProgress(record.completedFileIds, resources.map(({ resource }) => resource.id));
+      const currentLesson = findCurrentLesson(resources, record.lastOpenedFileId);
+
+      return { item, progress, currentLesson };
+    })
+    .filter((entry): entry is { item: Product; progress: number; currentLesson: string | undefined } => entry !== null)
+    .slice(0, CONTINUE_LEARNING_LIMIT), [catalogProducts, products, progressRecords]);
+
+  const visibleCategories = useMemo(() => categories.filter((category) =>
+    category.id !== "live" || products.some((product) => product.category === "live")), [products]);
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const searchResults: Product[] = useMemo(() => {
@@ -169,14 +250,54 @@ export default function App({
   const suggestions = searchResults.slice(0, 5);
 
   const [activeCategory, setActiveCategory] = useState("all");
+  useEffect(() => {
+    if (!visibleCategories.some((category) => category.id === activeCategory)) setActiveCategory("all");
+  }, [activeCategory, visibleCategories]);
 
   const categoryFiltered: Product[] = useMemo(() => {
-    if (activeCategory === "all") {
-      // "Trending Now" — show only the top 4 products, ranked by rating.
-      return [...products].sort((a, b) => b.rating - a.rating).slice(0, 4);
-    }
-    return products.filter((p) => p.category === activeCategory);
+    const categoryProducts = activeCategory === "all"
+      ? products
+      : products.filter((product) => product.category === activeCategory);
+    const explicitlyTrending = categoryProducts.filter((product) => product.trending);
+    const ranked = explicitlyTrending.length > 0 ? explicitlyTrending : categoryProducts;
+    return [...ranked]
+      .sort((left, right) => productRatingScore(right) - productRatingScore(left) || right.ratingCount - left.ratingCount)
+      .slice(0, HOME_PRODUCT_LIMIT);
   }, [activeCategory, products]);
+
+  // Personal recommendations use real learning or ownership signals only.
+  // With no prior learning/purchase data, the section is intentionally absent.
+  const recommendationSources = useMemo(() => {
+    if (continueLearningEntries.length > 0) return continueLearningEntries.map(({ item }) => item);
+    return products.filter((product) => purchasedIds.has(product.id));
+  }, [continueLearningEntries, products, purchasedIds]);
+
+  const recommendedProducts = useMemo(() => {
+    if (recommendationSources.length === 0) return [];
+    const excluded = new Set([
+      ...Array.from(purchasedIds),
+      ...continueLearningEntries.map(({ item }) => item.id),
+    ]);
+    return products
+      .filter((product) => !excluded.has(product.id))
+      .map((product) => {
+        let relevance = 0;
+        for (const source of recommendationSources) {
+          if (product.category === source.category) relevance = Math.max(relevance, 2);
+          const productSubject = usefulCatalogValue(product.subject)?.toLowerCase();
+          const sourceSubject = usefulCatalogValue(source.subject)?.toLowerCase();
+          if (productSubject && productSubject === sourceSubject) relevance = Math.max(relevance, 4);
+          const productLevel = usefulCatalogValue(product.classLevel)?.toLowerCase();
+          const sourceLevel = usefulCatalogValue(source.classLevel)?.toLowerCase();
+          if (productLevel && productLevel === sourceLevel && product.category === source.category) relevance = Math.max(relevance, 3);
+        }
+        return { product, relevance };
+      })
+      .filter(({ relevance }) => relevance > 0)
+      .sort((left, right) => right.relevance - left.relevance || productRatingScore(right.product) - productRatingScore(left.product) || right.product.ratingCount - left.product.ratingCount)
+      .slice(0, HOME_PRODUCT_LIMIT)
+      .map(({ product }) => product);
+  }, [continueLearningEntries, products, purchasedIds, recommendationSources]);
 
   const handleSelectSuggestion = (product: Product) => {
     setSearchQuery(product.title);
@@ -214,6 +335,7 @@ export default function App({
 
   const handleFooterChange = (tab: TabKey) => {
     if (tab === "home") {
+      if (window.location.hash.split("?")[0] !== "#/home") window.location.hash = "#/home";
       setSearchQuery("");
       contentTopRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
@@ -236,6 +358,11 @@ export default function App({
   };
 
   const isSearching = normalizedQuery.length > 0;
+  const isFeedbackExperience = typeof window !== "undefined" && window.location.hash.split("?")[0] === "#/home/feedback";
+
+  useEffect(() => {
+    if (isFeedbackExperience) homeScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [isFeedbackExperience]);
 
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
@@ -253,144 +380,32 @@ export default function App({
           onOpenNotifications={onNavigateToNotifications}
         />
 
-        <main className="flex-1 overflow-y-auto pb-2">
-          {isSearching ? (
-            <section data-home-grid className="px-5 pt-6 md:px-8">
-              <div className="flex items-center justify-between">
-                <h2 className="dc-scene-ink text-base font-bold text-white md:text-lg">
-                  Results for “{searchQuery}”
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="dc-scene-ink text-xs font-semibold text-indigo-300 hover:text-indigo-200"
-                >
-                  Clear
-                </button>
-              </div>
-              <p className="dc-scene-ink mt-1 text-xs text-white/55">
-                {searchResults.length} item{searchResults.length !== 1 ? "s" : ""} found
-              </p>
-
-              {searchResults.length === 0 ? (
-                <div className="dc-scene-ink mt-10 flex flex-col items-center gap-2 text-center text-white/55">
-                  <span className="text-4xl">🔎</span>
-                  <p className="text-sm">
-                    We couldn't find anything for "{searchQuery}".<br />
-                    Try searching a different keyword.
-                  </p>
-                </div>
-              ) : (
-                <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-                  {searchResults.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isFavorite={favoriteIds.has(product.id)}
-                      onToggleFavorite={onToggleFavorite}
-                      onOpen={onNavigateToProduct}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : (
-            <>
-              <div data-home-hero>
-                <HeroCarousel banners={banners} onOpen={handleBannerOpen} />
-              </div>
-
-              <div data-home-category-nav>
-                <CategoryNav
-                  categories={categories}
-                  activeCategory={activeCategory}
-                  onSelect={setActiveCategory}
+        <main ref={homeScrollRef} className="flex-1 overflow-y-auto pb-2">
+          <div data-home-content className="dc-home-content">
+            {isFeedbackExperience ? (
+              <FeedbackExperiencePage onBack={() => { window.location.hash = "#/home"; }} />
+            ) : isSearching ? (
+              <section className="dc-home-section dc-home-search-section">
+                <HomeSectionHeader
+                  title={`Results for “${searchQuery}”`}
+                  trailing={(
+                    <button type="button" onClick={() => setSearchQuery("")} className="dc-home-section-action dc-home-clear-search dc-scene-ink">
+                      Clear
+                    </button>
+                  )}
                 />
-              </div>
-
-              {continueLearningEntries.length > 0 ? (
-                <div data-home-continue>
-                  <ContinueLearning
-                    items={continueLearningEntries.map(({ item, progress }) => ({
-                      id: item.id,
-                      title: item.title,
-                      author: item.author,
-                      image: item.image,
-                      progress,
-                      onResume: () => onNavigateToCourse(item),
-                      onOpen: () => onNavigateToCourse(item),
-                    }))}
-                  />
-                </div>
-              ) : (
-                // While a signed-in learner's progress snapshot is still
-                // in flight (and the catalog it joins against is not
-                // loaded yet), reserve the section with dimension-matched
-                // cards so the grid below never jumps. Signed-out users
-                // and learners with no progress get nothing here, same as
-                // before.
-                user && (progressLoading || catalogLoading) && (
-                  <div data-home-continue data-home-continue-loading>
-                    <ContinueLearningSkeleton count={2} />
+                <p className="dc-home-results-count dc-scene-ink">
+                  {searchResults.length} item{searchResults.length !== 1 ? "s" : ""} found
+                </p>
+                {searchResults.length === 0 ? (
+                  <div className="dc-home-search-empty">
+                    <BookOpenIcon className="h-8 w-8 text-indigo-200/80" aria-hidden="true" />
+                    <p>We couldn’t find anything for “{searchQuery}”.</p>
+                    <span>Try a different title, subject or keyword.</span>
                   </div>
-                )
-              )}
-
-              <PublicPacksRail />
-
-              <section data-home-trending className="px-5 pt-6 md:px-8">
-                <div className="flex items-center justify-between">
-                  <h2 className="dc-scene-ink text-base font-bold text-white md:text-lg">
-                    {activeCategory === "all"
-                      ? "Trending Now"
-                      : categories.find((c) => c.id === activeCategory)?.label}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToStore()}
-                    className="dc-scene-ink text-xs font-semibold text-white/55 hover:text-white/85"
-                  >
-                    View All
-                  </button>
-                </div>
-
-
-                {catalogLoading ? (
-                  // Skeleton cards carry the EXACT geometry of ProductCard
-                  // (same glass plate, aspect-[4/3] art, same text-block
-                  // heights), so the swap to real cards has zero layout
-                  // shift. The grid/columns/gap classes are identical to
-                  // the real grid below. 4 placeholders match the
-                  // "Trending Now" top-4 count on the default tab.
-                  <div
-                    data-home-grid
-                    data-home-grid-loading
-                    aria-busy="true"
-                    aria-label="Loading products"
-                    className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4"
-                  >
-                    {Array.from({ length: activeCategory === "all" ? 4 : 6 }).map((_, index) => (
-                      <ProductCardSkeleton key={index} />
-                    ))}
-                  </div>
-                ) : catalogError ? (
-                  // Snapshot failure still surfaces clearly — skeletons
-                  // replace the LOADING state only, never the error state.
-                  <div className="mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">
-                    {catalogError}
-                  </div>
-                ) : categoryFiltered.length === 0 ? (
-                  /* The category's "no products" line sits on the shared
-                     empty-state card (same glass + type as Store / My
-                     Purchases) instead of bare text on the background. */
-                  <EmptyState
-                    className="mt-6"
-                    icon={<BookOpenIcon className="h-7 w-7 text-indigo-300" />}
-                    title="No products in this category yet."
-                  />
                 ) : (
-                  <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-                    {categoryFiltered.map((product) => (
+                  <div data-home-grid className="dc-home-product-grid mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                    {searchResults.map((product) => (
                       <ProductCard
                         key={product.id}
                         product={product}
@@ -402,75 +417,128 @@ export default function App({
                   </div>
                 )}
               </section>
+            ) : (
+              <>
+                {homeBanners.length > 0 ? (
+                  <div data-home-hero>
+                    <HeroCarousel banners={homeBanners} onOpen={handleBannerOpen} />
+                  </div>
+                ) : catalogLoading ? (
+                  <div data-home-hero role="status" aria-busy="true" aria-label="Loading featured content">
+                    <HeroSkeleton />
+                  </div>
+                ) : null}
 
-              <div data-home-reviews>
-                <Reviews reviews={homepageReviews} onOpenReview={handleOpenReview} />
-              </div>
-
-              {/* ── Feedback wall (AI Canvas Sticker Wall) ──────────────────
-                  Sits at the very bottom of Home. A submitted note becomes a
-                  user query the owner answers from #/queries. The wall is
-                  tall on desktop and switches to a shorter, phone-tuned
-                  layout under 640 px (fewer seeded stickers, smaller cards,
-                  compact copy) so it fits without spilling. */}
-              <section data-home-sticker-wall className="mt-8 px-4 md:px-8">
-                <div className="h-[520px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0F0F12] sm:h-[640px] md:h-[740px]">
-                  {/* The wall boots a matter.js world + a rAF render loop, and
-                      it is the LAST section on Home. `DeferredVisible` keeps
-                      the reserved box (no layout shift) but only mounts — and
-                      only downloads — the physics once the learner scrolls
-                      near it, so a Home visit that never reaches the bottom
-                      costs neither the chunk nor the CPU. */}
-                  <DeferredVisible className="h-full w-full">
-                    <Suspense fallback={<div className="h-full w-full" />}>
-                      <StickerWall
-                        onSubmitNote={async (note) => { await createUserQuery(note).catch(() => undefined); }}
-                        footer={
-                          <button
-                            type="button"
-                            onClick={() => {
-                              prefetchRoute("#/queries");
-                              window.location.hash = "#/queries";
-                            }}
-                            className="rounded-full border border-white/15 bg-white/[0.07] px-5 py-2 text-sm font-black text-white backdrop-blur transition hover:bg-white/[0.14]"
-                            data-home-explore-queries
-                          >
-                            Explore user queries
-                          </button>
-                        }
-                      />
-                    </Suspense>
-                  </DeferredVisible>
-                </div>
-              </section>
-
-              {/* ── Social profile card (admin Branding → Social profile) ──
-                  The LAST home page content, before the bottom nav: the
-                  Uiverse-style profile card (grumpy-ape-40). Every value is
-                  branding data — logo, app name, tagline (bio) and the list
-                  of social accounts, each of which links out with its own
-                  icon (platform glyph, or the URL's own icon for a host we
-                  don't know). With no account configured the card renders
-                  its clean non-clickable state (never a broken link/icon).
-
-                  GEOMETRY: same section padding and the same reserved box
-                  height as the feedback wall above it, so the two cards
-                  measure exactly the same at every screen size. */}
-              <section data-home-social-card-section className="mt-8 px-4 pb-4 md:px-8">
-                <div
-                  data-home-social-slot
-                  className="h-[520px] w-full sm:h-[640px] md:h-[740px]"
-                >
-                  <SocialProfileCard
-                    logoUrl={branding.logoUrl}
-                    name={branding.appName}
-                    bio={branding.tagline}
-                    links={branding.socialLinks}
+                <div data-home-category-nav>
+                  <CategoryNav
+                    categories={visibleCategories}
+                    activeCategory={activeCategory}
+                    onSelect={setActiveCategory}
                   />
                 </div>
-              </section>
-            </>
-          )}
+
+                {continueLearningEntries.length > 0 ? (
+                  <div data-home-continue>
+                    <ContinueLearning
+                      items={continueLearningEntries.map(({ item, progress, currentLesson }) => ({
+                        id: item.id,
+                        title: item.title,
+                        author: item.author,
+                        image: item.image,
+                        details: [usefulCatalogValue(item.classLevel), usefulCatalogValue(item.subject)].filter(Boolean).join(" · ") || undefined,
+                        currentLesson,
+                        progress,
+                        onResume: () => onNavigateToCourse(item),
+                        onOpen: () => onNavigateToCourse(item),
+                      }))}
+                    />
+                  </div>
+                ) : (
+                  user && (progressLoading || catalogLoading) && (
+                    <div data-home-continue data-home-continue-loading>
+                      <ContinueLearningSkeleton count={2} />
+                    </div>
+                  )
+                )}
+
+                <section data-home-trending className="dc-home-section">
+                  <HomeSectionHeader
+                    title="Trending Now"
+                    trailing={(
+                      <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
+                        View all
+                      </button>
+                    )}
+                  />
+
+                  {catalogLoading ? (
+                    <div
+                      data-home-grid
+                      data-home-grid-loading
+                      aria-busy="true"
+                      aria-label="Loading products"
+                      className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4"
+                    >
+                      {Array.from({ length: HOME_PRODUCT_LIMIT }).map((_, index) => <ProductCardSkeleton key={index} />)}
+                    </div>
+                  ) : catalogError ? (
+                    <div className="dc-home-catalog-error border-rose-400/30" role="alert">{catalogError}</div>
+                  ) : categoryFiltered.length === 0 ? (
+                    <EmptyState
+                      className="dc-home-empty-state"
+                      icon={<BookOpenIcon className="h-7 w-7 text-indigo-200" />}
+                      title="No products in this category yet."
+                    />
+                  ) : (
+                    <div data-home-grid className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                      {categoryFiltered.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          isFavorite={favoriteIds.has(product.id)}
+                          onToggleFavorite={onToggleFavorite}
+                          onOpen={onNavigateToProduct}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {recommendedProducts.length > 0 ? (
+                  <section className="dc-home-section dc-home-recommendations" aria-labelledby="home-recommendations-title">
+                    <HomeSectionHeader
+                      id="home-recommendations-title"
+                      title="Recommended for You"
+                      trailing={(
+                        <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
+                          View all
+                        </button>
+                      )}
+                    />
+                    <div data-home-grid className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                      {recommendedProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          isFavorite={favoriteIds.has(product.id)}
+                          onToggleFavorite={onToggleFavorite}
+                          onOpen={onNavigateToProduct}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {publishedHomepageReviews.length > 0 ? (
+                  <div data-home-reviews>
+                    <Reviews reviews={publishedHomepageReviews} onOpenReview={handleOpenReview} />
+                  </div>
+                ) : null}
+
+                <FeedbackSection onOpen={() => { window.location.hash = "#/home/feedback"; }} />
+              </>
+            )}
+          </div>
         </main>
 
         {/* Home's footer is visible by default and never collapses; the
