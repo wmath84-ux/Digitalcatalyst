@@ -54,6 +54,7 @@ const categories = read("src/home/components/CategoryNav.tsx");
 const home = read("src/home/App.tsx");
 const reviews = read("src/home/components/Reviews.tsx");
 const continueLearning = read("src/home/components/ContinueLearning.tsx");
+const sectionHeader = read("src/home/components/HomeSectionHeader.tsx");
 // The Home category empty state renders through the shared card component.
 const emptyState = read("src/components/ui/EmptyState.tsx");
 
@@ -143,7 +144,7 @@ test("Home's bar, hero frame, tiles, segment and popover wear the plate", () => 
   assert.match(header, /className="dc-scene-plate dc-scene-plate--bar absolute left-0 right-0/);
   assert.match(hero, /className="dc-scene-plate select-none overflow-hidden touch-pan-y"/);
   assert.match(tile, /dc-scene-plate group relative overflow-hidden text-white/);
-  assert.match(categories, /className="dc-segment dc-scene-plate shrink-0"/);
+  assert.match(categories, /className="dc-segment dc-scene-plate shrink-0 dc-home-category-group"/);
 });
 
 test("the search pill gets a rim and legible placeholder ink inside the bar", () => {
@@ -173,28 +174,23 @@ test("the bar variant paints the element, and never stacks or seams", () => {
   assert.match(css, /:where\(\.dc-scene-plate:not\(\.dc-scene-plate--bar\)\):hover/);
 });
 
-test("copy with no surface under it carries the scene ink hook", () => {
-  // Section headings + their meta/action labels sit straight on the Winter
-  // scene; a per-glyph dark scrim is the only thing that keeps them legible
-  // over the snow band at the bottom of the viewport.
+test("Home's shared section headings and bare actions carry the scene ink hook", () => {
+  // Headings/actions sit directly on the Winter scene. The shared heading
+  // component applies the existing per-glyph scrim consistently across Home.
   assert.match(css, /:where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
-  assert.match(home, /<h2 className="dc-scene-ink text-base font-bold text-white md:text-lg">/);
-  assert.match(home, /dc-scene-ink text-xs font-semibold text-white\/55 hover:text-white\/85/);
-  assert.match(home, /dc-scene-ink mt-1 text-xs text-white\/55/);
-  // The category's "no products" line used to be bare scene copy; it now sits
-  // on the shared EmptyState glass card (2026-09-12 pass) — a plated surface,
-  // so the card's own content carries the ink hook (EmptyState.tsx pins
-  // `dc-empty dc-scene-ink` on its content) instead of the old bare
-  // `dc-scene-ink` paragraph.
+  assert.match(sectionHeader, /<h2 id=\{id\} className="dc-scene-ink text-base font-bold text-white md:text-lg">/);
+  assert.match(home, /<HomeSectionHeader[\s\S]*?title="Trending Now"/);
+  assert.match(home, /dc-home-section-action dc-scene-ink/);
+  assert.match(home, /dc-home-results-count dc-scene-ink/);
+  // Empty categories use the shared glass card rather than bare scene copy.
   assert.match(home, /<EmptyState\b/);
   assert.match(emptyState, /dc-empty dc-scene-ink/);
-  assert.match(reviews, /<h2 className="dc-scene-ink text-base font-bold text-white">Loved by Learners<\/h2>/);
-  assert.match(reviews, /dc-scene-ink text-xs font-semibold text-white\/55/);
-  assert.match(continueLearning, /<h2 className="dc-scene-ink text-base font-bold text-white">Continue Learning<\/h2>/);
-  // The single-item "% done" label used indigo-600 — under 2:1 on both the dark
-  // plate and the night sky. The same label inside the card is indigo-300.
-  assert.match(continueLearning, /dc-scene-ink text-xs font-semibold text-indigo-300/);
-  assert.doesNotMatch(continueLearning, /text-indigo-600/);
+  // Reviews and Continue Learning use the same shared heading instead of
+  // maintaining per-section copies with slightly different contrast.
+  assert.match(reviews, /<HomeSectionHeader[\s\S]*?title="Loved by Learners"/);
+  assert.match(continueLearning, /<HomeSectionHeader[\s\S]*?title="Continue Learning"/);
+  assert.doesNotMatch(reviews, /average rating|dc-home-review-average/);
+  assert.match(continueLearning, /dc-home-progress-summary dc-scene-ink/);
   // The carousel's dot row paints straight onto the scene as well.
   assert.match(css, /:where\(\[data-home-hero\]\) button\[aria-label\^="Go to slide"\]/);
 });

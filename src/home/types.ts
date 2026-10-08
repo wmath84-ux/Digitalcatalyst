@@ -13,6 +13,11 @@ export interface Product {
   image: string;
   searchKeywords?: string[];
   trending?: boolean;
+  /** Catalog metadata used by the Home learning cards when it exists. */
+  classLevel?: string;
+  subject?: string;
+  isFree?: boolean;
+  description?: string;
 }
 
 export interface Category {
@@ -38,8 +43,10 @@ export interface Banner {
   title: string;
   subtitle: string;
   cta: string;
+  /** Optional facts derived from the catalog for a default featured slide. */
+  metadata?: string[];
   /**
-  /** Tailwind gradient class string (e.g. "from-violet-600 via-fuchsia-500 to-pink-500").
+   * Tailwind gradient class string (e.g. "from-violet-600 via-fuchsia-500 to-pink-500").
  * Use one of the presets from `bannerGradients.ts` so the class is always
  * compiled into the stylesheet.
  */

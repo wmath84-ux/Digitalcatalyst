@@ -1,6 +1,6 @@
+import { Heart, Star } from "lucide-react";
 import type { Product } from "../types";
 import { GlassCard } from "../../components/ui/GlassCard";
-import { GlassButton } from "../../components/ui/glass-button";
 
 interface ProductCardProps {
   product: Product;
@@ -10,12 +10,27 @@ interface ProductCardProps {
   onOpen?: (product: Product) => void;
 }
 
-const typeMeta: Record<string, { label: string; color: string }> = {
-  video: { label: "Video", color: "bg-indigo-500" },
-  pdf: { label: "PDF", color: "bg-rose-500" },
-  ebook: { label: "E-book", color: "bg-emerald-500" },
-  live: { label: "Live", color: "bg-orange-500" },
+const typeMeta: Record<Product["type"], string> = {
+  video: "Video",
+  pdf: "PDF",
+  ebook: "E-book",
+  live: "Live class",
 };
+
+const GENERIC_SUBJECTS = new Set(["digital learning", "course", "pdf", "notes", "e-book", "live"]);
+const GENERIC_LEVELS = new Set(["lifetime access"]);
+
+function productDetails(product: Product) {
+  const subject = product.subject?.trim();
+  const level = product.classLevel?.trim();
+  const details = [
+    level && !GENERIC_LEVELS.has(level.toLowerCase()) ? level : "",
+    subject && !GENERIC_SUBJECTS.has(subject.toLowerCase()) ? subject : "",
+  ].filter((value, index, all) => value && all.indexOf(value) === index);
+  return details.join(" · ") || product.author?.trim() || "";
+}
+
+const money = (amount: number) => `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount)}`;
 
 export default function ProductCard({
   product,
@@ -24,74 +39,66 @@ export default function ProductCard({
   className = "",
   onOpen,
 }: ProductCardProps) {
-  const discount = Math.round(((product.mrp - product.price) / product.mrp) * 100);
   const meta = typeMeta[product.type];
+  const details = productDetails(product);
+  const hasRating = Number.isFinite(product.rating) && product.rating > 0 && product.ratingCount > 0;
+  const hasPrice = product.isFree === true || (Number.isFinite(product.price) && product.price > 0);
+  const hasOriginalPrice = !product.isFree && product.mrp > product.price && product.mrp > 0;
 
   return (
     <GlassCard
-      onClick={() => onOpen?.(product)}
-      contentClassName="p-0"
-      tint={0.62}
-      tintColor="173,216,255"
+      radius={24}
+      tint={0.25}
       blur={0}
-      radius={22}
-      /* Match Store page card styling: same glass material, same ratio, same background */
-      className={`dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col ${className}`}
+      contentClassName="p-0"
+      className={`dc-scene-plate group relative overflow-hidden text-white dc-home-product-card ${className}`}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
-        <img
-          src={product.image}
-          alt={product.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
-        {/* Bottom scrim for text readability */}
-        <div aria-hidden className="dc-store-card-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
-        
-        <span
-          className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white ${meta.color}`}
-        >
-          {meta.label}
-        </span>
-        {product.trending && (
-          <span className="absolute left-2 bottom-2 rounded-md bg-[var(--dc-chrome-glass)] px-1.5 py-0.5 text-[10px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
-            🔥 Trending
-          </span>
-        )}
-        <GlassButton
+      <div className="dc-home-product-shell">
+        <button
           type="button"
-          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleFavorite(product.id);
-          }}
-          className="absolute right-2 top-2 [&_.size-12]:size-7"
+          className="dc-home-product-open"
+          onClick={() => onOpen?.(product)}
+          aria-label={`View ${product.title}`}
         >
-          <span className={isFavorite ? "text-rose-500" : "text-white/55"}>
-            {isFavorite ? "❤️" : "🤍"}
-          </span>
-        </GlassButton>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <h4 className="dc-store-card-title line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-white/85">
-          {product.title}
-        </h4>
-        <p className="text-[11px] text-white/55">{product.author}</p>
-
-        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-300">
-          <span>⭐ {product.rating}</span>
-          <span className="text-white/40">({product.ratingCount.toLocaleString()})</span>
-        </div>
-
-        <div className="mt-1.5 flex items-center justify-between">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-white">₹{product.price}</span>
-            <span className="text-[11px] text-white/55 line-through">₹{product.mrp}</span>
+          <div className="dc-home-product-media aspect-[4/3]">
+            <img
+              src={product.image}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="dc-home-product-image"
+            />
+            <span className="dc-home-product-type">{meta}</span>
           </div>
-          <span className="text-[10px] font-bold text-emerald-300">{discount}% off</span>
-        </div>
+          <div className="dc-home-product-copy">
+            <h3 className="dc-home-product-title min-h-[2.5rem]" title={product.title}>{product.title}</h3>
+            {details ? <p className="dc-home-product-details" title={details}>{details}</p> : <span className="dc-home-product-details-spacer" aria-hidden="true" />}
+            <div className="dc-home-product-meta-row">
+              {hasRating ? (
+                <span className="dc-home-product-rating" aria-label={`Rated ${product.rating.toFixed(1)} out of 5${product.ratingCount > 0 ? ` from ${product.ratingCount} reviews` : ""}`}>
+                  <Star size={13} fill="currentColor" strokeWidth={1.8} aria-hidden="true" />
+                  {product.rating.toFixed(1)}
+                  {product.ratingCount > 0 ? <span className="dc-home-product-rating-count">({product.ratingCount.toLocaleString()})</span> : null}
+                </span>
+              ) : <span className="dc-home-product-rating-spacer" aria-hidden="true" />}
+              {hasPrice ? (
+                <span className="dc-home-product-price">
+                  {product.isFree ? "Free" : money(product.price)}
+                  {hasOriginalPrice ? <del>{money(product.mrp)}</del> : null}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </button>
+        <button
+          type="button"
+          aria-label={isFavorite ? `Remove ${product.title} from favorites` : `Add ${product.title} to favorites`}
+          aria-pressed={isFavorite}
+          onClick={() => onToggleFavorite(product.id)}
+          className={`dc-home-product-favorite ${isFavorite ? "is-favorite" : ""}`}
+        >
+          <Heart size={17} fill={isFavorite ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" />
+        </button>
       </div>
     </GlassCard>
   );

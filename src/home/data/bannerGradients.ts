@@ -67,6 +67,9 @@ export function normalizeBanner(raw: Record<string, unknown>, fallbackIndex: num
   const moduleId = typeof raw.moduleId === "string" && raw.moduleId.trim()
     ? raw.moduleId.trim()
     : undefined;
+  const metadata = Array.isArray(raw.metadata)
+    ? raw.metadata.map((value) => String(value ?? "").trim()).filter(Boolean).slice(0, 3)
+    : undefined;
 
   return {
     id: str(raw.id, `banner-${fallbackIndex + 1}`),
@@ -75,6 +78,7 @@ export function normalizeBanner(raw: Record<string, unknown>, fallbackIndex: num
     title: str(raw.title, "Welcome back"),
     subtitle: str(raw.subtitle, ""),
     cta: str(raw.cta, "Explore Now"),
+    metadata,
     gradient: resolveBannerGradient(str(raw.gradient, "")),
     linkType,
     // A link is only valid with a real product id (and module id for modules).
