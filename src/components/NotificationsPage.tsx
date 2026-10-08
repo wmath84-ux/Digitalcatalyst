@@ -123,8 +123,8 @@ function mapCloudNotification(id: string, data: Record<string, unknown>): SiteNo
   const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
     ? data.target
     : { type: "subscription" };
-  // `expired` drives the renewal deep link (#/subscription?renew=1), so it must
-  // survive the cloud → local mapping.
+  // Keep the expiry flag through the cloud → local mapping for notification
+  // state; every subscription alert now opens the shared plans page directly.
   const notification: SiteNotification = {
     id,
     title: String(data.title || "Notification"),
@@ -499,7 +499,7 @@ export default function NotificationsPage({
     if (user && notification.remoteNotificationId) void updateDoc(doc(db, "users", user.id, "notifications", notification.remoteNotificationId), { read: true, readAt: serverTimestamp() });
     // Navigate to the exact location that caused the alert: a specific
     // product/course page, the My Day tab with the item highlighted, or the
-    // subscription page (with renew intent when expired).
+    // shared subscription plan-selection page.
     window.location.hash = getNotificationDeepLink(notification);
   };
 

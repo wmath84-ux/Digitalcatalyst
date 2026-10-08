@@ -31,7 +31,15 @@ export default function ProfilePreview() {
   const tier = TIERS[scenario];
   const subscriber = scenario !== "free";
   const active = scenario === "premium";
-  const plan = subscriber ? { status: "active", expiresAt: active ? PREMIUM_AT : EXPIRED_AT, cycle: active ? "yearly" : "monthly", planId: "premium", reminderOptOut: false } : null;
+  const plan = subscriber ? {
+    status: "active",
+    expiresAt: active ? PREMIUM_AT : EXPIRED_AT,
+    cycle: active ? "yearly" : "monthly",
+    planId: "premium",
+    reminderOptOut: false,
+    features: ["my-day", "revision"],
+    includedProductIds: ["1", "2"],
+  } : null;
 
   const tierLabel = tier === "normal" ? "Free learner" : tier === "premium" ? "Premium" : "Premium";
   const planLabel = tier === "normal" ? "Free plan" : "Premium Plan";
@@ -71,19 +79,20 @@ export default function ProfilePreview() {
               expired: subscriber && !active,
               tierLabel,
               planLabel,
+              planDescription: subscriber ? "A balanced plan for focused study and cloud tools." : "",
+              revisionTestBankLimit: subscriber ? 50 : null,
+              features: subscriber ? [
+                { id: "my-day", name: "My Day cloud saving", description: "Tasks, schedules and notes synced securely." },
+                { id: "revision", name: "Roman AI Pro", description: "Daily tests and smart revision." },
+              ] : [],
+              includedCourses: subscriber ? [
+                { id: "1", title: "Mastering React in 2026", image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=240&h=180&fit=crop" },
+                { id: "2", title: "The Product Designer's Toolkit", image: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=240&h=180&fit=crop" },
+              ] : [],
               subscription: plan,
             }}
-            membershipBadge={subscriber && plan ? (
-              <span
-                data-profile-membership-status={active ? "active" : "expired"}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${active ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"}`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`} />
-                {active ? "Active" : "Expired"}
-              </span>
-            ) : null}
             onOpenPlans={() => undefined}
-            onOpenSubscriberExperience={() => undefined}
+            onOpenFeature={() => undefined}
             stats={{
               ownedCount: 7,
               favoriteCount: 12,

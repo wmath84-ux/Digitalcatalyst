@@ -38,12 +38,12 @@ const PROFILE_FILES = [
 
 test("the Home reference card is the pinned docs plate", () => {
   const home = read("src/home/components/ProductCard.tsx");
-  assert.match(home, /<GlassSurface[\s\S]*?radius=\{24\}[\s\S]*?tint=\{0\.25\}[\s\S]*?blur=\{0\}/);
+  const homeCss = read("src/home/home.css");
+  assert.match(home, /<GlassCard[\s\S]*?radius=\{24\}[\s\S]*?tint=\{0\.25\}[\s\S]*?blur=\{0\}/);
   assert.match(home, /dc-scene-plate/);
-  // Home's card copy: a 13px semibold title in the lifted /85 ink and an 11px
-  // muted meta line — the two steps the Profile ramp is built from.
-  assert.match(home, /text-\[13px\] font-semibold leading-tight text-white\/85/);
-  assert.match(home, /text-\[11px\] text-white\/55/);
+  // The reusable Home product card owns its title/meta ramp in home.css.
+  assert.match(homeCss, /\.dc-home-product-title \{[\s\S]*?font-size: clamp\(14px,[\s\S]*?font-weight: 680/);
+  assert.match(homeCss, /\.dc-home-product-details,[\s\S]*?font-size: 11\.5px/);
 });
 
 test("every profile card wears the HOME plate via ProfileCard", () => {

@@ -263,8 +263,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Per-day tag so each morning's post-expiry notice stands alone in the
         // tray instead of collapsing into the previous day's notification.
         // Expired stages deep-link straight into the renewal flow.
-        const renewalUrl = reminder.expired ? "/#/subscription?renew=1" : "/#/subscription";
-        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: renewalUrl, category: "subscription", targetType: "subscription" });
+        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: "/#/subscription", category: "subscription", targetType: "subscription" });
       }
       summary.renewals = { scanned: snapshot.size, created, pushed };
     }

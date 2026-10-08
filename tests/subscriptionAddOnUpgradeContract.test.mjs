@@ -193,12 +193,12 @@ test("subscription page evaluates add-ons with the selected features and product
   assert.match(page, /no plan price is charged again/);
 });
 
-test("the owned-plan card offers the add-more upgrade path", () => {
-  const card = read("src/subscription/components/OwnedPlanCard.tsx");
-  assert.match(card, /data-subscription-owned-add-more/);
-  assert.match(card, /Add features or courses to this plan/);
+test("the always-visible plan picker exposes add-on pickers to active members", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
-  assert.match(page, /onAddMore=\{\(\) => setAddOnIntent\(true\)\}/);
+  assert.match(page, /data-subscription-layout data-subscription-workspace/);
+  assert.match(page, /<CourseSelectTrigger/);
+  assert.match(page, /<FeatureSelectTrigger/);
+  assert.doesNotMatch(page, /<OwnedPlanCard|setAddOnIntent/);
 });
 
 test("the price summary marks the plan row as included for add-on upgrades", () => {

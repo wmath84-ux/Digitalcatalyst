@@ -246,29 +246,24 @@ test("HiddenFeatureHint renders the 'Unlock' card with a clear CTA to the subscr
   assert.match(hiddenHint, /Premium feature/);
 });
 
-test("SubscriptionPage wires all three new components + the bottom upgrade button", () => {
-  assert.match(subscriptionPage, /SubscriberActiveBadge/);
+test("SubscriptionPage always shows plan selection without a member-management or bottom upgrade surface", () => {
+  assert.match(subscriptionPage, /data-subscription-layout data-subscription-workspace/);
+  assert.match(subscriptionPage, /<PlanOverview/);
+  assert.match(subscriptionPage, /<CourseSelectTrigger/);
+  assert.match(subscriptionPage, /<FeatureSelectTrigger/);
+  assert.doesNotMatch(subscriptionPage, /<ActiveMemberView|<OwnedPlanCard|data-subscription-member-view/);
+  assert.doesNotMatch(subscriptionPage, /data-subscription-upgrade-button/);
   // The subscriber-only price badge lives in the plan card the page renders
-  // (PlanOverview); the page itself owns the price resolution and the props.
+  // (PlanOverview); the page itself owns price resolution and the props.
   assert.match(planOverview, /import SubscriberOnlyPriceBadge from "\.\.\/\.\.\/components\/subscription\/SubscriberOnlyPriceBadge"/);
   assert.match(planOverview, /<SubscriberOnlyPriceBadge[\s\S]*?price=\{subscriberPriceRupees\}/);
   assert.match(subscriptionPage, /subscriberPriceRupees=\{subscriberPriceRupees\}/);
   assert.match(subscriptionPage, /useSubscriptionGateLogic/);
-  // Both admin surfaces (the plan sheet's own override and the gate matrix)
-  // resolve through the one merged helper, so the badge and the charge agree.
+  // Both admin surfaces resolve through the same pricing helper.
   assert.match(subscriptionPage, /resolveEffectiveSubscriberPrice/);
   assert.match(subscriptionPage, /activePlan\.subscriberPricingOverride \?\? null/);
-  assert.match(subscriptionPage, /data-subscription-upgrade-button/);
-  assert.match(
-    subscriptionPage,
-    /subscriberPriceRupees/,
-    "SubscriptionPage computes the subscriber-only price for the current plan + cycle",
-  );
-  assert.match(
-    planOverview,
-    /subscriberPriceRupees/,
-    "PlanOverview accepts the subscriber-only price and renders the badge",
-  );
+  assert.match(subscriptionPage, /subscriberPriceRupees/);
+  assert.match(planOverview, /subscriberPriceRupees/);
 });
 
 // ---------------------------------------------------------------------------

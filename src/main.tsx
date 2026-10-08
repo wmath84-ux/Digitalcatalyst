@@ -71,7 +71,6 @@ const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibrary
 const MyCourseEditorPage = lazyRoute(() => import("./personal-library/MyCourseEditorPage"));
 const MyCoursePlayerPage = lazyRoute(() => import("./personal-library/MyCoursePlayerPage"));
 const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage"));
-const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
 const GlassPreviewPage = lazyRoute(() => import("./GlassPreview"));
@@ -223,7 +222,6 @@ const STUDY_LIBRARY_HASH = "#/study-library";
 /** Learner-authored courses: `#/my-course/new`, `#/my-course/<id>`, `#/my-course/<id>/edit`. */
 const MY_COURSE_HASH = "#/my-course/";
 const STUDY_PACK_HASH = "#/pack/";
-const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
@@ -544,7 +542,7 @@ function RenewalNotice() {
     <RenewalBannerHost
       uid={user?.id ?? null}
       onRenew={() => {
-        window.location.hash = `${SUBSCRIPTION_HASH}?renew=1`;
+        window.location.hash = SUBSCRIPTION_HASH;
       }}
     />
   );
@@ -618,7 +616,6 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
   if (hash.startsWith(MY_COURSE_HASH)) return isMyCourseEditorRoute(hash) ? MyCourseEditorPage : MyCoursePlayerPage;
   if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
-  if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
   if (hash.startsWith(MY_DAY_HASH)) return MyDayApp;
   if (hash.startsWith(LEADERBOARD_HASH)) return LeaderboardApp;
@@ -1899,7 +1896,6 @@ function RootPage(): ReactNode {
       />
     );
   }
-  if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
   if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
   if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;

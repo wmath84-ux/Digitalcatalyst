@@ -53,6 +53,7 @@ type ProductForm = {
   productType: string;
   classLevel: string;
   subject: string;
+  chapters: string[];
   sku: string;
   tags: string[];
   /** Store page filter chips this product should appear under. */
@@ -92,6 +93,7 @@ const EMPTY_PRODUCT: ProductForm = {
   productType: "course",
   classLevel: "",
   subject: "",
+  chapters: [],
   sku: "",
   tags: [],
   filterIds: [],
@@ -186,6 +188,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
         setForm({
           ...res.product,
           filterIds: Array.isArray(res.product.filterIds) ? res.product.filterIds : [],
+          chapters: Array.isArray(res.product.chapters) ? res.product.chapters.map((value) => String(value).trim()).filter(Boolean) : [],
           salePrice: res.product.salePrice ?? null,
           manualRating: res.product.manualRating ?? null,
         });
@@ -608,6 +611,14 @@ export function ProductEditor({ productId }: { productId?: string }) {
                 <input className={inputClass} value={form.subject} onChange={(e) => update("subject", e.target.value)} />
               </Field>
             </div>
+            <Field label="Chapters" hint="Optional; comma-separated. Related products use class + chapter matches.">
+              <input
+                className={inputClass}
+                placeholder="e.g. Real Numbers, Polynomials"
+                value={form.chapters.join(", ")}
+                onChange={(e) => update("chapters", csvToList(e.target.value))}
+              />
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Estimated duration">
                 <input className={inputClass} placeholder="e.g. 12 hours" value={form.estimatedDuration} onChange={(e) => update("estimatedDuration", e.target.value)} />

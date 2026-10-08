@@ -10,6 +10,10 @@ import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
+import { resolveFeaturePrice } from "../../utils/featurePricing";
+import { FALLBACK_SUBSCRIPTION_CATALOG } from "../subscription/data/fallbackCatalog";
+import { loadSubscriptionCatalog } from "../subscription/utils/loadSubscriptionCatalog";
+import type { SubscriptionCatalog } from "../subscription/utils/subscriptionCatalog";
 import ProfileLayout, {
   BaseModal,
   EditModal,
@@ -115,7 +119,7 @@ export default function ProfileApp() {
   const [referralUsed, setReferralUsed] = useState(false);
   const [subscriptionRenewal, setSubscriptionRenewal] = useState<SubscriptionSnapshot | null>(null);
   const [profileSubscription, setProfileSubscription] = useState<SubscriptionSnapshot | null>(null);
-  const [membershipLoaded, setMembershipLoaded] = useState(false);
+  const [subscriptionCatalog, setSubscriptionCatalog] = useState<SubscriptionCatalog>(FALLBACK_SUBSCRIPTION_CATALOG);
   const [now, setNow] = useState(() => Date.now());
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState("");
@@ -128,8 +132,17 @@ export default function ProfileApp() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void loadSubscriptionCatalog()
+      .then((catalog) => {
+        if (!cancelled && catalog.plans.length > 0) setSubscriptionCatalog(catalog);
+      })
+      .catch((error) => console.warn("Profile subscription catalog unavailable; using defaults.", error));
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (!user) return undefined;
-    setMembershipLoaded(false);
     const unsubscribeProfile = onSnapshot(doc(db, "users", user.id), (snapshot) => {
       const data = snapshot.data() || {};
       setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences || {}) });
@@ -147,6 +160,8 @@ export default function ProfileApp() {
         cycle: String(data.subscriptionCycle || "monthly"),
         planId: mirroredPlanId || legacyTier,
         reminderOptOut: Boolean(data.renewalReminderOptOut),
+        features: Array.isArray(data.subscriptionFeatures) ? data.subscriptionFeatures.map(String) : [],
+        includedProductIds: Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : [],
       } : null);
     }, (error) => console.warn("Profile sync failed", error));
 
@@ -160,13 +175,16 @@ export default function ProfileApp() {
           cycle: String(data.cycle || "monthly"),
           planId: String(data.planId || ""),
           reminderOptOut: Boolean(data.renewalReminderOptOut),
+          features: Array.isArray(data.features) ? data.features.map(String) : [],
+          includedProductIds: Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : [],
+          revisionTestBankLimit: data.revisionTestBankLimit === null || data.revisionTestBankLimit === undefined
+            ? null
+            : Number.isFinite(Number(data.revisionTestBankLimit)) ? Number(data.revisionTestBankLimit) : null,
         } : null);
-        setMembershipLoaded(true);
       },
       (error) => {
         console.warn("Subscription profile sync failed", error);
         setSubscriptionRenewal(null);
-        setMembershipLoaded(true);
       },
     );
     return () => {
@@ -197,11 +215,54 @@ export default function ProfileApp() {
     return { tier, subscription, active, expired, subscriber: true };
   }, [now, profileSubscription, subscriptionRenewal]);
 
+  const membershipPlan = useMemo(
+    () => membership.subscription
+      ? subscriptionCatalog.plans.find((plan) => plan.id === membership.subscription?.planId) || null
+      : null,
+    [membership.subscription, subscriptionCatalog],
+  );
+  const profileMembershipFeatures = useMemo(() => {
+    if (!membership.subscriber || !membership.subscription) return [];
+    const planId = membership.subscription.planId;
+    const cycle = membership.subscription.cycle === "yearly" ? "yearly" : "monthly";
+    const includedIds = new Set([
+      ...(membership.subscription.features || []),
+      ...(membershipPlan?.includedFeatureIds || []),
+    ].map(String));
+    for (const feature of subscriptionCatalog.features) {
+      if (feature.included || resolveFeaturePrice(feature as never, planId, cycle).included) {
+        includedIds.add(String(feature.id));
+      }
+    }
+    return subscriptionCatalog.features
+      .filter((feature) => includedIds.has(String(feature.id)))
+      .map((feature) => ({ id: String(feature.id), name: feature.name, description: feature.description || "" }));
+  }, [membership.subscriber, membership.subscription, membershipPlan, subscriptionCatalog]);
+  const profileMembershipCourses = useMemo(() => {
+    if (!membership.subscriber || !membership.subscription) return [];
+    const planId = membership.subscription.planId;
+    const includedIds = new Set([
+      ...(membership.subscription.includedProductIds || []),
+      ...(membershipPlan?.includedProductIds || []),
+      ...subscriptionCatalog.productUnlocks
+        .filter((unlock) => unlock.active && unlock.planId === planId)
+        .map((unlock) => unlock.productId),
+    ].map(String));
+    return products
+      .filter((product) => includedIds.has(String(product.id)) || Boolean(product.documentId && includedIds.has(String(product.documentId))))
+      .map((product) => ({ id: String(product.documentId || product.id), title: product.title, image: product.image || "" }));
+  }, [membership.subscriber, membership.subscription, membershipPlan, subscriptionCatalog, products]);
+
   const initials = user?.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "Recently";
   const ownedCount = signedIn ? Math.max(purchasedIds.size, canonicalOwnedIds.length) : purchasedIds.size;
   const tierLabel = TIER_LABELS[membership.tier];
-  const planLabel = PLAN_LABELS[membership.tier];
+  const planLabel = membershipPlan?.name || (membership.subscription ? membership.subscription.planId : PLAN_LABELS[membership.tier]);
+  const cycle = membership.subscription?.cycle === "yearly" ? "yearly" : "monthly";
+  const storedTestBankLimit = membership.subscription?.revisionTestBankLimit;
+  const revisionTestBankLimit = storedTestBankLimit !== null && storedTestBankLimit !== undefined && Number.isFinite(Number(storedTestBankLimit))
+    ? Number(storedTestBankLimit)
+    : membershipPlan?.revisionTestBankLimits?.[cycle] ?? null;
 
   const handleFooterChange = (tab: TabKey) => {
     if (tab === "home") window.location.hash = "#/home";
@@ -295,21 +356,12 @@ export default function ProfileApp() {
     window.location.hash = "#/subscription";
   };
 
-  const openSubscriberExperience = () => {
-    window.location.hash = "#/profile/subscriber-experience";
+  const openMembershipFeature = (featureId: string) => {
+    const id = featureId.trim().toLowerCase().replace(/_/g, "-");
+    if (id === "myday" || id.includes("my-day")) window.location.hash = "#/my-day";
+    else if (id === "revision" || id.includes("revision") || id.includes("test-bank")) window.location.hash = "#/revision";
+    else openPlans();
   };
-
-  const membershipBadge = membershipLoaded && membership.subscriber ? (
-    <span
-      data-profile-membership-status={membership.active ? "active" : "expired"}
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
-        membership.active ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"
-      }`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${membership.active ? "bg-emerald-500" : "bg-rose-500"}`} />
-      {membership.active ? "Active" : "Expired"}
-    </span>
-  ) : null;
 
   const membershipPayload: ProfileLayoutMembership = {
     tier: membership.tier,
@@ -318,6 +370,10 @@ export default function ProfileApp() {
     expired: membership.expired,
     tierLabel,
     planLabel,
+    planDescription: membershipPlan?.description || "",
+    revisionTestBankLimit,
+    features: profileMembershipFeatures,
+    includedCourses: profileMembershipCourses,
     subscription: membership.subscription,
   };
 
@@ -357,9 +413,8 @@ export default function ProfileApp() {
             photoUploading={photoUploading}
             photoError={photoError}
             membership={membershipPayload}
-            membershipBadge={membershipBadge}
             onOpenPlans={openPlans}
-            onOpenSubscriberExperience={openSubscriberExperience}
+            onOpenFeature={openMembershipFeature}
             stats={{
               ownedCount,
               favoriteCount: favoriteIds.size,
@@ -379,8 +434,11 @@ export default function ProfileApp() {
               now,
               onRenew: openPlans,
               onToggleReminders: (next) => {
-                if (!user || !subscriptionRenewal) return;
-                void updateDoc(doc(db, "users", user.id, "subscription", "current"), { renewalReminderOptOut: next }).catch(() => undefined);
+                if (!user) return;
+                const reminderRef = subscriptionRenewal
+                  ? doc(db, "users", user.id, "subscription", "current")
+                  : doc(db, "users", user.id);
+                void updateDoc(reminderRef, { renewalReminderOptOut: next }).catch(() => undefined);
               },
             } : null}
             onOpenUsageLimits={() => { window.location.hash = "#/usage-limits"; }}

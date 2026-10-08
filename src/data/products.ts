@@ -13,6 +13,8 @@ export type Product = {
   category: "Notes" | "Course" | "PDF" | "E-book" | "Live";
   classLevel: string;
   subject: string;
+  /** Explicit chapter names used to match related products within the same class. */
+  chapters?: string[];
   tags: string[];
   /**
    * Ids of the admin-managed store filter chips this product is attached to

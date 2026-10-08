@@ -74,6 +74,11 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     category: mapCategory(data),
     classLevel: String(data.dimensions || data.level || "Lifetime access"),
     subject: String(data.subject || data.category || "Digital learning"),
+    chapters: Array.isArray(data.chapters)
+      ? data.chapters.map((chapter: unknown) => String(chapter || "").trim()).filter(Boolean)
+      : Array.isArray(data.adminProduct?.chapters)
+        ? data.adminProduct.chapters.map((chapter: unknown) => String(chapter || "").trim()).filter(Boolean)
+        : [],
     tags: tags.map((tag) => tag.toUpperCase()),
     // Admin-configured store filter chips this product is attached to.
     filterIds: [

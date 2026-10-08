@@ -1,7 +1,12 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
+import { PaymentButton } from "../components/ui/PaymentButton";
+import RenewalStatusCard from "../components/subscription/RenewalStatusCard";
+import { buildRenewalView } from "../../utils/renewalPresentation";
+import { getRenewalReminder } from "../../utils/subscriptionRenewal";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { ProfileCard } from "./ProfileCard";
 import {
   ArrowRight,
   BadgeCheck,
@@ -11,24 +16,20 @@ import {
   Camera,
   Check,
   ChevronRight,
-  Clock3,
-  Copy,
+  CreditCard,
   Crown,
   Gauge,
   Heart,
-  Layers,
   LoaderCircle,
   Lock,
   LogOut,
   Mail,
   Pencil,
   Save,
-  ShieldCheck,
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   Ticket,
-  UserCheck,
   X,
   Zap,
 } from "lucide-react";
@@ -57,7 +58,13 @@ export type SubscriptionSnapshot = {
   cycle: string;
   planId: string;
   reminderOptOut: boolean;
+  features?: string[];
+  includedProductIds?: string[];
+  revisionTestBankLimit?: number | null;
 };
+
+export type ProfileMembershipFeature = { id: string; name: string; description?: string };
+export type ProfileMembershipCourse = { id: string; title: string; image: string };
 
 export const TIER_LABELS: Record<MembershipTier, string> = {
   normal: "Free",
@@ -99,6 +106,10 @@ export interface ProfileLayoutMembership {
   expired: boolean;
   tierLabel: string;
   planLabel: string;
+  planDescription: string;
+  revisionTestBankLimit: number | null;
+  features: ProfileMembershipFeature[];
+  includedCourses: ProfileMembershipCourse[];
   subscription: SubscriptionSnapshot | null;
 }
 
@@ -115,9 +126,8 @@ export type ProfileLayoutProps = {
   photoError?: string;
 
   membership: ProfileLayoutMembership;
-  membershipBadge?: ReactNode;
   onOpenPlans: () => void;
-  onOpenSubscriberExperience: () => void;
+  onOpenFeature: (featureId: string) => void;
 
   stats: {
     ownedCount: number;
@@ -173,8 +183,8 @@ export default function ProfileLayout({
   photoUploading = false,
   photoError,
   membership,
-  membershipBadge,
   onOpenPlans,
+  onOpenFeature,
   stats,
   referral,
   renewal,
@@ -194,9 +204,25 @@ export default function ProfileLayout({
 
   const snapshot = renewal?.subscription || membership.subscription;
   const now = renewal?.now || Date.now();
+  const active = membership.active;
   const daysRemaining = snapshot && snapshot.expiresAt > now
     ? Math.max(1, Math.ceil((snapshot.expiresAt - now) / 86400000))
     : 0;
+  const reminderOptOut = Boolean(snapshot?.reminderOptOut);
+  const renewalView = snapshot && membership.subscriber
+    ? buildRenewalView(
+        getRenewalReminder({
+          status: snapshot.status,
+          expiresAt: snapshot.expiresAt,
+          planId: snapshot.planId,
+          planName: membership.planLabel,
+          // The card is account management, not a push/email notification.
+          // Keep the status visible even when the learner opted out of reminders.
+          renewalReminderOptOut: false,
+        }, now),
+        { planName: membership.planLabel, now },
+      )
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
@@ -226,8 +252,8 @@ export default function ProfileLayout({
         </div>
       )}
 
-      {/* Profile Card */}
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+      {/* Profile summary */}
+      <ProfileCard data-profile-hero className="mb-6" contentClassName="p-6">
         <div className="flex items-start gap-4">
           {/* Avatar */}
           <div className="shrink-0">
@@ -244,7 +270,7 @@ export default function ProfileLayout({
                   onError={() => setBrokenPhoto(src)}
                 />
               ) : (
-                <div className="grid h-20 w-24 place-items-center rounded-full bg-indigo-600 text-2xl font-bold text-white sm:h-24 sm:w-24">
+                <div className="grid h-20 w-20 place-items-center rounded-full bg-indigo-600 text-2xl font-bold text-white sm:h-24 sm:w-24">
                   {initials}
                 </div>
               )}
@@ -263,13 +289,17 @@ export default function ProfileLayout({
           {/* Info */}
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-medium text-indigo-200">
-                {membership.planLabel}
+              <span data-profile-plan-label className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-medium text-indigo-200">
+                {membership.subscriber ? membership.planLabel : PLAN_LABELS.normal}
               </span>
-              {membership.subscriber && membership.active && (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-200">
+              {membership.subscriber && (
+                <span
+                  data-profile-plan-status={active ? "active" : "expired"}
+                  data-profile-membership-status={active ? "active" : "expired"}
+                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${active ? "bg-emerald-500/20 text-emerald-200" : "bg-rose-500/20 text-rose-200"}`}
+                >
                   <BadgeCheck className="h-3 w-3" />
-                  Active
+                  {active ? "Active" : "Expired"}
                 </span>
               )}
             </div>
@@ -331,90 +361,191 @@ export default function ProfileLayout({
             <span className="text-xs text-white/60">In Cart</span>
           </button>
         </div>
-      </div>
+      </ProfileCard>
 
-      {/* Membership Card */}
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-        <div className="mb-4 flex items-start justify-between">
+      {/* Membership and renewal live together here; the Subscription page is for browsing plans. */}
+      <ProfileCard
+        data-profile-membership-card
+        data-profile-membership-tier={membership.tier}
+        className="mb-6"
+        contentClassName="p-5 sm:p-6"
+      >
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-indigo-500/20 text-indigo-300">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/25">
               {TIER_ICONS[membership.tier]}
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">
-                {membership.subscriber ? "Membership" : "Free Plan"}
-              </h3>
-              <p className="text-sm text-white/60">
-                {membership.subscriber ? membership.planLabel : "Upgrade to unlock more features"}
-              </p>
+              <h3 className="dc-profile-card-title">Membership</h3>
+              <p className="dc-profile-card-meta">{membership.subscriber ? membership.planLabel : "Free plan"}</p>
             </div>
           </div>
           {membership.subscriber && (
-            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              membership.active
-                ? "bg-emerald-500/20 text-emerald-200"
-                : "bg-rose-500/20 text-rose-200"
-            }`}>
-              {membership.active ? "Active" : "Expired"}
+            <span
+              data-profile-membership-status={active ? "active" : "expired"}
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"}`}
+            >
+              {active ? "Active" : "Expired"}
             </span>
           )}
-        </div>
+        </header>
 
         {membership.subscriber && snapshot ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Expires</span>
-              <span className="font-medium text-white">
-                {membership.active ? formatDate(snapshot.expiresAt) : `Ended ${formatDate(snapshot.expiresAt)}`}
-              </span>
+          <>
+            <div data-profile-membership-details className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                <p className="dc-profile-card-meta">Billing cycle</p>
+                <p className="mt-1 text-sm font-semibold text-white">{cycleLabel(snapshot.cycle)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                <p className="dc-profile-card-meta">{active ? "Access ends" : "Access ended"}</p>
+                <p className="mt-1 text-sm font-semibold text-white">{formatDate(snapshot.expiresAt)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                <p className="dc-profile-card-meta">{active ? "Time remaining" : "Membership"}</p>
+                <p className="mt-1 text-sm font-semibold text-white">{active ? `${daysRemaining} days` : "Expired"}</p>
+              </div>
             </div>
-            {membership.active && (
-              <>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-white/60">Days remaining</span>
-                  <span className="font-medium text-white">{daysRemaining} days</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-white/60">Billing cycle</span>
-                  <span className="font-medium text-white">{cycleLabel(snapshot.cycle)}</span>
-                </div>
-              </>
+
+            {membership.revisionTestBankLimit !== null ? (
+              <p data-member-test-bank-capacity className="mt-3 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-semibold text-white/75">
+                Cloud Test Bank: {membership.revisionTestBankLimit === -1 ? "Unlimited saved tests" : `up to ${membership.revisionTestBankLimit} saved tests`}
+              </p>
+            ) : null}
+
+            {renewalView ? (
+              <div className="mt-4">
+                <RenewalStatusCard
+                  view={renewalView}
+                  cycle={snapshot.cycle === "yearly" ? "yearly" : "monthly"}
+                  reminderOptOut={reminderOptOut}
+                  onRenew={renewal?.onRenew || onOpenPlans}
+                  onToggleReminders={renewal?.onToggleReminders}
+                />
+              </div>
+            ) : (
+              <section
+                data-renewal-card
+                data-stage={active ? "active" : "expired"}
+                className={`mt-4 rounded-2xl border p-4 ${active ? "border-indigo-300/20 bg-indigo-500/[0.06]" : "border-rose-400/25 bg-rose-500/[0.08]"}`}
+              >
+                <p className="text-sm font-semibold text-white">{active ? "Your membership is active" : "Your membership has ended"}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/60">
+                  {active ? `Your access is available until ${formatDate(snapshot.expiresAt)}.` : `Access ended ${formatDate(snapshot.expiresAt)}. Renew to restore your plan.`}
+                  {" "}Renewal is manual and secure.
+                </p>
+                {renewal?.onToggleReminders ? (
+                  <GlassButton
+                    variant="capsule"
+                    type="button"
+                    data-renewal-reminder-toggle
+                    onClick={() => renewal.onToggleReminders(!reminderOptOut)}
+                    className="mt-3 [&>span>div]:h-9 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-semibold"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Bell className="h-3.5 w-3.5" />
+                      {reminderOptOut ? "Turn reminders on" : "Turn reminders off"}
+                    </span>
+                  </GlassButton>
+                ) : null}
+              </section>
             )}
-            <button
-              onClick={onOpenPlans}
-              className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
-            >
-              {membership.active ? "Manage Subscription" : "Renew Subscription"}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] p-3">
-                <Zap className="h-4 w-4 text-indigo-300" />
-                <span className="text-xs text-white/70">Unlimited My Day</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] p-3">
-                <Sparkles className="h-4 w-4 text-violet-300" />
-                <span className="text-xs text-white/70">Higher AI Quotas</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] p-3">
-                <Layers className="h-4 w-4 text-cyan-300" />
-                <span className="text-xs text-white/70">Study Packs</span>
-              </div>
+
+            {membership.planDescription ? (
+              <p className="dc-profile-card-note mt-3 line-clamp-2">{membership.planDescription}</p>
+            ) : null}
+
+            {membership.features.length > 0 ? (
+              <section className="mt-5" data-member-features>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h4 className="dc-profile-card-title">Included features</h4>
+                  <span className="dc-profile-card-meta">{membership.features.length}</span>
+                </div>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {membership.features.map((feature) => (
+                    <li key={feature.id}>
+                      <button
+                        type="button"
+                        data-profile-membership-feature={feature.id}
+                        onClick={() => onOpenFeature(feature.id)}
+                        className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-left transition hover:bg-white/[0.07]"
+                      >
+                        <Check className="h-4 w-4 shrink-0 text-emerald-300" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold text-white/85">{feature.name}</span>
+                          {feature.description ? <span className="mt-0.5 block truncate text-[10px] text-white/50">{feature.description}</span> : null}
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/45" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {membership.includedCourses.length > 0 ? (
+              <section className="mt-5" data-profile-membership-courses>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h4 className="dc-profile-card-title">Courses in your plan</h4>
+                  <span className="dc-profile-card-meta">{membership.includedCourses.length}</span>
+                </div>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {membership.includedCourses.map((course) => (
+                    <li key={course.id}>
+                      <button
+                        type="button"
+                        onClick={() => library.onOpenCourse(course.id)}
+                        className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-2.5 text-left transition hover:bg-white/[0.07]"
+                      >
+                        {course.image ? <img src={course.image} alt="" className="h-10 w-12 shrink-0 rounded-lg object-cover" /> : null}
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-white/85">{course.title}</span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/45" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-2" data-member-manage-actions>
+              {!renewalView?.canRenew ? (
+                <PaymentButton
+                  block
+                  size="sm"
+                  icon={<CreditCard className="h-4 w-4" />}
+                  onClick={renewal?.onRenew || onOpenPlans}
+                  data-member-renew=""
+                  label={active ? "Renew early" : "Renew subscription"}
+                />
+              ) : null}
+              <GlassButton
+                variant="capsule"
+                type="button"
+                onClick={onOpenPlans}
+                data-member-change-plan
+                className="w-full [&>span>div]:h-10 [&>span>div]:w-full [&>span>div]:font-semibold"
+              >
+                Change plan or features
+              </GlassButton>
             </div>
-            <button
+          </>
+        ) : (
+          <div data-profile-upgrade-card className="flex flex-col gap-3">
+            <p className="dc-profile-card-note">Explore plans and their included features when you are ready.</p>
+            <GlassButton
+              variant="capsule"
+              type="button"
               onClick={onOpenPlans}
-              className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
+              className="w-full [&>span>div]:h-10 [&>span>div]:w-full [&>span>div]:font-semibold"
             >
-              Explore Plans
-            </button>
+              Explore plans
+            </GlassButton>
           </div>
         )}
-      </div>
+      </ProfileCard>
 
       {/* Study Library */}
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+      <ProfileCard data-profile-library-card data-profile-study-library className="mb-6" contentClassName="p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-cyan-500/20 text-cyan-300">
@@ -467,46 +598,51 @@ export default function ProfileLayout({
             </button>
           </div>
         )}
-      </div>
+        </ProfileCard>
 
       {/* Quick Actions */}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <button
-          onClick={onOpenUsageLimits}
-          className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left transition hover:bg-white/[0.05]"
-        >
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-indigo-500/20 text-indigo-300">
-            <Gauge className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white">Usage Limits</h3>
-            <p className="text-xs text-white/60">View quotas and reset details</p>
-          </div>
-        </button>
+        <ProfileCard data-profile-usage-card contentClassName="p-4">
+          <button
+            type="button"
+            onClick={onOpenUsageLimits}
+            className="flex min-h-14 w-full items-center gap-3 text-left"
+          >
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/25">
+              <Gauge className="h-4 w-4" />
+            </span>
+            <span>
+              <span className="block dc-profile-card-title">Usage Limits</span>
+              <span className="mt-0.5 block dc-profile-card-meta">View quotas and reset details</span>
+            </span>
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-white/45" />
+          </button>
+        </ProfileCard>
 
         {referral && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <ProfileCard data-profile-referral-card contentClassName="p-4">
             <div className="mb-2 flex items-center gap-2">
               <Ticket className="h-4 w-4 text-amber-300" />
-              <h3 className="text-sm font-bold text-white">Referral Code</h3>
+              <h3 className="dc-profile-card-title">Referral Code</h3>
             </div>
             <div className="flex items-center gap-2">
               <code className="flex-1 truncate font-mono text-sm text-white">
                 {referral.code}
               </code>
               <button
+                type="button"
                 onClick={referral.onCopy}
-                className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+                className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/[0.09]"
               >
                 Copy
               </button>
             </div>
-          </div>
+          </ProfileCard>
         )}
       </div>
 
       {/* Account */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+      <ProfileCard data-profile-account-card contentClassName="p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-500/20 text-emerald-300">
             <Lock className="h-4 w-4" />
@@ -545,7 +681,7 @@ export default function ProfileLayout({
             Open Dashboard
           </button>
         )}
-      </div>
+      </ProfileCard>
     </div>
   );
 }

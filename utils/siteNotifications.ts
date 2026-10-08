@@ -208,8 +208,8 @@ export const filterNotifications = (notifications: SiteNotification[], filter: N
 
 /**
  * Exact in-app location for a notification. Every target type resolves to a
- * real route (with query params for My Day sections and renewal intents) so a
- * tap lands on the item that caused the alert, not a generic page.
+ * real route (with query params for My Day sections) so a tap lands on the
+ * item that caused the alert, not a generic page.
  */
 export const getNotificationDeepLink = (notification: SiteNotification): string => {
   const target = notification.target;
@@ -248,9 +248,7 @@ export const getNotificationDeepLink = (notification: SiteNotification): string 
     const itemId = String(target.itemId || '');
     return itemId.startsWith('#/revision') ? itemId : '#/revision';
   }
-  if (target.type === 'subscription') {
-    return notification.expired ? '#/subscription?renew=1' : '#/subscription';
-  }
+  if (target.type === 'subscription') return '#/subscription';
   if (target.type === 'announcement') return '#/home';
   if (target.type === 'community') return '#/home';
   return '#/notifications';

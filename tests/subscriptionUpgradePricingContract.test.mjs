@@ -15,18 +15,21 @@ test("admin-configured plan price is charged by both client and server", () => {
   assert.match(admin, /Yearly plan price \(₹\)/);
 });
 
-test("active subscribers can enter upgrade flow and switch to a HIGHER plan only", () => {
+test("active subscribers use the shared picker and can select their own or a HIGHER plan", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   const writer = read("api/_lib/subscriptions.ts");
-  // The no-downgrade rule: the change-plan entry point opens on the next
-  // HIGHER plan, and the picker itself is filtered to the member's own plan
-  // plus the plans above it. Lower plans are never offered or selectable.
-  assert.match(page, /const upgradePlans = useMemo/);
-  assert.match(page, /candidate\.active && candidate\.id !== ownedPlanId/);
+  // Profile's change-plan action opens the common plan page. The picker is
+  // filtered to the member's own plan plus higher plans; lower plans are
+  // never offered or selectable.
+  assert.match(page, /const pickerPlans = useMemo/);
+  assert.match(page, /const audienceVisible = plans\.filter/);
+  assert.match(page, /isPlanVisibleForAudience\(candidate\.id, isActiveMember/);
   assert.match(page, /order >= ownedPlanOrder/);
-  assert.match(page, /const nextPlan = upgradePlans\[0\] \|\| null/);
-  // The old banner inviting the member to "choose any active plan" was
-  // removed together with the ability to move sideways/down.
+  assert.match(page, /setSelectedPlanId\(ownedVisible \? ownedPlanId : pickerPlans\[0\]\.id\)/);
+  assert.match(page, /plans=\{pickerPlans\}/);
+  assert.doesNotMatch(page, /manageMode|const upgradePlans|const nextPlan/);
+  // The old banner inviting the member to "choose any active plan" remains
+  // absent, and the server protects paid entitlement carry-over.
   assert.equal(
     page.includes("Choose any active plan, feature, or product below"),
     false,
