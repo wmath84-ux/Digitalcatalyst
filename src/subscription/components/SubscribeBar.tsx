@@ -29,12 +29,9 @@ interface Props {
 }
 
 /**
- * The reference button carries one colour (`--clr`): the icon plate and the
- * colour that wipes in behind the label. The bar only re-points it where the
- * app already used colour as MEANING — an already-owned plan keeps the
- * emerald-600 identity, a downgrade-blocked selection goes neutral slate so
- * it never reads as purchasable. A purchasable selection passes nothing and
- * gets the Uiverse component's own green, identical to every other pay CTA.
+ * The button keeps a clean white idle surface. Semantic tones still control
+ * the hover/loading accent for owned and blocked selections without painting
+ * those colours into the pre-interaction button.
  */
 const OWNED_CLAIM_COLOR = "#059669"; /* emerald-600 — "this is active for you" */
 const BLOCKED_CLAIM_COLOR = "#64748b"; /* slate — disabled-looking, not buyable */
@@ -153,9 +150,8 @@ export default function SubscribeBar({
           `onSubscribe`, same `isDisabled`, same `resolveSubscribeCta`
           verdict (label + tone + disabled all still come from the shared
           helper), same ownership data-attributes the server guard is paired
-          with. Meaning colour moves onto the reference's own --clr: an
-          owned plan paints the plate emerald, a blocked one neutral slate,
-          a purchasable one keeps the reference green. */}
+          with. Semantic accent colours are held for hover/loading only; the
+          resting button remains clean white in every ownership state. */}
       <PaymentButton
         block
         size="md"

@@ -126,10 +126,9 @@ test("the workspace owns its own scrolling — no second scroll container", () =
   assert.doesNotMatch(myDayApp, /overflow-y-auto/);
 });
 
-test("expired subscription reminders deep-link into the renewal flow", () => {
-  assert.match(siteNotifications, /notification\.expired \? '#\/subscription\?renew=1' : '#\/subscription'/);
-  assert.match(cron, /const renewalUrl = reminder\.expired \? "\/#\/subscription\?renew=1" : "\/#\/subscription"/);
-  assert.match(cron, /url: renewalUrl/);
+test("all subscription reminders deep-link to the shared plan-selection page", () => {
+  assert.match(siteNotifications, /target\.type === 'subscription'\) return '#\/subscription'/);
+  assert.match(cron, /url: "\/#\/subscription"/);
 });
 
 test("foreground local notifications use the same deep links", () => {

@@ -10,6 +10,7 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Copy,
@@ -100,31 +101,108 @@ type CurriculumViewMode = "included" | "paid-upgrade";
 
 const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
 
+const GENERIC_CHAPTER_WORDS = new Set([
+  "advanced", "all", "basic", "beginner", "board", "boards", "cbse", "complete", "concept",
+  "course", "courses", "ebook", "exam", "exams", "foundation", "general", "icse", "introduction",
+  "jee", "learning", "lesson", "lessons", "main", "module", "modules", "ncert", "neet", "notes",
+  "overview", "pdf", "practice", "question", "questions", "resources", "revision", "school", "study",
+  "test", "tests", "unit", "units",
+]);
+
+const relatedClassKey = (product: Product): string => {
+  const label = getProductClassLabel(product).trim();
+  if (!label) return "";
+  const number = label.match(/\b(?:class|grade)\s*[-–—]?\s*(\d{1,2})(?:st|nd|rd|th)?\b/i);
+  return number ? `class ${Number(number[1])}` : label.toLocaleLowerCase().replace(/\s+/g, " ");
+};
+
+const normalizeChapterSignal = (value: unknown, product: Product): string => {
+  let normalized = String(value || "").normalize("NFKC").toLocaleLowerCase().trim();
+  if (!normalized) return "";
+  normalized = normalized
+    .replace(/\b(?:chapter|ch\.?|unit|module)\s*(?:no\.?\s*)?\d+[a-z]?\b/gi, " ")
+    .replace(/\b(?:class|grade)\s*[-–—]?\s*\d{1,2}(?:st|nd|rd|th)?\b/gi, " ");
+
+  const subject = getProductSubjectLabel(product).trim();
+  if (subject) {
+    const normalizedSubject = subject.toLocaleLowerCase().replace(/\s+/g, " ");
+    normalized = normalized.split(normalizedSubject).join(" ");
+  }
+  normalized = normalized
+    .replace(/\b(?:mathematics|maths?|science|physics|chemistry|biology|social studies|english|history|geography)\b/gi, " ")
+    .replace(/\b(?:chapter|ch|unit|module|part|volume|vol)\b/gi, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+  const words = normalized.split(/\s+/).filter(Boolean).map((word) => {
+    if (word.endsWith("ies") && word.length > 4) return `${word.slice(0, -3)}y`;
+    if (word.endsWith("s") && !word.endsWith("ss") && word.length > 4) return word.slice(0, -1);
+    return word;
+  }).filter((word) => !GENERIC_CHAPTER_WORDS.has(word));
+  return words.length > 0 ? words.join(" ") : "";
+};
+
+const relatedChapterKeys = (product: Product): Set<string> => {
+  const extended = product as Product & Record<string, unknown>;
+  const values: unknown[] = [
+    ...(Array.isArray(product.chapters) ? product.chapters : []),
+    extended.chapter,
+    extended.chapterName,
+    ...(Array.isArray(extended.chapterNames) ? extended.chapterNames : []),
+    // Keep title-derived chapter names as a useful fallback for older catalog
+    // entries that predate the explicit Chapters field in the product editor.
+    product.title,
+    getProductPresentation(product).title,
+    ...(Array.isArray(product.tags) ? product.tags : []),
+    ...(Array.isArray(product.searchKeywords) ? product.searchKeywords : []),
+  ];
+
+  const collectModuleTitles = (modules: unknown) => {
+    if (!Array.isArray(modules)) return;
+    for (const module of modules) {
+      if (!module || typeof module !== "object") continue;
+      const row = module as { title?: unknown; modules?: unknown };
+      values.push(row.title);
+      collectModuleTitles(row.modules);
+    }
+  };
+  collectModuleTitles(product.canonicalModules);
+  if (product.courseContent && product.courseContent !== fullDemoCourseContent) {
+    collectModuleTitles(product.courseContent);
+  }
+
+  return new Set(values.map((value) => normalizeChapterSignal(value, product)).filter(Boolean));
+};
+
 /**
- * Live related-product ranking. It only considers products currently emitted
- * by CatalogContext, excludes the open product, and gives deterministic
- * priority to matching subject/category/level/tags. Newly published products
- * therefore become eligible automatically without a hard-coded PDP list.
+ * Related products require both the same class/level AND at least one shared
+ * chapter signal. Signals come from the explicit Chapters editor field first,
+ * then existing titles, tags, keywords and curriculum module headings, so old
+ * catalog records remain eligible without guessing from category alone.
  */
-export const getRelatedProducts = (product: Product, catalog: Product[], limit = 3) => {
-  const tags = new Set(product.tags.map((tag) => tag.toLowerCase()));
-  const subject = getProductSubjectLabel(product).toLowerCase();
-  const classLevel = getProductClassLabel(product).toLowerCase();
+export const getRelatedProducts = (product: Product, catalog: Product[], limit = 12) => {
+  const classKey = relatedClassKey(product);
+  const chapterKeys = relatedChapterKeys(product);
+  if (!classKey || chapterKeys.size === 0) return [];
+
   return catalog
     .filter((candidate) => candidate.id !== product.id)
     .map((candidate) => {
-      const sharedTags = candidate.tags.reduce((count, tag) => count + (tags.has(tag.toLowerCase()) ? 1 : 0), 0);
-      const candidateSubject = getProductSubjectLabel(candidate).toLowerCase();
-      const candidateClassLevel = getProductClassLabel(candidate).toLowerCase();
-      const score =
-        (subject && subject === candidateSubject ? 8 : 0)
-        + (candidate.category === product.category ? 5 : 0)
-        + (classLevel && classLevel === candidateClassLevel ? 3 : 0)
-        + sharedTags * 2;
-      return { candidate, score };
+      const candidateClassKey = relatedClassKey(candidate);
+      if (candidateClassKey !== classKey) return null;
+      const sharedChapterKeys = [...relatedChapterKeys(candidate)].filter((key) => chapterKeys.has(key));
+      if (sharedChapterKeys.length === 0) return null;
+      const sameSubject = getProductSubjectLabel(candidate).toLocaleLowerCase() === getProductSubjectLabel(product).toLocaleLowerCase();
+      return { candidate, sharedChapterCount: sharedChapterKeys.length, sameSubject };
     })
-    .sort((a, b) => b.score - a.score || b.candidate.rating - a.candidate.rating || a.candidate.title.localeCompare(b.candidate.title))
-    .slice(0, limit)
+    .filter((item): item is { candidate: Product; sharedChapterCount: number; sameSubject: boolean } => Boolean(item))
+    .sort((a, b) =>
+      b.sharedChapterCount - a.sharedChapterCount
+      || Number(b.sameSubject) - Number(a.sameSubject)
+      || b.candidate.rating - a.candidate.rating
+      || a.candidate.title.localeCompare(b.candidate.title),
+    )
+    .slice(0, Math.max(0, limit))
     .map(({ candidate }) => candidate);
 };
 
@@ -213,6 +291,17 @@ function PremiumProductContent({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewNotice, setReviewNotice] = useState("");
+  const [showReviewsPage, setShowReviewsPage] = useState(false);
+
+  useEffect(() => {
+    const syncReviewsRoute = () => {
+      const query = window.location.hash.split("?").slice(1).join("?");
+      setShowReviewsPage(new URLSearchParams(query).get("reviews") === "1");
+    };
+    syncReviewsRoute();
+    window.addEventListener("hashchange", syncReviewsRoute);
+    return () => window.removeEventListener("hashchange", syncReviewsRoute);
+  }, [product.id]);
 
   const gallery = useMemo(() => getProductImageSources(product), [product]);
   const visibleGallery = gallery.filter((image) => !failedImageSources.has(image));
@@ -286,7 +375,7 @@ function PremiumProductContent({
   const ownedResourceIds = resolution.ownedResourceIds;
   const identity = getProductPresentation(product);
   const instructorLabel = getProductInstructorLabel(product);
-  const related = useMemo(() => getRelatedProducts(product, products, 6), [product, products]);
+  const related = useMemo(() => getRelatedProducts(product, products, 12), [product, products]);
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
@@ -549,6 +638,20 @@ function PremiumProductContent({
     }
   };
 
+  const toggleReviewComposer = () => {
+    if (!user) {
+      window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
+      return;
+    }
+    setReviewComposerOpen((open) => !open);
+  };
+  const openReviewsPage = () => {
+    window.location.hash = `#/product/${encodeURIComponent(product.id)}?reviews=1`;
+  };
+  const backToProduct = () => {
+    window.location.hash = `#/product/${encodeURIComponent(product.id)}`;
+  };
+
   const classLabel = getProductClassLabel(product);
   const subjectLabel = identity.subjectLabel;
   const metadataItems = [
@@ -563,6 +666,39 @@ function PremiumProductContent({
   const hasPurchaseBuilder = !isProductOwned && !unavailable && Boolean(product.canonicalModules?.length);
   const firstAvailableUpdate = availablePaidUpdates[0];
   const updateBenefits = firstAvailableUpdate ? buildUpdateBenefits(firstAvailableUpdate) : [];
+
+  if (showReviewsPage) {
+    return (
+      <div data-pdp-root data-pdp-reviews-page className="relative min-h-full pb-8 text-white">
+        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
+          <button
+            type="button"
+            data-pdp-reviews-back
+            onClick={backToProduct}
+            className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/80 transition hover:bg-white/[0.08] hover:text-white"
+          >
+            <ChevronRight aria-hidden="true" className="h-4 w-4 rotate-180" />
+            Back to product
+          </button>
+          <ReviewsCard
+            mode="full"
+            product={product}
+            reviews={productReviews}
+            canReview={Boolean(user)}
+            composerOpen={reviewComposerOpen}
+            rating={reviewRating}
+            comment={reviewComment}
+            submitting={reviewSubmitting}
+            notice={reviewNotice}
+            onToggleComposer={toggleReviewComposer}
+            onRating={setReviewRating}
+            onComment={setReviewComment}
+            onSubmit={() => void submitReview()}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div data-pdp-root className="relative pb-5 text-white">
@@ -853,6 +989,7 @@ function PremiumProductContent({
 
           <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard
+            mode="preview"
             product={product}
             reviews={productReviews}
             canReview={Boolean(user)}
@@ -861,13 +998,8 @@ function PremiumProductContent({
             comment={reviewComment}
             submitting={reviewSubmitting}
             notice={reviewNotice}
-            onToggleComposer={() => {
-              if (!user) {
-                window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
-                return;
-              }
-              setReviewComposerOpen((open) => !open);
-            }}
+            onToggleComposer={toggleReviewComposer}
+            onSeeAllReviews={openReviewsPage}
             onRating={setReviewRating}
             onComment={setReviewComment}
             onSubmit={() => void submitReview()}
@@ -1242,7 +1374,8 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   );
 }
 
-const REVIEW_PAGE_SIZE = 6;
+const REVIEW_PREVIEW_SIZE = 4;
+const REVIEW_PAGE_SIZE = 8;
 
 function getProductRatingSummary(product: Product, reviews: PublishedProductReview[]) {
   if (Number.isFinite(product.rating) && product.rating > 0 && product.reviews > 0) {
@@ -1254,7 +1387,8 @@ function getProductRatingSummary(product: Product, reviews: PublishedProductRevi
   return { rating: average, count: ratings.length, hasRating: true, source: "published" as const };
 }
 
-function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
+function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onSeeAllReviews, onRating, onComment, onSubmit }: {
+  mode: "preview" | "full";
   product: Product;
   reviews: PublishedProductReview[];
   canReview: boolean;
@@ -1264,6 +1398,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   submitting: boolean;
   notice: string;
   onToggleComposer: () => void;
+  onSeeAllReviews?: () => void;
   onRating: (rating: number) => void;
   onComment: (comment: string) => void;
   onSubmit: () => void;
@@ -1272,15 +1407,28 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   useEffect(() => {
     setVisibleCount(REVIEW_PAGE_SIZE);
   }, [product.id]);
-  const visibleReviews = reviews.slice(0, visibleCount);
-  const remaining = Math.max(0, reviews.length - visibleCount);
+  const visibleReviews = reviews.slice(0, mode === "preview" ? REVIEW_PREVIEW_SIZE : visibleCount);
+  const remaining = mode === "full" ? Math.max(0, reviews.length - visibleCount) : 0;
   const ratingSummary = getProductRatingSummary(product, reviews);
+  const identity = getProductPresentation(product);
+
   return (
-    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="dc-scene-plate scroll-mt-36 text-white" contentClassName="p-4 sm:p-5">
+    <GlassSurface
+      data-pdp-reviews
+      data-pdp-review-mode={mode}
+      id={mode === "preview" ? "product-reviews" : undefined}
+      radius={24}
+      tint={0.25}
+      blur={0}
+      className="dc-scene-plate scroll-mt-36 text-white"
+      contentClassName="p-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-white">Ratings &amp; Reviews</h2>
-          <p className="mt-1 text-xs text-white/55">Published feedback for this product</p>
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-white">{mode === "full" ? "Reviews & Ratings" : "Ratings & Reviews"}</h2>
+          <p className="mt-1 break-words text-xs text-white/55">
+            {mode === "full" ? `Published feedback for ${identity.title}` : "Published feedback for this product"}
+          </p>
         </div>
         <button
           type="button"
@@ -1341,7 +1489,11 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
       {notice && <p role="status" aria-live="polite" className="mt-3 rounded-xl border border-indigo-300/10 bg-indigo-500/10 p-3 text-xs font-medium text-indigo-100">{notice}</p>}
 
       {reviews.length > 0 ? (
-        <div data-pdp-review-list className="mt-4 grid grid-cols-1 gap-3">
+        <div
+          data-pdp-review-list
+          data-pdp-review-preview-limit={mode === "preview" ? REVIEW_PREVIEW_SIZE : undefined}
+          className="mt-4 grid grid-cols-1 gap-3"
+        >
           {visibleReviews.map((review) => (
             <SimplePanel className="dc-pdp-review min-w-0" key={review.id} contentClassName="p-4">
               <article>
@@ -1368,52 +1520,137 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
               className="min-h-11 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-semibold"
             >
-              Load {Math.min(REVIEW_PAGE_SIZE, remaining)} more reviews
+              Show {Math.min(REVIEW_PAGE_SIZE, remaining)} more reviews
             </GlassButton>
           ) : null}
         </div>
-      ) : <p className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-sm text-white/60">No published written reviews yet.</p>}
+      ) : (
+        <p className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-sm text-white/60">
+          No published written reviews yet.
+        </p>
+      )}
+
+      {mode === "preview" ? (
+        <button type="button" data-see-all-reviews onClick={onSeeAllReviews} className="dc-pdp-review-action mt-4 w-full">
+          See all reviews
+        </button>
+      ) : null}
     </GlassSurface>
   );
 }
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
-  if (!onNavigate) return null;
+  const [activePages, setActivePages] = useState<[number, number]>([0, 0]);
+  const productSignature = products.map((item) => item.id).join("|");
+  useEffect(() => setActivePages([0, 0]), [productSignature]);
+  if (!onNavigate || products.length === 0) return null;
+
+  // Interleave the relevance-ranked catalog so each row starts with a strong
+  // match instead of putting every highest-ranked item on the same rail.
+  const rows = [
+    products.filter((_, index) => index % 2 === 0),
+    products.filter((_, index) => index % 2 === 1),
+  ];
+  const movePage = (rowIndex: 0 | 1, delta: number, pageCount: number) => {
+    setActivePages((current) => {
+      const next = [...current] as [number, number];
+      next[rowIndex] = Math.max(0, Math.min(pageCount - 1, current[rowIndex] + delta));
+      return next;
+    });
+  };
+
   return (
     <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-4 sm:p-5">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-white">You may also like</h2>
-        <p className="mt-1 text-xs text-white/55">Other products from the live catalog</p>
-      </div>
-      <div data-pdp-related-list className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {products.map((item) => {
-          const identity = getProductPresentation(item);
-          const image = getProductImageSources(item)[0];
+      <header className="mb-4">
+        <h2 className="text-xl font-bold text-white">Related products</h2>
+        <p className="mt-1 text-xs text-white/55">More to explore from the same class and chapters</p>
+      </header>
+      <div data-pdp-related-list className="flex flex-col gap-5">
+        {rows.map((rowProducts, rowIndex) => {
+          if (rowProducts.length === 0) return null;
+          const pages = Array.from({ length: Math.ceil(rowProducts.length / 2) }, (_, pageIndex) =>
+            rowProducts.slice(pageIndex * 2, pageIndex * 2 + 2),
+          );
+          const pageIndex = Math.min(activePages[rowIndex], pages.length - 1);
+          const rowNumber = rowIndex + 1;
+          const viewportId = `pdp-related-row-${rowNumber}`;
           return (
-            <SimplePanel
-              key={item.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onNavigate(item)}
-              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate(item); } }}
-              aria-label={`View ${identity.title}`}
-              className="group min-w-0 cursor-pointer overflow-hidden text-left transition-colors hover:border-indigo-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300"
-              contentClassName="flex min-w-0 p-0"
-            >
-              <ProductImageThumb product={item} source={image} />
-              <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3">
-                <span className="dc-pdp-related-type">{identity.typeLabel}</span>
-                <span className="break-words text-sm font-semibold text-white">{identity.title}</span>
-                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/60">
-                  {item.reviews > 0 && item.rating > 0 ? <><RatingStars rating={item.rating} />{item.rating.toFixed(1)} · {item.reviews.toLocaleString("en-IN")} ratings</> : "No ratings yet"}
-                </span>
-                <span className="font-semibold tabular-nums text-white">{formatPrice(item.price)}</span>
-              </span>
-            </SimplePanel>
+            <section key={rowNumber} data-pdp-related-row={rowNumber} className="min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-xs font-semibold text-white/65">Recommendations {rowNumber}</h3>
+                <div className="flex items-center gap-1.5" aria-label={`Slide controls for related products row ${rowNumber}`}>
+                  <button
+                    type="button"
+                    data-pdp-related-prev={rowNumber}
+                    aria-label={`Previous related products, row ${rowNumber}`}
+                    aria-controls={viewportId}
+                    disabled={pageIndex === 0}
+                    onClick={() => movePage(rowIndex as 0 | 1, -1, pages.length)}
+                    className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    data-pdp-related-next={rowNumber}
+                    aria-label={`Next related products, row ${rowNumber}`}
+                    aria-controls={viewportId}
+                    disabled={pageIndex >= pages.length - 1}
+                    onClick={() => movePage(rowIndex as 0 | 1, 1, pages.length)}
+                    className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div id={viewportId} data-pdp-related-viewport className="min-w-0" aria-live="polite">
+                <div
+                  data-pdp-related-track
+                  data-active-page={pageIndex}
+                  className="flex min-w-0 transition-transform duration-300 ease-out motion-reduce:transition-none"
+                  style={{ transform: `translate3d(-${pageIndex * 100}%, 0, 0)` }}
+                >
+                  {pages.map((page, index) => (
+                    <div key={index} data-pdp-related-page className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                      {page.map((item) => (
+                        <RelatedProductCard key={item.id} item={item} onNavigate={onNavigate} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
           );
         })}
       </div>
     </GlassSurface>
+  );
+}
+
+function RelatedProductCard({ item, onNavigate }: { item: Product; onNavigate: (product: Product) => void }) {
+  const identity = getProductPresentation(item);
+  const image = getProductImageSources(item)[0];
+  return (
+    <SimplePanel
+      data-pdp-related-card
+      role="button"
+      tabIndex={0}
+      onClick={() => onNavigate(item)}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate(item); } }}
+      aria-label={`View ${identity.title}`}
+      className="group min-w-0 cursor-pointer overflow-hidden text-left transition-colors hover:border-indigo-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300"
+      contentClassName="flex min-w-0 p-0"
+    >
+      <ProductImageThumb product={item} source={image} />
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3">
+        <span className="dc-pdp-related-type">{identity.typeLabel}</span>
+        <span className="break-words text-sm font-semibold text-white">{identity.title}</span>
+        <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/60">
+          {item.reviews > 0 && item.rating > 0 ? <><RatingStars rating={item.rating} />{item.rating.toFixed(1)} · {item.reviews.toLocaleString("en-IN")} ratings</> : "No ratings yet"}
+        </span>
+        <span className="font-semibold tabular-nums text-white">{formatPrice(item.price)}</span>
+      </span>
+    </SimplePanel>
   );
 }
 

@@ -28,7 +28,7 @@ test("review cards navigate to that product's PDP review section", () => {
   assert.match(main, /\?section=reviews/);
   assert.match(pdp, /section=reviews/);
   assert.match(pdp, /getElementById\("product-reviews"\)/);
-  assert.match(pdp, /id="product-reviews"/);
+  assert.match(pdp, /id=\{mode === "preview" \? "product-reviews" : undefined\}/);
 });
 
 test("PDP renders only published reviews matched to the current product", () => {

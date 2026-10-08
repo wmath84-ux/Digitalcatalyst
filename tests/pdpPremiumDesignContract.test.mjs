@@ -22,15 +22,24 @@ test("premium PDP uses live products rather than imported showcase product data"
   assert.match(pdp, /product\.images/);
 });
 
-test("related products are deterministic live-catalog matches", () => {
+test("related products match the live catalog by class and shared chapter", () => {
   assert.match(pdp, /getRelatedProducts/);
   assert.match(pdp, /candidate\.id !== product\.id/);
-  assert.match(pdp, /getProductSubjectLabel\(candidate\)/);
-  assert.match(pdp, /subject && subject === candidateSubject/);
-  assert.match(pdp, /candidate\.category === product\.category/);
-  assert.match(pdp, /getProductClassLabel\(candidate\)/);
+  assert.match(pdp, /relatedClassKey/);
+  assert.match(pdp, /relatedChapterKeys/);
+  assert.match(pdp, /candidateClassKey !== classKey/);
+  assert.match(pdp, /sharedChapterKeys\.length === 0/);
+  assert.match(pdp, /Array\.isArray\(product\.chapters\)/);
   assert.match(main, /products=\{products\}/);
   assert.doesNotMatch(pdp, /Math\.random/);
+});
+
+test("related products use two button-controlled rows, not drag scrolling", () => {
+  assert.match(pdp, /data-pdp-related-row=\{rowNumber\}/);
+  assert.match(pdp, /data-pdp-related-prev=\{rowNumber\}/);
+  assert.match(pdp, /data-pdp-related-next=\{rowNumber\}/);
+  assert.match(pdp, /translate3d\(-\$\{pageIndex \* 100\}%/);
+  assert.doesNotMatch(pdp.slice(pdp.indexOf("function RelatedProducts"), pdp.indexOf("function RelatedProductCard")), /useDragScroll|onPointerDown/);
 });
 
 test("all premium PDP commerce controls are wired to app handlers", () => {

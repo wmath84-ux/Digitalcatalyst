@@ -268,6 +268,7 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
     category: str(normalizedBody.category),
     productType: str(normalizedBody.productType, "course"),
     subject: str(normalizedBody.subject),
+    chapters: strList(normalizedBody.chapters),
     sku: str(normalizedBody.sku),
     language: str(normalizedBody.language, "English"),
     dimensions: str(normalizedBody.classLevel || normalizedBody.estimatedDuration),

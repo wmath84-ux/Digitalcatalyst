@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
  * PaymentButton — the app's ONE payment CTA.
  *
  * A faithful React port of Creatlydev's "pretty-grasshopper-57" Uiverse
- * button (https://uiverse.io/Creatlydev/pretty-grasshopper-57); the complete
- * visual behaviour (white capsule, brand-coloured icon plate, the colour
- * panel that wipes in from the left over .3s, the label that turns white in
- * the same beat, the soft 10/10/20 drop shadow, the 24px radius that renders
- * as a capsule at the reference's 40px height) lives in `payment-button.css`
+ * button (https://uiverse.io/Creatlydev/pretty-grasshopper-57), with a clean
+ * white idle surface and indigo icon. The accent wipe and icon plate appear
+ * only on interaction/loading; the label turns white in the same beat. The
+ * soft 10/10/20 shadow and 24px radius live in `payment-button.css`
  * and is not re-interpreted here.
  *
  * It is used for EVERY payment / purchase / checkout action in the product —
@@ -40,7 +39,7 @@ export interface PaymentButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
   block?: boolean;
   /** Scale variant — pure `font-size`, so every proportion stays the reference's. */
   size?: PaymentButtonSize;
-  /** The reference's `--clr`: the colour of the icon plate and of the hover wipe. */
+  /** Accent used for the hover wipe, interactive icon plate, and loading state; idle remains white. */
   color?: string;
   /** Optional glyph replacement for the reference's icon slot. */
   icon?: ReactNode;
@@ -79,8 +78,8 @@ function PaymentsGlyph() {
       <mask id={maskId} fill="#fff">
         <path fillRule="evenodd" clipRule="evenodd" d={markPath} />
       </mask>
-      <path fillRule="evenodd" clipRule="evenodd" d={markPath} fill="#fff" />
-      <path d={maskPath} fill="#fff" mask={`url(#${maskId})`} />
+      <path fillRule="evenodd" clipRule="evenodd" d={markPath} fill="currentColor" />
+      <path d={maskPath} fill="currentColor" mask={`url(#${maskId})`} />
       <defs>
         <linearGradient id={gradId} x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#fff" stopOpacity="0.71" />

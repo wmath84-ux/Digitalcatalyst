@@ -29,10 +29,12 @@ test("the banner is mounted once in the app shell", () => {
   assert.equal((main.match(/<RenewalNotice \/>/g) || []).length, 1);
 });
 
-test("the renew CTA opens the subscription page in manage mode", () => {
-  assert.match(main, /SUBSCRIPTION_HASH\}\?renew=1/);
-  // The subscription page must understand that param.
-  assert.match(read("src/subscription/components/SubscriptionPage.tsx"), /renew=1/);
+test("the renew CTA opens the shared subscription plan-selection page", () => {
+  assert.match(main, /onRenew=\{\(\) => \{\s*window\.location\.hash = SUBSCRIPTION_HASH;\s*\}\}/);
+  const page = read("src/subscription/components/SubscriptionPage.tsx");
+  assert.match(page, /getDoc\(doc\(db, "users", user\.id, "subscription", "current"\)\)/);
+  assert.match(page, /const pickerPlans = useMemo/);
+  assert.doesNotMatch(page, /renew=1|manageMode/);
 });
 
 test("the banner stays quiet where it would be redundant or intrusive", () => {

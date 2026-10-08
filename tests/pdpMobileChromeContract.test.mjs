@@ -54,14 +54,15 @@ test("every pack surface on the product page takes the shared plate", () => {
     /<GlassSurface data-product-share radius=\{20\} className="dc-scene-plate absolute right-0 top-12/,
     /<GlassSurface radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate text-white" contentClassName="p-4">/, // coupon
     /<GlassSurface data-pdp-details radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate overflow-hidden text-white"/,
-    /<GlassSurface data-pdp-reviews id="product-reviews" radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate scroll-mt-36 text-white"/,
+    /<GlassSurface\s+data-pdp-reviews[\s\S]*?id=\{mode === "preview" \? "product-reviews" : undefined\}[\s\S]*?radius=\{24\}[\s\S]*?tint=\{0\.25\}[\s\S]*?blur=\{0\}[\s\S]*?className="dc-scene-plate scroll-mt-36 text-white"/,
     /<GlassSurface data-pdp-related radius=\{24\} className="dc-scene-plate text-white"/,
   ];
   for (const surface of surfaces) assert.match(pdp, surface, `missing plate: ${surface}`);
   // No surface on the page is left unplated.
   assert.doesNotMatch(pdp, /<GlassSurface (?![^>]*dc-scene-plate)/, "a GlassSurface on the PDP has no plate");
   // The pinned sensitivity is untouched — the plate is the fix, not a re-tune.
-  assert.equal(pdp.match(/tint=\{0\.25\} blur=\{0\}/g).length, 7);
+  assert.equal(pdp.match(/tint=\{0\.25\}/g)?.length, 7);
+  assert.equal(pdp.match(/blur=\{0\}/g)?.length, 7);
   assert.doesNotMatch(pdp, /tint=\{0\.[3-9]/);
 });
 

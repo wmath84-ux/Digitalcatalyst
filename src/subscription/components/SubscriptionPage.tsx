@@ -12,9 +12,9 @@
 // quote-driven flow as products / modules / updates.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
-import { BadgeCheck, BookOpen, CalendarClock, CreditCard, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { CalendarClock, CreditCard, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
 import Header from "../../components/Header";
 import BottomNav, { type TabKey } from "../../components/BottomNav";
 import StackedCards from "./StackedCards";
@@ -28,9 +28,7 @@ import PriceSummary from "./PriceSummary";
 import PricingGlassCard from "./PricingGlassCard";
 import { GlassButton } from "../../components/ui/glass-button";
 import SubscribeBar from "./SubscribeBar";
-import { PaymentButton } from "../../components/ui/PaymentButton";
 import HelpModal from "./HelpModal";
-import SubscriberActiveBadge from "../../components/subscription/SubscriberActiveBadge";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
@@ -54,20 +52,12 @@ import FeaturePricingTiers from "./FeaturePricingTiers";
 import PlanComparisonTable from "./PlanComparisonTable";
 import LiveSelectionCard from "./LiveSelectionCard";
 import GlassModal from "../../components/ui/glass-modal";
-import ActiveMemberView from "./ActiveMemberView";
-import OwnedPlanCard from "./OwnedPlanCard";
 import "../subscription-minimal.css";
 import {
-  buildOwnedPlanSummary,
   evaluatePlanChange,
   evaluateSubscriptionSelection,
 } from "../../../utils/subscriptionOwnership";
-import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
-import {
-  buildRenewalView,
-  formatExpiryDate,
-  toMillis as renewalToMillis,
-} from "../../../utils/renewalPresentation";
+import { toMillis as renewalToMillis } from "../../../utils/renewalPresentation";
 import { OverlayBoundsProvider } from "../../components/ui/overlayBounds";
 import {
   startCheckout,
@@ -75,6 +65,7 @@ import {
   type SubscriptionFeatureDoc,
   type SubscriptionPlanDoc,
 } from "../utils/subscriptionCatalog";
+import { loadSubscriptionCatalog } from "../utils/loadSubscriptionCatalog";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -128,16 +119,6 @@ export default function SubscriptionPage({
 
   // The buyer's live subscription record (null when never subscribed).
   const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
-  // When true the member deliberately opened the buy flow (renew or
-  // change plan) and we show the full purchase UI again.
-  const [manageMode, setManageMode] = useState<boolean>(
-    () => typeof window !== "undefined" && /[?&]renew=1/.test(window.location.hash),
-  );
-  // When true the member explicitly wants to ADD features / courses to their
-  // current plan (an add-on upgrade) — the pickers stay visible even though
-  // the selected plan + cycle is the one they already own.
-  const [addOnIntent, setAddOnIntent] = useState<boolean>(false);
-
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -223,8 +204,8 @@ export default function SubscriptionPage({
     };
   }, []);
 
-  // Live subscription record. Drives the member view: an active
-  // subscriber must never be shown the buy flow again by default.
+  // Live subscription record. It drives plan ownership and checkout guards;
+  // the membership summary and reminder controls now live in Profile.
   useEffect(() => {
     if (!user) { setActiveSubscription(null); return undefined; }
     return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
@@ -676,10 +657,9 @@ export default function SubscriptionPage({
     payablePaise: Math.max(subtotalPaise, minPayablePaise),
   });
 
-  // ---------- Membership state ----------
-  // An active subscriber sees the member dashboard, never the buy flow,
-  // unless they explicitly chose to renew or change their plan.
-  const showMemberView = isActiveMember && !manageMode;
+  // Active and free accounts both land on this same plan-selection page.
+  // Membership management lives in Profile; the existing ownership guards
+  // below still prevent repeat purchases and enforce the no-downgrade rules.
 
   // ---------------------------------------------------------------------------
   // NO-DOWNGRADE plan ladder. An active member never sees the plans BELOW
@@ -701,12 +681,6 @@ export default function SubscriptionPage({
       return order >= ownedPlanOrder;
     });
   }, [plans, isActiveMember, ownedPlanOrder, ownedPlanId, gateSettings.planVisibility]);
-
-  // Higher plans only — the plans a member can actually switch TO.
-  const upgradePlans = useMemo(
-    () => pickerPlans.filter((candidate) => candidate.active && candidate.id !== ownedPlanId),
-    [pickerPlans, ownedPlanId],
-  );
 
   // If the selection falls outside the ladder (e.g. the catalog loaded after
   // the default pre-select picked the lowest plan for a Premium member), snap
@@ -733,14 +707,6 @@ export default function SubscriptionPage({
     }
   }, [isActiveMember, ownedCycle, selectedPlanId, ownedPlanId, cycle]);
 
-  const memberRenewalView = useMemo(() => {
-    if (!activeSubscription) return null;
-    const memberPlanName =
-      plans.find((p) => p.id === String(activeSubscription.planId || ""))?.name ||
-      String(activeSubscription.planId || "Subscription");
-    return buildRenewalView(getRenewalReminder(activeSubscription), { planName: memberPlanName });
-  }, [activeSubscription, plans]);
-
   const memberFeatureIds = useMemo(
     () => (Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []),
     [activeSubscription],
@@ -760,44 +726,6 @@ export default function SubscriptionPage({
     }
     return Array.from(owned);
   }, [features, memberFeatureIds, selectedPlanId, cycle]);
-  const memberFeatures = useMemo(
-    () => rawFeatures.filter((feature) => memberFeatureIds.includes(feature.id)),
-    [rawFeatures, memberFeatureIds],
-  );
-  const memberProductTitles = useMemo(() => {
-    const ids = new Set(
-      Array.isArray(activeSubscription?.includedProductIds)
-        ? activeSubscription.includedProductIds.map(String)
-        : [],
-    );
-    return availableProducts.filter((product) => productHasId(product, ids)).map((product) => product.title);
-  }, [activeSubscription, availableProducts]);
-
-  // ---------- Owned-plan summary card ----------
-  // The shared ownership verdict (computed in the pricing block above) drives
-  // this card: when the buyer lands on the exact plan + cycle they already
-  // own, the buy flow is replaced by a statement of what is active — except
-  // while the member is browsing add-ons for that plan (`addOnIntent`), when
-  // the pickers reopen and only the new items are ever charged.
-  const ownedPlanSummary = useMemo(() => {
-    // The owned card is replaced by the pickers while the member is browsing
-    // add-ons for their current plan.
-    if (!isSelectionOwned || addOnIntent) return null;
-    return buildOwnedPlanSummary<SubscriptionFeatureDoc>({
-      record: activeSubscription,
-      planName:
-        plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name ||
-        String(activeSubscription?.planId || "Your plan"),
-      features: memberFeatures,
-      productTitles: memberProductTitles,
-    });
-  }, [activeSubscription, isSelectionOwned, addOnIntent, memberFeatures, memberProductTitles, plans]);
-
-  // Plans the member could still switch to — used for the "want something
-  // different?" hint on the owned card. Only HIGHER plans are offered: a
-  // downgrade is never purchasable, so it is never advertised either.
-  const purchasablePlanNames = useMemo(() => upgradePlans.map((p) => p.name), [upgradePlans]);
-
   // Course picker owned ids: store-purchased products (already in the
   // catalog) UNION products unlocked by the active subscription — neither
   // can ever be re-selected, so they are never charged a second time.
@@ -1037,175 +965,32 @@ export default function SubscriptionPage({
               </div>
             ) : (
               <>
-      {/* The page formerly rendered a second sticky title bar here ("Manage
-          plan" / "My membership" / "Go Premium") with its own back button and
-          the help (?) icon. That extra header is removed; the help icon now
-          lives on the main app Header above (onHelpClick) so it is visible on
-          every subscription page state. */}
-
-      {/* ── HERO ────────────────────────────────────────────────────────────
-          One panel that says what this page is and what is true for THIS
-          visitor (member or buyer). It replaces the old unlabelled stack of
-          cards: a tablet/desktop visitor now lands on a titled, bounded
-          workspace instead of a phone column floating in empty space. */}
+      {/* This is the plan-selection page for every account. Active membership
+          details and controls live in Profile, while ownership and upgrade
+          safeguards remain enforced in this purchase flow. */}
       <section data-subscription-hero aria-labelledby="subscription-hero-title">
         <span className="dc-sub-eyebrow">
-          {showMemberView ? (
-            <>
-              <BadgeCheck className="h-3 w-3" aria-hidden="true" /> Active membership
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-3 w-3" aria-hidden="true" /> Eduvora plans
-            </>
-          )}
+          <Sparkles className="h-3 w-3" aria-hidden="true" /> Eduvora plans
         </span>
         <h1 id="subscription-hero-title">
-          {showMemberView
-            ? `${plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || "Your plan"} membership`
-            : plan
-              ? `${plan.name} — choose your duration`
-              : "Choose the plan that fits how you study"}
+          {plan ? `${plan.name} — choose your duration` : "Choose the plan that fits how you study"}
         </h1>
         <p className="dc-sub-lede">
-          {showMemberView
-            ? `Everything you unlocked stays active until ${formatExpiryDate(subscriptionExpiresAtMs)}. Renew, add more, or move to a higher plan whenever you want — nothing changes without your confirmation.`
-            : "One plan, plus only the courses and features you actually want. Every price is re-checked on the server before any payment, and we remind you before the cycle ends."}
+          One plan, plus only the courses and features you actually want. Every price is re-checked on the server before any payment, and we remind you before the cycle ends.
         </p>
         <div className="dc-sub-trust">
-          {showMemberView ? (
-            <>
-              <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Active until {formatExpiryDate(subscriptionExpiresAtMs)}</span>
-              <span><BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> {memberFeatures.length} feature{memberFeatures.length === 1 ? "" : "s"} unlocked</span>
-              {memberProductTitles.length > 0 ? (
-                <span><BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> {memberProductTitles.length} bonus course{memberProductTitles.length === 1 ? "" : "s"}</span>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <span><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Server-verified pricing</span>
-              <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Reminder before the cycle ends</span>
-              <span><CreditCard className="h-3.5 w-3.5" aria-hidden="true" /> One payment per cycle</span>
-            </>
-          )}
+          <span><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Server-verified pricing</span>
+          <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Reminder before the cycle ends</span>
+          <span><CreditCard className="h-3.5 w-3.5" aria-hidden="true" /> One payment per cycle</span>
         </div>
       </section>
 
-      {/* An active member gets the membership dashboard, not the buy flow. */}
-      {showMemberView ? (
-        <div className="flex-1">
-          <div className="mt-4">
-            <SubscriberActiveBadge
-              planLabel={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || null}
-              expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
-            />
-          </div>
-          <ActiveMemberView
-            planName={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || String(activeSubscription?.planId || "Your plan")}
-            plan={plans.find((p) => p.id === String(activeSubscription?.planId || "")) || null}
-            cycle={activeSubscription?.cycle === "yearly" ? "yearly" : "monthly"}
-            unlockedFeatures={memberFeatures}
-            unlockedProductTitles={memberProductTitles}
-            expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
-            renewalView={memberRenewalView}
-            reminderOptOut={Boolean(activeSubscription?.renewalReminderOptOut)}
-            onRenew={() => setManageMode(true)}
-            onChangePlan={() => {
-              // Open directly on the next HIGHER plan so an existing
-              // subscriber can immediately upgrade. Lower plans are never
-              // offered — a membership can only move up while it is active.
-              const nextPlan = upgradePlans[0] || null;
-              if (nextPlan) setSelectedPlanId(nextPlan.id);
-              setManageMode(true);
-            }}
-            onToggleReminders={(next) => {
-              if (!user) return;
-              void updateDoc(doc(db, "users", user.id, "subscription", "current"), {
-                renewalReminderOptOut: next,
-              }).catch(() => undefined);
-            }}
-            onOpenFeature={(featureId) => {
-              if (featureId === "my-day") window.location.hash = "#/my-day";
-              if (featureId === "revision") window.location.hash = "#/revision";
-            }}
-          />
-          <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
-          {/* BOTTOM-most action: a clear "Upgrade" button for existing
-              subscribers who want a HIGHER plan. Lives at the very end
-              of the member dashboard so the user always sees the path
-              to upgrade. Tapping it opens the buy flow on the next
-              higher plan. */}
-          {upgradePlans.length > 0 ? (
-            <div className="mt-5 mb-4 flex flex-col items-stretch gap-2">
-              {/* Upgrade CTA — the app-wide payment button, so the path into a
-                  higher plan looks and behaves like every other purchase entry
-                  point. Same handler, same plan pick, same manage-mode
-                  switch; the focus ring is the component's own. */}
-              <PaymentButton
-                block
-                size="md"
-                data-subscription-upgrade-button=""
-                onClick={() => {
-                  const next = upgradePlans[0];
-                  if (!next) return;
-                  setSelectedPlanId(next.id);
-                  setManageMode(true);
-                }}
-                label="Upgrade — view higher plans"
-              />
-              <span className="text-center text-[11px] font-medium text-white/55">
-                Move to a higher plan anytime. Your current membership stays active until the cycle ends.
-              </span>
-            </div>
-          ) : null}
-        </div>
-      ) : (
-      <>
       <div className="flex-1 pb-4">
-        {/* Returning member who chose to renew / change plan / add items.
-            The old info banner ("You already have an active membership…")
-            was removed on request; only the Cancel control remains so the
-            member can exit the buy flow back to their membership dashboard. */}
-        {isActiveMember && manageMode ? (
-          <div className="mt-4 flex justify-end">
-            <GlassButton
-              variant="capsule"
-              type="button"
-              onClick={() => {
-                setManageMode(false);
-                setAddOnIntent(false);
-              }}
-              className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black [&>span>div]:text-violet-200"
-            >
-              Cancel
-            </GlassButton>
-          </div>
-        ) : null}
         {/* Fallback catalog banner removed — default plans are always shown
             with accurate pricing, so the warning added noise without value. */}
-        {/* Already-owned selection: the entire buy flow below is replaced by
-            a single statement of what is active. Nothing purchasable is
-            rendered, so the same subscription type cannot be bought twice —
-            EXCEPT through the explicit add-on path ("Add features / courses"),
-            which reopens the pickers and only ever charges the new items.
-            On desktop the buy flow splits into a two-column workspace: the
-            configuration surface (showcase + plan + add-ons + discounts) in
-            the main column, and a persistent review rail (live card + price
-            summary) that stays beside the pointer while the buyer edits. */}
-        {isSelectionOwned && ownedPlanSummary ? (
-            <OwnedPlanCard
-              summary={ownedPlanSummary}
-              expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
-              renewalOpensAtLabel={formatExpiryDate(ownedPlanSummary.renewalOpensAt)}
-              otherPlanNames={purchasablePlanNames}
-              onSeeOtherPlans={() => {
-                // Only HIGHER plans are ever offered (no-downgrade rule).
-                const firstUpgrade = upgradePlans[0] || null;
-                if (firstUpgrade) setSelectedPlanId(firstUpgrade.id);
-              }}
-              onAddMore={() => setAddOnIntent(true)}
-            />
-        ) : (
+        {/* The plan picker remains visible for every account. Ownership is
+            still checked by the quote/CTA guards, while Profile owns renewal
+            details and member-management actions. */}
         <div data-subscription-layout data-subscription-workspace>
           <div data-subscription-main className="min-w-0">
             {/* The swipeable plan deck is the ONE deliberately glassy surface
@@ -1443,10 +1228,9 @@ export default function SubscriptionPage({
             </p>
           </aside>
         </div>
-        )}
 
-        {/* Bottom instructions — moved from top per user request: carry-over, current plan, add-on notes should be at bottom, not top */}
-        {isActiveMember && manageMode ? (
+        {/* Selection and carry-over notes stay with the plan picker. */}
+        {isActiveMember ? (
           <div className="mt-6 flex flex-col gap-2.5 pb-2">
             <div className="flex flex-col gap-2.5">
               {isAddOnUpgrade ? (
@@ -1577,8 +1361,6 @@ export default function SubscriptionPage({
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
       </>
       )}
-      </>
-      )}
           </div>
         </main>
 
@@ -1590,35 +1372,10 @@ export default function SubscriptionPage({
 }
 
 // ---------------------------------------------------------------------------
-// Server-driven catalog loader. The client posts to a thin proxy
-// endpoint that reads the Firestore `subscriptionPlans` /
-// `subscriptionFeatures` / `subscriptionPlanFeatures` /
-// `subscriptionPlanProductUnlocks` / `subscriptionPlanModuleUnlocks`
-// collections and returns a normalised `SubscriptionCatalog`.
+// Subscription catalogue loading is shared with the Profile membership
+// summary so both screens show the same server-normalized plan and feature
+// names.
 // ---------------------------------------------------------------------------
-
-async function loadSubscriptionCatalog(): Promise<SubscriptionCatalog> {
-  const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
-  if (!firebaseUser) {
-    // Allow public read so the page works even when the user is
-    // signed out (the catalog itself is not user-specific).
-  }
-  const token = firebaseUser ? await firebaseUser.getIdToken(true) : "";
-  const response = await apiFetch("/api/subscription-catalog", {
-    method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Could not load subscription plans (server returned ${response.status}).`,
-    );
-  }
-  const data = (await response.json().catch(() => ({}))) as { ok?: boolean; catalog?: SubscriptionCatalog; error?: string };
-  if (!data.ok || !data.catalog) {
-    throw new Error(data.error || "Subscription catalog response was malformed.");
-  }
-  return data.catalog;
-}
 
 // Pre-flight the coupon discount without navigating away from
 // the page. Calls a thin server endpoint that re-quotes the

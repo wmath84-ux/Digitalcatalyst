@@ -408,14 +408,32 @@
   text-align: left;
 }
 
-[data-pdp-root] [data-pdp-related-list] > .dc-simple-panel {
+[data-pdp-root] [data-pdp-related-list] {
+  min-width: 0;
+}
+
+[data-pdp-root] [data-pdp-related-viewport] {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+[data-pdp-root] [data-pdp-related-track] {
+  will-change: transform;
+}
+
+[data-pdp-root] [data-pdp-related-page] {
+  flex: 0 0 100%;
+  width: 100%;
+}
+
+[data-pdp-root] [data-pdp-related-card] {
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.025);
 }
 
-[data-pdp-root] [data-pdp-related-list] img {
+[data-pdp-root] [data-pdp-related-card] img {
   width: 7rem;
   height: 6rem;
   background: #0b1020;
@@ -440,6 +458,17 @@
 
 [data-pdp-root] [data-pdp-review-list] .dc-simple-panel {
   height: 100%;
+}
+
+@media (min-width: 640px) {
+  [data-pdp-root] [data-pdp-review-list] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.875rem;
+  }
+
+  [data-pdp-root] [data-pdp-review-list] [data-load-more-reviews] {
+    grid-column: 1 / -1;
+  }
 }
 
 [data-pdp-root] .dc-pdp-lightbox {
@@ -541,9 +570,6 @@
     grid-column: 1 / -1;
   }
 
-  [data-pdp-root] [data-pdp-related-list] {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-  }
 }
 
 @media (min-width: 640px) and (max-width: 1199px) {
@@ -638,9 +664,6 @@
     height: 2.5rem;
   }
 
-  [data-pdp-root] [data-pdp-related-list] > .dc-simple-panel {
-    min-width: 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

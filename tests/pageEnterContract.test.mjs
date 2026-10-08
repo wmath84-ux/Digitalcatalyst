@@ -73,6 +73,9 @@ test("app keys stay stable for Revision and My Day, follow id for product and co
   assert.equal(pageEnterAppKey("#/profile"), "#/profile");
   assert.equal(pageEnterAppKey("#/usage-limits"), "#/usage-limits");
   assert.equal(pageEnterAppKey("#/profile/subscriber-experience"), null);
+  // The retired management URL is a legacy alias for Profile, not a separate page.
+  assert.doesNotMatch(main, /PROFILE_SUBSCRIBER_EXPERIENCE_HASH|SubscriberExperiencePage/);
+  assert.match(main, /if \(hash\.startsWith\(PROFILE_HASH\)\) return <PageEnter pageKey=\{pageEnterAppKey\(hash\)\}><ProfileApp \/><\/PageEnter>/);
   assert.equal(pageEnterAppKey("#/cart"), "#/cart");
   assert.equal(pageEnterAppKey("#/favorites"), null);
   assert.equal(pageEnterAppKey("#/course/xyz?module=m1"), "#/course/xyz");
@@ -105,7 +108,7 @@ test("RootPage wraps only the listed apps in PageEnter", () => {
   assert.match(main, /<UserQueriesPage/);
 
   const slice = (from, to) => main.slice(main.indexOf(from), main.indexOf(to));
-  assert.doesNotMatch(slice("hash.startsWith(SEARCH_HASH)", "PROFILE_SUBSCRIBER_EXPERIENCE_HASH"), /PageEnter/);
+  assert.doesNotMatch(slice("hash.startsWith(SEARCH_HASH)", "hash.startsWith(PROFILE_HASH)"), /PageEnter/);
   assert.doesNotMatch(slice("hash.startsWith(NOTIFICATIONS_HASH)", "hash.startsWith(SEARCH_HASH)"), /PageEnter/);
   assert.doesNotMatch(slice("hash.startsWith(SETTINGS_HASH)", "hash.startsWith(PROFILE_HASH)"), /PageEnter/);
   assert.doesNotMatch(slice("hash.startsWith(LEADERBOARD_HASH)", "hash.startsWith(FLOWPATH_HASH)"), /PageEnter/);

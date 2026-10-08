@@ -198,16 +198,17 @@ test("an upgrade selection keeps the normal purchase CTA", () => {
 // Wiring contracts — the rule must actually reach the UI and the server
 // ---------------------------------------------------------------------------
 
-test("the subscription page hides lower plans instead of offering them", () => {
+test("the shared subscription page hides lower plans and retains checkout guards", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   assert.match(page, /evaluatePlanChange/);
-  // The picker receives the ladder-filtered list, never the raw catalog.
+  // Paid and free users share the plan-selection page; its picker gets the
+  // ladder-filtered list, never the raw catalog.
+  assert.match(page, /Active and free accounts both land on this same plan-selection page/);
   assert.match(page, /const pickerPlans = useMemo/);
   assert.match(page, /order >= ownedPlanOrder/);
   assert.match(page, /<PlanOverview[\s\S]*?plans=\{pickerPlans\}/);
-  // Switching entry points open on the next HIGHER plan only.
-  assert.match(page, /const upgradePlans = useMemo/);
-  assert.match(page, /upgradePlans\[0\]/);
+  assert.match(page, /setSelectedPlanId\(ownedVisible \? ownedPlanId : pickerPlans\[0\]\.id\)/);
+  assert.doesNotMatch(page, /manageMode|const upgradePlans/);
   // The merged verdict still feeds the subscribe bar + the refuse-to-checkout stop.
   assert.match(page, /if \(ownershipState\.blocked\) \{[\s\S]*?setSubmitError\([\s\S]*?return;/);
 });

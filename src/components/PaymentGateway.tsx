@@ -382,8 +382,8 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
          * `/api/razorpay/create-order` → Razorpay Standard Checkout →
          * `verify-payment`), keeps the same `disabled={busy}` gate, and the
          * existing busy copy lands in the reference's filled/loading state.
-         * The plate is the reference's own green (#00ad54), so the app's
-         * "green = trusted money" signal survives unchanged. */
+         * The idle button stays white; the shared accent only appears during
+         * interaction/loading, keeping every pay surface consistent. */
         <PaymentButton
           block
           size="lg"
