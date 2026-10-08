@@ -6,9 +6,8 @@ import {
 } from "./components/ui/glass-toggle-group";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
-  ArrowUpRight,
   BadgeCheck,
-  BarChart3,
+  BookOpen,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -16,8 +15,9 @@ import {
   Copy,
   Crown,
   Expand,
-  Globe,
+  GraduationCap,
   Heart,
+  Layers,
   LockKeyhole,
   MessageCircle,
   PackageOpen,
@@ -27,6 +27,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   Star,
+  X,
   Zap,
 } from "lucide-react";
 import Header from "./components/Header";
@@ -44,8 +45,9 @@ import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
 import { PaymentButton } from "./components/ui/PaymentButton";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
-import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
-import { reviews as fallbackReviews } from "./home/data/mockData";
+import { usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
+import { fullDemoCourseContent } from "./data/demoCourseContent";
+import { getProductClassLabel, getProductInstructorLabel, getProductPresentation, getProductSubjectLabel } from "./pdp/productPresentation";
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
 import { auth, db } from "../firebase";
@@ -106,14 +108,18 @@ const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLoca
  */
 export const getRelatedProducts = (product: Product, catalog: Product[], limit = 3) => {
   const tags = new Set(product.tags.map((tag) => tag.toLowerCase()));
+  const subject = getProductSubjectLabel(product).toLowerCase();
+  const classLevel = getProductClassLabel(product).toLowerCase();
   return catalog
     .filter((candidate) => candidate.id !== product.id)
     .map((candidate) => {
       const sharedTags = candidate.tags.reduce((count, tag) => count + (tags.has(tag.toLowerCase()) ? 1 : 0), 0);
+      const candidateSubject = getProductSubjectLabel(candidate).toLowerCase();
+      const candidateClassLevel = getProductClassLabel(candidate).toLowerCase();
       const score =
-        (candidate.subject.toLowerCase() === product.subject.toLowerCase() ? 8 : 0)
+        (subject && subject === candidateSubject ? 8 : 0)
         + (candidate.category === product.category ? 5 : 0)
-        + (candidate.classLevel.toLowerCase() === product.classLevel.toLowerCase() ? 3 : 0)
+        + (classLevel && classLevel === candidateClassLevel ? 3 : 0)
         + sharedTags * 2;
       return { candidate, score };
     })
@@ -167,22 +173,29 @@ function PremiumProductContent({
   const { user } = useAuth();
   const { appName } = useBranding();
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
-  const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
   const { reviews: liveProductReviews } = usePublishedProductReviews(reviewCatalog);
+  // Only moderation-published reviews whose product id matches this product
+  // are eligible for the PDP; Home presentation placeholders never enter here.
   const [localReviews, setLocalReviews] = useState<PublishedProductReview[]>([]);
   const productReviews = useMemo(
     () => {
-      const fromHome = homepageReviews.filter((review) => review.productId === product.id);
-      const live = liveProductReviews.filter((review) => review.productId === product.id || review.productId === product.documentId);
+      const belongsToProduct = (review: PublishedProductReview) =>
+        review.productId === product.id || review.productId === product.documentId;
+      const local = localReviews.filter(belongsToProduct);
+      const live = liveProductReviews.filter(belongsToProduct);
       const byId = new Map<string, PublishedProductReview>();
-      // Locally-added reviews are seeded first so a just-submitted review is
-      // guaranteed to appear at the top, then replaced by its synced twin.
-      for (const review of [...localReviews, ...live, ...fromHome]) byId.set(review.id, review);
+      // Locally-added reviews keep a just-submitted item visible until its
+      // published Firestore snapshot arrives; a synced twin replaces it.
+      for (const review of [...local, ...live]) byId.set(review.id, review);
       return Array.from(byId.values()).sort((a, b) => b.createdAtMs - a.createdAtMs);
     },
-    [homepageReviews, liveProductReviews, localReviews, product.documentId, product.id],
+    [liveProductReviews, localReviews, product.documentId, product.id],
   );
   const [activeImage, setActiveImage] = useState(0);
+  const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
+  const [loadedImageSource, setLoadedImageSource] = useState<string | null>(null);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const fullscreenCloseRef = useRef<HTMLButtonElement>(null);
   // Mouse parity: the gallery thumbs are a hidden-scrollbar rail, so a desktop
   // pointer drags it left/right like a thumb — and a drag never re-selects the
   // image it happens to end on.
@@ -200,6 +213,32 @@ function PremiumProductContent({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewNotice, setReviewNotice] = useState("");
+
+  const gallery = useMemo(() => getProductImageSources(product), [product]);
+  const visibleGallery = gallery.filter((image) => !failedImageSources.has(image));
+  const selectedImageIndex = Math.min(activeImage, Math.max(0, visibleGallery.length - 1));
+  const selectedImage = visibleGallery[selectedImageIndex] || null;
+
+  useEffect(() => {
+    setActiveImage(0);
+    setFailedImageSources(new Set());
+    setLoadedImageSource(null);
+    setExpandedImage(null);
+  }, [product.id]);
+
+  useEffect(() => {
+    if (!expandedImage) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpandedImage(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    window.requestAnimationFrame(() => fullscreenCloseRef.current?.focus());
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previousFocus?.focus();
+    };
+  }, [expandedImage]);
 
   useEffect(() => {
     if (!window.location.hash.includes("section=reviews")) return;
@@ -245,22 +284,22 @@ function PremiumProductContent({
   const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
   const ownedModuleIds = resolution.ownedModuleIds;
   const ownedResourceIds = resolution.ownedResourceIds;
-  const gallery = product.images?.length ? product.images : [product.image];
-  const selectedImage = gallery[Math.min(activeImage, gallery.length - 1)] || product.image;
+  const identity = getProductPresentation(product);
+  const instructorLabel = getProductInstructorLabel(product);
   const related = useMemo(() => getRelatedProducts(product, products, 6), [product, products]);
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
   const collectedModules = useMemo(() => collectCurriculumModules(product), [product]);
   const includedCurriculum = useMemo(
-    () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules,
+    () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules as CurriculumModule[],
     [collectedModules],
   );
   const { modules, mode: curriculumMode } = useMemo(
     () => filterCurriculumForPdp(collectedModules as unknown as CurriculumModule[], { isProductOwned, ownedUpdateIds: updates }) as { modules: CurriculumModule[]; mode: CurriculumViewMode },
     [collectedModules, isProductOwned, updates],
   );
-  const { modulesCount, resourcesCount: resourceCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);
+  const { modulesCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);
 
   useEffect(() => {
     const firstId = modules[0]?.id || null;
@@ -328,7 +367,7 @@ function PremiumProductContent({
     const url = productShareUrl || window.location.href;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: product.title, text: product.description || product.title, url });
+        await navigator.share({ title: identity.title, text: product.description?.trim() || identity.title, url });
         setShareOpen(false);
         return;
       } catch (error) {
@@ -340,7 +379,7 @@ function PremiumProductContent({
 
   const shareTo = (target: "whatsapp" | "telegram") => {
     const url = encodeURIComponent(productShareUrl || window.location.href);
-    const text = encodeURIComponent(`${product.title} — ${product.description || `Learn on ${appName}`}`);
+    const text = encodeURIComponent(`${identity.title} — ${product.description?.trim() || `Learn on ${appName}`}`);
     const href = target === "whatsapp"
       ? `https://wa.me/?text=${text}%20${url}`
       : `https://t.me/share/url?url=${url}&text=${text}`;
@@ -500,7 +539,7 @@ function PremiumProductContent({
       setReviewComment("");
       setReviewComposerOpen(false);
       playSfxSuccess();
-      setReviewNotice("Review added. Your rating now counts toward this product.");
+      setReviewNotice("Review added.");
     } catch (error) {
       console.error("Review submission failed", error);
       playSfxError();
@@ -510,187 +549,243 @@ function PremiumProductContent({
     }
   };
 
-  const autoHighlights = [
-    modulesCount > 0 ? `${modulesCount} structured module${modulesCount === 1 ? "" : "s"}` : null,
-    resourceCount > 0 ? `${resourceCount} downloadable or streaming resource${resourceCount === 1 ? "" : "s"}` : null,
-    "Access from your purchases library",
-    "Available on mobile and desktop",
-    "Account-linked secure delivery",
-    product.paidUpdates?.length ? `${product.paidUpdates.length} published course update${product.paidUpdates.length === 1 ? "" : "s"}` : null,
-  ].filter((item): item is string => Boolean(item));
-  // "What's included" is curated in the product editor. When the merchant has
-  // configured custom bullets, those are shown verbatim; otherwise we fall back
-  // to the modules/resources summary so the section never shows unrelated text.
-  const highlights = product.features?.length ? product.features : autoHighlights;
+  const classLabel = getProductClassLabel(product);
+  const subjectLabel = identity.subjectLabel;
+  const metadataItems = [
+    classLabel ? { icon: classLabel.toLowerCase() === "lifetime access" ? BadgeCheck : GraduationCap, label: classLabel.toLowerCase() === "lifetime access" ? "Access" : "Level", text: classLabel } : null,
+    subjectLabel ? { icon: BookOpen, label: "Subject", text: subjectLabel } : null,
+    { icon: PackageOpen, label: "Format", text: identity.typeLabel },
+    modulesCount > 0 ? { icon: Layers, label: "Curriculum", text: `${modulesCount} module${modulesCount === 1 ? "" : "s"}` } : null,
+  ].filter((item): item is { icon: typeof BookOpen; label: string; text: string } => Boolean(item));
+  const includedItems = buildIncludedSummaries(includedCurriculum, modulesCount);
+  const ratingSummary = getProductRatingSummary(product, productReviews);
+  const highlights = (product.features || []).map((feature) => feature.trim()).filter(Boolean);
+  const hasPurchaseBuilder = !isProductOwned && !unavailable && Boolean(product.canonicalModules?.length);
+  const firstAvailableUpdate = availablePaidUpdates[0];
+  const updateBenefits = firstAvailableUpdate ? buildUpdateBenefits(firstAvailableUpdate) : [];
 
   return (
     <div data-pdp-root className="relative pb-5 text-white">
+      <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink flex min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60">
+        <button type="button" onClick={onBack} className="min-h-9 shrink-0 px-1 transition hover:text-white">Store</button>
+        <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
+        <span className="shrink-0 text-white/65">{identity.typeLabel}</span>
+        <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
+        <span aria-current="page" title={identity.title} className="min-w-0 flex-1 truncate font-semibold text-white">{identity.title}</span>
+      </nav>
 
-      <div className="relative">
-        <nav data-pdp-loose className="dc-scene-ink flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-white/55">
-          <button type="button" onClick={onBack} className="transition hover:text-white">Store</button>
-          <ChevronRight className="h-3 w-3 text-white/40" />
-          <span>{product.category}</span>
-          <ChevronRight className="h-3 w-3 text-white/40" />
-          <span className="max-w-[190px] truncate font-medium text-white">{product.title}</span>
-        </nav>
-
-        {/* Desktop: `data-pdp-body` becomes a two-area grid (gallery + stack on
-            the left, the sticky purchase column on the right) from 1200 px up —
-            see the "PRODUCT DETAIL — DESKTOP WORKSPACE LAYOUT" block in
-            src/index.css. On phone / tablet it stays a plain vertical stack in
-            exactly the mobile order (gallery → buy → everything else). */}
-        <div data-pdp-body className="flex flex-col gap-6 px-4 pb-8 pt-4">
-          <section data-pdp-gallery className="flex flex-col gap-3">
-            <SimplePanel className="group relative overflow-hidden" contentClassName="relative">
-              <img data-pdp-hero-img src={selectedImage} alt={product.title} loading="eager" fetchPriority="high" decoding="async" className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
+      {/* Desktop places the media and long-form details in the main column,
+          with the decision panel in a stable right rail. On smaller screens the
+          same DOM order becomes a single product-first journey. */}
+      <div data-pdp-body className="flex min-w-0 flex-col gap-6 px-4 pb-8 pt-4">
+        <section data-pdp-gallery className="flex min-w-0 flex-col gap-3">
+          <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate group relative overflow-hidden" contentClassName="relative">
+            <div data-pdp-media aria-busy={Boolean(selectedImage && loadedImageSource !== selectedImage)} className="relative aspect-[4/3] overflow-hidden">
+              {selectedImage ? (
+                <>
+                  {loadedImageSource !== selectedImage && <div aria-hidden="true" className="dc-pdp-image-loading absolute inset-0" />}
+                  <img
+                    key={selectedImage}
+                    data-pdp-hero-img
+                    src={selectedImage}
+                    alt={identity.title}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    onLoad={() => setLoadedImageSource(selectedImage)}
+                    onError={() => setFailedImageSources((current) => new Set(current).add(selectedImage))}
+                    className={`aspect-[4/3] w-full object-contain transition-opacity duration-200 ${loadedImageSource === selectedImage ? "opacity-100" : "opacity-0"}`}
+                  />
+                </>
+              ) : (
+                <ProductArtworkFallback product={product} title={identity.title} typeLabel={identity.typeLabel} />
+              )}
+            </div>
+            {product.status === "published" && (
               <div className="dc-scene-plate dc-scene-plate--bar absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
-              <div className="absolute right-3 top-3 flex gap-2">
+            )}
+            <div className="absolute right-3 top-3 flex gap-2">
+              {onToggleFavorite ? (
                 <span className="relative inline-flex">
                   <EmojiBurstLayer particles={likeParticles} />
-                <GlassButton type="button" onClick={() => { if (!favorite) likeBurst(); onToggleFavorite?.(product.id); }} aria-label="Save product" className="[&_.size-12]:size-9">
-                  <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
-                </GlassButton>
-                </span>
-                <GlassButton type="button" onClick={() => window.open(selectedImage, "_blank", "noopener,noreferrer")} aria-label="Open image" className="[&_.size-12]:size-9">
-                  <Expand className="h-4 w-4" />
-                </GlassButton>
-              </div>
-              <div className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
-            </SimplePanel>
-            {gallery.length > 1 && (
-              <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
-                {gallery.map((image, index) => (
-                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-white/80" : "border-transparent opacity-70"}`}>
-                    <img src={image} alt={`${product.title} ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section data-pdp-buy className="flex flex-col gap-5">
-            <div data-pdp-titleblock className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
-                {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-500/15 px-2.5 py-1 text-[10px] font-semibold text-orange-300">{tag}</span>)}
-                <span className="text-[11px] text-white/55">by <span className="font-medium text-white/85">{product.instructor}</span></span>
-              </div>
-              <h1 className="text-2xl font-black leading-[1.2] tracking-tight dc-ink-1">{product.title}</h1>
-              {/* Body copy steps down to ink-2 (readable) instead of ink-3 —
-                  the description is content, not a caption. */}
-              <p className="text-sm leading-relaxed dc-ink-2">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <RatingStars rating={product.rating} />
-                <span className="font-bold dc-ink-1">{product.rating.toFixed(1)}</span>
-                <a href="#product-reviews" className="dc-ink-3 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
-                {product.reviews >= 25 ? <span className="dc-proof">🔥 {product.reviews.toLocaleString("en-IN")} learners rated this</span> : null}
-              </div>
-            </div>
-
-            <SimplePanel data-pdp-meta className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
-              <Meta icon={Clock} text={product.classLevel} />
-              <Meta icon={BarChart3} text={product.subject} />
-              <Meta icon={Globe} text={product.category} />
-              <Meta icon={BadgeCheck} text={`${modulesCount} modules`} />
-            </SimplePanel>
-
-            {isProductOwned ? (
-              availablePaidUpdates.length > 0 ? (
-                <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-hidden text-white" contentClassName="p-5">
-                  <div className="relative flex items-start gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white">
-                      <Zap size={20} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <p className="text-[11px] font-black uppercase tracking-wider text-indigo-300">Course upgrade available</p>
-                        <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-200">Premium content update</span>
-                      </div>
-                      <h2 className="mt-0.5 text-base font-black text-white">{availablePaidUpdates[0].title}</h2>
-                      <p className="mt-1 text-xs leading-5 text-white/85">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
-                    </div>
-                  </div>
-                  {/* Purchase CTA — the shared payment button (Uiverse
-                      pretty-grasshopper-57). Handler, price and route are the
-                      page's own `handleBuyUpgrade`, unchanged. */}
-                  <PaymentButton
-                    block
-                    className="relative mt-4"
-                    icon={<Zap size={18} />}
-                    onClick={handleBuyUpgrade}
-                    data-pdp-upgrade-checkout=""
-                    label={`Buy upgrade · ${formatPrice(availablePaidUpdates[0].cashPrice)}`}
-                  />
-                  {onOpenCourse ? (
-                    <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
-                      <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                        <PlayCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span>Open course in library</span>
-                      </span>
-                    </GlassButton>
-                  ) : null}
-                </GlassSurface>
-              ) : null
-            ) : (
-              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-visible text-white" contentClassName="p-5">
-                {/* Anchoring: the struck reference price is read first and
-                    quietly, so the payable figure lands as the relief. The
-                    saving is stated in rupees (loss aversion) rather than as a
-                    bare percentage. */}
-                <div className="relative flex flex-wrap items-end gap-x-2 gap-y-1">
-                  {product.originalPrice > product.price && <span className="mb-1.5 text-base dc-anchor-price">{formatPrice(product.originalPrice)}</span>}
-                  <span className="text-4xl tracking-tight dc-hero-price">{formatPrice(product.price)}</span>
-                  {discount > 0 && <span className="dc-save-pill mb-1.5">Save {formatPrice(product.originalPrice - product.price)} · {discount}%</span>}
-                </div>
-                {/* Transparency bias: state exactly what the money buys before
-                    asking for the tap. */}
-                <ul className="relative mt-3 flex flex-col gap-1.5" aria-label="What you get">
-                  <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
-                    <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
-                    One-time payment — lifetime access from your purchases library.
-                  </li>
-                  <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
-                    <Zap className="h-3.5 w-3.5 shrink-0 text-indigo-300" aria-hidden="true" />
-                    Unlocks instantly after checkout, on mobile and desktop.
-                  </li>
-                </ul>
-                <div className="relative mt-5 flex gap-3">
-                  {/* The product page's money CTA is the app-wide payment
-                      button now: same `primaryAction` (onCheckout with the
-                      product price + applied coupon), same "unavailable"
-                      disabled rule, contextual label kept. */}
-                  <PaymentButton
-                    block
-                    className="min-w-0 flex-1"
-                    icon={<Zap size={18} />}
-                    disabled={unavailable}
-                    onClick={primaryAction}
-                    data-pdp-checkout=""
-                    label={unavailable ? "Coming soon" : `Get it for ${formatPrice(product.price)}`}
-                  />
-                  <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex-1 disabled:opacity-60 [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-bold">
-                    <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to my cart"}
+                  <GlassButton
+                    type="button"
+                    onClick={() => { if (!favorite) likeBurst(); onToggleFavorite(product.id); }}
+                    aria-label={favorite ? "Remove from saved products" : "Save product"}
+                    aria-pressed={favorite}
+                    className="min-h-11 min-w-11 [&_.size-12]:size-9"
+                  >
+                    <Heart aria-hidden="true" className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
                   </GlassButton>
-                </div>
-                <div className="relative mt-3 flex justify-end">
-                  <div ref={shareRef} className="relative">
-                    <GlassButton type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="[&_.size-12]:size-10"><Share2 className="h-4 w-4" /></GlassButton>
-                    {/* Wave 10: the share menu is the pack popover material (GlassSurface
-                        radius 20) with the pack's own PopoverItem rows — no painted row plates. */}
-                    <GlassSurface data-product-share radius={20} className="dc-scene-plate absolute right-0 top-12 z-50 w-60 text-white" contentClassName="py-1" hidden={!shareOpen}>
-                      <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
-                      <PopoverItem onClick={() => void shareNative()} className="text-xs font-medium"><Share2 className="h-3.5 w-3.5" /> Share via device</PopoverItem>
-                      <PopoverItem onClick={() => shareTo("whatsapp")} className="text-xs font-medium"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</PopoverItem>
-                      <PopoverItem onClick={() => shareTo("telegram")} className="text-xs font-medium"><Send className="h-3.5 w-3.5" /> Telegram</PopoverItem>
-                      <PopoverItem onClick={() => void copyLink()} className="justify-between text-xs font-medium"><span className="flex items-center gap-3"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-400" />}</PopoverItem>
-                    </GlassSurface>
+                </span>
+              ) : null}
+              {selectedImage ? (
+                <GlassButton
+                  type="button"
+                  onClick={() => setExpandedImage(selectedImage)}
+                  aria-label="View product image fullscreen"
+                  className="min-h-11 min-w-11 [&_.size-12]:size-9"
+                >
+                  <Expand aria-hidden="true" className="h-4 w-4" />
+                </GlassButton>
+              ) : null}
+            </div>
+            {visibleGallery.length > 1 && (
+              <div className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]" aria-live="polite">
+                {selectedImageIndex + 1} / {visibleGallery.length}
+              </div>
+            )}
+          </GlassSurface>
+          {visibleGallery.length > 1 && (
+            <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
+              {visibleGallery.map((image, index) => (
+                <button
+                  key={`${image}-${index}`}
+                  type="button"
+                  onClick={() => { setActiveImage(index); setLoadedImageSource(null); }}
+                  aria-label={`Show product image ${index + 1}`}
+                  aria-pressed={selectedImageIndex === index}
+                  className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${selectedImageIndex === index ? "border-indigo-300/80" : "border-transparent opacity-75 hover:opacity-100"}`}
+                >
+                  <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section data-pdp-buy className="flex min-w-0 flex-col gap-4">
+          <div data-pdp-titleblock className="dc-pdp-identity space-y-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span className="dc-pdp-type-badge">{identity.typeLabel}</span>
+              <span className="dc-pdp-store-label">{appName}</span>
+            </div>
+            {instructorLabel ? (
+              <p className="text-xs text-white/65">By <span className="font-semibold text-white/85">{instructorLabel}</span></p>
+            ) : null}
+            <h1 className="dc-pdp-title font-black tracking-tight text-white">{identity.title}</h1>
+            {product.description?.trim() ? (
+              <p className="dc-pdp-summary text-sm leading-relaxed text-white/75">{product.description.trim()}</p>
+            ) : null}
+            <div className="dc-pdp-identity-rating flex flex-wrap items-center gap-2 text-xs">
+              {ratingSummary.hasRating ? (
+                <>
+                  <RatingStars rating={ratingSummary.rating} />
+                  <span className="font-bold text-white">{ratingSummary.rating.toFixed(1)}</span>
+                  <a href="#product-reviews" className="text-white/65 underline underline-offset-2">
+                    {ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}
+                  </a>
+                </>
+              ) : <span className="text-white/60">No ratings yet</span>}
+            </div>
+          </div>
+
+          {metadataItems.length > 0 && (
+            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3">
+              {metadataItems.map((item) => <Meta key={`${item.label}-${item.text}`} icon={item.icon} label={item.label} text={item.text} />)}
+            </GlassSurface>
+          )}
+
+          {isProductOwned ? (
+            firstAvailableUpdate ? (
+              <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-hidden text-white" contentClassName="p-5">
+                <div className="relative flex items-start gap-3">
+                  <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600/90 text-white">
+                    <Zap size={20} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-200">
+                      {identity.isCourse ? "Course upgrade available" : "Content upgrade available"}
+                    </p>
+                    <h2 className="mt-1 text-base font-bold leading-snug text-white">{firstAvailableUpdate.title}</h2>
+                    {firstAvailableUpdate.description?.trim() ? (
+                      <p className="mt-2 text-sm leading-relaxed text-white/75">{firstAvailableUpdate.description.trim()}</p>
+                    ) : updateBenefits.length > 0 ? (
+                      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75" aria-label="Included in this update">
+                        {updateBenefits.map((benefit) => <li key={benefit} className="flex items-center gap-1.5"><CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-emerald-400" />{benefit}</li>)}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-sm leading-relaxed text-white/75">A published content update is available for this product.</p>
+                    )}
+                    {firstAvailableUpdate.description?.trim() && updateBenefits.length > 0 ? (
+                      <p className="mt-2 text-xs text-white/60">Includes {updateBenefits.join(" · ")}</p>
+                    ) : null}
                   </div>
                 </div>
+                <PaymentButton
+                  block
+                  className="relative mt-4"
+                  icon={<Zap size={18} />}
+                  onClick={handleBuyUpgrade}
+                  data-pdp-upgrade-checkout=""
+                  label={`Upgrade for ${formatPrice(firstAvailableUpdate.cashPrice)}`}
+                />
+                {onOpenCourse ? (
+                  <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
+                    <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                      <PlayCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>{identity.libraryAction}</span>
+                    </span>
+                  </GlassButton>
+                ) : null}
               </GlassSurface>
-            )}
+            ) : onOpenCourse ? (
+              <button
+                type="button"
+                data-pdp-library-primary
+                onClick={() => onOpenCourse(product)}
+                className="dc-pdp-library-cta"
+              >
+                <PlayCircle aria-hidden="true" className="h-5 w-5 shrink-0" />
+                <span>{identity.libraryAction}</span>
+              </button>
+            ) : null
+          ) : (
+            <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-visible text-white" data-pdp-price-box contentClassName="p-5">
+              <div className="relative flex flex-wrap items-end gap-x-2 gap-y-1">
+                {product.originalPrice > product.price && product.originalPrice > 0 ? <span className="mb-1 text-sm dc-anchor-price">{formatPrice(product.originalPrice)}</span> : null}
+                <span className="text-4xl tracking-tight dc-hero-price">{formatPrice(product.price)}</span>
+                {discount > 0 ? <span className="mb-1 text-xs font-semibold text-emerald-300">Save {discount}%</span> : null}
+              </div>
+              <PaymentButton
+                block
+                className="relative mt-4"
+                icon={<Zap size={18} />}
+                disabled={unavailable}
+                onClick={primaryAction}
+                data-pdp-checkout=""
+                label={unavailable ? "Coming soon" : productIsFree ? "Get access · Free" : `Get access · ${formatPrice(product.price)}`}
+              />
+              {!productIsFree && onAddToCart && (
+                <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart(product.id)} className="mt-2.5 w-full disabled:opacity-60 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold">
+                  <ShoppingCart aria-hidden="true" className="h-4 w-4" /> {inCart ? "In cart" : "Add to cart"}
+                </GlassButton>
+              )}
+              <div className="relative mt-3 flex justify-end">
+                <div ref={shareRef} className="relative">
+                  <GlassButton
+                    type="button"
+                    onClick={() => setShareOpen((value) => !value)}
+                    aria-label="Share product"
+                    aria-expanded={shareOpen}
+                    aria-haspopup="menu"
+                    className="min-h-11 min-w-11 [&_.size-12]:size-10"
+                  >
+                    <Share2 aria-hidden="true" className="h-4 w-4" />
+                  </GlassButton>
+                  <GlassSurface data-product-share radius={20} className="dc-scene-plate absolute right-0 top-12 z-50 w-60 max-w-[calc(100vw-2rem)] text-white" id="product-share-menu" contentClassName="py-1" hidden={!shareOpen}>
+                    <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
+                    <PopoverItem onClick={() => void shareNative()} className="text-xs font-medium"><Share2 aria-hidden="true" className="h-3.5 w-3.5" /> Share via device</PopoverItem>
+                    <PopoverItem onClick={() => shareTo("whatsapp")} className="text-xs font-medium"><MessageCircle aria-hidden="true" className="h-3.5 w-3.5" /> WhatsApp</PopoverItem>
+                    <PopoverItem onClick={() => shareTo("telegram")} className="text-xs font-medium"><Send aria-hidden="true" className="h-3.5 w-3.5" /> Telegram</PopoverItem>
+                    <PopoverItem onClick={() => void copyLink()} className="justify-between text-xs font-medium"><span className="flex items-center gap-3"><Copy aria-hidden="true" className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check aria-hidden="true" className="h-3.5 w-3.5 text-emerald-400" />}</PopoverItem>
+                  </GlassSurface>
+                </div>
+              </div>
+            </GlassSurface>
+          )}
 
             {/* Thumb zone: once the buy box scrolls away the primary action
                 follows the user down the page, parked where the thumb rests
@@ -711,7 +806,8 @@ function PremiumProductContent({
                   icon={<Zap size={18} />}
                   onClick={primaryAction}
                   data-pdp-thumb-checkout=""
-                  label="Get it now"
+                  ariaLabel={productIsFree ? "Get free access" : `Get access for ${formatPrice(product.price)}`}
+                  label={productIsFree ? "Get access" : "Get access now"}
                 />
               </div>
             ) : null}
@@ -723,7 +819,7 @@ function PremiumProductContent({
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <SimplePanel className="text-white" contentClassName="p-4">
+              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white" contentClassName="p-4">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -734,15 +830,15 @@ function PremiumProductContent({
                   onApply={handleApplyCoupon}
                   onRemove={handleRemoveCoupon}
                 />
-              </SimplePanel>
+              </GlassSurface>
             )}
 
           </section>
 
           <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
-          {!isProductOwned && !unavailable && (
+          {hasPurchaseBuilder && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase</h2><p className="dc-scene-ink text-xs dc-ink-3">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
+              <div className="mb-3 px-1"><h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase</h2><p className="dc-scene-ink text-xs dc-ink-3">Choose the full product or select available modules, resources, and paid updates.</p></div>
               <PdpPurchaseBuilder
                 product={product}
                 isProductOwned={isProductOwned}
@@ -755,7 +851,7 @@ function PremiumProductContent({
             </section>
           )}
 
-          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard
             product={product}
             reviews={productReviews}
@@ -765,7 +861,13 @@ function PremiumProductContent({
             comment={reviewComment}
             submitting={reviewSubmitting}
             notice={reviewNotice}
-            onToggleComposer={() => setReviewComposerOpen((open) => !open)}
+            onToggleComposer={() => {
+              if (!user) {
+                window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
+                return;
+              }
+              setReviewComposerOpen((open) => !open);
+            }}
             onRating={setReviewRating}
             onComment={setReviewComment}
             onSubmit={() => void submitReview()}
@@ -773,13 +875,179 @@ function PremiumProductContent({
           {related.length > 0 && <RelatedProducts products={related} onNavigate={onNavigateToProduct} />}
           </div>
         </div>
+      {expandedImage && (
+        <div
+          data-pdp-lightbox
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Fullscreen image: ${identity.title}`}
+          className="dc-pdp-lightbox"
+          onClick={(event) => { if (event.target === event.currentTarget) setExpandedImage(null); }}
+        >
+          <button ref={fullscreenCloseRef} type="button" onClick={() => setExpandedImage(null)} className="dc-pdp-lightbox-close" aria-label="Close fullscreen image">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+          <img src={expandedImage} alt={identity.title} decoding="async" onError={() => setExpandedImage(null)} />
+          <p>{identity.title}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildIncludedSummaries(modules: CurriculumModule[], modulesCount: number): string[] {
+  const counts = new Map<string, number>();
+  const visit = (items: CurriculumModule[]) => {
+    for (const module of items) {
+      for (const resource of module.resources || []) {
+        const type = resource.type.trim().toLowerCase() || "resource";
+        counts.set(type, (counts.get(type) || 0) + 1);
+      }
+      visit(module.modules || []);
+    }
+  };
+  visit(modules);
+
+  const typeLabels: Record<string, [string, string]> = {
+    audio: ["audio resource", "audio resources"],
+    brain: ["practice set", "practice sets"],
+    doc: ["document", "documents"],
+    ebook: ["e-book", "e-books"],
+    embed: ["interactive resource", "interactive resources"],
+    google_form: ["Google Form", "Google Forms"],
+    image: ["image", "images"],
+    interactive: ["interactive activity", "interactive activities"],
+    mindmap: ["mind map", "mind maps"],
+    mind_map: ["mind map", "mind maps"],
+    note: ["study note", "study notes"],
+    pdf: ["PDF", "PDFs"],
+    read: ["reading resource", "reading resources"],
+    sheet: ["spreadsheet", "spreadsheets"],
+    slides: ["slide deck", "slide decks"],
+    video: ["video lesson", "video lessons"],
+    video_url: ["video lesson", "video lessons"],
+    youtube: ["video lesson", "video lessons"],
+  };
+  const summaries: string[] = [];
+  if (modulesCount > 0) summaries.push(`${modulesCount} module${modulesCount === 1 ? "" : "s"}`);
+  for (const [type, count] of counts) {
+    const labels = typeLabels[type] || [type.replace(/[_-]+/g, " "), `${type.replace(/[_-]+/g, " ")}s`];
+    summaries.push(`${count} ${count === 1 ? labels[0] : labels[1]}`);
+  }
+  return summaries;
+}
+
+function formatResourceType(type: string): string {
+  const labels: Record<string, string> = {
+    audio: "Audio",
+    brain: "Practice set",
+    doc: "Document",
+    ebook: "E-book",
+    embed: "Interactive",
+    google_form: "Google Form",
+    image: "Image",
+    interactive: "Interactive",
+    mindmap: "Mind map",
+    mind_map: "Mind map",
+    note: "Study note",
+    pdf: "PDF",
+    read: "Reading",
+    sheet: "Spreadsheet",
+    slides: "Slides",
+    video: "Video",
+    video_url: "Video",
+    youtube: "Video",
+  };
+  const normalized = type.trim().toLowerCase();
+  return labels[normalized] || normalized.replace(/[_-]+/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function buildUpdateBenefits(update: NonNullable<Product["paidUpdates"]>[number]): string[] {
+  const modules = update.includedModuleIds?.length || 0;
+  const resources = update.includedResourceIds?.length || 0;
+  return [
+    modules > 0 ? `${modules} module${modules === 1 ? "" : "s"}` : null,
+    resources > 0 ? `${resources} resource${resources === 1 ? "" : "s"}` : null,
+  ].filter((item): item is string => Boolean(item));
+}
+
+const GENERIC_PRODUCT_IMAGE = /^(?:hero(?:-main|-\d+)?|related-\d+|gallery-\d+|product-(?:pdf|video|ebook|live))$/i;
+const TOPIC_IMAGE_RULES: Array<{ file: RegExp; product: RegExp }> = [
+  { file: /chemical[-_ ]reactions?/i, product: /\bchemical\s+reactions?\b/i },
+  { file: /real[-_ ]numbers?/i, product: /\breal\s+numbers?\b/i },
+  { file: /trigonometry/i, product: /\btrigonometric(?:al)?\b|\btrigonometry\b/i },
+  { file: /mechanics/i, product: /\bmechanics\b|\bmechanical\b/i },
+  { file: /english[-_ ]grammar/i, product: /\benglish\s+grammar\b|\bgrammar\b/i },
+  { file: /photosynthesis/i, product: /\bphotosynthesis\b/i },
+  { file: /chain[-_ ]rule/i, product: /\bchain\s+rule\b/i },
+];
+const COURSE_IMAGE_ALIASES: Record<string, string> = {
+  datascience: "data science",
+  webdev: "web development",
+  uiux: "ui ux",
+};
+
+function imageSourceMatchesProduct(source: string, product: Product): boolean {
+  const value = source.trim();
+  if (!value || /^(?:javascript|file):/i.test(value)) return false;
+  let filename = "";
+  try {
+    const url = new URL(value, "https://pdp.learnbook.invalid");
+    if (!new Set(["http:", "https:", "data:", "blob:"]).has(url.protocol)) return false;
+    filename = decodeURIComponent(url.pathname.split("/").pop() || "").split("/").pop() || "";
+  } catch {
+    return false;
+  }
+  const stem = filename.replace(/\.[a-z0-9]{2,8}$/i, "").toLowerCase();
+  if (GENERIC_PRODUCT_IMAGE.test(stem)) return false;
+
+  const identityText = [product.title, getProductSubjectLabel(product), ...(product.tags || [])]
+    .filter(Boolean)
+    .join(" ");
+  for (const rule of TOPIC_IMAGE_RULES) {
+    if (rule.file.test(stem) && !rule.product.test(identityText)) return false;
+  }
+  const courseImage = stem.match(/^course[-_](.+)$/i);
+  if (courseImage) {
+    const topic = COURSE_IMAGE_ALIASES[courseImage[1].replace(/[-_\s]/g, "")] || courseImage[1].replace(/[-_]+/g, " ");
+    const normalize = (text: string) => text.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!normalize(identityText).includes(normalize(topic))) return false;
+  }
+  return true;
+}
+
+function getProductImageSources(product: Product): string[] {
+  const candidates = [...(product.images || []), product.image];
+  return [...new Set(candidates.map((image) => String(image || "").trim()).filter(Boolean))]
+    .filter((image) => imageSourceMatchesProduct(image, product));
+}
+
+function ProductArtworkFallback({ product, title, typeLabel, compact = false }: { product: Product; title: string; typeLabel: string; compact?: boolean }) {
+  const subject = getProductSubjectLabel(product);
+  return (
+    <div role="img" aria-label={`Artwork unavailable for ${title}`} className={`dc-pdp-artwork-fallback ${compact ? "dc-pdp-artwork-fallback--compact" : ""}`}>
+      <div className="dc-pdp-artwork-copy">
+        <span className="dc-pdp-artwork-type">{typeLabel}</span>
+        <BookOpen aria-hidden="true" className="dc-pdp-artwork-icon" />
+        <strong>{title}</strong>
+        {subject ? <span className="dc-pdp-artwork-subject">{subject}</span> : null}
+        <span className="dc-pdp-artwork-note">Product artwork unavailable</span>
       </div>
     </div>
   );
 }
 
-function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
+function ProductImageThumb({ product, source }: { product: Product; source: string | undefined }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [source]);
+  const identity = getProductPresentation(product);
+  if (!source || failed) return <ProductArtworkFallback product={product} title={identity.title} typeLabel={identity.typeLabel} compact />;
+  return <img src={source} alt={identity.title} loading="lazy" decoding="async" width={112} height={96} onError={() => setFailed(true)} className="h-24 w-28 shrink-0 object-contain" />;
+}
+
+function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
+  const instructorLabel = getProductInstructorLabel(product);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [tabBarStuck, setTabBarStuck] = useState(false);
   // Mouse parity on the tab strip too: drag it sideways instead of hunting for
@@ -822,7 +1090,7 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   // scroll box — an `overflow-hidden` ancestor traps `position: sticky`,
   // which is why the magnet tab bar below never seated under the header.
   return (
-    <SimplePanel data-pdp-details className="overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
+    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="dc-scene-plate overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
@@ -850,15 +1118,28 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
           </GlassToggleGroup>
         </div>
       </div>
-      <div className="p-4 pt-3">
+      <div className="p-4 pt-3" data-pdp-tab-content aria-live="polite">
         {tab === "Description" && (
           <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-white/85">{product.description || `Complete information for ${product.title}.`}</p>
+            <section>
+              <h2 className="dc-pdp-section-heading">{getProductPresentation(product).aboutHeading}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                {product.description?.trim() || "A description has not been added for this product yet."}
+              </p>
+            </section>
+            {includedItems.length > 0 && (
+              <SimplePanel data-pdp-included className="dc-pdp-flat" contentClassName="p-4">
+                <h3 className="mb-3 text-sm font-semibold text-white">What's included</h3>
+                <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 sm:grid-cols-2">
+                  {includedItems.map((item) => <li key={item} className="flex min-w-0 items-start gap-2 text-sm leading-relaxed text-white/80"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" /><span>{item}</span></li>)}
+                </ul>
+              </SimplePanel>
+            )}
             {highlights.length > 0 && (
-              <SimplePanel className="dc-pdp-flat" contentClassName="p-4">
-                <p className="mb-3 text-sm font-semibold text-white">What's included</p>
-                <ul className="space-y-2.5">
-                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-white/85"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+              <SimplePanel data-pdp-highlights className="dc-pdp-flat" contentClassName="p-4">
+                <h3 className="mb-3 text-sm font-semibold text-white">Product highlights</h3>
+                <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 sm:grid-cols-2">
+                  {highlights.map((highlight) => <li key={highlight} className="flex min-w-0 items-start gap-2 text-sm leading-relaxed text-white/80"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" /><span>{highlight}</span></li>)}
                 </ul>
               </SimplePanel>
             )}
@@ -870,9 +1151,9 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
           ) : (
             <div className="space-y-3" data-pdp-curriculum data-pdp-curriculum-mode={curriculumMode}>
               {curriculumMode === "paid-upgrade" ? (
-                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-200">Paid upgrades</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-200/75">These modules stay locked after the course purchase. Unlock them with a paid upgrade — they look different here so they are never mixed with included lessons.</p>
+                <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Paid upgrades</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-100/75">These modules are not part of the base product. Unlock them with a published paid update.</p>
                 </div>
               ) : null}
               <div className="space-y-2">
@@ -883,9 +1164,19 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
             </div>
           )
         )}
-        {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">{initials(product.instructor)}</div><div><p className="font-bold text-white">{product.instructor}</p><p className="text-xs text-white/55">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-white/55">Instructor information is synced from this live product's catalog record.</p></div></div>}
+        {tab === "Instructor" && (
+          instructorLabel ? (
+            <article data-pdp-instructor className="flex items-start gap-4">
+              <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/15 bg-indigo-500/15 text-base font-bold text-indigo-100">{initials(instructorLabel)}</div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-white/55">Instructor / provider</p>
+                <p className="mt-1 break-words font-semibold text-white">{instructorLabel}</p>
+              </div>
+            </article>
+          ) : <EmptyDetail text="Instructor or provider information has not been added yet." />
+        )}
       </div>
-    </SimplePanel>
+    </GlassSurface>
   );
 }
 
@@ -913,7 +1204,8 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
         <GlassAccordionTrigger className="gap-3 py-3">
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${paid ? "bg-amber-500" : "bg-indigo-600"}`}>{index + 1}</span>
           <span className="min-w-0 flex-1">
-            <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-100" : "text-white"}`}>{module.title}</span>
+            <span className={`block text-[10px] font-semibold uppercase tracking-wide ${paid ? "text-amber-200/70" : "text-white/45"}`}>Module {String(index + 1).padStart(2, "0")}</span>
+            <span className={`mt-0.5 block break-words text-sm font-semibold leading-snug ${paid ? "text-amber-100" : "text-white"}`}>{module.title}</span>
             {paid ? (
               <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200">
@@ -923,15 +1215,21 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
               </span>
             ) : null}
           </span>
-          <span className={`text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
+          {(resources.length > 0 || childModules.length > 0) && (
+            <span className={`shrink-0 text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>
+              {resources.length > 0 ? `${resources.length} resource${resources.length === 1 ? "" : "s"}` : null}
+              {resources.length > 0 && childModules.length > 0 ? " · " : null}
+              {childModules.length > 0 ? `${childModules.length} submodule${childModules.length === 1 ? "" : "s"}` : null}
+            </span>
+          )}
           {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-400" /> : null}
         </GlassAccordionTrigger>
         <GlassAccordionContent className="space-y-2 pb-3">
           {resources.map((resource) => (
             <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>
               <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-white/40"}`} />
-              <span className="min-w-0 flex-1 truncate">{resource.name}</span>
-              <span className={`uppercase text-[9px] ${paid ? "text-amber-300/70" : "text-white/55"}`}>{resource.type}</span>
+              <span className="min-w-0 flex-1 break-words">{resource.name}</span>
+              <span className={`shrink-0 text-[9px] uppercase tracking-wide ${paid ? "text-amber-300/70" : "text-white/55"}`}>{formatResourceType(resource.type)}</span>
             </div>
           ))}
           {childModules.map((child, childIndex) => (
@@ -945,6 +1243,16 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
 }
 
 const REVIEW_PAGE_SIZE = 6;
+
+function getProductRatingSummary(product: Product, reviews: PublishedProductReview[]) {
+  if (Number.isFinite(product.rating) && product.rating > 0 && product.reviews > 0) {
+    return { rating: product.rating, count: product.reviews, hasRating: true, source: "catalog" as const };
+  }
+  const ratings = reviews.map((review) => Number(review.rating)).filter((rating) => Number.isFinite(rating) && rating > 0);
+  if (ratings.length === 0) return { rating: 0, count: 0, hasRating: false, source: "published" as const };
+  const average = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+  return { rating: average, count: ratings.length, hasRating: true, source: "published" as const };
+}
 
 function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
   product: Product;
@@ -966,41 +1274,89 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   }, [product.id]);
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
+  const ratingSummary = getProductRatingSummary(product, reviews);
   return (
-    <SimplePanel data-pdp-reviews id="product-reviews" className="scroll-mt-36 text-white" contentClassName="p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
-        <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
+    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="dc-scene-plate scroll-mt-36 text-white" contentClassName="p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white">Ratings &amp; Reviews</h2>
+          <p className="mt-1 text-xs text-white/55">Published feedback for this product</p>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleComposer}
+          aria-controls="pdp-review-composer"
+          aria-expanded={composerOpen}
+          className="dc-pdp-review-action"
+        >
+          {composerOpen ? "Cancel review" : canReview ? "Write a review" : "Sign in to review"}
+        </button>
       </div>
-      <SimplePanel className="dc-pdp-flat mt-5" contentClassName="flex items-center gap-5 p-5">
-        <div className="text-center"><span className="text-4xl font-extrabold text-white">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
-        <div className="h-14 w-px bg-white/[0.12]" />
-        <div><p className="text-sm font-semibold text-white/85">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-white/55">Live aggregate from the product catalog</p></div>
-      </SimplePanel>
-      {composerOpen && (
-        <SimplePanel className="mt-4" contentClassName="p-4">
-          {canReview ? (
-            <>
-              <p className="text-xs font-semibold text-white/85">Your rating</p>
-              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <GlassButton key={value} onClick={() => onRating(value)} aria-label={`${value} stars`} aria-pressed={value <= rating} className="[&_.size-12]:size-9"><Star className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></GlassButton>)}</div>
-              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="dc-field mt-3 w-full resize-none rounded-2xl p-3 text-sm text-white outline-none placeholder:text-white/40" />
-              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
-            </>
-          ) : <p className="text-xs leading-relaxed text-white/55">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
+
+      <div data-pdp-rating-summary className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
+        {ratingSummary.hasRating ? (
+          <>
+            <div className="min-w-[4.5rem] text-center">
+              <span className="block text-3xl font-bold tabular-nums text-white">{ratingSummary.rating.toFixed(1)}</span>
+              <RatingStars rating={ratingSummary.rating} className="mt-1 justify-center" />
+            </div>
+            <div className="min-h-10 w-px self-stretch bg-white/10" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white/85">{ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}</p>
+              <p className="mt-1 text-xs text-white/55">{ratingSummary.source === "catalog" ? "Catalog rating summary" : "Based on published reviews"}</p>
+            </div>
+          </>
+        ) : (
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white/85">No ratings yet</p>
+            <p className="mt-1 text-xs text-white/55">Be the first to share a rating.</p>
+          </div>
+        )}
+      </div>
+
+      {composerOpen && canReview && (
+        <SimplePanel id="pdp-review-composer" className="mt-4" contentClassName="p-4">
+          <p className="text-sm font-semibold text-white/85">Your rating</p>
+          <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Choose a rating">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <GlassButton key={value} type="button" onClick={() => onRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} aria-pressed={value === rating} className="min-h-11 min-w-11 [&_.size-12]:size-9">
+                <Star aria-hidden="true" className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} />
+              </GlassButton>
+            ))}
+          </div>
+          <textarea
+            value={comment}
+            onChange={(event) => onComment(event.target.value.slice(0, 2000))}
+            rows={4}
+            maxLength={2000}
+            aria-label="Your product review"
+            placeholder="Share your experience with this product…"
+            className="dc-field mt-3 w-full resize-y rounded-2xl p-3 text-sm text-white outline-none placeholder:text-white/40 focus-visible:ring-2 focus-visible:ring-indigo-300"
+          />
+          <button type="button" disabled={submitting} onClick={onSubmit} className="dc-pdp-review-submit mt-3 w-full disabled:opacity-60">
+            {submitting ? "Submitting…" : "Submit review"}
+          </button>
         </SimplePanel>
       )}
-      {notice && <p className="mt-3 rounded-xl bg-indigo-500/15 p-3 text-xs font-medium text-indigo-200">{notice}</p>}
+      {notice && <p role="status" aria-live="polite" className="mt-3 rounded-xl border border-indigo-300/10 bg-indigo-500/10 p-3 text-xs font-medium text-indigo-100">{notice}</p>}
+
       {reviews.length > 0 ? (
-        <div data-pdp-review-list className="mt-4 space-y-3">
+        <div data-pdp-review-list className="mt-4 grid grid-cols-1 gap-3">
           {visibleReviews.map((review) => (
-            <SimplePanel className="dc-pdp-review" key={review.id} contentClassName="p-4">
+            <SimplePanel className="dc-pdp-review min-w-0" key={review.id} contentClassName="p-4">
               <article>
-              <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
-                       <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-white"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-white/55">{review.date}</p></div>
-                <RatingStars rating={review.rating} />
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-white/85">“{review.comment}”</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <div aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-white">
+                      <span className="min-w-0 break-words">{review.name}</span>
+                      {review.verifiedPurchase && <BadgeCheck aria-label="Verified purchase" className="h-4 w-4 shrink-0 text-emerald-400" />}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-white/55">{review.date}</p>
+                  </div>
+                  <RatingStars rating={review.rating} className="shrink-0" />
+                </div>
+                <p className="mt-3 break-words text-sm leading-relaxed text-white/80">“{review.comment}”</p>
               </article>
             </SimplePanel>
           ))}
@@ -1010,32 +1366,82 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               type="button"
               data-load-more-reviews
               onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
-              className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
+              className="min-h-11 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-semibold"
             >
-              Load more · {Math.min(REVIEW_PAGE_SIZE, remaining)} of {remaining} remaining
+              Load {Math.min(REVIEW_PAGE_SIZE, remaining)} more reviews
             </GlassButton>
           ) : null}
         </div>
-      ) : <p className="mt-4 text-center text-xs text-white/55">Published written reviews will appear here when available.</p>}
-    </SimplePanel>
+      ) : <p className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-sm text-white/60">No published written reviews yet.</p>}
+    </GlassSurface>
   );
 }
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
+  if (!onNavigate) return null;
   return (
-    <SimplePanel data-pdp-related className="text-white" contentClassName="p-5">
-      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
-      <div data-pdp-related-list className="space-y-3">{products.map((item) => <SimplePanel key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} loading="lazy" decoding="async" width={112} height={96} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></SimplePanel>)}</div>
-    </SimplePanel>
+    <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-4 sm:p-5">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-white">You may also like</h2>
+        <p className="mt-1 text-xs text-white/55">Other products from the live catalog</p>
+      </div>
+      <div data-pdp-related-list className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {products.map((item) => {
+          const identity = getProductPresentation(item);
+          const image = getProductImageSources(item)[0];
+          return (
+            <SimplePanel
+              key={item.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onNavigate(item)}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate(item); } }}
+              aria-label={`View ${identity.title}`}
+              className="group min-w-0 cursor-pointer overflow-hidden text-left transition-colors hover:border-indigo-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300"
+              contentClassName="flex min-w-0 p-0"
+            >
+              <ProductImageThumb product={item} source={image} />
+              <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3">
+                <span className="dc-pdp-related-type">{identity.typeLabel}</span>
+                <span className="break-words text-sm font-semibold text-white">{identity.title}</span>
+                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/60">
+                  {item.reviews > 0 && item.rating > 0 ? <><RatingStars rating={item.rating} />{item.rating.toFixed(1)} · {item.reviews.toLocaleString("en-IN")} ratings</> : "No ratings yet"}
+                </span>
+                <span className="font-semibold tabular-nums text-white">{formatPrice(item.price)}</span>
+              </span>
+            </SimplePanel>
+          );
+        })}
+      </div>
+    </GlassSurface>
   );
 }
 
 function RatingStars({ rating, className = "" }: { rating: number; className?: string }) {
-  return <span className={`flex items-center gap-0.5 ${className}`}>{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-3.5 w-3.5 ${rating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-white/40"}`} />)}</span>;
+  const safeRating = Math.max(0, Math.min(5, Number(rating) || 0));
+  return (
+    <span role="img" aria-label={`${safeRating.toFixed(1)} out of 5 stars`} className={`flex items-center gap-0.5 ${className}`}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <Star key={index} aria-hidden="true" className={`h-3.5 w-3.5 ${safeRating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-white/35"}`} />
+      ))}
+    </span>
+  );
 }
 
-function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-white/55" /><span className="truncate">{text}</span></div>; }
-function EmptyDetail({ text }: { text: string }) { return <SimplePanel contentClassName="flex flex-col items-center py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></SimplePanel>; }
+function Meta({ icon: Icon, label, text }: { icon: typeof Clock; label: string; text: string }) {
+  return (
+    <div data-pdp-meta-item className="flex min-w-0 items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+      <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-indigo-200/80" />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-white/50">{label}</span>
+        <span className="break-words text-xs font-semibold leading-snug text-white/85">{text}</span>
+      </span>
+    </div>
+  );
+}
+function EmptyDetail({ text }: { text: string }) {
+  return <SimplePanel data-pdp-empty-detail contentClassName="flex flex-col items-center py-6 text-center"><PackageOpen aria-hidden="true" className="h-6 w-6 text-white/40" /><p className="mt-2 max-w-md px-3 text-sm text-white/60">{text}</p></SimplePanel>;
+}
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
 const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<string>): CurriculumModule | null => {
@@ -1077,7 +1483,10 @@ export const collectCurriculumModules = (product: Product): CurriculumModule[] =
   const paidModuleIds = collectPaidModuleIdSet(product.paidUpdates || []);
   const canonical = (product.canonicalModules || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
   if (canonical.length > 0) return canonical;
-  return (product.courseContent || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
+  // CatalogContext retains a legacy demo tree for older Course Player routes.
+  // Never present that shared demo data as this live product's curriculum.
+  const courseContent = product.courseContent === fullDemoCourseContent ? [] : (product.courseContent || []);
+  return courseContent.map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
 };
 
 
@@ -1086,4 +1495,15 @@ const curriculumContainsId = (modules: CurriculumModule[], id: string): boolean 
 
 export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
-function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-full bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-500">Back to store</button></div></div>; }
+function MissingProduct({ onBack }: { onBack: () => void }) {
+  return (
+    <div data-pdp-not-found className="grid min-h-[50vh] place-items-center px-6 py-10 text-center">
+      <div>
+        <ShoppingBag aria-hidden="true" className="mx-auto h-10 w-10 text-white/40" />
+        <h1 className="mt-4 text-2xl font-bold text-white">Product not found</h1>
+        <p className="mt-2 text-sm text-white/60">This product is no longer available in the live catalog.</p>
+        <button type="button" onClick={onBack} className="dc-pdp-library-cta mt-5">Back to store</button>
+      </div>
+    </div>
+  );
+}

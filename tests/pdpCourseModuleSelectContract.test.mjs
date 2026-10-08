@@ -11,20 +11,30 @@ const quotes = fs.readFileSync("api/_lib/quotes.ts", "utf8");
 const push = fs.readFileSync("utils/webPush.ts", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 
-test("product detail always offers a subscription-style module picker", () => {
-  assert.match(pdp, /Select course modules/);
+test("product detail offers a clearly labelled individual-purchase module picker", () => {
   assert.match(pdp, /PdpPurchaseBuilder/);
   assert.match(builder, /ModuleSelectTrigger/);
   assert.match(builder, /ModuleSelectModal/);
+  assert.match(builder, /label="Purchase individually"/);
   assert.match(builder, /selected_modules/);
   assert.match(builder, /modulePicker/);
-  assert.match(trigger, /Select course modules/);
+  assert.match(trigger, /Purchase individually/);
+  assert.match(trigger, /font-display text-base font-extrabold tracking-tight/);
   assert.match(trigger, /No modules yet · tap to view/);
   assert.match(modal, /Select modules/);
   assert.match(modal, /data-pdp-module-pick/);
   assert.match(modal, /data-pdp-no-modules/);
   assert.match(modal, />No modules</);
   assert.match(modal, /Select all/);
+});
+
+test("module choices are plain list rows while their checkboxes stay glass", () => {
+  assert.match(modal, /<ul data-pdp-module-list/);
+  assert.match(modal, /className="dc-pdp-module-row"/);
+  assert.doesNotMatch(modal, /<GlassCard/);
+  assert.match(modal, /<GlassCheckbox/);
+  assert.match(modal, /<GlassButton[\s\S]*data-pdp-module-select-confirm/);
+  assert.match(modal, /<GlassInput/);
 });
 
 const css = fs.readFileSync("src/index.css", "utf8");

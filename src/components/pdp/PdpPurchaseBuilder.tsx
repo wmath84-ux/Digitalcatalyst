@@ -38,6 +38,7 @@ import type {
   CheckoutSelection,
 } from "@/types/commerce";
 import type { Product } from "@/data/products";
+import { getProductPresentation } from "@/pdp/productPresentation";
 import ModuleSelectTrigger from "./ModuleSelectTrigger";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
@@ -161,6 +162,7 @@ export default function PdpPurchaseBuilder({
 }: PdpPurchaseBuilderProps) {
   const modules = (product.canonicalModules || []) as CanonicalCourseModule[];
   const paidUpdates = (product.paidUpdates || []) as CanonicalPaidUpdate[];
+  const presentation = getProductPresentation(product);
 
   const purchasableModules = useMemo(() => getPurchasableModules(modules), [modules]);
   const bundleModules = useMemo(() => getBundleModules(modules), [modules]);
@@ -340,6 +342,7 @@ export default function PdpPurchaseBuilder({
   const modulePicker = (
     <>
       <ModuleSelectTrigger
+        label="Purchase individually"
         totalModules={purchasableModules.length}
         selectedCount={selectedModuleIds.size}
         selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
@@ -386,7 +389,7 @@ export default function PdpPurchaseBuilder({
             active={mode !== "selected_resources" && mode !== "paid_update"}
             onClick={() => setExtraMode(null)}
           >
-            Course · modules
+            {presentation.isCourse ? "Course · modules" : "Product modules"}
           </ExtraModeChip>
           {extraModes.map((extra) => (
             <ExtraModeChip key={extra} active={mode === extra} onClick={() => setExtraMode(extra)}>
@@ -401,6 +404,7 @@ export default function PdpPurchaseBuilder({
           modules={bundleModules}
           isProductOwned={isProductOwned}
           fullCourse={summary.fullCourse}
+          productLabel={presentation.typeLabel}
         />
       )}
 
@@ -417,6 +421,7 @@ export default function PdpPurchaseBuilder({
       {mode === "paid_update" && (
         <PaidUpdateSelector
           updates={availableUpdates}
+          productLabel={presentation.typeLabel}
           selectedId={selectedUpdateId}
           onSelect={setSelectedUpdateId}
         />
@@ -428,6 +433,8 @@ export default function PdpPurchaseBuilder({
         mode={mode}
         summary={summary}
         isProductOwned={isProductOwned}
+        productLabel={presentation.typeLabel}
+        libraryAction={presentation.libraryAction}
         validation={validation}
         previewNotice={previewNotice}
         onPreview={handlePreview}
@@ -462,10 +469,12 @@ function FullCoursePanel({
   modules,
   isProductOwned,
   fullCourse,
+  productLabel,
 }: {
   modules: CanonicalCourseModule[];
   isProductOwned: boolean;
   fullCourse: { regularPrice: number; salePrice: number | null; effectivePrice: number };
+  productLabel: string;
 }) {
   const discount =
     fullCourse.regularPrice > fullCourse.effectivePrice && fullCourse.regularPrice > 0
@@ -477,8 +486,8 @@ function FullCoursePanel({
         <div className="flex items-start gap-2 rounded-2xl bg-emerald-500/15 p-3 text-sm text-emerald-200 ring-1 ring-emerald-400/30">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <p className="font-black">You already own this course</p>
-            <p className="mt-1 text-xs text-emerald-200/80">Open it from your library to start learning.</p>
+            <p className="font-black">This product is already in your library</p>
+            <p className="mt-1 text-xs text-emerald-200/80">Open it from your library to continue.</p>
           </div>
         </div>
       ) : null}
@@ -498,7 +507,7 @@ function FullCoursePanel({
         ) : null}
       </div>
       <p className="mt-1 text-xs text-white/55">
-        Full course · {modules.length} module{modules.length === 1 ? "" : "s"} · Lifetime access
+        {productLabel}{modules.length > 0 ? ` · ${modules.length} module${modules.length === 1 ? "" : "s"}` : ""}
       </p>
       <div className="mt-4">
         <p className="text-xs font-black uppercase tracking-wider text-white/55">What's included</p>
@@ -534,7 +543,7 @@ function ResourceSelector({
   if (resources.length === 0) {
     return (
       <SimplePanel className="text-white/55" contentClassName="p-4 text-sm">
-        No resources are sold individually for this course.
+        No resources are sold individually for this product.
       </SimplePanel>
     );
   }
@@ -608,25 +617,31 @@ function ResourceSelector({
 
 function PaidUpdateSelector({
   updates,
+  productLabel,
   selectedId,
   onSelect,
 }: {
   updates: CanonicalPaidUpdate[];
+  productLabel: string;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
   if (updates.length === 0) {
     return (
       <SimplePanel className="text-white/55" contentClassName="p-4 text-sm">
-        No paid updates are available for this course right now.
+        No paid updates are available for this product right now.
       </SimplePanel>
     );
   }
   return (
-    <div className="space-y-2">
-      <p className="px-1 text-xs font-black uppercase tracking-wider text-white/55">Available paid updates</p>
+    <div className="space-y-2" role="group" aria-label={`Paid updates for ${productLabel}`}>
+      <p className="px-1 text-xs font-semibold uppercase tracking-wider text-white/55">Available paid updates</p>
       {updates.map((u) => {
         const isSelected = selectedId === u.id;
+        const includedSummary = [
+          u.includedModuleIds.length > 0 ? `${u.includedModuleIds.length} module${u.includedModuleIds.length === 1 ? "" : "s"}` : null,
+          u.includedResourceIds.length > 0 ? `${u.includedResourceIds.length} resource${u.includedResourceIds.length === 1 ? "" : "s"}` : null,
+        ].filter((item): item is string => Boolean(item));
         return (
           <SimplePanel
             key={u.id}
@@ -658,7 +673,7 @@ function PaidUpdateSelector({
               {u.description ? (
                 <p className="mt-1 line-clamp-2 text-xs text-white/55 sm:text-sm">{u.description}</p>
               ) : null}
-              <p className="mt-1 text-[11px] font-semibold text-violet-300">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
+              {includedSummary.length > 0 ? <p className="mt-1 text-[11px] font-semibold text-violet-200">Includes {includedSummary.join(" · ")}</p> : null}
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 <span className="font-black text-white">{formatPrice(u.cashPrice)}</span>
                 {u.publishDate ? (
@@ -680,10 +695,10 @@ function SummaryPanel({
 }) {
   const diff = summary.fullCourseDifference;
   const diffLabel = diff > 0
-    ? `You save ${formatPriceValue(diff) || ""} vs full course`
+    ? `You save ${formatPriceValue(diff) || ""} vs full product`
     : diff < 0
-      ? `Full course is ${formatPriceValue(-diff) || ""} cheaper`
-      : "Same price as full course";
+      ? `Full product is ${formatPriceValue(-diff) || ""} cheaper`
+      : "Same price as full product";
   return (
     <GlassSurface data-pdp-summary radius={24} className="text-white" contentClassName="p-4 sm:p-5">
       <div className="flex items-center justify-between">
@@ -740,7 +755,7 @@ function SummaryPanel({
       {summary.fullCourse.effectivePrice > 0 ? (
         <div className="mt-3 flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-xs text-white/55 sm:text-sm">
           <span className="inline-flex items-center gap-1">
-            <ShoppingBag size={12} /> Full course: {formatPriceValue(summary.fullCourse.effectivePrice)}
+            <ShoppingBag size={12} /> Full product: {formatPriceValue(summary.fullCourse.effectivePrice)}
           </span>
           <span className="font-semibold text-white/85">{diffLabel}</span>
         </div>
@@ -753,6 +768,8 @@ function CtaBar({
   mode,
   summary,
   isProductOwned,
+  productLabel,
+  libraryAction,
   validation,
   previewNotice,
   onPreview,
@@ -761,6 +778,8 @@ function CtaBar({
   mode: PdpPurchaseMode;
   summary: ReturnType<typeof computeSummary>;
   isProductOwned: boolean;
+  productLabel: string;
+  libraryAction: string;
   validation: { ok: boolean; reason?: string };
   previewNotice: string | null;
   onPreview: () => void;
@@ -772,14 +791,14 @@ function CtaBar({
   let helper: string | null = null;
   if (mode === "full_product") {
     if (isProductOwned) {
-      label = "Open owned course";
+      label = libraryAction;
       icon = CircleCheck;
-      helper = "You already own this course.";
+      helper = "This product is already in your library.";
     } else if (summary.effectiveSubtotal === 0) {
       label = "Get free access";
       icon = Sparkles;
     } else {
-      label = `Buy full course — ${formatPriceValue(summary.effectiveSubtotal) || ""}`;
+      label = `Get ${productLabel.toLowerCase()} · ${formatPriceValue(summary.effectiveSubtotal) || ""}`;
     }
   } else if (mode === "selected_modules") {
     if (summary.selectedCount === 0) {
@@ -856,9 +875,6 @@ function CtaBar({
         label={label}
       />
       {helper ? <p className="px-1 text-center text-[11px] font-semibold text-white/55">{helper}</p> : null}
-      <p className="px-1 text-center text-[10px] font-medium text-white/55">
-        Preview-only — payment wiring is coming next.
-      </p>
     </div>
   );
 }
