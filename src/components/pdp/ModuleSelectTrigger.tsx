@@ -15,7 +15,7 @@ interface Props {
   onOpen: () => void;
 }
 
-export default function ModuleSelectTrigger({ label = "Select course modules", totalModules, selectedCount, selectedTotal, onOpen }: Props) {
+export default function ModuleSelectTrigger({ label = "Purchase individually", totalModules, selectedCount, selectedTotal, onOpen }: Props) {
   return (
     <div className="px-0 pt-0">
       <GlassSurface radius={16} className="text-white">
@@ -30,10 +30,10 @@ export default function ModuleSelectTrigger({ label = "Select course modules", t
             <LayoutGrid className="h-5 w-5 text-violet-300" />
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-sm font-bold text-white/85">{label}</p>
+            <p data-pdp-module-trigger-title className="font-display text-base font-extrabold tracking-tight text-white">{label}</p>
             {selectedCount === 0 ? (
               <p className="truncate text-xs text-white/55">
-                {totalModules === 0 ? "No modules yet · tap to view" : `${totalModules} module${totalModules === 1 ? "" : "s"} available · pick what you need`}
+                {totalModules === 0 ? "No modules yet · tap to view" : `${totalModules} module${totalModules === 1 ? "" : "s"} available · choose individually`}
               </p>
             ) : (
               <p className="truncate text-xs font-medium text-violet-300">

@@ -652,3 +652,150 @@
     animation-duration: 1ms !important;
   }
 }
+
+/* Purchase-individually picker: retain glass for its frame and controls, while
+   presenting the module choices as a clear, compact list instead of a stack of
+   glass cards. The overlay is portalled, so these selectors use its PDP hooks. */
+[data-pdp-root] [data-pdp-module-trigger-title] {
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-select-header] h2 {
+  color: #f8fafc;
+  font-size: 1.15rem !important;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-select-header] p {
+  margin-top: 0.2rem;
+  color: rgba(226, 232, 240, 0.67);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-pdp-module-select-modal] [data-pdp-select-all] {
+  min-height: 2.75rem;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: transparent;
+}
+
+[data-pdp-module-select-modal] [data-pdp-select-all]:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-list] {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-pick] {
+  display: flex;
+  width: 100%;
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  padding: 0.8rem 0.55rem;
+  background: transparent;
+  color: #f8fafc;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-pick]:not([data-owned="true"]) {
+  cursor: pointer;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-pick]:hover,
+[data-pdp-module-select-modal] [data-pdp-module-pick][data-selected="true"] {
+  background: rgba(99, 102, 241, 0.09);
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-pick]:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid rgba(165, 180, 252, 0.85);
+  outline-offset: -2px;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-title {
+  color: #f8fafc;
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-summary {
+  color: rgba(226, 232, 240, 0.65);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-option {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-price {
+  color: rgba(248, 250, 252, 0.9);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-pdp-module-select-modal] .dc-pdp-module-price--owned {
+  color: #a7f3d0;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-select-footer] {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-select-confirm] {
+  width: 100%;
+}
+
+[data-pdp-module-select-modal] [data-pdp-module-select-confirm] > span > div {
+  min-height: 3rem;
+  border-radius: 999px;
+  font-weight: 750;
+}
+
+@media (max-width: 380px) {
+  [data-pdp-module-select-modal] [data-pdp-module-pick] {
+    gap: 0.6rem;
+    padding-inline: 0.25rem;
+  }
+
+  [data-pdp-module-select-modal] .dc-pdp-module-option {
+    gap: 0.5rem;
+  }
+
+  [data-pdp-module-select-modal] .dc-pdp-module-title {
+    font-size: 0.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-pdp-module-select-modal] [data-pdp-module-pick] {
+    transition-duration: 1ms;
+  }
+}

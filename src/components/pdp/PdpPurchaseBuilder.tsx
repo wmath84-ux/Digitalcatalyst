@@ -342,7 +342,7 @@ export default function PdpPurchaseBuilder({
   const modulePicker = (
     <>
       <ModuleSelectTrigger
-        label={presentation.isCourse ? "Select course modules" : "Select product modules"}
+        label="Purchase individually"
         totalModules={purchasableModules.length}
         selectedCount={selectedModuleIds.size}
         selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
