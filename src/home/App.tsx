@@ -12,6 +12,7 @@ import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import HomeSectionHeader from "./components/HomeSectionHeader";
 import FeedbackSection from "./components/FeedbackSection";
+import FeedbackExperiencePage from "./components/FeedbackExperiencePage";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BookOpenIcon } from "../components/icons";
@@ -209,6 +210,7 @@ export default function App({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
+  const homeScrollRef = useRef<HTMLElement>(null);
 
   // Continue Learning is derived from the learner's live course-progress
   // documents. Titles, last-opened lesson and completion are all catalog data.
@@ -333,6 +335,7 @@ export default function App({
 
   const handleFooterChange = (tab: TabKey) => {
     if (tab === "home") {
+      if (window.location.hash.split("?")[0] !== "#/home") window.location.hash = "#/home";
       setSearchQuery("");
       contentTopRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
@@ -355,6 +358,11 @@ export default function App({
   };
 
   const isSearching = normalizedQuery.length > 0;
+  const isFeedbackExperience = typeof window !== "undefined" && window.location.hash.split("?")[0] === "#/home/feedback";
+
+  useEffect(() => {
+    if (isFeedbackExperience) homeScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [isFeedbackExperience]);
 
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
@@ -372,9 +380,11 @@ export default function App({
           onOpenNotifications={onNavigateToNotifications}
         />
 
-        <main className="flex-1 overflow-y-auto pb-2">
+        <main ref={homeScrollRef} className="flex-1 overflow-y-auto pb-2">
           <div data-home-content className="dc-home-content">
-            {isSearching ? (
+            {isFeedbackExperience ? (
+              <FeedbackExperiencePage onBack={() => { window.location.hash = "#/home"; }} />
+            ) : isSearching ? (
               <section className="dc-home-section dc-home-search-section">
                 <HomeSectionHeader
                   title={`Results for “${searchQuery}”`}
@@ -525,13 +535,7 @@ export default function App({
                   </div>
                 ) : null}
 
-                <FeedbackSection
-                  canSubmit={Boolean(user)}
-                  onSignIn={() => {
-                    const returnHash = window.location.hash || "#/home";
-                    window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(returnHash)}`;
-                  }}
-                />
+                <FeedbackSection onOpen={() => { window.location.hash = "#/home/feedback"; }} />
               </>
             )}
           </div>

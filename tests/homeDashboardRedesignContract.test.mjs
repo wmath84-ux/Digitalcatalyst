@@ -15,6 +15,8 @@ const productCard = read("src/home/components/ProductCard.tsx");
 const hero = read("src/home/components/HeroCarousel.tsx");
 const reviews = read("src/home/components/Reviews.tsx");
 const feedback = read("src/home/components/FeedbackSection.tsx");
+const feedbackPage = read("src/home/components/FeedbackExperiencePage.tsx");
+const routeShell = read("src/main.tsx");
 
 const renderStart = app.indexOf("{homeBanners.length > 0 ? (");
 
@@ -123,13 +125,39 @@ test("reviews show published data only and make verification conditional", () =>
   assert.match(reviews, /onOpenReview\(review\.productId\)/);
 });
 
-test("feedback stays compact and reuses the existing query submission flow", () => {
-  assert.match(feedback, /createUserQuery\(trimmed\.slice\(0, MAX_FEEDBACK_LENGTH\)\)/);
-  assert.match(feedback, /MAX_FEEDBACK_LENGTH = 500/);
-  assert.match(app, /returnHash = window\.location\.hash \|\| "#\/home"/);
-  assert.match(app, /mode=login&return=/);
+test("Home feedback entry remains compact and opens its own hash subroute", () => {
+  assert.match(feedback, /Have something to share\?/);
+  assert.match(feedback, /onClick=\{onOpen\}/);
+  assert.match(feedback, /Open feedback/);
+  assert.doesNotMatch(feedback, /<Modal|textarea|createUserQuery/);
+  assert.match(app, /window\.location\.hash = "#\/home\/feedback"/);
+  assert.match(app, /isFeedbackExperience = .*window\.location\.hash\.split\("\?"\)\[0\] === "#\/home\/feedback"/);
+  assert.match(app, /<FeedbackExperiencePage onBack=/);
+  assert.match(app, /if \(isFeedbackExperience\) homeScrollRef\.current\?\.scrollTo\(\{ top: 0, behavior: "auto" \}\)/);
+  assert.match(app, /<main ref=\{homeScrollRef\}/);
+  assert.match(app, /window\.location\.hash\.split\("\?"\)\[0\] !== "#\/home"/);
+  assert.match(routeShell, /hash\.startsWith\(HOME_HASH\)\) return "home"/);
+  assert.match(routeShell, /hash\.startsWith\(HOME_HASH\)\) return HomeApp/);
+  assert.match(app, /<BottomNav[\s\S]*?active="home"/);
   assert.match(styles, /\.dc-home-feedback-content/);
   assert.match(styles, /@media \(max-width: 480px\)/);
+});
+
+test("separate feedback page restores the interactive wall and branded social card", () => {
+  assert.match(feedbackPage, /lazy\(\(\) => import\("\.\.\/\.\.\/components\/StickerWall"\)\)/);
+  assert.match(feedbackPage, /onSubmitNote=\{async \(note\) => \{ await createUserQuery\(note\)\.catch\(\(\) => undefined\); \}\}/);
+  assert.match(feedbackPage, /prefetchRoute\("#\/queries"\)/);
+  assert.match(feedbackPage, /window\.location\.hash = "#\/queries"/);
+  assert.match(feedbackPage, /<SocialProfileCard/);
+  assert.match(feedbackPage, /logoUrl=\{branding\.logoUrl\}/);
+  assert.match(feedbackPage, /name=\{branding\.appName\}/);
+  assert.match(feedbackPage, /bio=\{branding\.tagline\}/);
+  assert.match(feedbackPage, /links=\{branding\.socialLinks\}/);
+  assert.match(feedbackPage, /data-home-sticker-wall/);
+  assert.match(feedbackPage, /data-home-social-card-section/);
+  assert.match(feedbackPage, /Back to Home/);
+  assert.match(styles, /\.dc-home-feedback-page \{/);
+  assert.doesNotMatch(app, /StickerWall|SocialProfileCard/);
 });
 
 test("layout is Home-scoped, responsive, reduced-motion aware, and keeps nav clearance", () => {
@@ -139,7 +167,7 @@ test("layout is Home-scoped, responsive, reduced-motion aware, and keeps nav cle
   assert.match(styles, /@media \(max-width: 480px\)/);
   assert.match(styles, /@media \(max-width: 350px\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(app, /<main className="flex-1 overflow-y-auto pb-2">/);
+  assert.match(app, /<main ref=\{homeScrollRef\} className="flex-1 overflow-y-auto pb-2">/);
   assert.match(app, /<BottomNav[\s\S]*?peekAlwaysOpen/);
   assert.doesNotMatch(styles, /(?:^|\n)\s*(?:body|header|footer|nav|\.dc-app-frame|\.dc-app-shell)\s*\{/);
 });

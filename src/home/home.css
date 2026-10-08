@@ -889,8 +889,91 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   -webkit-line-clamp: 1;
 }
 
-/* Compact feedback entry point; the full composer lives in a responsive
-   dialog, not a tall canvas on the learning dashboard. */
+/* Dedicated Home feedback destination: keep the original wall and branded
+   social card together without mounting either large experience on the feed. */
+.dc-home-feedback-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dc-home-space);
+  width: 100%;
+  min-width: 0;
+}
+
+.dc-home-feedback-page-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 17px;
+  min-width: 0;
+}
+
+.dc-home-feedback-back {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(238, 237, 255, 0.9);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.dc-home-feedback-back:hover {
+  border-color: rgba(185, 174, 255, 0.32);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dc-home-feedback-back:focus-visible {
+  outline: 2px solid rgba(176, 166, 255, 0.95);
+  outline-offset: 3px;
+}
+
+.dc-home-feedback-page-eyebrow {
+  margin: 0 0 6px;
+  color: #bdb3ff;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.dc-home-feedback-page-heading h1 {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.98);
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.dc-home-feedback-page-description {
+  max-width: 58ch;
+  margin: 8px 0 0;
+  color: rgba(228, 232, 246, 0.74);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.dc-home-feedback-wall-section,
+.dc-home-feedback-social-section {
+  width: 100%;
+  min-width: 0;
+}
+
+.dc-home-feedback-wall-frame,
+.dc-home-feedback-social-slot {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Compact feedback entry point on the main dashboard. */
 .dc-home-feedback-card {
   min-width: 0;
 }
@@ -936,8 +1019,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   line-height: 1.4;
 }
 
-.dc-home-feedback-button,
-.dc-home-feedback-submit {
+.dc-home-feedback-button {
   display: inline-flex;
   min-height: 42px;
   flex: 0 0 auto;
@@ -953,102 +1035,12 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+  transition: background-color 150ms ease, transform 150ms ease;
 }
 
-.dc-home-feedback-button:hover,
-.dc-home-feedback-submit:hover:not(:disabled) {
+.dc-home-feedback-button:hover {
   background: #625ce0;
   transform: translateY(-1px);
-}
-
-.dc-home-feedback-form,
-.dc-home-feedback-signin,
-.dc-home-feedback-success {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.dc-home-feedback-form > p,
-.dc-home-feedback-signin > p,
-.dc-home-feedback-success > p {
-  margin: 0;
-  color: rgba(240, 242, 250, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.dc-home-feedback-form textarea {
-  width: 100%;
-  min-height: 136px;
-  resize: vertical;
-  padding: 13px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  background: rgba(4, 8, 20, 0.52);
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.dc-home-feedback-form textarea::placeholder {
-  color: rgba(233, 237, 249, 0.45);
-}
-
-.dc-home-feedback-form textarea:focus-visible {
-  border-color: rgba(171, 161, 255, 0.7);
-  outline: 2px solid rgba(171, 161, 255, 0.3);
-  outline-offset: 1px;
-}
-
-.dc-home-feedback-form-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.dc-home-feedback-count {
-  color: rgba(229, 234, 246, 0.6);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.dc-home-feedback-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.dc-home-feedback-error {
-  margin: 0;
-  color: #ffb4c2;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.dc-home-feedback-success {
-  align-items: flex-start;
-}
-
-.dc-home-feedback-success h3 {
-  margin: 0;
-  color: #fff;
-  font-size: 18px;
-  line-height: 1.3;
-}
-
-.dc-home-feedback-success-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(52, 211, 153, 0.16);
-  color: #8ce0bd;
-  font-size: 20px;
-  font-weight: 700;
 }
 
 .dc-home-catalog-error {
@@ -1317,8 +1309,16 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   }
 
   .dc-home-feedback-button {
-    width: 100%;
+    width: calc(100% - 49px);
     margin-left: 49px;
+  }
+
+  .dc-home-feedback-page-heading h1 {
+    font-size: clamp(24px, 7.2vw, 31px);
+  }
+
+  .dc-home-feedback-page-description {
+    font-size: 13px;
   }
 }
 
