@@ -16,7 +16,7 @@ import FeedbackExperiencePage from "./components/FeedbackExperiencePage";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BookOpenIcon } from "../components/icons";
-import { categories, reviews as fallbackReviews } from "./data/mockData";
+import { categories } from "./data/mockData";
 import { calculateCourseProgress, findCurrentLesson } from "./data/homeDashboardData";
 import type { Banner, Product } from "./types";
 import type { CanonicalCourseModule, CanonicalCourseResource } from "../types/commerce";
@@ -165,7 +165,9 @@ export default function App({
       productId: featured.id,
     }];
   }, [catalogProducts, configuredBanners, usingCustom]);
-  const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
+  // Learner reviews come from published product reviews only: no placeholder
+  // reviews are ever mixed in, and the rail shows at most four.
+  const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, [], 4);
   const publishedHomepageReviews = useMemo(
     () => homepageReviews.filter((review) => review.source === "live" && Number.isFinite(review.rating) && review.rating >= 1 && review.rating <= 5),
     [homepageReviews],

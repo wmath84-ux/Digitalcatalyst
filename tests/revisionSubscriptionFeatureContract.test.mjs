@@ -87,7 +87,9 @@ test("the premium gate pushes buyers to the subscription page", () => {
 test("Revision is a first-class selectable feature with default selection", () => {
   assert.match(subscriptionPage, /const defaultFeatureIds = \["my-day", "revision"\]/);
   assert.match(subscriptionPage, /defaultFeatureIds\.filter/);
-  assert.match(subscriptionPage, /if \(featureId === "revision"\) window\.location\.hash = "#\/revision"/);
+  // The feature row that opens Revision now lives in the profile's membership card.
+  assert.match(fs.readFileSync("src/profile/MembershipManagement.tsx", "utf8"), /OPENABLE_FEATURES = new Set\(\["my-day", "revision"\]\)/);
+  assert.match(fs.readFileSync("src/profile/App.tsx", "utf8"), /if \(featureId === "revision"\) window\.location\.hash = "#\/revision"/);
 });
 
 test("the feature picker renders the revision icons", () => {

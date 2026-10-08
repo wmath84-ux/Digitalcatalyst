@@ -20,21 +20,28 @@
  *                    a capsule, exactly like the reference) · overflow hidden
  *   · surface        background #fff · color #121212 · border none
  *   · shadow         10px 10px 20px rgba(0,0,0,.05)
- *   · decor layer    inset 0 · background var(--clr) · translateX(-100%)
+ *   · decor layer    inset 0 · background var(--uzp-wipe) · translateX(-100%)
  *                    → translate(0) on hover over .3s
  *   · content        flex · align-items center · font-weight 600 · overflow hidden
- *   · icon plate     48×40px · background var(--clr) · display grid · place-items center
+ *   · icon plate     48×40px · background #fff (clean white) · glyph var(--uzp-glyph)
  *   · text           2px 1.5rem 2px / padding-left .75rem · inline-block
  *                    transition color .2s · nowrap + ellipsis · max-width 150px
- *   · hover          decor slides in, text goes #fff
+ *   · hover          decor slides in (neutral light grey by default), text turns
+ *                    dark (var(--uzp-hover-text))
+ *
+ * Tone: by default every CTA is neutral white. The optional `color` prop on
+ * PaymentButton sets --uzp-clr, --uzp-glyph and --uzp-wipe to that meaning colour
+ * and makes the hover text white.
  * The reference defines no :active rule (its whole interaction is the hover
  * slide), so none is invented here.
  */
 
 .uzp-pay {
-  /* The reference's own `style="--clr: #00ad54"` — the brand colour that
-     paints the icon plate and wipes in behind the label on hover. */
-  --uzp-clr: #00ad54;
+  /* Neutral defaults: a clean white CTA before and after the hover wipe.
+     PaymentButton's `color` prop overrides these with a meaning colour. */
+  --uzp-wipe: #eef0f4;
+  --uzp-glyph: #121212;
+  --uzp-hover-text: #121212;
 
   text-decoration: none;
   line-height: 1;
@@ -58,7 +65,7 @@
 .uzp-pay__decor {
   position: absolute;
   inset: 0;
-  background-color: var(--uzp-clr);
+  background-color: var(--uzp-wipe);
   transform: translateX(-100%);
   transition: transform 0.3s;
   z-index: 0;
@@ -75,11 +82,11 @@
 .uzp-pay__icon {
   width: 3em; /* 48px @16px */
   height: 2.5em; /* 40px @16px */
-  background-color: var(--uzp-clr);
+  background-color: #fff;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: #fff;
+  color: var(--uzp-glyph);
 }
 
 /* The reference inlines a 24px SVG inside the 48×40 plate. Expressed in em
@@ -103,7 +110,7 @@
 }
 
 .uzp-pay:hover .uzp-pay__text {
-  color: #fff;
+  color: var(--uzp-hover-text);
 }
 
 .uzp-pay:hover .uzp-pay__decor {
@@ -114,7 +121,7 @@
    the accessibility floor the app requires, drawn with the component's own
    accent so the design still reads as the reference. */
 .uzp-pay:focus-visible {
-  outline: 2px solid var(--uzp-clr);
+  outline: 2px solid var(--uzp-clr, #64748b);
   outline-offset: 2px;
 }
 
@@ -167,7 +174,7 @@
 }
 
 .uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
-  color: #fff;
+  color: var(--uzp-hover-text);
 }
 
 .uzp-pay__spinner {
@@ -200,7 +207,7 @@
 
 .uzp-pay[data-uzp-state="loading"]:disabled .uzp-pay__text,
 .uzp-pay:disabled.uzp-pay[data-uzp-state="loading"] .uzp-pay__text {
-  color: #fff;
+  color: var(--uzp-hover-text);
 }
 
 /* ── Reduced motion: the slide resolves instantly, states unchanged. ──── */

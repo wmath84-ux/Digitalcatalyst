@@ -22,13 +22,13 @@ test("premium PDP uses live products rather than imported showcase product data"
   assert.match(pdp, /product\.images/);
 });
 
-test("related products are deterministic live-catalog matches", () => {
+test("related products are same-class, same-chapter live-catalog matches in a two-row slider", () => {
   assert.match(pdp, /getRelatedProducts/);
   assert.match(pdp, /candidate\.id !== product\.id/);
-  assert.match(pdp, /getProductSubjectLabel\(candidate\)/);
-  assert.match(pdp, /subject && subject === candidateSubject/);
-  assert.match(pdp, /candidate\.category === product\.category/);
-  assert.match(pdp, /getProductClassLabel\(candidate\)/);
+  assert.match(pdp, /getProductClassKey\(candidate\) === classKey/);
+  assert.match(pdp, /getProductChapterKey\(candidate\) === chapterKey/);
+  assert.match(pdp, /data-pdp-related-next/);
+  assert.match(pdp, /data-pdp-related-prev/);
   assert.match(main, /products=\{products\}/);
   assert.doesNotMatch(pdp, /Math\.random/);
 });

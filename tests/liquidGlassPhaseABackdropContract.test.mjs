@@ -129,7 +129,6 @@ const A2_FILES = [
   "src/subscription/components/SubscriptionPage.tsx",
   "src/subscription/components/PlanOverview.tsx",
   "src/subscription/components/PriceSummary.tsx",
-  "src/subscription/components/ActiveMemberView.tsx",
   "src/subscription/components/OwnedPlanCard.tsx",
   "src/subscription/components/SubscribeBar.tsx",
   "src/subscription/components/StackedCards.tsx",
@@ -184,8 +183,7 @@ test("A2: checkout sections and subscription cards are GlassCard / GlassSurface,
   for (const file of [
     "src/components/checkout/CheckoutReviewStep.tsx",
     "src/components/checkout/CheckoutSuccessStep.tsx",
-    "src/subscription/components/ActiveMemberView.tsx",
-    "src/subscription/components/OwnedPlanCard.tsx",
+      "src/subscription/components/OwnedPlanCard.tsx",
     "src/subscription/components/PlanOverview.tsx",
     "src/subscription/components/PriceSummary.tsx",
   ]) {
@@ -235,7 +233,6 @@ test("A3: profile + settings paint no opaque white / gradient surface; cards, ac
     "src/profile/App.tsx",
     "src/profile/ProfileLayout.tsx",
     "src/profile/ProfilePreview.tsx",
-    "src/profile/SubscriberExperiencePage.tsx",
     "src/settings/SettingsPage.tsx",
   ]) {
     const src = read(file);

@@ -3,7 +3,7 @@
 // Shown INSTEAD of the buy flow when the plan + cycle the user is currently
 // looking at is the exact one they already own.
 // Redesigned: flexible responsive grid for mobile/tablet/desktop — same
-// system as ActiveMemberView, no single flat column.
+// system as the profile membership card, no single flat column.
 
 import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
 import { GlassCard } from "../../components/ui/GlassCard";

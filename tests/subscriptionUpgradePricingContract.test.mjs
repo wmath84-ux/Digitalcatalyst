@@ -24,7 +24,9 @@ test("active subscribers can enter upgrade flow and switch to a HIGHER plan only
   assert.match(page, /const upgradePlans = useMemo/);
   assert.match(page, /candidate\.active && candidate\.id !== ownedPlanId/);
   assert.match(page, /order >= ownedPlanOrder/);
-  assert.match(page, /const nextPlan = upgradePlans\[0\] \|\| null/);
+  assert.match(page, /\[\?&\]plan=\(\[\^&#\]\+\)/);
+  assert.match(page, /setSelectedPlanId\(requestedPlanId\)/);
+  assert.match(read("src/profile/App.tsx"), /#\/subscription\?renew=1&plan=/);
   // The old banner inviting the member to "choose any active plan" was
   // removed together with the ability to move sideways/down.
   assert.equal(

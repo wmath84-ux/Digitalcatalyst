@@ -6,12 +6,16 @@ import { cn } from "@/lib/utils";
  * PaymentButton — the app's ONE payment CTA.
  *
  * A faithful React port of Creatlydev's "pretty-grasshopper-57" Uiverse
- * button (https://uiverse.io/Creatlydev/pretty-grasshopper-57); the complete
- * visual behaviour (white capsule, brand-coloured icon plate, the colour
- * panel that wipes in from the left over .3s, the label that turns white in
+ * button (https://uiverse.io/Creatlydev/pretty-grasshopper-57): white capsule,
+ * the panel that wipes in from the left over .3s, the label that changes in
  * the same beat, the soft 10/10/20 drop shadow, the 24px radius that renders
- * as a capsule at the reference's 40px height) lives in `payment-button.css`
- * and is not re-interpreted here.
+ * as a capsule at the reference's 40px height. The styling lives in
+ * `payment-button.css`.
+ *
+ * Resting state is clean white everywhere: white surface, white icon plate,
+ * dark glyph, and a neutral light-grey wipe on hover. Only an explicit `color`
+ * (renewal tones, the owned-plan emerald, the blocked slate) re-tints the glyph
+ * and the wipe, so colour keeps its meaning instead of being decoration.
  *
  * It is used for EVERY payment / purchase / checkout action in the product —
  * checkout, cart, product detail, the purchase builder, the subscription bar,
@@ -23,7 +27,8 @@ import { cn } from "@/lib/utils";
  * aria-*, data-*) to it, so the caller's payment behaviour, server calls,
  * redirects, error handling and route guards run exactly as before.
  *
- * The reference paints a 24px payments glyph in a 48×40 plate. `icon` swaps
+ * The reference paints a 24px payments glyph in a 48×40 plate (dark on the
+ * clean white plate by default; see the `color` prop for tinted CTAs). `icon` swaps
  * that glyph for the caller's own (same slot, same plate) for the rare CTA
  * whose meaning is carried by a different symbol — the plate, size and
  * position are the reference's either way.
@@ -40,7 +45,7 @@ export interface PaymentButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
   block?: boolean;
   /** Scale variant — pure `font-size`, so every proportion stays the reference's. */
   size?: PaymentButtonSize;
-  /** The reference's `--clr`: the colour of the icon plate and of the hover wipe. */
+  /** Meaning colour. Tints the glyph and the hover wipe; omitted = neutral white/grey. */
   color?: string;
   /** Optional glyph replacement for the reference's icon slot. */
   icon?: ReactNode;
@@ -76,11 +81,11 @@ function PaymentsGlyph() {
       focusable="false"
     >
       <circle opacity="0.5" cx="25" cy="25" r="23" fill={`url(#${gradId})`} />
-      <mask id={maskId} fill="#fff">
+      <mask id={maskId} fill="currentColor">
         <path fillRule="evenodd" clipRule="evenodd" d={markPath} />
       </mask>
-      <path fillRule="evenodd" clipRule="evenodd" d={markPath} fill="#fff" />
-      <path d={maskPath} fill="#fff" mask={`url(#${maskId})`} />
+      <path fillRule="evenodd" clipRule="evenodd" d={markPath} fill="currentColor" />
+      <path d={maskPath} fill="currentColor" mask={`url(#${maskId})`} />
       <defs>
         <linearGradient id={gradId} x1="25" y1="2" x2="25" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#fff" stopOpacity="0.71" />
@@ -120,7 +125,14 @@ export const PaymentButton = forwardRef<HTMLButtonElement, PaymentButtonProps>(f
 ) {
   const isDisabled = Boolean(disabled);
   const rootStyle = {
-    ...(color ? { "--uzp-clr": color } : null),
+    ...(color
+      ? {
+          "--uzp-clr": color,
+          "--uzp-glyph": color,
+          "--uzp-wipe": color,
+          "--uzp-hover-text": "#fff",
+        }
+      : null),
     ...style,
   } as CSSProperties;
 

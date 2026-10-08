@@ -34,10 +34,12 @@ test("curriculum lists nested modules and falls back to courseContent", () => {
   assert.match(mapping, /m\.files\?\.length \? m\.files : m\.resources/);
 });
 
-test("product ratings paginate six at a time with a load more control", () => {
-  assert.match(pdp, /const REVIEW_PAGE_SIZE = 6/);
-  assert.match(pdp, /data-load-more-reviews/);
-  assert.match(pdp, /setVisibleCount\(\(count\) => count \+ REVIEW_PAGE_SIZE\)/);
+test("product page shows four reviews and an All reviews page opens the rest", () => {
+  assert.match(pdp, /const REVIEW_PREVIEW_COUNT = 4/);
+  assert.match(pdp, /reviews\.slice\(0, REVIEW_PREVIEW_COUNT\)/);
+  assert.match(pdp, /data-pdp-all-reviews/);
+  assert.match(pdp, />All reviews</);
+  assert.match(pdp, /view=reviews/);
   assert.match(pdp, /usePublishedProductReviews/);
 });
 

@@ -20,6 +20,13 @@ import ProfileLayout, {
   type ProfileLayoutMembership,
   type SubscriptionSnapshot,
 } from "./ProfileLayout";
+import type { ProfileMembershipManagement } from "./MembershipManagement";
+import {
+  loadSubscriptionCatalog,
+  type SubscriptionCatalog,
+} from "../subscription/utils/subscriptionCatalog";
+import { getRenewalReminder } from "../../utils/subscriptionRenewal";
+import { buildRenewalView, formatExpiryDate } from "../../utils/renewalPresentation";
 
 type Modal = "edit" | "settings" | null;
 
@@ -114,6 +121,13 @@ export default function ProfileApp() {
   const [referralCode, setReferralCode] = useState("");
   const [referralUsed, setReferralUsed] = useState(false);
   const [subscriptionRenewal, setSubscriptionRenewal] = useState<SubscriptionSnapshot | null>(null);
+  // Feature ids and included course ids granted by the canonical membership doc.
+  const [subscriptionGrants, setSubscriptionGrants] = useState<{ featureIds: string[]; productIds: string[] }>({
+    featureIds: [],
+    productIds: [],
+  });
+  const [subscriptionCatalog, setSubscriptionCatalog] = useState<SubscriptionCatalog | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [profileSubscription, setProfileSubscription] = useState<SubscriptionSnapshot | null>(null);
   const [membershipLoaded, setMembershipLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -161,11 +175,16 @@ export default function ProfileApp() {
           planId: String(data.planId || ""),
           reminderOptOut: Boolean(data.renewalReminderOptOut),
         } : null);
+        setSubscriptionGrants({
+          featureIds: Array.isArray(data.features) ? data.features.map(String) : [],
+          productIds: Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : [],
+        });
         setMembershipLoaded(true);
       },
       (error) => {
         console.warn("Subscription profile sync failed", error);
         setSubscriptionRenewal(null);
+        setSubscriptionGrants({ featureIds: [], productIds: [] });
         setMembershipLoaded(true);
       },
     );
@@ -196,6 +215,70 @@ export default function ProfileApp() {
     const expired = !active;
     return { tier, subscription, active, expired, subscriber: true };
   }, [now, profileSubscription, subscriptionRenewal]);
+
+  // Plan, feature and course names for the membership management block. The
+  // catalog is only fetched for paid members, so free visitors never pay for it.
+  useEffect(() => {
+    if (!membership.subscriber) return undefined;
+    let cancelled = false;
+    setCatalogLoading(true);
+    loadSubscriptionCatalog()
+      .then((next) => { if (!cancelled) setSubscriptionCatalog(next); })
+      .catch((error) => console.warn("Membership catalog load failed", error))
+      .finally(() => { if (!cancelled) setCatalogLoading(false); });
+    return () => { cancelled = true; };
+  }, [membership.subscriber]);
+
+  const membershipManagement = useMemo<ProfileMembershipManagement | null>(() => {
+    const subscription = membership.subscription;
+    if (!membership.active || !subscription) return null;
+    const plans = subscriptionCatalog?.plans || [];
+    const plan = plans.find((candidate) => candidate.id === subscription.planId) || null;
+    const cycle = subscription.cycle === "yearly" ? "yearly" : "monthly";
+    const limit = plan?.revisionTestBankLimits?.[cycle] ?? 20;
+    const featureIds = new Set(subscriptionGrants.featureIds);
+    const productIds = new Set(subscriptionGrants.productIds);
+    const features = (subscriptionCatalog?.features || [])
+      .filter((feature) => featureIds.has(feature.id))
+      .map((feature) => ({ id: feature.id, name: feature.name }));
+    const courses = products
+      .filter((product) => productIds.has(String(product.id)) || Boolean(product.documentId && productIds.has(String(product.documentId))))
+      .map((product) => product.title);
+    const renewalView = buildRenewalView(
+      getRenewalReminder({ status: subscription.status, expiresAt: subscription.expiresAt, planId: subscription.planId, cycle: subscription.cycle }, now),
+      { now, planName: plan?.name || PLAN_LABELS[membership.tier] },
+    );
+    // The next higher active plan, for the one-tap upgrade (same ladder the
+    // subscription picker uses: upgrades only, never sideways or down).
+    const currentOrder = Number(plan?.sortOrder);
+    const nextPlan = plan && Number.isFinite(currentOrder)
+      ? plans
+        .filter((candidate) => candidate.active && candidate.id !== plan.id && Number(candidate.sortOrder) > currentOrder)
+        .sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder))[0] || null
+      : null;
+    return {
+      cycle,
+      testBankLabel: limit === -1 ? "Unlimited" : `${limit} tests`,
+      upgradePlanName: nextPlan?.name || null,
+      onUpgrade: nextPlan ? () => { window.location.hash = `#/subscription?renew=1&plan=${encodeURIComponent(nextPlan.id)}`; } : undefined,
+      renewalView,
+      expiresAtLabel: formatExpiryDate(subscription.expiresAt),
+      reminderOptOut: subscription.reminderOptOut,
+      features,
+      courses,
+      loading: catalogLoading && !subscriptionCatalog,
+      onRenew: () => { window.location.hash = "#/subscription?renew=1"; },
+      onChangePlan: () => { window.location.hash = "#/subscription?renew=1"; },
+      onToggleReminders: (next) => {
+        if (!user) return;
+        void updateDoc(doc(db, "users", user.id, "subscription", "current"), { renewalReminderOptOut: next }).catch(() => undefined);
+      },
+      onOpenFeature: (featureId) => {
+        if (featureId === "my-day") window.location.hash = "#/my-day";
+        if (featureId === "revision") window.location.hash = "#/revision";
+      },
+    };
+  }, [membership, subscriptionCatalog, catalogLoading, subscriptionGrants, products, now, user]);
 
   const initials = user?.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "Recently";
@@ -295,8 +378,8 @@ export default function ProfileApp() {
     window.location.hash = "#/subscription";
   };
 
-  const openSubscriberExperience = () => {
-    window.location.hash = "#/profile/subscriber-experience";
+  const openRenewal = () => {
+    window.location.hash = "#/subscription?renew=1";
   };
 
   const membershipBadge = membershipLoaded && membership.subscriber ? (
@@ -359,7 +442,7 @@ export default function ProfileApp() {
             membership={membershipPayload}
             membershipBadge={membershipBadge}
             onOpenPlans={openPlans}
-            onOpenSubscriberExperience={openSubscriberExperience}
+            onOpenRenewal={openRenewal}
             stats={{
               ownedCount,
               favoriteCount: favoriteIds.size,
@@ -373,16 +456,7 @@ export default function ProfileApp() {
               used: referralUsed,
               onCopy: () => void navigator.clipboard?.writeText(referralCode),
             } : null}
-            renewal={membership.subscriber && membership.subscription ? {
-              tier: membership.tier,
-              subscription: membership.subscription,
-              now,
-              onRenew: openPlans,
-              onToggleReminders: (next) => {
-                if (!user || !subscriptionRenewal) return;
-                void updateDoc(doc(db, "users", user.id, "subscription", "current"), { renewalReminderOptOut: next }).catch(() => undefined);
-              },
-            } : null}
+            management={membershipManagement}
             onOpenUsageLimits={() => { window.location.hash = "#/usage-limits"; }}
             onOpenStudyLibrary={() => { window.location.hash = "#/study-library"; }}
             library={{

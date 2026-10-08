@@ -10,11 +10,13 @@ const main = fs.readFileSync("src/main.tsx", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 const fallback = fs.readFileSync("src/home/data/mockData.ts", "utf8");
 
-test("home review rail requests exactly six diversified product reviews", () => {
-  assert.match(home, /useHomepageProductReviews\(catalogProducts, fallbackReviews, 6\)/);
+test("home review rail requests four live product reviews and no placeholder reviews", () => {
+  assert.match(home, /useHomepageProductReviews\(catalogProducts, \[\], 4\)/);
+  assert.match(home, /review\.source === "live"/);
   assert.match(hook, /for \(const maxPerProduct of \[1, 2\]\)/);
   assert.match(hook, /b\.createdAtMs - a\.createdAtMs/);
-  assert.equal((fallback.match(/id: "r\d+"/g) || []).length, 6);
+  assert.doesNotMatch(fallback, /export const reviews/);
+  assert.doesNotMatch(home, /fallbackReviews/);
 });
 
 test("published live reviews progressively replace placeholders", () => {
@@ -35,10 +37,10 @@ test("PDP renders only published reviews matched to the current product", () => 
   assert.match(pdp, /const belongsToProduct = \(review: PublishedProductReview\) =>/);
   assert.match(pdp, /review\.productId === product\.id \|\| review\.productId === product\.documentId/);
   assert.match(pdp, /liveProductReviews\.filter\(belongsToProduct\)/);
-  assert.match(pdp, /visibleReviews\.map\(\(review\)/);
+  assert.match(pdp, /previewReviews\.map\(\(review\)/);
   assert.match(pdp, /review\.comment/);
-  assert.match(pdp, /data-load-more-reviews/);
-  assert.match(pdp, /REVIEW_PAGE_SIZE/);
+  assert.match(pdp, /data-pdp-all-reviews/);
+  assert.match(pdp, /REVIEW_PREVIEW_COUNT/);
 });
 
 test("signed-in learners publish reviews immediately for the live rail", () => {

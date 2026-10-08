@@ -13,7 +13,8 @@ const customerDetail = read("src/admin/pages/CustomerDetailPage.tsx");
 const subscriptionWriter = read("api/_lib/subscriptions.ts");
 const revisionData = read("api/_lib/revisionData.ts");
 const rules = read("firestore.rules");
-const memberView = read("src/subscription/components/ActiveMemberView.tsx");
+const memberView = read("src/profile/MembershipManagement.tsx");
+const profileApp = read("src/profile/App.tsx");
 const planOverview = read("src/subscription/components/PlanOverview.tsx");
 const fallbackCatalog = read("src/subscription/data/fallbackCatalog.ts");
 
@@ -61,6 +62,7 @@ test("admin can raise capacity for a specific existing subscriber", () => {
 test("customer sees the selected plan's Test Bank capacity on the subscription page", () => {
   assert.match(planOverview, /data-revision-bank-benefit/);
   assert.match(planOverview, /save up to \$\{activePlan\.revisionTestBankLimits\?\.\[cycle\] \?\? 20\}|Unlimited cloud-saved tests/);
-  assert.match(memberView, /data-member-test-bank-capacity/);
-  assert.match(memberView, /save up to \$\{plan\.revisionTestBankLimits\?\.\[cycle\] \?\? 20\}/);
+  assert.match(memberView, /Test Bank capacity/);
+  assert.match(memberView, /testBankLabel/);
+  assert.match(profileApp, /revisionTestBankLimits\?\.\[cycle\] \?\? 20/);
 });

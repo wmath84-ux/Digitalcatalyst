@@ -135,3 +135,32 @@ export function getProductInstructorLabel(product: Product): string {
   // every listed product.
   return /^digital catalyst$/i.test(instructor) ? "" : instructor;
 }
+
+const normalizeMatchKey = (value: string): string =>
+  cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0900-\u097f]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    // Plural and singular chapter names ("Real Numbers" / "Real Number") match.
+    .map((word) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word))
+    .join(" ");
+
+/** Class key for related-product matching, e.g. "12" for "Class 12". */
+export function getProductClassKey(product: Product): string | null {
+  const match = getProductClassLabel(product).match(/\b(\d{1,2})\b/);
+  return match ? String(Number(match[1])) : null;
+}
+
+/**
+ * Chapter key for related-product matching: the topic after the dash in the
+ * presented title ("Class 10 Mathematics — Real numbers" → "real number").
+ * Titles without a chapter part return null and match nothing.
+ */
+export function getProductChapterKey(product: Product): string | null {
+  const title = getProductPresentation(product).title;
+  const index = title.lastIndexOf(" — ");
+  if (index < 0) return null;
+  return normalizeMatchKey(title.slice(index + 3)) || null;
+}

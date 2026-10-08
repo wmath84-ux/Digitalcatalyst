@@ -21,7 +21,6 @@ const pricing = fs.readFileSync("utils/subscriptionPricing.js", "utf8");
 const pricingTypes = fs.readFileSync("utils/subscriptionPricing.d.ts", "utf8");
 const subscriptionPage = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
 const planOverview = fs.readFileSync("src/subscription/components/PlanOverview.tsx", "utf8");
-const subscriberBadge = fs.readFileSync("src/components/subscription/SubscriberActiveBadge.tsx", "utf8");
 const subscriberPriceBadge = fs.readFileSync("src/components/subscription/SubscriberOnlyPriceBadge.tsx", "utf8");
 const hiddenHint = fs.readFileSync("src/components/subscription/HiddenFeatureHint.tsx", "utf8");
 const gateHook = fs.readFileSync("src/hooks/useSubscriptionGateLogic.ts", "utf8");
@@ -228,12 +227,6 @@ test("useSubscriptionGateLogic reads the live settings doc with safe defaults", 
 // 6. Subscription page chrome — the subscriber gets a clear "you are a member" visual
 // ---------------------------------------------------------------------------
 
-test("SubscriberActiveBadge renders a clear 'already a member' visual at the top", () => {
-  assert.match(subscriberBadge, /data-subscriber-active-badge/);
-  assert.match(subscriberBadge, /Member exclusive/);
-  assert.match(subscriberBadge, /You are a member/);
-});
-
 test("SubscriberOnlyPriceBadge renders the discounted price with the public price as a strikethrough", () => {
   assert.match(subscriberPriceBadge, /data-subscriber-only-price-badge/);
   assert.match(subscriberPriceBadge, /Your subscriber price/);
@@ -246,8 +239,8 @@ test("HiddenFeatureHint renders the 'Unlock' card with a clear CTA to the subscr
   assert.match(hiddenHint, /Premium feature/);
 });
 
-test("SubscriptionPage wires all three new components + the bottom upgrade button", () => {
-  assert.match(subscriptionPage, /SubscriberActiveBadge/);
+test("SubscriptionPage wires the price badge and the bottom upgrade button", () => {
+  assert.doesNotMatch(subscriptionPage, /SubscriberActiveBadge/);
   // The subscriber-only price badge lives in the plan card the page renders
   // (PlanOverview); the page itself owns the price resolution and the props.
   assert.match(planOverview, /import SubscriberOnlyPriceBadge from "\.\.\/\.\.\/components\/subscription\/SubscriberOnlyPriceBadge"/);
@@ -258,7 +251,8 @@ test("SubscriptionPage wires all three new components + the bottom upgrade butto
   // resolve through the one merged helper, so the badge and the charge agree.
   assert.match(subscriptionPage, /resolveEffectiveSubscriberPrice/);
   assert.match(subscriptionPage, /activePlan\.subscriberPricingOverride \?\? null/);
-  assert.match(subscriptionPage, /data-subscription-upgrade-button/);
+  // Upgrades stay reachable: the plan list is still built from upgradePlans.
+  assert.match(subscriptionPage, /const upgradePlans = useMemo/);
   assert.match(
     subscriptionPage,
     /subscriberPriceRupees/,

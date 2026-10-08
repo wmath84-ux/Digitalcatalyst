@@ -10,6 +10,7 @@
 // entitlement pipeline handles subscriptions.
 
 import type { CheckoutSelection } from "../../types/commerce";
+import { apiFetch } from "../../utils/apiBase";
 
 /** Billing cycle supported by a plan. */
 export type BillingCycle = "monthly" | "yearly";
@@ -218,3 +219,28 @@ export const startCheckout = async (input: {
     window.location.hash = "#/checkout";
   }
 };
+
+// Loads the normalised catalog for signed-in and signed-out visitors alike
+// (the catalog itself is not user-specific).
+export async function loadSubscriptionCatalog(): Promise<SubscriptionCatalog> {
+  const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
+  if (!firebaseUser) {
+    // Allow public read so the page works even when the user is
+    // signed out (the catalog itself is not user-specific).
+  }
+  const token = firebaseUser ? await firebaseUser.getIdToken(true) : "";
+  const response = await apiFetch("/api/subscription-catalog", {
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Could not load subscription plans (server returned ${response.status}).`,
+    );
+  }
+  const data = (await response.json().catch(() => ({}))) as { ok?: boolean; catalog?: SubscriptionCatalog; error?: string };
+  if (!data.ok || !data.catalog) {
+    throw new Error(data.error || "Subscription catalog response was malformed.");
+  }
+  return data.catalog;
+}

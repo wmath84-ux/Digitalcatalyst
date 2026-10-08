@@ -6530,25 +6530,13 @@ html[data-course-player-active="true"] {
   font-size: 1.25rem;
 }
 
-/* Related products: a tiled grid instead of a phone-length list.
-   auto-fill keeps the cards at a sane width at every desktop size
-   (2-up in the narrow split, 3-up once the column is wide). */
-.dc-desktop-shell [data-pdp-related-list] {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 14px;
-}
-
 /* Published reviews tile two-up once the left column is genuinely wide
-   (≥ 1440 px viewports); the load-more action always spans the row. */
+   (≥ 1440 px viewports). */
 @media (min-width: 1440px) {
   .dc-desktop-shell [data-pdp-review-list] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
-  }
-  .dc-desktop-shell [data-pdp-review-list] [data-load-more-reviews] {
-    grid-column: 1 / -1;
   }
 }
 

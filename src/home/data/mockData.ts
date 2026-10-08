@@ -1,4 +1,4 @@
-import type { Banner, Category, Review } from "../types";
+import type { Banner, Category } from "../types";
 
 export const categories: Category[] = [
   { id: "all", label: "All", icon: "✨" },
@@ -35,74 +35,5 @@ export const banners: Banner[] = [
     subtitle: "Join 12,000+ learners for a free live problem-solving session",
     cta: "Reserve Seat",
     gradient: "from-cyan-500 via-sky-500 to-blue-600",
-  },
-];
-
-export const reviews: Review[] = [
-  {
-    id: "r1",
-    name: "Ananya Verma",
-    avatarColor: "bg-pink-500",
-    initials: "AV",
-    rating: 5,
-    date: "2 days ago",
-    comment:
-      "The video lectures are crystal clear and the daily study plan keeps me motivated to finish every module!",
-    course: "Complete Physics Mastery",
-  },
-  {
-    id: "r2",
-    name: "Rohit Malhotra",
-    avatarColor: "bg-indigo-500",
-    initials: "RM",
-    rating: 5,
-    date: "1 week ago",
-    comment:
-      "Bought the PDF notes before my exam and honestly they were more helpful than my coaching material. Super concise!",
-    course: "Quick Revision Notes",
-  },
-  {
-    id: "r3",
-    name: "Sneha Kapoor",
-    avatarColor: "bg-emerald-500",
-    initials: "SK",
-    rating: 4,
-    date: "3 weeks ago",
-    comment:
-      "Live classes feel just like an actual classroom. The instructor answered every single doubt patiently.",
-    course: "Live Vedic Maths Bootcamp",
-  },
-  {
-    id: "r4",
-    name: "Karan Mehta",
-    avatarColor: "bg-orange-500",
-    initials: "KM",
-    rating: 5,
-    date: "1 month ago",
-    comment:
-      "The app UI is so smooth, swiping through the banners and finding new courses feels genuinely premium.",
-    course: "Python for Beginners",
-  },
-  {
-    id: "r5",
-    name: "Priya Nair",
-    avatarColor: "bg-sky-500",
-    initials: "PN",
-    rating: 5,
-    date: "2 months ago",
-    comment:
-      "Loved the e-book formatting and the ability to resume right where I left off. Highly recommend this app!",
-    course: "Design Thinking Handbook",
-  },
-  {
-    id: "r6",
-    name: "Aditya Singh",
-    avatarColor: "bg-violet-500",
-    initials: "AS",
-    rating: 5,
-    date: "2 months ago",
-    comment:
-      "The lessons are structured beautifully and the purchase library makes it easy to return to exactly what I was studying.",
-    course: "Digital Learning Library",
   },
 ];

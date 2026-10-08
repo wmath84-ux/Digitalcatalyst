@@ -83,7 +83,7 @@ export default function ProfilePreview() {
               </span>
             ) : null}
             onOpenPlans={() => undefined}
-            onOpenSubscriberExperience={() => undefined}
+            onOpenRenewal={() => undefined}
             stats={{
               ownedCount: 7,
               favoriteCount: 12,
@@ -97,7 +97,19 @@ export default function ProfilePreview() {
               used: false,
               onCopy: () => undefined,
             }}
-            renewal={subscriber && plan ? { tier, subscription: plan, now: Date.now(), onRenew: () => undefined, onToggleReminders: () => undefined } : null}
+            management={active && plan ? {
+              cycle: plan.cycle,
+              testBankLabel: "Unlimited",
+              renewalView: null,
+              expiresAtLabel: new Date(plan.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+              reminderOptOut: false,
+              features: [{ id: "my-day", name: "Unlimited My Day" }, { id: "revision", name: "Revision test bank" }],
+              courses: ["Mastering React in 2026"],
+              onRenew: () => undefined,
+              onChangePlan: () => undefined,
+              onToggleReminders: () => undefined,
+              onOpenFeature: () => undefined,
+            } : null}
             onOpenUsageLimits={() => undefined}
             onOpenStudyLibrary={() => undefined}
             library={{

@@ -25,7 +25,6 @@ export function pageEnterAppKey(hash: string): string | null {
   if (path.startsWith("#/store")) return "#/store";
   if (path.startsWith("#/product/")) return path;
   if (path.startsWith("#/subscription")) return "#/subscription";
-  if (path.startsWith("#/profile/subscriber-experience")) return null;
   if (path.startsWith("#/profile")) return "#/profile";
   if (path.startsWith("#/usage-limits")) return "#/usage-limits";
   if (path.startsWith("#/cart")) return "#/cart";

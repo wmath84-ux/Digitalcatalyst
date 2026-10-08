@@ -29,12 +29,11 @@ interface Props {
 }
 
 /**
- * The reference button carries one colour (`--clr`): the icon plate and the
- * colour that wipes in behind the label. The bar only re-points it where the
- * app already used colour as MEANING — an already-owned plan keeps the
- * emerald-600 identity, a downgrade-blocked selection goes neutral slate so
- * it never reads as purchasable. A purchasable selection passes nothing and
- * gets the Uiverse component's own green, identical to every other pay CTA.
+ * Every pay CTA is clean white by default. The bar only passes a colour where
+ * the app already used colour as MEANING — an already-owned plan gets the
+ * emerald-600 glyph and wipe, a downgrade-blocked selection the neutral slate
+ * so it never reads as purchasable. A purchasable selection passes nothing and
+ * stays the same white CTA as every other pay surface.
  */
 const OWNED_CLAIM_COLOR = "#059669"; /* emerald-600 — "this is active for you" */
 const BLOCKED_CLAIM_COLOR = "#64748b"; /* slate — disabled-looking, not buyable */

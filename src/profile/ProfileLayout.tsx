@@ -2,6 +2,7 @@ import { GlassSwitch } from "../components/ui/glass-switch";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { useState, type FormEvent, type ReactNode } from "react";
+import MembershipManagement, { type ProfileMembershipManagement } from "./MembershipManagement";
 import {
   ArrowRight,
   BadgeCheck,
@@ -116,8 +117,10 @@ export type ProfileLayoutProps = {
 
   membership: ProfileLayoutMembership;
   membershipBadge?: ReactNode;
+  /** Opens the subscription page (buy flow) for non-subscribers. */
   onOpenPlans: () => void;
-  onOpenSubscriberExperience: () => void;
+  /** Opens the subscription page on the renew path for expired members. */
+  onOpenRenewal: () => void;
 
   stats: {
     ownedCount: number;
@@ -134,13 +137,8 @@ export type ProfileLayoutProps = {
     onCopy: () => void;
   } | null;
 
-  renewal: {
-    tier: MembershipTier;
-    subscription: SubscriptionSnapshot;
-    now: number;
-    onRenew: () => void;
-    onToggleReminders: (next: boolean) => void;
-  } | null;
+  /** Membership management for active subscribers (null otherwise). */
+  management: ProfileMembershipManagement | null;
 
   onOpenUsageLimits: () => void;
   onOpenStudyLibrary: () => void;
@@ -175,9 +173,10 @@ export default function ProfileLayout({
   membership,
   membershipBadge,
   onOpenPlans,
+  onOpenRenewal,
   stats,
   referral,
-  renewal,
+  management,
   onOpenUsageLimits,
   onOpenStudyLibrary,
   library,
@@ -192,8 +191,8 @@ export default function ProfileLayout({
   const [brokenPhoto, setBrokenPhoto] = useState("");
   const showPhoto = Boolean(src) && src !== brokenPhoto;
 
-  const snapshot = renewal?.subscription || membership.subscription;
-  const now = renewal?.now || Date.now();
+  const snapshot = membership.subscription;
+  const now = Date.now();
   const daysRemaining = snapshot && snapshot.expiresAt > now
     ? Math.max(1, Math.ceil((snapshot.expiresAt - now) / 86400000))
     : 0;
@@ -380,12 +379,16 @@ export default function ProfileLayout({
                 </div>
               </>
             )}
-            <button
-              onClick={onOpenPlans}
-              className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
-            >
-              {membership.active ? "Manage Subscription" : "Renew Subscription"}
-            </button>
+            {membership.active && management ? (
+              <MembershipManagement {...management} />
+            ) : !membership.active ? (
+              <button
+                onClick={onOpenRenewal}
+                className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
+              >
+                Renew Subscription
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-3">
