@@ -8,13 +8,14 @@ const formatPrice = (value: number | null) => {
 };
 
 interface Props {
+  label?: string;
   totalModules: number;
   selectedCount: number;
   selectedTotal: number;
   onOpen: () => void;
 }
 
-export default function ModuleSelectTrigger({ totalModules, selectedCount, selectedTotal, onOpen }: Props) {
+export default function ModuleSelectTrigger({ label = "Select course modules", totalModules, selectedCount, selectedTotal, onOpen }: Props) {
   return (
     <div className="px-0 pt-0">
       <GlassSurface radius={16} className="text-white">
@@ -29,7 +30,7 @@ export default function ModuleSelectTrigger({ totalModules, selectedCount, selec
             <LayoutGrid className="h-5 w-5 text-violet-300" />
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-sm font-bold text-white/85">Select course modules</p>
+            <p className="text-sm font-bold text-white/85">{label}</p>
             {selectedCount === 0 ? (
               <p className="truncate text-xs text-white/55">
                 {totalModules === 0 ? "No modules yet · tap to view" : `${totalModules} module${totalModules === 1 ? "" : "s"} available · pick what you need`}

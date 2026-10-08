@@ -25,15 +25,17 @@ test("premium PDP uses live products rather than imported showcase product data"
 test("related products are deterministic live-catalog matches", () => {
   assert.match(pdp, /getRelatedProducts/);
   assert.match(pdp, /candidate\.id !== product\.id/);
-  assert.match(pdp, /candidate\.subject\.toLowerCase\(\) === product\.subject\.toLowerCase\(\)/);
+  assert.match(pdp, /getProductSubjectLabel\(candidate\)/);
+  assert.match(pdp, /subject && subject === candidateSubject/);
   assert.match(pdp, /candidate\.category === product\.category/);
+  assert.match(pdp, /getProductClassLabel\(candidate\)/);
   assert.match(main, /products=\{products\}/);
   assert.doesNotMatch(pdp, /Math\.random/);
 });
 
 test("all premium PDP commerce controls are wired to app handlers", () => {
-  assert.match(pdp, /onAddToCart\?\.\(product\.id\)/);
-  assert.match(pdp, /onToggleFavorite\?\.\(product\.id\)/);
+  assert.match(pdp, /onAddToCart\(product\.id\)/);
+  assert.match(pdp, /onToggleFavorite\(product\.id\)/);
   // The main buy path now forwards the coupon-adjusted selection
   // (`withCoupon`) rather than the raw one, so the literal
   // `onCheckoutSelection(selection, ...)` no longer appears there.

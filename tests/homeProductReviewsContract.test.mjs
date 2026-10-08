@@ -31,8 +31,10 @@ test("review cards navigate to that product's PDP review section", () => {
   assert.match(pdp, /id="product-reviews"/);
 });
 
-test("PDP renders the same product-specific written review cards", () => {
-  assert.match(pdp, /homepageReviews\.filter\(\(review\) => review\.productId === product\.id\)/);
+test("PDP renders only published reviews matched to the current product", () => {
+  assert.match(pdp, /const belongsToProduct = \(review: PublishedProductReview\) =>/);
+  assert.match(pdp, /review\.productId === product\.id \|\| review\.productId === product\.documentId/);
+  assert.match(pdp, /liveProductReviews\.filter\(belongsToProduct\)/);
   assert.match(pdp, /visibleReviews\.map\(\(review\)/);
   assert.match(pdp, /review\.comment/);
   assert.match(pdp, /data-load-more-reviews/);
@@ -43,7 +45,7 @@ test("signed-in learners publish reviews immediately for the live rail", () => {
   assert.match(pdp, /addDoc\(collection\(db, "siteReviews"\)/);
   assert.match(pdp, /status: "published"/);
   assert.match(pdp, /canReview=\{Boolean\(user\)\}/);
-  assert.match(pdp, /Review added\. Your rating now counts toward this product/);
+  assert.match(pdp, /setReviewNotice\("Review added\."\)/);
   assert.match(pdp, /setLocalReviews/);
 });
 
