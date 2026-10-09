@@ -6982,6 +6982,58 @@ html[data-course-player-active="true"] {
   }
 }
 
+/* Roomier shared site-footer capsule. The seven-tab dock already uses most
+   of a small phone, so the viewport cap only lets it grow when there is room.
+   On large phones and portrait tablets it can reach 698px (about 1.8× the
+   primary dock's normal 388px width); shorter footer sets use the same
+   viewport-aware cap. The existing max-content sizing, padding wave, icon
+   transforms, and item spacing remain untouched. */
+@media (min-width: 320px) and (max-width: 959px) {
+  [data-site-footer-nav][data-dock-count="7"] { --dc-footer-nav-expanded-max: 698px; }
+  [data-site-footer-nav][data-dock-count="6"] { --dc-footer-nav-expanded-max: 608px; }
+  [data-site-footer-nav][data-dock-count="3"] { --dc-footer-nav-expanded-max: 328px; }
+
+  [data-site-footer-nav] [data-glass-dock] {
+    box-sizing: border-box;
+    min-width: min(96vw, var(--dc-footer-nav-expanded-max, 698px), calc(100vw - 24px));
+    justify-content: center;
+  }
+}
+
+/* Revision uses six tabs and Cart uses three; keep their wider-screen caps at
+   about 1.8× their own resting width, not the primary dock's absolute width. */
+@media (min-width: 350px) and (max-width: 380px) {
+  [data-site-footer-nav][data-dock-count="3"] { --dc-footer-nav-expanded-max: 284px; }
+}
+@media (max-width: 349px) {
+  [data-site-footer-nav][data-dock-count="3"] { --dc-footer-nav-expanded-max: 238px; }
+}
+@media (max-width: 319px) {
+  [data-site-footer-nav][data-dock-count="6"] { --dc-footer-nav-expanded-max: 608px; }
+  [data-site-footer-nav][data-dock-count="3"] { --dc-footer-nav-expanded-max: 238px; }
+  [data-site-footer-nav][data-dock-count="6"] [data-glass-dock],
+  [data-site-footer-nav][data-dock-count="3"] [data-glass-dock] {
+    box-sizing: border-box;
+    min-width: min(96vw, var(--dc-footer-nav-expanded-max), calc(100vw - 24px));
+    justify-content: center;
+  }
+}
+
+/* Make the existing glyphs easier to recognize on touch-sized footers without
+   changing their plates, active states, colors, badges, or desktop sizing. */
+@media (max-width: 959px) {
+  [data-site-footer-nav] [data-glass-dock-item] > button > span > svg {
+    width: 27px !important;
+    height: 27px !important;
+  }
+}
+@media (max-width: 349px) {
+  [data-site-footer-nav] [data-glass-dock-item] > button > span > svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+
 /* The text tab row (src/components/ui/PageTabs.tsx) exists because Revision's
    floating pill used to be `md:hidden`, and it is still the nav on desktop
    (≥960 px, where the hard rule below hides every footer). In the 768–959 px

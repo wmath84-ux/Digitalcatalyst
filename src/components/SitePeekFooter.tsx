@@ -164,6 +164,7 @@ export default function SitePeekFooter({
 
   const handleSelect = useCallback(
     (id: string) => {
+      draggingRef.current = false
       setPinned(false)
       setHover(false)
       pointerX.set(-200)
@@ -207,10 +208,18 @@ export default function SitePeekFooter({
           startYRef.current = event.clientY
           rememberPointer(event.clientX, event.clientY)
           pointerX.set(event.clientX)
-          try {
-            event.currentTarget.setPointerCapture(event.pointerId)
-          } catch {
-            /* capture is a nicety */
+          // Let GlassDock retain capture when the gesture starts on the dock:
+          // it owns a pending RAF for the wave and its pointerup resets/cancels
+          // that frame. Capturing the same pointer on this parent can starve
+          // the dock's cleanup and let a queued zoom frame run after release.
+          const dock = event.currentTarget.querySelector('[data-glass-dock]')
+          const startsInDock = dock?.contains(event.target as Node) ?? false
+          if (event.pointerType === 'mouse' || !startsInDock) {
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId)
+            } catch {
+              /* capture is a nicety */
+            }
           }
         } : undefined}
         onPointerMove={alwaysOpen ? (event) => {
@@ -230,13 +239,24 @@ export default function SitePeekFooter({
           const dy = event.clientY - startYRef.current
           const isHorizontalDrag =
             Math.abs(dx) >= DRAG_SELECT_THRESHOLD && Math.abs(dx) > Math.abs(dy)
-          if (isHorizontalDrag) {
-            const id = tabAtX(event.clientX)
-            if (id) handleSelect(id)
+          const id = isHorizontalDrag ? tabAtX(event.clientX) : null
+          if (id) {
+            handleSelect(id)
+          } else if (event.pointerType !== 'mouse' || isHorizontalDrag) {
+            // Gestures captured by the panel may bypass GlassDock's pointerup
+            // cleanup. Settle touch/pen gestures and unfinished mouse drags.
+            pointerX.set(-200)
           }
         } : undefined}
-        onPointerCancel={alwaysOpen ? () => {
+        onPointerCancel={alwaysOpen ? (event) => {
           draggingRef.current = false
+          try {
+            event.currentTarget.releasePointerCapture?.(event.pointerId)
+          } catch {
+            /* pointercancel may already have released capture */
+          }
+          // Touch cancellation does not guarantee a matching pointerleave.
+          pointerX.set(-200)
         } : undefined}
         className={`pointer-events-none ${alwaysOpen ? 'pointer-events-auto' : ''}`}
       >
@@ -305,8 +325,14 @@ export default function SitePeekFooter({
             if (id) handleSelect(id)
             else close()
           }}
-          onPointerCancel={() => {
+          onPointerCancel={(event) => {
             draggingRef.current = false
+            try {
+              event.currentTarget.releasePointerCapture?.(event.pointerId)
+            } catch {
+              /* pointercancel may already have released capture */
+            }
+            pointerX.set(-200)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
