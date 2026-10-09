@@ -103,7 +103,8 @@ test("category trends and product proof are catalog-backed and guarded", () => {
   assert.match(app, /slice\(0, HOME_PRODUCT_LIMIT\)/);
   assert.match(productCard, /product\.ratingCount > 0/);
   assert.match(productCard, /product\.isFree === true/);
-  assert.match(productCard, /product\.mrp > product\.price/);
+  assert.match(productCard, /const finalPrice = isFree \? 0 : product\.price/);
+  assert.match(productCard, /product\.mrp > finalPrice/);
   assert.match(productCard, /GENERIC_SUBJECTS/);
   assert.match(productCard, /title=\{product\.title\}/);
   assert.match(styles, /\.dc-home-product-title \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?-webkit-line-clamp: 2;/);

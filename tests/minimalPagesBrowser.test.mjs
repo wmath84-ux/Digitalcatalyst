@@ -57,12 +57,12 @@ check('minimal pages render at mobile, portrait tablet, landscape tablet and des
 });
 check('PDP tabs and purchase controls, usage navigation, and membership actions still work',async()=>{
  const pdp=await open('pdp');
- await pdp.getByRole('button',{name:'Curriculum',exact:true}).click();
+ await pdp.getByRole('button',{name:'Content',exact:true}).click();
  assert.equal(await pdp.locator('[data-pdp-curriculum-module]').count(),1);
  await pdp.locator('[data-pdp-curriculum-module] button').first().click();
- await pdp.getByRole('button',{name:'Instructor',exact:true}).click();
- assert.ok(await pdp.locator('[data-pdp-details]').textContent().then(s=>s.includes('Digital Catalyst')));
- await pdp.locator('[data-pdp-checkout]').click();assert.equal(await pdp.locator('output').textContent(),'checkout');
+ await pdp.getByRole('button',{name:'About',exact:true}).click();
+ assert.equal(await pdp.locator('[data-pdp-instructor]').count(),0,'the generic store brand is not repeated as a made-up instructor');
+ await pdp.locator('[data-pdp-checkout], [data-pdp-cta-button]').click();assert.equal(await pdp.locator('output').textContent(),'checkout');
  await pdp.close();
  const usage=await open('usage');await usage.getByRole('button',{name:'Compare plans'}).click();assert.equal(await usage.evaluate(()=>location.hash),'#/subscription');await usage.close();
  const member=await open('member');await member.locator('[data-member-renew]').click();assert.equal(await member.locator('output').textContent(),'renew');await member.locator('[data-member-change-plan]').click();assert.equal(await member.locator('output').textContent(),'change');await member.close();

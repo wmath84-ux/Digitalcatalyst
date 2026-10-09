@@ -12,7 +12,7 @@
 //      products through the shared matcher.
 //   5. PDP — the three small trust boxes (Secure checkout / Instant access /
 //      Lifetime library) are gone.
-//   6. LOOK — store and product detail use glassmorphism + shadows.
+//   6. LOOK — store retains glass; the product page uses a minimal editorial layout.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -207,13 +207,10 @@ test("store surfaces use frosted glass, colour and depth", () => {
   assert.match(hero, /from-indigo-600 via-violet-600 to-fuchsia-600/);
 });
 
-test("product detail uses the same glass treatment", () => {
-  // Phase A6: PDP sections are pack GlassSurfaces (own material); the sticky
-  // tab bar keeps a real blur so content scrolling under it stays legible.
+test("product detail keeps its media frame but removes nested glass info cards", () => {
   assert.match(pdp, /<GlassSurface\b/);
-  assert.match(pdp, /backdrop-blur-xl/);
-  // Phase A: no page wash on the PDP root either — the backdrop is the page.
-  assert.doesNotMatch(pdp, /min-h-screen bg-white/);
-  assert.doesNotMatch(pdp, /data-pdp-root className="[^"]*bg-gradient-to-b from-indigo-50/);
-  assert.doesNotMatch(pdp, /shadow-\[0_16px_45px_-20px_rgba\(49,46,129,0\.55\)\]/, "no page-assuming drop shadow on glass");
+  assert.match(pdp, /<section data-pdp-details/);
+  assert.match(pdp, /<dl data-pdp-meta/);
+  assert.match(pdp, /<PdpPurchaseBuilder\s+compact/);
+  assert.doesNotMatch(pdp, /<GlassSurface[^>]*data-pdp-(meta|details|reviews)/);
 });

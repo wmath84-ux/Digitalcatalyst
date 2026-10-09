@@ -598,3 +598,39 @@ test("Empty selection produces zero totals but still returns a valid summary sha
   assert.equal(summary.saleSavings, 0);
   assert.equal(summary.lineItems.length, 0);
 });
+
+
+test("a paid catalog price without an original price does not become a free bundle", () => {
+  const out = computeFullCoursePrice({ product: buildProduct({ originalPrice: 0, price: 1299, salePrice: null }), modules: [] });
+  assert.equal(out.effectivePrice, 1299);
+  assert.equal(out.regularPrice, 1299);
+});
+
+test("an explicit free flag keeps the genuine original price and sets the effective price to zero", () => {
+  const product = buildProduct({ originalPrice: 2499, price: 1299, isFree: true });
+  const out = computeFullCoursePrice({ product, modules: [] });
+  assert.deepEqual(out, { regularPrice: 2499, salePrice: 0, effectivePrice: 0 });
+  const summary = computeSummary({ product, mode: "full_product", modules: [], selectedIds: new Set(), isProductOwned: false });
+  assert.equal(summary.effectiveSubtotal, 0);
+  assert.equal(summary.regularSubtotal, 2499);
+});
+
+
+test("individually-owned resources are disabled and excluded from payable totals", () => {
+  const r = buildResource({ id: "resource-owned", parentModuleId: "m1", individuallyPurchasable: true, cashPrice: 199 });
+  const modules = [buildModule({ id: "m1", resources: [r] })];
+  const ownership = { isProductOwned: false, ownedUpdateIds: [], ownedModuleIds: [], ownedResourceIds: new Set([r.id]) };
+  assert.equal(getIsResourceOwned(r, modules, ownership), true);
+  const selection = { product: buildProduct(), mode: "selected_resources", modules, selectedIds: new Set([r.id]), ...ownership };
+  assert.deepEqual(validateSelection(selection).ids, []);
+  assert.equal(computeSummary(selection).effectiveSubtotal, 0);
+  assert.equal(computeSummary(selection).selectedCount, 0);
+});
+
+test("resources in owned nested modules are recognised without buying them again", () => {
+  const r = buildResource({ id: "nested-resource", parentModuleId: "child", individuallyPurchasable: true });
+  const modules = [buildModule({ id: "parent", modules: [buildModule({ id: "child", parentModuleId: "parent", resources: [r] })] })];
+  const visibleResource = getPurchasableResources(modules)[0];
+  assert.equal(visibleResource.parentModuleId, "child");
+  assert.equal(getIsResourceOwned(visibleResource, modules, { isProductOwned: false, ownedModuleIds: ["child"] }), true);
+});

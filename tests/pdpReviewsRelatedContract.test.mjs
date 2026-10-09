@@ -18,8 +18,8 @@ test("product-page reviews use published product reviews, not Home placeholders"
   assert.doesNotMatch(pdp, /useHomepageProductReviews|home\/data\/mockData|fallbackReviews|DUMMY_REVIEWS/i);
 });
 
-test("the PDP previews four reviews and opens a full Reviews & Ratings view", () => {
-  assert.match(pdp, /const REVIEW_PREVIEW_SIZE = 4/);
+test("the PDP previews two concise reviews and opens a full Reviews & Ratings view", () => {
+  assert.match(pdp, /const REVIEW_PREVIEW_SIZE = 2/);
   assert.match(pdp, /reviews\.slice\(0, mode === "preview" \? REVIEW_PREVIEW_SIZE : visibleCount\)/);
   assert.match(pdp, /data-see-all-reviews/);
   assert.match(pdp, /See all reviews/);

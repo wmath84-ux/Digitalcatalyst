@@ -37,11 +37,12 @@ test("paid cards render actual price, discount price, product details and review
   assert.equal(card.querySelector(".dc-home-product-rating-count").textContent, "(1,240)");
 });
 
-test("zero-price products show Free even when the catalog has no isFree flag", () => {
+test("free products show their real original price followed by numeric ₹0", () => {
   for (const overrides of [{ price: 0 }, { price: 0, isFree: false }, { isFree: true }]) {
     const card = render(overrides);
-    assert.equal(card.querySelector(".dc-home-product-current-price").textContent, "Free");
-    assert.equal(card.querySelector(".dc-home-product-price del"), null);
+    assert.equal(card.querySelector(".dc-home-product-current-price").textContent, "₹0");
+    assert.equal(card.querySelector(".dc-home-product-price del").textContent, "₹2,499");
+    assert.equal(card.querySelector(".dc-home-product-price").firstElementChild.tagName, "DEL");
   }
 });
 
@@ -65,4 +66,24 @@ test("only real rating evidence is shown; product and favorite buttons remain ac
   assert.equal(card.querySelector(".dc-home-product-open").getAttribute("aria-label"), "View Mathematics");
   assert.equal(card.querySelector(".dc-home-product-favorite").getAttribute("aria-label"), "Remove Mathematics from favorites");
   assert.equal(card.querySelector(".dc-home-product-favorite").getAttribute("aria-pressed"), "true");
+});
+
+
+test("free products without a valid original price never get a fabricated strike-through", () => {
+  for (const mrp of [undefined, Number.NaN, Infinity, -1, 0]) {
+    const card = render({ price: 0, mrp });
+    assert.equal(card.querySelector(".dc-home-product-current-price").textContent, "₹0");
+    assert.equal(card.querySelector(".dc-home-product-price del"), null);
+  }
+  assert.equal(render({ price: 0, mrp: 399 }).querySelector(".dc-home-product-price del").textContent, "₹399");
+});
+
+
+test("original and final prices retain real paise values rather than rounding the catalog amount", () => {
+  const free = render({ price: 0, mrp: 399.95 });
+  assert.equal(free.querySelector(".dc-home-product-price del").textContent, "₹399.95");
+  assert.equal(free.querySelector(".dc-home-product-current-price").textContent, "₹0");
+  const paid = render({ price: 1299.95, mrp: 2499.95 });
+  assert.equal(paid.querySelector(".dc-home-product-current-price").textContent, "₹1,299.95");
+  assert.equal(paid.querySelector(".dc-home-product-price del").textContent, "₹2,499.95");
 });

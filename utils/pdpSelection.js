@@ -219,7 +219,7 @@ export const getPurchasableResources = (modules) => {
       out.push({
         ...r,
         parentTitle: str(m.title),
-        parentModuleId: str(m.parentModuleId || m.id),
+        parentModuleId: str(m.id),
       });
     });
     arr(m.modules).forEach(visit);
@@ -245,13 +245,16 @@ export const getResourceEffectivePrice = (resource) => {
 
 /**
  * Resources are "owned" when:
+ *   - the resource itself was purchased, OR
  *   - the parent module is owned, OR
  *   - the base product is owned and the resource is part of the bundle
  *     (i.e. the parent module is `includeInBundle`).
  */
-export const getIsResourceOwned = (resource, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const getIsResourceOwned = (resource, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   if (!isObject(resource)) return false;
-  const byId = new Map(arr(modules).filter(isObject).map((m) => [m.id, m]));
+  const owned = ownedResourceIds instanceof Set ? ownedResourceIds : new Set(ownedResourceIds || []);
+  if (owned.has(resource.id) || (resource.entitlementId && owned.has(resource.entitlementId))) return true;
+  const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
   const module = byId.get(resource.parentModuleId);
   if (!module) return false;
   return getIsModuleOwned(module, { isProductOwned, ownedUpdateIds, ownedModuleIds });
@@ -292,7 +295,7 @@ export const getAvailablePaidUpdates = (paidUpdates, ownedUpdateIds) => {
  *       * dependencies must be a subset of the selection or already-owned
  *         modules.
  */
-export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   const idList = (selectedIds instanceof Set ? Array.from(selectedIds) : arr(selectedIds)).map(String);
   if (mode === "full_product") {
     return { ok: true, purchaseKind: "full_product", ids: [] };
@@ -339,7 +342,7 @@ export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, 
       }
       const r = byId.get(id);
       if (!r) continue;
-      if (getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds })) continue;
+      if (getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds })) continue;
       out.push(id);
     }
     return { ok: true, purchaseKind: "selected_resources", ids: out };
@@ -385,12 +388,18 @@ export const computeFullCoursePrice = ({ product, modules }) => {
   if (isObject(product)) {
     const regularRaw = numOrNull(product.originalPrice);
     const saleRaw = numOrNull(product.salePrice) ?? numOrNull(product.price);
+    if (product.isFree === true) {
+      return { regularPrice: Math.max(0, regularRaw || saleRaw || 0), salePrice: 0, effectivePrice: 0 };
+    }
     if (regularRaw !== null && regularRaw > 0) {
       return {
         regularPrice: regularRaw,
         salePrice: saleRaw === null ? null : saleRaw,
         effectivePrice: saleRaw === null ? regularRaw : Math.min(saleRaw, regularRaw),
       };
+    }
+    if (saleRaw !== null && saleRaw > 0) {
+      return { regularPrice: saleRaw, salePrice: null, effectivePrice: saleRaw };
     }
   }
   let regular = 0;
@@ -491,7 +500,7 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
  * Build the canonical `CheckoutLineItem[]` for a given (mode, selectedIds)
  * state. Used by the summary panel.
  */
-export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
   const productId = str(product?.id);
   const productTitle = str(product?.title);
@@ -593,7 +602,7 @@ export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdate
         salePrice: sale,
         effectivePrice: effective,
         quantity: 1,
-        alreadyOwned: getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds }),
+        alreadyOwned: getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }),
         entitlementId: str(r.entitlementId, id),
       };
     }).filter(Boolean);
@@ -604,8 +613,8 @@ export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdate
 /**
  * Compute the dynamic summary block for the summary panel.
  */
-export const computeSummary = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
-  const lines = buildLineItems({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds });
+export const computeSummary = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
+  const lines = buildLineItems({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds });
   const totals = computeLineTotals(lines);
   const full = computeFullCoursePrice({ product, modules });
   const titles = lines.filter((l) => !l.alreadyOwned).map((l) => l.title);

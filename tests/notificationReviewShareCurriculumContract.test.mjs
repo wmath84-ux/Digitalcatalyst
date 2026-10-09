@@ -34,8 +34,8 @@ test("curriculum lists nested modules and falls back to courseContent", () => {
   assert.match(mapping, /m\.files\?\.length \? m\.files : m\.resources/);
 });
 
-test("the Reviews & Ratings page paginates eight at a time while the PDP previews four", () => {
-  assert.match(pdp, /const REVIEW_PREVIEW_SIZE = 4/);
+test("the Reviews & Ratings page paginates eight at a time while the PDP previews two concise reviews", () => {
+  assert.match(pdp, /const REVIEW_PREVIEW_SIZE = 2/);
   assert.match(pdp, /const REVIEW_PAGE_SIZE = 8/);
   assert.match(pdp, /mode === "preview" \? REVIEW_PREVIEW_SIZE : visibleCount/);
   assert.match(pdp, /data-load-more-reviews/);
@@ -55,7 +55,7 @@ test("product sharing uses the device share sheet plus copy and chat apps", () =
   assert.match(pdp, /navigator\.share/);
   assert.match(pdp, /data-product-share/);
   assert.match(pdp, /WhatsApp/);
-  assert.match(pdp, /Copy product link/);
+  assert.match(pdp, /Copy link/);
   assert.match(pdp, /#\/product\/\$\{encodeURIComponent\(product\.id\)\}/);
 });
 

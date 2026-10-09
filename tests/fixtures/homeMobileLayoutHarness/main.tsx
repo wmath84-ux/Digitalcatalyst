@@ -9,7 +9,7 @@ import "../../../src/empty-state-glass.css";
 import Home from "../../../src/home/App";
 import ProductDetail from "../../../src/PdpApp";
 import { initFooterNavSpace } from "../../../src/utils/footerNavSpace";
-import { products } from "./products";
+import { pdpFixtureCatalog, pdpFixtureProduct } from "./products";
 
 initFooterNavSpace();
 const record = (action: string) => { document.querySelector("output")!.textContent = action; };
@@ -25,16 +25,26 @@ function Fixture() {
       return next;
     });
   };
-  const pdp = new URLSearchParams(location.search).get("page") === "pdp";
+  const params = new URLSearchParams(location.search);
+  const pdp = params.get("page") === "pdp";
+  const [product, setProduct] = useState(() => pdpFixtureProduct(params));
+  const [cartIds, setCartIds] = useState(() => new Set(params.has("inCart") ? [product.id] : []));
   return (
     <>
       <output style={{ position: "fixed", bottom: 0, pointerEvents: "none" }} />
       {pdp ? (
         <ProductDetail
-          product={products[0]}
-          products={products}
+          product={params.has("missingProduct") ? null : product}
+          products={pdpFixtureCatalog(product, params)}
+          purchasedIds={new Set(params.has("owned") ? [product.id] : [])}
+          ownedUpdateIds={new Set(params.has("updateOwned") ? ["revision-update"] : [])}
+          cartIds={cartIds}
+          onAddToCart={(id) => { record(`cart:${id}`); setCartIds((current) => new Set([...current, id])); }}
+          onOpenCourse={(item) => record(`course:${item.id}`)}
+          onNavigateToProduct={(item) => { record(`product:${item.id}`); setProduct(item); }}
           onBack={() => record("back")}
-          onCheckout={() => record("checkout")}
+          onCheckout={(finalPrice, couponCode) => record(JSON.stringify({ purchaseKind: "full_product", productIds: [product.id], finalPrice, couponCode }))}
+          onCheckoutSelection={(selection, finalPrice) => record(JSON.stringify({ ...selection, finalPrice }))}
           onToggleFavorite={toggleFavorite}
           favoriteIds={favoriteIds}
         />

@@ -1,35 +1,5 @@
-// tests/pdpMobileChromeContract.test.mjs
-//
-// Contract for the 2026-09-06 owner follow-up:
-//
-//   "Now optimise product detail page and footer navigation for mobile users."
-//
-// Two surfaces, one bug each.
-//
-// THE PRODUCT PAGE. Every surface on it asks for the pinned docs sensitivity
-// (radius 24 · tint 0.25 · blur 0) — i.e. the pack's ~10% frost — and its two
-// gallery badges, its sticky tab bar and the mobile thumb-zone CTA paint
-// `--dc-chrome-glass`, the same 10% token. Over the fixed winter scene that is
-// white ink on nothing, exactly what Home and the store had before the plate.
-// The page also had two hidden-scrollbar rails (gallery thumbs, detail tabs)
-// that a mouse could not move.
-//
-// THE FOOTER, FOR MOBILE. Six 44px tabs + five 8px gaps + the panel's 16px
-// padding + the nav's 12px gutter = exactly 360px, the width of the most common
-// phone, with zero slack. `[data-glass-dock]` opts out of `max-width` so the
-// magnification spring is never frozen — which also means nothing clips it: on a
-// 320px handset the first and last tab simply hang off-screen, untappable. The
-// fix tightens the rhythm (gaps + paddings) and never the tap targets.
-//
-// Rules this contract holds the line on:
-//   1. material stays CSS in src/glass.css behind `html[data-glass="on"]`, so
-//      `?glass=off` restores the published material;
-//   2. the pinned docs sensitivity in TS never moves to gain contrast;
-//   3. every hook other contracts measure the page by survives
-//      (`data-pdp-tabbar`, `rounded-t-[23px]`, `data-pdp-thumb-bar`,
-//      `dc-thumb-bar`, `md:hidden`, `data-pdp-curriculum*`, `backdrop-blur-xl`);
-//   4. the dock's own files stay byte-comparable, and its 44px target does not
-//      shrink to make the row fit.
+// Mobile PDP contract: readable plain sections, one primary action, a bounded
+// details switcher, the pinned gallery material, and the unchanged 44px dock.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -45,76 +15,39 @@ const dock = read("src/components/glass-dock/GlassDock.tsx");
 /* 1. The product page wears the plate                                */
 /* ------------------------------------------------------------------ */
 
-test("every pack surface on the product page takes the shared plate", () => {
-  const surfaces = [
-    /<GlassSurface radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate group relative overflow-hidden"/, // gallery
-    /<GlassSurface data-pdp-meta radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate text-white\/85"/,
-    /<GlassSurface data-pdp-upgrade-box radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate relative overflow-hidden text-white"/,
-    /<GlassSurface radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate relative overflow-visible text-white"/, // buy box
-    /<GlassSurface data-product-share radius=\{20\} className="dc-scene-plate absolute right-0 top-12/,
-    /<GlassSurface radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate text-white" contentClassName="p-4">/, // coupon
-    /<GlassSurface data-pdp-details radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate overflow-hidden text-white"/,
-    /<GlassSurface\s+data-pdp-reviews[\s\S]*?id=\{mode === "preview" \? "product-reviews" : undefined\}[\s\S]*?radius=\{24\}[\s\S]*?tint=\{0\.25\}[\s\S]*?blur=\{0\}[\s\S]*?className="dc-scene-plate scroll-mt-36 text-white"/,
-    /<GlassSurface data-pdp-related radius=\{24\} className="dc-scene-plate text-white"/,
-  ];
-  for (const surface of surfaces) assert.match(pdp, surface, `missing plate: ${surface}`);
-  // No surface on the page is left unplated.
-  assert.doesNotMatch(pdp, /<GlassSurface (?![^>]*dc-scene-plate)/, "a GlassSurface on the PDP has no plate");
-  // The pinned sensitivity is untouched — the plate is the fix, not a re-tune.
-  assert.equal(pdp.match(/tint=\{0\.25\}/g)?.length, 7);
-  assert.equal(pdp.match(/blur=\{0\}/g)?.length, 7);
-  assert.doesNotMatch(pdp, /tint=\{0\.[3-9]/);
+test("the actual gallery keeps its pinned glass settings; copy is not nested in cards", () => {
+  assert.match(pdp, /<GlassSurface radius=\{24\} tint=\{0\.25\} blur=\{0\} className="dc-scene-plate group relative overflow-hidden"/);
+  assert.equal(pdp.match(/tint=\{0\.25\}/g)?.length, 1);
+  assert.equal(pdp.match(/blur=\{0\}/g)?.length, 1);
+  assert.match(pdp, /<dl data-pdp-meta/);
+  assert.match(pdp, /<section data-pdp-price-box/);
+  assert.match(pdp, /<section data-pdp-details/);
+  assert.match(pdp, /<section data-pdp-reviews/);
+  assert.doesNotMatch(pdp, /<GlassSurface[^>]*data-pdp-(meta|details|reviews|price-box|related)/);
 });
 
-test("the chrome-token pills, the stuck tab bar and the mobile CTA take the bar plate", () => {
-  // The two gallery badges are plain divs painted with the 10% chrome token.
-  assert.equal(
-    pdp.match(/className="dc-scene-plate dc-scene-plate--bar absolute (?:left-3 top-3|bottom-3 right-3) flex|className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full/g)?.length,
-    2,
-    "both gallery badges are plated",
-  );
-  // The sticky tab bar is plated only in its stuck state, and its geometry —
-  // which other contracts measure the scroll maths by — is untouched.
-  assert.match(
-    pdp,
-    /\$\{tabBarStuck \? "dc-scene-plate dc-scene-plate--bar bg-\[var\(--dc-chrome-glass\)\]" : "rounded-t-\[23px\]"\}/,
-  );
-  assert.match(pdp, /data-pdp-tabbar/);
-  assert.match(pdp, /sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200/);
-
-  // The thumb-zone CTA is the mobile-only purchase bar (`md:hidden`) that parks
-  // above the dock; `.dc-thumb-bar` paints the 10% token from a layer, which the
-  // unlayered bar plate out-ranks.
-  assert.match(pdp, /<div data-pdp-thumb-bar className="dc-scene-plate dc-scene-plate--bar dc-thumb-bar flex items-center gap-3 md:hidden">/);
-  assert.match(indexCss, /\.dc-thumb-bar \{[\s\S]{0,240}?background: var\(--dc-chrome-glass\);/);
+test("the product page removes decorative badges and duplicate thumb purchase controls", () => {
+  assert.doesNotMatch(pdp, /Live catalog|EmojiBurst|data-pdp-thumb-bar|data-pdp-thumb-checkout|Build your purchase/);
+  assert.match(pdp, /hasPurchaseBuilder \? \([\s\S]*?<PdpPurchaseBuilder\s+compact[\s\S]*?\) : \(/);
+  assert.match(pdp, /aria-label="View product image fullscreen"/);
+  assert.match(pdp, /data-pdp-tabbar className="dc-pdp-tabs"/);
 });
 
-test("the copy that sits on the scene with no surface under it takes the scrim", () => {
-  assert.match(pdp, /<nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden min-w-0 items-center gap-1\.5 px-4 pt-4 text-\[11px\] text-white\/60 sm:flex">/);
-  assert.match(pdp, /<h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase<\/h2>/);
-  assert.match(pdp, /<p className="dc-scene-ink text-xs dc-ink-3">/);
-  assert.match(pdp, /<div className="dc-scene-ink rounded-2xl border border-amber-400\/30 bg-amber-500\/15/);
-  // Labels INSIDE a plated card need nothing: the plate re-pins --dc-ink-3.
-  assert.match(css, /:where\(\.dc-scene-plate\) \{\s*\n\s*--dc-ink-1: rgba\(255, 255, 255, 0\.97\);[\s\S]{0,120}?--dc-ink-3: rgba\(255, 255, 255, 0\.64\);/);
+test("desktop breadcrumbs survive and plain product copy has a readable backing", () => {
+  const minimalCss = read("src/pdp-minimal.css");
+  assert.match(pdp, /<nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden[^"]*sm:flex"/);
+  assert.match(minimalCss, /\[data-pdp-root\] \{[\s\S]*?background: rgba\(10, 14, 24, 0\.96\)/);
+  assert.match(minimalCss, /\.dc-pdp-description \{[^}]*color: #d0d7e3/);
+  assert.match(css, /:where\(\.dc-scene-plate\) \{\s*\n\s*--dc-ink-1: rgba\(255, 255, 255, 0\.97\);/);
 });
 
-/* ------------------------------------------------------------------ */
-/* 2. The two rails take the mouse drag                               */
-/* ------------------------------------------------------------------ */
-
-test("the gallery thumbs and the tab strip take the mouse drag", () => {
+test("only gallery thumbs need drag scrolling; detail choices are bounded buttons", () => {
   assert.match(pdp, /import \{ useDragScroll \} from "@\/hooks\/useDragScroll";/);
-  assert.equal(pdp.match(/useDragScroll<HTMLDivElement>\(\)/g)?.length, 2);
-  assert.match(pdp, /<div data-pdp-thumbs ref=\{thumbs\.ref\} onPointerDown=\{thumbs\.onPointerDown\} className="flex gap-2 overflow-x-auto pb-1">/);
-  assert.match(pdp, /<div ref=\{tabStrip\.ref\} onPointerDown=\{tabStrip\.onPointerDown\} className="flex overflow-x-auto/);
-  // Both hooks are declared before any early return in their own component.
-  const content = pdp.slice(pdp.indexOf("function PremiumProductContent"), pdp.indexOf("function DetailsCard"));
-  assert.ok(content.indexOf("const thumbs = useDragScroll") < content.indexOf("if ("), "thumbs hook must precede the first early return");
-  const details = pdp.slice(pdp.indexOf("function DetailsCard"), pdp.indexOf("function CurriculumModuleRow"));
-  assert.ok(details.indexOf("const tabStrip = useDragScroll") < details.indexOf("return ("), "tabStrip hook must precede the render");
-  // A thumb-sized target on the tab strip: `min-h-[38px]`, and the drag never
-  // switches a tab (useDragScroll swallows the click a drag ends with).
-  assert.match(pdp, /className="whitespace-nowrap px-3\.5 py-2 text-xs font-semibold min-h-\[38px\]"/);
+  assert.equal(pdp.match(/useDragScroll<HTMLDivElement>\(\)/g)?.length, 1);
+  assert.match(pdp, /<div data-pdp-thumbs ref=\{thumbs\.ref\} onPointerDown=\{thumbs\.onPointerDown\}/);
+  assert.match(pdp, /aria-pressed=\{tab === item\.value\} onClick=\{\(\) => onTab\(item\.value\)\}/);
+  assert.doesNotMatch(pdp, /tabStrip|GlassToggleGroup/);
+  assert.match(read("src/pdp-minimal.css"), /\.dc-pdp-tabs \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -148,8 +81,9 @@ test("the dock's mobile clearance and safe-area gutter are still in place", () =
   // The gutter lives on the shared footer wrapper every screen renders now.
   assert.match(read("src/components/BottomNav.tsx"), /<SiteFooterNav/);
   assert.match(read("src/components/SiteFooterNav.tsx"), /pb-\[max\(env\(safe-area-inset-bottom\),10px\)\]/);
-  // The mobile CTA parks above that measured height, never under the dock.
-  assert.match(indexCss, /bottom: calc\(var\(--dc-footer-nav-h, 0px\) \+ 8px\);/);
+  // The product page clears the dock without adding a second checkout CTA.
+  assert.match(read("src/pdp-minimal.css"), /padding-bottom: calc\(1\.5rem \+ var\(--dc-footer-nav-h, 0px\)/);
+  assert.doesNotMatch(pdp, /data-pdp-thumb-checkout/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -169,7 +103,6 @@ test("the dock's files stay byte-comparable and the pinned hooks survive", () =>
     "data-pdp-scroll",
     "data-pdp-body",
     "data-pdp-gallery",
-    "backdrop-blur-xl",
   ]) {
     assert.ok(pdp.includes(hook), `PDP must keep ${hook}`);
   }

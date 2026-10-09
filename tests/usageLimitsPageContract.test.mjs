@@ -58,11 +58,14 @@ test("the page uses a centered, responsive content column instead of stretching 
   assert.match(css, /\.dc-desktop-shell \[data-usage-limits-content\]/);
 });
 
-test("the purchased-course library action keeps its icon and label in one inline row", () => {
+test("the purchased-product library action is a simple accessible button wired to its real handler", () => {
   const pdp = read("src/PdpApp.tsx");
-  const start = pdp.indexOf("Open course in library");
+  const start = pdp.indexOf("data-pdp-library-primary");
   assert.ok(start > -1);
-  const snippet = pdp.slice(start - 300, start + 80);
-  assert.match(snippet, /inline-flex items-center justify-center gap-2 whitespace-nowrap/);
-  assert.match(snippet, /PlayCircle className="h-4 w-4 shrink-0"/);
+  const snippet = pdp.slice(start - 30, start + 250);
+  assert.match(snippet, /type="button"/);
+  assert.match(snippet, /onClick=\{\(\) => onOpenCourse\(product\)\}/);
+  assert.match(snippet, /className="dc-pdp-library-cta"/);
+  assert.match(snippet, /identity\.libraryAction/);
+  assert.doesNotMatch(snippet, /PlayCircle/);
 });
