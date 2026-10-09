@@ -745,7 +745,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     <AppShell
       active={resolveActiveFromHash(hash)}
       pageTitle={
-        hash.startsWith("#/flowpath")
+        hash.startsWith(LEADERBOARD_HASH)
+          ? "Leaderboard"
+          : hash.startsWith(MY_COURSE_HASH)
+            ? (isMyCourseEditorRoute(hash) && hash.split("?")[0].endsWith("/edit") ? "Edit course" : "Create course")
+          : hash.startsWith("#/flowpath")
           ? "FlowPath"
           : hash.startsWith(REVISION_HASH)
             ? "Revision"
@@ -760,7 +764,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                     : undefined
       }
       pageSubtitle={
-        hash.startsWith("#/flowpath")
+        hash.startsWith(LEADERBOARD_HASH)
+          ? "Members and referral codes"
+          : hash.startsWith(MY_COURSE_HASH)
+            ? "Your modules and study resources"
+          : hash.startsWith("#/flowpath")
           ? "Your day. Your goals. One continuous flow."
           : hash.startsWith(REVISION_HASH)
             ? "Tests, smart recall & mastery"

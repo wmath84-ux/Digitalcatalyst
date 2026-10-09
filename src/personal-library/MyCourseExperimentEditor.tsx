@@ -268,7 +268,7 @@ export default function MyCourseExperimentEditor({ resource, onChange }: Experim
               ref={fileRef}
               type="file"
               accept=".html,.htm,text/html"
-              className="hidden"
+              className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";

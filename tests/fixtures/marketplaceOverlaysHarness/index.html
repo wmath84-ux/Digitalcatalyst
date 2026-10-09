@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-glass="on">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Marketplace, leaderboard and overlay regression fixture</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+        background: #0a0e18;
+      }
+      #root > div > [data-app-frame],
+      #root > div[data-app-frame] {
+        height: 100dvh;
+        overflow: hidden;
+      }
+      main {
+        min-height: 0;
+      }
+      [data-subscription-page],
+      [data-study-library-content] {
+        padding-bottom: calc(var(--dc-footer-nav-h, 0px) + 20px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -65,7 +65,11 @@ test("the Study Library is a course shelf, not the old saved-link organiser", ()
     /usePersonalModules\(/,
     /personalResourceToCourseFile/,
   ]) {
-    assert.doesNotMatch(study, gone, `study library still pins the old surface: ${gone}`);
+    assert.doesNotMatch(
+      study,
+      gone,
+      `study library still pins the old surface: ${gone}`
+    );
   }
 });
 
@@ -100,75 +104,46 @@ test("every course card is the store's product card — image, title, Play, Edit
 test("One New course action opens the builder; course open and edit routes remain intact", () => {
   assert.match(study, /MY_COURSE_NEW_HASH = "#\/my-course\/new"/);
   assert.equal((study.match(/data-my-course-create\b/g) || []).length, 1);
-  assert.doesNotMatch(study, /data-my-course-create-empty|data-my-course-create-fab/);
+  assert.doesNotMatch(
+    study,
+    /data-my-course-create-empty|data-my-course-create-fab/
+  );
   assert.match(study, /encodeURIComponent\(courseId\)/);
   assert.match(study, /myCoursePlayHash\(course\.id\)/);
   assert.match(study, /myCourseEditHash\(course\.id\)/);
 });
 
-test("the card's Delete asks first, through the Profile page's own glass", () => {
-  // The card only requests; the shelf confirms and deletes (the builder keeps
-  // its own delete for the edit flow — "card par hi delete, andar bhi").
+test("the card's Delete uses a named native confirmation with guarded writes and retry", () => {
   assert.match(
     study,
-    /const \[pendingDelete, setPendingDelete\] = useState<MyCourse \| null>\(null\);/
+    /const \[pendingDelete, setPendingDelete\] = useState<MyCourse \| null>\(null\)/
   );
   assert.match(study, /await myCourses\.remove\(pendingDelete\.id\)/);
-  assert.match(study, /<ConfirmDialog[\s\S]{0,160}material="profile"/);
-  // The shared dialog grew a material switch, and "profile" is verbatim the
-  // Profile cards' recipe: the Cart card's bare pack surface (GlassSurface
-  // defaults — tint 0.5 · blur 14), no re-skin class.
+  assert.match(study, /<ContentDialog[\s\S]*role="alertdialog"/);
+  assert.match(study, /deletePendingRef\.current/);
+  assert.match(study, /setDeleteError\(\s*result\.message/);
+  assert.match(study, /busy=\{deleting\}/);
+  assert.match(study, /fallbackFocusRef=\{createButtonRef\}/);
+  // Other callers keep their legacy confirm material; the library does not.
   assert.match(confirm, /material\?: "scene" \| "profile"/);
-  assert.match(confirm, /tint=\{0\.5\}/);
-  assert.match(confirm, /blur=\{14\}/);
-  assert.doesNotMatch(confirm, /tintColor=\{/);
-  assert.doesNotMatch(confirm, /dc-rev-glass/);
-  assert.match(
-    confirm,
-    /profileGlass\n\s+\? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"/
-  );
-  // …and the `scene` path is byte-for-byte what My Day / Home pin.
-  assert.match(
-    confirm,
-    /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/
-  );
-  assert.match(profile, /<section data-profile-hero/);
 });
 
-test("the builder overlay wears the Profile glass and lays out for every screen", () => {
-  // 1 · ONE material — the Cart card's bare surface at its defaults — shared
-  // by every panel + the bar. Defaults need no const and no re-skin class.
-  assert.doesNotMatch(editor, /PROFILE_GLASS/);
-  assert.doesNotMatch(editor, /dc-rev-glass/);
-  assert.doesNotMatch(editor, /tint=\{|tintColor|blur=\{/);
-  const panels = editor.match(/<GlassSurface radius=\{32\}/g) ?? [];
-  assert.equal(panels.length, 2, `both panels wear the radius-32 surface (found ${panels.length})`);
+test("the native builder preserves sections, viewport-aware layout and safe sticky actions", () => {
+  const css = read("src/personal-library/course-editor-minimal.css");
+  assert.doesNotMatch(editor, /<GlassSurface|<ConfirmDialog/);
+  assert.match(editor, /data-my-course-meta/);
+  assert.match(editor, /data-my-course-modules/);
+  assert.match(editor, /dc-editor-actions/);
+  assert.match(editor, /<ContentDialog/);
+  assert.match(editor, /busy=\{busy\}/);
+  assert.match(css, /position: sticky/);
+  assert.match(css, /container-type: inline-size/);
   assert.match(
-    editor,
-    /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta/
+    css,
+    /grid-template-columns: minmax\(260px, 0\.8fr\) minmax\(0, 1\.6fr\)/
   );
-  assert.match(
-    editor,
-    /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules/
-  );
-  // The sticky action bar keeps radius 0 (edge-to-edge bar, not a card).
-  assert.match(
-    editor,
-    /radius=\{0\}\s+className="sticky bottom-0 z-30 border-t border-white\/15 text-white"/
-  );
-  // No dark slabs left in the overlay.
-  assert.doesNotMatch(editor, /bg-slate-950\/85/);
-  assert.doesNotMatch(editor, /rounded-3xl border border-white\/10 bg-white\/\[0\.04\]/);
-  // 2 · fluid layout: single column on a phone, side-by-side panels on a
-  // desktop, and the cover beside the fields from 640px.
-  assert.match(editor, /max-w-\[1280px\]/);
-  assert.match(
-    editor,
-    /grid grid-cols-1 items-start gap-4 xl:grid-cols-\[minmax\(0,20rem\)_minmax\(0,1fr\)\]/
-  );
-  assert.match(editor, /mt-4 grid gap-4 sm:grid-cols-\[190px_minmax\(0,1fr\)\] xl:grid-cols-1/);
-  // 3 · the builder's own delete still rides the same profile-glass dialog.
-  assert.match(editor, /<ConfirmDialog[\s\S]{0,120}material="profile"/);
+  assert.match(css, /font-size: 16px/);
+  assert.match(css, /min-height: 44px/);
 });
 
 test("a course without a cover gets a random one, persisted at save", () => {
@@ -188,7 +163,10 @@ test("a course without a cover gets a random one, persisted at save", () => {
     /if \(!String\(clean\.coverImage \|\| ""\)\.trim\(\)\) clean\.coverImage = randomCoverImage\(\);/
   );
   // The player's identity image falls back the same way.
-  assert.match(adapter, /image: course\.coverImage \|\| fallbackCoverImage\(course\.id\)/);
+  assert.match(
+    adapter,
+    /image: course\.coverImage \|\| fallbackCoverImage\(course\.id\)/
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -210,14 +188,17 @@ test("the builder creates modules, folders inside folders, and reorders / delete
   assert.match(editor, /data-my-course-add-module/);
   assert.match(editor, /data-my-module-add-child/);
   assert.match(editor, /createMyModule\(/);
-  assert.match(editor, /addChildNode\(draft\.modules, parentId, createMyModule/);
+  assert.match(
+    editor,
+    /addChildNode\(draft\.modules, parentId, createMyModule/
+  );
   assert.match(editor, /const updateNode = /);
   assert.match(editor, /const removeNode = /);
   assert.match(editor, /const moveNode = /);
   assert.match(editor, /MY_COURSE_MAX_DEPTH/);
   assert.match(editor, /Nesting limit reached/);
   // Destructive actions confirm first.
-  assert.match(editor, /ConfirmDialog/);
+  assert.match(editor, /ContentDialog/);
   assert.match(editor, /data-my-course-delete/);
 });
 
@@ -243,10 +224,17 @@ test("a resource carries name, file type, a link OR an upload, and details", () 
     "mindmap",
     "brain",
   ]) {
-    assert.match(editor, new RegExp(`id: "${type}"`), `resource type missing: ${type}`);
+    assert.match(
+      editor,
+      new RegExp(`id: "${type}"`),
+      `resource type missing: ${type}`
+    );
   }
   // A resource the player cannot open is named out loud in the editor.
-  assert.match(editor, /the player opens a resource only when it has something to show/);
+  assert.match(
+    editor,
+    /the player opens a resource only\s+when it has something to show/
+  );
 });
 
 test("Brain (MCQ) creation mirrors the admin: bulk paste AND hand-written questions", () => {
@@ -280,9 +268,15 @@ test("Brain (MCQ) creation mirrors the admin: bulk paste AND hand-written questi
 test("courses live in users/{uid}/myCourses and the rules re-derive ownership from the path", () => {
   assert.match(client, /MY_COURSES_COLLECTION = "myCourses"/);
   assert.match(client, /collection\(db, "users", uid, MY_COURSES_COLLECTION\)/);
-  assert.match(client, /doc\(db, "users", uid, MY_COURSES_COLLECTION, courseId\)/);
+  assert.match(
+    client,
+    /doc\(db, "users", uid, MY_COURSES_COLLECTION, courseId\)/
+  );
   assert.match(rules, /match \/myCourses\/\{courseId\}/);
-  assert.match(rules, /allow read, delete: if isOwner\(uid\) \|\| isAdmin\(\);/);
+  assert.match(
+    rules,
+    /allow read, delete: if isOwner\(uid\) \|\| isAdmin\(\);/
+  );
   assert.match(
     rules,
     /allow create, update: if isOwner\(uid\)[\s\S]*?request\.resource\.data\.uid == uid/
@@ -314,7 +308,10 @@ test("a learner-authored course is projected into the player's own Product shape
   assert.match(playerHost, /lazy\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
   assert.match(playerHost, /<CoursePlayer/);
   assert.match(adapter, /export const myCourseToProduct/);
-  assert.match(adapter, /courseContent: course\.modules\.map\(toCourseModule\)/);
+  assert.match(
+    adapter,
+    /courseContent: course\.modules\.map\(toCourseModule\)/
+  );
   assert.match(adapter, /id: myCourseStorageId\(course\.id\)/);
   // Brain sets survive the projection with their questions…
   assert.match(adapter, /practiceQuestions: toPracticeQuestions\(resource\)/);
@@ -335,12 +332,21 @@ test("no premium (Paid) tab in a learner-authored course", () => {
   assert.match(player, /MINE_HIDDEN_TABS: DockTab\[\] = \["paid"\]/);
   // The tab is filtered out of both docks and out of the ⌘/Ctrl+1… walk…
   assert.match(overlay, /hiddenTabs\?: DockTab\[\]/);
-  assert.match(overlay, /buildDockItems = \(tab: DockTab, hiddenTabs: DockTab\[\] = \[\]\)/);
-  assert.match(overlay, /TABS\.filter\(\(\{ key \}\) => !hiddenTabs\.includes\(key\)\)/);
+  assert.match(
+    overlay,
+    /buildDockItems = \(tab: DockTab, hiddenTabs: DockTab\[\] = \[\]\)/
+  );
+  assert.match(
+    overlay,
+    /TABS\.filter\(\(\{ key \}\) => !hiddenTabs\.includes\(key\)\)/
+  );
   assert.match(peekDock, /buildDockItems\(tab, hiddenTabs\)/);
   assert.match(player, /const visibleTabOrder = useMemo\(/);
   // …and a hidden tab can never be the open one.
-  assert.match(player, /if \(hiddenTabs\.includes\(dockTab\)\) setDockTab\("modules"\);/);
+  assert.match(
+    player,
+    /if \(hiddenTabs\.includes\(dockTab\)\) setDockTab\("modules"\);/
+  );
 });
 
 test("settings stay, the three official-resource rows do not", () => {
@@ -348,8 +354,14 @@ test("settings stay, the three official-resource rows do not", () => {
   // "Save for later" exist only for OFFICIAL course resources.
   assert.match(playerPanel, /mine\?: boolean/);
   assert.match(playerPanel, /!mine && gateFile \? \(/);
-  assert.match(playerPanel, /!mine && showPersonalLibraryActions && onAddToPersonalModule/);
-  assert.match(playerPanel, /!mine && showPersonalLibraryActions && onSaveForLater/);
+  assert.match(
+    playerPanel,
+    /!mine && showPersonalLibraryActions && onAddToPersonalModule/
+  );
+  assert.match(
+    playerPanel,
+    /!mine && showPersonalLibraryActions && onSaveForLater/
+  );
   // Every other preference is untouched.
   assert.match(playerPanel, /settingsRow\("Snowfall"/);
   assert.match(playerPanel, /settingsRow\("Always-visible footer dock"/);
@@ -365,7 +377,10 @@ test("everything the learner writes is stored under mine-<courseId>", () => {
     /export const myCourseStorageId = \(courseId: string\): string => `mine-\$\{courseId\}`;/
   );
   // progress · notes · playback · mind maps · AI chat · split ratio
-  assert.match(player, /doc\(db, "users", user\.id, "courseProgress", storageProductId\)/);
+  assert.match(
+    player,
+    /doc\(db, "users", user\.id, "courseProgress", storageProductId\)/
+  );
   // Notes are scoped by the same id, through the cloud hook: one Firestore
   // document per note at `users/{uid}/notes/{noteId}`, `productId` field =
   // `mine-<courseId>`, plus the localStorage mirror under the same key.
@@ -382,14 +397,23 @@ test("everything the learner writes is stored under mine-<courseId>", () => {
     /toFirestoreNote\(note, \{ uid: owner, productId: product \}\)/
   );
   assert.match(player, /loadPlaybackStore\(user\.id, storageProductId\)/);
-  assert.match(player, /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/);
-  assert.match(player, /productId: storageProductId,\s*\n\s*moduleId: activeMindMapModuleId,/);
+  assert.match(
+    player,
+    /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/
+  );
+  assert.match(
+    player,
+    /productId: storageProductId,\s*\n\s*moduleId: activeMindMapModuleId,/
+  );
   assert.match(player, /<LumenChat\s*\n\s*key=\{storageProductId\}/);
   assert.match(player, /courseId=\{storageProductId\}/);
 });
 
 test("the player never offers the official 'My Modules' manager on a learner-authored course", () => {
-  assert.match(player, /personalModulesEntry=\{isMine \? null : personalModulesEntry\}/);
+  assert.match(
+    player,
+    /personalModulesEntry=\{isMine \? null : personalModulesEntry\}/
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -398,8 +422,14 @@ test("the player never offers the official 'My Modules' manager on a learner-aut
 
 test("the builder and the player are authenticated lazy routes", () => {
   assert.match(main, /MY_COURSE_HASH = "#\/my-course\/"/);
-  assert.match(main, /lazyRoute\(\(\) => import\("\.\/personal-library\/MyCourseEditorPage"\)\)/);
-  assert.match(main, /lazyRoute\(\(\) => import\("\.\/personal-library\/MyCoursePlayerPage"\)\)/);
+  assert.match(
+    main,
+    /lazyRoute\(\(\) => import\("\.\/personal-library\/MyCourseEditorPage"\)\)/
+  );
+  assert.match(
+    main,
+    /lazyRoute\(\(\) => import\("\.\/personal-library\/MyCoursePlayerPage"\)\)/
+  );
   assert.match(main, /hash\.startsWith\(MY_COURSE_HASH\)/);
   assert.match(main, /<MyCourseEditorPage/);
   assert.match(main, /<MyCoursePlayerPage/);

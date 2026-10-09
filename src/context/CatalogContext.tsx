@@ -90,7 +90,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     searchKeywords,
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,
-    originalPrice: isFree ? 0 : Math.max(regularPrice, salePrice),
+    // Keep the configured regular price for display even when final access
+    // is free. Missing MRP remains zero; checkout authority stays server-side.
+    originalPrice: Math.max(regularPrice, salePrice),
     features: features.length > 0 ? features : undefined,
     price: isFree ? 0 : salePrice,
     isFree,

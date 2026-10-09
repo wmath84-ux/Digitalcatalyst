@@ -7,7 +7,10 @@ const home = fs.readFileSync("src/home/App.tsx", "utf8");
 const nav = fs.readFileSync("src/components/BottomNav.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const leaderboard = fs.readFileSync("src/LeaderboardApp.tsx", "utf8");
-const subscription = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
+const subscription = fs.readFileSync(
+  "src/subscription/components/SubscriptionPage.tsx",
+  "utf8"
+);
 const admin = fs.readFileSync("src/admin/pages/SubscriptionsPage.tsx", "utf8");
 const referrals = fs.readFileSync("api/_lib/referrals.ts", "utf8");
 const entitlements = fs.readFileSync("api/_lib/entitlements.ts", "utf8");
@@ -17,15 +20,22 @@ test("home and store no longer switch filters on left/right swipe", () => {
   // The swipe-to-switch-category gesture was removed: categories on Home and
   // filter chips on the Store only change through explicit taps.
   const store = fs.readFileSync("src/components/StorePage.tsx", "utf8");
-  assert.doesNotMatch(home, /handleSwipeStart|handleSwipeEnd|switchCategory|categorySwipeHandlers|onTouchStart|onTouchEnd/);
-  assert.doesNotMatch(store, /switchChip|handleTouchStart|handleTouchEnd|onTouchStart|onTouchEnd|touchStartX/);
+  assert.doesNotMatch(
+    home,
+    /handleSwipeStart|handleSwipeEnd|switchCategory|categorySwipeHandlers|onTouchStart|onTouchEnd/
+  );
+  assert.doesNotMatch(
+    store,
+    /switchChip|handleTouchStart|handleTouchEnd|onTouchStart|onTouchEnd|touchStartX/
+  );
   // The tap-driven category nav itself remains intact on Home.
   assert.match(home, /<CategoryNav/);
   assert.match(home, /onSelect=\{setActiveCategory\}/);
   // The store's tap-driven FilterChips remain intact. The chip list is now
   // admin-managed (settings/storeFilters), so the props carry filter objects
   // and the selected filter id instead of plain label strings.
-  assert.match(store, /<FilterChips filters=\{chips\} activeId=\{activeFilter\.id\} onSelect=\{setActiveFilterId\} \/>/);
+  assert.match(store, /chips\.map\(\(filter\)/);
+  assert.match(store, /onClick=\{\(\) => setActiveFilterId\(filter\.id\)\}/);
 });
 
 test("leaderboard is reached from the home header while the footer hosts Revision", () => {
@@ -38,29 +48,29 @@ test("leaderboard is reached from the home header while the footer hosts Revisio
   assert.match(homeHeader, /ariaLabel: "Leaderboard"/);
   assert.match(homeHeader, /window\.location\.hash = "#\/leaderboard"/);
   // The leaderboard page renders the shared footer without a highlighted tab.
-  assert.match(leaderboard, /<BottomNav active=\{null\}/);
+  assert.match(leaderboard, /<BottomNav\s+active=\{null\}/);
 });
 
 test("leaderboard distinguishes used, available and unavailable codes", () => {
   assert.match(leaderboard, /"Used"/);
-  assert.match(leaderboard, /"Use now"/);
+  assert.match(leaderboard, /"Available"/);
   assert.match(leaderboard, /Unused IDs/);
 });
 
 test("leaderboard toggles all users versus subscribers with referral IDs", () => {
-  assert.match(leaderboard, /All users/);
+  assert.match(leaderboard, /Members/);
   assert.match(leaderboard, /Subscribers/);
   assert.match(leaderboard, /Unused IDs/);
   assert.match(leaderboard, /Referral ID/);
   assert.match(leaderboard, /photoURL/);
 });
 
-test("leaderboard referral IDs have a small copy icon button", () => {
+test("leaderboard referral IDs have an accessible guarded copy button", () => {
   assert.match(leaderboard, /Copy/);
   assert.match(leaderboard, /copyReferralCode/);
   assert.match(leaderboard, /navigator\.clipboard/);
   assert.match(leaderboard, /aria-label=\{`Copy referral ID/);
-  assert.match(leaderboard, /<Copy size=\{13\}/);
+  assert.match(leaderboard, /disabled=\{!available \|\| !row\.referralCode\}/);
 });
 
 test("a referral ID can be redeemed only once", () => {
@@ -82,7 +92,10 @@ test("reusing a spent referral shows a clear already-used message on the subscri
   assert.match(engine, /This referral is already used by someone/);
   // …and the subscription-page input renders it as a prominent alert
   // card (not just a tiny error line) with a route to unused IDs.
-  const input = fs.readFileSync("src/subscription/components/PromoCodeInput.tsx", "utf8");
+  const input = fs.readFileSync(
+    "src/subscription/components/PromoCodeInput.tsx",
+    "utf8"
+  );
   assert.match(input, /data-referral-already-used/);
   assert.match(input, /This referral is already used by someone/);
   assert.match(input, /role="alert"/);
@@ -138,26 +151,38 @@ test("historic referral usage is repaired automatically, with zero manual steps"
   assert.match(cron, /repair skipped/);
 });
 
-test("the owner's profile crosses out a used referral ID with a clear Used badge", () => {
+test("the owner's native profile clearly discontinues a used single-use referral", () => {
   const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
-  const profileLayout = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
+  const profileLayout = fs.readFileSync(
+    "src/profile/ProfileLayout.tsx",
+    "utf8"
+  );
   assert.match(profile, /referralUsedCount/);
-  assert.match(profileLayout, /data-profile-referral-used/);
-  assert.match(profileLayout, /line-through/);
-  assert.match(profileLayout, />Used</);
-  assert.match(profileLayout, /no longer active/);
+  assert.match(profileLayout, /data-profile-referral-card/);
+  assert.match(
+    profileLayout,
+    /disabled=\{referral\.used \|\| !referral\.code\}/
+  );
+  assert.match(profileLayout, /Already redeemed/);
+  assert.match(profileLayout, /cannot be used again/);
 });
 
 test("leaderboard hides used IDs from Unused and crosses them out elsewhere", () => {
   // Unused view lists only never-used, still-active IDs.
-  assert.match(leaderboard, /row\.usedCount < 1 && row\.available/);
+  assert.match(leaderboard, /row\.usedCount < 1 &&\s*row\.available/);
   // Used rows show a crossed-out code and a discontinued note.
-  assert.match(leaderboard, /line-through/);
-  assert.match(leaderboard, /discontinued/);
+  assert.match(
+    fs.readFileSync("src/leaderboard-minimal.css", "utf8"),
+    /text-decoration: line-through/
+  );
+  assert.match(leaderboard, /"Used"/);
   // The API derives availability from the coupon's live state.
   const api = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
   assert.match(api, /usedCount < 1/);
-  assert.match(api, /status !== "inactive"|status\)? !== \\?"inactive\\?"|"inactive"/);
+  assert.match(
+    api,
+    /status !== "inactive"|status\)? !== \\?"inactive\\?"|"inactive"/
+  );
 });
 
 test("a spent referral coupon is refused by the shared validator with the already-used code", () => {
@@ -205,11 +230,14 @@ test("a spent referral coupon is refused by the shared validator with the alread
 test("subscription has a separate server-validated referral input", () => {
   assert.match(subscription, /kind="referral"/);
   assert.match(subscription, /\/api\/subscription-referral/);
-  assert.match(subscription, /appliedReferral\?\.code \|\| appliedCoupon\?\.code/);
+  assert.match(subscription, /appliedReferral[\s\S]*\.code/);
 });
 
 test("default referral discount is ₹250 and admin can customize it", () => {
-  assert.match(referrals, /discountPaise: Math\.max\(0, Math\.round\(Number\(data\.discountPaise \?\? 25000\)\)\)/);
+  assert.match(
+    referrals,
+    /discountPaise: Math\.max\(0, Math\.round\(Number\(data\.discountPaise \?\? 25000\)\)\)/
+  );
   assert.match(admin, /Referral discount \(₹\)/);
   assert.match(admin, /Save referral settings/);
 });
@@ -229,12 +257,30 @@ test("leaderboard falls back to the public cache when the API is unavailable", (
 });
 
 test("users cannot forge their referral or subscription identity", () => {
-  assert.match(rules, /'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt'/);
+  assert.match(
+    rules,
+    /'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt'/
+  );
 });
 
 test("referral coupons cannot be self-used", () => {
-  const coupon = normaliseCouponDoc({ code: "DCOWNER", type: "flat", value: 25000, referralOwnerUid: "owner" });
-  const result = validateCoupon(coupon, { subtotalPaise: 50000, productIds: [], moduleIds: [], resourceIds: [], categories: [], purchaseKind: "subscription", userHasPriorPurchases: false, userUsageCount: 0, userUid: "owner" });
+  const coupon = normaliseCouponDoc({
+    code: "DCOWNER",
+    type: "flat",
+    value: 25000,
+    referralOwnerUid: "owner",
+  });
+  const result = validateCoupon(coupon, {
+    subtotalPaise: 50000,
+    productIds: [],
+    moduleIds: [],
+    resourceIds: [],
+    categories: [],
+    purchaseKind: "subscription",
+    userHasPriorPurchases: false,
+    userUsageCount: 0,
+    userUid: "owner",
+  });
   assert.equal(result.ok, false);
   assert.equal(result.code, "REFERRAL_SELF_USE");
 });

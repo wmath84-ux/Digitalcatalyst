@@ -1,0 +1,75 @@
+/* The legacy overlay hook removes its max-width globally; a content dialog
+   must keep its own cap instead of becoming an edge-to-edge desktop sheet. */
+.dc-content-dialog[data-pdp-module-select-modal] {
+  max-width: 720px !important;
+}
+.dc-module-search {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.dc-module-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 48px;
+  border-bottom: 1px solid var(--dialog-border);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.dc-module-choices {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dc-module-choices > li + li {
+  border-top: 1px solid var(--dialog-border);
+}
+.dc-module-choice {
+  display: flex;
+  min-width: 0;
+  align-items: start;
+  gap: 0.875rem;
+  padding-block: 1rem;
+  cursor: pointer;
+}
+.dc-module-choice input {
+  margin-top: 0.25rem;
+}
+.dc-module-choice-copy {
+  flex: 1;
+  min-width: 0;
+}
+.dc-module-choice-copy strong {
+  display: block;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.dc-module-choice-copy > span {
+  display: block;
+  margin-top: 0.375rem;
+  color: var(--dialog-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.dc-module-choice-price {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.375rem;
+  max-width: 36%;
+  text-align: right;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.dc-module-choice-price del {
+  color: var(--dialog-muted);
+  font-size: 0.75rem;
+}
+.dc-module-rules {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--dialog-border);
+}

@@ -1,9 +1,11 @@
 // tests/studyLibraryOverlayGlassRuntime.test.mjs
 //
-// Runtime proof for the My Study Library overlay glass (owner brief
+// Compatibility proof for the legacy confirmation material (owner brief
 // 2026-09-29, cart card → profile): the delete confirmation — the overlay
-// the shelf AND the builder open — can wear the EXACT material the Profile
-// page's cards wear.
+// retained for other consumers — can wear the material the Profile
+// page once used. The Library/builder now use ContentDialog; native focus,
+// bounds, retry and keyboard behaviours are exercised by
+// marketplaceOverlaysMinimalBrowser.test.mjs.
 //
 // The Profile recipe is the Cart empty-state card's bare pack surface
 // (GlassSurface defaults: tint 0.5 · rgb(60,62,68) · blur 14), so the frost,

@@ -68,29 +68,73 @@ test("normalizeStoreFilters drops junk, de-duplicates and sorts", () => {
     null,
     "nonsense",
   ]);
-  assert.deepEqual(filters.map((filter) => filter.id), ["a", "b"]);
+  assert.deepEqual(
+    filters.map((filter) => filter.id),
+    ["a", "b"]
+  );
   assert.equal(filters[0].active, true);
 });
 
 test("a product matches a filter it was explicitly attached to", () => {
-  const product = { filterIds: ["class-10-boards"], category: "Course", classLevel: "", subject: "", tags: [] };
-  assert.equal(productMatchesStoreFilter(product, { id: "class-10-boards", label: "Class 10 Boards" }), true);
-  assert.equal(productMatchesStoreFilter(product, { id: "class-9", label: "Class 9" }), false);
+  const product = {
+    filterIds: ["class-10-boards"],
+    category: "Course",
+    classLevel: "",
+    subject: "",
+    tags: [],
+  };
+  assert.equal(
+    productMatchesStoreFilter(product, {
+      id: "class-10-boards",
+      label: "Class 10 Boards",
+    }),
+    true
+  );
+  assert.equal(
+    productMatchesStoreFilter(product, { id: "class-9", label: "Class 9" }),
+    false
+  );
 });
 
 test("legacy products still match by category, class, subject or tag", () => {
-  const legacy = { category: "Notes", classLevel: "Class 10", subject: "Physics", tags: ["BOARD"] };
-  assert.equal(productMatchesStoreFilter(legacy, { id: "notes", label: "Notes" }), true);
-  assert.equal(productMatchesStoreFilter(legacy, { id: "class-10", label: "Class 10" }), true);
-  assert.equal(productMatchesStoreFilter(legacy, { id: "physics", label: "Physics" }), true);
-  assert.equal(productMatchesStoreFilter(legacy, { id: "board", label: "board" }), true);
-  assert.equal(productMatchesStoreFilter(legacy, { id: "chemistry", label: "Chemistry" }), false);
+  const legacy = {
+    category: "Notes",
+    classLevel: "Class 10",
+    subject: "Physics",
+    tags: ["BOARD"],
+  };
+  assert.equal(
+    productMatchesStoreFilter(legacy, { id: "notes", label: "Notes" }),
+    true
+  );
+  assert.equal(
+    productMatchesStoreFilter(legacy, { id: "class-10", label: "Class 10" }),
+    true
+  );
+  assert.equal(
+    productMatchesStoreFilter(legacy, { id: "physics", label: "Physics" }),
+    true
+  );
+  assert.equal(
+    productMatchesStoreFilter(legacy, { id: "board", label: "board" }),
+    true
+  );
+  assert.equal(
+    productMatchesStoreFilter(legacy, { id: "chemistry", label: "Chemistry" }),
+    false
+  );
 });
 
 test("the All chip always matches and derived chips cover the catalog", () => {
   assert.equal(productMatchesStoreFilter({}, ALL_STORE_FILTER), true);
-  const derived = derivedStoreFilters([{ category: "Course", classLevel: "Class 10", subject: "Physics" }]);
-  assert.deepEqual(derived.map((filter) => filter.label).sort(), ["Class 10", "Course", "Physics"]);
+  const derived = derivedStoreFilters([
+    { category: "Course", classLevel: "Class 10", subject: "Physics" },
+  ]);
+  assert.deepEqual(derived.map((filter) => filter.label).sort(), [
+    "Class 10",
+    "Course",
+    "Physics",
+  ]);
 });
 
 /* ------------------------------------------------------------------ */
@@ -120,7 +164,10 @@ test("the editor can create, rename, reorder, hide and delete filters", () => {
 });
 
 test("filter list changes are persisted through the admin API", () => {
-  assert.match(editor, /adminFetch<\{ filters: StoreFilter\[\] \}>\("\/api\/admin\/store\/filters"\)/);
+  assert.match(
+    editor,
+    /adminFetch<\{ filters: StoreFilter\[\] \}>\("\/api\/admin\/store\/filters"\)/
+  );
   assert.match(editor, /"\/api\/admin\/store\/filters", \{ method: "PATCH"/);
   assert.match(adminClient, /p==="\/api\/admin\/store\/filters"/);
   assert.match(adminClient, /doc\(db, "settings", STORE_FILTERS_DOC_ID\)/);
@@ -133,7 +180,10 @@ test("filter list changes are persisted through the admin API", () => {
 
 test("filterIds are written to Firestore and read back into the editor", () => {
   assert.match(adminClient, /filterIds: strList\(normalizedBody\.filterIds\)/);
-  assert.match(mapping, /filterIds: arr\(editor\.filterIds\?\.length \? editor\.filterIds : raw\.filterIds\)\.map\(String\)/);
+  assert.match(
+    mapping,
+    /filterIds: arr\(editor\.filterIds\?\.length \? editor\.filterIds : raw\.filterIds\)\.map\(String\)/
+  );
 });
 
 test("the catalog exposes filterIds to the store page", () => {
@@ -148,7 +198,10 @@ test("the catalog exposes filterIds to the store page", () => {
 
 test("store page renders the live admin filter chips", () => {
   assert.match(storePage, /useStoreFilters\(\)/);
-  assert.match(storePage, /adminFilters\.filter\(\(filter\) => filter\.active\)/);
+  assert.match(
+    storePage,
+    /adminFilters\.filter\(\(filter\) => filter\.active\)/
+  );
   // Falls back to derived chips so the row is never empty.
   assert.match(storePage, /derivedStoreFilters\(products\)/);
   assert.match(storePage, /\[ALL_STORE_FILTER, \.\.\.list\]/);
@@ -184,27 +237,21 @@ test("product detail no longer shows the Secure checkout / Instant access / Life
 /* 6. Glassmorphism + shadows on store and product detail              */
 /* ------------------------------------------------------------------ */
 
-test("store surfaces use frosted glass, colour and depth", () => {
-  // [liquid-glass · Wave 3] The store's frost moved from hand-written utility
-  // classes onto the vendored pack: `GlassCard` / `GlassSurface` set
-  // `backdrop-filter` inline and paint their own specular rim, and translucency
-  // is the surface's `tint` rather than a `bg-white/60`. The intent of this test
-  // — every store surface is frosted, translucent and has depth — is unchanged,
-  // so the markers now accept either implementation. Anything that still paints
-  // its own frost (StorePage, Hero) is checked exactly as before.
-  // Phase A6 (2026-09-02): every store surface is a pack component (GlassCard /
-  // GlassSurface / GlassButton / GlassToggleGroup) on the pack's own material —
-  // no app-side `bg-white/NN` frost, tint override or page-assuming shadow.
-  for (const [name, source] of [["StorePage", storePage], ["ProductCard", productCard], ["FilterChips", filterChips], ["Hero", hero]]) {
-    assert.match(source, /<GlassSurface|<GlassCard|<GlassToggleGroup|<GlassButton/, `${name} should render the pack's glass`);
-    assert.doesNotMatch(source, /className="[^"]*\bbg-white\/(?:[4-9]\d|100)\b/, `${name} must not paint an opaque white plate`);
-    assert.doesNotMatch(source, /bg-gradient-to-(?:br|b|r|t|l|bl|tr)\b(?![^"]*bg-clip-text)/, `${name} must not paint a gradient plate`);
-  }
-  // Phase A (2026-09-02): the page paints NO ambient wash or orbs of its own —
-  // the single fixed Black Ice backdrop is the only page background.
-  assert.doesNotMatch(storePage, /data-glass-ambient[^>]*blur-3xl/, "store must not paint its own ambient orbs");
-  assert.doesNotMatch(storePage, /from-indigo-50 via-slate-50 to-white/, "store must not paint a page wash");
-  assert.match(hero, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+test("the branded marketplace uses plain catalog cards and native filters without filler surfaces", () => {
+  const nativeCard = read("src/components/StoreProductCard.tsx");
+  const css = read("src/components/store-marketplace.css");
+  assert.match(storePage, /data-store-marketplace/);
+  assert.match(storePage, /<StoreProductCard/);
+  assert.match(storePage, /<ContentDialog/);
+  assert.doesNotMatch(
+    storePage,
+    /<GlassCard|<GlassSurface|<Hero|<TiltedCoverflow/
+  );
+  assert.match(nativeCard, /data-store-final-price/);
+  assert.match(nativeCard, /hasOriginal/);
+  assert.match(css, /background: #0a0e18/);
+  assert.match(css, /min-height: 44px/);
+  assert.doesNotMatch(css, /backdrop-filter|bg-gradient|blur-3xl/);
 });
 
 test("product detail keeps its media frame but removes nested glass info cards", () => {

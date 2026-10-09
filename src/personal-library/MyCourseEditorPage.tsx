@@ -15,29 +15,41 @@
 // so everything built here shows up as real modules, real lessons and real
 // practice in the player — the learner's own course, their own design.
 //
-// Look & feel (owner brief 2026-09-29, cart card → profile):
-//   · every panel of this overlay wears EXACTLY the glass the Profile page's
-//     cards wear — the Cart empty-state card's bare pack surface at radius
-//     32 (GlassSurface defaults: tint 0.5 · rgb(60,62,68) · blur 14 — frost
-//     9.8px + saturate 1.3, flat 21% tint, pack sheen + rim), no re-skin;
-//   · the layout is fluid: one column on a phone, the cover beside the fields
-//     on a tablet, and Course-identity | Modules side by side from 1280px;
-//   · a course without a cover shows (and, at save, keeps) a random bundled
-//     image, so no surface ever renders an empty frame;
-//   · Delete sits in the sticky action bar of the builder AND on the card in
-//     the shelf — both behind the same confirmation.
+// Plain, responsive course editing. Data, uploads, validation and player
+// adapters remain the same canonical authoring pipeline.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, ArrowDown, ArrowUp, BookOpen, Brain, Check, FileText, FlaskConical, FolderPlus, Globe2,
-  GraduationCap, Image as ImageIcon, Layers3, Link2, LoaderCircle, Music2, Network,
-  Play, Plus, Presentation, Sheet, Trash2, Upload, Video, X,
+  ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  Brain,
+  Check,
+  FileText,
+  FlaskConical,
+  FolderPlus,
+  Globe2,
+  GraduationCap,
+  Image as ImageIcon,
+  Layers3,
+  Link2,
+  LoaderCircle,
+  Music2,
+  Network,
+  Play,
+  Presentation,
+  Sheet,
+  Trash2,
+  Upload,
+  Video,
+  X,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import Header from "../components/Header";
 import { toast } from "../components/ui/glass-toast";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { GlassSurface } from "../components/ui/glass";
+import ContentDialog from "../components/ui/ContentDialog";
+import "./course-editor-minimal.css";
 import { useAuth } from "../context/AuthContext";
 import { useMyCourses } from "../hooks/useMyCourses";
 import {
@@ -52,12 +64,26 @@ import {
 } from "../lib/myCourseClient";
 import { fallbackCoverImage } from "../lib/myCourseCovers";
 import {
-  MY_COURSE_DESC_MAX, MY_COURSE_MAX_DEPTH, MY_COURSE_MAX_MODULES, MY_COURSE_MAX_RESOURCES,
-  MY_COURSE_TITLE_MAX, MY_MODULE_DESC_MAX, MY_MODULE_TITLE_MAX, MY_RESOURCE_DESC_MAX,
+  MY_COURSE_DESC_MAX,
+  MY_COURSE_MAX_DEPTH,
+  MY_COURSE_MAX_MODULES,
+  MY_COURSE_MAX_RESOURCES,
+  MY_COURSE_TITLE_MAX,
+  MY_MODULE_DESC_MAX,
+  MY_MODULE_TITLE_MAX,
+  MY_RESOURCE_DESC_MAX,
   MY_RESOURCE_NAME_MAX,
-  type MyCourse, type MyCourseModule, type MyCourseResource, type MyCourseResourceType,
+  type MyCourse,
+  type MyCourseModule,
+  type MyCourseResource,
+  type MyCourseResourceType,
 } from "../types/myCourse";
-import MyCourseBrainEditor, { IconButton, inputClass, labelClass, myQuestionIssues } from "./MyCourseBrainEditor";
+import MyCourseBrainEditor, {
+  IconButton,
+  inputClass,
+  labelClass,
+  myQuestionIssues,
+} from "./MyCourseBrainEditor";
 import MyCourseExperimentEditor from "./MyCourseExperimentEditor";
 import { experimentBlockingIssues } from "../utils/experimentSpec";
 
@@ -73,51 +99,124 @@ type TypeOption = {
 };
 
 const TYPE_OPTIONS: TypeOption[] = [
-  { id: "youtube", label: "YouTube video", icon: Play, needsUrl: true, hint: "Paste any YouTube link" },
-  { id: "video", label: "Video file", icon: Video, upload: true, hint: "Upload, or paste a direct video URL" },
-  { id: "audio", label: "Audio", icon: Music2, upload: true, hint: "Upload, or paste a direct audio URL" },
-  { id: "pdf", label: "PDF", icon: FileText, upload: true, hint: "Upload a PDF or paste its link" },
-  { id: "doc", label: "Document (Google Doc)", icon: BookOpen, needsUrl: true, hint: "Google Docs link" },
-  { id: "sheet", label: "Sheet", icon: Sheet, needsUrl: true, hint: "Google Sheets link" },
-  { id: "slides", label: "Slides", icon: Presentation, needsUrl: true, hint: "Google Slides link" },
-  { id: "image", label: "Image", icon: ImageIcon, upload: true, hint: "Upload an image or paste its URL" },
-  { id: "google_form", label: "Google Form", icon: FileText, needsUrl: true, hint: "Forms link" },
-  { id: "embed", label: "Website / embed", icon: Globe2, needsUrl: true, hint: "Any https page" },
-  { id: "ebook", label: "E-book", icon: GraduationCap, upload: true, hint: "PDF / EPUB file or link" },
-  { id: "mindmap", label: "Mind map (Whimsical)", icon: Network, needsUrl: true, hint: "Whimsical board link" },
-  { id: "brain", label: "Brain · MCQ practice", icon: Brain, hint: "Write your own questions" },
+  {
+    id: "youtube",
+    label: "YouTube video",
+    icon: Play,
+    needsUrl: true,
+    hint: "Paste any YouTube link",
+  },
+  {
+    id: "video",
+    label: "Video file",
+    icon: Video,
+    upload: true,
+    hint: "Upload, or paste a direct video URL",
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    icon: Music2,
+    upload: true,
+    hint: "Upload, or paste a direct audio URL",
+  },
+  {
+    id: "pdf",
+    label: "PDF",
+    icon: FileText,
+    upload: true,
+    hint: "Upload a PDF or paste its link",
+  },
+  {
+    id: "doc",
+    label: "Document (Google Doc)",
+    icon: BookOpen,
+    needsUrl: true,
+    hint: "Google Docs link",
+  },
+  {
+    id: "sheet",
+    label: "Sheet",
+    icon: Sheet,
+    needsUrl: true,
+    hint: "Google Sheets link",
+  },
+  {
+    id: "slides",
+    label: "Slides",
+    icon: Presentation,
+    needsUrl: true,
+    hint: "Google Slides link",
+  },
+  {
+    id: "image",
+    label: "Image",
+    icon: ImageIcon,
+    upload: true,
+    hint: "Upload an image or paste its URL",
+  },
+  {
+    id: "google_form",
+    label: "Google Form",
+    icon: FileText,
+    needsUrl: true,
+    hint: "Forms link",
+  },
+  {
+    id: "embed",
+    label: "Website / embed",
+    icon: Globe2,
+    needsUrl: true,
+    hint: "Any https page",
+  },
+  {
+    id: "ebook",
+    label: "E-book",
+    icon: GraduationCap,
+    upload: true,
+    hint: "PDF / EPUB file or link",
+  },
+  {
+    id: "mindmap",
+    label: "Mind map (Whimsical)",
+    icon: Network,
+    needsUrl: true,
+    hint: "Whimsical board link",
+  },
+  {
+    id: "brain",
+    label: "Brain · MCQ practice",
+    icon: Brain,
+    hint: "Write your own questions",
+  },
   /**
    * Interactive 2D experiment — the learner's own single-file HTML, usually
    * generated by an AI from the prompt this editor writes (see
    * MyCourseExperimentEditor). It plays in a sandboxed stage inside the Course
    * Player, works offline, and needs no hosting at all.
    */
-  { id: "interactive", label: "Interactive 2D experiment", icon: FlaskConical, hint: "Make it with AI — one HTML file" },
+  {
+    id: "interactive",
+    label: "Interactive 2D experiment",
+    icon: FlaskConical,
+    hint: "Make it with AI — one HTML file",
+  },
 ];
 
 const typeOption = (type: MyCourseResourceType): TypeOption =>
   TYPE_OPTIONS.find((option) => option.id === type) || TYPE_OPTIONS[0];
-
-/**
- * The Profile page's card material is the Cart empty-state card's bare pack
- * surface — GlassSurface at its defaults (tint 0.5 · rgb(60,62,68) · blur
- * 14) with radius 32 — so there is nothing to spell: the panels below pass
- * no material props at all (owner brief 2026-09-29, cart card → profile).
- * The sticky action bar keeps radius 0 (it is an edge-to-edge bar, not a
- * card); the delete confirmation follows via ConfirmDialog material="profile".
- */
 
 /* ── immutable tree helpers ──────────────────────────────────────────────── */
 
 const updateNode = (
   modules: MyCourseModule[],
   id: string,
-  patch: (module: MyCourseModule) => MyCourseModule,
+  patch: (module: MyCourseModule) => MyCourseModule
 ): MyCourseModule[] =>
   modules.map((module) =>
     module.id === id
       ? patch(module)
-      : { ...module, modules: updateNode(module.modules, id, patch) },
+      : { ...module, modules: updateNode(module.modules, id, patch) }
   );
 
 const removeNode = (modules: MyCourseModule[], id: string): MyCourseModule[] =>
@@ -125,7 +224,11 @@ const removeNode = (modules: MyCourseModule[], id: string): MyCourseModule[] =>
     .filter((module) => module.id !== id)
     .map((module) => ({ ...module, modules: removeNode(module.modules, id) }));
 
-const moveNode = (modules: MyCourseModule[], id: string, delta: number): MyCourseModule[] => {
+const moveNode = (
+  modules: MyCourseModule[],
+  id: string,
+  delta: number
+): MyCourseModule[] => {
   const index = modules.findIndex((module) => module.id === id);
   if (index >= 0) {
     const destination = index + delta;
@@ -135,15 +238,22 @@ const moveNode = (modules: MyCourseModule[], id: string, delta: number): MyCours
     next.splice(destination, 0, moved);
     return next;
   }
-  return modules.map((module) => ({ ...module, modules: moveNode(module.modules, id, delta) }));
+  return modules.map((module) => ({
+    ...module,
+    modules: moveNode(module.modules, id, delta),
+  }));
 };
 
-const addChildNode = (modules: MyCourseModule[], parentId: string | null, child: MyCourseModule): MyCourseModule[] => {
+const addChildNode = (
+  modules: MyCourseModule[],
+  parentId: string | null,
+  child: MyCourseModule
+): MyCourseModule[] => {
   if (parentId === null) return [...modules, child];
   return modules.map((module) =>
     module.id === parentId
       ? { ...module, modules: [...module.modules, child] }
-      : { ...module, modules: addChildNode(module.modules, parentId, child) },
+      : { ...module, modules: addChildNode(module.modules, parentId, child) }
   );
 };
 
@@ -165,7 +275,11 @@ interface MyCourseEditorPageProps {
   onPlay: (courseId: string) => void;
 }
 
-export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCourseEditorPageProps) {
+export default function MyCourseEditorPage({
+  courseId,
+  onBack,
+  onPlay,
+}: MyCourseEditorPageProps) {
   const { user } = useAuth();
   const myCourses = useMyCourses();
   const isNew = !courseId || courseId === "new";
@@ -174,6 +288,8 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deletePendingRef = useRef(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const dirtyRef = useRef(false);
 
@@ -181,7 +297,11 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
   useEffect(() => {
     if (draft) return;
     if (isNew) {
-      if (user?.id) setDraft({ ...createMyCourse(user.id), modules: [createMyModule("Module 1")] });
+      if (user?.id)
+        setDraft({
+          ...createMyCourse(user.id),
+          modules: [createMyModule("Module 1")],
+        });
       return;
     }
     // A plain JSON clone (not structuredClone) so the editor also works on the
@@ -191,58 +311,86 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
 
   const stats = useMemo(() => {
     const modules = draft?.modules || [];
-    return { modules: countModules(modules), resources: countResources(modules) };
+    return {
+      modules: countModules(modules),
+      resources: countResources(modules),
+    };
   }, [draft]);
 
   const patch = useCallback((next: Partial<MyCourse>) => {
     dirtyRef.current = true;
-    setDraft((current) => (current ? { ...current, ...next, updatedAt: Date.now() } : current));
+    setDraft((current) =>
+      current ? { ...current, ...next, updatedAt: Date.now() } : current
+    );
   }, []);
 
   const patchModules = useCallback((modules: MyCourseModule[]) => {
     dirtyRef.current = true;
-    setDraft((current) => (current ? { ...current, modules, updatedAt: Date.now() } : current));
+    setDraft((current) =>
+      current ? { ...current, modules, updatedAt: Date.now() } : current
+    );
   }, []);
 
   const addModule = useCallback(
     (parentId: string | null) => {
       if (!draft) return;
       if (stats.modules >= MY_COURSE_MAX_MODULES) {
-        toast({ title: "Module limit reached", description: `A course holds up to ${MY_COURSE_MAX_MODULES} modules.`, variant: "info" });
+        toast({
+          title: "Module limit reached",
+          description: `A course holds up to ${MY_COURSE_MAX_MODULES} modules.`,
+          variant: "info",
+        });
         return;
       }
       if (parentId && depthOf(draft.modules, parentId) >= MY_COURSE_MAX_DEPTH) {
-        toast({ title: "Nesting limit reached", description: `Folders can nest ${MY_COURSE_MAX_DEPTH} levels deep.`, variant: "info" });
+        toast({
+          title: "Nesting limit reached",
+          description: `Folders can nest ${MY_COURSE_MAX_DEPTH} levels deep.`,
+          variant: "info",
+        });
         return;
       }
       const count = countModules(draft.modules) + 1;
-      patchModules(addChildNode(draft.modules, parentId, createMyModule(`Module ${count}`)));
+      patchModules(
+        addChildNode(draft.modules, parentId, createMyModule(`Module ${count}`))
+      );
     },
-    [draft, patchModules, stats.modules],
+    [draft, patchModules, stats.modules]
   );
 
   const addResource = useCallback(
     (moduleId: string, type: MyCourseResourceType = "youtube") => {
       if (!draft) return;
       if (stats.resources >= MY_COURSE_MAX_RESOURCES) {
-        toast({ title: "Resource limit reached", description: `A course holds up to ${MY_COURSE_MAX_RESOURCES} resources.`, variant: "info" });
+        toast({
+          title: "Resource limit reached",
+          description: `A course holds up to ${MY_COURSE_MAX_RESOURCES} resources.`,
+          variant: "info",
+        });
         return;
       }
-      patchModules(updateNode(draft.modules, moduleId, (module) => ({
-        ...module,
-        resources: [...module.resources, createMyResource(type)],
-        updatedAt: Date.now(),
-      })));
+      patchModules(
+        updateNode(draft.modules, moduleId, (module) => ({
+          ...module,
+          resources: [...module.resources, createMyResource(type)],
+          updatedAt: Date.now(),
+        }))
+      );
     },
-    [draft, patchModules, stats.resources],
+    [draft, patchModules, stats.resources]
   );
 
   const updateModule = useCallback(
     (moduleId: string, next: (module: MyCourseModule) => MyCourseModule) => {
       if (!draft) return;
-      patchModules(updateNode(draft.modules, moduleId, (module) => ({ ...next(module), updatedAt: Date.now() })));
+      patchModules(
+        updateNode(draft.modules, moduleId, (module) => ({
+          ...next(module),
+          updatedAt: Date.now(),
+        }))
+      );
     },
-    [draft, patchModules],
+    [draft, patchModules]
   );
 
   const removeModule = useCallback(
@@ -250,7 +398,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
       if (!draft) return;
       patchModules(removeNode(draft.modules, moduleId));
     },
-    [draft, patchModules],
+    [draft, patchModules]
   );
 
   const moveModule = useCallback(
@@ -258,7 +406,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
       if (!draft) return;
       patchModules(moveNode(draft.modules, moduleId, delta));
     },
-    [draft, patchModules],
+    [draft, patchModules]
   );
 
   const handleCoverFile = async (file: File) => {
@@ -271,7 +419,8 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
     } catch (uploadError) {
       toast({
         title: "That image could not be uploaded",
-        description: uploadError instanceof Error ? uploadError.message : undefined,
+        description:
+          uploadError instanceof Error ? uploadError.message : undefined,
         variant: "error",
       });
     } finally {
@@ -279,7 +428,9 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
     }
   };
 
-  const save = async (options: { thenPlay?: boolean } = {}): Promise<boolean> => {
+  const save = async (
+    options: { thenPlay?: boolean } = {}
+  ): Promise<boolean> => {
     if (!draft) return false;
     if (!draft.title.trim()) {
       setError("Give your course a title before saving.");
@@ -301,45 +452,115 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
   };
 
   const confirmDelete = async () => {
-    if (!draft || isNew) return;
-    setDeleteOpen(false);
+    if (!draft || isNew || deletePendingRef.current) return;
+    deletePendingRef.current = true;
     setBusy(true);
-    const result = await myCourses.remove(draft.id);
-    setBusy(false);
-    if (!result.ok) {
-      toast({ title: "The course was not deleted", description: result.message, variant: "error" });
-      return;
+    setDeleteError("");
+    try {
+      const result = await myCourses.remove(draft.id);
+      if (!result.ok) {
+        setDeleteError(
+          result.message || "The course could not be deleted. Try again."
+        );
+        return;
+      }
+      setDeleteOpen(false);
+      toast({ title: "Course deleted", variant: "success" });
+      onBack();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "The course could not be deleted."
+      );
+    } finally {
+      deletePendingRef.current = false;
+      setBusy(false);
     }
-    toast({ title: "Course deleted", variant: "success" });
-    onBack();
   };
 
   if (!user) {
     return (
-      <main className="grid min-h-screen place-items-center px-6 text-center text-white" data-my-course-editor>
+      <main
+        className="grid min-h-screen place-items-center px-6 text-center text-white"
+        data-my-course-editor
+      >
         <div>
           <Layers3 className="mx-auto h-12 w-12 text-violet-300" />
-          <h1 className="mt-4 text-2xl font-black">Sign in to build your course</h1>
+          <h1 className="mt-4 text-2xl font-black">
+            Sign in to build your course
+          </h1>
         </div>
       </main>
     );
   }
 
-  if (!isNew && myCourses.state === "ready" && !existing) {
+  if (
+    !isNew &&
+    myCourses.state === "ready" &&
+    !existing &&
+    !deletePendingRef.current
+  ) {
     return (
-      <div className="min-h-screen text-white" data-my-course-editor data-my-course-missing>
-        <Header cartCount={0} notifCount={0} title="Course not found" subtitle="My Study Library" onNavigateToCart={() => {}} onNavigateToNotifications={() => {}} onNavigateToSubscription={() => {}} />
+      <div
+        className="min-h-screen text-white"
+        data-my-course-editor
+        data-my-course-missing
+      >
+        <Header
+          cartCount={0}
+          notifCount={0}
+          title="Course not found"
+          subtitle="My Study Library"
+          onNavigateToCart={() => {}}
+          onNavigateToNotifications={() => {}}
+          onNavigateToSubscription={() => {}}
+        />
         <main className="mx-auto w-full max-w-md px-4 py-10 text-center">
-          <p className="text-sm font-semibold text-white/60">This course no longer exists in your library.</p>
-          <button type="button" onClick={onBack} className="mt-5 min-h-11 rounded-full bg-violet-600 px-5 text-sm font-black">Back to My Study Library</button>
+          <p className="text-sm font-semibold text-white/60">
+            This course no longer exists in your library.
+          </p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-5 min-h-11 rounded-full bg-violet-600 px-5 text-sm font-black"
+          >
+            Back to My Study Library
+          </button>
         </main>
       </div>
     );
   }
 
+  if (!draft && myCourses.state === "error") {
+    return (
+      <main
+        data-my-course-editor
+        data-my-course-editor-error
+        className="min-h-screen p-6 text-white"
+      >
+        <h1>Course could not be loaded</h1>
+        <p role="alert">{myCourses.error}</p>
+        <button
+          type="button"
+          className="dc-content-secondary"
+          onClick={myCourses.reload}
+        >
+          Try again
+        </button>
+        <button type="button" className="dc-content-secondary" onClick={onBack}>
+          My Study Library
+        </button>
+      </main>
+    );
+  }
+
   if (!draft) {
     return (
-      <main className="grid min-h-screen place-items-center text-white" data-my-course-editor-loading>
+      <main
+        className="grid min-h-screen place-items-center text-white"
+        data-my-course-editor-loading
+      >
         <LoaderCircle className="h-8 w-8 animate-spin text-violet-300" />
       </main>
     );
@@ -347,26 +568,42 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
 
   // A course without a cover of its own previews the random bundled image the
   // client persists at save time — the overlay never shows an empty frame.
-  const previewCover = String(draft.coverImage || "").trim() || fallbackCoverImage(draft.id);
+  const previewCover =
+    String(draft.coverImage || "").trim() || fallbackCoverImage(draft.id);
 
   return (
-    <div className="min-h-screen text-white" data-my-course-editor data-course-id={draft.id}>
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
+    <div
+      className="min-h-screen text-white"
+      data-my-course-editor
+      data-editor-minimal
+      data-course-id={draft.id}
+    >
+      <div
+        data-app-frame
+        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full"
+      >
         <Header
           cartCount={0}
           notifCount={0}
-          title={isNew ? "New course" : "Edit course"}
-          subtitle="My Study Library"
-          onNavigateToCart={() => { window.location.hash = "#/cart"; }}
-          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
+          onNavigateToCart={() => {
+            window.location.hash = "#/cart";
+          }}
+          onNavigateToNotifications={() => {
+            window.location.hash = "#/notifications";
+          }}
+          onNavigateToSubscription={() => {
+            window.location.hash = "#/subscription";
+          }}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-28 pt-3 sm:px-5 lg:px-7 xl:px-9" data-my-course-editor-content>
+        <main
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-28 pt-3 sm:px-5 lg:px-7 xl:px-9"
+          data-my-course-editor-content
+        >
           {/* The overlay lays itself out by the space it is given: a single
               column on a phone, the cover beside the fields from 640px, and
               Course identity | Modules side by side from 1280px. */}
-          <div className="mx-auto w-full max-w-[1280px] space-y-4">
+          <div className="dc-editor-layout">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -376,23 +613,26 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               >
                 <ArrowLeft size={14} /> My Study Library
               </button>
-              <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/50">
-                {stats.modules} module{stats.modules === 1 ? "" : "s"} · {stats.resources} resource{stats.resources === 1 ? "" : "s"}
+              <span className="dc-editor-counts">
+                {stats.modules} module{stats.modules === 1 ? "" : "s"} ·{" "}
+                {stats.resources} resource{stats.resources === 1 ? "" : "s"}
               </span>
             </div>
 
             {/* Two panels, one fluid grid: stacked on a phone and a portrait
                 tablet, side by side from 1280px on a desktop. */}
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+            <div className="dc-editor-workspace">
               {/* ── 1. Course identity ─────────────────────────────────── */}
-              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Course</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight">{isNew ? "Build your own course" : "Edit your course"}</h1>
+              <section className="dc-editor-section" data-my-course-meta>
+                <h1 className="dc-editor-title">
+                  {isNew ? "New course" : "Edit course"}
+                </h1>
                 <p className="mt-1 text-xs font-medium leading-5 text-white/50">
-                  Cover, modules, lessons aur apne MCQ — sab kuch aap design karein. Save ke baad Play se Course Player khulega.
+                  Edit the details, organise your modules, then save or open the
+                  Course Player.
                 </p>
 
-                <div className="mt-4 grid gap-4 sm:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-1">
+                <div className="dc-editor-identity">
                   <div>
                     <span className={labelClass}>Cover image</span>
                     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/30">
@@ -401,7 +641,11 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                         alt="Course cover"
                         className="h-full w-full object-cover"
                         data-my-course-cover-preview
-                        data-my-course-cover-source={String(draft.coverImage || "").trim() ? "own" : "random"}
+                        data-my-course-cover-source={
+                          String(draft.coverImage || "").trim()
+                            ? "own"
+                            : "random"
+                        }
                       />
                       {coverUploading ? (
                         <span className="absolute inset-0 grid place-items-center bg-black/55">
@@ -418,7 +662,10 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                           <X size={14} />
                         </button>
                       ) : (
-                        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/75 ring-1 ring-white/15" data-my-course-cover-auto>
+                        <span
+                          className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/75 ring-1 ring-white/15"
+                          data-my-course-cover-auto
+                        >
                           Auto cover · saves with the course
                         </span>
                       )}
@@ -427,7 +674,7 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                       <input
                         type="file"
                         accept="image/*"
-                        className="hidden"
+                        className="sr-only"
                         disabled={coverUploading}
                         onChange={(event) => {
                           const file = event.target.files?.[0];
@@ -436,16 +683,31 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                         }}
                         data-my-course-cover-input
                       />
-                      {coverUploading ? "Uploading…" : <><Upload size={13} /> Upload cover</>}
+                      {coverUploading ? (
+                        "Uploading…"
+                      ) : (
+                        <>
+                          <Upload size={13} /> Upload cover
+                        </>
+                      )}
                     </label>
                     <input
-                      value={draft.coverImage?.startsWith("data:") ? "" : draft.coverImage || ""}
-                      onChange={(event) => patch({ coverImage: event.target.value })}
+                      value={
+                        draft.coverImage?.startsWith("data:")
+                          ? ""
+                          : draft.coverImage || ""
+                      }
+                      onChange={(event) =>
+                        patch({ coverImage: event.target.value })
+                      }
                       placeholder="…or paste an image URL"
                       className={`${inputClass} mt-2`}
                       aria-label="Cover image URL"
                     />
-                    <p className="mt-1.5 text-[10px] font-semibold leading-4 text-white/40" data-my-course-cover-hint>
+                    <p
+                      className="mt-1.5 text-[10px] font-semibold leading-4 text-white/40"
+                      data-my-course-cover-hint
+                    >
                       {draft.coverImage
                         ? "Apna cover lag gaya — save par yahi rahega."
                         : "Koi cover nahi — ek random image apne aap set ho kar save ho jayegi."}
@@ -457,7 +719,9 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                       <span className={labelClass}>Course title</span>
                       <input
                         value={draft.title}
-                        onChange={(event) => patch({ title: event.target.value })}
+                        onChange={(event) =>
+                          patch({ title: event.target.value })
+                        }
                         maxLength={MY_COURSE_TITLE_MAX}
                         placeholder="e.g. NEET Biology — my revision plan"
                         className={inputClass}
@@ -468,7 +732,9 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                       <span className={labelClass}>Description (optional)</span>
                       <textarea
                         value={draft.description || ""}
-                        onChange={(event) => patch({ description: event.target.value })}
+                        onChange={(event) =>
+                          patch({ description: event.target.value })
+                        }
                         maxLength={MY_COURSE_DESC_MAX}
                         rows={4}
                         placeholder="What is this course for?"
@@ -478,14 +744,15 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                     </label>
                   </div>
                 </div>
-              </GlassSurface>
+              </section>
 
               {/* ── 2. Modules ────────────────────────────────────────── */}
-              <GlassSurface radius={32} className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules>
+              <section className="dc-editor-section" data-my-course-modules>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Structure</p>
-                    <h2 className="mt-0.5 text-lg font-black">Modules & resources</h2>
+                    <h2 className="mt-0.5 text-lg font-black">
+                      Modules & resources
+                    </h2>
                   </div>
                   <button
                     type="button"
@@ -497,7 +764,9 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                   </button>
                 </div>
                 <p className="mt-1 text-[11px] font-medium leading-5 text-white/45">
-                  Har module ke andar resources (video, PDF, link, Brain MCQ) aur nested sub-modules — jaise admin course banata hai.
+                  Videos, PDFs, links, MCQ practice and experiments. Up to{" "}
+                  {MY_COURSE_MAX_MODULES} modules, {MY_COURSE_MAX_RESOURCES}{" "}
+                  resources and {MY_COURSE_MAX_DEPTH} nesting levels.
                 </p>
 
                 <div className="mt-3 space-y-3">
@@ -518,36 +787,28 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                     />
                   ))}
                   {draft.modules.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => addModule(null)}
-                      className="w-full rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 text-center text-[12px] font-black text-white/55 transition hover:bg-white/[0.05]"
-                    >
-                      <Plus className="mx-auto mb-2 h-6 w-6 text-white/35" />
-                      Add your first module
-                    </button>
+                    <p className="dc-editor-note">
+                      No modules yet. Add a module to organise your resources.
+                    </p>
                   ) : null}
                 </div>
-              </GlassSurface>
-            </div>{/* /fluid panel grid */}
+              </section>
+            </div>
+            {/* /fluid panel grid */}
 
             {error ? (
-              <p role="alert" className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100">
+              <p
+                role="alert"
+                className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
+              >
                 {error}
               </p>
             ) : null}
           </div>
         </main>
 
-        {/* ── Sticky action bar — the same bare Profile glass as the panels
-            (radius 0: it is an edge-to-edge bar), so it reads as part of the
-            overlay instead of a dark slab ── */}
-        <GlassSurface
-          radius={0}
-          className="sticky bottom-0 z-30 border-t border-white/15 text-white"
-          contentClassName="px-3 py-3 sm:px-5"
-          data-my-course-editor-actions
-        >
+        {/* Persistent save controls; no duplicate create actions. */}
+        <footer className="dc-editor-actions" data-my-course-editor-actions>
           <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-2">
             {!isNew ? (
               <button
@@ -560,8 +821,14 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
                 <Trash2 size={13} /> Delete
               </button>
             ) : null}
-            <span className="ml-auto hidden text-[11px] font-semibold text-white/40 sm:block">
-              {myCourses.saving ? "Saving…" : dirtyRef.current ? "Unsaved changes" : "Saved"}
+            <span className="dc-editor-save-state">
+              {myCourses.saving
+                ? "Saving…"
+                : isNew
+                ? "New course · Not saved"
+                : dirtyRef.current
+                ? "Unsaved changes"
+                : "Saved"}
             </span>
             <button
               type="button"
@@ -570,7 +837,12 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/10 disabled:opacity-40"
               data-my-course-save
             >
-              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check size={15} />} Save
+              {busy ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check size={15} />
+              )}{" "}
+              Save
             </button>
             <button
               type="button"
@@ -582,20 +854,48 @@ export default function MyCourseEditorPage({ courseId, onBack, onPlay }: MyCours
               <Play size={15} /> Save & play
             </button>
           </div>
-        </GlassSurface>
+        </footer>
       </div>
 
-      {/* The delete confirmation wears the exact glass of the Profile page's
-          cards (the Cart card's bare surface) via material="profile". */}
-      <ConfirmDialog
+      {/* A named native confirmation keeps failures visible for retry. */}
+      <ContentDialog
         open={deleteOpen}
-        material="profile"
+        onClose={() => setDeleteOpen(false)}
+        busy={busy}
         title="Delete this course?"
-        message={`“${draft.title || "Untitled course"}” and everything inside it will be permanently deleted. This can't be undone.`}
-        confirmLabel="Delete"
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setDeleteOpen(false)}
-      />
+        description="This action cannot be undone."
+        data-my-course-delete-dialog
+        footer={
+          <>
+            <button
+              type="button"
+              className="dc-content-secondary"
+              disabled={busy}
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="dc-content-primary dc-content-danger"
+              disabled={busy}
+              onClick={() => void confirmDelete()}
+            >
+              {busy ? "Deleting…" : "Delete course"}
+            </button>
+          </>
+        }
+      >
+        <p className="dc-content-note">
+          “{draft.title || "Untitled course"}” and all its modules and resources
+          will be permanently deleted.
+        </p>
+        {deleteError ? (
+          <p role="alert" className="dc-editor-error">
+            {deleteError}
+          </p>
+        ) : null}
+      </ContentDialog>
     </div>
   );
 }
@@ -617,46 +917,81 @@ interface ModuleNodeEditorProps {
 }
 
 function ModuleNodeEditor({
-  module, depth, index, siblingCount, uid, courseId, onUpdate, onRemove, onMove, onAddChild, onAddResource,
+  module,
+  depth,
+  index,
+  siblingCount,
+  uid,
+  courseId,
+  onUpdate,
+  onRemove,
+  onMove,
+  onAddChild,
+  onAddResource,
 }: ModuleNodeEditorProps) {
   const [open, setOpen] = useState(depth === 1);
   const canNest = depth < MY_COURSE_MAX_DEPTH;
 
   return (
     <article
-      className={`rounded-2xl border p-3 ${depth === 1 ? "border-white/12 bg-white/[0.035]" : "border-white/10 bg-black/20"}`}
+      className={`rounded-2xl border p-3 ${
+        depth === 1
+          ? "border-white/12 bg-white/[0.035]"
+          : "border-white/10 bg-black/20"
+      }`}
       data-my-module={module.id}
       data-my-module-depth={depth}
-      style={depth > 1 ? { marginLeft: Math.min((depth - 1) * 14, 42) } : undefined}
+      style={
+        depth > 1 ? { marginLeft: Math.min((depth - 1) * 14, 42) } : undefined
+      }
     >
-      <div className="flex items-center gap-2">
+      <div className="dc-editor-node-heading">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-[11px] font-black text-violet-200 ring-1 ring-violet-400/25"
+          aria-label={`${open ? "Collapse" : "Expand"} ${
+            module.title || "module"
+          }`}
           data-my-module-toggle
         >
           {index + 1}
         </button>
         <input
           value={module.title}
-          onChange={(event) => onUpdate((current) => ({ ...current, title: event.target.value }))}
+          onChange={(event) =>
+            onUpdate((current) => ({ ...current, title: event.target.value }))
+          }
           maxLength={MY_MODULE_TITLE_MAX}
           placeholder={`Module ${index + 1} title`}
           className={`${inputClass} flex-1`}
           aria-label={`Module ${index + 1} title`}
           data-my-module-title
         />
-        <IconButton label="Move module up" onClick={() => onMove(-1)} disabled={index === 0}>
-          <ArrowUp size={14} />
-        </IconButton>
-        <IconButton label="Move module down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
-          <ArrowDown size={14} />
-        </IconButton>
-        <IconButton label="Delete module" onClick={onRemove} tone="danger">
-          <Trash2 size={14} />
-        </IconButton>
+        <div
+          className="dc-editor-node-actions"
+          role="group"
+          aria-label="Module controls"
+        >
+          <IconButton
+            label="Move module up"
+            onClick={() => onMove(-1)}
+            disabled={index === 0}
+          >
+            <ArrowUp size={14} />
+          </IconButton>
+          <IconButton
+            label="Move module down"
+            onClick={() => onMove(1)}
+            disabled={index === siblingCount - 1}
+          >
+            <ArrowDown size={14} />
+          </IconButton>
+          <IconButton label="Delete module" onClick={onRemove} tone="danger">
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
       </div>
 
       {open ? (
@@ -665,7 +1000,12 @@ function ModuleNodeEditor({
             <span className={labelClass}>Description (optional)</span>
             <textarea
               value={module.description || ""}
-              onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value }))}
+              onChange={(event) =>
+                onUpdate((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
               maxLength={MY_MODULE_DESC_MAX}
               rows={2}
               placeholder="What is this module about?"
@@ -683,36 +1023,55 @@ function ModuleNodeEditor({
                 onUpdate={(next) =>
                   onUpdate((current) => ({
                     ...current,
-                    resources: current.resources.map((item) => (item.id === resource.id ? next(item) : item)),
+                    resources: current.resources.map((item) =>
+                      item.id === resource.id ? next(item) : item
+                    ),
                     updatedAt: Date.now(),
                   }))
                 }
                 onRemove={() =>
                   onUpdate((current) => ({
                     ...current,
-                    resources: current.resources.filter((item) => item.id !== resource.id),
+                    resources: current.resources.filter(
+                      (item) => item.id !== resource.id
+                    ),
                     updatedAt: Date.now(),
                   }))
                 }
                 onMove={(delta) =>
                   onUpdate((current) => {
-                    const at = current.resources.findIndex((item) => item.id === resource.id);
+                    const at = current.resources.findIndex(
+                      (item) => item.id === resource.id
+                    );
                     const destination = at + delta;
-                    if (at < 0 || destination < 0 || destination >= current.resources.length) return current;
+                    if (
+                      at < 0 ||
+                      destination < 0 ||
+                      destination >= current.resources.length
+                    )
+                      return current;
                     const next = [...current.resources];
                     const [moved] = next.splice(at, 1);
                     next.splice(destination, 0, moved);
-                    return { ...current, resources: next, updatedAt: Date.now() };
+                    return {
+                      ...current,
+                      resources: next,
+                      updatedAt: Date.now(),
+                    };
                   })
                 }
-                index={module.resources.findIndex((item) => item.id === resource.id)}
+                index={module.resources.findIndex(
+                  (item) => item.id === resource.id
+                )}
                 siblingCount={module.resources.length}
               />
             ))}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wide text-white/45">Add resource</span>
+            <span className="text-[10px] font-black uppercase tracking-wide text-white/45">
+              Add resource
+            </span>
             <select
               value=""
               onChange={(event) => {
@@ -723,9 +1082,15 @@ function ModuleNodeEditor({
               aria-label="Resource type to add"
               data-my-resource-type-picker
             >
-              <option value="" className="bg-slate-900">Choose a type…</option>
+              <option value="" className="bg-slate-900">
+                Choose a type…
+              </option>
               {TYPE_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id} className="bg-slate-900">
+                <option
+                  key={option.id}
+                  value={option.id}
+                  className="bg-slate-900"
+                >
                   {option.label}
                 </option>
               ))}
@@ -759,15 +1124,27 @@ function ModuleNodeEditor({
                 }))
               }
               onRemove={() =>
-                onUpdate((current) => ({ ...current, modules: removeNode(current.modules, child.id), updatedAt: Date.now() }))
+                onUpdate((current) => ({
+                  ...current,
+                  modules: removeNode(current.modules, child.id),
+                  updatedAt: Date.now(),
+                }))
               }
               onMove={(delta) =>
-                onUpdate((current) => ({ ...current, modules: moveNode(current.modules, child.id, delta), updatedAt: Date.now() }))
+                onUpdate((current) => ({
+                  ...current,
+                  modules: moveNode(current.modules, child.id, delta),
+                  updatedAt: Date.now(),
+                }))
               }
               onAddChild={() =>
                 onUpdate((current) => ({
                   ...current,
-                  modules: addChildNode(current.modules, child.id, createMyModule("New sub-module")),
+                  modules: addChildNode(
+                    current.modules,
+                    child.id,
+                    createMyModule("New sub-module")
+                  ),
                   updatedAt: Date.now(),
                 }))
               }
@@ -787,8 +1164,13 @@ function ModuleNodeEditor({
         </div>
       ) : (
         <p className="mt-2 truncate text-[11px] font-semibold text-white/40">
-          {module.resources.length} resource{module.resources.length === 1 ? "" : "s"}
-          {module.modules.length ? ` · ${module.modules.length} sub-module${module.modules.length === 1 ? "" : "s"}` : ""}
+          {module.resources.length} resource
+          {module.resources.length === 1 ? "" : "s"}
+          {module.modules.length
+            ? ` · ${module.modules.length} sub-module${
+                module.modules.length === 1 ? "" : "s"
+              }`
+            : ""}
         </p>
       )}
     </article>
@@ -808,24 +1190,38 @@ interface ResourceEditorProps {
   onMove: (delta: number) => void;
 }
 
-function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate, onRemove, onMove }: ResourceEditorProps) {
+function ResourceEditor({
+  resource,
+  uid,
+  courseId,
+  index,
+  siblingCount,
+  onUpdate,
+  onRemove,
+  onMove,
+}: ResourceEditorProps) {
   const option = typeOption(resource.type);
   const Icon = option.icon;
   const [uploading, setUploading] = useState(false);
   const isBrain = resource.type === "brain";
   const isExperiment = resource.type === "interactive";
   const questions = resource.practiceQuestions || [];
-  const missing = questions.filter((question) => myQuestionIssues(question).length > 0).length;
+  const missing = questions.filter(
+    (question) => myQuestionIssues(question).length > 0
+  ).length;
   const experimentHtml = resource.interactiveHtml || "";
-  const experimentHosted = /^https:\/\//i.test(String(resource.url || "").trim());
+  const experimentHosted = /^https:\/\//i.test(
+    String(resource.url || "").trim()
+  );
   // A resource is "ready" when the player can actually open it: a Brain set
   // needs valid questions, an experiment needs its HTML (or a hosted link),
   // everything else needs a link or an upload.
   const ready = isBrain
     ? questions.length > 0 && missing === 0
     : isExperiment
-      ? (Boolean(experimentHtml.trim()) || experimentHosted) && experimentBlockingIssues(experimentHtml).length === 0
-      : !isBrain;
+    ? (Boolean(experimentHtml.trim()) || experimentHosted) &&
+      experimentBlockingIssues(experimentHtml).length === 0
+    : Boolean(String(resource.url || "").trim());
 
   const handleFile = async (file: File) => {
     setUploading(true);
@@ -844,7 +1240,8 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
     } catch (uploadError) {
       toast({
         title: "That file could not be uploaded",
-        description: uploadError instanceof Error ? uploadError.message : undefined,
+        description:
+          uploadError instanceof Error ? uploadError.message : undefined,
         variant: "error",
       });
     } finally {
@@ -854,18 +1251,24 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
 
   return (
     <div
-      className={`rounded-2xl border p-3 ${ready ? "border-white/10 bg-black/25" : "border-amber-400/30 bg-amber-500/[0.06]"}`}
+      className={`rounded-2xl border p-3 ${
+        ready
+          ? "border-white/10 bg-black/25"
+          : "border-amber-400/30 bg-amber-500/[0.06]"
+      }`}
       data-my-resource={resource.id}
       data-my-resource-type={resource.type}
       data-my-resource-ready={ready ? "true" : "false"}
     >
-      <div className="flex items-center gap-2">
+      <div className="dc-editor-node-heading">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500/12 text-cyan-200 ring-1 ring-cyan-400/20">
           <Icon size={16} />
         </span>
         <input
           value={resource.name}
-          onChange={(event) => onUpdate((current) => ({ ...current, name: event.target.value }))}
+          onChange={(event) =>
+            onUpdate((current) => ({ ...current, name: event.target.value }))
+          }
           maxLength={MY_RESOURCE_NAME_MAX}
           placeholder={isBrain ? "Practice set name" : "Resource name"}
           className={`${inputClass} flex-1`}
@@ -880,7 +1283,12 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
               ...current,
               type,
               ...(type === "brain"
-                ? { practiceQuestions: current.practiceQuestions?.length ? current.practiceQuestions : [createMyQuestion()], practiceTitle: current.practiceTitle || current.name }
+                ? {
+                    practiceQuestions: current.practiceQuestions?.length
+                      ? current.practiceQuestions
+                      : [createMyQuestion()],
+                    practiceTitle: current.practiceTitle || current.name,
+                  }
                 : { practiceQuestions: undefined, practiceTitle: undefined }),
               updatedAt: Date.now(),
             }));
@@ -895,15 +1303,29 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
             </option>
           ))}
         </select>
-        <IconButton label="Move resource up" onClick={() => onMove(-1)} disabled={index === 0}>
-          <ArrowUp size={14} />
-        </IconButton>
-        <IconButton label="Move resource down" onClick={() => onMove(1)} disabled={index === siblingCount - 1}>
-          <ArrowDown size={14} />
-        </IconButton>
-        <IconButton label="Delete resource" onClick={onRemove} tone="danger">
-          <Trash2 size={14} />
-        </IconButton>
+        <div
+          className="dc-editor-node-actions"
+          role="group"
+          aria-label="Resource controls"
+        >
+          <IconButton
+            label="Move resource up"
+            onClick={() => onMove(-1)}
+            disabled={index === 0}
+          >
+            <ArrowUp size={14} />
+          </IconButton>
+          <IconButton
+            label="Move resource down"
+            onClick={() => onMove(1)}
+            disabled={index === siblingCount - 1}
+          >
+            <ArrowDown size={14} />
+          </IconButton>
+          <IconButton label="Delete resource" onClick={onRemove} tone="danger">
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
       </div>
 
       <div className="mt-3 space-y-3">
@@ -913,13 +1335,22 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
               <span className={labelClass}>
                 {isExperiment
                   ? "Hosted link (optional — only for experiments too big to store)"
-                  : `${option.upload ? "Link or upload" : "Link"} ${option.hint ? `— ${option.hint}` : ""}`}
+                  : `${option.upload ? "Link or upload" : "Link"} ${
+                      option.hint ? `— ${option.hint}` : ""
+                    }`}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="dc-editor-node-heading">
                 <Link2 size={14} className="shrink-0 text-white/35" />
                 <input
                   value={resource.url || ""}
-                  onChange={(event) => onUpdate((current) => ({ ...current, url: event.target.value, source: "link", updatedAt: Date.now() }))}
+                  onChange={(event) =>
+                    onUpdate((current) => ({
+                      ...current,
+                      url: event.target.value,
+                      source: "link",
+                      updatedAt: Date.now(),
+                    }))
+                  }
                   inputMode="url"
                   autoCapitalize="none"
                   autoCorrect="off"
@@ -935,7 +1366,7 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
               <label className="flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3 text-[11px] font-black text-white/70 transition hover:border-violet-400/50 hover:bg-white/[0.06]">
                 <input
                   type="file"
-                  className="hidden"
+                  className="sr-only"
                   disabled={uploading}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -944,7 +1375,14 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
                   }}
                   data-my-resource-file
                 />
-                {uploading ? "Uploading…" : <><Upload size={13} /> Upload file{resource.fileName ? ` — ${resource.fileName}` : ""}</>}
+                {uploading ? (
+                  "Uploading…"
+                ) : (
+                  <>
+                    <Upload size={13} /> Upload file
+                    {resource.fileName ? ` — ${resource.fileName}` : ""}
+                  </>
+                )}
               </label>
             ) : null}
           </div>
@@ -954,7 +1392,13 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
           <span className={labelClass}>Details (optional)</span>
           <textarea
             value={resource.description || ""}
-            onChange={(event) => onUpdate((current) => ({ ...current, description: event.target.value, updatedAt: Date.now() }))}
+            onChange={(event) =>
+              onUpdate((current) => ({
+                ...current,
+                description: event.target.value,
+                updatedAt: Date.now(),
+              }))
+            }
             maxLength={MY_RESOURCE_DESC_MAX}
             rows={2}
             placeholder="A note about this resource"
@@ -965,7 +1409,13 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
         {isExperiment ? (
           <MyCourseExperimentEditor
             resource={resource}
-            onChange={(patch) => onUpdate((current) => ({ ...current, ...patch, updatedAt: Date.now() }))}
+            onChange={(patch) =>
+              onUpdate((current) => ({
+                ...current,
+                ...patch,
+                updatedAt: Date.now(),
+              }))
+            }
           />
         ) : null}
 
@@ -987,19 +1437,23 @@ function ResourceEditor({ resource, uid, courseId, index, siblingCount, onUpdate
 
         {!isBrain && !isExperiment && !String(resource.url || "").trim() ? (
           <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-100">
-            Add a link (or upload a file) — the player opens a resource only when it has something to show.
+            Add a link (or upload a file) — the player opens a resource only
+            when it has something to show.
           </p>
         ) : null}
         {isExperiment && !experimentHtml.trim() && !experimentHosted ? (
           <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-100">
-            Paste the HTML your AI gave you (or upload the .html file) — an experiment with no source cannot open.
+            Paste the HTML your AI gave you (or upload the .html file) — an
+            experiment with no source cannot open.
           </p>
         ) : null}
         {isBrain && !ready ? (
           <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-100">
             {questions.length === 0
               ? "Add at least one question — the Brain tab needs a set to open."
-              : `${missing} question${missing === 1 ? "" : "s"} still need text, two options or a marked answer.`}
+              : `${missing} question${
+                  missing === 1 ? "" : "s"
+                } still need text, two options or a marked answer.`}
           </p>
         ) : null}
       </div>

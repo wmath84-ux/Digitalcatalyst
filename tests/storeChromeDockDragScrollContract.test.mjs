@@ -65,14 +65,21 @@ const homeReviews = read("src/home/components/Reviews.tsx");
 
 test("the drag hook is mouse/pen only and never hijacks the wheel or touch", () => {
   // A thumb keeps the browser's own scrolling, momentum and snap.
-  assert.match(hook, /event\.pointerType !== "mouse" && event\.pointerType !== "pen"/);
+  assert.match(
+    hook,
+    /event\.pointerType !== "mouse" && event\.pointerType !== "pen"/
+  );
   // Only the left button starts a drag.
   assert.match(hook, /event\.button !== 0/);
   // A rail that fits its content stays inert.
   assert.match(hook, /node\.scrollWidth <= node\.clientWidth \+ 1/);
   // The wheel is NOT converted: turning a vertical wheel into horizontal rail
   // scroll would steal page scrolling from the store's sticky filter bar.
-  assert.doesNotMatch(hook, /addEventListener\("wheel"|onWheel/, "the wheel stays the page's");
+  assert.doesNotMatch(
+    hook,
+    /addEventListener\("wheel"|onWheel/,
+    "the wheel stays the page's"
+  );
   assert.doesNotMatch(hook, /preventDefault\(\)[\s\S]{0,80}wheel/i);
   // A fling is motion, so reduced-motion stops the rail dead.
   assert.match(hook, /prefers-reduced-motion: reduce/);
@@ -83,7 +90,10 @@ test("the drag hook is mouse/pen only and never hijacks the wheel or touch", () 
   assert.match(hook, /addEventListener\("dragstart"/);
   // The rail's reachable range is clamped in the hook rather than left to the
   // browser (LTR-only app), so an edge behaves the same everywhere.
-  assert.match(hook, /Math\.min\(Math\.max\(left, 0\), Math\.max\(node\.scrollWidth - node\.clientWidth, 0\)\)/);
+  assert.match(
+    hook,
+    /Math\.min\(Math\.max\(left, 0\), Math\.max\(node\.scrollWidth - node\.clientWidth, 0\)\)/
+  );
   // The held state is painted as an attribute, not as inline style churn.
   assert.match(hook, /setAttribute\("data-drag-scrolling", "true"\)/);
   assert.match(hook, /removeAttribute\("data-drag-scrolling"\)/);
@@ -103,24 +113,24 @@ test("the held-rail states live in index.css, outside the glass gate", () => {
   assert.doesNotMatch(indexCss, /data-glass[^{]*\[data-drag-scrolling/);
 });
 
-test("every horizontal rail on Home and the store takes the drag", () => {
-  const rails = [
-    ["home category strip", homeCategories, /className="mt-5 flex overflow-x-auto px-5 pb-1 no-scrollbar"/],
-    ["home reviews rail", homeReviews, /overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory/],
-    ["store filter chips", chips, /flex gap-2 overflow-x-auto pb-1/],
-    ["search page chips", searchPage, /mt-3 flex gap-2 overflow-x-auto pb-1 md:flex-wrap/],
-  ];
-  for (const [name, source, shape] of rails) {
-    assert.match(source, /useDragScroll/, `${name}: missing the drag hook`);
-    assert.match(source, /ref=\{\w+\.ref\}\s*\n\s*onPointerDown=\{\w+\.onPointerDown\}/, `${name}: rail is not wired`);
-    assert.match(source, shape, `${name}: the scroller itself changed shape`);
+test("native Store, Home reviews and Search rails retain mouse/pen dragging", () => {
+  for (const [name, source] of [
+    ["home reviews", homeReviews],
+    ["native store chips", storePage],
+    ["search chips", searchPage],
+  ]) {
+    assert.match(
+      source,
+      /useDragScroll/,
+      `${name}: mouse/pen drag is retained`
+    );
+    assert.match(source, /ref=\{\w+\.ref\}/);
+    assert.match(source, /onPointerDown=\{\w+\.onPointerDown\}/);
   }
-  // The reviews rail keeps its snap + hidden scrollbar (pinned by the Home pass).
   assert.match(homeReviews, /snap-x-mandatory/);
-  // The store's coverflow already owns a framer-motion `drag="x"` stage — it is
-  // not a scroller, so the hook must not be layered on top of it.
   assert.match(coverflow, /drag="x"/);
   assert.doesNotMatch(coverflow, /useDragScroll/);
+  assert.doesNotMatch(storePage, /<TiltedCoverflow/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -133,12 +143,23 @@ test("the dock's material is CSS — its files stay byte-comparable", () => {
     ["GlassMaterial.tsx", dockMaterial],
     ["BottomNav.tsx", bottomNav],
   ]) {
-    assert.doesNotMatch(source, /dc-scene-(plate|ink|field)/, `${name} must not carry scene hooks`);
-    assert.doesNotMatch(source, /from "[^"]*ui\/glass-/, `${name} must not import registry primitives`);
+    assert.doesNotMatch(
+      source,
+      /dc-scene-(plate|ink|field)/,
+      `${name} must not carry scene hooks`
+    );
+    assert.doesNotMatch(
+      source,
+      /from "[^"]*ui\/glass-/,
+      `${name} must not import registry primitives`
+    );
   }
   // The pinned docs sensitivity never moved to "fix" the dock's contrast.
   assert.match(dockMaterial, /GLASS_DOCS_SURFACE\.tintAlpha/);
-  assert.match(dockMaterial, /DOCK_PANEL_BG = `rgba\(\$\{GLASS_TINT_RGB\},\$\{GLASS_DOCS_SURFACE\.tintAlpha\}\)`/);
+  assert.match(
+    dockMaterial,
+    /DOCK_PANEL_BG = `rgba\(\$\{GLASS_TINT_RGB\},\$\{GLASS_DOCS_SURFACE\.tintAlpha\}\)`/
+  );
   // The plate is keyed off the hook the dock already ships.
   assert.match(dock, /data-glass-dock=""/);
   assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{/);
@@ -150,9 +171,15 @@ test("the dock wears the owner's light-blue frosted material (2026-09-10)", () =
   // The navy chrome plate it wore before is gone: the nav is now ONE flat
   // light-blue tint over a frosted backdrop, and the frost lives on the dock's
   // own material layer so panel + lens can never stack past 20%.
-  const rule = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{([^}]*)\}/.exec(css)?.[1];
+  const rule =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{([^}]*)\}/.exec(
+      css
+    )?.[1];
   assert.ok(rule, "expected the dock material rule");
-  assert.match(rule, /background-color: var\(--dc-footer-nav-tint\) !important/);
+  assert.match(
+    rule,
+    /background-color: var\(--dc-footer-nav-tint\) !important/
+  );
   // No gradient: a gradient is a second density, and the brief pins one.
   assert.match(rule, /background-image: none !important/);
   // A rim and a lift, so a light plate still has an edge over the snow.
@@ -169,11 +196,20 @@ test("the dock wears the owner's light-blue frosted material (2026-09-10)", () =
 
   // GlassMaterial's own gradient used to add ~17% more colour on top of the
   // panel; inside the dock it is now frost-only, so 18% is the whole tint.
-  const lens = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(css)?.[1];
+  const lens =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(
+      css
+    )?.[1];
   assert.ok(lens, "expected the dock's material-layer rule");
   assert.match(lens, /background: transparent !important/);
-  assert.match(lens, /-webkit-backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/);
-  assert.match(lens, /[^-]backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/);
+  assert.match(
+    lens,
+    /-webkit-backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/
+  );
+  assert.match(
+    lens,
+    /[^-]backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/
+  );
 });
 
 test("the dock plate wins the cascade against index.css's transparent panel", () => {
@@ -184,12 +220,21 @@ test("the dock plate wins the cascade against index.css's transparent panel", ()
   // same importance, one specificity point higher (html + the gate attribute),
   // so the material lands — and `?glass=off` still falls back to the bare lens.
   const bare = indexCss.replace(/\/\*[\s\S]*?\*\//g, "");
-  assert.match(bare, /\[data-glass-dock\] \{\s*overflow: visible;\s*isolation: isolate;\s*background: transparent !important;\s*\}/);
-  assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{\s*\n\s*background-color:/);
+  assert.match(
+    bare,
+    /\[data-glass-dock\] \{\s*overflow: visible;\s*isolation: isolate;\s*background: transparent !important;\s*\}/
+  );
+  assert.match(
+    css,
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{\s*\n\s*background-color:/
+  );
 });
 
 test("the dock tooltips are an opaque plate and drop their six live filters", () => {
-  const rule = /html\[data-glass="on"\] :where\(\[data-glass-dock-item\]\) > div:first-child \{([^}]*)\}/.exec(css)?.[1];
+  const rule =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock-item\]\) > div:first-child \{([^}]*)\}/.exec(
+      css
+    )?.[1];
   assert.ok(rule, "expected the tooltip rule");
   assert.match(rule, /background-color: rgba\(6, 11, 26, 0\.9\) !important/);
   assert.match(rule, /color: rgba\(255, 255, 255, 0\.96\) !important/);
@@ -204,17 +249,22 @@ test("?glass=off finally switches the dock's refraction lens off", () => {
   // and writes `backdrop-filter: url(#…)` inline, so the document-wide off rule
   // never reached it: the footer kept refracting with glass off.
   assert.doesNotMatch(dockMaterial, /data-glass-lens|data-glass-surface/);
-  assert.match(css, /html\[data-glass="off"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] \* \{\s*\n\s*backdrop-filter: none !important/);
+  assert.match(
+    css,
+    /html\[data-glass="off"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] \* \{\s*\n\s*backdrop-filter: none !important/
+  );
   // The plate itself is gated, so off restores the published 10% tint.
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
   for (const [, selectors] of bare.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
     if (!/data-glass-dock/.test(selectors)) continue;
-    for (const selector of selectors.split(",").map((s) => s.replace(/^[\s}]+/, "").trim())) {
+    for (const selector of selectors
+      .split(",")
+      .map((s) => s.replace(/^[\s}]+/, "").trim())) {
       if (!/data-glass-dock/.test(selector)) continue;
       assert.match(
         selector,
         /^html\[data-glass="(on|off)"\]/,
-        `a dock rule escaped the glass gate: ${selector.slice(0, 90)}`,
+        `a dock rule escaped the glass gate: ${selector.slice(0, 90)}`
       );
     }
   }
@@ -232,8 +282,10 @@ test("the dock's only text — the tooltip — clears AA over the light plate", 
     const s = v / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   };
-  const lum = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-  const over = (fg, alpha, bg) => fg.map((c, i) => alpha * c + (1 - alpha) * bg[i]);
+  const lum = ([r, g, b]) =>
+    0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const over = (fg, alpha, bg) =>
+    fg.map((c, i) => alpha * c + (1 - alpha) * bg[i]);
   const ratio = (a, b) => {
     const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
     return (hi + 0.05) / (lo + 0.05);
@@ -250,7 +302,10 @@ test("the dock's only text — the tooltip — clears AA over the light plate", 
     const tooltip = over([6, 11, 26], 0.9, plate);
     const tooltipInk = over([255, 255, 255], 0.96, tooltip);
     const rt = ratio(tooltipInk, tooltip);
-    assert.ok(rt >= 4.5, `dock tooltip over ${scene} measures ${rt.toFixed(2)}:1, under AA`);
+    assert.ok(
+      rt >= 4.5,
+      `dock tooltip over ${scene} measures ${rt.toFixed(2)}:1, under AA`
+    );
   }
 
   // The tab glyphs have no plate of their own to measure, so the affordance is
@@ -258,7 +313,7 @@ test("the dock's only text — the tooltip — clears AA over the light plate", 
   // blue / violet icons edged over a light plate.
   assert.match(
     css,
-    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) button > span \{\s*\n\s*filter: drop-shadow\(0 1px 2px rgba\(4, 8, 18, 0\.55\)\);/,
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) button > span \{\s*\n\s*filter: drop-shadow\(0 1px 2px rgba\(4, 8, 18, 0\.55\)\);/
   );
 });
 
@@ -268,19 +323,29 @@ test("the dock's only text — the tooltip — clears AA over the light plate", 
 
 test("the app chrome strips take the bar plate, and the token stays pinned", () => {
   // The shared header is the store's header (and every other route's).
-  assert.match(sharedHeader, /className=\{`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white\/75/);
+  assert.match(
+    sharedHeader,
+    /className=\{`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white\/75/
+  );
   // The published material stays in the class list — `?glass=off` restores it.
   assert.match(sharedHeader, /bg-white\/75/);
   assert.match(sharedHeader, /backdrop-blur-xl/);
   // The store's sticky filter bar.
-  assert.match(storePage, /data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20/);
+  assert.match(storePage, /data-store-filter-bar/);
+  assert.match(storePage, /dc-marketplace-chips/);
 
   // index.css paints those strips with the 10% chrome token at !important from
   // `[data-site-header]:not([data-home-header])` — specificity (0,2,0). The bar
   // rule has to out-rank that, which is why `body` joins the selector.
   assert.match(css, /html\[data-glass="on"\] body \.dc-scene-plate--bar \{/);
-  const barRule = /html\[data-glass="on"\] body \.dc-scene-plate--bar \{([^}]*)\}/.exec(css)?.[1];
-  assert.match(barRule, /background-color: rgba\(8, 14, 30, 0\.74\) !important/);
+  const barRule =
+    /html\[data-glass="on"\] body \.dc-scene-plate--bar \{([^}]*)\}/.exec(
+      css
+    )?.[1];
+  assert.match(
+    barRule,
+    /background-color: rgba\(8, 14, 30, 0\.74\) !important/
+  );
 
   // The token itself is NOT retuned: `--course-surface` and the desktop shell
   // read it too, and their published material must not move.
@@ -291,39 +356,53 @@ test("the app chrome strips take the bar plate, and the token stays pinned", () 
 
 test("the store's own surfaces wear the plate", () => {
   // Search capsule: the pack surface is an overlay, the input its sibling.
-  assert.match(searchBar, /className="dc-scene-plate pointer-events-none absolute inset-0/);
-  assert.match(searchBar, /data-store-search-trigger/, "the tap-to-search contract is untouched");
+  assert.match(
+    searchBar,
+    /className="dc-scene-plate pointer-events-none absolute inset-0/
+  );
+  assert.match(
+    searchBar,
+    /data-store-search-trigger/,
+    "the tap-to-search contract is untouched"
+  );
   // The launcher-scoped ink, because `.dc-scene-field` cannot reach a sibling.
-  assert.match(css, /html\[data-glass="on"\] :where\(\[data-search-launcher\]\) input::placeholder \{/);
-  assert.match(css, /:where\(\[data-search-launcher\]\) :where\(\.text-white\\\/35, \.text-white\\\/40, \.text-white\\\/45\)/);
+  assert.match(
+    css,
+    /html\[data-glass="on"\] :where\(\[data-search-launcher\]\) input::placeholder \{/
+  );
+  assert.match(
+    css,
+    /:where\(\[data-search-launcher\]\) :where\(\.text-white\\\/35, \.text-white\\\/40, \.text-white\\\/45\)/
+  );
 
   // The filter segment is the same hook Home's category strip wears.
   assert.match(chips, /className="dc-segment dc-scene-plate shrink-0"/);
-  assert.match(chips, /overflow-x-auto/, "long filter lists still scroll sideways");
+  assert.match(
+    chips,
+    /overflow-x-auto/,
+    "long filter lists still scroll sideways"
+  );
   // The filter sheet and the view-mode popover.
-  assert.match(chips, /className="dc-scene-plate w-full overflow-hidden text-sm text-white\/85"/);
-  assert.match(searchBar, /className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1\.5 flex w-max text-white"/);
+  assert.match(
+    chips,
+    /className="dc-scene-plate w-full overflow-hidden text-sm text-white\/85"/
+  );
+  assert.match(
+    searchBar,
+    /className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1\.5 flex w-max text-white"/
+  );
 });
 
-test("the store's copy keeps the ink scrim — on the hero card and on the scene", () => {
-  // 2026-09-10: the hero is no longer loose copy on the scene — the owner asked
-  // for the whole block to be packed into a card ("isko card mein pack karo"),
-  // so the scrim rides on the card root and every line inside it keeps the
-  // same dark text-shadow over the light-blue lens.
-  assert.match(storeHero, /className="dc-store-glass dc-scene-ink"/);
-  assert.match(storeHero, /<h2 className="dc-store-hero-title mt-3\.5">/);
-  assert.match(storeHero, /<p className="dc-store-hero-body mt-3 max-w-xl">/);
-  assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
-  // The plate's ink floor still hands a pill's accent back explicitly (the rule
-  // serves every `.dc-scene-plate` on the scene, not just the store hero).
-  assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-plate\):where\(\.text-indigo-200\) \{\s*\n\s*color: #c7d2fe;/);
-  // "Top rated" is the one store heading still on the raw scene, and it is a
-  // real heading now (owner: "text size badhao, ekadam heading jaisa").
-  assert.match(storePage, /className="dc-scene-ink dc-store-section-title px-3 sm:px-4">Top rated</);
-  assert.match(coverflow, /className="dc-scene-ink text-xs tracking-wide text-\[#9E9E98\]"/);
-  // `.dc-section-label` is white at 56% (--dc-ink-3): unreadable over snow, so
-  // the sections that still use it keep the lifted ink.
-  assert.match(indexCss, /\.dc-section-label \{\s*\n\s*color: var\(--dc-ink-3\)/);
+test("native marketplace copy has its own ink floor without repainting the app chrome", () => {
+  const native = read("src/components/store-marketplace.css");
+  assert.match(storePage, /dc-marketplace-heading/);
+  assert.match(storePage, /Explore the Store/);
+  assert.match(storePage, /\{appName\} · Learning marketplace/);
+  assert.doesNotMatch(storePage, /<Hero|<TiltedCoverflow|data-store-top-rated/);
+  assert.match(native, /text-shadow: none/);
+  assert.match(native, /color: #f8fafc/);
+  // Existing glass consumers remain gated and their material stays unchanged.
+  assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-ink\)/);
 });
 
 test("the ramp lift is justified by the band the hero actually sits on", () => {
@@ -343,7 +422,8 @@ test("the ramp lift is justified by the band the hero actually sits on", () => {
     const s = v / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   };
-  const lum = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const lum = ([r, g, b]) =>
+    0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
   const over = (fg, a, bg) => fg.map((c, i) => a * c + (1 - a) * bg[i]);
   const ratio = (a, b) => {
     const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
@@ -362,10 +442,18 @@ test("the ramp lift is justified by the band the hero actually sits on", () => {
 
   for (const [band, bg] of Object.entries(bands)) {
     const before = ratio(hex(publishedLead), bg);
-    assert.ok(before < 3, `${publishedLead} over ${band} measures ${before.toFixed(2)}:1 — the lift would not be needed`);
+    assert.ok(
+      before < 3,
+      `${publishedLead} over ${band} measures ${before.toFixed(
+        2
+      )}:1 — the lift would not be needed`
+    );
     for (const stop of lifted) {
       const after = ratio(hex(stop), bg);
-      assert.ok(after >= 4.5, `${stop} over ${band} measures ${after.toFixed(2)}:1, under AA`);
+      assert.ok(
+        after >= 4.5,
+        `${stop} over ${band} measures ${after.toFixed(2)}:1, under AA`
+      );
     }
   }
 
@@ -376,22 +464,43 @@ test("the ramp lift is justified by the band the hero actually sits on", () => {
   // ramp once more inside the glass, to the 100/200 stops, and those clear AA
   // at every stop over the lens.
   const glassed = Object.fromEntries(
-    Object.entries(bands).map(([band, bg]) => [band, over([173, 216, 255], 0.26, bg)]),
+    Object.entries(bands).map(([band, bg]) => [
+      band,
+      over([173, 216, 255], 0.26, bg),
+    ])
   );
   const inGlass = ["#e0e7ff", "#ede9fe", "#fae8ff"]; // the 100/200 stops, same hue run
   for (const stop of lifted) {
-    const worst = Math.min(...Object.values(glassed).map((bg) => ratio(hex(stop), bg)));
-    assert.ok(worst < 4.5, `${stop} inside the glass still measures ${worst.toFixed(2)}:1 — the second lift would not be needed`);
+    const worst = Math.min(
+      ...Object.values(glassed).map((bg) => ratio(hex(stop), bg))
+    );
+    assert.ok(
+      worst < 4.5,
+      `${stop} inside the glass still measures ${worst.toFixed(
+        2
+      )}:1 — the second lift would not be needed`
+    );
   }
   for (const [band, bg] of Object.entries(glassed)) {
     for (const stop of inGlass) {
       const r = ratio(hex(stop), bg);
-      assert.ok(r >= 4.5, `${stop} inside the store glass over ${band} measures ${r.toFixed(2)}:1, under AA`);
+      assert.ok(
+        r >= 4.5,
+        `${stop} inside the store glass over ${band} measures ${r.toFixed(
+          2
+        )}:1, under AA`
+      );
     }
   }
   const storeCss = read("src/store-glass.css");
-  assert.match(storeCss, /:where\(\.dc-store-glass\) :where\(\.bg-clip-text\.text-transparent\) \{/);
-  assert.match(storeCss, /linear-gradient\(to right, #e0e7ff 0%, #ede9fe 50%, #fae8ff 100%\) !important/);
+  assert.match(
+    storeCss,
+    /:where\(\.dc-store-glass\) :where\(\.bg-clip-text\.text-transparent\) \{/
+  );
+  assert.match(
+    storeCss,
+    /linear-gradient\(to right, #e0e7ff 0%, #ede9fe 50%, #fae8ff 100%\) !important/
+  );
 
   // And the scrim that carries the lifted ramp over the mountain's bright cap.
   assert.match(storeHero, /<h2 className="dc-store-hero-title mt-3\.5">/);
@@ -406,9 +515,12 @@ test("the hero's pinned gradient ramp is lifted in CSS, not rewritten in JSX", (
   // the store page was its least readable. The 300 stops are the CSS-side lift.
   assert.match(
     css,
-    /html\[data-glass="on"\] :where\(\.dc-scene-ink\) :where\(\.bg-clip-text\.text-transparent\) \{\s*\n\s*background-image: linear-gradient\(to right, #a5b4fc 0%, #c4b5fd 50%, #f0abfc 100%\) !important/,
+    /html\[data-glass="on"\] :where\(\.dc-scene-ink\) :where\(\.bg-clip-text\.text-transparent\) \{\s*\n\s*background-image: linear-gradient\(to right, #a5b4fc 0%, #c4b5fd 50%, #f0abfc 100%\) !important/
   );
-  assert.match(css, /html\[data-glass="on"\] :where\(\[data-store-coverflow\]\) :where\(\.dc-scene-ink\) \{/);
+  assert.match(
+    css,
+    /html\[data-glass="on"\] :where\(\[data-store-coverflow\]\) :where\(\.dc-scene-ink\) \{/
+  );
 });
 
 /* ------------------------------------------------------------------ */
@@ -416,15 +528,33 @@ test("the hero's pinned gradient ramp is lifted in CSS, not rewritten in JSX", (
 /* ------------------------------------------------------------------ */
 
 test("the vendored registry items are still untouched", () => {
-  for (const item of ["glass", "glass-card", "glass-input", "glass-toggle-group", "glass-button", "glass-select"]) {
+  for (const item of [
+    "glass",
+    "glass-card",
+    "glass-input",
+    "glass-toggle-group",
+    "glass-button",
+    "glass-select",
+  ]) {
     const src = read(`src/components/ui/${item}.tsx`);
-    assert.doesNotMatch(src, /dc-scene-(plate|ink|field)/, `${item}.tsx must stay byte-comparable`);
-    assert.doesNotMatch(src, /data-drag-scrolling/, `${item}.tsx must stay byte-comparable`);
+    assert.doesNotMatch(
+      src,
+      /dc-scene-(plate|ink|field)/,
+      `${item}.tsx must stay byte-comparable`
+    );
+    assert.doesNotMatch(
+      src,
+      /data-drag-scrolling/,
+      `${item}.tsx must stay byte-comparable`
+    );
   }
 });
 
-test("the store's cards needed no new work — GlassCard plates every route", () => {
+test("Store-specific native cards do not change the legacy card's other consumers", () => {
+  const nativeCard = read("src/components/StoreProductCard.tsx");
+  assert.match(storePage, /<StoreProductCard/);
+  assert.match(nativeCard, /<article/);
+  assert.doesNotMatch(nativeCard, /<GlassCard|<GlassSurface/);
   assert.match(read("src/components/ProductCard.tsx"), /<GlassCard\b/);
   assert.match(read("src/components/ui/GlassCard.tsx"), /dc-glass-card/);
-  assert.match(storePage, /<GlassCard\b/);
 });

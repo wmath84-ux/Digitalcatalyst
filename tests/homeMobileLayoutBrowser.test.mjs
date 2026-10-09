@@ -353,7 +353,7 @@ check("individual modules change the sole price/CTA, include dependencies and re
     await modal.waitFor();
     if (owned) {
       assert.equal(await modal.locator('[data-pdp-module-pick="algebra"]').getAttribute("data-owned"), "true");
-      assert.ok(await modal.locator('[data-pdp-module-pick="algebra"]').isDisabled());
+      assert.ok(await modal.locator('[data-pdp-module-pick="algebra"] input[type="checkbox"]').isDisabled());
       await modal.locator('[data-pdp-module-pick="algebra"]').click({ force: true });
       assert.equal(await modal.locator('[data-pdp-module-pick="algebra"]').getAttribute("data-selected"), "false");
     }

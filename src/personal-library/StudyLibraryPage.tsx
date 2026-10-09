@@ -11,7 +11,7 @@
 //   · every course is a card drawn with the store's own product-card
 //     material, carrying the cover, the title, Play, Edit and Delete
 //     (owner brief 2026-09-29: a self-created course deletes from its card —
-//     through the same profile-card glass the Profile page wears)
+//     through a keyboard-accessible, native confirmation)
 //   · Play opens the SAME Course Player a purchased course opens, on the
 //     modules and practice the learner built.
 //
@@ -19,11 +19,11 @@
 // resource lists, filters or plan-usage panels — because the course itself
 // now carries all of that inside the player.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useRef } from "react";
 import { ArrowLeft, Search, X } from "lucide-react";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
+import ContentDialog from "../components/ui/ContentDialog";
 import { toast } from "../components/ui/glass-toast";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
@@ -38,7 +38,8 @@ import "./study-library-minimal.css";
 
 /** Routes the library navigates to (kept in one place — see appRoutes.ts). */
 export const MY_COURSE_NEW_HASH = "#/my-course/new";
-export const myCoursePlayHash = (courseId: string) => `#/my-course/${encodeURIComponent(courseId)}`;
+export const myCoursePlayHash = (courseId: string) =>
+  `#/my-course/${encodeURIComponent(courseId)}`;
 export const myCourseEditHash = (courseId: string) =>
   `#/my-course/${encodeURIComponent(courseId)}/edit`;
 
@@ -62,14 +63,19 @@ export default function StudyLibraryPage() {
     const needle = query.trim().toLowerCase();
     if (!needle) return myCourses.courses;
     return myCourses.courses.filter((course) =>
-      `${course.title} ${course.description || ""}`.toLowerCase().includes(needle)
+      `${course.title} ${course.description || ""}`
+        .toLowerCase()
+        .includes(needle)
     );
   }, [myCourses.courses, query]);
 
   const totals = useMemo(
     () => ({
       courses: myCourses.courses.length,
-      modules: myCourses.courses.reduce((total, course) => total + countModules(course.modules), 0),
+      modules: myCourses.courses.reduce(
+        (total, course) => total + countModules(course.modules),
+        0
+      ),
       resources: myCourses.courses.reduce(
         (total, course) => total + countResources(course.modules),
         0
@@ -88,23 +94,30 @@ export default function StudyLibraryPage() {
     window.location.hash = myCourseEditHash(course.id);
   }, []);
 
-  // Delete from the card (owner brief 2026-09-29). The card only ASKS — the
-  // course is removed after the confirmation, which wears the exact glass the
-  // Profile page's cards wear. The builder keeps its own Delete for edits.
+  // The card requests deletion; the native dialog keeps the named course,
+  // destructive rule, busy state and retry visible until the write succeeds.
   const [pendingDelete, setPendingDelete] = useState<MyCourse | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deletePendingRef = useRef(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
 
   const requestDelete = useCallback((course: MyCourse) => {
+    setDeleteError("");
     setPendingDelete(course);
   }, []);
 
   const confirmDelete = useCallback(async () => {
-    if (!pendingDelete || deleting) return;
+    if (!pendingDelete || deletePendingRef.current) return;
+    deletePendingRef.current = true;
+    setDeleteError("");
     setDeleting(true);
     try {
       const result = await myCourses.remove(pendingDelete.id);
       if (!result.ok) {
-        toast({ title: "Course was not deleted", description: result.message, variant: "error" });
+        setDeleteError(
+          result.message || "Course was not deleted. Please try again."
+        );
         return;
       }
       setPendingDelete(null);
@@ -115,15 +128,14 @@ export default function StudyLibraryPage() {
         variant: "success",
       });
     } catch {
-      toast({
-        title: "Course was not deleted",
-        description: "Please retry. Your course is still in the library.",
-        variant: "error",
-      });
+      setDeleteError(
+        "Course was not deleted. Please retry. Your course is still in the library."
+      );
     } finally {
+      deletePendingRef.current = false;
       setDeleting(false);
     }
-  }, [deleting, myCourses, pendingDelete]);
+  }, [myCourses, pendingDelete]);
 
   if (!user)
     return (
@@ -134,7 +146,8 @@ export default function StudyLibraryPage() {
           type="button"
           className="dc-account-primary"
           onClick={() => {
-            window.location.hash = "#/auth?mode=login&return=%23%2Fstudy-library";
+            window.location.hash =
+              "#/auth?mode=login&return=%23%2Fstudy-library";
           }}
         >
           Sign in
@@ -144,7 +157,10 @@ export default function StudyLibraryPage() {
 
   return (
     <div data-study-library-page className="min-h-screen text-white">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full flex-col">
+      <div
+        data-app-frame
+        className="relative mx-auto flex min-h-screen w-full flex-col"
+      >
         <Header
           cartCount={cartIds.size}
           notifCount={0}
@@ -175,11 +191,14 @@ export default function StudyLibraryPage() {
             <header className="dc-account-header">
               <div>
                 <h1>My Study Library</h1>
-                <p className="dc-account-note">Courses you create and manage.</p>
+                <p className="dc-account-note">
+                  Courses you create and manage.
+                </p>
                 {myCourses.state === "ready" || myCourses.courses.length > 0 ? (
                   <p data-study-library-count className="dc-account-note">
-                    {totals.courses} course{totals.courses === 1 ? "" : "s"} · {totals.modules}{" "}
-                    module{totals.modules === 1 ? "" : "s"} · {totals.resources} resource
+                    {totals.courses} course{totals.courses === 1 ? "" : "s"} ·{" "}
+                    {totals.modules} module{totals.modules === 1 ? "" : "s"} ·{" "}
+                    {totals.resources} resource
                     {totals.resources === 1 ? "" : "s"}
                   </p>
                 ) : null}
@@ -187,6 +206,7 @@ export default function StudyLibraryPage() {
               <button
                 type="button"
                 data-my-course-create
+                ref={createButtonRef}
                 className="dc-account-primary"
                 onClick={() => {
                   window.location.hash = MY_COURSE_NEW_HASH;
@@ -197,11 +217,18 @@ export default function StudyLibraryPage() {
             </header>
             {myCourses.state === "loading" && myCourses.courses.length === 0 ? (
               <LibrarySkeleton />
-            ) : myCourses.state === "error" && myCourses.courses.length === 0 ? (
+            ) : myCourses.state === "error" &&
+              myCourses.courses.length === 0 ? (
               <section role="alert" className="dc-study-empty">
                 <h2>Your library couldn't load</h2>
-                <p className="dc-account-error">{myCourses.error || "Please retry."}</p>
-                <button type="button" className="dc-account-text-action" onClick={myCourses.reload}>
+                <p className="dc-account-error">
+                  {myCourses.error || "Please retry."}
+                </p>
+                <button
+                  type="button"
+                  className="dc-account-text-action"
+                  onClick={myCourses.reload}
+                >
                   Try again
                 </button>
               </section>
@@ -224,7 +251,11 @@ export default function StudyLibraryPage() {
                       onChange={(event) => setQuery(event.target.value)}
                     />
                     {query ? (
-                      <button type="button" aria-label="Clear search" onClick={() => setQuery("")}>
+                      <button
+                        type="button"
+                        aria-label="Clear search"
+                        onClick={() => setQuery("")}
+                      >
                         <X aria-hidden="true" />
                       </button>
                     ) : null}
@@ -240,7 +271,9 @@ export default function StudyLibraryPage() {
                 ) : courses.length === 0 ? (
                   <section className="dc-study-empty">
                     <h2>No matches</h2>
-                    <p className="dc-account-note">Try a course title or description.</p>
+                    <p className="dc-account-note">
+                      Try a course title or description.
+                    </p>
                   </section>
                 ) : (
                   <div data-my-course-grid className="dc-study-list">
@@ -265,23 +298,53 @@ export default function StudyLibraryPage() {
           onChange={navigateFromBottom}
           purchasesBadge={purchasedIds.size}
         />
-        {/* Card-level delete confirmation — the Profile card glass (tint 0.62 ·
-            rgb(173,216,255) · blur 0 + `.dc-rev-glass`), sized by the shared
-            responsive overlay: full-width sheet on a phone, centred dialog on
-            a tablet / desktop. */}
-        <ConfirmDialog
+        {/* A native confirmation stays open for failed writes and restores
+            focus safely even when an optimistic removal replaced the card. */}
+        <ContentDialog
           open={Boolean(pendingDelete)}
-          material="profile"
+          onClose={() => {
+            if (!deletePendingRef.current) setPendingDelete(null);
+          }}
+          busy={deleting}
+          role="alertdialog"
           title="Delete this course?"
-          message={`“${
+          description={`“${
             pendingDelete?.title || "Untitled course"
           }” and everything inside it will be permanently deleted. This can't be undone.`}
-          confirmLabel={deleting ? "Deleting…" : "Delete"}
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => {
-            if (!deleting) setPendingDelete(null);
-          }}
-        />
+          fallbackFocusRef={createButtonRef}
+          data-my-course-delete-confirm
+          footer={
+            <>
+              <button
+                type="button"
+                className="dc-content-secondary"
+                disabled={deleting}
+                onClick={() => setPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dc-content-primary dc-content-danger"
+                disabled={deleting}
+                aria-busy={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </>
+          }
+        >
+          <p className="dc-content-note">
+            The original courses you purchased are not affected. Only this
+            course in your Study Library is deleted.
+          </p>
+          {deleteError ? (
+            <p role="alert" className="dc-content-error">
+              {deleteError}
+            </p>
+          ) : null}
+        </ContentDialog>
       </div>
     </div>
   );

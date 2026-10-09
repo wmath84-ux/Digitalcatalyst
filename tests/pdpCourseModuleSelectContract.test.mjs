@@ -3,10 +3,22 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const pdp = fs.readFileSync("src/PdpApp.tsx", "utf8");
-const builder = fs.readFileSync("src/components/pdp/PdpPurchaseBuilder.tsx", "utf8");
-const trigger = fs.readFileSync("src/components/pdp/ModuleSelectTrigger.tsx", "utf8");
-const modal = fs.readFileSync("src/components/pdp/ModuleSelectModal.tsx", "utf8");
-const checkout = fs.readFileSync("src/components/checkout/CheckoutReviewStep.tsx", "utf8");
+const builder = fs.readFileSync(
+  "src/components/pdp/PdpPurchaseBuilder.tsx",
+  "utf8"
+);
+const trigger = fs.readFileSync(
+  "src/components/pdp/ModuleSelectTrigger.tsx",
+  "utf8"
+);
+const modal = fs.readFileSync(
+  "src/components/pdp/ModuleSelectModal.tsx",
+  "utf8"
+);
+const checkout = fs.readFileSync(
+  "src/components/checkout/CheckoutReviewStep.tsx",
+  "utf8"
+);
 const quotes = fs.readFileSync("api/_lib/quotes.ts", "utf8");
 const push = fs.readFileSync("utils/webPush.ts", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
@@ -28,42 +40,43 @@ test("product detail offers a clearly labelled individual-purchase module picker
   assert.match(modal, /Select all/);
 });
 
-test("module choices are plain list rows while their checkboxes stay glass", () => {
-  assert.match(modal, /<ul data-pdp-module-list/);
-  assert.match(modal, /className="dc-pdp-module-row"/);
-  assert.doesNotMatch(modal, /<GlassCard/);
-  assert.match(modal, /<GlassCheckbox/);
-  assert.match(modal, /<GlassButton[\s\S]*data-pdp-module-select-confirm/);
-  assert.match(modal, /<GlassInput/);
+test("module choices retain plain native rows, accessible checkboxes, owned state and prerequisites", () => {
+  assert.match(modal, /<ul[\s\S]{0,160}data-pdp-module-list/);
+  assert.match(modal, /className="dc-module-choice"/);
+  assert.doesNotMatch(
+    modal,
+    /<GlassCard|<GlassCheckbox|<GlassButton|<GlassInput/
+  );
+  assert.match(modal, /type="checkbox"/);
+  assert.match(modal, /type="search"/);
+  assert.match(modal, /data-pdp-module-select-confirm/);
+  assert.match(modal, /disabled=\{owned\}/);
+  assert.match(modal, /Requires:/);
+  assert.match(modal, /Already purchased/);
 });
 
 const css = fs.readFileSync("src/index.css", "utf8");
 
 test("PDP module picker is a viewport-capped overlay, not a full-black sheet", () => {
+  const dialog = fs.readFileSync("src/components/ui/ContentDialog.tsx", "utf8");
+  const bounds = fs.readFileSync(
+    "src/components/ui/content-dialog.css",
+    "utf8"
+  );
+  const picker = fs.readFileSync(
+    "src/components/pdp/module-picker.css",
+    "utf8"
+  );
+  assert.match(modal, /<ContentDialog/);
   assert.match(modal, /data-pdp-module-select-overlay/);
-  assert.match(modal, /createPortal/);
-  assert.match(modal, /document\.body/);
-  // Wave 14: the scrim is the pack sheet/dialog scrim (`bg-black/50` +
-  // `backdrop-blur-[2px]`), the same one the subscription gate's GlassSheet
-  // paints — no hand-mixed indigo wash in JSX or CSS.
-  assert.match(modal, /bg-black\/50 p-3 backdrop-blur-\[2px\]/);
-  assert.doesNotMatch(modal, /bg-indigo-950\/30|bg-black\/55/);
-  assert.match(modal, /min-h-0/);
-  assert.doesNotMatch(
-    css,
-    /\[data-pdp-module-select-overlay\][\s\S]{0,240}rgba\(49,\s*46,\s*129,\s*0\.28\)/,
-    "PDP overlay must not paint its own indigo scrim over the pack one",
-  );
-  assert.match(
-    css,
-    /\[data-pdp-module-select-overlay\] \[data-pdp-module-select-modal\] \{\s*width:\s*min\(100%,\s*28rem\)/,
-    "tablet * { max-width: 100% } must not stretch the picker to the full viewport",
-  );
-  assert.match(
-    css,
-    /\[data-pdp-module-select-overlay\] \[data-pdp-module-select-modal\] \{[\s\S]{0,200}max-height:\s*calc\(100vh - 1\.5rem\)/,
-    "the picker card must be height-capped to the viewport",
-  );
+  assert.match(dialog, /Dialog\.Portal/);
+  assert.match(dialog, /onCloseAutoFocus/);
+  assert.match(dialog, /onEscapeKeyDown/);
+  assert.match(dialog, /lockBodyScroll\(\)/);
+  assert.match(bounds, /max-height: calc\(\s*100dvh/);
+  assert.match(bounds, /overflow-y: auto/);
+  assert.match(picker, /max-width: 720px !important/);
+  assert.doesNotMatch(bounds, /backdrop-filter/);
 });
 
 test("checkout proceed is not blocked for paid quotes", () => {

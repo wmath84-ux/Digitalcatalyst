@@ -1,16 +1,16 @@
 import { useMemo, useState, useEffect } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
-import Hero from "./Hero";
-import SearchBar from "./SearchBar";
-import FilterChips from "./FilterChips";
-import ProductCard from "./ProductCard";
-import TiltedCoverflow from "./TiltedCoverflow";
-import { EmptyState } from "./ui/EmptyState";
-import { GlassCard } from "./ui/GlassCard";
-import { GlassButton } from "./ui/glass-button";
-import Skeleton from "./ui/Skeleton";
-import { BookOpenIcon } from "./icons";
+import { Search } from "lucide-react";
+import StoreProductCard from "./StoreProductCard";
+import ContentDialog from "./ui/ContentDialog";
+import { useBranding } from "../context/BrandingContext";
+import {
+  DEFAULT_ADVANCED_FILTERS,
+  type AdvancedFilters,
+} from "./StoreAdvancedFilters";
+import "./store-marketplace.css";
+import useDragScroll from "../hooks/useDragScroll";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
   ALL_STORE_FILTER,
@@ -30,127 +30,27 @@ type StorePageProps = {
   onView: (product: Product) => void;
 };
 
+/* ── Main StorePage ──────────────────────────────────────────────────── */
 
-
-/* ── ProductCard variant for list / rectangular view ──────────────────── */
-
-function ProductCardList({
-  product,
-  wishlisted,
-  inCart,
+export default function StorePage({
+  wishlist,
+  cartIds,
   purchased,
   onToggleWishlist,
   onAddToCart,
   onView,
-}: {
-  product: Product;
-  wishlisted: boolean;
-  inCart: boolean;
-  purchased: boolean;
-  onToggleWishlist: (id: string) => void;
-  onAddToCart: (id: string) => void;
-  onView: (product: Product) => void;
-}) {
-  const discount =
-    product.originalPrice > 0
-      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-      : 0;
-  const unavailable = product.availableForSale === false && !purchased;
-
-  return (
-    <GlassCard
-      onClick={() => onView(product)}
-      contentClassName="flex p-0"
-      /* Same light-blue lens as the square grid card (owner brief 2026-09-10),
-         so switching layout changes the shape and never the material. */
-      tint={0.62}
-      tintColor="173,216,255"
-      blur={0}
-      radius={22}
-      className="dc-store-glass dc-scene-ink group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
-    >
-      {/* Image — left side */}
-      <div className="relative h-auto w-36 shrink-0 overflow-hidden sm:w-44">
-        <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-        <div className="absolute left-2 top-2 flex gap-1">
-          {purchased && (
-            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
-              Purchased
-            </span>
-          )}
-        </div>
-        <GlassButton
-          type="button"
-          aria-label="Toggle wishlist"
-          onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
-          className="absolute right-2 top-2 z-20 [&_.size-12]:size-7"
-        >
-          <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${wishlisted ? "fill-rose-500 text-rose-500" : "fill-none text-white/75"}`} strokeWidth={2} stroke="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
-        </GlassButton>
-      </div>
-
-      {/* Content — right side */}
-      <div className="relative flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-        {/* Same hierarchy contract as the grid card: title leads, proof
-            follows, byline is the quietest line — so switching layouts never
-            changes what the eye reads first. */}
-        <h3 className="text-sm font-extrabold leading-[1.35] dc-ink-1 sm:text-[15px]">{product.title}</h3>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="inline-flex items-center gap-1">
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 text-amber-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-            <span className="text-xs font-bold dc-ink-1">{product.rating.toFixed(1)}</span>
-            <span className="text-xs dc-ink-3">({product.reviews})</span>
-          </span>
-          {product.reviews >= 25 ? <span className="dc-proof">🔥 Popular</span> : null}
-        </div>
-        <p className="text-xs font-medium dc-ink-3">by {product.instructor}</p>
-        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-1">
-          {product.originalPrice > product.price && (
-            <span className="text-xs dc-anchor-price">₹{product.originalPrice}</span>
-          )}
-          <span className="text-lg dc-hero-price">₹{product.price}</span>
-          {discount > 0 && (
-            <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
-          )}
-        </div>
-        {/* Wave 10: terminal states are flat meaning-colour plates (amber /
-            emerald, same rule as the grid card); the actionable state is the
-            solid indigo primary capsule. */}
-        {purchased || inCart || unavailable ? (
-          <div
-            className={`mt-1 flex w-full cursor-default items-center justify-center rounded-full border px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide ${
-              unavailable ? "border-amber-400/30 bg-amber-500/20 text-amber-200" : "border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
-            }`}
-          >
-            {purchased ? "Purchased" : unavailable ? "Not for sale" : "In Cart"}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onAddToCart(product.id); }}
-            className="dc-focusable mt-1 flex w-full items-center justify-center rounded-full bg-indigo-600 px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]"
-          >
-            Add to my cart
-          </button>
-        )}
-      </div>
-    </GlassCard>
-  );
-}
-
-/* ── Main StorePage ──────────────────────────────────────────────────── */
-
-export default function StorePage({ wishlist, cartIds, purchased, onToggleWishlist, onAddToCart, onView }: StorePageProps) {
+}: StorePageProps) {
   const { products, loading, error } = useCatalog();
   const { filters: adminFilters } = useStoreFilters();
+  const { appName } = useBranding();
+  const chipDrag = useDragScroll<HTMLDivElement>();
+  const [filterOpen, setFilterOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  // Advanced filters — new per user request, moved to top row left of Recommended
-  const [advancedFilters, setAdvancedFilters] = useState<import("./StoreAdvancedFilters").AdvancedFilters>({
+  // Native advanced filters preserve all catalog and ownership constraints.
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     priceRange: "all",
     rating: "all",
     category: "all",
@@ -169,25 +69,33 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   }, [adminFilters, products]);
 
   const activeFilter = useMemo(
-    () => chips.find((filter) => filter.id === activeFilterId) || ALL_STORE_FILTER,
-    [chips, activeFilterId],
+    () =>
+      chips.find((filter) => filter.id === activeFilterId) || ALL_STORE_FILTER,
+    [chips, activeFilterId]
   );
 
   useEffect(() => {
-    if (activeFilterId !== ALL_STORE_FILTER.id && !chips.some((filter) => filter.id === activeFilterId)) {
+    if (
+      activeFilterId !== ALL_STORE_FILTER.id &&
+      !chips.some((filter) => filter.id === activeFilterId)
+    ) {
       setActiveFilterId(ALL_STORE_FILTER.id);
     }
   }, [chips, activeFilterId]);
 
   const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
     let list = products.filter((p) => {
+      const price = p.isFree === true ? 0 : p.price;
       const matchesSearch =
-        !search.trim() ||
-        p.title.toLowerCase().includes(search.toLowerCase()) ||
-        p.subject.toLowerCase().includes(search.toLowerCase()) ||
-        p.instructor.toLowerCase().includes(search.toLowerCase()) ||
-        p.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase())) ||
-        (p.searchKeywords || []).some((keyword) => keyword.toLowerCase().includes(search.toLowerCase()));
+        !query ||
+        p.title.toLowerCase().includes(query) ||
+        p.subject.toLowerCase().includes(query) ||
+        p.instructor.toLowerCase().includes(query) ||
+        p.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+        (p.searchKeywords || []).some((keyword) =>
+          keyword.toLowerCase().includes(query)
+        );
 
       const matchesChip = productMatchesStoreFilter(p, activeFilter);
 
@@ -195,236 +103,361 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       let matchesAdvanced = true;
       // Price range
       if (advancedFilters.priceRange !== "all") {
-        if (advancedFilters.priceRange === "free") matchesAdvanced = matchesAdvanced && (p.isFree || p.price === 0);
-        else if (advancedFilters.priceRange === "under500") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 500;
-        else if (advancedFilters.priceRange === "under1000") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 1000;
-        else if (advancedFilters.priceRange === "under2000") matchesAdvanced = matchesAdvanced && p.price > 0 && p.price < 2000;
-        else if (advancedFilters.priceRange === "premium") matchesAdvanced = matchesAdvanced && p.price >= 2000;
+        if (advancedFilters.priceRange === "free")
+          matchesAdvanced = matchesAdvanced && (p.isFree || price === 0);
+        else if (advancedFilters.priceRange === "under500")
+          matchesAdvanced = matchesAdvanced && price > 0 && price < 500;
+        else if (advancedFilters.priceRange === "under1000")
+          matchesAdvanced = matchesAdvanced && price > 0 && price < 1000;
+        else if (advancedFilters.priceRange === "under2000")
+          matchesAdvanced = matchesAdvanced && price > 0 && price < 2000;
+        else if (advancedFilters.priceRange === "premium")
+          matchesAdvanced = matchesAdvanced && price >= 2000;
       }
       // Rating
       if (advancedFilters.rating !== "all") {
         const minRating = parseFloat(advancedFilters.rating);
-        if (!isNaN(minRating)) matchesAdvanced = matchesAdvanced && p.rating >= minRating;
+        if (!isNaN(minRating))
+          matchesAdvanced = matchesAdvanced && p.rating >= minRating;
       }
       // Category
       if (advancedFilters.category !== "all") {
-        matchesAdvanced = matchesAdvanced && p.category === advancedFilters.category;
+        matchesAdvanced =
+          matchesAdvanced && p.category === advancedFilters.category;
       }
       // Availability
       if (advancedFilters.availability !== "all") {
-        if (advancedFilters.availability === "free") matchesAdvanced = matchesAdvanced && (p.isFree || p.price === 0);
-        else if (advancedFilters.availability === "paid") matchesAdvanced = matchesAdvanced && !p.isFree && p.price > 0;
-        else if (advancedFilters.availability === "purchased") matchesAdvanced = matchesAdvanced && purchased.has(p.id);
-        else if (advancedFilters.availability === "not-purchased") matchesAdvanced = matchesAdvanced && !purchased.has(p.id);
+        if (advancedFilters.availability === "free")
+          matchesAdvanced = matchesAdvanced && (p.isFree || price === 0);
+        else if (advancedFilters.availability === "paid")
+          matchesAdvanced = matchesAdvanced && !p.isFree && price > 0;
+        else if (advancedFilters.availability === "purchased")
+          matchesAdvanced = matchesAdvanced && purchased.has(p.id);
+        else if (advancedFilters.availability === "not-purchased")
+          matchesAdvanced = matchesAdvanced && !purchased.has(p.id);
       }
 
       return matchesSearch && matchesChip && matchesAdvanced;
     });
 
     list = [...list];
-    if (sort === "Price: Low to High") list.sort((a, b) => a.price - b.price);
-    if (sort === "Price: High to Low") list.sort((a, b) => b.price - a.price);
+    if (sort === "Price: Low to High")
+      list.sort((a, b) => (a.isFree ? 0 : a.price) - (b.isFree ? 0 : b.price));
+    if (sort === "Price: High to Low")
+      list.sort((a, b) => (b.isFree ? 0 : b.price) - (a.isFree ? 0 : a.price));
     if (sort === "Top Rated") list.sort((a, b) => b.rating - a.rating);
     if (sort === "Newest") list.reverse();
 
     return list;
   }, [products, search, activeFilter, sort, advancedFilters, purchased]);
 
+  const activeAdvancedCount = Object.values(advancedFilters).filter(
+    (value) => value !== "all"
+  ).length;
+  const clearFilters = () => {
+    setSearch("");
+    setActiveFilterId(ALL_STORE_FILTER.id);
+    setAdvancedFilters(DEFAULT_ADVANCED_FILTERS);
+  };
+  const card = (product: Product, list = false) => (
+    <StoreProductCard
+      key={product.id}
+      product={product}
+      brandName={appName}
+      list={list}
+      wishlisted={wishlist.has(product.id)}
+      inCart={cartIds.has(product.id)}
+      purchased={purchased.has(product.id)}
+      onToggleWishlist={onToggleWishlist}
+      onAddToCart={onAddToCart}
+      onView={onView}
+    />
+  );
   return (
-    /* No `overflow-hidden` here on purpose: an `overflow` ancestor other
-       than `visible` becomes the sticky element's offset container, which
-       would silently disable the filter bar's sticky behaviour. Every child
-       that can overflow (hero, coverflow, cards) clips itself. */
-    <div data-store-page className="relative pb-6">
-      {/* Phase A: the page paints no ambient wash or orbs of its own — the
-          single fixed Black Ice backdrop is the background on every device. */}
-
-      <Hero resourceCount={filtered.length} />
-
-      {/* AI Canvas Tilted Coverflow — the store's top-rated rail. Slides are
-          ranked by a Bayesian weighted rating (see topRatedSlides) and update
-          automatically whenever the catalog snapshot changes; the source
-          demo's default cards fill the fan until seven products exist.
-          `data-store-top-rated` is the desktop-alignment hook (index.css):
-          the shell zeroes the label's mobile px-4 so the caption lines up
-          with the shell gutter. */}
-      <section aria-label="Top rated" data-store-top-rated className="pt-1 lg:pt-2">
-        {/* A real heading, not a 10px eyebrow (owner brief 2026-09-10: "top
-            rated … text size badhao, ekadam heading jaisa dikhna chahiye").
-            Still loose ink on the scene, so it keeps the `.dc-scene-ink`
-            text-shadow scrim — white at full strength washes out over the snow
-            behind the coverflow without it. The size ramp itself is
-            `.dc-store-section-title` in src/store-glass.css. */}
-        <h2 className="dc-scene-ink dc-store-section-title px-3 sm:px-4">Top rated</h2>
-        <TiltedCoverflow products={products} onOpenProduct={onView} />
-      </section>
-
-      <div className="space-y-4">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          sort={sort}
-          onSortChange={setSort}
-          advancedFilters={advancedFilters}
-          onAdvancedFiltersChange={setAdvancedFilters}
-          resultCount={filtered.length}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-        />
-      </div>
-
-      {/* The bar is a SIBLING of the search wrapper, not a child: a sticky
-          element is confined to its containing block, so inside the old
-          `space-y-4` box (which ends at the bar's own bottom edge) it could
-          only "stick" for ~65 px of scroll. At page level its containing
-          block runs to the end of the product list, so the chips stay
-          reachable the whole time the user browses. The 16 px gap it used to
-          get from `space-y-4` is now an explicit `mt-4`.
-
-          Same chrome plate as the header: this sticky bar painted the pack's
-          10% `--dc-chrome-glass` tint, i.e. nothing visible over the snow the
-          products scroll through. `dc-scene-plate--bar` gives it the shared
-          dark plate + hairline rim + soft drop (src/glass.css), and outranks
-          both the token utilities below and index.css's chrome rule while
-          glass is on. (On desktop, `top` is lifted below the shell's top bar
-          by a shell-scoped rule in index.css — the class list stays `top-0`
-          for the mobile scroller.) */}
-      {/* P2-8: HOLD — store blur/color only to revision+PDP. Store filter bar stays flat chrome (no glass blur), cards keep blur={0}. Revision/PDP retain chrome blur. */}
-      {/* Filter chips bar — now only sliding toggle, Filters button moved to top row left of Recommended per user request, layout toggle moved to top row right of Recommended */}
-      <div data-store-filter-bar className="sticky top-0 z-20 mt-4 border-b border-slate-200/60 bg-white/85 py-2.5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
-          <div className="flex items-center gap-1 pr-3">
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} hideFilterButton />
-            </div>
-          </div>
-      </div>
-
-      {error ? (
-        <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
-      ) : loading ? (
-        /* Dimension-matched skeletons: the store defaults to the Home-ratio
-           grid, so each placeholder is the same 4:3 art + copy stack in the
-           same grid container (`data-store-grid`) the live cards use — zero
-           layout shift when the real list replaces them, at every breakpoint. */
-        <div data-store-gutter data-store-grid data-store-grid-loading aria-busy="true" aria-label="Loading products" className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
-            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex w-full min-h-0 flex-col overflow-hidden [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col">
-              <div className="relative aspect-[4/3] w-full overflow-hidden">
-                <Skeleton width="100%" height="100%" radius={0} />
-              </div>
-              <div className="flex flex-1 flex-col gap-1 p-3">
-                <Skeleton width="92%" height="0.9rem" radius={6} />
-                <Skeleton width="64%" height="0.9rem" radius={6} />
-                <div className="mt-auto">
-                  <Skeleton width="100%" height="2rem" radius={999} />
-                </div>
-              </div>
-            </GlassCard>
+    <section data-store-page data-store-marketplace>
+      <div className="dc-marketplace-layout">
+        <header className="dc-marketplace-heading">
+          <p>{appName} · Learning marketplace</p>
+          <h1>Explore the Store</h1>
+          <span>Courses, notes and resources for your next step.</span>
+        </header>
+        <div className="dc-marketplace-discovery">
+          <label className="dc-marketplace-search">
+            <Search size={20} aria-hidden="true" />
+            <span className="sr-only">Search the Store</span>
+            <input
+              data-store-search-trigger
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search courses, subjects or instructors"
+              aria-label="Search the Store"
+            />
+          </label>
+          <button
+            type="button"
+            data-store-advanced-filter-trigger
+            className="dc-marketplace-control"
+            onClick={() => setFilterOpen(true)}
+          >
+            Filters{activeAdvancedCount ? ` (${activeAdvancedCount})` : ""}
+          </button>
+        </div>
+        <div
+          data-store-filter-bar
+          ref={chipDrag.ref}
+          onPointerDown={chipDrag.onPointerDown}
+          className="dc-marketplace-chips"
+          role="group"
+          aria-label="Catalog categories"
+        >
+          {chips.map((filter) => (
+            <button
+              type="button"
+              key={filter.id}
+              aria-pressed={activeFilter.id === filter.id}
+              onClick={() => setActiveFilterId(filter.id)}
+            >
+              {filter.label}
+            </button>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        /* Educational empty state, on the shared EmptyState card (same
-           light-glacier glass + type as Home and My Purchases): says what
-           happened, why, and gives the user a one-tap way out instead of a
-           dead end. */
-        <EmptyState
-          className="mx-4 mt-6 lg:mx-0"
-          icon={<BookOpenIcon className="h-7 w-7 text-indigo-300" />}
-          title={search.trim() ? `Nothing matched “${search.trim()}”` : "No resources in this filter yet"}
-          body={
-            search.trim()
-              ? "We search titles, subjects, instructors and tags. Try a shorter keyword, or reset the filter to see the full catalog."
-              : "This category has no published resources right now. Switch back to All to browse everything available today."
-          }
-          action={
-            (search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? (
+        <div className="dc-marketplace-toolbar">
+          <p role="status" aria-live="polite">
+            {loading
+              ? "Loading catalog…"
+              : error
+              ? "Catalog unavailable"
+              : `${filtered.length} resource${
+                  filtered.length === 1 ? "" : "s"
+                }`}
+          </p>
+          {search.trim() ||
+          activeFilter.id !== ALL_STORE_FILTER.id ||
+          activeAdvancedCount ? (
+            <button
+              type="button"
+              className="dc-marketplace-text-action"
+              onClick={clearFilters}
+            >
+              Clear filters
+            </button>
+          ) : null}
+          <div className="dc-marketplace-arrange">
+            <label>
+              <span className="sr-only">Sort products</span>
+              <select
+                data-store-sort
+                aria-label="Sort products"
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+              >
+                {[
+                  "Recommended",
+                  "Price: Low to High",
+                  "Price: High to Low",
+                  "Top Rated",
+                  "Newest",
+                ].map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">Product layout</span>
+              <select
+                data-store-view-selector
+                aria-label="Product layout"
+                value={viewMode}
+                onChange={(event) =>
+                  setViewMode(event.target.value as ViewMode)
+                }
+              >
+                <option value="grid">Grid</option>
+                <option value="list">List</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        {error ? (
+          <div role="alert" className="dc-marketplace-state">
+            <h2>Catalog could not be loaded</h2>
+            <p>{error}</p>
+            <button
+              type="button"
+              className="dc-marketplace-text-action"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
+          <div
+            data-store-grid
+            data-store-grid-loading
+            className="dc-marketplace-grid"
+            aria-busy="true"
+            aria-label="Loading products"
+          >
+            {Array.from({ length: 6 }, (_, index) => (
+              <div
+                key={index}
+                className="dc-marketplace-skeleton"
+                aria-hidden="true"
+              />
+            ))}
+          </div>
+        ) : !filtered.length ? (
+          <div className="dc-marketplace-state">
+            <h2>
+              {products.length
+                ? "No matching resources"
+                : "The catalog is being prepared"}
+            </h2>
+            <p>
+              {products.length
+                ? "Try another search or clear the filters."
+                : "Published courses and study resources will appear here."}
+            </p>
+            {products.length ? (
               <button
                 type="button"
-                onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
-                className="dc-focusable mt-1 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500"
+                className="dc-marketplace-text-action"
+                onClick={clearFilters}
               >
                 Show all resources
               </button>
-            ) : null
-          }
-        />
-      ) : viewMode === "list" ? (
-        /* ── Rectangular cards / list view ── */
-        <div data-store-gutter data-store-list className="flex flex-col gap-2 px-3 pt-3 sm:px-4 sm:pt-4">
-          {filtered.map((product) => (
-            <ProductCardList
-              key={product.id}
-              product={product}
-              wishlisted={wishlist.has(product.id)}
-              inCart={cartIds.has(product.id)}
-              purchased={purchased.has(product.id)}
-              onToggleWishlist={onToggleWishlist}
-              onAddToCart={onAddToCart}
-              onView={onView}
-            />
+            ) : null}
+          </div>
+        ) : viewMode === "list" ? (
+          <div data-store-list className="dc-marketplace-list">
+            {filtered.map((product) => card(product, true))}
+          </div>
+        ) : (
+          <div
+            data-store-grid={viewMode === "grid" ? "" : undefined}
+            data-store-mixed={viewMode === "mixed" ? "" : undefined}
+            className={`dc-marketplace-grid ${
+              viewMode === "mixed" ? "is-mixed" : ""
+            }`}
+          >
+            {filtered.map((product, index) =>
+              viewMode === "mixed" && index % 3 === 0 ? (
+                <div
+                  key={product.id}
+                  className="dc-marketplace-feature"
+                  data-store-mixed-feature
+                >
+                  {card(product, true)}
+                </div>
+              ) : (
+                card(product)
+              )
+            )}
+          </div>
+        )}
+      </div>
+      <ContentDialog
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter the Store"
+        description="Choose the resources you want to see."
+        data-store-advanced-filters
+        footer={
+          <>
+            <button
+              type="button"
+              className="dc-content-secondary"
+              onClick={() => setAdvancedFilters(DEFAULT_ADVANCED_FILTERS)}
+            >
+              Reset filters
+            </button>
+            <button
+              type="button"
+              className="dc-content-primary"
+              onClick={() => setFilterOpen(false)}
+            >
+              Show results
+            </button>
+          </>
+        }
+      >
+        <div className="dc-marketplace-filter-fields">
+          {(
+            [
+              {
+                key: "priceRange",
+                label: "Price",
+                options: [
+                  ["all", "All prices"],
+                  ["free", "₹0 · Free"],
+                  ["under500", "Under ₹500"],
+                  ["under1000", "Under ₹1,000"],
+                  ["under2000", "Under ₹2,000"],
+                  ["premium", "₹2,000 and above"],
+                ],
+              },
+              {
+                key: "rating",
+                label: "Rating",
+                options: [
+                  ["all", "All ratings"],
+                  ["4.5", "4.5 and above"],
+                  ["4", "4 and above"],
+                  ["3.5", "3.5 and above"],
+                  ["3", "3 and above"],
+                ],
+              },
+              {
+                key: "category",
+                label: "Resource type",
+                options: [
+                  ["all", "All types"],
+                  ...["Course", "Notes", "PDF", "E-book", "Live"].map(
+                    (value) => [value, value]
+                  ),
+                ],
+              },
+              {
+                key: "availability",
+                label: "Access",
+                options: [
+                  ["all", "All resources"],
+                  ["free", "Free"],
+                  ["paid", "Paid"],
+                  ["purchased", "Purchased"],
+                  ["not-purchased", "Not purchased"],
+                ],
+              },
+            ] as {
+              key: keyof AdvancedFilters;
+              label: string;
+              options: string[][];
+            }[]
+          ).map((field) => (
+            <label key={field.key}>
+              <span>{field.label}</span>
+              <select
+                aria-label={field.label}
+                value={advancedFilters[field.key]}
+                onChange={(event) =>
+                  setAdvancedFilters((current) => ({
+                    ...current,
+                    [field.key]: event.target.value,
+                  }))
+                }
+              >
+                {field.options.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           ))}
         </div>
-      ) : viewMode === "mixed" ? (
-        /* ── Mixed view: every 3rd item is a full-row featured card, the rest
-           flow in the grid. One flat container at every breakpoint (the old
-           per-pair wrappers were overridden by the desktop `data-store-grid`
-           auto-fill rule, which left two cards stranded in empty tracks).
-           Mobile: grid-cols-2 with the featured card spanning both tracks —
-           identical to the old pair behaviour. Desktop (index.css): the same
-           auto-fill columns as the grid view. */
-        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
-          {filtered.map((product, index) =>
-            index % 3 === 0 ? (
-              /* Featured card. The wrapper is `flex` so the horizontal card
-                 stretches to the row height (set by the taller vertical
-                 cards beside it) instead of floating with dead space under
-                 it. */
-              <div key={product.id} data-store-mixed-feature className="col-span-2 flex">
-                <ProductCardList
-                  product={product}
-                  wishlisted={wishlist.has(product.id)}
-                  inCart={cartIds.has(product.id)}
-                  purchased={purchased.has(product.id)}
-                  onToggleWishlist={onToggleWishlist}
-                  onAddToCart={onAddToCart}
-                  onView={onView}
-                />
-              </div>
-            ) : (
-              <ProductCard
-                key={product.id}
-                product={product}
-                wishlisted={wishlist.has(product.id)}
-                inCart={cartIds.has(product.id)}
-                purchased={purchased.has(product.id)}
-                onToggleWishlist={onToggleWishlist}
-                onAddToCart={onAddToCart}
-                onView={onView}
-              />
-            ),
-          )}
-        </div>
-      ) : (
-        /* ── Default grid view: Home-ratio glass cards ──
-           Same column/gap rhythm as Home trending (`grid-cols-2 gap-3
-           sm:grid-cols-3 md:gap-4`). Tablet/desktop auto-fill lives in
-           index.css under `[data-store-grid]` so it stays in lockstep with
-           `[data-home-grid]`. */
-        <div data-store-gutter data-store-grid className="grid grid-cols-2 gap-3 px-3 pt-3 sm:grid-cols-3 sm:px-4 sm:pt-4 md:gap-4">
-          {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              wishlisted={wishlist.has(product.id)}
-              inCart={cartIds.has(product.id)}
-              purchased={purchased.has(product.id)}
-              onToggleWishlist={onToggleWishlist}
-              onAddToCart={onAddToCart}
-              onView={onView}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      </ContentDialog>
+    </section>
   );
 }
