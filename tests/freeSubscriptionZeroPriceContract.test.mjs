@@ -72,12 +72,17 @@ test("a ₹0 plan produces a ₹0 line but still carries the plan entitlement", 
 });
 
 test("zero-priced features are free items, not invalid config", () => {
-  assert.equal(isFeaturePayable({ id: "f", name: "F", included: false, pricePaise: 0, active: true }), true);
+  assert.equal(
+    isFeaturePayable({ id: "f", name: "F", included: false, pricePaise: 0, active: true }),
+    true
+  );
   const verdict = validateSubscriptionSelection({
     plan: freePlan(),
     cycle: "monthly",
     selectedFeatureIds: ["f"],
-    featureRecords: [{ id: "f", name: "Free thing", included: false, pricePaise: 0, active: true, sortOrder: 0 }],
+    featureRecords: [
+      { id: "f", name: "Free thing", included: false, pricePaise: 0, active: true, sortOrder: 0 },
+    ],
   });
   assert.equal(verdict.ok, true, verdict.reason || "");
 });
@@ -136,7 +141,9 @@ test("a free plan with a PAID add-on still charges the add-on", () => {
       plan: freePlan(),
       cycle: "monthly",
       selectedFeatureIds: ["ai"],
-      featureRecords: [{ id: "ai", name: "AI", included: false, pricePaise: 49900, active: true, sortOrder: 0 }],
+      featureRecords: [
+        { id: "ai", name: "AI", included: false, pricePaise: 49900, active: true, sortOrder: 0 },
+      ],
     }),
   });
   assert.equal(out.ok, true, out.reason || "");
@@ -168,19 +175,22 @@ test("owned beats free: an already-owned selection never shows the free CTA", ()
   assert.match(cta.label, /Subscribed/);
 });
 
-test("the subscribe bar renders FREE for a ₹0 total", () => {
+test("Free subscriptions retain numeric zero and the shared ownership/free checkout decision", () => {
   const bar = read("src/subscription/components/SubscribeBar.tsx");
-  assert.match(bar, /const isFreeSelection = totalPaise <= 0/);
-  assert.match(bar, /data-subscription-free=/);
-  assert.match(bar, /freeSelection: isFreeSelection/);
+  assert.match(bar, /freeSelection: totalPaise <= 0/);
+  assert.match(bar, /resolveSubscribeCta/);
+  const summary = read("src/subscription/components/PriceSummary.tsx");
+  assert.match(summary, /data-subscription-free=/);
+  assert.match(summary, /formatSubscriptionMoney\(totalPaise\)/);
 });
 
-test("the plan overview and order summary show Free instead of ₹0", () => {
-  const overview = read("src/subscription/components/PlanOverview.tsx");
-  assert.match(overview, /data-subscription-plan-free=/);
+test("Plan prices and summaries show numeric ₹0 and preserve paise", () => {
+  const picker = read("src/subscription/components/MinimalPlanPicker.tsx");
   const summary = read("src/subscription/components/PriceSummary.tsx");
-  assert.match(summary, /data-subscription-total-free=/);
-  assert.match(summary, /basePricePaise <= 0/);
+  assert.match(picker, /formatSubscriptionMoney as money/);
+  assert.match(summary, /₹\$\{/);
+  assert.match(summary, /maximumFractionDigits: 2/);
+  assert.match(summary, /data-subscription-total/);
 });
 
 test("the subscription page derives isFreeSelection from subtotal + min payable and hides promo inputs", () => {
@@ -204,12 +214,18 @@ test("create-order routes a ₹0 quote through the FREE- intent branch", () => {
 
 test("verify-payment refuses `free: true` for an intent that is not a free intent", () => {
   const verify = read("api/razorpay/verify-payment.ts");
-  assert.match(verify, /const intentIsFree = intent\.free === true \|\| Number\(intent\.amountPaise \|\| 0\) === 0/);
+  assert.match(
+    verify,
+    /const intentIsFree = intent\.free === true \|\| Number\(intent\.amountPaise \|\| 0\) === 0/
+  );
   assert.match(verify, /if \(!intentIsFree\)/);
   assert.match(verify, /not a free order/i);
 });
 
-test("the free path grants the subscription with source \"free\"", () => {
+test('the free path grants the subscription with source "free"', () => {
   const verify = read("api/razorpay/verify-payment.ts");
-  assert.match(verify, /grantSubscriptionFromQuote\(\{\s*quote,\s*orderId,\s*paymentId: null,\s*source: "free",\s*\}\)/);
+  assert.match(
+    verify,
+    /grantSubscriptionFromQuote\(\{\s*quote,\s*orderId,\s*paymentId: null,\s*source: "free",\s*\}\)/
+  );
 });

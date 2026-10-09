@@ -19,7 +19,10 @@ const revisionApp = fs.readFileSync("src/revision/RevisionApp.tsx", "utf8");
 const premiumGate = fs.readFileSync("src/components/subscription/PremiumGate.tsx", "utf8");
 const useRevisionAccess = fs.readFileSync("src/hooks/useRevisionAccess.ts", "utf8");
 const fallback = fs.readFileSync("src/subscription/data/fallbackCatalog.ts", "utf8");
-const subscriptionPage = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
+const subscriptionPage = fs.readFileSync(
+  "src/subscription/components/SubscriptionPage.tsx",
+  "utf8"
+);
 const featureModal = fs.readFileSync("src/subscription/components/FeatureSelectModal.tsx", "utf8");
 const adminClient = fs.readFileSync("src/lib/admin/client.ts", "utf8");
 const serverSubscriptions = fs.readFileSync("api/_lib/subscriptions.ts", "utf8");
@@ -40,7 +43,10 @@ test("revision access mirrors the My Day gate against the revision feature doc",
   // Missing/inactive feature doc removes the gate (feature becomes free).
   // Phase-1 reads the snapshot into a typed `data` variable and computes
   // `featureConfigured` + `visibilityMode` together.
-  assert.match(useRevisionAccess, /featureConfigured\s*=\s*snapshot\.exists\(\)\s*&&\s*data\.active\s*!==\s*false/);
+  assert.match(
+    useRevisionAccess,
+    /featureConfigured\s*=\s*snapshot\.exists\(\)\s*&&\s*data\.active\s*!==\s*false/
+  );
 });
 
 test("RevisionApp gates create actions with the shared floating premium gate", () => {
@@ -56,11 +62,26 @@ test("RevisionApp gates create actions with the shared floating premium gate", (
   assert.match(revisionApp, /if \(hasAccess\) return true;/);
   assert.match(revisionApp, /setPaywallOpen\(true\)/);
   assert.match(revisionApp, /onRequireAccess=\{requireAccess\}/);
-  assert.match(revisionApp, /case "bank":[\s\S]{0,140}<TestBankPage uid=\{uid\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
-  assert.match(revisionApp, /case "ai-generate":[\s\S]{0,180}<AiGeneratePage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
-  assert.match(revisionApp, /case "bulk-import":[\s\S]{0,180}<BulkImportPage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/);
-  const testPlayerBranch = revisionApp.slice(revisionApp.indexOf('case "test-play":'), revisionApp.indexOf('case "test-result":'));
-  const studySessionBranch = revisionApp.slice(revisionApp.indexOf('case "session":'), revisionApp.indexOf('case "weak-topics":'));
+  assert.match(
+    revisionApp,
+    /case "bank":[\s\S]{0,140}<TestBankPage uid=\{uid\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/
+  );
+  assert.match(
+    revisionApp,
+    /case "ai-generate":[\s\S]{0,180}<AiGeneratePage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/
+  );
+  assert.match(
+    revisionApp,
+    /case "bulk-import":[\s\S]{0,180}<BulkImportPage uid=\{uid\} route=\{route\.hash\} hasAccess=\{hasAccess\} onRequireAccess=\{requireAccess\}/
+  );
+  const testPlayerBranch = revisionApp.slice(
+    revisionApp.indexOf('case "test-play":'),
+    revisionApp.indexOf('case "test-result":')
+  );
+  const studySessionBranch = revisionApp.slice(
+    revisionApp.indexOf('case "session":'),
+    revisionApp.indexOf('case "weak-topics":')
+  );
   assert.doesNotMatch(testPlayerBranch, /requireAccess|onRequireAccess/);
   assert.doesNotMatch(studySessionBranch, /requireAccess|onRequireAccess/);
   // The gate lives on the existing route — #/revision still mounts the app.
@@ -87,13 +108,15 @@ test("the premium gate pushes buyers to the subscription page", () => {
 test("Revision is a first-class selectable feature with default selection", () => {
   assert.match(subscriptionPage, /const defaultFeatureIds = \["my-day", "revision"\]/);
   assert.match(subscriptionPage, /defaultFeatureIds\.filter/);
-  assert.match(subscriptionPage, /if \(featureId === "revision"\) window\.location\.hash = "#\/revision"/);
+  assert.match(subscriptionPage, /<FeatureSelectModal[\s\S]*?features=\{features\}/);
 });
 
-test("the feature picker renders the revision icons", () => {
-  assert.match(featureModal, /brain: <Brain/);
-  assert.match(featureModal, /"refresh-cw": <RefreshCw/);
-  assert.match(featureModal, /brain: "bg-indigo-500\/15 text-indigo-300"/);
+test("The feature picker identifies features by real names, descriptions and accessible checkboxes", () => {
+  assert.match(featureModal, /feature\.name/);
+  assert.match(featureModal, /feature\.description/);
+  assert.match(featureModal, /data-subscription-feature-pick/);
+  assert.match(featureModal, /type="checkbox"/);
+  assert.doesNotMatch(featureModal, /ICON_MAP|<GlassTile/);
 });
 
 // ---------------------------------------------------------------------------

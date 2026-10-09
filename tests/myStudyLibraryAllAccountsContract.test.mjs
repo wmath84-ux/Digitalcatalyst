@@ -66,28 +66,19 @@ const sharedDoc = await import("../utils/myCourseDoc.js");
 // ---------------------------------------------------------------------------
 
 test("My Study Library has no admin-only gate anywhere in the client path", () => {
-  // Comments are stripped first: these files DOCUMENT the admin catch-all they
-  // are defending against, and a mention in a comment is not a code path.
   const code = (source) =>
     source
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .split("\n")
       .map((line) => line.replace(/\/\/.*$/, ""))
       .join("\n");
-
-  for (const [label, source] of [
-    ["the shelf page", page],
-    ["the library controller", hook],
-    ["the storage layer", client],
-  ]) {
-    const codeOnly = code(source);
-    assert.doesNotMatch(codeOnly, /isAdmin/, `${label} must not branch on an admin role`);
-    assert.doesNotMatch(codeOnly, /role === "admin"/, `${label} must not branch on an admin role`);
-    assert.doesNotMatch(codeOnly, /wmath84@gmail\.com/, `${label} must not hard-code the developer's account`);
-    assert.doesNotMatch(codeOnly, /APPROVED_ADMIN_EMAIL/, `${label} must not hard-code the developer's account`);
+  for (const source of [page, hook, client]) {
+    assert.doesNotMatch(
+      code(source),
+      /isAdmin|role === "admin"|APPROVED_ADMIN_EMAIL|wmath84@gmail\.com/
+    );
   }
-  // The only gate is "are you signed in" — which is the same for everyone.
-  assert.match(page, /if \(!user\) \{/);
+  assert.match(page, /if \(!user\)/);
   assert.match(hook, /const uid = user\?\.id \|\| null;/);
 });
 
@@ -111,11 +102,17 @@ test("entitlements is readable by its owner — it was falling through to the ad
   const start = rules.indexOf("match /entitlements/{entitlementId} {");
   assert.ok(start > 0, "no entitlements rule: only an admin could resolve owned courses");
   const block = rules.slice(start, start + 600);
-  assert.match(block, /allow read: if isAdmin\(\)\n\s*\|\| \(signedIn\(\) && resource\.data\.uid == request\.auth\.uid\);/);
+  assert.match(
+    block,
+    /allow read: if isAdmin\(\)\n\s*\|\| \(signedIn\(\) && resource\.data\.uid == request\.auth\.uid\);/
+  );
   // Writes stay server-only: no client may ever grant itself a course.
   assert.match(block, /allow write: if false;/);
   // Course access was silently refused for non-admins.
-  assert.match(read("src/hooks/useCourseAccess.ts"), /query\(collection\(db, "entitlements"\), where\("uid", "==", uid\)\)/);
+  assert.match(
+    read("src/hooks/useCourseAccess.ts"),
+    /query\(collection\(db, "entitlements"\), where\("uid", "==", uid\)\)/
+  );
 });
 
 test("the admin catch-all is still the LAST rule, and the workflow keeps the rules deployed", () => {
@@ -134,7 +131,10 @@ test("the admin catch-all is still the LAST rule, and the workflow keeps the rul
   assert.match(workflow, /--project my-website-761e9/);
   // Storage already lets any signed-in learner write the community bucket the
   // cover / resource uploads use — that half was never admin-only.
-  assert.match(serverRules, /match \/community\/\{allPaths=\*\*\} \{\n\s*allow read, write: if signedIn\(\);/);
+  assert.match(
+    serverRules,
+    /match \/community\/\{allPaths=\*\*\} \{\n\s*allow read, write: if signedIn\(\);/
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,10 @@ test("the admin catch-all is still the LAST rule, and the workflow keeps the rul
 
 test("the server handler authorises from the VERIFIED token, never from the body", () => {
   assert.match(handler, /const \{ uid \} = await requireFirebaseUser\(req\);/);
-  assert.match(handler, /db\.collection\("users"\)\.doc\(uid\)\.collection\(MY_COURSES_COLLECTION\)/);
+  assert.match(
+    handler,
+    /db\.collection\("users"\)\.doc\(uid\)\.collection\(MY_COURSES_COLLECTION\)/
+  );
   // The Admin SDK path still enforces the caps: rules are bypassed, so this
   // module is the only thing standing between a browser and a 1 MB document.
   assert.match(handler, /sanitizeMyCourseDoc\(uid, body\.course\)/);
@@ -184,9 +187,15 @@ test("the route is a rewrite onto the deployed function, not a 13th serverless e
 test("a refused Firestore listener switches the shelf to the server path", () => {
   assert.match(client, /export const isMyCoursesFirestoreBlocked = \(error: unknown\): boolean =>/);
   assert.match(client, /"permission-denied",\n\s*"unauthenticated",\n\s*"failed-precondition",/);
-  assert.match(client, /if \(isMyCoursesFirestoreBlocked\(error\)\) \{\n[\s\S]{0,220}startApiFallback\(error\);/);
+  assert.match(
+    client,
+    /if \(isMyCoursesFirestoreBlocked\(error\)\) \{\n[\s\S]{0,220}startApiFallback\(error\);/
+  );
   assert.match(client, /export function subscribeMyCoursesViaApi\(/);
-  assert.match(client, /export async function listMyCoursesViaApi\(uid: string\): Promise<MyCourse\[\]>/);
+  assert.match(
+    client,
+    /export async function listMyCoursesViaApi\(uid: string\): Promise<MyCourse\[\]>/
+  );
   // The fallback polls, and refreshes at once when the device comes back.
   assert.match(client, /window\.addEventListener\("online", onOnline\);/);
   assert.match(client, /intervalMs = 15000,/);
@@ -194,15 +203,24 @@ test("a refused Firestore listener switches the shelf to the server path", () =>
 
 test("saves and deletes fall back too, so a refused rule can never lose a course", () => {
   // saveMyCourse
-  const save = client.slice(client.indexOf("export async function saveMyCourse"), client.indexOf("/**\n * One-shot read"));
+  const save = client.slice(
+    client.indexOf("export async function saveMyCourse"),
+    client.indexOf("/**\n * One-shot read")
+  );
   assert.match(save, /await setDoc\(courseRef\(uid, clean\.id\), payload, \{ merge: true \}\);/);
   assert.match(save, /if \(!isMyCoursesFirestoreBlocked\(error\)\) throw error;/);
-  assert.match(save, /await myCoursesApi<\{ course\?: unknown \}>\(\{ action: "myCourses\.save", course: clean \}\);/);
+  assert.match(
+    save,
+    /await myCoursesApi<\{ course\?: unknown \}>\(\{ action: "myCourses\.save", course: clean \}\);/
+  );
   // deleteMyCourse
   const remove = client.slice(client.indexOf("export async function deleteMyCourse"));
   assert.match(remove, /action: "myCourses\.delete", courseId/);
   // fetchMyCourses (the player's "Save for later" one-shot read)
-  const fetch = client.slice(client.indexOf("export async function fetchMyCourses"), client.indexOf("export async function deleteMyCourse"));
+  const fetch = client.slice(
+    client.indexOf("export async function fetchMyCourses"),
+    client.indexOf("export async function deleteMyCourse")
+  );
   assert.match(fetch, /return listMyCoursesViaApi\(uid\);/);
 });
 
@@ -211,24 +229,42 @@ test("the fast path returns by itself once Firestore is allowed again", () => {
   assert.match(client, /let firestoreRefusedThisSession = false;/);
   assert.match(client, /if \(firestoreRefusedThisSession\) startApiFallback\(null\);/);
   // …and a Firestore snapshot clears it and stops the polling fallback.
-  assert.match(client, /if \(stopApi\) \{\n\s*stopApi\(\);\n\s*stopApi = null;\n\s*\}\n\s*firestoreRefusedThisSession = false;/);
-  assert.match(client, /export const myCoursesUsingServerPath = \(\): boolean => firestoreRefusedThisSession;/);
+  assert.match(
+    client,
+    /if \(stopApi\) \{\n\s*stopApi\(\);\n\s*stopApi = null;\n\s*\}\n\s*firestoreRefusedThisSession = false;/
+  );
+  assert.match(
+    client,
+    /export const myCoursesUsingServerPath = \(\): boolean => firestoreRefusedThisSession;/
+  );
   // A refusal is recorded with a timestamp, and a one-shot read re-tests
   // Firestore once it goes stale — so the fast path returns even for a learner
   // who never reopens the shelf (the listener above is not running).
-  assert.match(client, /const markFirestoreRefused = \(\): void => \{[\s\S]{0,140}firestoreRefusedAt = Date\.now\(\);/);
-  assert.match(client, /const firestoreRefusedRecently = \(\): boolean =>\n\s*firestoreRefusedThisSession && Date\.now\(\) - firestoreRefusedAt < FIRESTORE_REFUSED_RETRY_MS;/);
+  assert.match(
+    client,
+    /const markFirestoreRefused = \(\): void => \{[\s\S]{0,140}firestoreRefusedAt = Date\.now\(\);/
+  );
+  assert.match(
+    client,
+    /const firestoreRefusedRecently = \(\): boolean =>\n\s*firestoreRefusedThisSession && Date\.now\(\) - firestoreRefusedAt < FIRESTORE_REFUSED_RETRY_MS;/
+  );
   assert.match(client, /if \(firestoreRefusedRecently\(\)\) return listMyCoursesViaApi\(uid\);/);
   assert.equal(client.match(/markFirestoreRefused\(\);/g)?.length, 4);
 });
 
 test("the learner is told what actually refused, in words they can act on", () => {
   assert.match(client, /export const describeMyCoursesError = \(error: unknown\): string =>/);
-  assert.match(hook, /import \{\n\s*deleteMyCourse,\n\s*describeMyCoursesError,\n\s*saveMyCourse,\n\s*subscribeMyCourses,\n\} from "\.\.\/lib\/myCourseClient";/);
+  assert.match(
+    hook,
+    /import \{\n\s*deleteMyCourse,\n\s*describeMyCoursesError,\n\s*saveMyCourse,\n\s*subscribeMyCourses,\n\} from "\.\.\/lib\/myCourseClient";/
+  );
   assert.match(hook, /setError\(describeMyCoursesError\(nextError\)\);/);
   assert.equal(hook.match(/describeMyCoursesError\(writeError\)/g)?.length, 2);
   // Firestore's own text must never reach the learner again.
-  assert.doesNotMatch(hook, /setError\(nextError\.message \|\| "Your library could not be loaded\."\);/);
+  assert.doesNotMatch(
+    hook,
+    /setError\(nextError\.message \|\| "Your library could not be loaded\."\);/
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -252,7 +288,11 @@ test("the server's caps are the client's caps", () => {
     "MY_COURSE_MAX_RESOURCES",
     "MY_COURSE_MAX_DEPTH",
   ]) {
-    assert.equal(sharedDoc[name], clientCap(name), `${name} drifted between the server and the client`);
+    assert.equal(
+      sharedDoc[name],
+      clientCap(name),
+      `${name} drifted between the server and the client`
+    );
   }
   assert.equal(sharedDoc.MY_COURSE_SCHEMA_VERSION, 1);
   assert.equal(sharedDoc.MY_COURSES_COLLECTION, "myCourses");
@@ -279,7 +319,10 @@ test("the server refuses to write without a verified uid or a course id", () => 
   assert.deepEqual(sharedDoc.sanitizeMyCourseDoc("", { id: "course_1" }).ok, false);
   assert.equal(sharedDoc.sanitizeMyCourseDoc("uid1", {}).code, "MISSING_COURSE_ID");
   // Firestore reserves ids wrapped in "__" — the same trap personalCourse hit.
-  assert.equal(sharedDoc.sanitizeMyCourseDoc("uid1", { id: "__library__" }).code, "INVALID_COURSE_ID");
+  assert.equal(
+    sharedDoc.sanitizeMyCourseDoc("uid1", { id: "__library__" }).code,
+    "INVALID_COURSE_ID"
+  );
 });
 
 test("the server sanitises the body uid away and writes the token's", () => {
@@ -296,20 +339,38 @@ test("the server sanitises the body uid away and writes the token's", () => {
 });
 
 test("the tree is depth-, module- and resource-capped before it is written", () => {
-  const deep = { id: "m0", title: "L0", modules: [{ id: "m1", modules: [{ id: "m2", modules: [{ id: "m3", modules: [{ id: "m4", title: "too deep" }] }] }] }] };
+  const deep = {
+    id: "m0",
+    title: "L0",
+    modules: [
+      {
+        id: "m1",
+        modules: [
+          { id: "m2", modules: [{ id: "m3", modules: [{ id: "m4", title: "too deep" }] }] },
+        ],
+      },
+    ],
+  };
   const result = sharedDoc.sanitizeMyCourseDoc("uid1", { id: "course_1", modules: [deep] });
   assert.equal(result.ok, true);
-  const depth = (module) => 1 + (module.modules || []).reduce((max, child) => Math.max(max, depth(child)), 0);
+  const depth = (module) =>
+    1 + (module.modules || []).reduce((max, child) => Math.max(max, depth(child)), 0);
   assert.ok(depth(result.doc.modules[0]) <= sharedDoc.MY_COURSE_MAX_DEPTH);
 
   const many = Array.from({ length: 600 }, (_, index) => ({
     id: `m${index}`,
-    resources: Array.from({ length: 3 }, (_, r) => ({ id: `r${index}-${r}`, type: "youtube", url: "https://youtu.be/x" })),
+    resources: Array.from({ length: 3 }, (_, r) => ({
+      id: `r${index}-${r}`,
+      type: "youtube",
+      url: "https://youtu.be/x",
+    })),
   }));
   const capped = sharedDoc.sanitizeMyCourseDoc("uid1", { id: "course_2", modules: many });
   assert.equal(capped.ok, true);
   assert.ok(capped.doc.modules.length <= sharedDoc.MY_COURSE_MAX_MODULES);
-  assert.ok(sharedDoc.countMyCourseResources(capped.doc.modules) <= sharedDoc.MY_COURSE_MAX_RESOURCES);
+  assert.ok(
+    sharedDoc.countMyCourseResources(capped.doc.modules) <= sharedDoc.MY_COURSE_MAX_RESOURCES
+  );
 });
 
 test("a cover too large for a Firestore document is refused with a real message", () => {

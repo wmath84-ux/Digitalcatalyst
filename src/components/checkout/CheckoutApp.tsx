@@ -19,7 +19,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { GlassButton } from "../ui/glass-button";
+import { CheckoutAction } from "./CheckoutSection";
+import "./checkout-minimal.css";
 import StepIndicator from "../StepIndicator";
 import PaymentGateway, { type VerifiedPayment } from "../PaymentGateway";
 import Header from "../Header";
@@ -31,11 +32,7 @@ import { useBranding } from "../../context/BrandingContext";
 import CheckoutReviewStep from "./CheckoutReviewStep";
 import CheckoutSuccessStep from "./CheckoutSuccessStep";
 
-const STEPS = [
-  { label: "Review", icon: "📋" },
-  { label: "Payment", icon: "💳" },
-  { label: "Done", icon: "✅" },
-];
+const STEPS = [{ label: "Review" }, { label: "Payment" }, { label: "Done" }];
 
 type StepId = 1 | 2 | 3;
 
@@ -78,9 +75,15 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const onPopState = () => {
-      if (typeof document !== "undefined" && document.body.classList.contains("eduvora-razorpay-open")) {
+      if (
+        typeof document !== "undefined" &&
+        document.body.classList.contains("eduvora-razorpay-open")
+      ) {
         return;
       }
+      // Hash navigation also emits popstate. Do not overwrite an intentional
+      // destination (receipt/library/Profile/footer) with the source route.
+      if (window.location.hash && !/^#\/checkout(?:[/?]|$)/.test(window.location.hash)) return;
       goBackRef.current();
     };
     window.addEventListener("popstate", onPopState);
@@ -88,9 +91,15 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   }, []);
 
   const handleProceedToPayment = useCallback(() => {
-    if (!checkout.quote) return;
+    if (
+      !checkout.quote ||
+      checkout.status !== "ready" ||
+      checkout.quote.expiresAt <= Date.now() ||
+      (checkout.quote.status && checkout.quote.status !== "active")
+    )
+      return;
     setStep(2);
-  }, [checkout.quote]);
+  }, [checkout.quote, checkout.status]);
 
   const handlePaymentSuccess = useCallback((payment: VerifiedPayment) => {
     setTransaction(payment);
@@ -128,9 +137,10 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   // server-side from the persisted `ServerPriceQuote`.
   const quote = checkout.quote;
   const selection = checkout.selection;
-  const productName = selection && quote
-    ? quote.verifiedLineItems[0]?.title || selection.productIds[0] || appName
-    : appName;
+  const productName =
+    selection && quote
+      ? quote.verifiedLineItems[0]?.title || selection.productIds[0] || appName
+      : appName;
   const finalPrice = quote?.cashPayable || 0;
   const quoteId = quote?.quoteId || "";
 
@@ -157,24 +167,28 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
 
         <div data-checkout-toolbar className="border-b border-white/10">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <GlassButton
+            <CheckoutAction
               type="button"
               onClick={checkout.goBack}
               className="[&_.size-12]:size-9"
               aria-label="Back to source"
             >
               <ArrowLeft size={16} />
-            </GlassButton>
+            </CheckoutAction>
             <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
-            <span className="text-[10px] font-mono text-white/55">Step {step}/3</span>
+            <span className="dc-checkout-step-count">{step} of 3</span>
           </div>
-          {/* P2-10: checkout step bar — sticky glass parity with store/pdp chrome */}
+          {/* Plain, read-only progress through the three checkout steps. */}
           <div className="px-4 pb-2" data-checkout-stepbar data-step={step}>
-            <StepIndicator currentStep={step} steps={STEPS} />
+            <StepIndicator minimal currentStep={step} steps={STEPS} />
           </div>
         </div>
 
-        <div ref={scrollRef} data-footer-nav-space className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
+        <div
+          ref={scrollRef}
+          data-footer-nav-space
+          className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8"
+        >
           <div data-checkout-content className="flex min-w-0 flex-col gap-3">
             {step === 1 ? (
               <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />

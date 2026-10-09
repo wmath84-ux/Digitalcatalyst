@@ -1,54 +1,30 @@
 // src/components/checkout/CheckoutReviewStep.tsx
 //
-// Mobile-first checkout review page. Reads the canonical CheckoutContext
-// (selection + verified ServerPriceQuote + buyer) and renders:
-//
-//   - purchase type chip
-//   - buyer card (name, email, mobile, Firebase verified state)
-//   - itemised line items (already-owned exclusion visible)
-//   - price section: regular subtotal, sale discount, coupon discount = ₹0,
-//     EduCoin discount = ₹0, cash payable, minimum payable, GST inclusive,
-//     final total
-//   - selection details (modules / resources / update contents /
-//     cart products) — read from the verified line items
-//   - navigation: back to source, edit selection, refresh quote, proceed
-//   - safe recovery UI when the quote is invalid / expired / failed
+// Plain, quote-driven review: buyer identity, individually named items, real
+// price / coupon reductions, payable and minimum rules, selection details,
+// membership scope / expiry, and safe refresh / failure recovery. Financial
+// amounts and access claims come from the verified server quote.
 
-import { useEffect, useMemo, useState } from "react";
-import { GlassCard } from "../ui/GlassCard";
-import { GlassButton } from "../ui/glass-button";
-import { GlassInput } from "../ui/glass-input";
+import { useEffect, useId, useMemo, useState } from "react";
+import CheckoutSection, { CheckoutAction, formatCheckoutMoney } from "./CheckoutSection";
 import { PaymentButton } from "../ui/PaymentButton";
-import {
-  AlertCircle,
-  ArrowLeft,
-  BadgeCheck,
-  CalendarDays,
-  ChevronRight,
-  Info,
-  LoaderCircle,
-  PackageOpen,
-  RefreshCw,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Tag,
-  TicketPercent,
-  Unlock,
-  Wallet,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { apiFetch } from "../../utils/apiBase";
 import type { CheckoutLineItem, ServerPriceQuote } from "../../types/commerce";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
-import { formatPaise } from "../../utils/money";
+import {
+  subscriptionProductFor,
+  subscriptionUnlockName,
+  type SubscriptionDisplayProduct,
+} from "../../subscription/utils/unlockPresentation";
 import { payableBeforeCouponPaise, shouldShowCouponInput } from "../../../utils/couponVisibility";
 
-const formatRupee = formatPaise;
+const formatRupee = formatCheckoutMoney;
 
-const PURCHASE_TYPE_LABEL: Record<string, string> = {
+export const PURCHASE_TYPE_LABEL: Record<string, string> = {
   full_product: "Full course",
   selected_modules: "Selected modules",
   selected_resources: "Selected resources",
@@ -57,17 +33,6 @@ const PURCHASE_TYPE_LABEL: Record<string, string> = {
   free_entitlement: "Free entitlement",
   subscription: "Subscription plan",
   subscription_features: "Subscription add-on",
-};
-
-const PURCHASE_TYPE_ICON: Record<string, typeof ShoppingBag> = {
-  full_product: ShoppingBag,
-  selected_modules: PackageOpen,
-  selected_resources: Unlock,
-  cart_bundle: ShoppingBag,
-  paid_update: BadgeCheck,
-  free_entitlement: Sparkles,
-  subscription: Wallet,
-  subscription_features: Tag,
 };
 
 const RESOURCE_TYPE_LABEL: Record<string, string> = {
@@ -85,37 +50,78 @@ const RESOURCE_TYPE_LABEL: Record<string, string> = {
   mindmap: "Mind map",
 };
 
-export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: () => void; onEdit: () => void }) {
+export default function CheckoutReviewStep({
+  onProceed,
+  onEdit,
+}: {
+  onProceed: () => void;
+  onEdit: () => void;
+}) {
   const checkout = useCheckout();
   const { user } = useAuth();
   const { products: catalogProducts } = useCatalog();
-  const [showDetails, setShowDetails] = useState<boolean>(true);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [expiryClock, setExpiryClock] = useState(() => Date.now());
+  useEffect(() => {
+    const expiresAt = checkout.quote?.expiresAt;
+    if (!expiresAt || expiresAt <= Date.now()) return;
+    const timer = window.setTimeout(
+      () => setExpiryClock(Date.now()),
+      Math.min(2147483647, expiresAt - Date.now() + 20)
+    );
+    return () => window.clearTimeout(timer);
+  }, [checkout.quote?.expiresAt]);
 
   const kind = checkout.selection?.purchaseKind || "";
   const isSubscriptionPurchase = kind === "subscription" || kind === "subscription_features";
   const purchaseTypeLabel = PURCHASE_TYPE_LABEL[kind] || "Checkout";
-  const PurchaseTypeIcon = PURCHASE_TYPE_ICON[kind] || ShoppingBag;
 
   const lineItems: CheckoutLineItem[] = checkout.quote?.verifiedLineItems || [];
   const lineItemsForDisplay = useMemo(
     () => lineItems.filter((line) => !line.alreadyOwned),
-    [lineItems],
+    [lineItems]
   );
   const ownedLineItems = useMemo(() => lineItems.filter((line) => line.alreadyOwned), [lineItems]);
 
-  const showLoading = checkout.status === "loading" || checkout.quoteStatus === "loading" || checkout.quoteStatus === "refreshing";
+  const showLoading =
+    checkout.status === "loading" ||
+    checkout.quoteStatus === "loading" ||
+    checkout.quoteStatus === "refreshing";
   const showInvalid = checkout.status === "invalid";
   const showError = checkout.status === "needs_refresh" || checkout.status === "error";
   const showEmpty = checkout.status === "empty" && !showLoading;
 
   if (showEmpty) {
-    return <SafeRecoveryUI kind="empty" onGoBack={checkout.goBack} onRefresh={checkout.refresh} refreshPending={false} />;
+    return (
+      <SafeRecoveryUI
+        kind="empty"
+        onGoBack={checkout.goBack}
+        onRefresh={checkout.refresh}
+        refreshPending={false}
+      />
+    );
   }
   if (showInvalid) {
-    return <SafeRecoveryUI kind="invalid" reason={checkout.errorMessage} onGoBack={checkout.goBack} onRefresh={checkout.refresh} refreshPending={false} />;
+    return (
+      <SafeRecoveryUI
+        kind="invalid"
+        reason={checkout.errorMessage}
+        onGoBack={checkout.goBack}
+        onRefresh={checkout.refresh}
+        refreshPending={false}
+      />
+    );
   }
   if (showError && !checkout.quote) {
-    return <SafeRecoveryUI kind="error" reason={checkout.errorMessage} onGoBack={checkout.goBack} onRefresh={checkout.refresh} refreshPending={false} />;
+    return (
+      <SafeRecoveryUI
+        kind="error"
+        reason={checkout.errorMessage}
+        onGoBack={checkout.goBack}
+        onRefresh={checkout.refresh}
+        refreshPending={false}
+      />
+    );
   }
   if (showLoading && !checkout.quote) {
     return <LoadingShell message="Loading server-verified price quote…" />;
@@ -123,7 +129,15 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
 
   const quote = checkout.quote;
   if (!quote || !checkout.selection) {
-    return <SafeRecoveryUI kind="error" reason={checkout.errorMessage} onGoBack={checkout.goBack} onRefresh={checkout.refresh} refreshPending={false} />;
+    return (
+      <SafeRecoveryUI
+        kind="error"
+        reason={checkout.errorMessage}
+        onGoBack={checkout.goBack}
+        onRefresh={checkout.refresh}
+        refreshPending={false}
+      />
+    );
   }
 
   const regularSubtotal = quote.regularSubtotal || 0;
@@ -131,7 +145,12 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   const couponDiscount = quote.couponDiscount || 0;
   const cashPayable = quote.cashPayable || 0;
   const minimumPayable = quote.minimumPayable || 0;
-  const finalTotal = Math.max(cashPayable, minimumPayable);
+  const finalTotal = cashPayable;
+  const quoteExpired =
+    quote.expiresAt <= Math.max(expiryClock, Date.now()) ||
+    (quote.status && quote.status !== "active");
+  const paymentBlocked =
+    showLoading || showError || Boolean(quoteExpired) || checkout.status !== "ready";
 
   // Selection details: derive from the verified line items (which carry the
   // canonical product/module/resource/update hierarchy via `parentTitle`).
@@ -139,8 +158,15 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   const resourceLines = lineItemsForDisplay.filter((line) => line.kind === "selected_resources");
   const updateLines = lineItemsForDisplay.filter((line) => line.kind === "paid_update");
   const subscriptionPlanLines = lineItemsForDisplay.filter((line) => line.kind === "subscription");
-  const subscriptionAddonLines = lineItemsForDisplay.filter((line) => line.kind === "subscription_features");
-  const productLines = lineItemsForDisplay.filter((line) => line.kind === "full_product" || line.kind === "cart_bundle" || line.kind === "free_entitlement");
+  const subscriptionAddonLines = lineItemsForDisplay.filter(
+    (line) => line.kind === "subscription_features"
+  );
+  const productLines = lineItemsForDisplay.filter(
+    (line) =>
+      line.kind === "full_product" ||
+      line.kind === "cart_bundle" ||
+      line.kind === "free_entitlement"
+  );
 
   // Coupon fields are only meaningful when money is actually charged.
   // A free product, a free entitlement grant, or a subscription whose
@@ -157,10 +183,9 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       {/* Purchase type chip */}
       <div className="flex flex-wrap items-center gap-2" data-checkout-review-head>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-black text-indigo-200">
-          <PurchaseTypeIcon size={12} />
           {purchaseTypeLabel}
         </span>
-        <span className="text-[10px] font-mono text-white/55">quote {quote.quoteId}</span>
+        <span className="dc-checkout-note">Server-verified pricing</span>
       </div>
 
       {/* Buyer card */}
@@ -179,31 +204,31 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           buyer unlocks, and the price section below shows the money. Rendering
           both repeated the same names on the review page. */}
       {isSubscriptionPurchase ? null : (
-      <GlassCard data-checkout-line-items>
-        <header className="mb-2 flex items-center justify-between">
-          <h2 className="dc-section-label">
-            Items ({lineItemsForDisplay.length + ownedLineItems.length})
-          </h2>
-          {lineItemsForDisplay.length > 0 ? (
-            <p className="text-[11px] text-white/55">
-              {lineItemsForDisplay.length} new · {ownedLineItems.length} already owned
-            </p>
-          ) : null}
-        </header>
-        <div className="space-y-2">
-          {lineItemsForDisplay.length === 0 && ownedLineItems.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
-              No items to charge for. This quote is fully covered by your existing library.
-            </p>
-          ) : null}
-          {lineItemsForDisplay.map((line) => (
-            <CheckoutLineItemCard key={line.id} line={line} />
-          ))}
-          {ownedLineItems.map((line) => (
-            <CheckoutLineItemCard key={line.id} line={line} />
-          ))}
-        </div>
-      </GlassCard>
+        <CheckoutSection data-checkout-line-items>
+          <header className="mb-2 flex items-center justify-between">
+            <h2 className="dc-section-label">
+              Items ({lineItemsForDisplay.length + ownedLineItems.length})
+            </h2>
+            {lineItemsForDisplay.length > 0 ? (
+              <p className="text-[11px] text-white/55">
+                {lineItemsForDisplay.length} new · {ownedLineItems.length} already owned
+              </p>
+            ) : null}
+          </header>
+          <div className="space-y-2">
+            {lineItemsForDisplay.length === 0 && ownedLineItems.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
+                No items to charge for. This quote is fully covered by your existing library.
+              </p>
+            ) : null}
+            {lineItemsForDisplay.map((line) => (
+              <CheckoutLineItemCard minimal key={line.id} line={line} />
+            ))}
+            {ownedLineItems.map((line) => (
+              <CheckoutLineItemCard minimal key={line.id} line={line} />
+            ))}
+          </div>
+        </CheckoutSection>
       )}
 
       {/* Part 7 — Coupon input card (server-validated, with verified savings).
@@ -225,7 +250,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       ) : null}
 
       {/* Price section */}
-      <GlassCard data-checkout-price-section>
+      <CheckoutSection data-checkout-price-section>
         <header className="mb-2 flex items-center justify-between">
           <h2 className="dc-section-label">Price breakdown</h2>
           <p className="text-[10px] dc-ink-3">GST inclusive</p>
@@ -239,7 +264,9 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ) : null}
           {couponDiscount > 0 ? (
             <PriceRow
-              label={`${quote.couponIsReferral ? "Referral discount" : "Coupon discount"}${quote.couponCode ? ` (${quote.couponCode})` : ""}`}
+              label={`${quote.couponIsReferral ? "Referral discount" : "Coupon discount"}${
+                quote.couponCode ? ` (${quote.couponCode})` : ""
+              }`}
               value={-couponDiscount}
               negative
             />
@@ -248,26 +275,21 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
             <PriceRow label="Minimum payable" value={minimumPayable} muted />
           ) : null}
         </dl>
-        <div className="mt-3 border-t border-white/10 pt-3">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-black dc-ink-1">Final total</span>
-            <span className="text-2xl dc-hero-price sm:text-3xl">{formatRupee(finalTotal)}</span>
-          </div>
-          {/* Loss aversion: total savings restated in rupees, not just as
-              individual negative rows the buyer has to add up themselves. */}
-          {regularSubtotal - finalTotal > 0 ? (
-            <div className="mt-1.5 flex items-center justify-end gap-2">
-              <span className="text-[12px] dc-anchor-price">{formatRupee(regularSubtotal)}</span>
-              <span className="dc-save-pill">You save {formatRupee(regularSubtotal - finalTotal)}</span>
-            </div>
-          ) : null}
-          <p className="mt-2 text-[11px] dc-ink-3">Verified server-side before payment. No amount can change after this screen without a fresh quote.</p>
+        <div className="dc-checkout-total">
+          <span>Final total</span>
+          <strong data-checkout-final-total>{formatRupee(finalTotal)}</strong>
         </div>
-      </GlassCard>
+        {regularSubtotal - finalTotal > 0 ? (
+          <p className="dc-checkout-note">You save {formatRupee(regularSubtotal - finalTotal)}.</p>
+        ) : null}
+        <p className="dc-checkout-note">
+          The payable is verified server-side. Any change requires a fresh quote.
+        </p>
+      </CheckoutSection>
 
       {/* Selection details */}
       {showDetails ? (
-        <GlassCard data-checkout-selection-details>
+        <CheckoutSection data-checkout-selection-details>
           <header className="mb-2 flex items-center justify-between">
             <h2 className="dc-section-label">Selection details</h2>
             <button
@@ -301,9 +323,25 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
               />
               {updateLines.flatMap((line) => line.detailItems || []).length > 0 ? (
                 <div className="rounded-2xl bg-violet-500/15 p-3 ring-1 ring-violet-400/30">
-                  <p className="text-xs font-black uppercase tracking-wider text-violet-200">New content included</p>
-                  <ul className="mt-2 space-y-1.5">{updateLines.flatMap((line) => line.detailItems || []).map((item) => <li key={item} className="flex items-center gap-2 text-xs font-semibold text-violet-200"><BadgeCheck size={12} className="shrink-0" />{item}</li>)}</ul>
-                  <p className="mt-2 text-[10px] text-violet-300">Your existing course stays owned; this checkout adds only the listed upgrade content.</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-violet-200">
+                    New content included
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {updateLines
+                      .flatMap((line) => line.detailItems || [])
+                      .map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-center gap-2 text-xs font-semibold text-violet-200"
+                        >
+                          {item}
+                        </li>
+                      ))}
+                  </ul>
+                  <p className="mt-2 text-[10px] text-violet-300">
+                    Your existing course stays owned; this checkout adds only the listed upgrade
+                    content.
+                  </p>
                 </div>
               ) : null}
             </div>
@@ -312,17 +350,23 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
             <div className="space-y-3">
               {quote.subscriptionAddOn ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-3 text-xs font-semibold leading-5 text-emerald-200">
-                  <span aria-hidden="true">⬆️</span>
                   <span>
-                    Upgrading your current membership — you are only charged for
-                    the new add-ons below. Your plan, billing cycle and expiry
-                    date stay exactly as they are.
+                    Upgrading your current membership — you are only charged for the new add-ons
+                    below. Your plan, billing cycle and expiry date stay exactly as they are.
                   </span>
                 </div>
               ) : (
-                <SelectionList title="Subscription plan" emptyLabel="Plan details unavailable." lines={subscriptionPlanLines} />
+                <SelectionList
+                  title="Subscription plan"
+                  emptyLabel="Plan details unavailable."
+                  lines={subscriptionPlanLines}
+                />
               )}
-              <SelectionList title={`Included add-ons & products (${subscriptionAddonLines.length})`} emptyLabel="No optional add-ons selected." lines={subscriptionAddonLines} />
+              <SelectionList
+                title={`Included add-ons & products (${subscriptionAddonLines.length})`}
+                emptyLabel="No optional add-ons selected."
+                lines={subscriptionAddonLines}
+              />
             </div>
           ) : null}
           {kind === "cart_bundle" ? (
@@ -346,9 +390,9 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
               lines={productLines}
             />
           ) : null}
-        </GlassCard>
+        </CheckoutSection>
       ) : (
-        <GlassButton
+        <CheckoutAction
           variant="capsule"
           type="button"
           onClick={() => setShowDetails(true)}
@@ -356,16 +400,23 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           data-checkout-selection-toggle
         >
           Show selection details
-        </GlassButton>
+        </CheckoutAction>
       )}
 
       {/* Refresh banner */}
-      {showError ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm" data-checkout-review-notice>
+      {showError || quoteExpired ? (
+        <div
+          className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm"
+          data-checkout-review-notice
+        >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
-            <p className="font-black">We couldn't refresh the price.</p>
-            <p className="mt-0.5 text-amber-200">{checkout.errorMessage || "Please try again, or edit the selection."}</p>
+            <p className="font-black">
+              {quoteExpired ? "Price quote expired" : "Price could not be refreshed"}
+            </p>
+            <p className="mt-0.5 text-amber-200">
+              {checkout.errorMessage || "Please try again, or edit the selection."}
+            </p>
           </div>
           <button
             type="button"
@@ -388,52 +439,56 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           block
           size="lg"
           loading={showLoading}
-          disabled={showLoading}
+          disabled={paymentBlocked}
+          icon={null}
+          className="dc-checkout-primary"
           onClick={onProceed}
           data-checkout-proceed=""
-          label={finalTotal === 0 ? "Get free access" : `Pay ${formatRupee(finalTotal)} securely`}
+          label={finalTotal === 0 ? "Continue to free access" : "Continue to payment"}
         />
         {/* Transparency bias, placed at the exact point of commitment. */}
-        <p className="flex items-center justify-center gap-1.5 pb-1 text-[11px] font-semibold dc-ink-2">
-          <ShieldCheck size={13} className="shrink-0 text-emerald-400" aria-hidden="true" />
-          {finalTotal === 0 ? "No card needed — access unlocks instantly." : "Razorpay secure checkout · nothing is charged until you confirm."}
+        <p className="dc-checkout-note">
+          {finalTotal === 0
+            ? "No card needed. Access unlocks after the server confirms this order."
+            : "Razorpay secure checkout · nothing is charged until you confirm."}
         </p>
-        <div className="grid grid-cols-2 gap-2">
-          <GlassButton
-            variant="capsule"
-            type="button"
-            onClick={checkout.goBack}
-            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold"
-          >
-            <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back to source</span>
-          </GlassButton>
-          <GlassButton
-            variant="capsule"
-            type="button"
-            onClick={() => void checkout.refresh()}
-            disabled={showLoading}
-            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold disabled:opacity-60"
-          >
-            <span className="flex items-center gap-1.5">
-              {showLoading && checkout.quoteStatus === "refreshing" ? (
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw size={14} />
-              )}
-              Refresh quote
-            </span>
-          </GlassButton>
-        </div>
-        <GlassButton
+        {!showError && !quoteExpired ? (
+          <div>
+            <CheckoutAction
+              variant="capsule"
+              type="button"
+              onClick={() => void checkout.refresh()}
+              disabled={showLoading}
+              className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold disabled:opacity-60"
+            >
+              <span className="flex items-center gap-1.5">
+                {showLoading && checkout.quoteStatus === "refreshing" ? (
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                Refresh quote
+              </span>
+            </CheckoutAction>
+          </div>
+        ) : null}
+        <CheckoutAction
           variant="capsule"
           type="button"
           onClick={onEdit}
           className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
         >
-          <span className="flex items-center gap-1.5">Edit selection <ChevronRight size={14} /></span>
-        </GlassButton>
-        <p className="px-1 text-center text-[10px] font-medium dc-ink-3">
-          Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Prices are verified server-side before payment.
+          <span className="flex items-center gap-1.5">
+            Edit selection <ChevronRight size={14} />
+          </span>
+        </CheckoutAction>
+        <p className="dc-checkout-note">
+          Quote expires at{" "}
+          {new Date(quote.expiresAt).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}{" "}
+          · Prices are verified server-side before payment.
         </p>
       </div>
     </div>
@@ -464,9 +519,11 @@ const FALLBACK_FEATURE_NAMES: Record<string, string> = {
 export function SubscriptionUnlocksCard({
   quote,
   products: catalogProducts = [],
+  receipt = false,
 }: {
   quote: ServerPriceQuote;
-  products?: Array<{ id: string; documentId?: string; title: string }>;
+  products?: readonly SubscriptionDisplayProduct[];
+  receipt?: boolean;
 }) {
   const [catalog, setCatalog] = useState<{
     plans: Array<{ id: string; name: string; description: string }>;
@@ -515,21 +572,27 @@ export function SubscriptionUnlocksCard({
   const planLine = lineItems.find((line) => line.kind === "subscription") || null;
   const catalogPlan = catalog?.plans.find((plan) => plan.id === planId) || null;
   const planName =
+    planLine?.title?.replace(/\s*\((Monthly|Yearly)\)$/i, "") ||
     catalogPlan?.name ||
-    planLine?.title ||
     FALLBACK_PLAN_NAMES[planId] ||
     planId ||
     "Subscription plan";
-  const planDescription = catalogPlan?.description || planLine?.parentTitle || "";
-  const cycleLabel = quote.subscriptionCycle === "yearly"
-    ? "Yearly"
-    : quote.subscriptionCycle === "monthly"
+  const planDescription = planLine?.parentTitle || catalogPlan?.description || "";
+  const cycleLabel =
+    quote.subscriptionCycle === "yearly"
+      ? "Yearly"
+      : quote.subscriptionCycle === "monthly"
       ? "Monthly"
       : null;
   const expiresAt = Number(quote.subscriptionExpiresAt || 0);
-  const expiryLabel = expiresAt > 0
-    ? new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-    : "";
+  const expiryLabel =
+    expiresAt > 0
+      ? new Date(expiresAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "";
 
   // Features. `subscriptionFeatureIds` is the authoritative selected list and
   // includes plan-included / free features that produce no priced line item —
@@ -548,7 +611,7 @@ export function SubscriptionUnlocksCard({
     const catalogFeature = catalog?.features.find((feature) => feature.id === id) || null;
     return {
       id,
-      name: catalogFeature?.name || pricedLine?.title || FALLBACK_FEATURE_NAMES[id] || id,
+      name: pricedLine?.title || catalogFeature?.name || FALLBACK_FEATURE_NAMES[id] || id,
       description: catalogFeature?.description || "",
       pricePaise: pricedLine ? pricedLine.effectivePrice : null,
       included: !pricedLine,
@@ -562,217 +625,251 @@ export function SubscriptionUnlocksCard({
   // verified line items with server-resolved titles, so the checkout page
   // always mirrors the exact products the buyer picked on the subscription
   // page (and how many).
-  const productNameFor = (id: string, fallback: string): string => {
-    const match = catalogProducts.find(
-      (product) =>
-        String(product.id) === id ||
-        (product.documentId ? String(product.documentId) === id : false),
-    );
-    return match?.title || fallback;
-  };
-  const selectedProductLines = lineItems.filter(
+  const isPlanUnlock = (line: CheckoutLineItem) =>
+    /^subscription_unlock:/.test(line.id) ||
+    /^subscription_(product|module)_unlock:/.test(line.entitlementId || "") ||
+    /^Plan unlock:/.test(line.title || "");
+  const productLines = lineItems.filter(
     (line) =>
       line.kind === "subscription_features" &&
       Boolean(line.productId) &&
       !line.featureId &&
-      !/^Plan unlock:/.test(line.title || ""),
+      !line.moduleId
   );
-  const planUnlockLines = lineItems.filter(
-    (line) =>
-      line.kind === "subscription_features" &&
-      Boolean(line.productId) &&
-      !line.featureId &&
-      /^Plan unlock:/.test(line.title || ""),
-  );
-  const selectedProductRows = selectedProductLines.map((line) => ({
-    id: `product:${String(line.productId || line.id)}`,
-    name: productNameFor(String(line.productId || ""), line.title || "Bonus product"),
-    pricePaise: line.effectivePrice,
-    alreadyOwned: Boolean(line.alreadyOwned),
+  const selectedProductRows = productLines
+    .filter((line) => !isPlanUnlock(line))
+    .map((line) => ({
+      id: `product:${line.id}`,
+      name: subscriptionUnlockName(catalogProducts, String(line.productId || ""), null, line.title),
+      pricePaise: line.effectivePrice,
+      alreadyOwned: Boolean(line.alreadyOwned),
+    }));
+  const planUnlockRows = productLines.filter(isPlanUnlock).map((line) => ({
+    id: `unlock:${line.id}`,
+    name: subscriptionUnlockName(catalogProducts, String(line.productId || ""), null, line.title),
   }));
-  const planUnlockRows = planUnlockLines.map((line) => ({
-    id: `unlock:${String(line.productId || line.id)}`,
-    name: productNameFor(
-      String(line.productId || ""),
-      String(line.title || "").replace(/^Plan unlock:\s*/i, ""),
-    ),
-  }));
-
-  const featureLabel = (row: { included: boolean; pricePaise: number | null; alreadyOwned?: boolean }): string => {
-    if (row.alreadyOwned) return "Already purchased — no charge";
-    if (!row.included && typeof row.pricePaise === "number") return formatRupee(row.pricePaise);
-    return quote.subscriptionAddOn ? "Already in your membership" : "Included with plan";
-  };
+  // A module grant is partial access, not an unlock of the whole parent course.
+  const moduleRows = lineItems
+    .filter(
+      (line) =>
+        line.kind === "subscription_features" && Boolean(line.productId) && Boolean(line.moduleId)
+    )
+    .map((line) => ({
+      id: line.id,
+      name: subscriptionUnlockName(
+        catalogProducts,
+        String(line.productId),
+        line.moduleId,
+        line.title
+      ),
+      productTitle:
+        line.parentTitle && line.parentTitle !== planName && line.parentTitle !== catalogPlan?.name
+          ? line.parentTitle
+          : subscriptionProductFor(catalogProducts, String(line.productId))?.title ||
+            String(line.productId),
+      pricePaise: line.effectivePrice,
+      alreadyOwned: Boolean(line.alreadyOwned),
+    }));
 
   return (
-    <GlassCard data-checkout-subscription-unlocks>
-      <header className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-600 text-white">
-          <Unlock size={14} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-black text-white">What you&apos;ll get</h2>
-          <p className="text-[11px] text-white/55">Unlocks after your payment is verified.</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-violet-500/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200">
-          {cycleLabel ? `${cycleLabel} membership` : "Membership"}
-        </span>
-      </header>
-
-      {/* Membership row */}
-      <div className="mt-3 rounded-2xl border border-violet-400/30 bg-violet-500/15 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-black text-white" data-checkout-subscription-plan-name>
-              {planName}
-            </p>
-            {planDescription ? (
-              <p className="mt-0.5 text-[11px] leading-relaxed text-white/55">{planDescription}</p>
-            ) : null}
-          </div>
-          {quote.subscriptionAddOn ? (
-            <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
-              Add-on
-            </span>
-          ) : null}
-        </div>
-        {expiryLabel ? (
-          <p
-            data-checkout-subscription-expiry
-            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-violet-200"
-          >
-            <CalendarDays size={12} />
-            {quote.subscriptionAddOn
-              ? `Your current expiry stays unchanged — ${expiryLabel}`
-              : `Access until ${expiryLabel}`}
+    <CheckoutSection data-checkout-subscription-unlocks>
+      <h2>{receipt ? "Membership" : "What you'll get"}</h2>
+      <div className="dc-checkout-item" data-checkout-subscription-plan-name>
+        <div className="dc-checkout-item-copy">
+          <h3>{planName}</h3>
+          {planDescription ? <p className="dc-checkout-note">{planDescription}</p> : null}
+          <p className="dc-checkout-note">
+            {cycleLabel ? `${cycleLabel} membership` : "Membership"}
+            {quote.subscriptionAddOn ? " · Plan already paid" : ""}
           </p>
-        ) : null}
+        </div>
+        <strong className="dc-checkout-item-price">
+          {quote.subscriptionAddOn
+            ? "₹0"
+            : planLine
+            ? formatRupee(planLine.effectivePrice)
+            : "Included in total"}
+        </strong>
       </div>
-
-      {/* Features unlocked */}
-      <div className="mt-3">
-        <h3
-          className="text-[11px] font-black uppercase tracking-wider text-white/55"
-          data-checkout-subscription-features-count={featureRows.length}
-        >
-          Features ({featureRows.length})
-        </h3>
-        {featureRows.length === 0 ? (
-          <p className="mt-1.5 text-xs italic text-white/55">No features in this selection.</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {featureRows.map((row) => (
+      {expiryLabel ? (
+        <p data-checkout-subscription-expiry className="dc-checkout-note">
+          {quote.subscriptionAddOn
+            ? `Your current expiry stays unchanged — ${expiryLabel}`
+            : `Access until ${expiryLabel}`}
+        </p>
+      ) : null}
+      <h3 className="mt-4" data-checkout-subscription-features-count={featureRows.length}>
+        Features ({featureRows.length})
+      </h3>
+      {featureRows.length ? (
+        <ul>
+          {featureRows.map((row) => (
+            <li
+              key={row.id}
+              data-checkout-subscription-feature={row.id}
+              className="dc-checkout-item"
+            >
+              <div className="dc-checkout-item-copy">
+                <h3>{row.name}</h3>
+                {row.description ? <p className="dc-checkout-note">{row.description}</p> : null}
+                {row.alreadyOwned ? (
+                  <p className="dc-checkout-note">Already purchased · No charge</p>
+                ) : row.included ? (
+                  <p className="dc-checkout-note">
+                    {quote.subscriptionAddOn ? "Already in your membership" : "Included with plan"}
+                  </p>
+                ) : null}
+              </div>
+              <strong className="dc-checkout-item-price">
+                {formatRupee(row.alreadyOwned ? 0 : row.pricePaise || 0)}
+              </strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="dc-checkout-note">No features in this selection.</p>
+      )}
+      <h3 className="mt-4" data-checkout-subscription-products-count={selectedProductRows.length}>
+        Products ({selectedProductRows.length}
+        {planUnlockRows.length ? ` + ${planUnlockRows.length} included` : ""})
+      </h3>
+      {selectedProductRows.length || planUnlockRows.length ? (
+        <ul>
+          {selectedProductRows.map((row) => (
+            <li
+              key={row.id}
+              data-checkout-subscription-product={row.id}
+              className="dc-checkout-item"
+            >
+              <div className="dc-checkout-item-copy">
+                <h3>{row.name}</h3>
+                {row.alreadyOwned ? (
+                  <p className="dc-checkout-note">Already purchased · No charge</p>
+                ) : null}
+              </div>
+              <strong className="dc-checkout-item-price">
+                {formatRupee(row.alreadyOwned ? 0 : row.pricePaise)}
+              </strong>
+            </li>
+          ))}
+          {planUnlockRows.map((row) => (
+            <li
+              key={row.id}
+              data-checkout-subscription-plan-unlock={row.id}
+              className="dc-checkout-item"
+            >
+              <div className="dc-checkout-item-copy">
+                <h3>{row.name}</h3>
+                <p className="dc-checkout-note">Included with plan</p>
+              </div>
+              <strong className="dc-checkout-item-price">₹0</strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="dc-checkout-note">No products in this selection.</p>
+      )}
+      {moduleRows.length ? (
+        <>
+          <h3 className="mt-4" data-checkout-subscription-modules-count={moduleRows.length}>
+            Modules ({moduleRows.length})
+          </h3>
+          <ul>
+            {moduleRows.map((row) => (
               <li
-                key={`feature:${row.id}`}
-                data-checkout-subscription-feature={row.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
+                key={row.id}
+                data-checkout-subscription-module={row.id}
+                className="dc-checkout-item"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black text-white">{row.name}</p>
-                  {row.description ? (
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-white/55">{row.description}</p>
+                <div className="dc-checkout-item-copy">
+                  <h3>{row.name}</h3>
+                  <p className="dc-checkout-note">Module · {row.productTitle}</p>
+                  {row.alreadyOwned ? (
+                    <p className="dc-checkout-note">Already purchased · No charge</p>
+                  ) : row.pricePaise === 0 ? (
+                    <p className="dc-checkout-note">Included with plan</p>
                   ) : null}
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                    row.included || row.alreadyOwned ? "bg-emerald-500/20 text-emerald-200" : "bg-violet-500/20 text-violet-200"
-                  }`}
-                >
-                  {featureLabel(row)}
-                </span>
+                <strong className="dc-checkout-item-price">
+                  {formatRupee(row.alreadyOwned ? 0 : row.pricePaise)}
+                </strong>
               </li>
             ))}
           </ul>
-        )}
-      </div>
-
-      {/* Products included */}
-      <div className="mt-3">
-        <h3
-          className="text-[11px] font-black uppercase tracking-wider text-white/55"
-          data-checkout-subscription-products-count={selectedProductRows.length}
-        >
-          Products ({selectedProductRows.length}{planUnlockRows.length > 0 ? ` + ${planUnlockRows.length} included` : ""})
-        </h3>
-        {selectedProductRows.length === 0 && planUnlockRows.length === 0 ? (
-          <p className="mt-1.5 text-xs italic text-white/55">No products in this selection.</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {selectedProductRows.map((row) => (
-              <li
-                key={row.id}
-                data-checkout-subscription-product={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
-              >
-                <span className="min-w-0 flex-1 text-xs font-bold text-white/85">{row.name}</span>
-                {row.alreadyOwned ? (
-                  <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
-                    Already purchased
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-xs font-black text-violet-200">{formatRupee(row.pricePaise)}</span>
-                )}
-              </li>
-            ))}
-            {planUnlockRows.map((row) => (
-              <li
-                key={row.id}
-                data-checkout-subscription-plan-unlock={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-2.5"
-              >
-                <span className="min-w-0 flex-1 text-xs font-bold text-emerald-200">{row.name}</span>
-                <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
-                  Included with plan
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <p className="mt-3 text-[10px] leading-relaxed text-white/55">
-        This list matches the plan, features and products you selected on the
-        subscription page. Renewal always requires your confirmation.
+        </>
+      ) : null}
+      <p className="dc-checkout-note">
+        {quote.subscriptionAddOn
+          ? "Only the new add-ons are charged; your plan, cycle and expiry are unchanged. "
+          : ""}
+        {receipt
+          ? "Access has been confirmed. "
+          : "Access unlocks after the server verifies your order. "}
+        Renewal always requires your confirmation.
       </p>
-    </GlassCard>
+    </CheckoutSection>
   );
 }
 
-function BuyerCard({ buyer, authUid }: { buyer: ReturnType<typeof useCheckout>["buyer"]; authUid?: string }) {
+function BuyerCard({
+  buyer,
+  authUid,
+}: {
+  buyer: ReturnType<typeof useCheckout>["buyer"];
+  authUid?: string;
+}) {
   if (!buyer) {
     return (
-      <GlassCard data-checkout-buyer className="text-sm text-amber-200">
+      <CheckoutSection data-checkout-buyer className="text-sm text-amber-200">
         <p className="font-black">Buyer identity missing</p>
-        <p className="mt-0.5 text-xs text-amber-200">Please sign in again to load the verified buyer details.</p>
-      </GlassCard>
+        <p className="mt-0.5 text-xs text-amber-200">
+          Please sign in again to load the verified buyer details.
+        </p>
+      </CheckoutSection>
     );
   }
   const verified = buyer.tokenVerified && (!authUid || authUid === buyer.uid);
   return (
-    <GlassCard data-checkout-buyer>
+    <CheckoutSection data-checkout-buyer>
       <header className="mb-2 flex items-center justify-between">
         <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Buyer</h2>
         <span
           data-firebase-verified={verified ? "true" : "false"}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${
-            verified ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30" : "bg-amber-500/15 text-amber-200 ring-amber-400/30"
+            verified
+              ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30"
+              : "bg-amber-500/15 text-amber-200 ring-amber-400/30"
           }`}
         >
-          {verified ? <ShieldCheck size={10} /> : <Info size={10} />}
-          {verified ? "Firebase verified" : "Verification pending"}
+          {verified ? "Verified buyer" : "Verification pending"}
         </span>
       </header>
       <div className="space-y-1 text-sm">
-        <p className="truncate text-base font-black text-white">{buyer.name || "Unnamed buyer"}</p>
-        <p className="truncate text-xs text-white/55">{buyer.email || "No email on file"}</p>
-        {buyer.mobile ? <p className="truncate text-xs text-white/55">📱 {buyer.mobile}</p> : null}
-        <p className="truncate text-[11px] text-white/55">UID: {buyer.uid}</p>
+        <p className="dc-checkout-buyer-name">{buyer.name || "Buyer"}</p>
+        <p className="dc-checkout-note">{buyer.email || "No email on file"}</p>
+        {buyer.mobile ? <p className="dc-checkout-note">{buyer.mobile}</p> : null}
+        <details className="dc-checkout-reference">
+          <summary>Buyer reference</summary>
+          <p>{buyer.uid}</p>
+        </details>
       </div>
-    </GlassCard>
+    </CheckoutSection>
   );
 }
 
-function PriceRow({ label, value, negative, muted, note }: { label: string; value: number; negative?: boolean; muted?: boolean; note?: string }) {
+function PriceRow({
+  label,
+  value,
+  negative,
+  muted,
+  note,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+  muted?: boolean;
+  note?: string;
+}) {
   const display = negative ? `− ${formatRupee(Math.abs(value))}` : formatRupee(value);
   return (
     <div className="flex items-baseline justify-between">
@@ -780,12 +877,26 @@ function PriceRow({ label, value, negative, muted, note }: { label: string; valu
         {label}
         {note ? <span className="ml-1 text-[10px] text-white/55">{note}</span> : null}
       </dt>
-      <dd className={`font-bold ${negative ? "text-emerald-300" : muted ? "text-white/55" : "text-white/85"}`}>{display}</dd>
+      <dd
+        className={`font-bold ${
+          negative ? "text-emerald-300" : muted ? "text-white/55" : "text-white/85"
+        }`}
+      >
+        {display}
+      </dd>
     </div>
   );
 }
 
-function SelectionList({ title, emptyLabel, lines }: { title: string; emptyLabel: string; lines: CheckoutLineItem[] }) {
+function SelectionList({
+  title,
+  emptyLabel,
+  lines,
+}: {
+  title: string;
+  emptyLabel: string;
+  lines: CheckoutLineItem[];
+}) {
   if (lines.length === 0) {
     return (
       <div>
@@ -803,9 +914,13 @@ function SelectionList({ title, emptyLabel, lines }: { title: string; emptyLabel
             <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
             <span className="min-w-0 flex-1">
               <span className="font-bold text-white line-clamp-1">{line.title}</span>
-              {line.parentTitle ? <span className="ml-1 text-white/55">· {line.parentTitle}</span> : null}
+              {line.parentTitle ? (
+                <span className="ml-1 text-white/55">· {line.parentTitle}</span>
+              ) : null}
             </span>
-            <span className="shrink-0 font-bold text-white">{formatRupee(line.effectivePrice)}</span>
+            <span className="shrink-0 font-bold text-white">
+              {formatRupee(line.effectivePrice)}
+            </span>
           </li>
         ))}
       </ul>
@@ -826,15 +941,21 @@ function SafeRecoveryUI({
   onRefresh: () => void;
   refreshPending: boolean;
 }) {
-  const title = kind === "empty" ? "No active checkout" : kind === "invalid" ? "This checkout is no longer available" : "We couldn't load the price";
+  const title =
+    kind === "empty"
+      ? "No active checkout"
+      : kind === "invalid"
+      ? "This checkout is no longer available"
+      : "We couldn't load the price";
   const detail =
     kind === "empty"
       ? "Start a new checkout from a product or paid update."
       : kind === "invalid"
-        ? reason || "The selection was rejected by the server. Please return to the product page and try again."
-        : reason || "Network or server error. Please refresh, or return to the product page.";
+      ? reason ||
+        "The selection was rejected by the server. Please return to the product page and try again."
+      : reason || "Network or server error. Please refresh, or return to the product page.";
   return (
-    <GlassCard data-checkout-recovery-ui className="text-sm text-amber-100">
+    <CheckoutSection data-checkout-recovery-ui className="text-sm text-amber-100">
       <div className="flex items-start gap-3">
         <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
         <div className="flex-1">
@@ -843,16 +964,18 @@ function SafeRecoveryUI({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <GlassButton
+        <CheckoutAction
           type="button"
           variant="capsule"
           onClick={onGoBack}
           className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
         >
-          <span className="flex items-center justify-center gap-1.5 text-sm font-bold"><ArrowLeft size={14} /> Return to source</span>
-        </GlassButton>
+          <span className="flex items-center justify-center gap-1.5 text-sm font-bold">
+            <ArrowLeft size={14} /> Return to source
+          </span>
+        </CheckoutAction>
         {kind !== "empty" ? (
-          <GlassButton
+          <CheckoutAction
             variant="capsule"
             type="button"
             onClick={onRefresh}
@@ -860,24 +983,28 @@ function SafeRecoveryUI({
             className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold [&>span>div]:text-amber-200 disabled:opacity-60"
           >
             <span className="flex items-center gap-1.5">
-              {refreshPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw size={14} />}
+              {refreshPending ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
               Try again
             </span>
-          </GlassButton>
+          </CheckoutAction>
         ) : null}
       </div>
-    </GlassCard>
+    </CheckoutSection>
   );
 }
 
 function LoadingShell({ message }: { message: string }) {
   return (
-    <GlassCard data-checkout-loading className="text-center text-sm text-white/70">
+    <CheckoutSection data-checkout-loading className="text-center text-sm text-white/70">
       <div className="flex flex-col items-center gap-3">
         <LoaderCircle className="h-6 w-6 animate-spin text-violet-300" />
         <p className="font-semibold">{message}</p>
       </div>
-    </GlassCard>
+    </CheckoutSection>
   );
 }
 
@@ -912,63 +1039,48 @@ function CouponCard({
   onRemove: () => Promise<void>;
   disabled: boolean;
 }) {
-  const isApplied = Boolean(appliedCode) && appliedDiscount > 0;
+  const inputId = useId();
+  const isApplied = Boolean(appliedCode);
   const applying = status === "applying";
   return (
-    <GlassCard data-checkout-coupon data-applied={isApplied ? "true" : "false"}>
-      <header className="mb-2 flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-white/55">
-          <TicketPercent size={12} /> Coupon
-        </h2>
-        {isApplied ? (
-          <span
-            data-checkout-coupon-applied
-            className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-200 ring-1 ring-emerald-400/30"
-          >
-            <BadgeCheck size={10} /> Verified savings
-          </span>
-        ) : null}
-      </header>
-
+    <CheckoutSection data-checkout-coupon data-applied={isApplied ? "true" : "false"}>
+      <h2>Coupon</h2>
       {isApplied ? (
-        <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/15 p-2.5 ring-1 ring-emerald-400/30">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-emerald-200">
-              {appliedCode}
+        <div className="dc-checkout-code-applied">
+          <div>
+            <strong data-checkout-coupon-applied>{appliedCode}</strong>
+            <p className="dc-checkout-note">
               {appliedType === "percent" && appliedValue !== null
-                ? ` (${appliedValue}% off)`
+                ? `${appliedValue}% code · `
                 : appliedType === "flat" && appliedValue !== null
-                  ? ` (${formatRupee(appliedValue)} off)`
-                  : ""}
-            </p>
-            <p className="text-[11px] text-emerald-200">
-              You saved {formatRupee(appliedDiscount)} on this order.
+                ? `${formatRupee(appliedValue)} code · `
+                : ""}
+              Verified reduction: {formatRupee(appliedDiscount)}.
             </p>
           </div>
-          <GlassButton
-            variant="capsule"
-            type="button"
+          <CheckoutAction
             onClick={() => void onRemove()}
             disabled={disabled || applying}
-            className="shrink-0 [&>span>div]:h-9 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-bold [&>span>div]:text-emerald-200 disabled:opacity-60"
             data-checkout-coupon-remove
           >
-            {applying ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Remove"}
-          </GlassButton>
+            {applying ? "Removing…" : "Remove"}
+          </CheckoutAction>
         </div>
       ) : (
         <form
+          className="dc-checkout-code-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!input.trim() || applying || disabled) return;
-            void onApply(input.trim());
+            if (input.trim() && !applying && !disabled) void onApply(input.trim());
           }}
-          className="space-y-2"
         >
-          <div className="flex items-stretch gap-2">
-            <GlassInput
+          <label htmlFor={inputId} className="sr-only">
+            Coupon code
+          </label>
+          <div>
+            <input
+              id={inputId}
               type="text"
-              inputMode="text"
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
@@ -977,34 +1089,35 @@ function CouponCard({
               placeholder="Enter coupon code"
               disabled={applying || disabled}
               data-checkout-coupon-input
-              className="min-w-0 flex-1 [&_input]:font-bold [&_input]:uppercase [&_input]:tracking-wider [&_input]:placeholder:font-normal [&_input]:placeholder:tracking-normal"
+              aria-invalid={status === "error"}
+              aria-describedby={errorMessage && status === "error" ? `${inputId}-error` : undefined}
             />
-            <button
+            <CheckoutAction
               type="submit"
               disabled={applying || disabled || !input.trim()}
               data-checkout-coupon-apply
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {applying ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Apply"}
-            </button>
+              {applying ? "Applying…" : "Apply"}
+            </CheckoutAction>
           </div>
           {errorMessage && status === "error" ? (
             <p
+              id={`${inputId}-error`}
               data-checkout-coupon-error
               role="alert"
-              className="flex items-start gap-1.5 rounded-xl bg-rose-500/15 px-3 py-2 text-[11px] font-semibold leading-5 text-rose-200"
+              className="dc-checkout-error"
             >
-              <AlertCircle size={12} className="mt-0.5 shrink-0" />
               {errorMessage}
             </p>
           ) : (
-            <p className="px-1 text-[10px] font-medium text-white/55">
-              Coupons are validated server-side; the discount appears in your price breakdown once applied.
+            <p className="dc-checkout-note">
+              Checkout verifies the code for these items. Any reduction appears in the price
+              breakdown.
             </p>
           )}
         </form>
       )}
-    </GlassCard>
+    </CheckoutSection>
   );
 }
 

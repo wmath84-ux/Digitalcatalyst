@@ -19,10 +19,19 @@ const leaderboard = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
 const myDayServer = fs.readFileSync("api/_lib/myDay.ts", "utf8");
 const pricing = fs.readFileSync("utils/subscriptionPricing.js", "utf8");
 const pricingTypes = fs.readFileSync("utils/subscriptionPricing.d.ts", "utf8");
-const subscriptionPage = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
+const subscriptionPage = fs.readFileSync(
+  "src/subscription/components/SubscriptionPage.tsx",
+  "utf8"
+);
 const planOverview = fs.readFileSync("src/subscription/components/PlanOverview.tsx", "utf8");
-const subscriberBadge = fs.readFileSync("src/components/subscription/SubscriberActiveBadge.tsx", "utf8");
-const subscriberPriceBadge = fs.readFileSync("src/components/subscription/SubscriberOnlyPriceBadge.tsx", "utf8");
+const subscriberBadge = fs.readFileSync(
+  "src/components/subscription/SubscriberActiveBadge.tsx",
+  "utf8"
+);
+const subscriberPriceBadge = fs.readFileSync(
+  "src/components/subscription/SubscriberOnlyPriceBadge.tsx",
+  "utf8"
+);
 const hiddenHint = fs.readFileSync("src/components/subscription/HiddenFeatureHint.tsx", "utf8");
 const gateHook = fs.readFileSync("src/hooks/useSubscriptionGateLogic.ts", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
@@ -58,7 +67,10 @@ test("subscriptionGate reader uses the shared Admin Firestore accessor", () => {
   // bundle — which also serves `/api/myday` — so every My Day create failed.
   // The reader must import `adminDb` and call it.
   assert.match(gateServer, /import\s*\{\s*adminDb\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
-  assert.doesNotMatch(gateServer, /import\s*\{\s*getFirestore\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
+  assert.doesNotMatch(
+    gateServer,
+    /import\s*\{\s*getFirestore\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/
+  );
   assert.match(gateServer, /const\s+db\s*=\s*adminDb\(\);/);
   // Admin Firestore uses reference methods and a boolean `exists` property,
   // not the client SDK's standalone doc/getDoc functions or exists() method.
@@ -74,21 +86,25 @@ test("server model honours the subscriber-only price rule", () => {
   assert.match(
     gateServer,
     /function\s+resolveSubscriberOnlyPrice\(/,
-    "resolveSubscriberOnlyPrice is exported from the server",
+    "resolveSubscriberOnlyPrice is exported from the server"
   );
   // ...but that wrapper is only an adapter: the rule itself lives in the
   // shared runtime helper, which the quote and the client page also use, so
   // there is exactly one implementation of the subscriber price.
-  assert.match(gateServer, /sharedResolveSubscriberOnlyPrice\(/, "the server wrapper delegates to the shared resolver");
+  assert.match(
+    gateServer,
+    /sharedResolveSubscriberOnlyPrice\(/,
+    "the server wrapper delegates to the shared resolver"
+  );
   assert.match(
     pricing,
     /if\s*\(!isSubscriber\)\s*return\s+basePrice/,
-    "non-subscribers always get the public price",
+    "non-subscribers always get the public price"
   );
   assert.match(
     pricing,
     /if\s*\(Number\(candidate\)\s*<=\s*0\)\s*return\s+basePrice/,
-    "a zero / negative override falls back to the public price",
+    "a zero / negative override falls back to the public price"
   );
 });
 
@@ -96,17 +112,17 @@ test("server model resolves the per-plan AI-questions-per-day cap", () => {
   assert.match(
     gateServer,
     /function\s+resolveAiQuestionsPerDay\(/,
-    "resolveAiQuestionsPerDay is exported",
+    "resolveAiQuestionsPerDay is exported"
   );
   assert.match(
     gateServer,
     /const\s+planCap\s*=\s*settings\.usageLimits\?\.aiQuestionsPerDay\?\.\[planId\]/,
-    "the per-plan cap is read from the settings doc",
+    "the per-plan cap is read from the settings doc"
   );
   assert.match(
     gateServer,
     /if\s*\(Number\(featureCap\)\s*<=\s*0\)\s*return\s+null/,
-    "a zero / negative feature cap resolves to 'unlimited'",
+    "a zero / negative feature cap resolves to 'unlimited'"
   );
 });
 
@@ -119,19 +135,26 @@ test("the public read endpoint is wired through the leaderboard dispatcher", () 
   // project stays within the 12-function Hobby cap.
   const rewrite = vercel.rewrites.find((r) => r.source === "/api/subscription-gate");
   assert.ok(rewrite, "vercel.json rewrites /api/subscription-gate");
-  assert.equal(rewrite.destination, "/api/referral-leaderboard", "rewrite points to the leaderboard dispatcher");
+  assert.equal(
+    rewrite.destination,
+    "/api/referral-leaderboard",
+    "rewrite points to the leaderboard dispatcher"
+  );
   // The leaderboard dispatches by path.
   assert.match(
     leaderboard,
     /path\s*===\s*"\/api\/subscription-gate"/,
-    "leaderboard recognises the new path",
+    "leaderboard recognises the new path"
   );
   assert.match(
     leaderboard,
     /return\s+handleSubscriptionGate\(req,\s*res\)/,
-    "leaderboard dispatches the path to handleSubscriptionGate",
+    "leaderboard dispatches the path to handleSubscriptionGate"
   );
-  assert.match(leaderboard, /import\s*\{\s*handleSubscriptionGate\s*\}\s*from\s*"\.\/_lib\/subscriptionGateServer\.js"/);
+  assert.match(
+    leaderboard,
+    /import\s*\{\s*handleSubscriptionGate\s*\}\s*from\s*"\.\/_lib\/subscriptionGateServer\.js"/
+  );
 });
 
 test("the public read handler is GET-only and returns the settings doc", () => {
@@ -149,14 +172,14 @@ test("admin client routes the new endpoint and normalises the shape on save", ()
   assert.match(
     admin,
     /\/api\/admin\/subscriptions\/gate"\)\s*result\s*=\s*await\s+subscriptionGateRequest\(init\)/,
-    "admin client routes the new path to subscriptionGateRequest",
+    "admin client routes the new path to subscriptionGateRequest"
   );
   // The writer merges on top of the existing doc so the admin can
   // update a single section without resending the whole shape.
   assert.match(
     admin,
     /setDoc\(ref,\s*stripUndefinedDeep\(\{\.\.\.b,\s*updatedAt:\s*serverTimestamp\(\)\}\),\s*\{\s*merge:\s*true\s*\}\)/,
-    "the writer merges the body on top of the existing doc",
+    "the writer merges the body on top of the existing doc"
   );
 });
 
@@ -178,7 +201,7 @@ test("admin form exposes the 'Subscription Logic' tab", () => {
   assert.match(
     adminPage,
     /key:\s*"logic",\s*label:\s*"Subscription Logic"/,
-    "the new tab is registered in the Tabs component",
+    "the new tab is registered in the Tabs component"
   );
   // The tab content renders a kill switch + a per-feature matrix + a
   // plan visibility / subscriber-pricing section.
@@ -199,17 +222,20 @@ test("admin form exposes the 'Subscription Logic' tab", () => {
 // ---------------------------------------------------------------------------
 
 test("api myday access snapshot reads the gate settings + stacks per-doc and global modes", () => {
-  assert.match(myDayServer, /import\s*\{\s*getSubscriptionGateSettings\s*\}\s*from\s*"\.\/subscriptionGate\.js"/);
+  assert.match(
+    myDayServer,
+    /import\s*\{\s*getSubscriptionGateSettings\s*\}\s*from\s*"\.\/subscriptionGate\.js"/
+  );
   assert.match(myDayServer, /getSubscriptionGateSettings\(\)/);
   assert.match(
     myDayServer,
     /globalHideOn\s*=\s*gateSettings\s*\?\s*gateSettings\.hideUntilPurchasedEnabled\s*\|\|\s*Boolean\(gateSettings\.features\?\.\\?\[\\?"myday\\?"]\?\.gated\)\s*:\s*false/,
-    "the global kill switch + per-feature override stack into the effective mode",
+    "the global kill switch + per-feature override stack into the effective mode"
   );
   assert.match(
     myDayServer,
     /visibilityMode\s*=\s*perDocMode\s*===\s*"hide"\s*\|\|\s*globalHideOn\s*\?\s*"hide"\s*:\s*"gate"/,
-    "the effective visibilityMode is 'hide' when per-doc OR global says so",
+    "the effective visibilityMode is 'hide' when per-doc OR global says so"
   );
 });
 
@@ -247,23 +273,16 @@ test("HiddenFeatureHint renders the 'Unlock' card with a clear CTA to the subscr
 });
 
 test("SubscriptionPage always shows plan selection without a member-management or bottom upgrade surface", () => {
-  assert.match(subscriptionPage, /data-subscription-layout data-subscription-workspace/);
-  assert.match(subscriptionPage, /<PlanOverview/);
-  assert.match(subscriptionPage, /<CourseSelectTrigger/);
-  assert.match(subscriptionPage, /<FeatureSelectTrigger/);
-  assert.doesNotMatch(subscriptionPage, /<ActiveMemberView|<OwnedPlanCard|data-subscription-member-view/);
-  assert.doesNotMatch(subscriptionPage, /data-subscription-upgrade-button/);
-  // The subscriber-only price badge lives in the plan card the page renders
-  // (PlanOverview); the page itself owns price resolution and the props.
-  assert.match(planOverview, /import SubscriberOnlyPriceBadge from "\.\.\/\.\.\/components\/subscription\/SubscriberOnlyPriceBadge"/);
-  assert.match(planOverview, /<SubscriberOnlyPriceBadge[\s\S]*?price=\{subscriberPriceRupees\}/);
-  assert.match(subscriptionPage, /subscriberPriceRupees=\{subscriberPriceRupees\}/);
-  assert.match(subscriptionPage, /useSubscriptionGateLogic/);
-  // Both admin surfaces resolve through the same pricing helper.
+  assert.match(subscriptionPage, /data-subscription-layout\s+data-subscription-workspace/);
+  assert.match(subscriptionPage, /<MinimalPlanPicker/);
+  assert.match(subscriptionPage, /data-subscription-course-trigger/);
+  assert.match(subscriptionPage, /data-subscription-feature-trigger/);
+  assert.doesNotMatch(
+    subscriptionPage,
+    /<ActiveMemberView|<OwnedPlanCard|data-subscription-upgrade-button/
+  );
+  assert.match(subscriptionPage, /subscriberPricing=\{gateSettings\.subscriberPricing\}/);
   assert.match(subscriptionPage, /resolveEffectiveSubscriberPrice/);
-  assert.match(subscriptionPage, /activePlan\.subscriberPricingOverride \?\? null/);
-  assert.match(subscriptionPage, /subscriberPriceRupees/);
-  assert.match(planOverview, /subscriberPriceRupees/);
 });
 
 // ---------------------------------------------------------------------------
@@ -304,7 +323,6 @@ test("a missing settings/subscriptionGate document keeps the legacy gate working
   assert.match(
     gateServer,
     /if\s*\(!snap\.exists\)\s*\{\s*return\s*\{\s*\.\.\.SUBSCRIPTION_GATE_DEFAULTS\s*\}\s*;\s*\}/,
-    "missing doc → defaults (legacy gate preserved)",
+    "missing doc → defaults (legacy gate preserved)"
   );
 });
-

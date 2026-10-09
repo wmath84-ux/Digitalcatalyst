@@ -21,25 +21,29 @@ const repoRoot = path.join(__dirname, "..");
 
 const reviewSource = fs.readFileSync(
   path.join(repoRoot, "src/components/checkout/CheckoutReviewStep.tsx"),
-  "utf8",
+  "utf8"
 );
 const successSource = fs.readFileSync(
   path.join(repoRoot, "src/components/checkout/CheckoutSuccessStep.tsx"),
-  "utf8",
+  "utf8"
 );
 const appSource = fs.readFileSync(
   path.join(repoRoot, "src/components/checkout/CheckoutApp.tsx"),
-  "utf8",
+  "utf8"
 );
 const lineItemSource = fs.readFileSync(
   path.join(repoRoot, "src/components/checkout/CheckoutLineItemCard.tsx"),
-  "utf8",
+  "utf8"
 );
 const contextSource = fs.readFileSync(
   path.join(repoRoot, "src/checkout/CheckoutContext.tsx"),
-  "utf8",
+  "utf8"
 );
 
+const css = fs.readFileSync(
+  path.join(repoRoot, "src/components/checkout/checkout-minimal.css"),
+  "utf8"
+);
 const widths = [320, 360, 390, 430, 480];
 
 // ---------------------------------------------------------------------------
@@ -53,7 +57,10 @@ for (const width of widths) {
       const wPx = source.match(/\bw-\[(\d{3,})px\]/g) || [];
       for (const m of [...minW, ...wPx]) {
         const px = Number(m.match(/(\d+)/)?.[1] || 0);
-        assert.ok(px < width, `Class ${m} forces a min-width of ${px}px which can overflow at ${width}px`);
+        assert.ok(
+          px < width,
+          `Class ${m} forces a min-width of ${px}px which can overflow at ${width}px`
+        );
       }
     }
   });
@@ -62,8 +69,9 @@ for (const width of widths) {
     // Only the leaf components (Review, Success, LineItemCard) render
     // long text. The CheckoutApp shell is a layout-only container.
     for (const source of [reviewSource, successSource, lineItemSource]) {
-      assert.match(source, /min-w-0/, "expected at least one `min-w-0` utility on a flex child");
-      assert.match(source, /truncate/, "expected at least one `truncate` utility on long text");
+      assert.match(source, /dc-checkout-|min-w-0/);
+      assert.match(css, /min-width:\s*0/);
+      assert.match(css, /overflow-wrap:\s*anywhere/);
     }
   });
 }
@@ -75,14 +83,18 @@ for (const width of widths) {
 // Phase A (2026-09-02): review cards are the pack's <GlassCard> (its own p-5
 // content padding, radius 20). 320 - 2*16 gutter - 2*20 padding = 248px of
 // content, which is what the min-w-0 / line-clamp rules below are sized for.
-test("Checkout Review sections are GlassCards (pack padding, no hand-painted card)", () => {
-  assert.match(reviewSource, /<GlassCard data-checkout-line-items>/);
-  assert.match(reviewSource, /<GlassCard data-checkout-price-section>/);
-  assert.doesNotMatch(reviewSource, /rounded-3xl border border-slate-200 bg-white/);
+test("Checkout Review uses plain sections without nested cards", () => {
+  assert.match(reviewSource, /<CheckoutSection data-checkout-line-items>/);
+  assert.match(reviewSource, /<CheckoutSection data-checkout-price-section>/);
+  assert.doesNotMatch(reviewSource, /<GlassCard/);
 });
 
-test("Checkout Review price section is a GlassCard so the total is never clipped on 320px", () => {
-  assert.match(reviewSource, /<GlassCard data-checkout-price-section>[\s\S]*?Final total[\s\S]*?<\/GlassCard>/);
+test("Checkout Review keeps the authoritative final total in a wrapping plain section", () => {
+  assert.match(
+    reviewSource,
+    /<CheckoutSection data-checkout-price-section>[\s\S]*?data-checkout-final-total[\s\S]*?<\/CheckoutSection>/
+  );
+  assert.match(css, /\.dc-checkout-total[\s\S]*?flex-wrap:\s*wrap/);
 });
 
 test("Checkout Review uses min-w-0 + line-clamp on the line-item title so 320px doesn't overflow", () => {
@@ -90,26 +102,30 @@ test("Checkout Review uses min-w-0 + line-clamp on the line-item title so 320px 
   assert.match(lineItemSource, /min-w-0 flex-1/);
 });
 
-test("Checkout Review uses gap-2 grid-cols-2 for the back/refresh action row so both fit on 320px", () => {
-  assert.match(reviewSource, /grid-cols-2[^"]*gap-2/);
+test("Checkout has a single source-back action and a readable non-duplicated refresh action", () => {
+  assert.match(reviewSource, /!showError && !quoteExpired/);
+  assert.match(reviewSource, /Refresh quote/);
+  assert.match(appSource, /aria-label="Back to source"/);
+  assert.match(css, /\.dc-checkout-text-action[\s\S]*?min-height:\s*2\.75rem/);
 });
 
-test("Checkout Review uses p-1 text-center helper text for safe 320px wrapping", () => {
-  assert.match(reviewSource, /px-1 text-center text-\[1[01]px\]/);
+test("Checkout notes wrap without tiny helper text", () => {
+  assert.match(reviewSource, /className="dc-checkout-note"/);
+  assert.match(css, /\.dc-checkout-note[\s\S]*?overflow-wrap:\s*anywhere/);
 });
 
 // ---------------------------------------------------------------------------
 // Success step: per-section structure
 // ---------------------------------------------------------------------------
 
-test("Checkout Success renders every section as a GlassCard (Phase A)", () => {
-  const matches = successSource.match(/<GlassCard/g) || [];
-  assert.ok(matches.length >= 3, `expected ≥ 3 GlassCard sections, got ${matches.length}`);
-  assert.doesNotMatch(successSource, /rounded-3xl border border-slate-200 bg-white/);
+test("Checkout Success is a read-only receipt with plain sections", () => {
+  assert.ok((successSource.match(/<CheckoutSection/g) || []).length >= 3);
+  assert.doesNotMatch(successSource, /<GlassCard|confetti|Replay/);
 });
 
-test("Checkout Success uses truncate on the receipt row values to avoid horizontal scroll", () => {
-  assert.match(successSource, /<dd[^>]*truncate|<dt[^>]*truncate|truncate/);
+test("Receipt IDs wrap so their full values remain readable", () => {
+  assert.match(successSource, /dc-checkout-facts/);
+  assert.match(css, /\.dc-checkout-facts dd[\s\S]*?overflow-wrap:\s*anywhere/);
 });
 
 test("Checkout Success has a back-to-source CTA that fits a 320px viewport", () => {
@@ -120,19 +136,10 @@ test("Checkout Success has a back-to-source CTA that fits a 320px viewport", () 
 // Buyer card
 // ---------------------------------------------------------------------------
 
-test("Checkout Review: buyer card uses truncate on name/email so 320px doesn't overflow", () => {
-  // The buyer card uses a block layout (space-y-1) so `truncate` on
-  // each <p> is sufficient — no min-w-0 needed. The regex looks for a
-  // `<p>` whose class list contains `truncate` and whose body
-  // immediately follows with `{buyer.<field>`.
-  assert.match(
-    reviewSource,
-    /<p[^>]*\btruncate\b[^>]*>\s*\{buyer\.name/,
-  );
-  assert.match(
-    reviewSource,
-    /<p[^>]*\btruncate\b[^>]*>\s*\{buyer\.email/,
-  );
+test("Checkout buyer details wrap instead of hiding identity behind truncation", () => {
+  assert.match(reviewSource, /className="dc-checkout-buyer-name"/);
+  assert.match(reviewSource, /buyer\.email \|\| "No email on file"/);
+  assert.match(css, /\.dc-checkout-buyer-name[\s\S]*?overflow-wrap:\s*anywhere/);
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +210,7 @@ test("Checkout App does not import the deprecated `src/data/checkoutData.ts` sin
     assert.doesNotMatch(
       codeOnly,
       /data\/checkoutData/,
-      "Checkout component still references the deprecated `src/data/checkoutData.ts` singleton in code",
+      "Checkout component still references the deprecated `src/data/checkoutData.ts` singleton in code"
     );
   }
 });
@@ -213,10 +220,7 @@ test("Checkout Context exposes the canonical `refresh()` action so a 320px user 
   // (src/checkout/types.ts) and implemented in the provider. The
   // provider must call fetchQuote (the Part 4 endpoint) inside the
   // refresh handler.
-  const typesSource = fs.readFileSync(
-    path.join(repoRoot, "src/checkout/types.ts"),
-    "utf8",
-  );
+  const typesSource = fs.readFileSync(path.join(repoRoot, "src/checkout/types.ts"), "utf8");
   assert.match(typesSource, /refresh: \(\) => Promise<void>/);
   assert.match(contextSource, /useCallback\(async \(\) => \{[^]*fetchQuote/s);
 });

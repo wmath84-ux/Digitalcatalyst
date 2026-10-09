@@ -224,7 +224,7 @@ test("the owned-plan summary lists exactly the features the member paid for", ()
   assert.deepEqual(
     summary.features.map((f) => f.id),
     ["my-day", "premium-content"],
-    "features the member does not own must never appear as included",
+    "features the member does not own must never appear as included"
   );
   assert.equal(summary.featureCount, 2);
   assert.deepEqual(summary.productTitles, ["React Masterclass"]);
@@ -296,12 +296,15 @@ test("the subscription page always keeps plan selection visible without a member
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   assert.match(page, /evaluateSubscriptionSelection/);
   assert.match(page, /const isSelectionOwned = ownershipState\.owned/);
-  assert.match(page, /data-subscription-layout data-subscription-workspace/);
-  assert.match(page, /<PlanOverview/);
-  assert.match(page, /<CourseSelectTrigger/);
-  assert.match(page, /<FeatureSelectTrigger/);
+  assert.match(page, /data-subscription-layout\s+data-subscription-workspace/);
+  assert.match(page, /<MinimalPlanPicker/);
+  assert.match(page, /data-subscription-course-trigger/);
+  assert.match(page, /data-subscription-feature-trigger/);
   assert.match(page, /<PriceSummary/);
-  assert.doesNotMatch(page, /buildOwnedPlanSummary|<OwnedPlanCard|<ActiveMemberView|data-subscription-member-view/);
+  assert.doesNotMatch(
+    page,
+    /buildOwnedPlanSummary|<OwnedPlanCard|<ActiveMemberView|data-subscription-member-view/
+  );
   assert.doesNotMatch(page, /data-subscription-upgrade-button/);
 });
 
@@ -309,7 +312,10 @@ test("the subscription icon routes every account to the common plan-selection pa
   const main = read("src/main.tsx");
   const profileApp = read("src/profile/App.tsx");
   const page = read("src/subscription/components/SubscriptionPage.tsx");
-  assert.match(profileApp, /const openPlans = \(\) => \{\s*window\.location\.hash = "#\/subscription";\s*\}/);
+  assert.match(
+    profileApp,
+    /const openPlans = \(\) => \{\s*window\.location\.hash = "#\/subscription";\s*\}/
+  );
   assert.match(profileApp, /onNavigateToSubscription=\{openPlans\}/);
   assert.match(main, /if \(hash\.startsWith\(SUBSCRIPTION_HASH\)\) \{[\s\S]*?<SubscriptionApp/);
   assert.match(page, /Active and free accounts both land on this same plan-selection page/);
@@ -320,24 +326,21 @@ test("the page refuses to start checkout for a blocked selection", () => {
   assert.match(page, /if \(ownershipState\.blocked\) \{[\s\S]*?setSubmitError\([\s\S]*?return;/);
 });
 
-test("the subscribe bar renders the owned tone from the shared helper", () => {
+test("The single checkout action preserves shared ownership labels, reasons and disabled state", () => {
   const bar = read("src/subscription/components/SubscribeBar.tsx");
   assert.match(bar, /resolveSubscribeCta/);
   assert.match(bar, /data-subscription-owned=/);
-  assert.match(bar, /data-subscription-cta-tone=\{cta\.tone\}/);
-  // The shared button stays white at rest; the owned distinction remains a
-  // semantic hover/loading accent rather than an idle green fill.
-  assert.match(bar, /isOwned\s*\n?\s*\? OWNED_CLAIM_COLOR/, "owned CTA must use a distinct colour");
-  assert.match(bar, /const OWNED_CLAIM_COLOR = "#059669"/, "owned colour stays emerald-600");
-  assert.match(bar, /<PaymentButton/);
+  assert.match(bar, /cta\.disabled/);
+  assert.match(bar, /ownershipState\.reason/);
+  assert.match(bar, /<button[\s\S]*?data-subscription-cta/);
 });
 
 test("the plan picker marks which plan and cycle are already active", () => {
-  const overview = read("src/subscription/components/PlanOverview.tsx");
-  assert.match(overview, /ownedPlanId/);
-  assert.match(overview, /ownedCycle/);
-  assert.match(overview, /data-subscription-plan-owned/);
-  assert.match(overview, /data-subscription-cycle-owned/);
+  const picker = read("src/subscription/components/MinimalPlanPicker.tsx");
+  assert.match(picker, /data-subscription-plan-owned/);
+  assert.match(picker, /data-subscription-cycle-owned/);
+  assert.match(picker, /Current plan/);
+  assert.match(picker, /ownedCycle === "yearly"/);
 });
 
 test("Profile now presents and manages the active plan, including early renewal", () => {
@@ -347,8 +350,9 @@ test("Profile now presents and manages the active plan, including early renewal"
   assert.match(profile, /data-member-features/);
   assert.match(profile, /Courses in your plan/);
   assert.match(profile, /data-member-manage-actions/);
-  assert.match(profile, /!renewalView\?\.canRenew/);
-  assert.match(profile, /label=\{active \? "Renew early" : "Renew subscription"\}/);
+  assert.match(profile, /renewalView\?\.canRenew/);
+  assert.match(profile, /const renewLabel = renewalView\?\.canRenew/);
+  assert.match(profile, /label=\{renewLabel\}/);
   assert.match(profile, /data-member-renew/);
   assert.match(profile, /data-member-change-plan/);
   assert.match(profileApp, /const reminderRef = subscriptionRenewal/);

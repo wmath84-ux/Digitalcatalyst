@@ -155,10 +155,8 @@ test("CheckoutReviewStep coupon card renders a Remove button (data-checkout-coup
 });
 
 test("CheckoutReviewStep coupon card renders a loading state during apply / remove", () => {
-  // The Apply / Remove buttons show a spinner while
-  // `couponStatus === "applying"`. The card is disabled while a
-  // round-trip is in flight.
-  assert.match(reviewStep, /applying\s*\?\s*<LoaderCircle/);
+  assert.match(reviewStep, /applying\s*\?\s*"Applying…"/);
+  assert.match(reviewStep, /applying\s*\?\s*"Removing…"/);
   assert.match(reviewStep, /disabled=\{applying \|\| disabled\}/);
 });
 
@@ -168,9 +166,10 @@ test("CheckoutReviewStep coupon card renders an error state (data-checkout-coupo
   assert.match(reviewStep, /errorMessage\s*&&/);
 });
 
-test("CheckoutReviewStep coupon card renders a verified-savings badge when a coupon is applied", () => {
+test("CheckoutReviewStep presents the actual verified coupon reduction without a decorative badge", () => {
   assert.match(reviewStep, /data-checkout-coupon-applied/);
-  assert.match(reviewStep, /Verified savings/);
+  assert.match(reviewStep, /Verified reduction/);
+  assert.match(reviewStep, /formatRupee\(appliedDiscount\)/);
 });
 
 test("CheckoutReviewStep price section shows the coupon discount only when a coupon is applied", () => {
@@ -205,7 +204,7 @@ test("CheckoutSuccessStep coupon row renders the percent / flat label", () => {
 });
 
 test("CheckoutSuccessStep coupon discount row renders when a coupon was applied", () => {
-  // The discount row in the totals section only renders when
-  // `couponDiscount > 0`.
-  assert.match(successStep, /couponDiscount > 0 \? <ReceiptRow label="Coupon discount"/);
+  assert.match(successStep, /quote\.couponCode/);
+  assert.match(successStep, /quote\.couponIsReferral/);
+  assert.match(successStep, /formatCheckoutMoney\(quote\.couponDiscount\)/);
 });

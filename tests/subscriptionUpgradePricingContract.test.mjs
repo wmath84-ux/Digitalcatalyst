@@ -10,7 +10,7 @@ test("admin-configured plan price is charged by both client and server", () => {
   const admin = read("src/admin/pages/SubscriptionsPage.tsx");
   assert.match(engine, /const planPricePaise = getPlanCyclePricePaise\(plan, cycle\)/);
   assert.match(engine, /effectivePrice: planPricePaise/);
-  assert.match(page, /plan\.yearlyPricePaise : plan\.monthlyPricePaise/);
+  assert.match(page, /plan\.yearlyPricePaise\s*:\s*plan\.monthlyPricePaise/);
   assert.match(admin, /Monthly plan price \(₹\)/);
   assert.match(admin, /Yearly plan price \(₹\)/);
 });
@@ -33,7 +33,7 @@ test("active subscribers use the shared picker and can select their own or a HIG
   assert.equal(
     page.includes("Choose any active plan, feature, or product below"),
     false,
-    "the arbitrary-plan banner must be gone — only upgrades are shown now",
+    "the arbitrary-plan banner must be gone — only upgrades are shown now"
   );
   assert.match(writer, /const isPlanChange = previous\.exists/);
   assert.match(writer, /const subscriptionBase = isPlanChange \? args\.now/);

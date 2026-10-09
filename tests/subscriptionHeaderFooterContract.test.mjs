@@ -11,7 +11,7 @@ const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const subscriptionPage = read("src/subscription/components/SubscriptionPage.tsx");
 const subscriptionApp = read("src/subscription/App.tsx");
-const subscriptionCss = read("src/subscription/subscription.css");
+const subscriptionCss = read("src/subscription/subscription-minimal.css");
 const main = read("src/main.tsx");
 const header = read("src/components/Header.tsx");
 const footer = read("src/components/BottomNav.tsx");
@@ -19,7 +19,10 @@ const footerShell = read("src/components/SiteFooterNav.tsx");
 
 test("subscription page renders the shared Eduvora header and footer", () => {
   assert.match(subscriptionPage, /import Header from "\.\.\/\.\.\/components\/Header"/);
-  assert.match(subscriptionPage, /import BottomNav, \{ type TabKey \} from "\.\.\/\.\.\/components\/BottomNav"/);
+  assert.match(
+    subscriptionPage,
+    /import BottomNav, \{ type TabKey \} from "\.\.\/\.\.\/components\/BottomNav"/
+  );
   assert.match(subscriptionPage, /<Header[\s\S]*cartCount=\{cartCount\}/);
   assert.match(subscriptionPage, /<BottomNav active=\{null\} onChange=\{onNavigateFooter\}/);
   assert.match(header, /data-site-header/);
@@ -29,18 +32,14 @@ test("subscription page renders the shared Eduvora header and footer", () => {
 });
 
 test("subscription loading and catalog-error states keep the header and footer", () => {
-  // Loading + error states render inside the shared shell instead of replacing the page.
   assert.match(subscriptionPage, /data-subscription-loading/);
   assert.match(subscriptionPage, /data-subscription-catalog-error/);
-  // The main is also the page's overlay-bounds column (My Day's pattern):
-  // every picker opened from this page clamps to it on tablet / desktop.
-  // The content column is also `overflow-x-hidden` so a wide plan table
-  // cannot leak a horizontal scrollbar onto the whole page.
   assert.match(
     subscriptionPage,
-    /<main ref=\{contentColumnRef\} data-subscription-page className="flex-1 overflow-x-hidden overflow-y-auto">/,
+    /<main[\s\S]*?ref=\{contentColumnRef\}[\s\S]*?data-subscription-page/
   );
   assert.match(subscriptionPage, /<OverlayBoundsProvider value=\{contentColumnRef\}>/);
+  assert.match(subscriptionCss, /\.dc-subscription-compare-scroll[\s\S]*?overflow:\s*auto/);
 });
 
 test("subscription route wires the same navigation destinations as other pages", () => {
@@ -56,23 +55,11 @@ test("subscription route wires the same navigation destinations as other pages",
 });
 
 test("subscription page owns a responsive design system (phone / tablet / desktop)", () => {
-  // The design system is a real stylesheet, loaded by the route component so
-  // it sits after the app theme and can win the layout back from the legacy
-  // container-query block in src/index.css.
-  assert.match(subscriptionApp, /import "\.\/subscription\.css"/);
-  // Phone → tablet → desktop widths, then the two-column workspace with the
-  // sticky review rail (the Store page's model: one column that knows its
-  // width, then a real workspace).
-  assert.match(subscriptionCss, /\[data-subscription-shell\]/);
-  assert.match(subscriptionCss, /\[data-subscription-workspace\]/);
-  assert.match(subscriptionCss, /grid-template-columns: minmax\(0, 1fr\) minmax\(320px, var\(--sub-rail-w\)\)/);
-  assert.match(subscriptionCss, /position: sticky !important/);
-  assert.match(subscriptionPage, /data-subscription-workspace/);
-  assert.match(subscriptionPage, /data-subscription-shell/);
-  // The user's rule: a MIX of materials, never all-glass. Content the buyer
-  // must read is a solid plate; glass survives only where it is the point
-  // (the swipe deck, the sticky buy bar, the modals).
-  assert.match(subscriptionCss, /\[data-subscription-step\] \.dc-glass-card/);
-  assert.match(subscriptionCss, /backdrop-filter: none !important/);
-  assert.match(subscriptionCss, /\[data-subscription-step\] > \.dc-sub-step-body/);
+  assert.doesNotMatch(subscriptionApp, /import "\.\/subscription\.css"/);
+  assert.match(subscriptionPage, /import "\.\.\/subscription-minimal\.css"/);
+  assert.match(subscriptionCss, /container-name:\s*dc-subscription/);
+  assert.match(subscriptionCss, /@container dc-subscription \(min-width:\s*860px\)/);
+  assert.match(subscriptionCss, /grid-template-columns:\s*minmax\(0, 1\.25fr\) minmax\(0, 1fr\)/);
+  assert.match(subscriptionCss, /background:\s*transparent/);
+  assert.match(subscriptionCss, /box-shadow:\s*none/);
 });

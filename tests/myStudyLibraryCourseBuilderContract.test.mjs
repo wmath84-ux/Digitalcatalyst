@@ -86,25 +86,33 @@ test("every course card is the store's product card — image, title, Play, Edit
   assert.match(card, /fallbackCoverImage\(course\.id\)/);
   // Nothing else on the card: no favourite heart, no price, no rating, no
   // rating count, no share/study-pack row.
-  for (const gone of [/onToggleFavorite/, /₹/, /ratingCount/, /Trending/, /data-create-study-pack/]) {
+  for (const gone of [
+    /onToggleFavorite/,
+    /₹/,
+    /ratingCount/,
+    /Trending/,
+    /data-create-study-pack/,
+  ]) {
     assert.doesNotMatch(card, gone, `card carries an extra control: ${gone}`);
   }
 });
 
-test("the '+' opens the builder from the grid tile, the empty state and a floating button", () => {
+test("One New course action opens the builder; course open and edit routes remain intact", () => {
   assert.match(study, /MY_COURSE_NEW_HASH = "#\/my-course\/new"/);
-  assert.match(study, /data-my-course-create\b/);
-  assert.match(study, /data-my-course-create-empty/);
-  assert.match(study, /data-my-course-create-fab/);
-  // Play and Edit go to the player / editor routes for that course.
-  assert.match(study, /export const myCoursePlayHash = \(courseId: string\) => `#\/my-course\/\$\{encodeURIComponent\(courseId\)\}`;/);
-  assert.match(study, /export const myCourseEditHash = \(courseId: string\) => `#\/my-course\/\$\{encodeURIComponent\(courseId\)\}\/edit`;/);
+  assert.equal((study.match(/data-my-course-create\b/g) || []).length, 1);
+  assert.doesNotMatch(study, /data-my-course-create-empty|data-my-course-create-fab/);
+  assert.match(study, /encodeURIComponent\(courseId\)/);
+  assert.match(study, /myCoursePlayHash\(course\.id\)/);
+  assert.match(study, /myCourseEditHash\(course\.id\)/);
 });
 
 test("the card's Delete asks first, through the Profile page's own glass", () => {
   // The card only requests; the shelf confirms and deletes (the builder keeps
   // its own delete for the edit flow — "card par hi delete, andar bhi").
-  assert.match(study, /const \[pendingDelete, setPendingDelete\] = useState<MyCourse \| null>\(null\);/);
+  assert.match(
+    study,
+    /const \[pendingDelete, setPendingDelete\] = useState<MyCourse \| null>\(null\);/
+  );
   assert.match(study, /await myCourses\.remove\(pendingDelete\.id\)/);
   assert.match(study, /<ConfirmDialog[\s\S]{0,160}material="profile"/);
   // The shared dialog grew a material switch, and "profile" is verbatim the
@@ -115,10 +123,16 @@ test("the card's Delete asks first, through the Profile page's own glass", () =>
   assert.match(confirm, /blur=\{14\}/);
   assert.doesNotMatch(confirm, /tintColor=\{/);
   assert.doesNotMatch(confirm, /dc-rev-glass/);
-  assert.match(confirm, /profileGlass\n\s+\? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"/);
+  assert.match(
+    confirm,
+    /profileGlass\n\s+\? "glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white sm:max-w-md lg:max-w-lg"/
+  );
   // …and the `scene` path is byte-for-byte what My Day / Home pin.
-  assert.match(confirm, /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/);
-  assert.match(profile, /<ProfileCard data-profile-hero/);
+  assert.match(
+    confirm,
+    /"dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"/
+  );
+  assert.match(profile, /<section data-profile-hero/);
 });
 
 test("the builder overlay wears the Profile glass and lays out for every screen", () => {
@@ -129,17 +143,29 @@ test("the builder overlay wears the Profile glass and lays out for every screen"
   assert.doesNotMatch(editor, /tint=\{|tintColor|blur=\{/);
   const panels = editor.match(/<GlassSurface radius=\{32\}/g) ?? [];
   assert.equal(panels.length, 2, `both panels wear the radius-32 surface (found ${panels.length})`);
-  assert.match(editor, /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta/);
-  assert.match(editor, /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules/);
+  assert.match(
+    editor,
+    /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-meta/
+  );
+  assert.match(
+    editor,
+    /className="relative overflow-hidden text-white" contentClassName="p-4 sm:p-5" data-my-course-modules/
+  );
   // The sticky action bar keeps radius 0 (edge-to-edge bar, not a card).
-  assert.match(editor, /radius=\{0\}\s+className="sticky bottom-0 z-30 border-t border-white\/15 text-white"/);
+  assert.match(
+    editor,
+    /radius=\{0\}\s+className="sticky bottom-0 z-30 border-t border-white\/15 text-white"/
+  );
   // No dark slabs left in the overlay.
   assert.doesNotMatch(editor, /bg-slate-950\/85/);
   assert.doesNotMatch(editor, /rounded-3xl border border-white\/10 bg-white\/\[0\.04\]/);
   // 2 · fluid layout: single column on a phone, side-by-side panels on a
   // desktop, and the cover beside the fields from 640px.
   assert.match(editor, /max-w-\[1280px\]/);
-  assert.match(editor, /grid grid-cols-1 items-start gap-4 xl:grid-cols-\[minmax\(0,20rem\)_minmax\(0,1fr\)\]/);
+  assert.match(
+    editor,
+    /grid grid-cols-1 items-start gap-4 xl:grid-cols-\[minmax\(0,20rem\)_minmax\(0,1fr\)\]/
+  );
   assert.match(editor, /mt-4 grid gap-4 sm:grid-cols-\[190px_minmax\(0,1fr\)\] xl:grid-cols-1/);
   // 3 · the builder's own delete still rides the same profile-glass dialog.
   assert.match(editor, /<ConfirmDialog[\s\S]{0,120}material="profile"/);
@@ -157,7 +183,10 @@ test("a course without a cover gets a random one, persisted at save", () => {
   assert.match(covers, /export const randomCoverImage = \(\): string =>/);
   // Persisted in the write itself, so BOTH paths (Firestore and the server
   // fallback, which sends `clean`) carry the cover.
-  assert.match(client, /if \(!String\(clean\.coverImage \|\| ""\)\.trim\(\)\) clean\.coverImage = randomCoverImage\(\);/);
+  assert.match(
+    client,
+    /if \(!String\(clean\.coverImage \|\| ""\)\.trim\(\)\) clean\.coverImage = randomCoverImage\(\);/
+  );
   // The player's identity image falls back the same way.
   assert.match(adapter, /image: course\.coverImage \|\| fallbackCoverImage\(course\.id\)/);
 });
@@ -199,7 +228,21 @@ test("a resource carries name, file type, a link OR an upload, and details", () 
   assert.match(editor, /data-my-resource-file/);
   assert.match(editor, /uploadMyCourseResourceFile\(/);
   // Every file type the official player understands, plus Brain.
-  for (const type of ["youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "image", "google_form", "embed", "ebook", "mindmap", "brain"]) {
+  for (const type of [
+    "youtube",
+    "video",
+    "audio",
+    "pdf",
+    "doc",
+    "sheet",
+    "slides",
+    "image",
+    "google_form",
+    "embed",
+    "ebook",
+    "mindmap",
+    "brain",
+  ]) {
     assert.match(editor, new RegExp(`id: "${type}"`), `resource type missing: ${type}`);
   }
   // A resource the player cannot open is named out loud in the editor.
@@ -224,7 +267,10 @@ test("Brain (MCQ) creation mirrors the admin: bulk paste AND hand-written questi
   // prompt, ≥2 options, a marked answer and its explanation, which is never
   // optional anywhere the learner or the admin touches a set.
   assert.match(brain, /practiceQuestionIssues/);
-  assert.match(brain, /export const myQuestionIssues = \(question: MyCourseQuestion\): string\[\] => practiceQuestionIssues\(question\);/);
+  assert.match(
+    brain,
+    /export const myQuestionIssues = \(question: MyCourseQuestion\): string\[\] => practiceQuestionIssues\(question\);/
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -237,10 +283,16 @@ test("courses live in users/{uid}/myCourses and the rules re-derive ownership fr
   assert.match(client, /doc\(db, "users", uid, MY_COURSES_COLLECTION, courseId\)/);
   assert.match(rules, /match \/myCourses\/\{courseId\}/);
   assert.match(rules, /allow read, delete: if isOwner\(uid\) \|\| isAdmin\(\);/);
-  assert.match(rules, /allow create, update: if isOwner\(uid\)[\s\S]*?request\.resource\.data\.uid == uid/);
+  assert.match(
+    rules,
+    /allow create, update: if isOwner\(uid\)[\s\S]*?request\.resource\.data\.uid == uid/
+  );
   // Never writable into another learner's namespace, never a plan/entitlement
   // surface: no purchase, coin or subscription fields may ride along.
-  assert.match(rules, /!request\.resource\.data\.keys\(\)\.hasAny\(\['role', 'status', 'purchasedProductIds'/);
+  assert.match(
+    rules,
+    /!request\.resource\.data\.keys\(\)\.hasAny\(\['role', 'status', 'purchasedProductIds'/
+  );
   // Document-size guard rails.
   assert.match(types, /MY_COURSE_MAX_MODULES/);
   assert.match(types, /MY_COURSE_MAX_RESOURCES/);
@@ -304,16 +356,31 @@ test("settings stay, the three official-resource rows do not", () => {
 });
 
 test("everything the learner writes is stored under mine-<courseId>", () => {
-  assert.match(player, /storageProductId = isMine && mine \? `mine-\$\{mine\.courseId\}` : String\(product\.id\)/);
-  assert.match(types, /export const myCourseStorageId = \(courseId: string\): string => `mine-\$\{courseId\}`;/);
+  assert.match(
+    player,
+    /storageProductId = isMine && mine \? `mine-\$\{mine\.courseId\}` : String\(product\.id\)/
+  );
+  assert.match(
+    types,
+    /export const myCourseStorageId = \(courseId: string\): string => `mine-\$\{courseId\}`;/
+  );
   // progress · notes · playback · mind maps · AI chat · split ratio
   assert.match(player, /doc\(db, "users", user\.id, "courseProgress", storageProductId\)/);
   // Notes are scoped by the same id, through the cloud hook: one Firestore
   // document per note at `users/{uid}/notes/{noteId}`, `productId` field =
   // `mine-<courseId>`, plus the localStorage mirror under the same key.
-  assert.match(player, /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/);
-  assert.match(read("src/course/useCourseNotes.ts"), /persistLocalNotes\(scope\.uid, scope\.productId, sorted\);/);
-  assert.match(read("src/course/cloudNotes.ts"), /toFirestoreNote\(note, \{ uid: owner, productId: product \}\)/);
+  assert.match(
+    player,
+    /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/
+  );
+  assert.match(
+    read("src/course/useCourseNotes.ts"),
+    /persistLocalNotes\(scope\.uid, scope\.productId, sorted\);/
+  );
+  assert.match(
+    read("src/course/cloudNotes.ts"),
+    /toFirestoreNote\(note, \{ uid: owner, productId: product \}\)/
+  );
   assert.match(player, /loadPlaybackStore\(user\.id, storageProductId\)/);
   assert.match(player, /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/);
   assert.match(player, /productId: storageProductId,\s*\n\s*moduleId: activeMindMapModuleId,/);
@@ -338,7 +405,10 @@ test("the builder and the player are authenticated lazy routes", () => {
   assert.match(main, /<MyCoursePlayerPage/);
   assert.match(routes, /"#\/my-course\/"/);
   // Both require a signed-in learner (the guard bounces to login).
-  const prefixes = routes.slice(routes.indexOf("AUTH_REQUIRED_PREFIXES"), routes.indexOf("] as const;"));
+  const prefixes = routes.slice(
+    routes.indexOf("AUTH_REQUIRED_PREFIXES"),
+    routes.indexOf("] as const;")
+  );
   assert.match(prefixes, /MY_COURSE_PREFIX/);
 });
 
@@ -356,5 +426,8 @@ test("#/my-course/new and #/my-course/<id>/edit open the builder; #/my-course/<i
 
 test("the player route is a full-screen experience; the builder keeps the app chrome", () => {
   assert.match(main, /isMyCoursePlayerRoute\(hash\)/);
-  assert.doesNotMatch(main, /hash\.startsWith\("#\/my-course\/"\)\s*\n\s*\|\| hash\.startsWith\(PROFILE_PREVIEW_HASH\)/);
+  assert.doesNotMatch(
+    main,
+    /hash\.startsWith\("#\/my-course\/"\)\s*\n\s*\|\| hash\.startsWith\(PROFILE_PREVIEW_HASH\)/
+  );
 });

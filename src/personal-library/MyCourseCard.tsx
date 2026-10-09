@@ -12,7 +12,8 @@
 // and a course whose learner never picked a cover shows a random bundled one
 // instead of an empty placeholder (the client also persists one at save time).
 
-import { Layers3, PencilLine, Play, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, Layers3, PencilLine, Play, Trash2 } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import { countModules, countResources } from "../lib/myCourseClient";
 import { fallbackCoverImage } from "../lib/myCourseCovers";
@@ -21,17 +22,83 @@ import "../components/collection-cards.css";
 
 interface MyCourseCardProps {
   course: MyCourse;
+  minimal?: boolean;
   onPlay: (course: MyCourse) => void;
   onEdit: (course: MyCourse) => void;
   onDelete: (course: MyCourse) => void;
 }
 
-export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCourseCardProps) {
+export default function MyCourseCard({
+  course,
+  onPlay,
+  onEdit,
+  onDelete,
+  minimal = false,
+}: MyCourseCardProps) {
+  const [failedCover, setFailedCover] = useState("");
   const moduleCount = countModules(course.modules);
   const resourceCount = countResources(course.modules);
   // No cover set → a stable random one from the bundled pool (never a gap).
   const cover = String(course.coverImage || "").trim() || fallbackCoverImage(course.id);
 
+  if (minimal)
+    return (
+      <article data-my-course-card={course.id} className="dc-study-course-row">
+        <button
+          type="button"
+          data-my-course-play={course.id}
+          className="dc-study-course-open"
+          aria-label={`Open ${course.title || "Untitled course"}`}
+          onClick={() => onPlay(course)}
+        >
+          {cover && failedCover !== cover ? (
+            <img
+              src={cover}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={() => setFailedCover(cover)}
+              data-my-course-cover={course.coverImage ? "" : "fallback"}
+            />
+          ) : (
+            <span className="dc-study-cover-fallback" aria-hidden="true">
+              Course
+            </span>
+          )}
+          <span className="dc-study-course-copy">
+            <strong data-my-course-title>{course.title || "Untitled course"}</strong>
+            <small>
+              {moduleCount} module{moduleCount === 1 ? "" : "s"} · {resourceCount} resource
+              {resourceCount === 1 ? "" : "s"}
+            </small>
+            {course.description ? (
+              <small className="dc-study-course-description">{course.description}</small>
+            ) : null}
+          </span>
+          <ChevronRight aria-hidden="true" />
+        </button>
+        <div className="dc-study-course-actions">
+          <button
+            type="button"
+            data-my-course-edit={course.id}
+            aria-label={`Edit ${course.title || "course"}`}
+            onClick={() => onEdit(course)}
+            className="dc-account-text-action"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            data-my-course-delete={course.id}
+            aria-label={`Delete ${course.title || "course"}`}
+            onClick={() => onDelete(course)}
+            className="dc-study-delete"
+          >
+            Delete
+          </button>
+        </div>
+      </article>
+    );
   return (
     <GlassSurface
       radius={24}
@@ -56,7 +123,8 @@ export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCou
         {resourceCount > 0 ? (
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-md bg-[var(--dc-chrome-glass)] px-1.5 py-0.5 text-[10px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
             <Layers3 size={11} />
-            {moduleCount} module{moduleCount === 1 ? "" : "s"} · {resourceCount} resource{resourceCount === 1 ? "" : "s"}
+            {moduleCount} module{moduleCount === 1 ? "" : "s"} · {resourceCount} resource
+            {resourceCount === 1 ? "" : "s"}
           </span>
         ) : null}
 
@@ -87,7 +155,11 @@ export default function MyCourseCard({ course, onPlay, onEdit, onDelete }: MyCou
       </div>
 
       <div className="dc-collection-body">
-        <h4 className="dc-collection-title" title={course.title || "Untitled course"} data-my-course-title>
+        <h4
+          className="dc-collection-title"
+          title={course.title || "Untitled course"}
+          data-my-course-title
+        >
           {course.title || "Untitled course"}
         </h4>
         {course.description ? (

@@ -1,58 +1,19 @@
-// src/components/checkout/CheckoutSuccessStep.tsx
-//
-// Part 6 — itemised success page. Displays the verified
-// `ServerPriceQuote`'s line items + totals as a clean receipt,
-// alongside the Razorpay orderId / paymentId returned by the
-// verify-payment step and the list of granted entitlement ids
-// written by the Part 6 entitlement writer.
-//
-// The component is read-only by design: it never mutates the quote,
-// never calls the server, and never reaches for `window.confirm`. All
-// destructive actions (cancel / back to source) live in the parent
-// `CheckoutApp`.
-
-import { useEffect, useState } from "react";
-import { GlassCard } from "../ui/GlassCard";
-import { GlassButton } from "../ui/glass-button";
-import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag, Sparkles } from "lucide-react";
+// Read-only receipt. Payment verification and entitlement activation remain
+// server-controlled in PaymentGateway; this screen only presents that result.
 import { useCheckout } from "../../checkout/CheckoutContext";
+import type { PurchaseKind } from "../../types/commerce";
+import CheckoutSection, { formatCheckoutMoney } from "./CheckoutSection";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
-import UnlockCelebration from "../subscription/UnlockCelebration";
-import type { CheckoutLineItem, PurchaseKind } from "../../types/commerce";
-import { formatPaise } from "../../utils/money";
-
-const formatRupee = formatPaise;
-
-const formatTimestamp = (value: number): string => {
-  if (!Number.isFinite(value)) return "";
-  return new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
-};
-
-const PURCHASE_KIND_LABEL: Record<string, string> = {
-  full_product: "Course / product",
-  selected_modules: "Modules",
-  selected_resources: "Resources",
-  cart_bundle: "Cart bundle",
-  paid_update: "Paid update",
-  free_entitlement: "Free entitlement",
-  subscription: "Subscription",
-  subscription_features: "Subscription add-on",
-};
+import { SubscriptionUnlocksCard, PURCHASE_TYPE_LABEL } from "./CheckoutReviewStep";
+import { useCatalog } from "../../context/CatalogContext";
 
 export interface CheckoutSuccessStepProps {
-  /** The Razorpay order id returned by `verify-payment`. */
   orderId?: string | null;
-  /** The Razorpay payment id returned by `verify-payment`. May be null for free paths. */
   paymentId?: string | null;
-  /** Display label for the payment method. */
   paymentMethod?: string | null;
-  /** Entitlement ids the server wrote to `entitlements/{uid}__{entitlementId}`. */
   grantedEntitlementIds?: string[];
-  /** The Part 1 purchase kind from the verified quote. */
   purchaseKind?: PurchaseKind | string | null;
-  /** The cash the user paid in paise (Razorpay amount). */
   cashPaid?: number;
-  /** The minimum payable from the quote (used for the "min" label). */
   minimumPayable?: number;
   currency?: string;
   onGoToLibrary?: () => void;
@@ -63,7 +24,7 @@ export default function CheckoutSuccessStep({
   orderId,
   paymentId,
   paymentMethod,
-  grantedEntitlementIds,
+  grantedEntitlementIds = [],
   purchaseKind,
   cashPaid,
   minimumPayable,
@@ -72,236 +33,146 @@ export default function CheckoutSuccessStep({
   onBackToSource,
 }: CheckoutSuccessStepProps) {
   const checkout = useCheckout();
+  const { products } = useCatalog();
   const quote = checkout.quote;
-  const lineItems: CheckoutLineItem[] = quote?.verifiedLineItems || [];
-  const displayItems = lineItems.filter((line) => !line.alreadyOwned);
-
-  // A membership activation is a milestone, not a receipt line: greet it
-  // with the sparkle-blast celebration instead of the plain library CTA.
-  const isSubscription = purchaseKind === "subscription" || purchaseKind === "subscription_features";
-  const [celebrationOpen, setCelebrationOpen] = useState(false);
-  useEffect(() => {
-    if (isSubscription) setCelebrationOpen(true);
-  }, [isSubscription]);
-
-  const planLabel =
-    lineItems.find((line) => line.kind === "subscription")?.title ||
-    quote?.subscriptionPlanId ||
-    "Premium";
-  const unlockedFeatureNames = lineItems
-    .filter((line) => line.kind === "subscription_features" && line.featureId)
-    .map((line) => String(line.title || line.featureId));
-  const subscriptionExpiryLabel = quote?.subscriptionExpiresAt
-    ? new Date(Number(quote.subscriptionExpiresAt)).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "";
-
-  if (!quote) {
+  if (!quote)
     return (
-      <div className="rounded-3xl border border-amber-400/30 bg-amber-500/15 p-5 text-sm text-amber-200">
-        <p className="font-black">No verified quote found.</p>
-        <p className="mt-1 text-xs text-amber-200">Please return to the source page to start a new checkout.</p>
+      <div data-checkout-success-step role="alert" className="dc-checkout-recovery">
+        <h2>Receipt unavailable</h2>
+        <p>No verified quote was found. Return to the source to check this purchase.</p>
       </div>
     );
-  }
-
-  const regularSubtotal = quote.regularSubtotal || 0;
-  const saleDiscount = quote.saleDiscount || 0;
-  const couponDiscount = quote.couponDiscount || 0;
-  const quoteCashPayable = quote.cashPayable || 0;
-  const quoteMinimumPayable = quote.minimumPayable || 0;
-  // Prefer the verified-payment `cashPaid` (the actual Razorpay
-  // amount the user paid). Fall back to the quote's cashPayable,
-  // then to max(cashPayable, minimumPayable).
-  const resolvedCashPaid =
-    typeof cashPaid === "number" && cashPaid > 0
+  const kind = purchaseKind || quote.purchaseKind;
+  const isSubscription = kind === "subscription" || kind === "subscription_features";
+  const finalTotal =
+    typeof cashPaid === "number" && Number.isFinite(cashPaid) && cashPaid >= 0
       ? cashPaid
-      : Math.max(quoteCashPayable, quoteMinimumPayable);
-  const resolvedMinPayable =
-    typeof minimumPayable === "number" && minimumPayable > 0 ? minimumPayable : quoteMinimumPayable;
-  const finalTotal = Math.max(resolvedCashPaid, resolvedMinPayable);
-  const purchaseKindLabel = purchaseKind ? PURCHASE_KIND_LABEL[purchaseKind] || String(purchaseKind) : "—";
-  const effectiveCurrency = currency || quote.currency || "INR";
-
+      : quote.cashPayable;
+  const floor = minimumPayable ?? quote.minimumPayable;
+  const couponRule =
+    quote.couponType === "percent" && quote.couponValue != null
+      ? `${quote.couponValue}% code`
+      : quote.couponType === "flat" && quote.couponValue != null
+      ? `${formatCheckoutMoney(quote.couponValue)} code`
+      : "";
   return (
-    <div className="flex flex-col gap-3" data-checkout-success-step>
-      <div className="flex flex-col items-center gap-2 rounded-3xl border border-emerald-400/30 bg-emerald-500/15 p-5 text-center ">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ">
-          <CircleCheck size={28} />
-        </span>
-        <h2 className="text-xl font-black text-emerald-200">Payment verified</h2>
-        <p className="text-xs text-emerald-200">Access is unlocked and entitlements are saved to your account.</p>
-        <p className="text-[10px] font-mono text-emerald-200">quote {quote.quoteId}</p>
-      </div>
-
-      {/* Receipt header — real order + payment id from verify-payment */}
-      <GlassCard data-checkout-success-receipt>
-        <header className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Receipt</h2>
-          <span className="text-[11px] text-white/55">Issued {formatTimestamp(Date.now())}</span>
-        </header>
-        <dl className="space-y-1.5 text-sm">
-          <ReceiptRow label="Order ID" value={orderId || quote.quoteId} mono />
-          <ReceiptRow label="Payment ID" value={paymentId || "—"} mono />
-          <ReceiptRow label="Payment method" value={paymentMethod || "Razorpay"} />
-          {quote.couponCode ? (
+    <div data-checkout-success-step className="dc-checkout-success">
+      <header className="dc-checkout-success-head">
+        <h2>{finalTotal === 0 ? "Access confirmed" : "Payment verified"}</h2>
+        <p className="dc-checkout-note">
+          {isSubscription
+            ? "Membership access has been updated."
+            : "Your purchased content is available in My Purchases."}
+        </p>
+      </header>
+      {isSubscription ? (
+        <div data-checkout-success-membership-info>
+          <SubscriptionUnlocksCard receipt quote={quote} products={products} />
+        </div>
+      ) : null}
+      <CheckoutSection data-checkout-success-receipt>
+        <h2>Receipt</h2>
+        <dl className="dc-checkout-facts">
+          <ReceiptRow label="Order ID" value={orderId || quote.quoteId} />
+          <ReceiptRow
+            label="Payment ID"
+            value={paymentId || (finalTotal === 0 ? "No payment required" : "Not available")}
+          />
+          <ReceiptRow label="Purchase" value={PURCHASE_TYPE_LABEL[kind] || String(kind)} />
+          <ReceiptRow
+            label="Method"
+            value={finalTotal === 0 ? "Free access" : paymentMethod || "Razorpay"}
+          />
+          <ReceiptRow label="Buyer" value={checkout.buyer?.email || "Not available"} />
+          <ReceiptRow label="Status" value="Verified" />
+        </dl>
+      </CheckoutSection>
+      {!isSubscription ? (
+        <CheckoutSection data-checkout-success-items>
+          <h2>Purchased items</h2>
+          {quote.verifiedLineItems.length ? (
+            quote.verifiedLineItems.map((line) => (
+              <CheckoutLineItemCard minimal readOnly key={line.id} line={line} />
+            ))
+          ) : (
+            <p className="dc-checkout-note">No new chargeable items.</p>
+          )}
+        </CheckoutSection>
+      ) : null}
+      <CheckoutSection data-checkout-success-totals>
+        <h2>Price breakdown</h2>
+        <dl className="dc-checkout-facts">
+          <ReceiptRow label="Items subtotal" value={formatCheckoutMoney(quote.regularSubtotal)} />
+          {quote.saleDiscount > 0 ? (
             <ReceiptRow
-              label="Coupon"
-              value={`${quote.couponCode}${
-                quote.couponType === "percent" && typeof quote.couponValue === "number"
-                  ? ` (${quote.couponValue}% off)`
-                  : quote.couponType === "flat" && typeof quote.couponValue === "number"
-                    ? ` (${formatRupee(quote.couponValue)} off)`
-                    : ""
-              }`}
-              highlight
+              label="Price discount"
+              value={`−${formatCheckoutMoney(quote.saleDiscount)}`}
             />
           ) : null}
-          <ReceiptRow label="Purchase kind" value={purchaseKindLabel} />
-          <ReceiptRow label="Buyer" value={checkout.buyer?.email || checkout.buyer?.uid || "Unknown"} />
-          <ReceiptRow label="Status" value="Verified" badge />
+          {quote.couponCode ? (
+            <ReceiptRow
+              label={`${quote.couponIsReferral ? "Referral" : "Coupon"} (${quote.couponCode})`}
+              value={`−${formatCheckoutMoney(quote.couponDiscount)}${
+                couponRule ? ` · ${couponRule}` : ""
+              }`}
+            />
+          ) : null}
+          {floor > 0 ? (
+            <ReceiptRow label="Minimum payable" value={formatCheckoutMoney(floor)} />
+          ) : null}
         </dl>
-      </GlassCard>
-
-      {/* Granted entitlements */}
-      {Array.isArray(grantedEntitlementIds) && grantedEntitlementIds.length > 0 ? (
-        <GlassCard data-checkout-success-entitlements>
-          <header className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-black uppercase tracking-wider text-white/55">
-              Granted entitlements ({grantedEntitlementIds.length})
-            </h2>
-          </header>
-          <ul className="space-y-1">
+        <div className="dc-checkout-total">
+          <span>Cash paid</span>
+          <strong data-checkout-success-cash-paid>{formatCheckoutMoney(finalTotal)}</strong>
+        </div>
+        <p className="dc-checkout-note">{currency || quote.currency} · verified payment record</p>
+      </CheckoutSection>
+      {grantedEntitlementIds.length ? (
+        <details data-checkout-success-entitlements className="dc-checkout-reference">
+          <summary>Access references ({grantedEntitlementIds.length})</summary>
+          <ul>
             {grantedEntitlementIds.map((id) => (
-              <li
-                key={id}
-                data-granted-entitlement-id={id}
-                className="flex items-center gap-2 truncate rounded-xl border border-white/10 px-3 py-2 text-[11px] font-mono text-white/85"
-              >
-                <BadgeCheck size={12} className="shrink-0 text-emerald-300" />
-                <span className="truncate">{id}</span>
+              <li data-granted-entitlement-id={id} key={id}>
+                {id}
               </li>
             ))}
           </ul>
-        </GlassCard>
+        </details>
       ) : null}
-
-      {/* Line items */}
-      <GlassCard>
-        <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Items ({lineItems.length})</h2>
-          <p className="text-[11px] text-white/55">{displayItems.length} new · {lineItems.length - displayItems.length} already owned</p>
-        </header>
-        <div className="space-y-2">
-          {lineItems.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
-              Nothing to charge for.
-            </p>
-          ) : (
-            lineItems.map((line) => <CheckoutLineItemCard key={line.id} line={line} readOnly />)
-          )}
-        </div>
-      </GlassCard>
-
-      {/* Price summary */}
-      <GlassCard>
-        <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Totals</h2>
-          <p className="text-[10px] text-white/55">GST inclusive · {effectiveCurrency}</p>
-        </header>
-        <dl className="space-y-1.5 text-sm">
-          <ReceiptRow label="Regular subtotal" value={formatRupee(regularSubtotal)} />
-          {saleDiscount > 0 ? <ReceiptRow label="Sale discount" value={`− ${formatRupee(saleDiscount)}`} highlight /> : null}
-          {couponDiscount > 0 ? <ReceiptRow label="Coupon discount" value={`− ${formatRupee(couponDiscount)}`} highlight /> : null}
-          {resolvedMinPayable > 0 ? <ReceiptRow label="Minimum payable" value={formatRupee(resolvedMinPayable)} /> : null}
-        </dl>
-        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
-          <span className="text-base font-black text-white">Cash paid</span>
-          <span data-checkout-success-cash-paid className="text-2xl font-black text-white sm:text-3xl">
-            {formatRupee(finalTotal)}
-          </span>
-        </div>
-      </GlassCard>
-
-      <div className="flex items-start gap-2 rounded-2xl border border-sky-400/30 bg-sky-500/15 p-3 text-xs text-sky-200">
-        <Package className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>
-          Entitlements were written to the canonical <code>entitlements</code> collection in a single transaction. The receipt above is the authoritative record for this purchase.
-        </p>
-      </div>
-
-      {/* CTAs */}
-      <div className="space-y-2 pb-2">
+      <div className="dc-checkout-actions">
         {isSubscription ? (
-          <>
-            <button
-              type="button"
-              onClick={() => { window.location.hash = "#/subscription"; }}
-              data-checkout-success-membership
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99]"
-            >
-              <Sparkles size={18} /> Open my membership
-            </button>
-            <GlassButton
-              variant="capsule"
-              type="button"
-              onClick={() => setCelebrationOpen(true)}
-              className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
-            >
-              Replay celebration
-            </GlassButton>
-          </>
+          <button
+            type="button"
+            data-checkout-success-membership
+            className="dc-checkout-primary"
+            onClick={() => {
+              window.location.hash = "#/profile";
+            }}
+          >
+            Open membership
+          </button>
         ) : (
           <button
             type="button"
+            data-checkout-success-library
+            className="dc-checkout-primary"
             onClick={onGoToLibrary}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-4 text-base font-black text-white transition hover:bg-emerald-500 active:scale-[0.99]"
           >
-            <ShoppingBag size={18} /> Go to my library
+            Open My Purchases
           </button>
         )}
-        <GlassButton
-          variant="capsule"
-          type="button"
-          onClick={onBackToSource}
-          className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
-        >
-          <span className="flex items-center gap-2"><ArrowLeft size={14} /> Back to source</span>
-        </GlassButton>
+        <button type="button" className="dc-checkout-text-action" onClick={onBackToSource}>
+          Back to source
+        </button>
       </div>
-
-      {/* Sparkle-blast welcome for a freshly activated membership. */}
-      <UnlockCelebration
-        open={celebrationOpen}
-        planName={String(planLabel)}
-        featureNames={unlockedFeatureNames}
-        expiresAtLabel={subscriptionExpiryLabel}
-        primaryLabel="Open my membership"
-        onDismiss={() => setCelebrationOpen(false)}
-        onPrimaryAction={() => {
-          setCelebrationOpen(false);
-          window.location.hash = "#/subscription";
-        }}
-      />
     </div>
   );
 }
-
-function ReceiptRow({ label, value, mono, highlight, badge }: { label: string; value: string; mono?: boolean; highlight?: boolean; badge?: boolean }) {
+function ReceiptRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-xs text-white/55 shrink-0">{label}</dt>
-      <dd
-        className={`text-right text-xs min-w-0 truncate ${mono ? "font-mono" : ""} ${highlight ? "font-bold text-emerald-300" : "text-white/85"} ${
-          badge ? "inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30" : ""
-        }`}
-      >
-        {badge ? <BadgeCheck size={10} /> : null}
-        {value}
-      </dd>
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }

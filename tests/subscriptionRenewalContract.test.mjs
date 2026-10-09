@@ -6,7 +6,10 @@ const cron = fs.readFileSync("api/cron/subscription-renewals.ts", "utf8");
 const subscriptions = fs.readFileSync("api/_lib/subscriptions.ts", "utf8");
 const renewal = fs.readFileSync("utils/subscriptionRenewal.js", "utf8");
 const notifications = fs.readFileSync("src/components/NotificationsPage.tsx", "utf8");
-const profile = `${fs.readFileSync("src/profile/App.tsx", "utf8")}\n${fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8")}`;
+const profile = `${fs.readFileSync("src/profile/App.tsx", "utf8")}\n${fs.readFileSync(
+  "src/profile/ProfileLayout.tsx",
+  "utf8"
+)}`;
 const page = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
@@ -16,7 +19,10 @@ test("daily scheduler is authenticated and deduplicates notifications", () => {
   assert.match(cron, /CRON_SECRET/);
   assert.match(cron, /existing\.exists/);
   assert.match(cron, /collectionGroup\("subscription"\)/);
-  assert.deepEqual(vercel.crons[0], { path: "/api/cron/subscription-renewals", schedule: "30 0 * * *" });
+  assert.deepEqual(vercel.crons[0], {
+    path: "/api/cron/subscription-renewals",
+    schedule: "30 0 * * *",
+  });
 });
 
 test("post-expiry reminders run every morning for ten days, then stop", () => {
@@ -49,8 +55,8 @@ test("notifications sync across devices and renewal opens subscription", () => {
 });
 
 test("renewal is manual, restores package, and never claims an auto-charge", () => {
-  assert.match(profile, /Renewal is manual and secure/);
-  assert.match(page, /every renewal requires your confirmation/);
+  assert.match(profile, /Renewal is manual/);
+  assert.match(page, /Renewals are manual and require your confirmation/);
   assert.match(page, /includedProductIds/);
   assert.match(page, /data\.features/);
   assert.doesNotMatch(page, /renews automatically/);

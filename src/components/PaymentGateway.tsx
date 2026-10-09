@@ -18,15 +18,17 @@
 // does not show extra close buttons of our own.
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
-import { GlassSurface } from "./ui/glass";
-import { GlassButton } from "./ui/glass-button";
+import { LoaderCircle } from "lucide-react";
 import { PaymentButton } from "./ui/PaymentButton";
 import { auth } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
-import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
+import {
+  revealCheckoutChromeOverRazorpay,
+  type CheckoutChromeController,
+} from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
-import { formatPaise } from "../utils/money";
+import { formatCheckoutMoney } from "./checkout/CheckoutSection";
+import "./checkout/checkout-minimal.css";
 import { useBranding } from "../context/BrandingContext";
 
 export type VerifiedPayment = {
@@ -116,7 +118,10 @@ const loadRazorpay = () => {
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Razorpay Checkout could not be loaded. Check your connection and try again."));
+    script.onerror = () =>
+      reject(
+        new Error("Razorpay Checkout could not be loaded. Check your connection and try again.")
+      );
     document.head.appendChild(script);
   });
   return razorpayScriptPromise;
@@ -157,7 +162,13 @@ interface VerifyPaymentResponse {
   grantedEntitlementIds?: string[];
 }
 
-export default function PaymentGateway({ quoteId, finalPrice, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+export default function PaymentGateway({
+  quoteId,
+  finalPrice,
+  productName,
+  onPaymentSuccess,
+  onGoBack,
+}: PaymentGatewayProps) {
   const { appName } = useBranding();
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
@@ -166,7 +177,7 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
   // the overlay is released exactly when payment ends or the user leaves.
   const unpinChromeRef = useRef<CheckoutChromeController | null>(null);
   const razorpayHistoryPushedRef = useRef(false);
-  const displayAmount = formatPaise(finalPrice);
+  const displayAmount = formatCheckoutMoney(finalPrice);
 
   const releaseCheckoutChrome = () => {
     unpinChromeRef.current?.release();
@@ -178,7 +189,10 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
     razorpayHistoryPushedRef.current = false;
     if (typeof window === "undefined") return;
     if (window.history.state?.eduvoraRazorpayOpen) {
-      window.history.replaceState({ ...(window.history.state || {}), eduvoraRazorpayOpen: false }, "");
+      window.history.replaceState(
+        { ...(window.history.state || {}), eduvoraRazorpayOpen: false },
+        ""
+      );
     }
   };
 
@@ -245,14 +259,14 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
             paymentMethod: "Razorpay",
             grantedEntitlementIds: result.grantedEntitlementIds || [],
           }),
-        500,
+        500
       );
     } catch (verificationError) {
       setPaymentState("error");
       setError(
         verificationError instanceof Error
           ? verificationError.message
-          : "Payment verification failed. If money was deducted, contact support with your payment ID.",
+          : "Payment verification failed. If money was deducted, contact support with your payment ID."
       );
     }
   };
@@ -266,7 +280,9 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
       // Part 6: only `quoteId` is sent to the server. Product ids
       // and prices are derived server-side from the persisted
       // `ServerPriceQuote`.
-      const order = await apiRequest<CreateOrderResponse>("/api/razorpay/create-order", { quoteId });
+      const order = await apiRequest<CreateOrderResponse>("/api/razorpay/create-order", {
+        quoteId,
+      });
 
       if (order.free) {
         // Free path: the server-side `verify-payment` will still
@@ -289,7 +305,7 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
                 free: true,
                 grantedEntitlementIds: verify.grantedEntitlementIds || [],
               }),
-            400,
+            400
           );
         } catch (freeError) {
           setPaymentState("error");
@@ -299,7 +315,8 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
       }
 
       await loadRazorpay();
-      if (!window.Razorpay || !order.keyId || !order.amount) throw new Error("Razorpay Checkout is unavailable.");
+      if (!window.Razorpay || !order.keyId || !order.amount)
+        throw new Error("Razorpay Checkout is unavailable.");
       setPaymentState("awaiting");
       const checkout = new window.Razorpay({
         key: order.keyId,
@@ -349,57 +366,90 @@ export default function PaymentGateway({ quoteId, finalPrice, productName, onPay
       unpinChromeRef.current = revealCheckoutChromeOverRazorpay();
     } catch (paymentError) {
       setPaymentState("error");
-      setError(paymentError instanceof Error ? paymentError.message : "Could not start secure payment.");
+      setError(
+        paymentError instanceof Error ? paymentError.message : "Could not start secure payment."
+      );
     }
   };
 
-  const busy = paymentState === "creating" || paymentState === "awaiting" || paymentState === "verifying";
+  const busy =
+    paymentState === "creating" || paymentState === "awaiting" || paymentState === "verifying";
 
   return (
-    <div className="flex flex-col gap-4 animate-fadeIn">
-      <GlassSurface radius={16} className="text-white" contentClassName="p-5 text-center">
-        <ShieldCheck className="mx-auto h-9 w-9 text-emerald-300" />
-        <p className="mt-2 text-sm font-black text-white">Server-verified secure checkout</p>
-        <p className="mt-1 text-xs text-white/55">The payable amount comes from the verified quote and is reconfirmed by Razorpay on the server.</p>
-      </GlassSurface>
-
-      <div className="dc-quote rounded-2xl bg-indigo-600 p-5 text-white">
-        <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">{finalPrice === 0 ? "No payment needed" : "Amount to pay"}</p>
-        <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "FREE" : displayAmount}</p>
-        <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
-        <p className="mt-2 truncate text-[10px] font-mono text-indigo-200">quote {quoteId}</p>
-      </div>
-
-      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-300" />} title="Payment verified" detail="Access is being added to your account…" tone="emerald" />}
-      {busy && <StatusCard icon={<LoaderCircle className="h-10 w-10 animate-spin text-indigo-300" />} title={paymentState === "verifying" ? "Verifying payment" : paymentState === "awaiting" ? "Complete payment in Razorpay" : "Creating secure order"} detail={paymentState === "verifying" ? "Do not close this page while the server confirms your payment." : "Your access will unlock only after server verification."} tone="indigo" />}
-      {error && <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 p-4 text-sm font-semibold leading-6 text-rose-200"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
-
-      {paymentState !== "success" && (
-        /* The money action now wears the app's single payment CTA — the
-         * Uiverse "pretty-grasshopper-57" port every pay/checkout surface in
-         * the product shares (src/components/ui/PaymentButton.tsx). Visual
-         * layer only: this still calls the same `startPayment` (quote-driven
-         * `/api/razorpay/create-order` → Razorpay Standard Checkout →
-         * `verify-payment`), keeps the same `disabled={busy}` gate, and the
-         * existing busy copy lands in the reference's filled/loading state.
-         * The idle button stays white; the shared accent only appears during
-         * interaction/loading, keeping every pay surface consistent. */
+    <div data-payment-gateway data-payment-state={paymentState} className="dc-payment-page">
+      <header>
+        <h2>{finalPrice === 0 ? "Confirm free access" : "Payment"}</h2>
+        <p className="dc-checkout-note">{productName}</p>
+      </header>
+      <section className="dc-checkout-section">
+        <div className="dc-checkout-total">
+          <span>{finalPrice === 0 ? "Amount payable" : "Amount to pay"}</span>
+          <strong>{displayAmount}</strong>
+        </div>
+        <p className="dc-checkout-note">The server-verified amount is confirmed before payment.</p>
+      </section>
+      {paymentState === "success" ? (
+        <StatusCard title="Payment verified" detail="Access is being added to your account…" />
+      ) : null}
+      {busy ? (
+        <StatusCard
+          title={
+            paymentState === "verifying"
+              ? "Verifying payment"
+              : paymentState === "awaiting"
+              ? "Complete payment in Razorpay"
+              : "Creating secure order"
+          }
+          detail={
+            paymentState === "verifying"
+              ? "Keep this page open until verification finishes."
+              : "Access unlocks only after server verification."
+          }
+        />
+      ) : null}
+      {error ? (
+        <p role="alert" className="dc-checkout-error">
+          {error}
+        </p>
+      ) : null}
+      {paymentState !== "success" ? (
         <PaymentButton
           block
           size="lg"
+          className="dc-checkout-primary"
+          icon={null}
           loading={busy}
           disabled={busy}
           onClick={startPayment}
           data-payment-gateway-pay=""
-          label={finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${displayAmount}`}
+          label={busy ? "Please wait…" : finalPrice === 0 ? "Confirm free access" : "Pay securely"}
         />
-      )}
-      {!busy && paymentState !== "success" && <GlassButton variant="capsule" onClick={onGoBack} className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold">← Back to order summary</GlassButton>}
-      <p className="text-center text-[11px] font-medium text-white/55">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>
+      ) : null}
+      {!busy && paymentState !== "success" ? (
+        <button type="button" onClick={onGoBack} className="dc-checkout-text-action">
+          Back to review
+        </button>
+      ) : null}
+      <p className="dc-checkout-note">
+        {finalPrice === 0
+          ? "No card or payment is required for this order."
+          : "UPI, cards, net banking and supported wallets through Razorpay. Card details are not stored here."}
+      </p>
+      <details className="dc-checkout-reference">
+        <summary>Order reference</summary>
+        <p>{quoteId}</p>
+      </details>
     </div>
   );
 }
-
-function StatusCard({ icon, title, detail, tone }: { icon: React.ReactNode; title: string; detail: string; tone: "emerald" | "indigo" }) {
-  return <div className={`rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/15" : "border-indigo-400/30 bg-indigo-500/15"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/55">{detail}</p></div>;
+function StatusCard({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div role="status" className="dc-checkout-payment-status">
+      <LoaderCircle aria-hidden="true" className="h-4 w-4" />
+      <div>
+        <h3>{title}</h3>
+        <p className="dc-checkout-note">{detail}</p>
+      </div>
+    </div>
+  );
 }

@@ -5,7 +5,7 @@
 // input, but Part 9 only wires the coupon flow (the referral
 // path is left as a future Part).
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { motion } from "framer-motion";
 import { Tag, Users, CheckCircle2, XCircle, X, Loader2, AlertTriangle } from "lucide-react";
 import { GlassButton } from "../../components/ui/glass-button";
@@ -27,6 +27,8 @@ interface Props {
   /** Server-refused error message (rendered below the input). */
   errorMessage?: string | null;
   disabled?: boolean;
+  /** Plain form for subscription; preserve the existing PDP presentation. */
+  minimal?: boolean;
 }
 
 export default function PromoCodeInput({
@@ -39,7 +41,9 @@ export default function PromoCodeInput({
   kind,
   errorMessage,
   disabled,
+  minimal = false,
 }: Props) {
+  const inputId = useId();
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<"idle" | "error" | "loading">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -51,7 +55,16 @@ export default function PromoCodeInput({
     const code = value.trim();
     if (!code) return;
     setStatus("loading");
-    const result = await onApply(code);
+    let result: PromoResult;
+    try {
+      result = await onApply(code);
+    } catch (error) {
+      result = {
+        valid: false,
+        message:
+          error instanceof Error ? error.message : "Could not apply this code. Please retry.",
+      };
+    }
     if (result.valid) {
       setStatus("idle");
       setValue("");
@@ -64,6 +77,88 @@ export default function PromoCodeInput({
   };
 
   const displayError = errorMsg || errorMessage || "";
+
+  if (minimal)
+    return (
+      <div data-subscription-coupon-input data-code-kind={kind} className="dc-subscription-code">
+        {appliedCode ? (
+          <div className="dc-subscription-code-applied" role="status">
+            <div>
+              <strong>{appliedCode} applied</strong>
+              <p className="dc-subscription-note">{appliedMessage || "Code verified"}</p>
+            </div>
+            <button
+              type="button"
+              className="dc-subscription-text-action"
+              disabled={disabled}
+              aria-label={`Remove ${kind} code`}
+              onClick={onRemove}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <>
+            <label htmlFor={inputId}>{label}</label>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleApply();
+              }}
+            >
+              <input
+                id={inputId}
+                type="text"
+                value={value}
+                placeholder={placeholder}
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={Boolean(disabled) || status === "loading"}
+                aria-invalid={Boolean(displayError)}
+                aria-describedby={displayError ? `${inputId}-error` : undefined}
+                onChange={(event) => {
+                  setValue(event.target.value.toUpperCase());
+                  setErrorMsg("");
+                }}
+              />
+              <button
+                type="submit"
+                className="dc-subscription-text-action"
+                disabled={!value.trim() || status === "loading" || Boolean(disabled)}
+              >
+                {status === "loading" ? "Applying…" : "Apply"}
+              </button>
+            </form>
+            {displayError ? (
+              <div
+                id={`${inputId}-error`}
+                role="alert"
+                data-subscription-coupon-error
+                className="dc-subscription-error"
+              >
+                {displayError}
+                {kind === "referral" && /already used/i.test(displayError) ? (
+                  <>
+                    <p>Each referral ID can be used once. Choose an unused ID.</p>
+                    <button
+                      type="button"
+                      data-referral-already-used
+                      className="dc-subscription-text-action"
+                      onClick={() => {
+                        window.location.hash = "#/leaderboard";
+                      }}
+                    >
+                      View unused IDs
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    );
 
   return (
     <div data-subscription-coupon-input>
@@ -140,11 +235,14 @@ export default function PromoCodeInput({
                       This referral is already used by someone
                     </p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-rose-200">
-                      Each referral ID works only once, and this one has already been redeemed. Try a different code from the leaderboard's unused IDs.
+                      Each referral ID works only once, and this one has already been redeemed. Try
+                      a different code from the leaderboard's unused IDs.
                     </p>
                     <button
                       type="button"
-                      onClick={() => { window.location.hash = "#/leaderboard"; }}
+                      onClick={() => {
+                        window.location.hash = "#/leaderboard";
+                      }}
                       className="mt-2 rounded-full bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white transition hover:bg-rose-500 active:scale-[0.98]"
                     >
                       Open Unused IDs
