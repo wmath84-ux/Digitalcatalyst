@@ -23,8 +23,8 @@ const renderStart = app.indexOf("{homeBanners.length > 0 ? (");
 test("Home renders the requested dashboard sequence", () => {
   const order = [
     renderStart,
-    app.indexOf("<div data-home-category-nav>", renderStart),
     app.indexOf("<div data-home-continue>", renderStart),
+    app.indexOf("<div data-home-category-nav>", renderStart),
     app.indexOf("<section data-home-trending", renderStart),
     app.indexOf('title="Recommended for You"', renderStart),
     app.indexOf("<div data-home-reviews>", renderStart),

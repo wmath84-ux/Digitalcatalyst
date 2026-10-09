@@ -42,15 +42,16 @@ export default function ProductCard({
   const meta = typeMeta[product.type];
   const details = productDetails(product);
   const hasRating = Number.isFinite(product.rating) && product.rating > 0 && product.ratingCount > 0;
-  const hasPrice = product.isFree === true || (Number.isFinite(product.price) && product.price > 0);
-  const hasOriginalPrice = !product.isFree && product.mrp > product.price && product.mrp > 0;
+  const isFree = product.isFree === true || product.price === 0;
+  const hasPrice = isFree || (Number.isFinite(product.price) && product.price >= 0);
+  const hasOriginalPrice = !isFree && Number.isFinite(product.mrp) && product.mrp > product.price && product.mrp > 0;
 
   return (
     <GlassCard
       radius={24}
       tint={0.25}
       blur={0}
-      contentClassName="p-0"
+      contentClassName="flex min-w-0 flex-col p-0"
       className={`dc-scene-plate group relative overflow-hidden text-white dc-home-product-card ${className}`}
     >
       <div className="dc-home-product-shell">
@@ -83,7 +84,7 @@ export default function ProductCard({
               ) : <span className="dc-home-product-rating-spacer" aria-hidden="true" />}
               {hasPrice ? (
                 <span className="dc-home-product-price">
-                  {product.isFree ? "Free" : money(product.price)}
+                  <strong className="dc-home-product-current-price">{isFree ? "Free" : money(product.price)}</strong>
                   {hasOriginalPrice ? <del>{money(product.mrp)}</del> : null}
                 </span>
               ) : null}

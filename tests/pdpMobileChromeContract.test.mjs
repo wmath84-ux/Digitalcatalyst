@@ -90,7 +90,7 @@ test("the chrome-token pills, the stuck tab bar and the mobile CTA take the bar 
 });
 
 test("the copy that sits on the scene with no surface under it takes the scrim", () => {
-  assert.match(pdp, /<nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink flex min-w-0 items-center gap-1\.5 px-4 pt-4 text-\[11px\] text-white\/60">/);
+  assert.match(pdp, /<nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden min-w-0 items-center gap-1\.5 px-4 pt-4 text-\[11px\] text-white\/60 sm:flex">/);
   assert.match(pdp, /<h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase<\/h2>/);
   assert.match(pdp, /<p className="dc-scene-ink text-xs dc-ink-3">/);
   assert.match(pdp, /<div className="dc-scene-ink rounded-2xl border border-amber-400\/30 bg-amber-500\/15/);

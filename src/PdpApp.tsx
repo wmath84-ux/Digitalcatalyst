@@ -702,7 +702,7 @@ function PremiumProductContent({
 
   return (
     <div data-pdp-root className="relative pb-5 text-white">
-      <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink flex min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60">
+      <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60 sm:flex">
         <button type="button" onClick={onBack} className="min-h-9 shrink-0 px-1 transition hover:text-white">Store</button>
         <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
         <span className="shrink-0 text-white/65">{identity.typeLabel}</span>

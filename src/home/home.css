@@ -5,6 +5,8 @@
 [data-home-content] {
   --dc-home-space: clamp(28px, 3vw, 36px);
   --dc-home-gutter: clamp(20px, 2.5vw, 32px);
+  --dc-home-hero-gutter: clamp(10px, 1.25vw, 20px);
+  --dc-home-hero-outset: calc(var(--dc-home-gutter) - var(--dc-home-hero-gutter));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -28,6 +30,13 @@
   width: 100%;
   min-width: 0;
   margin: 0;
+}
+
+/* Let the promotion reach closer to the edges than the reading/card grid.
+   The inset still stays positive, so the wider slide never widens the page. */
+[data-home-content] [data-home-hero] {
+  width: calc(100% + var(--dc-home-hero-outset) * 2);
+  margin-inline: calc(var(--dc-home-hero-outset) * -1);
 }
 
 /* Featured course: preserve the dark glass and artwork, with a calmer copy
@@ -224,41 +233,41 @@
   opacity: 0.45;
 }
 
-/* Category selector — one comfortable touch target row with intentional
-   horizontal scrolling on narrow viewports. */
+/* Category selector — short labels share the available width. All five
+   options stay on screen, even on a 320px phone; no drag or scroll required. */
 .dc-home-category-scroll {
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-inline: contain;
+  max-width: 100%;
   padding: 2px 1px 4px;
-  touch-action: pan-x;
-  -webkit-overflow-scrolling: touch;
 }
 
 .dc-home-category-group {
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  max-width: 480px;
+  min-width: 0;
   padding: 4px !important;
   border-radius: 999px;
   box-shadow: none !important;
 }
 
+.dc-home-category-group > div:last-child,
+.dc-home-category-group [role="group"] {
+  min-width: 0;
+  width: 100%;
+}
+
 .dc-home-category-item {
-  min-height: 42px;
-  gap: 8px !important;
-  padding: 0 15px !important;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+  gap: 0 !important;
+  padding: 0 6px !important;
   border-radius: 999px;
   font-size: 13px !important;
   font-weight: 650 !important;
   line-height: 1;
-}
-
-.dc-home-category-icon {
-  font-size: 13px;
-  line-height: 1;
-  opacity: 0.82;
 }
 
 html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-child > div[aria-hidden] {
@@ -587,14 +596,16 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-product-shell {
   position: relative;
-  height: 100%;
+  display: flex;
+  flex: 1 1 auto;
   min-width: 0;
+  flex-direction: column;
 }
 
 .dc-home-product-open {
   display: flex;
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
   min-width: 0;
   flex-direction: column;
   padding: 0;
@@ -608,6 +619,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 .dc-home-product-media {
   position: relative;
   display: block;
+  flex: 0 0 auto;
   width: 100%;
   aspect-ratio: 4 / 3;
   overflow: hidden;
@@ -678,9 +690,10 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-product-copy {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
+  width: 100%;
   min-width: 0;
-  min-height: 138px;
+  min-height: 158px;
   flex-direction: column;
   gap: 7px;
   padding: 12px;
@@ -707,58 +720,71 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-height: 1.3em;
   margin: 0;
   overflow: hidden;
-  color: rgba(229, 234, 246, 0.67);
-  font-size: 11.5px;
-  line-height: 1.3;
+  color: rgba(229, 234, 246, 0.78);
+  font-size: 12px;
+  line-height: 1.4;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 
 .dc-home-product-meta-row {
   display: flex;
+  width: 100%;
   min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
   margin-top: auto;
 }
 
 .dc-home-product-rating,
 .dc-home-product-rating-spacer {
   display: inline-flex;
+  max-width: 100%;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   color: #ffd47f;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .dc-home-product-rating-count {
-  overflow: hidden;
-  color: rgba(231, 233, 244, 0.57);
-  font-size: 10px;
+  color: rgba(231, 233, 244, 0.76);
+  font-size: 11px;
   font-weight: 500;
-  text-overflow: ellipsis;
 }
 
+/* Rating and price get their own rows. MRP can wrap below the current
+   price rather than being hidden or pushing either amount out of the card. */
 .dc-home-product-price {
-  display: inline-flex;
+  display: flex;
+  max-width: 100%;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 5px;
-  color: rgba(255, 255, 255, 0.96);
-  font-size: 12px;
-  font-weight: 750;
+  column-gap: 6px;
+  row-gap: 2px;
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.dc-home-product-current-price {
+  font-weight: inherit;
   white-space: nowrap;
 }
 
 .dc-home-product-price del {
-  color: rgba(223, 228, 240, 0.48);
-  font-size: 10px;
+  color: rgba(223, 228, 240, 0.72);
+  font-size: 11px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .dc-home-product-skeleton .dc-home-product-copy {
@@ -1091,7 +1117,8 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 @media (min-width: 640px) {
   [data-home-content] {
-    padding-inline: clamp(24px, 3vw, 40px);
+    --dc-home-gutter: clamp(24px, 3vw, 40px);
+    padding-inline: var(--dc-home-gutter);
     padding-bottom: 40px;
   }
 
@@ -1131,7 +1158,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   }
 
   .dc-home-product-copy {
-    min-height: 148px;
+    min-height: 166px;
     padding: 15px;
   }
 
@@ -1208,8 +1235,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   }
 
   .dc-home-category-item {
-    min-height: 42px;
-    padding-inline: 13px !important;
+    padding-inline: 4px !important;
     font-size: 12.5px !important;
   }
 
@@ -1219,36 +1245,23 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   }
 
   .dc-home-product-copy {
-    min-height: 136px;
+    min-height: 158px;
     gap: 6px;
     padding: 10px;
   }
 
   .dc-home-product-title {
-    font-size: 13.5px;
+    font-size: 14px;
   }
 
   .dc-home-product-details,
   .dc-home-product-details-spacer {
-    font-size: 10.5px;
+    font-size: 11.5px;
   }
 
   .dc-home-product-rating {
     gap: 3px;
-    font-size: 10px;
-  }
-
-  .dc-home-product-rating-count {
-    display: none;
-  }
-
-  .dc-home-product-price {
-    gap: 3px;
-    font-size: 10.5px;
-  }
-
-  .dc-home-product-price del {
-    font-size: 9px;
+    font-size: 11.5px;
   }
 
   .dc-home-product-favorite {
@@ -1346,14 +1359,6 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
   .dc-home-product-copy {
     padding: 9px;
-  }
-
-  .dc-home-product-title {
-    font-size: 13px;
-  }
-
-  .dc-home-product-price del {
-    display: none;
   }
 
   .dc-home-continue-action {

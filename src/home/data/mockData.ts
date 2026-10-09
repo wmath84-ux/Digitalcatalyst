@@ -2,10 +2,10 @@ import type { Banner, Category, Review } from "../types";
 
 export const categories: Category[] = [
   { id: "all", label: "All", icon: "✨" },
-  { id: "video", label: "Video Lectures", icon: "🎬" },
-  { id: "pdf", label: "PDFs", icon: "📄" },
-  { id: "ebook", label: "E-books", icon: "📚" },
-  { id: "live", label: "Live Classes", icon: "🔴" },
+  { id: "video", label: "Video", icon: "🎬" },
+  { id: "pdf", label: "PDF", icon: "📄" },
+  { id: "ebook", label: "Books", icon: "📚" },
+  { id: "live", label: "Live", icon: "🔴" },
 ];
 
 export const banners: Banner[] = [
