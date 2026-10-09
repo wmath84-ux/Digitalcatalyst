@@ -20,7 +20,7 @@ const stubs = {
   useMyDayAccess: `export const useMyDayAccess = () => ({unlimited:false,canCreate:true,freeLimit:5,freeUsed:2,freeRemaining:3,resetAt:Date.now()+3600000,loading:false,error:null,uid:'fixture',access:{dayKey:'fixture'},refresh:async()=>{}});`,
   catalogService: `export const fetchRemoteCatalog = async () => ({});`,
   aiUsage: `const snap=${JSON.stringify(ai)}; export const emptyUsage = () => ({}); export const computeUsageSnapshot = () => snap; export const refreshAiUsageStatus = async () => snap; export const subscribeAiUsage = (uid,cb) => {cb({}, {exists:true});return ()=>{};};`,
-  apiBase: `export const apiFetch = async () => ({ok:true,json:async()=>({ok:true,tokens:[]})});`,
+  apiBase: `import {products} from '/tests/fixtures/collectionCardsHarness/products.ts';export const apiFetch=async(url,options)=>{if(!url.includes('quotes'))return{ok:true,json:async()=>({ok:true,tokens:[]})};const s=JSON.parse(options.body).selection;const p=products.find(p=>s.productIds.includes(p.id))||products[1];return{ok:true,json:async()=>({ok:true,quote:{quoteId:'quote-fixture',uid:'fixture',purchaseKind:s.purchaseKind,verifiedLineItems:[],regularSubtotal:p.price*100,saleDiscount:0,couponDiscount:0,cashPayable:p.price*100,minimumPayable:0,currency:'INR',expiresAt:Date.now()+900000,status:'active',couponCode:null}})};};`,
   firebase: `export const auth = {currentUser:{getIdToken:async()=> 'fixture'}}; export const db={};`,
   Header: `export default () => null;`,
   BottomNav: `export default () => null;`,
@@ -46,7 +46,7 @@ check('minimal pages render at mobile, portrait tablet, landscape tablet and des
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} at ${width}: page overflow`);
    if(name==='usage'){
     const styles=await page.locator('[data-ai-quota-card]').evaluate(el=>({radius:getComputedStyle(el).borderRadius,shadow:getComputedStyle(el).boxShadow,layers:[...el.children].filter(e=>e.hasAttribute('aria-hidden')).every(e=>getComputedStyle(e).display==='none')}));
-    assert.deepEqual(styles,{radius:'16px',shadow:'none',layers:true});
+    assert.deepEqual(styles,{radius:'0px',shadow:'none',layers:true});
    }
    if(name==='pdp') assert.equal(await page.locator('[data-pdp-reviews] > div[aria-hidden]').count(),0);
    if(name==='member') assert.equal(await page.locator('[data-important-membership]').count(),1);

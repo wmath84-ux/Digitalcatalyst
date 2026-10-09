@@ -19,11 +19,12 @@ test("auth page keeps the tiny Open dashboard hint", () => {
   assert.match(auth, /#\/admin-login/);
 });
 
-test("profile shows the same-size Open dashboard link only for the approved admin", () => {
+test("profile keeps a readable dashboard link only for the approved admin", () => {
   assert.match(profile, /APPROVED_ADMIN_EMAIL/);
   assert.match(profile, /String\(user\.role \|\| ""\) === "admin"/);
   assert.match(profileLayout, /data-profile-open-dashboard/);
-  assert.match(profileLayout, /text-\[9px\] font-medium tracking-wide/);
+  assert.match(profileLayout, /isAdmin \? <button/);
+  assert.match(fs.readFileSync("src/profile/profile-minimal.css", "utf8"), /\.dc-account-legal > \*[^}]*min-height: 2\.75rem/);
   assert.match(profileLayout, /Open dashboard/);
   assert.match(profile, /#\/admin-login/);
 });

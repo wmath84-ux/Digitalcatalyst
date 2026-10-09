@@ -106,9 +106,10 @@ export default function ProfileApp() {
   const { user, logout, updateAccount, setUser } = useAuth();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
-  // Full product ownership from the canonical entitlements collection.
-  // The Profile uses this as the authoritative Purchased count.
-  const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
+  // Count products with any purchased content scope, not only full courses.
+  // Individual module/resource buyers must still find their purchases here.
+  const { ownedProductIds: fullOwnedIds, accessibleProductIds, signedIn } = useOwnedProducts();
+  const canonicalOwnedIds = accessibleProductIds || fullOwnedIds;
   const [modal, setModal] = useState<Modal>(null);
   // Account notifications/privacy preferences are stored on the user record.
   // The clean-background preference is shared app-wide through its context.

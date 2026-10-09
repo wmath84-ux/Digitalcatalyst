@@ -1,0 +1,75 @@
+/* Account pages only. Shared navigation, theme primitives and source-of-truth
+   membership / allowance hooks are not restyled globally. */
+[data-profile-page], [data-account-profile], [data-purchases-page], [data-usage-limits-page] {
+  --account-border: rgba(226, 232, 240, 0.12);
+  --account-muted: #b1bbcb;
+  --account-accent: #c1baff;
+  color: #f8fafc;
+  background: #0a0e18;
+  text-shadow: none;
+  min-width: 0;
+}
+.dc-account-layout { width: 100%; max-width: 960px; margin-inline: auto; padding: 1.25rem clamp(0.25rem, 1vw, 1rem) 2rem; }
+.dc-account-header, .dc-account-section-header { display: flex; min-width: 0; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem 1rem; }
+.dc-account-header { margin-bottom: 1.5rem; }
+.dc-account-header h1 { color: #fff; font-size: clamp(1.5rem, 1.2rem + 1vw, 1.875rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.3; }
+.dc-account-layout h2 { color: #f8fafc; font-size: 1.125rem; font-weight: 750; line-height: 1.5; }
+.dc-account-identity { display: flex; align-items: start; gap: 1.25rem; }
+.dc-account-identity-copy { min-width: 0; flex: 1; }
+.dc-account-identity-copy h2 { font-size: 1.5rem; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.dc-account-email { margin-top: 0.25rem; color: #c3cddb; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.dc-account-bio { margin-top: 0.6rem; color: #d0d9e6; font-size: 0.875rem; line-height: 1.7; overflow-wrap: anywhere; }
+.dc-account-photo-action { display: grid; min-width: 5rem; width: 5rem; flex: 0 0 auto; gap: 0.5rem; text-align: center; color: var(--account-accent); font-size: 0.75rem; font-weight: 600; }
+.dc-account-photo-action img, .dc-account-avatar { display: grid; width: 5rem; height: 5rem; border-radius: 50%; object-fit: cover; }
+.dc-account-avatar { place-items: center; background: #282741; color: #e5e0ff; font-size: 1.5rem; font-weight: 750; }
+.dc-account-note { margin-top: 0.6rem; color: var(--account-muted); font-size: 0.8125rem; line-height: 1.65; overflow-wrap: anywhere; }
+.dc-account-error { margin-block: 0.6rem; color: #f6c4c2; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.dc-account-notice { margin-bottom: 1rem; color: #c9d9ef; font-size: 0.875rem; line-height: 1.6; }
+.dc-account-text-action { display: inline-flex; min-height: 2.75rem; min-width: 2.75rem; align-items: center; gap: 0.5rem; padding-block: 0.5rem; color: var(--account-accent); font-size: 0.8125rem; font-weight: 650; line-height: 1.5; }
+.dc-account-text-action:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dc-account-text-action:disabled { color: var(--account-muted); cursor: not-allowed; text-decoration: none; opacity: 0.65; }
+.dc-account-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); margin-block: 1.25rem 1.75rem; padding-block: 0.75rem; border-block: 1px solid var(--account-border); }
+.dc-account-stats button { display: grid; min-width: 0; min-height: 4.25rem; align-content: center; justify-items: center; gap: 0.25rem; }
+.dc-account-stats button + button { border-left: 1px solid var(--account-border); }
+.dc-account-stats strong { font-size: 1.375rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.dc-account-stats span { color: var(--account-muted); font-size: 0.75rem; }
+.dc-account-section { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--account-border); }
+.dc-account-stats + .dc-account-section { border-top: 0; padding-top: 0; }
+.dc-account-plan-name { margin-top: 0.35rem; color: #d1d8e4; font-size: 0.9375rem; font-weight: 600; }
+.dc-account-status { font-size: 0.8125rem; font-weight: 650; }
+.dc-account-status.is-active { color: #a2dac3; }
+.dc-account-status.is-expired { color: #f5c59b; }
+.dc-account-facts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem 1.5rem; margin-top: 1rem; }
+.dc-account-facts > div { min-width: 0; }
+.dc-account-facts dt { color: var(--account-muted); font-size: 0.75rem; }
+.dc-account-facts dd { margin-top: 0.3rem; color: #e4eaf3; font-size: 0.875rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.dc-account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin-top: 1rem; }
+.dc-account-primary { display: inline-flex; min-height: 3rem; width: 100%; align-items: center; justify-content: center; padding-inline: 1rem; border: 0; border-radius: 10px; background: #fff; color: #111827; font-size: 0.875rem; font-weight: 750; box-shadow: none; }
+.dc-account-primary:hover { background: #eae6ff; }
+.dc-account-primary .uzp-pay__content { min-height: 3rem; justify-content: center; }
+.dc-account-primary .uzp-pay__text { max-width: 100%; padding: 0.625rem 1rem; color: #111827; }
+.dc-account-primary .uzp-pay__icon, .dc-account-primary .uzp-pay__decor { display: none; }
+[data-profile-upgrade-card] .dc-account-primary { margin-top: 1rem; }
+.dc-account-disclosure { margin-top: 0.75rem; border-top: 1px solid var(--account-border); }
+.dc-account-disclosure summary { min-height: 3rem; padding-block: 0.9rem; color: #d3dcec; font-size: 0.875rem; font-weight: 650; cursor: pointer; }
+.dc-account-disclosure summary > span { margin-left: 0.5rem; color: var(--account-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.dc-account-link-list li { border-bottom: 1px solid var(--account-border); }
+.dc-account-link-list button { display: flex; width: 100%; min-width: 0; min-height: 3.5rem; align-items: center; justify-content: space-between; gap: 0.75rem; padding-block: 0.85rem; text-align: left; }
+.dc-account-link-list button > span { display: grid; min-width: 0; flex: 1; gap: 0.25rem; color: #e4eaf3; font-size: 0.875rem; overflow-wrap: anywhere; }
+.dc-account-link-list strong { font-weight: 650; }
+.dc-account-link-list small { color: var(--account-muted); font-size: 0.75rem; line-height: 1.6; }
+.dc-account-link-list svg { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--account-muted); }
+.dc-account-referral { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.dc-account-referral code { min-width: 0; color: #e5eaf4; font-size: 1rem; font-weight: 650; overflow-wrap: anywhere; }
+.dc-account-footer { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--account-border); }
+.dc-account-logout { min-height: 2.75rem; color: #f1b9b6; font-size: 0.875rem; font-weight: 650; }
+.dc-account-legal { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.5rem; }
+.dc-account-legal > * { display: inline-flex; min-height: 2.75rem; align-items: center; color: var(--account-muted); font-size: 0.75rem; }
+.dc-account-layout button:focus-visible, .dc-account-layout summary:focus-visible, .dc-account-layout a:focus-visible { outline: 2px solid var(--account-accent); outline-offset: 3px; border-radius: 4px; }
+.dc-account-modal { background: #111724; border: 1px solid rgba(226,232,240,0.15); border-radius: 16px; }
+.dc-account-modal label { font-size: 0.8125rem; }
+.dc-account-modal input, .dc-account-modal textarea { font-size: 0.9375rem; }
+.dc-account-preference-row { display: flex; align-items: center; gap: 0.75rem; min-height: 3.5rem; padding-block: 0.75rem; border-bottom: 1px solid rgba(226,232,240,0.1); }
+.dc-account-preference-icon { display: none; }
+@media (min-width: 640px) { .dc-account-facts { grid-template-columns: repeat(3, minmax(0,1fr)); } .dc-account-actions .dc-account-primary { width: auto; min-width: 12rem; } }
+@media (max-width: 359px) { .dc-account-identity { gap: 0.875rem; } .dc-account-photo-action, .dc-account-photo-action img, .dc-account-avatar { width: 4rem; min-width: 4rem; } .dc-account-photo-action img, .dc-account-avatar { height: 4rem; } .dc-account-identity-copy h2 { font-size: 1.25rem; } }

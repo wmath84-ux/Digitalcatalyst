@@ -13,6 +13,7 @@ import {
 import { useMyDayAccess } from "../hooks/useMyDayAccess";
 import { ProfileCard as GlassSurface } from "../profile/ProfileCard";
 import { GlassButton } from "./ui/glass-button";
+import UsageMetric from "../usage/UsageMetric";
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "now";
@@ -29,13 +30,14 @@ function formatResetClock(resetAt: number): string {
 }
 
 type Props = {
+  minimal?: boolean;
   /** Opens the My Day dashboard. */
   onOpenMyDay: () => void;
   /** Opens the subscription plans page. */
   onSubscribe: () => void;
 };
 
-export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) {
+export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe, minimal = false }: Props) {
   const {
     unlimited,
     canCreate,
@@ -94,6 +96,18 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
 
   const resetIn = resetAt > now ? formatCountdown(resetAt - now) : "now";
 
+  if (minimal) return (
+    <section data-myday-allowance-card data-myday-allowance-state={!resolved ? loading ? "loading" : "unavailable" : unlimited ? "unlimited" : browseOnlyPlan ? "browse-only" : exhausted ? "exhausted" : "available"} className="dc-usage-section" aria-live="polite">
+      <header className="dc-usage-section-header"><div><h2>My Day</h2><p data-myday-allowance-headline className="dc-account-note">Tasks, notes and reminders</p></div><button type="button" data-myday-allowance-refresh aria-label="Refresh My Day allowance" disabled={loading || !uid} onClick={() => void refresh()} className="dc-account-text-action">{loading ? "Syncing…" : "Refresh"}</button></header>
+      <p className="dc-usage-state">{badge.label}</p>
+      {!resolved ? <p role={loading ? "status" : "alert"} className={loading ? "dc-account-note" : "dc-account-error"}>{loading ? "Checking your allowance…" : error || "Allowance could not be verified. Retry to load current limits."}</p> : <>
+        <UsageMetric label="Daily creations" used={freeUsed} limit={freeLimit} remaining={freeRemaining} unlimited={unlimited} resetAt={!browseOnlyPlan && !unlimited ? resetAt : undefined} now={now} barHook="myday" />
+        <p className="dc-account-note">{browseOnlyPlan ? "Creation needs an eligible plan. Saved items stay readable." : exhausted ? "Creation allowance is used up. Saved items stay readable until it resets." : "One task, note or reminder uses one creation. Reading saved items stays open."}</p>
+        {error ? <p role="alert" className="dc-account-error">Last verified allowance shown. {error}</p> : null}
+      </>}
+      <button type="button" data-myday-allowance-open onClick={onOpenMyDay} className="dc-account-text-action">Open My Day</button>
+    </section>
+  );
   return (
     <section
       data-myday-allowance-card

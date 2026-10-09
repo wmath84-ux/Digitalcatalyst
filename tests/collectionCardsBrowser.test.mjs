@@ -27,7 +27,7 @@ before(async () => {
       },
       load(id) {
         if (id === "\0fixture:CatalogContext") return `import { products } from '/tests/fixtures/collectionCardsHarness/products.ts'; export const useCatalog = () => ({ products });`;
-        if (id === "\0fixture:useCourseAccess") return `export const useOwnedProducts = () => ({ ownedProductIds: [], signedIn: false });`;
+        if (id === "\0fixture:useCourseAccess") return `export const useOwnedProducts = () => ({ ownedProductIds: [], signedIn: false });export const useCourseAccess=()=>({loading:false,hasActiveSubscription:false,subscription:null,resolution:{hasFullProductAccess:false,accessibleModuleIds:new Set(),accessibleResourceIds:new Set(),ownedModuleIds:new Set(),ownedResourceIds:new Set(),ownedUpdateIds:new Set()}});`;
         if (id === "\0fixture:myCourseClient") return `export const countModules = modules => modules.length; export const countResources = () => 0;`;
       },
     }],
@@ -46,7 +46,7 @@ const check = (name, fn) => test(name, { timeout: 180000 }, async t => {
 async function open(pageName, width = 820, height = 1180) {
   const page = await browser.newPage({ viewport: { width, height } });
   await page.goto(`${origin}/tests/fixtures/collectionCardsHarness/index.html?page=${pageName}`);
-  await page.locator(".dc-collection-card").first().waitFor();
+  await page.locator(pageName === "library" ? "[data-purchase-entry]" : ".dc-collection-card").first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   return page;
 }
@@ -60,6 +60,14 @@ check("cards stay compact, readable and contained across tablet widths and rotat
       await page.evaluate(({ width, height }) => {
         document.documentElement.style.setProperty("--fixture-width", width > height && width >= 640 ? `${width - 260}px` : "100%");
       }, { width, height });
+      if (pageName === "library") {
+        const rowIssues = await page.locator("[data-purchase-entry]").evaluateAll(rows => rows.flatMap(row => {
+          const button = row.querySelector("button"); const rect = row.getBoundingClientRect(); const action = button.getBoundingClientRect();
+          return row.scrollWidth > row.clientWidth + 1 || action.width > rect.width + 1 || action.height < 44 ? ["purchase row overflow or undersized action"] : [];
+        }));
+        assert.deepEqual(rowIssues, [], `library at ${width}×${height}`);
+        continue;
+      }
       const problems = await page.locator(".dc-collection-card").evaluateAll(cards => cards.flatMap(card => {
         const issues = [];
         const rect = card.getBoundingClientRect();
@@ -96,7 +104,7 @@ check("cards stay compact, readable and contained across tablet widths and rotat
     }
     // Flat/kill-switch mode keeps the same readable layout.
     await page.evaluate(() => document.documentElement.dataset.glass = "off");
-    assert.equal(await page.locator(".dc-collection-title").first().evaluate(el => getComputedStyle(el).textShadow), "none");
+    assert.equal(await page.locator(pageName === "library" ? ".dc-purchases-title" : ".dc-collection-title").first().evaluate(el => getComputedStyle(el).textShadow), "none");
     await page.close();
   }
 });
@@ -105,7 +113,7 @@ check("library access, favourites, cart and study actions keep their behaviour",
   const page = await open("library");
   await page.locator('[data-purchase-access="hindi"]').click();
   assert.equal(await page.locator("output").textContent(), "open:hindi");
-  assert.equal(await page.locator('[data-purchase-access="hindi"]').textContent(), "Open Now");
+  assert.match(await page.locator('[data-purchase-access="hindi"]').getAttribute("aria-label"), /^Open /);
   await page.locator("[data-purchases-search]").fill("Physics");
   assert.equal(await page.locator("[data-purchase-entry]").count(), 1);
   await page.close();

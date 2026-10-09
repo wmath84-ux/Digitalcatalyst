@@ -24,7 +24,7 @@
 // product itself; the caller passes the product doc and the
 // hook computes the access.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   doc,
@@ -34,6 +34,7 @@ import {
 import { db } from "../../firebase";
 import { subscribeShared, subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { useAuth } from "../context/AuthContext";
+import { collectLibraryProductIds } from "../../utils/libraryOwnership";
 import {
   collectEntitlementOwnership,
   isSubscriptionRecordActive,
@@ -351,41 +352,57 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
  */
 export const useOwnedProducts = (): {
   ownedProductIds: string[];
+  /** Any active purchased scope, including individual modules/resources. */
+  accessibleProductIds: string[];
+  permanentProductIds: string[];
   loading: boolean;
+  error: string | null;
   signedIn: boolean;
 } => {
   const { user } = useAuth();
   const uid = user?.id || null;
+  const currentUid = useRef(uid);
+  currentUid.current = uid;
+  const [entitlementUid, setEntitlementUid] = useState<string | null>(null);
+  const [subscriptionUid, setSubscriptionUid] = useState<string | null>(null);
+  const [entitlementError, setEntitlementError] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [entitlementProductIds, setEntitlementProductIds] = useState<string[]>([]);
+  const [scopedProductIds, setScopedProductIds] = useState<string[]>([]);
   const [subscriptionProductIds, setSubscriptionProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(Boolean(uid));
 
   useEffect(() => {
     if (!uid) {
       setEntitlementProductIds([]);
+      setScopedProductIds([]);
       setLoading(false);
       return undefined;
     }
+    setLoading(true);
+    setEntitlementError(null);
+    setSubscriptionError(null);
+    setEntitlementProductIds([]);
+    setScopedProductIds([]);
     // Same shared listener as `useCourseAccess` above — the Profile library
     // and an open course player no longer bill the entitlements query twice.
     const unsubscribe = subscribeShared(
       `entitlements:${uid}`,
       () => query(collection(db, "entitlements"), where("uid", "==", uid)),
       (entries, err) => {
+        if (currentUid.current !== uid) return;
+        setEntitlementUid(uid);
         if (err) {
+          setEntitlementError("Purchased access could not be refreshed. Please retry.");
           setLoading(false);
           return;
         }
-        const ids = new Set<string>();
-        entries.forEach((item) => {
-          const data = item.data || {};
-          const kind = data.kind ? String(data.kind) : "";
-          if (kind === "full_product" && data.productId) {
-            ids.add(String(data.productId));
-          }
-        });
-        setEntitlementProductIds(Array.from(ids));
+        setEntitlementError(null);
+        const ids = collectLibraryProductIds(entries.map((item) => item.data));
+        setEntitlementProductIds(ids.full);
+        setScopedProductIds(ids.any);
         setLoading(false);
+
       },
     );
     return () => unsubscribe();
@@ -403,10 +420,14 @@ export const useOwnedProducts = (): {
       `users/${uid}/subscription/current`,
       () => doc(db, "users", uid, "subscription", "current"),
       (snapshotData, exists, err) => {
+        if (currentUid.current !== uid) return;
+        setSubscriptionUid(uid);
         if (err) {
+          setSubscriptionError("Membership access could not be refreshed. Please retry.");
           setSubscriptionProductIds([]);
           return;
         }
+        setSubscriptionError(null);
         const data = snapshotData || {};
         const record: SubscriptionRecordShape = {
           status: data.status ? String(data.status) : undefined,
@@ -422,9 +443,10 @@ export const useOwnedProducts = (): {
   }, [uid]);
 
   const ownedProductIds = useMemo(
-    () => Array.from(new Set([...entitlementProductIds, ...subscriptionProductIds])),
-    [entitlementProductIds, subscriptionProductIds],
+    () => Array.from(new Set([...(entitlementUid === uid ? entitlementProductIds : []), ...(subscriptionUid === uid ? subscriptionProductIds : [])])),
+    [entitlementProductIds, subscriptionProductIds, entitlementUid, subscriptionUid, uid],
   );
 
-  return { ownedProductIds, loading, signedIn: Boolean(uid) };
+  const accessibleProductIds = useMemo(() => Array.from(new Set([...ownedProductIds, ...(entitlementUid === uid ? scopedProductIds : [])])), [ownedProductIds, scopedProductIds, entitlementUid, uid]);
+  return { ownedProductIds, accessibleProductIds, permanentProductIds: entitlementUid === uid ? entitlementProductIds : [], loading: Boolean(uid) && (loading || entitlementUid !== uid || subscriptionUid !== uid), error: entitlementError || subscriptionError, signedIn: Boolean(uid) };
 };

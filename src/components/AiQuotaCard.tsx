@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
+import UsageMetric from "../usage/UsageMetric";
 import { defaultCatalogAiSettings, type CatalogAiSettings } from "../revision/engine/aiConfig";
 import { fetchRemoteCatalog } from "../revision/engine/catalogService";
 import {
@@ -61,8 +62,10 @@ export default function AiQuotaCard({
   uid,
   material = "store",
   compact = false,
+  minimal = false,
 }: {
   uid: string;
+  minimal?: boolean;
   /** `store` = the Revision Profile page's card (unchanged default);
    *  `cart` = the Cart empty-state card's bare surface (radius 32);
    *  `home` = the navy Home/account contrast plate at the pinned docs
@@ -163,6 +166,24 @@ export default function AiQuotaCard({
     ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30"
     : snap.allowed ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/30";
 
+  if (minimal) return (
+    <section data-ai-quota-card className="dc-usage-section" aria-live="polite">
+      <header className="dc-usage-section-header"><div><h2>School AI</h2>{hasAuthoritativeSnapshot ? <p className="dc-account-note">{snap.planName}{snap.planId !== "free" ? ` · ${formatCycle(snap.cycle)}` : ""}</p> : null}</div><button type="button" data-ai-quota-refresh aria-label="Refresh AI allowance" disabled={syncing} onClick={() => void refresh()} className="dc-account-text-action">{syncing ? "Syncing…" : "Refresh"}</button></header>
+      <p data-ai-quota-sync={badgeLabel.toLowerCase()} className="dc-usage-state">{badgeLabel}</p>
+      {!hasAuthoritativeSnapshot ? <p role={syncing ? "status" : "alert"} className={syncing ? "dc-account-note" : "dc-account-error"}>{syncing ? "Checking server usage…" : syncError || "Usage could not be verified. Retry to load current limits."}</p> : <>
+        {snap.tokensEnabled ? <UsageMetric label="Tokens today" used={snap.tokensUsedDay} limit={snap.dailyTokenBudget} remaining={snap.tokensRemaining} unlimited={snap.tokensUnlimited} resetAt={snap.tokensResetsAt} now={now} barHook="ai" /> : <>
+          <UsageMetric label="Daily requests" used={snap.dailyUsed} limit={snap.dailyLimit} remaining={snap.dailyRemaining} unlimited={snap.dailyUnlimited} resetAt={snap.dailyResetsAt} now={now} barHook="ai" />
+          <UsageMetric label={`${snap.windowHours}-hour safety window`} used={snap.windowUsed} limit={snap.windowLimit} remaining={snap.windowRemaining} unlimited={snap.windowUnlimited} resetAt={snap.windowUsed > 0 ? snap.windowResetsAt : undefined} now={now} barHook="ai" />
+        </>}
+        {snap.costEnabled ? <UsageMetric label="Model budget (USD)" resetLabel="Term ends" used={snap.costUsedMicros} limit={snap.costBudgetMicros} remaining={snap.costRemainingMicros} unlimited={snap.costUnlimited} resetAt={snap.termEndsAt || undefined} now={now} format={(value) => `$${(value / 1_000_000).toFixed(4)}`} barHook="ai" /> : null}
+        {snap.termEndsAt > 0 && !snap.costEnabled && snap.planId !== "free" ? <p className="dc-account-note">Plan term ends {new Date(snap.termEndsAt).toLocaleDateString("en-IN")}.</p> : null}
+        {snap.blockedReason ? <p role="alert" className="dc-account-error">{snap.blockedReason}</p> : null}
+        <p className="dc-account-note">{snap.tokensEnabled ? "Provider-reported tokens are counted." : "Daily and safety-window limits apply together."} Failed or incomplete requests aren't charged.</p>
+        {syncError ? <p role="alert" className="dc-account-error">Last verified usage shown. {syncError}</p> : null}
+      </>}
+      <div className="dc-usage-actions"><button type="button" onClick={() => { window.location.hash = "#/revision"; }} className="dc-account-text-action">Open Revision Hub</button><button type="button" onClick={() => { window.location.hash = "#/revision/ai-settings"; }} className="dc-account-text-action">AI settings</button></div>
+    </section>
+  );
   return (
     <GlassSurface
       data-ai-quota-card

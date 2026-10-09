@@ -15,18 +15,21 @@ import { PopoverItem } from "./components/ui/glass-popover";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
-import { buildCheckoutSelection, computeSummary, type PdpPurchaseMode } from "../utils/pdpSelection";
+import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
 import { PaymentButton } from "./components/ui/PaymentButton";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
+import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./components/pdp/PdpSelectionSummary";
+import { pdpSelectionKey, usePdpQuote } from "./pdp/usePdpQuote";
+import { paiseToRupees } from "./utils/money";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
 import { fullDemoCourseContent } from "./data/demoCourseContent";
 import { getProductClassLabel, getProductInstructorLabel, getProductPresentation, getProductSubjectLabel } from "./pdp/productPresentation";
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
-import { auth, db } from "../firebase";
+import { db } from "../firebase";
 import { apiFetch } from "./utils/apiBase";
-import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
+import PromoCodeInput from "./subscription/components/PromoCodeInput";
 import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
 import {
   collectPaidModuleIdSet,
@@ -257,11 +260,10 @@ function PremiumProductContent({
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
-  const [purchaseMode, setPurchaseMode] = useState<PdpPurchaseMode>("full_product");
-  const [selectionPayable, setSelectionPayable] = useState(() => isFreeProduct(product) ? 0 : product.price);
-  const [couponStatus, setCouponStatus] = useState<"idle" | "applying" | "error">("idle");
-  const [couponErrorMessage, setCouponErrorMessage] = useState<string | null>(null);
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<PdpSelectionSnapshot | null>(null);
+  const handleSelectionChange = useCallback((next: PdpSelectionSnapshot) => {
+    setSelectedOrder((previous) => previous && JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+  }, []);
   const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -397,26 +399,33 @@ function PremiumProductContent({
   const inCart = cartIds.has(product.id);
   const unavailable = product.availableForSale === false && !isProductOwned;
 
+  const defaultOrder = useMemo<PdpSelectionSnapshot>(() => {
+    const update = isProductOwned ? availablePaidUpdates[0] : undefined;
+    const mode = update ? "paid_update" : "full_product";
+    const selectedIds = new Set(update ? [update.id] : []);
+    const selection = buildCheckoutSelection({ product, mode, selectedIds, paidUpdateId: update?.id || null, returnRoute: `#/product/${encodeURIComponent(product.id)}` });
+    const summary = computeSummary({ product: isFreeProduct(product) ? { ...product, isFree: true } : product, mode, selectedIds, modules: product.canonicalModules || [], paidUpdates: product.paidUpdates || [], isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds });
+    return { selection, summary, valid: summary.selectedCount > 0, rules: [] };
+  }, [product, isProductOwned, availablePaidUpdates, updates, ownedModuleIds, ownedResourceIds]);
+  const order = !isProductOwned && selectedOrder ? selectedOrder : defaultOrder;
+  const purchaseMode = order.summary.mode;
+  const quoteSelection = { ...order.selection, productIds: [product.documentId || product.id] };
+  const pricing = usePdpQuote({ selection: quoteSelection, uid: user?.id || null, enabled: Boolean(user) && order.valid && !unavailable && (!isProductOwned || Boolean(availablePaidUpdates[0])), chargeable: order.summary.effectiveSubtotal > 0 });
+  const pricingView: PdpPricingView = { ...pricing, selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }) };
+  const pricingBusy = pricing.status === "loading" || pricing.applying;
+  const pricingBlocked = pricingBusy || pricing.status === "error";
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
-    const withCoupon = summary.effectiveSubtotal > 0 && appliedCoupon?.code ? { ...selection, couponCode: appliedCoupon.code } : selection;
-    if (onCheckoutSelection) onCheckoutSelection(withCoupon, summary.effectiveSubtotal);
-    else if (selection.purchaseKind === "full_product") onCheckout(summary.effectiveSubtotal, summary.effectiveSubtotal > 0 ? appliedCoupon?.code || null : null);
+    const withCoupon = { ...selection, productIds: [product.documentId || product.id], couponCode: summary.effectiveSubtotal > 0 ? pricing.appliedCode : null };
+    if (user && (!pricing.quote || pdpSelectionKey(withCoupon) !== pricingView.selectionKey)) return;
+    const payable = pricing.quote ? paiseToRupees(pricing.quote.cashPayable) : summary.effectiveSubtotal;
+    if (onCheckoutSelection) onCheckoutSelection(withCoupon, payable);
+    else if (selection.purchaseKind === "full_product") onCheckout(payable, withCoupon.couponCode);
   };
 
   // Directly buy the first available paid upgrade — used once the base course
   // is owned and the "Select course modules" section is no longer shown.
   const handleBuyUpgrade = () => {
-    const update = availablePaidUpdates[0];
-    if (!update) return;
-    const selection = buildCheckoutSelection({
-      product,
-      mode: "paid_update",
-      selectedIds: new Set([update.id]),
-      paidUpdateId: update.id,
-      returnRoute: `#/product/${encodeURIComponent(product.id)}`,
-    });
-    if (onCheckoutSelection) onCheckoutSelection(selection, Number(update.cashPrice) || 0);
-    else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
+    if (availablePaidUpdates[0]) handlePreview(order.selection, order.summary);
   };
 
   const copyLink = async () => {
@@ -468,97 +477,20 @@ function PremiumProductContent({
   };
 
   const primaryAction = () => {
-    if (!unavailable) onCheckout(isFreeProduct(product) ? 0 : product.price, isFreeProduct(product) ? null : appliedCoupon?.code || null);
+    if (!unavailable && !pricingBlocked) handlePreview(order.selection, order.summary);
   };
-
-  // Coupon handling — mirrors the subscription page. The code is validated
-  // server-side by re-quoting through the existing /api/quotes/create endpoint
-  // (same Part 7 coupon engine + Part 4 quote engine the real checkout uses),
-  // so the buyer sees "Verified savings" before entering checkout. The applied
-  // code is carried into checkout.
-  const handleApplyCoupon = useCallback(
-    async (rawCode: string): Promise<PromoResult> => {
-      if (isProductOwned) {
-        return { valid: false, message: "You already own this product." };
-      }
-      const code = rawCode.trim().toUpperCase();
-      if (!code) return { valid: false, message: "Enter a coupon code." };
-      setCouponStatus("applying");
-      setCouponErrorMessage(null);
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) return { valid: false, message: "Please sign in to apply a coupon." };
-        const token = await firebaseUser.getIdToken(true);
-        const response = await apiFetch("/api/quotes/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            purchaseKind: "full_product",
-            productIds: [product.documentId || product.id],
-            moduleIds: [],
-            resourceIds: [],
-            updateId: null,
-            subscriptionPlanId: null,
-            billingCycle: null,
-            featureIds: [],
-            couponCode: code,
-            returnRoute: null,
-          }),
-        });
-        const data = await response.json().catch(() => ({})) as { ok?: boolean; quote?: { couponDiscount?: number }; error?: string };
-        if (!response.ok || !data.ok) {
-          const message = data.error || "This coupon could not be applied.";
-          setCouponStatus("error");
-          setCouponErrorMessage(message);
-          return { valid: false, message };
-        }
-        const discountPaise = Math.max(0, Math.round(Number(data.quote?.couponDiscount || 0)));
-        setCouponStatus("idle");
-        playSfxSuccess();
-        setAppliedCoupon({
-          code,
-          discountPaise,
-          label: discountPaise > 0 ? `Verified savings · ₹${Math.round(discountPaise / 100)} off` : "Coupon applied (no additional savings).",
-        });
-        return { valid: true, message: "Coupon applied." };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "This coupon could not be applied.";
-        setCouponStatus("error");
-        setCouponErrorMessage(message);
-        playSfxError();
-        return { valid: false, message };
-      }
-    },
-    [isProductOwned, product.documentId, product.id],
-  );
-
-  const handleRemoveCoupon = useCallback(() => {
-    setAppliedCoupon(null);
-    setCouponErrorMessage(null);
-    setCouponStatus("idle");
-  }, []);
-
-  // A coupon can only reduce money that is actually charged. Free
-  // products (admin `isFree` switch or a ₹0 effective price) never
-  // render the coupon field anywhere on the PDP.
   const productIsFree = isFreeProduct(product);
-  const finalPrice = productIsFree ? 0 : product.price;
-  const canShowCouponInput = shouldShowCouponInput({
-    purchaseKind: "full_product",
-    payablePaise: Math.round((selectionPayable || 0) * 100),
-    isFree: productIsFree || isProductOwned,
+  const canShowCouponInput = !isProductOwned && !unavailable && order.valid && shouldShowCouponInput({
+    purchaseKind: order.selection.purchaseKind,
+    payablePaise: Math.round(order.summary.effectiveSubtotal * 100),
+    isFree: order.selection.purchaseKind === "full_product" && productIsFree,
   });
-
-  // If a product becomes free (or the buyer already owns it) while a
-  // coupon was applied, drop the code so nothing stale is carried
-  // into checkout.
-  useEffect(() => {
-    if (!canShowCouponInput && appliedCoupon) {
-      setAppliedCoupon(null);
-      setCouponErrorMessage(null);
-      setCouponStatus("idle");
-    }
-  }, [canShowCouponInput, appliedCoupon]);
+  const couponEntry = canShowCouponInput ? (
+    <details data-pdp-coupon className="dc-pdp-coupon">
+      <summary>Have a coupon?</summary>
+      <PromoCodeInput key={pdpSelectionKey({ ...order.selection, couponCode: null })} kind="coupon" label="Coupon code" placeholder="Enter code" appliedCode={pricing.appliedCode} appliedMessage={pricing.quote?.couponDiscount ? `Verified discount: ₹${paiseToRupees(pricing.quote.couponDiscount).toLocaleString("en-IN")}` : "Coupon verified for this selection"} errorMessage={pricing.couponError || null} onApply={pricing.applyCoupon} onRemove={pricing.removeCoupon} disabled={pricingBusy} />
+    </details>
+  ) : null;
 
   const submitReview = async () => {
     if (!user) {
@@ -775,8 +707,8 @@ function PremiumProductContent({
                 <h2 className="dc-pdp-update-title">{firstAvailableUpdate.title}</h2>
                 {firstAvailableUpdate.description?.trim() ? <p className="dc-pdp-selection-note">{firstAvailableUpdate.description.trim()}</p> : null}
                 {updateBenefits.length > 0 ? <p className="dc-pdp-selection-note">Includes {updateBenefits.join(" · ")}</p> : null}
-                <div className="dc-pdp-price-line"><strong className="dc-pdp-current-price">{formatPrice(firstAvailableUpdate.cashPrice)}</strong></div>
-                <PaymentButton block className="dc-pdp-primary" icon={null} onClick={handleBuyUpgrade} data-pdp-upgrade-checkout="" label="Get update" />
+                <PdpSelectionSummary snapshot={order} pricing={pricingView} />
+                <PaymentButton block className="dc-pdp-primary" icon={null} disabled={pricingBlocked} onClick={handleBuyUpgrade} data-pdp-upgrade-checkout="" label="Get update" />
                 {onOpenCourse ? <button type="button" data-pdp-library-secondary className="dc-pdp-text-action" onClick={() => onOpenCourse(product)}>{identity.libraryAction}</button> : null}
               </section>
             ) : onOpenCourse ? (
@@ -794,16 +726,15 @@ function PremiumProductContent({
                   ownedResourceIds={ownedResourceIds}
                   returnRoute={`#/product/${encodeURIComponent(product.id)}`}
                   onPreview={handlePreview}
-                  onPayableChange={setSelectionPayable}
-                  onModeChange={setPurchaseMode}
+                  onSelectionChange={handleSelectionChange}
+                  pricing={pricingView}
+                  couponEntry={couponEntry}
                 />
               ) : (
                 <>
-                  <div className="dc-pdp-price-line">
-                    {Number.isFinite(product.originalPrice) && product.originalPrice > finalPrice && product.originalPrice > 0 ? <del className="dc-pdp-original-price" title="Original price">{formatPrice(product.originalPrice)}</del> : null}
-                    <strong className="dc-pdp-current-price" title="Final price">{formatPrice(finalPrice)}</strong>
-                  </div>
-                  <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : productIsFree ? "Get free access" : "Get access"} />
+                  {couponEntry}
+                  <PdpSelectionSummary snapshot={order} pricing={pricingView} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
+                  <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
                 </>
               )}
               {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not available for purchase yet.</p> : null}
@@ -835,21 +766,6 @@ function PremiumProductContent({
             </div>
           </div>
 
-          {!isProductOwned && !unavailable && canShowCouponInput && (
-            <details data-pdp-coupon className="dc-pdp-coupon">
-              <summary>Have a coupon?</summary>
-              <PromoCodeInput
-                kind="coupon"
-                label="Coupon code"
-                placeholder="Enter code"
-                appliedCode={appliedCoupon?.code ?? null}
-                appliedMessage={appliedCoupon?.label ?? null}
-                errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-                onApply={handleApplyCoupon}
-                onRemove={handleRemoveCoupon}
-              />
-            </details>
-          )}
         </section>
 
         <div data-pdp-stack className="flex min-w-0 flex-col gap-6">

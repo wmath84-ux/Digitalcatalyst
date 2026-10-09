@@ -538,3 +538,21 @@
     transition-duration: 1ms;
   }
 }
+
+/* Functional information is not decoration: item names, discounts and totals
+   stay visible in one unboxed selection summary above the single action. */
+[data-pdp-root] .dc-pdp-order-summary { min-width: 0; padding-block: 0.75rem; }
+[data-pdp-root] .dc-pdp-summary-items { margin-top: 0.75rem; }
+[data-pdp-root] .dc-pdp-summary-items > li { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding-block: 0.65rem; border-bottom: 1px solid var(--pdp-border); font-size: 0.875rem; }
+[data-pdp-root] .dc-pdp-summary-item-copy { display: grid; min-width: 0; flex: 1; gap: 0.2rem; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-summary-item-copy small { color: var(--pdp-muted); font-size: 0.75rem; line-height: 1.5; }
+[data-pdp-root] .dc-pdp-summary-item-price { display: flex; max-width: 48%; flex-wrap: wrap; justify-content: end; gap: 0.25rem 0.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+[data-pdp-root] .dc-pdp-line-original { color: var(--pdp-muted); font-size: 0.75rem; }
+[data-pdp-root] .dc-pdp-summary-breakdown { display: grid; gap: 0.55rem; margin-top: 0.875rem; font-size: 0.8125rem; color: var(--pdp-muted); }
+[data-pdp-root] .dc-pdp-summary-breakdown > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+[data-pdp-root] .dc-pdp-summary-breakdown dt { min-width: 0; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-summary-breakdown dd { flex: 0 0 auto; color: #e6eaf2; font-variant-numeric: tabular-nums; }
+[data-pdp-root] .dc-pdp-summary-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; padding-top: 0.875rem; border-top: 1px solid var(--pdp-border); font-size: 0.875rem; font-weight: 650; }
+[data-pdp-root] .dc-pdp-summary-total > .dc-pdp-price-line { justify-content: end; }
+[data-pdp-root] .dc-pdp-selection-rules { display: grid; gap: 0.4rem; margin-top: 0.75rem; color: #b9c4d5; font-size: 0.75rem; line-height: 1.65; }
+[data-pdp-root] .dc-pdp-pricing-error { margin-top: 0.75rem; color: #f4bfbe; font-size: 0.8125rem; line-height: 1.6; }

@@ -46,6 +46,8 @@ import { PaymentButton } from "../ui/PaymentButton";
 import { SimplePanel } from "../ui/SimplePanel";
 import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
+import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./PdpSelectionSummary";
+import { pdpSelectionKey } from "../../pdp/quoteSelection";
 import { isFreeProduct } from "../../../utils/couponVisibility";
 import {
   buildCheckoutSelection,
@@ -73,6 +75,9 @@ export interface PdpPurchaseBuilderProps {
   product: Product;
   /** One price and one CTA, embedded in the product decision panel. */
   compact?: boolean;
+  pricing?: PdpPricingView;
+  couponEntry?: ReactNode;
+  onSelectionChange?: (snapshot: PdpSelectionSnapshot) => void;
   /** Keep optional coupon visibility in sync with the actual chosen content. */
   onPayableChange?: (payable: number) => void;
   /** The shared cart accepts full products, not individual-content selections. */
@@ -161,6 +166,9 @@ const RESOURCE_TYPE_ICON = {
 export default function PdpPurchaseBuilder({
   product,
   compact = false,
+  pricing,
+  couponEntry,
+  onSelectionChange,
   onPayableChange,
   onModeChange,
   isProductOwned,
@@ -287,6 +295,29 @@ export default function PdpPurchaseBuilder({
     [pricingProduct, mode, selectedModuleIds, selectedResourceIds, selectedUpdateId, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds],
   );
 
+  const checkoutSelection = useMemo(() => buildCheckoutSelection({
+    product, mode,
+    selectedIds: mode === "paid_update" ? new Set(selectedUpdateId ? [selectedUpdateId] : []) : mode === "selected_modules" ? selectedModuleIds : selectedResourceIds,
+    paidUpdateId: selectedUpdateId, returnRoute: returnRoute || DEFAULT_RETURN_ROUTE,
+  }), [product.id, mode, selectedUpdateId, selectedModuleIds, selectedResourceIds, returnRoute]);
+  const snapshot = useMemo<PdpSelectionSnapshot>(() => {
+    const flat = flattenModules(modules);
+    const byId = new Map(flat.map((module) => [module.id, module]));
+    const rules: string[] = [];
+    if (mode === "selected_modules") for (const id of selectedModuleIds) {
+      const module = byId.get(id);
+      for (const requiredId of module?.requiredPreviousModuleIds || []) {
+        const required = byId.get(requiredId);
+        if (required) rules.push(`${required.title} is required for ${module?.title}.${getIsModuleOwned(required, ownershipState) ? " Already owned; no additional charge." : " Included in this selection."}`);
+      }
+    }
+    if (summary.lineItems.some((line) => line.alreadyOwned)) rules.push("Already-owned items are excluded from the amount payable.");
+    return { selection: checkoutSelection, summary, valid: validation.ok && summary.selectedCount > 0, rules: [...new Set(rules)] };
+  }, [checkoutSelection, summary, validation.ok, mode, modules, selectedModuleIds, ownershipState]);
+  const expectedPricingKey = pdpSelectionKey({ ...checkoutSelection, productIds: [product.documentId || product.id], couponCode: pricing?.couponIntent || null });
+  const currentPricing = pricing && pricing.selectionKey !== expectedPricingKey ? { ...pricing, quote: null, status: "loading" as const } : pricing;
+  useEffect(() => { onSelectionChange?.(snapshot); }, [onSelectionChange, snapshot]);
+
   useEffect(() => {
     onPayableChange?.(summary.effectiveSubtotal);
     onModeChange?.(mode);
@@ -397,19 +428,6 @@ export default function PdpPurchaseBuilder({
 
   return (
     <div className="space-y-4" data-pdp-purchase-builder data-pdp-purchase-layout={compact ? "minimal" : "expanded"}>
-      {compact && (
-        <div data-pdp-compact-summary>
-          {(mode === "full_product" || summary.selectedCount > 0) && <div className="dc-pdp-price-line">
-            {(mode !== "full_product" || (Number.isFinite(product.originalPrice) && product.originalPrice > 0)) && summary.regularSubtotal > summary.effectiveSubtotal ? (
-              <del className="dc-pdp-original-price" title="Original price">{formatPriceValue(summary.regularSubtotal)}</del>
-            ) : null}
-            <strong className="dc-pdp-current-price" title="Final price">{formatPriceValue(summary.effectiveSubtotal)}</strong>
-          </div>}
-          {mode !== "full_product" && summary.selectedCount > 0 ? (
-            <p className="dc-pdp-selection-note">{summary.selectedCount} {mode === "selected_modules" ? "module" : mode === "selected_resources" ? "resource" : "update"}{summary.selectedCount === 1 ? "" : "s"} selected</p>
-          ) : null}
-        </div>
-      )}
       {(!compact || purchasableModules.length > 0) && modulePicker}
 
       {/* The Full course / Modules tabs were removed: the dropdown above is
@@ -463,10 +481,13 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      {!compact && <SummaryPanel summary={summary} />}
+      {couponEntry}
+      {compact ? <PdpSelectionSummary snapshot={snapshot} pricing={currentPricing} showOriginal={mode !== "full_product" || (Number.isFinite(product.originalPrice) && product.originalPrice > 0)} /> : <SummaryPanel summary={summary} />}
+      {compact && mode !== "full_product" && summary.selectedCount > 0 && summary.fullCourse.effectivePrice < summary.effectiveSubtotal ? <p className="dc-pdp-selection-note">The full product costs {formatPriceValue(summary.fullCourse.effectivePrice)}. <button type="button" className="dc-pdp-text-action" onClick={() => { setSelectedModuleIds(new Set()); setSelectedResourceIds(new Set()); setExtraMode(null); }}>Choose full product</button></p> : null}
 
       <CtaBar
         compact={compact}
+        pricing={currentPricing}
         mode={mode}
         summary={summary}
         isProductOwned={isProductOwned}
@@ -822,6 +843,7 @@ function SummaryPanel({
 
 function CtaBar({
   compact,
+  pricing,
   mode,
   summary,
   isProductOwned,
@@ -833,6 +855,7 @@ function CtaBar({
   onClearNotice,
 }: {
   compact: boolean;
+  pricing?: PdpPricingView;
   mode: PdpPurchaseMode;
   summary: ReturnType<typeof computeSummary>;
   isProductOwned: boolean;
@@ -901,12 +924,14 @@ function CtaBar({
     label = isProductOwned && mode === "full_product"
       ? libraryAction
       : mode === "full_product"
-        ? summary.effectiveSubtotal === 0 ? "Get free access" : "Get access"
+        ? (pricing?.quote ? pricing.quote.cashPayable === 0 : summary.effectiveSubtotal === 0) ? "Get free access" : "Get access"
         : "Continue to checkout";
     // Selector headings already explain how to choose content. Reserve helper
     // copy for actual validation errors instead of repeating the instruction.
     if (validation.ok) helper = null;
   }
+  if (pricing?.status === "loading" || pricing?.applying) { disabled = true; label = "Verifying price"; }
+  if (pricing?.status === "error") disabled = true;
   return (
     <div className="space-y-2" data-pdp-cta>
       {previewNotice && !validation.ok ? (

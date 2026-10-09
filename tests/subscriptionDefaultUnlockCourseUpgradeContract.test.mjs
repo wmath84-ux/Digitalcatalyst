@@ -35,7 +35,8 @@ test("owned product PDP surfaces one concise, working paid-upgrade action", () =
   assert.match(pdp, /data-pdp-upgrade-box/);
   assert.match(pdp, /Update available/);
   assert.match(pdp, /firstAvailableUpdate\.title/);
-  assert.match(pdp, /formatPrice\(firstAvailableUpdate\.cashPrice\)/);
+  assert.match(pdp, /<PdpSelectionSummary snapshot=\{order\} pricing=\{pricingView\}/);
+  assert.match(pdp, /mode = update \? "paid_update" : "full_product"/);
   assert.match(pdp, /onClick=\{handleBuyUpgrade\} data-pdp-upgrade-checkout="" label="Get update"/);
   assert.match(builder, /isProductOwned && availableModes\.includes\("paid_update"\)/);
 });

@@ -26,7 +26,7 @@ const stubs = {
   webPush: `export const ensureSavedWebPushSubscription = async () => {}; export const subscribeToWebPush = async () => {};`,
   firebase: `export const db={}; export const auth={currentUser:{getIdToken:async()=> 'fixture'}};`,
   firestore: `export const collection=(...parts)=>parts; export const serverTimestamp=()=>null; export const addDoc=async()=>({id:'review'}); export const onSnapshot=(ref,callback)=>{callback({docs:new URLSearchParams(location.search).has('noProgress')?[]:[{id:'course',data:()=>({productId:'course',completedFileIds:[],lastOpenedFileId:'lesson',updatedAt:1})}]});return()=>{};};`,
-  apiBase: `export const apiFetch = async (url,options) => {const body=JSON.parse(options?.body||'{}');const valid=body.couponCode!=='INVALID';return {ok:valid,json:async()=>valid?({ok:true,quote:{couponDiscount:10000}}):({ok:false,error:'Invalid coupon'})};};`,
+  apiBase: `export { apiFetch } from '/tests/fixtures/homeMobileLayoutHarness/quoteService.ts';`,
   // Not part of this regression: avoid loading the separate feedback wall.
   FeedbackExperiencePage: `export default () => null;`,
 };
@@ -624,6 +624,7 @@ check("navigating to another product resets the selected-content price and check
   await page.waitForFunction(() => document.querySelector("[data-pdp-titleblock] h1").textContent.startsWith("Algebra practice"));
   assert.equal(await page.locator("[data-pdp-buy] .dc-pdp-current-price").textContent(), "₹1,499");
   assert.equal(await page.locator(primaryPurchase).count(), 1);
+  await page.waitForFunction(() => document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status') === 'verified');
   assert.equal(await page.locator(primaryPurchase).textContent(), "Get access");
   await page.locator(primaryPurchase).click();
   const checkout = await receipt(page);
@@ -633,4 +634,87 @@ check("navigating to another product resets the selected-content price and check
   assert.deepEqual(checkout.moduleIds, []);
   assert.deepEqual(errors, []);
   await page.close();
+});
+
+
+check("individual selection summary names each module, its price and required dependency", async () => {
+  const { page, errors } = await open("page=pdp&options", 320);
+  await page.locator("[data-pdp-modules-trigger]").click();
+  const modal = page.locator("[data-pdp-module-select-modal]");
+  await modal.locator('[data-pdp-module-pick="geometry"]').click();
+  await modal.locator("[data-pdp-module-select-confirm]").click();
+  const summary = page.locator("[data-pdp-order-summary]");
+  await page.waitForFunction(() => document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status') === 'verified' && document.querySelector('[data-pdp-summary-items]')?.textContent.includes('Geometry'));
+  assert.equal(await summary.locator('[data-pdp-summary-item="algebra"]').textContent().then(text=>text.includes('₹499')), true);
+  assert.equal(await summary.locator('[data-pdp-summary-item="geometry"]').textContent().then(text=>text.includes('₹299')), true);
+  assert.equal(await summary.locator('[data-pdp-summary-total] .dc-pdp-current-price').textContent(), '₹798');
+  assert.match(await summary.locator('[data-pdp-selection-rules]').textContent(), /Algebra is required for Geometry/);
+  assert.match(await summary.textContent(), /not the full product/);
+  assert.equal(await summary.locator('.dc-simple-panel, .dc-scene-plate').count(), 0);
+  await assertContained(page, '[data-pdp-summary-items] li', '[data-pdp-order-summary]', 'itemised summary fits 320px');
+  assert.deepEqual(errors, []); await page.close();
+});
+
+check("coupons quote the actual selected resources and list sale, coupon and final total", async () => {
+  const { page, errors } = await open("page=pdp&options", 350);
+  await page.getByRole('button', {name:'Resources',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Select Practice notebook',exact:true}).check();
+  await page.waitForFunction(() => document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status') === 'verified');
+  const coupon = page.locator('[data-pdp-coupon]'); await coupon.locator('summary').click();
+  await coupon.getByPlaceholder('Enter code').fill('SAVE10'); await coupon.getByRole('button',{name:'Apply',exact:true}).click();
+  await coupon.getByText('SAVE10 applied',{exact:true}).waitFor();
+  const summary = page.locator('[data-pdp-order-summary]');
+  assert.match(await summary.locator('[data-pdp-summary-items]').textContent(), /Practice notebook/);
+  assert.match(await summary.locator('[data-pdp-summary-breakdown]').textContent(), /₹249/);
+  assert.match(await summary.locator('[data-pdp-summary-breakdown]').textContent(), /Price discount−₹50/);
+  assert.match(await summary.locator('[data-pdp-coupon-discount]').textContent(), /SAVE10.*₹19.9/);
+  assert.equal(await summary.locator('.dc-pdp-current-price').textContent(), '₹179.1');
+  const requests = await page.evaluate(() => window.quoteRequests);
+  const request = requests.findLast(value=>value.couponCode==='SAVE10');
+  assert.equal(request.purchaseKind,'selected_resources'); assert.deepEqual(request.resourceIds,['notebook']);
+  assert.equal('finalPrice' in request,false); assert.equal('discount' in request,false);
+  await page.locator(primaryPurchase).click(); const checkout=await receipt(page);
+  assert.equal(checkout.couponCode,'SAVE10');assert.equal(checkout.finalPrice,179.1);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+check("failed price verification blocks purchase and never presents an old quote as final", async () => {
+  const {page,errors}=await open('page=pdp&quoteError',390);
+  await page.locator('[data-pdp-order-summary] [role="alert"]').waitFor();
+  assert.ok(await page.locator(primaryPurchase).isDisabled());
+  assert.equal(await page.locator('[data-pdp-order-summary]').getAttribute('data-pricing-status'),'error');
+  assert.match(await page.locator('[data-pdp-summary-total]').textContent(), /Estimated total/);
+  assert.equal(await page.getByRole('button',{name:'Retry pricing',exact:true}).count(),1);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+
+check("coupon revalidation drops an ineligible full-product discount when choosing modules", async () => {
+  const {page,errors}=await open('page=pdp&options&couponFullOnly',390);
+  const coupon=page.locator('[data-pdp-coupon]');await coupon.locator('summary').click();await coupon.getByPlaceholder('Enter code').fill('SAVE100');await coupon.getByRole('button',{name:'Apply',exact:true}).click();await coupon.getByText('SAVE100 applied',{exact:true}).waitFor();
+  await page.locator('[data-pdp-modules-trigger]').click();const modal=page.locator('[data-pdp-module-select-modal]');await modal.locator('[data-pdp-module-pick="geometry"]').click();await modal.locator('[data-pdp-module-select-confirm]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status')==='verified' && document.querySelector('[data-pdp-summary-items]')?.textContent.includes('Geometry'));
+  assert.equal(await page.locator('[data-pdp-coupon-discount]').count(),0);assert.equal(await page.locator('[data-pdp-buy] .dc-pdp-current-price').textContent(),'₹798');
+  await page.locator(primaryPurchase).click();const checkout=await receipt(page);assert.equal(checkout.couponCode,null);assert.equal(checkout.finalPrice,798);assert.deepEqual(errors,[]);await page.close();
+});
+
+check("minimum charge is disclosed and a full discount still carries its coupon into checkout", async () => {
+  for(const [query,total] of [['minimumCharge','₹1'],['','₹0']]){
+    const{page,errors}=await open(`page=pdp&options&${query}`,350);await page.getByRole('button',{name:'Resources',exact:true}).click();await page.getByRole('checkbox',{name:'Select Practice notebook',exact:true}).check();const coupon=page.locator('[data-pdp-coupon]');await coupon.locator('summary').click();await coupon.getByPlaceholder('Enter code').fill('SAVE100');await coupon.getByRole('button',{name:'Apply',exact:true}).click();await coupon.getByText('SAVE100 applied',{exact:true}).waitFor();
+    // Flat fixture code discounts at most ₹100; use the nested ₹99 module to
+    // exercise the paid-order floor / fully-discounted path instead.
+    await page.getByRole('button',{name:'Full product',exact:true}).click();await page.locator('[data-pdp-modules-trigger]').click();const modal=page.locator('[data-pdp-module-select-modal]');await modal.locator('[data-pdp-module-pick="nested"]').click();await modal.locator('[data-pdp-module-select-confirm]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status')==='verified' && document.querySelector('[data-pdp-summary-items]')?.textContent.includes('Worked examples'));
+    assert.equal(await page.locator('[data-pdp-buy] .dc-pdp-current-price').textContent(),total);
+    if(query)assert.match(await page.locator('[data-pdp-selection-rules]').textContent(),/Minimum payable.*₹1/);
+    await page.locator(primaryPurchase).click();const checkout=await receipt(page);assert.equal(checkout.couponCode,'SAVE100');assert.equal(checkout.finalPrice,query?1:0);assert.deepEqual(errors,[]);await page.close();
+  }
+});
+
+check("slow responses from a previous selection cannot overwrite the current quote", async () => {
+  const{page,errors}=await open('page=pdp&options&slowQuotes',390);
+  await page.locator('[data-pdp-modules-trigger]').click();const modal=page.locator('[data-pdp-module-select-modal]');await modal.locator('[data-pdp-module-pick="geometry"]').click();await modal.locator('[data-pdp-module-select-confirm]').click();
+  await page.getByRole('button',{name:'Resources',exact:true}).click();await page.getByRole('checkbox',{name:'Select Practice notebook',exact:true}).check();
+  await page.waitForFunction(()=>document.querySelector('[data-pdp-order-summary]')?.getAttribute('data-pricing-status')==='verified' && document.querySelector('[data-pdp-summary-items]')?.textContent.includes('Practice notebook'));
+  await page.locator(primaryPurchase).click();assert.equal((await receipt(page)).finalPrice,199);assert.equal((await receipt(page)).purchaseKind,'selected_resources');assert.deepEqual(errors,[]);await page.close();
 });

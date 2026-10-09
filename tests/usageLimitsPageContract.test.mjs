@@ -28,7 +28,7 @@ test("the personal allowance cards leave Profile and render on Usage Limits", ()
   assert.match(profileLayout, /data-profile-usage-limits-link/);
   assert.match(profile, /onOpenUsageLimits=\{\(\) => \{ window\.location\.hash = "#\/usage-limits"; \}\}/);
   assert.match(page, /<MyDayAllowanceCard/);
-  assert.match(page, /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
+  assert.match(page, /<AiQuotaCard uid=\{user\.id\} material="home" minimal \/>/);
   assert.match(page, /data-school-ai-visible="true"/);
   assert.doesNotMatch(page, /hasSubscriberPlan|useHasSubscriberPlan/);
 });
