@@ -38,6 +38,11 @@ export interface SelfPracticeSetSummary {
 
 export declare const selfPracticeSetSummary: (questions: unknown) => SelfPracticeSetSummary;
 
+/** True for the fixed shelf course, and for a course an earlier build created with the same title. */
+export declare const isSelfPracticeCourse: (course: unknown) => boolean;
+/** The course new sets are written into: the canonical shelf, else a legacy one, else null. */
+export declare const findSelfPracticeCourse: (courses: unknown) => MyCourse | null;
+
 /** The SELF list for one player scope — same shape as `BrainPracticeSet`. */
 export declare const selfPracticeSetsFromCourses: (
   courses: unknown,

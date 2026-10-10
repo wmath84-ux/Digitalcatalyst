@@ -8,7 +8,7 @@ import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type 
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import {
-  SELF_PRACTICE_SETS_COURSE_ID,
+  findSelfPracticeCourse,
   placeSelfPracticeSet,
   selfPracticeSetsFromCourses,
 } from "../utils/selfPracticeSets.js";
@@ -1111,10 +1111,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       questions: MyCourseQuestion[];
     }): Promise<{ ok: boolean; message?: string }> => {
       if (!user?.id) return { ok: false, message: "Please sign in to save practice sets." };
-      const coursesNow = myLibrary.state === "loading"
-        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
-        : myLibrary.courses;
-      const existing = coursesNow.find((entry) => entry.id === SELF_PRACTICE_SETS_COURSE_ID) || null;
+      // Never write the shelf from a list that did not load: the save replaces
+      // the whole course document, so a guessed-empty shelf would erase the
+      // learner's other sets. Refuse honestly instead.
+      if (myLibrary.state === "error") {
+        return { ok: false, message: "Your Study Library could not be read, so this set was not saved. Reload and try again." };
+      }
+      let coursesNow = myLibrary.courses;
+      if (myLibrary.state === "loading") {
+        try {
+          coursesNow = await fetchMyCourses(user.id);
+        } catch {
+          return { ok: false, message: "Could not reach your Study Library to save this set. Check your connection and try again." };
+        }
+      }
+      const existing = findSelfPracticeCourse(coursesNow);
       const placed = placeSelfPracticeSet(
         {
           course: existing,
