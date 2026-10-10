@@ -56,6 +56,7 @@ import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseQuestion, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
+import { isMasterMindMapFile, masterMindMapView } from "../utils/courseMindMaps.js";
 import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
@@ -1067,6 +1068,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // The module whose mind-map library is showing when the learner opened a map
   // from the Modules library (no file selected). Cleared by any file selection.
   const [mindMapModuleOverride, setMindMapModuleOverride] = useState<string | null>(null);
+  // The MASTER mind map open in the LOWER study pane (Mind Map tab). It never
+  // touches `selectedFile`, so the upper lesson pane keeps its video/content.
+  const [masterMapKey, setMasterMapKey] = useState<string | null>(null);
   const activeMindMapModuleId = mindMapModuleOverride
     || (selectedFile ? moduleIdByFileId[String(selectedFile.id)] || selectedFile.personalModuleId || undefined : undefined);
 
@@ -1668,6 +1672,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   const selectFile = (file: CourseFile) => {
     setMindMapModuleOverride(null);
+    setMasterMapKey(null);
     // A Brain resource is not a document to open — it is the practice set on
     // the Brain tab, so selecting it takes the learner there instead of
     // handing an un-viewable type to the viewer stack.
@@ -1945,9 +1950,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             out.push({ mapKey: `master-${m.id}`, title: m.title || "Master mind map", rootTopic: m.title || "", nodeCount: 0, updatedAt: 0, createdAt: 0, segments, moduleId: String(m.id) });
           }
           for (const f of m.files || []) {
-            if (f.type !== "mindmap") continue;
+            if (f.type !== "mindmap" && !isMasterMindMapFile(f)) continue;
             if (!resolution.accessibleResourceIds.has(String(f.id)) && !moduleUnlocked) continue;
-            out.push({ mapKey: `master-${f.id}`, title: f.name || "Master mind map", rootTopic: f.name || "", nodeCount: 0, updatedAt: 0, createdAt: 0, segments, moduleId: String(m.id), file: f });
+            const nodeCount = isMasterMindMapFile(f) ? masterMindMapView(f)?.nodeCount ?? 0 : 0;
+            out.push({ mapKey: `master-${f.id}`, title: f.name || "Master mind map", rootTopic: f.name || "", nodeCount, updatedAt: 0, createdAt: 0, segments, moduleId: String(m.id), file: f });
           }
         }
         walk(m.modules || []);
@@ -1972,6 +1978,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // Switch to the Mind Map tab on the module that owns this map — the
     // override keeps the library on that module even though no file is open.
     setMindMapModuleOverride(moduleIdByFileId[String(file.id)] || file.personalModuleId || null);
+    // An admin mind map opens its own read-only view in this lower pane.
+    setMasterMapKey(isMasterMindMapFile(file) ? `master-${file.id}` : null);
     setDockTab("mindmap");
     splitDeckRef.current?.activateStudy();
   }, [moduleIdByFileId]);
@@ -1983,7 +1991,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const handleOpenMasterMap = useCallback((mapKey: string) => {
     const entry = masterMindMaps.find((item) => item.mapKey === mapKey);
     if (!entry) return;
-    if (entry.file) {
+    if (entry.file && isMasterMindMapFile(entry.file)) {
+      // Admin mind map: shown read-only in the LOWER pane. The upper lesson
+      // pane is left exactly as it was.
+      setMasterMapKey(entry.mapKey);
+      setMindMapModuleOverride(entry.moduleId);
+    } else if (entry.file) {
       selectFile(entry.file);
     } else {
       setMindMapModuleOverride(entry.moduleId);
@@ -1992,6 +2005,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [masterMindMaps]);
+  const masterMapView = useMemo(() => {
+    if (!masterMapKey) return null;
+    const entry = masterMindMaps.find((item) => item.mapKey === masterMapKey && isMasterMindMapFile(item.file));
+    if (!entry?.file) return null;
+    const view = masterMindMapView(entry.file);
+    return {
+      key: entry.mapKey,
+      title: entry.title,
+      mind: view?.mind ?? null,
+      error: view?.error ?? null,
+    };
+  }, [masterMapKey, masterMindMaps]);
 
   // The structured library is the Modules tab for every course: it groups the
   // real module tree (with notes, mind maps and lessons in each module), and
@@ -2095,6 +2120,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           uid={user?.id ?? null}
           masterMaps={masterMindMaps}
           onOpenMasterMap={handleOpenMasterMap}
+          masterMap={masterMapView}
+          onCloseMasterMap={() => setMasterMapKey(null)}
           landscape={useLandscapeRails}
           // True only while the mind map tab is the one on screen. Within one
           // player visit the panel restores the learner's last view (library

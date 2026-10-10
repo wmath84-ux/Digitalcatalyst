@@ -26,7 +26,7 @@ test("the editor still defaults to the Light palette without touching the shared
 });
 
 test("the Plus renders only while a node is selected or being created", () => {
-  assert.match(panel, /const showPlus = \(selected \|\| editing\) && !dragging;/);
+  assert.match(panel, /const showPlus = \(selected \|\| editing\) && !dragging( && !readOnly)?;/);
   assert.match(panel, /\{showPlus \? \(\s*<button[\s\S]*?data-mind-node-add=\{id\}/);
   // The old unconditional render is gone.
   assert.doesNotMatch(panel, /\/\* ── The `\+`: one tap appends a child to THIS node ──────────────── \*\/\}\s*<button/);

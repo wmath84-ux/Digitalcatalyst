@@ -400,7 +400,7 @@ test("every node opens the inline editor on a single tap (no separate pencil)", 
   assert.match(panel, /onPointerUp=\{handlePointerUp\}/);
   assert.match(panel, /onOpenEditor\(id\);/);
   // The click that trails a real drag must not pop the editor open.
-  assert.match(panel, /if \(dragMovedRef\.current\) return;/);
+  assert.match(panel, /if \(dragMovedRef\.current[\s\S]{0,40}return;/);
 });
 
 test("the mind map has a persisted light/dark pick and a genuine light palette", () => {
@@ -579,7 +579,7 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
 
 test("the toolbar stays hidden until a specific map is opened", () => {
   // The library is the home screen: no strip until a map is on the canvas.
-  assert.match(panel, /\{libraryOpen \? null : \(/);
+  assert.match(panel, /\{libraryOpen (\|\| readOnlyMaster )?\? null : \(/);
 });
 
 test("the toolbar rides at the top of the sheet, like the notes editor", () => {

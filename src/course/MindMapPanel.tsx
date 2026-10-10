@@ -107,7 +107,7 @@
 // drag-pan AND node dragging, and a custom node is just a React component,
 // so the `+` button is ordinary JSX rather than DOM surgery.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Background,
@@ -180,6 +180,7 @@ import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import MindMapJsonImportDialog from "./MindMapJsonImport";
 import type { CourseModule } from "../types/course";
+import { createMindMap } from "../../utils/mindMapTree";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
@@ -402,6 +403,7 @@ const EMPTY_FACING: Record<string, "left" | "right"> = Object.freeze({});
  * drag, and taps that end on a button are left to the button's own click.
  */
 function MindNode({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
+  const readOnly = useContext(MindReadOnlyContext);
   const {
     topic,
     depth,
@@ -527,7 +529,7 @@ function MindNode({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
       : null;
   const underlineShadow = boxed ? null : `inset 0 ${selected || editing ? -3 : -2}px 0 ${accent}`;
   const boxShadow = [underlineShadow, ringShadow].filter(Boolean).join(", ") || undefined;
-  const showPlus = (selected || editing) && !dragging;
+  const showPlus = (selected || editing) && !dragging && !readOnly;
 
   // ── Which way the box faces ────────────────────────────────────────────
   // `facing` is the GEOMETRY — which side of its parent the box actually ended
@@ -1161,12 +1163,24 @@ export interface MindMapPanelProps {
   masterMaps?: MindMapSummary[];
   /** Open a MASTER map's own resource (its lesson page), by its map key. */
   onOpenMasterMap?: (mapKey: string) => void;
+  /**
+   * An admin MASTER mind map shown READ-ONLY in this (lower) panel. `mind` is
+   * the validated map; `error` explains why it cannot be drawn. Null → the
+   * learner's own SELF maps are shown as usual.
+   */
+  masterMap?: { key: string; title: string; mind: MindMap | null; error?: string | null } | null;
+  /** Leave the master map and return to the map library. */
+  onCloseMasterMap?: () => void;
 }
+
+/** Read-only flag for every node box (hides the `+` and blocks editing). */
+const MindReadOnlyContext = createContext(false);
+const NOOP_MIND_CHANGE = (): void => undefined;
 
 function MindMapCanvas(props: MindMapPanelProps) {
   const {
-    mind,
-    onMindChange,
+    mind: selfMind,
+    onMindChange: onSelfMindChange,
     status,
     errorMessage,
     onFlush,
@@ -1188,7 +1202,19 @@ function MindMapCanvas(props: MindMapPanelProps) {
     uid = null,
     masterMaps = [],
   onOpenMasterMap,
+    masterMap = null,
+    onCloseMasterMap,
   } = props;
+  // A master map replaces the canvas content but is never written: the map is
+  // the teacher's, so every mutation is a no-op and the `+`/editing are off.
+  const readOnlyMaster = Boolean(masterMap);
+  const emptyMind = useMemo(() => createMindMap(), []);
+  const mind: MindMap = masterMap ? (masterMap.mind ?? emptyMind) : selfMind;
+  const onMindChange = readOnlyMaster ? NOOP_MIND_CHANGE : onSelfMindChange;
+  const readOnlyRef = useRef(readOnlyMaster);
+  readOnlyRef.current = readOnlyMaster;
+  const masterKey = masterMap?.key ?? null;
+  const prevMasterKey = useRef<string | null>(null);
   /** The map library sheet (grid of this module's maps) is the HOME screen:
    *  it is open by default (fresh player entry) so the learner picks a map to
    *  edit — or creates a new one — before ever landing on a canvas. Within a
@@ -1198,6 +1224,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const [libraryOpen, setLibraryOpen] = useState(
     () => getCoursePanelSession().mindMapView !== "canvas",
   );
+  // Opening a master map shows its canvas; closing it returns to the library.
+  useEffect(() => {
+    if (masterKey) setLibraryOpen(false);
+    else if (prevMasterKey.current) setLibraryOpen(true);
+    prevMasterKey.current = masterKey;
+  }, [masterKey]);
   // AI / JSON import: the dialog is closed by default. `undoSnapshot` holds the
   // map that was on the canvas before a JSON replacement, so it can be restored.
   const [jsonImportOpen, setJsonImportOpen] = useState(false);
@@ -1479,6 +1511,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // ── Handlers ───────────────────────────────────────────────────────────
   const handleAddChild = useCallback(
     (parentId: string) => {
+      if (readOnlyRef.current) return;
       let createdId: string | null = null;
       onMindChange((current) => {
         const result = addChildNode(current, parentId, "New idea");
@@ -1521,6 +1554,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   }, []);
 
   const handleOpenEditor = useCallback((id: string) => {
+    if (readOnlyRef.current) return;
     // Single tap on a node opens the editor directly. Selection is implied
     // (the editor input is only ever the active one), so the same call also
     // updates the selected id. Calling this on the root is a no-op for
@@ -1596,6 +1630,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const openMap = useCallback(
     (mapKey: string) => {
       if (mapKey !== activeMapKey) onSelectMap?.(mapKey);
+      onCloseMasterMap?.();
       setLibraryOpen(false);
       setSelectedId(null);
       setEditingId(null);
@@ -1971,7 +2006,25 @@ function MindMapCanvas(props: MindMapPanelProps) {
           </button>
         </div>
       ) : null}
-      {libraryOpen ? null : (
+      {masterMap && !libraryOpen ? (
+        <div
+          className="flex shrink-0 items-center gap-2 border-b border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-900"
+          data-course-mindmap-master-banner
+          data-master-map-key={masterMap.key}
+        >
+          <span className="min-w-0 truncate font-semibold">{masterMap.title || "Master mind map"}</span>
+          <span className="shrink-0 rounded-full bg-violet-200/70 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide">Read-only</span>
+          <button
+            type="button"
+            onClick={() => onCloseMasterMap?.()}
+            className="ml-auto shrink-0 rounded-md border border-violet-300 bg-white px-2.5 py-1 font-semibold text-violet-900 hover:bg-violet-100"
+            data-course-mindmap-master-close
+          >
+            Back to library
+          </button>
+        </div>
+      ) : null}
+      {libraryOpen || readOnlyMaster ? null : (
       <div
         ref={statusRef}
         className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -2316,6 +2369,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
       <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}>
+        <MindReadOnlyContext.Provider value={readOnlyMaster}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -2328,7 +2382,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.15}
           maxZoom={2.5}
-          nodesDraggable
+          nodesDraggable={!readOnlyMaster}
           // Deletion goes through the confirmation overlay only.
           deleteKeyCode={null}
           nodesConnectable={false}
@@ -2346,7 +2400,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             // of truth for "rename"). The action bar appears automatically
             // because the node is now selected. A click that trails a real
             // drag is skipped — that was a move, not a tap.
-            if (dragMovedRef.current) return;
+            if (dragMovedRef.current || readOnlyRef.current) return;
             setSelectedId(node.id);
             setEditingId(node.id);
           }}
@@ -2442,6 +2496,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             bgColor={mindTheme === "light" ? "#ffffff" : "transparent"}
           />
         </ReactFlow>
+        </MindReadOnlyContext.Provider>
 
         {/* ── Shared study-resource library ────────────────────────────────
             The library is the home screen for the module's saved maps. A
@@ -2546,6 +2601,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             <button
               type="button"
               onClick={() => {
+                onCloseMasterMap?.();
                 onCreateMap?.();
                 setLibraryOpen(false);
                 setSelectedId(null);

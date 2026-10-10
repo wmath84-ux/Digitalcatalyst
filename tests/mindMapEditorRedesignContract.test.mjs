@@ -42,7 +42,7 @@ test("C. the look is a remembered view; switching never writes the map", () => {
 });
 
 test("D. Plus only renders while a node is selected or being edited", () => {
-  assert.match(panel, /const showPlus = \(selected \|\| editing\) && !dragging;/);
+  assert.match(panel, /const showPlus = \(selected \|\| editing\) && !dragging( && !readOnly)?;/);
   assert.match(panel, /\{showPlus \? \(/);
 });
 

@@ -96,6 +96,15 @@ export const sanitizeMyCourseResource = (raw) => {
     resource.practiceTitle = clamp(source.practiceTitle, MY_RESOURCE_NAME_MAX);
     resource.practiceQuestions = questions;
   }
+  // Scope tags. A resource made from the Course Player (an experiment from the
+  // Experiment page's “+”, a practice set from the Brain tab) carries the
+  // player scope it belongs to. The SELF lists filter on these tags, so the
+  // save API must keep them — dropping one here makes a saved item vanish from
+  // its page the moment the write goes through /api/my-courses.
+  const experimentScope = clamp(source.experimentSourceProductId, 200);
+  if (experimentScope) resource.experimentSourceProductId = experimentScope;
+  const practiceScope = clamp(source.practiceSourceProductId, 200);
+  if (practiceScope) resource.practiceSourceProductId = practiceScope;
   if (type === "interactive") {
     // The experiment IS its HTML (see src/utils/experimentSpec.ts). Stored as
     // an ordinary string field, so the only cap that matters here is the byte
