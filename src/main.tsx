@@ -39,6 +39,8 @@ import "./profile-glass.css";
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come
 // AFTER index.css and glass.css to win the ties it re-points.
 import "./course/flatPlayerChrome.css";
+// Scoped appearance overrides for the independently persisted Course Player's Light palette.
+import "./course/courseTheme.css";
 // ── Route-level code splitting (perf pass 2026-09-08) ───────────────────────
 // Every screen below used to be a STATIC import, so the single bundle carried
 // the admin console, the course player, the revision engine and the mind map

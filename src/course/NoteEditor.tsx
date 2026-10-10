@@ -74,10 +74,13 @@ import { createNoteEditor, type NoteEditorInstance } from "./noteEditor/editorFa
 import { importLegacyHtml } from "./noteEditor/editorMigration";
 import { focusNoteBody, isNoteBodyEmpty, readNoteBody } from "./noteEditor/editorCommands";
 import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
+import type { CoursePlayerTheme } from "./playerPreferences";
 
 export type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
 
 export interface NoteEditorProps {
+  /** Notes' own persisted appearance; independent of the Player and canvas themes. */
+  theme?: CoursePlayerTheme;
   initialTitle: string;
   /** The body as stored (the title already split off). */
   initialBodyHtml: string;
@@ -378,6 +381,7 @@ function NoteEditorChrome({
  * undo history, which is the only clean history boundary ProseMirror offers.
  */
 function NoteEditorSession({
+  theme = "light",
   initialTitle,
   initialBodyHtml,
   readOnly = false,
@@ -594,14 +598,40 @@ function NoteEditorSession({
     [editor],
   );
 
-  const portalElements = useMemo(() => ({ default: typeof document !== "undefined" ? document.body : undefined }), []);
+  // BlockNote's floating controls normally attach to document.body, which is
+  // outside Notes' theme root. Give its portal a real, scoped host that carries
+  // the same theme tokens as the page; no global body theme is changed.
+  const [portalHost] = useState<HTMLDivElement | null>(() => {
+    if (typeof document === "undefined") return null;
+    const host = document.createElement("div");
+    host.className = "dc-note dc-note-portal-host";
+    host.dataset.courseThemePortal = "";
+    host.dataset.courseTheme = theme;
+    host.dataset.notesTheme = theme;
+    return host;
+  });
+  useLayoutEffect(() => {
+    if (!portalHost) return;
+    portalHost.dataset.courseTheme = theme;
+    portalHost.dataset.notesTheme = theme;
+  }, [portalHost, theme]);
+  useEffect(() => {
+    if (!portalHost) return undefined;
+    document.body.appendChild(portalHost);
+    return () => portalHost.remove();
+  }, [portalHost]);
+  const portalElements = useMemo(
+    () => ({ default: portalHost ?? (typeof document !== "undefined" ? document.body : undefined) }),
+    [portalHost],
+  );
 
   return (
     <ComponentsContext.Provider value={ariakitComponents}>
       <BlockNoteViewRaw
         editor={editor}
-        theme="light"
+        theme={theme}
         className="dc-note"
+        data-notes-theme={theme}
         editable={!readOnly}
         onChange={schedule}
         renderEditor={false}

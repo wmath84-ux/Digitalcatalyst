@@ -3,7 +3,7 @@
 // Course Player audio — the AI Canvas "Glass Music Player"
 // (https://aicanvas.me/components/glass-music-player), colour / look /
 // animation exact:
-//   · card: w-320 rounded-[32px], background rgba(12,10,14,0.55), hairline
+//   · card: w-320 rounded-[32px], background rgba(12,10,14,0.9), hairline
 //     border, `0 24px 64px rgba(0,0,0,0.55)` + inset top-light, a SEPARATE
 //     z-[-1] blur layer (blur 48 / saturate 1.6) and the left-12/right-12
 //     top highlight line,
@@ -248,11 +248,12 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
             transition={{ type: "spring", stiffness: 200, damping: 22 }}
             className="relative isolate w-[320px] overflow-hidden rounded-[32px]"
             style={{
-              background: "rgba(12,10,14,0.55)",
+              background: "rgba(12,10,14,0.9)",
               border: "1px solid rgba(255,255,255,0.09)",
               boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
             }}
             data-course-audio-player
+            data-course-theme-surface="dark"
             data-playing={playing ? "true" : "false"}
           >
             {/* Separate blur layer — never re-blurs while the disc spins. */}
@@ -275,15 +276,15 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   type="button"
                   aria-label="Rewind 15 seconds"
                   onClick={() => skipTo(-1)}
-                  whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.8)" }}
+                  whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.95)" }}
                   whileTap={{ scale: 0.85 }}
-                  style={{ color: "rgba(255,255,255,0.35)" }}
+                  style={{ color: "rgba(255,255,255,0.72)" }}
                 >
                   <ArrowLeft size={20} />
                 </motion.button>
                 <span
                   className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-                  style={{ color: "rgba(255,255,255,0.4)" }}
+                  style={{ color: "rgba(255,255,255,0.76)" }}
                 >
                   Now Playing
                 </span>
@@ -292,7 +293,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   aria-label="Like"
                   aria-pressed={liked}
                   onClick={() => setLiked((value) => !value)}
-                  animate={{ color: liked ? color : "rgba(255,255,255,0.35)" }}
+                  animate={{ color: liked ? color : "rgba(255,255,255,0.72)" }}
                   transition={{ duration: 0.2 }}
                   whileHover={{ scale: 1.15 }}
                   whileTap={{ scale: 0.85 }}
@@ -367,7 +368,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   <h3 className="max-w-full truncate text-lg font-bold tracking-tight text-white/95" title={name}>
                     {name}
                   </h3>
-                  <p className="text-[13px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>
+                  <p className="text-[13px] font-medium" style={{ color: "rgba(255,255,255,0.78)" }}>
                     {playing ? "Playing" : "Paused"}
                   </p>
                 </motion.div>
@@ -383,7 +384,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                     onClick={() => seek(((index + 0.001) / 3) * duration)}
                     animate={{
                       width: index === segment ? 20 : 5,
-                      opacity: index === segment ? 0.5 : 0.22,
+                      opacity: index === segment ? 0.92 : 0.58,
                       backgroundColor: index === segment ? color : "#ffffff",
                     }}
                     transition={{ type: "spring", stiffness: 400, damping: 28 }}
@@ -412,7 +413,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   onPointerUp={onSeekPointerUp}
                   onPointerCancel={onSeekPointerUp}
                   className="relative h-[3px] w-full cursor-pointer touch-none select-none overflow-hidden rounded-full"
-                  style={{ background: "rgba(255,255,255,0.07)" }}
+                  style={{ background: "rgba(255,255,255,0.16)" }}
                   data-course-audio-seek
                 >
                   <motion.div
@@ -422,10 +423,10 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   />
                 </div>
                 <div className="mt-2 flex justify-between">
-                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-current>
+                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.78)" }} data-course-audio-current>
                     {formatTime(currentTime)}
                   </span>
-                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-duration>
+                  <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.78)" }} data-course-audio-duration>
                     {formatTime(duration)}
                   </span>
                 </div>
@@ -438,9 +439,9 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   aria-label="Toggle loop"
                   aria-pressed={loop}
                   onClick={() => setLoop((value) => !value)}
-                  animate={{ color: loop ? color : "rgba(255,255,255,0.35)" }}
+                  animate={{ color: loop ? color : "rgba(255,255,255,0.72)" }}
                   transition={{ duration: 0.2 }}
-                  whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.75)" }}
+                  whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.95)" }}
                   whileTap={{ scale: 0.85 }}
                   data-course-audio-loop
                   data-active={loop ? "true" : "false"}
@@ -452,7 +453,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   type="button"
                   aria-label="Back 15 seconds"
                   onClick={() => skipTo(-1)}
-                  style={{ color: "rgba(255,255,255,0.65)" }}
+                  style={{ color: "rgba(255,255,255,0.78)" }}
                   whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
                   whileTap={{ scale: 0.9 }}
                   data-course-audio-restart
@@ -493,7 +494,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                   type="button"
                   aria-label="Forward 15 seconds"
                   onClick={() => skipTo(1)}
-                  style={{ color: "rgba(255,255,255,0.65)" }}
+                  style={{ color: "rgba(255,255,255,0.78)" }}
                   whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -510,9 +511,9 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
                     audio.muted = !audio.muted;
                     setMuted(audio.muted);
                   }}
-                  animate={{ color: muted ? color : "rgba(255,255,255,0.35)" }}
+                  animate={{ color: muted ? color : "rgba(255,255,255,0.72)" }}
                   transition={{ duration: 0.2 }}
-                  whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.75)" }}
+                  whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.95)" }}
                   whileTap={{ scale: 0.85 }}
                   data-course-audio-mute
                   data-muted={muted ? "true" : "false"}

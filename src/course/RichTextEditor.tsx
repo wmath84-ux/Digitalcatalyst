@@ -20,6 +20,7 @@ import { GlassButton } from "../components/ui/glass-button";
 import { GlassSurface } from "../components/ui/glass";
 import { GlassSwatch } from "../components/ui/glass-swatch";
 import { PopoverItem } from "../components/ui/glass-popover";
+import type { CoursePlayerTheme } from "./playerPreferences";
 
 interface RichTextEditorProps {
   value: string;
@@ -38,6 +39,8 @@ interface RichTextEditorProps {
   /** Tailwind classes controlling the writing surface height. */
   surfaceClassName?: string;
   ariaLabel?: string;
+  /** Theme inherited from the independently themed Notes panel. */
+  theme?: CoursePlayerTheme;
   /** Test / integration hook forwarded to the editable surface. */
   dataAttribute?: string;
 }
@@ -57,7 +60,7 @@ function MenuItem({ label, onClick, style }: { label: string; onClick: () => voi
   return <PopoverItem style={style} onMouseDown={e => e.preventDefault()} onClick={onClick} className="rounded-md px-3 py-2">{label}</PopoverItem>;
 }
 
-function FormatMenu({ label, icon, open, onToggle, menuRef, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; menuRef: React.RefObject<HTMLDivElement | null>; children: ReactNode }) {
+function FormatMenu({ label, icon, open, onToggle, menuRef, theme, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; menuRef: React.RefObject<HTMLDivElement | null>; theme: CoursePlayerTheme; children: ReactNode }) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
@@ -93,8 +96,8 @@ function FormatMenu({ label, icon, open, onToggle, menuRef, children }: { label:
   return <div ref={anchorRef} className="relative shrink-0">
     <GlassButton variant="capsule" aria-label={label} title={label} aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="[&>span>div]:h-7 [&>span>div]:px-1.5"><span className="flex items-center gap-1"><span>{icon}</span><span className="hidden text-[11px] sm:inline">{label}</span><ChevronDown size={10} /></span></GlassButton>
     {open && pos ? createPortal(
-      <div ref={menuRef} role="menu" aria-label={label} className="fixed z-[90]" style={{ top: pos.top, left: pos.left, width: pos.width }} data-course-rich-menu>
-        <GlassSurface radius={20} className="text-white" contentClassName="max-h-[280px] overflow-y-auto p-1">{children}</GlassSurface>
+      <div ref={menuRef} role="menu" aria-label={label} className="fixed z-[90]" style={{ top: pos.top, left: pos.left, width: pos.width }} data-course-rich-menu data-course-theme-portal="" data-course-theme={theme} data-notes-theme={theme}>
+        <GlassSurface radius={20} className="text-white" contentClassName="max-h-[280px] overflow-y-auto p-1" data-course-rich-menu-surface>{children}</GlassSurface>
       </div>,
       document.body,
     ) : null}
@@ -102,6 +105,7 @@ function FormatMenu({ label, icon, open, onToggle, menuRef, children }: { label:
 }
 
 export default function RichTextEditor({
+  theme = "light",
   value,
   onChange,
   heading,
@@ -335,16 +339,16 @@ export default function RichTextEditor({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-rich-editor>
       <div ref={toolbarRef} className="flex shrink-0 flex-nowrap items-center gap-1 overflow-x-auto rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-1.5 py-1.5 [backdrop-filter:var(--dc-chrome-glass-blur)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-course-rich-toolbar onScroll={() => setOpenMenu(null)}>
-        <FormatMenu label="Heading" icon={<Type size={13} />} open={openMenu === "heading"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
+        <FormatMenu label="Heading" icon={<Type size={13} />} open={openMenu === "heading"} menuRef={richMenuRef} theme={theme} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
           {[1, 2, 3, 4, 5].map(level => <MenuItem key={level} label={`Heading ${level}`} onClick={() => { exec("formatBlock", `h${level}`); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
-        <FormatMenu label="Text color" icon={<Palette size={13} />} open={openMenu === "color"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
+        <FormatMenu label="Text color" icon={<Palette size={13} />} open={openMenu === "color"} menuRef={richMenuRef} theme={theme} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
           <div className="grid grid-cols-6 gap-2 p-2">
             {["#202124", "#d93025", "#e37400", "#fbbc04", "#34a853", "#1a73e8", "#9334e8", "#e91e63", "#795548", "#607d8b", "#ffffff", "#eeeeee"].map(color => <GlassSwatch key={color} color={color} title={color} size={24} onMouseDown={e => e.preventDefault()} onClick={() => { surfaceRef.current?.focus(); exec("foreColor", color); emit(); setOpenMenu(null); }} />)}
             <label className="col-span-6 flex cursor-pointer items-center gap-2 border-t border-white/10 pt-2 text-xs text-white/70"><span className="h-5 w-5 rounded-full border" style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }} />Custom color<input type="color" className="sr-only" onChange={e => { surfaceRef.current?.focus(); exec("foreColor", e.target.value); emit(); setOpenMenu(null); }} /></label>
           </div>
         </FormatMenu>
-        <FormatMenu label="Font" icon={<span className="text-[11px] font-bold">Aa</span>} open={openMenu === "font"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
+        <FormatMenu label="Font" icon={<span className="text-[11px] font-bold">Aa</span>} open={openMenu === "font"} menuRef={richMenuRef} theme={theme} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
           {['Arial','Calibri','Cambria','Comic Sans MS','Courier New','Georgia','Helvetica','Roboto','Times New Roman','Trebuchet MS','Verdana'].map(font => <MenuItem key={font} label={font} style={{ fontFamily: font }} onClick={() => { exec("fontName", font); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
         {actions.map(({ key, label, icon: Icon, run }) => (

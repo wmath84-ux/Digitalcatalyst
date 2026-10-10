@@ -42,7 +42,7 @@ import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
-import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
+import { useCourseTheme, useMasterSelfPreference, type CoursePlayerTheme } from "./playerPreferences";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
 import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
@@ -212,9 +212,9 @@ function NoteStatus({
   );
 }
 
-function MasterNoteViewer({ note, onClose }: { note: MasterCourseNote; onClose: () => void }) {
+function MasterNoteViewer({ note, onClose, theme }: { note: MasterCourseNote; onClose: () => void; theme: CoursePlayerTheme }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-white" data-course-master-note-viewer data-course-notes-mode="master-readonly">
+    <div className="flex h-full flex-col overflow-hidden bg-white" data-course-master-note-viewer data-course-notes-mode="master-readonly" data-notes-theme={theme}>
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2">
         <button
           type="button"
@@ -237,6 +237,7 @@ function MasterNoteViewer({ note, onClose }: { note: MasterCourseNote; onClose: 
             readOnly
             autoFocus={false}
             ariaLabel={`Master course note: ${note.title}`}
+            theme={theme}
             dataAttribute="data-course-master-note-input"
           />
         </Suspense>
@@ -493,6 +494,7 @@ export default function NotesPanel({
     return (
       <MasterNoteViewer
         note={viewingMasterNote}
+        theme={noteThemeCtl.theme}
         onClose={() => setViewingMasterNoteId(null)}
       />
     );
@@ -595,8 +597,9 @@ export default function NotesPanel({
             <EditorBoundary
               onFail={() => setLegacyFallback(true)}
               fallback={
-                <div className="flex h-full min-h-0 flex-col bg-slate-950 p-3">
+                <div className="flex h-full min-h-0 flex-col bg-slate-950 p-3" data-course-notes-legacy-fallback>
                   <RichTextEditor
+                    theme={noteThemeCtl.theme}
                     value={value}
                     onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
                     heading={titleValue}
@@ -610,12 +613,13 @@ export default function NotesPanel({
                 </div>
               }
             >
-              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-course-notes-editor-loading />}>
+              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-course-notes-editor-loading data-notes-theme={noteThemeCtl.theme} />}>
                 <NoteEditor
                   key={seed.key}
                   ref={editorRef}
                   initialTitle={seed.title}
                   initialBodyHtml={seed.body}
+                  theme={noteThemeCtl.theme}
                   // §13/§14 — the SAME BlockNote document is the view and the
                   // editor: viewing is just the document rendered read-only.
                   readOnly={Boolean(editing && selfReadOnly)}
@@ -638,7 +642,7 @@ export default function NotesPanel({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list">
+    <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list" data-notes-theme={noteThemeCtl.theme}>
       {/* The library is one responsive resource-card system: the panel owns
           the add affordance; each resource card itself is the open target. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -824,6 +828,7 @@ export default function NotesPanel({
           player's clipped/overflow-hidden sheet can never cut it off, and
           it always sits above the overlay + dock on phones and tablets. */}
       <ConfirmDeleteDialog
+        theme={noteThemeCtl.theme}
         open={Boolean(pendingDeleteNote)}
         title="Delete this note?"
         message={

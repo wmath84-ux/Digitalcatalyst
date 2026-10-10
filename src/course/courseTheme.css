@@ -1,0 +1,1769 @@
+/*
+ * Course Player appearance rules.
+ *
+ * The player preference is feature-scoped: these neutral utility remaps apply
+ * only to ordinary Player chrome in Light mode. Read, Notes, Mind Map, AI,
+ * Brain, Live Experiments, media/viewer surfaces, and the footer docks carry
+ * their own appearance contracts and are explicitly kept outside this map.
+ * No layout, spacing, or responsive behavior is changed here.
+ */
+
+.course-player-shell[data-course-theme="light"] {
+  --dc-course-theme-page: #f6f7fb;
+  --dc-course-theme-surface: #ffffff;
+  --dc-course-theme-raised: #f8fafc;
+  --dc-course-theme-soft: #f1f5f9;
+  --dc-course-theme-border: rgba(15, 23, 42, 0.14);
+  --dc-course-theme-ink: #0f172a;
+  --dc-course-theme-ink-soft: #334155;
+  --dc-course-theme-ink-muted: #475569;
+  --dc-course-theme-placeholder: #64748b;
+  --course-text: #0b1220;
+  --course-muted: rgba(11, 18, 32, 0.7);
+  --course-border: rgba(15, 23, 42, 0.14);
+  background-color: #f6f7fb;
+  background-image:
+    radial-gradient(circle at 18% -10%, rgba(56, 189, 248, 0.08) 0, transparent 52%),
+    radial-gradient(circle at 84% -6%, rgba(139, 92, 246, 0.075) 0, transparent 50%),
+    linear-gradient(to bottom, #f8fafc 0%, #f3f5fa 58%, #eef1f7 100%);
+  color-scheme: light;
+}
+
+/* The staged loader renders before the split shell. It follows the same saved
+   Player preference without taking a global/body theme with it. */
+[data-course-player-loading][data-course-theme="light"] {
+  background-color: #f6f7fb;
+  background-image: radial-gradient(circle at 50% 15%, rgba(79, 70, 229, 0.06), transparent 46%);
+  color: #0f172a;
+  color-scheme: light;
+}
+[data-course-player-loading][data-course-theme="light"] [class~="text-white"] { color: #0f172a; }
+[data-course-player-loading][data-course-theme="light"] [class~="text-white/70"] { color: #475569; }
+[data-course-player-loading][data-course-theme="light"] [class~="text-white/40"] { color: #64748b; }
+[data-course-player-loading][data-course-theme="light"] [class~="text-emerald-400"] { color: #047857; }
+[data-course-player-loading][data-course-theme="light"] [class~="border-white/10"] { border-color: #cbd5e1; }
+[data-course-player-loading][data-course-theme="light"] [class~="bg-white/5"] { background: rgba(15, 23, 42, 0.06); }
+
+/* The Split Deck keeps its familiar paper / board materials in either
+   orientation. GlassSurface still supplies the material, but its tint and rim
+   are re-pointed to light values only inside ordinary Player chrome. */
+.course-player-shell[data-course-theme="light"] [data-course-study-pane] {
+  background-color: #f3f5fa;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f1f3f8 100%);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+  color-scheme: light;
+}
+.course-player-shell[data-course-theme="light"] [data-course-study-pane] > [data-glass-surface] > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.36) !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-lesson-pane] {
+  background-color: #f8fafc;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f6f7fb 100%);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row],
+.course-player-shell[data-course-theme="light"] [data-course-panel-row] {
+  background-color: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-row-kind="module"] {
+  background-color: rgba(226, 232, 240, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(71, 85, 105, 0.24);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-row-kind="file"] {
+  background-color: rgba(139, 92, 246, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.14);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-selected="true"],
+.course-player-shell[data-course-theme="light"] [data-course-overlay-file][data-selected="true"] {
+  background-color: rgba(124, 58, 237, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.32), 0 0 18px -8px rgba(109, 40, 217, 0.22);
+}
+.course-player-shell[data-course-theme="light"] [data-course-overlay-module][data-selected="true"] {
+  background-color: rgba(8, 145, 178, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.26);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-locked="true"] {
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.28);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-row-kind="file"]::before {
+  border-left-color: rgba(71, 85, 105, 0.28);
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row] .truncate.text-xs,
+.course-player-shell[data-course-theme="light"] [data-course-panel-row] .truncate.text-xs {
+  color: #0f172a;
+}
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row] [data-row-subtitle] {
+  color: #475569;
+}
+.course-player-shell[data-course-theme="light"] [data-course-panel-section-label] {
+  color: #475569;
+}
+
+/* Progress/settings strip — same two-part control and sizing, now on a clear
+   paper rail. The cyan-to-violet fill and status actions retain their accents. */
+.course-player-shell[data-course-theme="light"] [data-course-top-progress] {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.14) !important;
+  color: #0f172a;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+.course-player-shell[data-course-theme="light"] [data-course-top-progress] [data-course-progress-label] {
+  color: #0e7490 !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-top-progress] [data-course-progress-divider] {
+  background-color: rgba(15, 23, 42, 0.16);
+}
+.course-player-shell[data-course-theme="light"] [data-course-top-progress] [data-course-settings-trigger] {
+  color: #334155;
+}
+.course-player-shell[data-course-theme="light"] [data-course-top-progress] [data-course-settings-trigger]:hover {
+  background-color: rgba(15, 23, 42, 0.06);
+}
+
+/* Both footer docks retain the established solid navy plate and white hint
+   pills in Light mode. In particular, the peek tooltip must not inherit the
+   now-light --dc-flat-board-head token. */
+.course-player-shell[data-course-theme="light"] [data-course-dock] [data-glass-dock],
+.course-player-shell[data-course-theme="light"] [data-course-peek-dock] [data-glass-dock] {
+  background: linear-gradient(180deg, #141b30 0%, #0a0e1c 100%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 55px rgba(0, 0, 0, 0.48) !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-dock] [data-glass-dock-item] > div:first-child,
+.course-player-shell[data-course-theme="light"] [data-course-peek-dock] [data-glass-dock-item] > div:first-child {
+  background: #0d1424 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38) !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-dock] [data-glass-dock-item] > div:first-child *,
+.course-player-shell[data-course-theme="light"] [data-course-peek-dock] [data-glass-dock-item] > div:first-child * {
+  color: #ffffff !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-peek-rail] {
+  color: #ffffff;
+}
+
+/* Shared glass tint used by Player settings rows / buttons. This does not
+   touch independently themed features, third-party media, or either dock. */
+.course-player-shell[data-course-theme="light"] [data-glass-surface]:not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.42) !important;
+}
+.course-player-shell[data-course-theme="light"] [data-glass-surface]:not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) > div:nth-child(4) {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1) !important;
+}
+
+/* Neutral Tailwind utility remaps for ordinary Player chrome. These rules
+   deliberately exclude the feature roots below; each feature owns its own
+   preference and palette. The selector list is kept explicit so a Course
+   Player Light choice can never recolor Brain, Experiment, AI, Notes, Read,
+   Mind Map, media controls, Sketch's canvas, or the dark footer plates. */
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-white"], [class~="text-white/95"], [class~="text-white/90"],
+  [class~="text-white/85"], [class~="text-white/80"], [class~="text-white/75"],
+  [class~="text-slate-50"], [class~="text-slate-100"], [class~="text-slate-200"]
+):not(:where(
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *
+)) {
+  color: var(--dc-course-theme-ink);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-white/70"], [class~="text-white/65"], [class~="text-white/60"],
+  [class~="text-slate-300"]
+):not(:where(
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *
+)) {
+  color: var(--dc-course-theme-ink-soft);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-white/55"], [class~="text-white/50"], [class~="text-white/45"], [class~="text-white/40"],
+  [class~="text-white/35"], [class~="text-white/30"], [class~="text-white/25"], [class~="text-white/20"],
+  [class~="text-slate-400"]
+):not(:where(
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *
+)) {
+  color: var(--dc-course-theme-ink-muted);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-amber-50"], [class~="text-amber-100"], [class~="text-amber-100/80"],
+  [class~="text-amber-200"], [class~="text-amber-200/80"], [class~="text-amber-300"], [class~="text-amber-300/90"], [class~="text-amber-400"],
+  [class~="text-emerald-50"], [class~="text-emerald-100"], [class~="text-emerald-200"], [class~="text-emerald-200/90"], [class~="text-emerald-300"], [class~="text-emerald-300/80"], [class~="text-emerald-400"],
+  [class~="text-violet-100"], [class~="text-violet-200"], [class~="text-violet-200/80"], [class~="text-violet-200/90"], [class~="text-violet-300"],
+  [class~="text-rose-100"], [class~="text-rose-200"], [class~="text-rose-300"],
+  [class~="text-cyan-200"], [class~="text-cyan-300"], [class~="text-sky-200"], [class~="text-sky-300"], [class~="text-orange-300"]
+):not(:where(
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *
+)) {
+  color: #7c2d12;
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-emerald-300"], [class~="text-emerald-200"], [class~="text-emerald-100"],
+  [class~="text-cyan-200"], [class~="text-cyan-300"], [class~="text-sky-200"], [class~="text-sky-300"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *
+)) {
+  color: #0f766e;
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-violet-100"], [class~="text-violet-200"], [class~="text-violet-200/80"], [class~="text-violet-200/90"], [class~="text-violet-300"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *
+)) {
+  color: #5b21b6;
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="text-rose-100"], [class~="text-rose-200"], [class~="text-rose-300"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *
+)) {
+  color: #9f1239;
+}
+
+/* Light versions of the slate/white-neutral fills, hairlines, rings and native
+   fields used by the ordinary Player panels. Accent backgrounds are untouched. */
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="bg-slate-950"], [class~="bg-slate-950/95"], [class~="bg-slate-900"], [class~="bg-slate-900/95"],
+  [class~="bg-slate-800"], [class~="bg-slate-600"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  background-color: var(--dc-course-theme-surface);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class~="bg-white/10"], [class~="bg-white/15"], [class~="bg-white/20"],
+  [class~="bg-white/[0.03]"], [class~="bg-white/[0.04]"], [class~="bg-white/[0.05]"], [class~="bg-white/[0.06]"], [class~="bg-white/[0.07]"],
+  [class~="bg-black/20"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  background-color: rgba(15, 23, 42, 0.06);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class*="hover:bg-white/"], [class*="hover:bg-slate-"], [class*="hover:bg-black/"]
+):hover:not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  background-color: rgba(15, 23, 42, 0.07);
+}
+.course-player-shell[data-course-theme="light"] :is(
+  [class*="border-white/"], [class~="border-slate-800"], [class~="border-slate-900"]
+):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+.course-player-shell[data-course-theme="light"] :is([class*="ring-white/"], [class*="ring-slate-800/"]):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *
+)) {
+  --tw-ring-color: rgba(15, 23, 42, 0.18);
+}
+.course-player-shell[data-course-theme="light"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  color-scheme: light;
+}
+.course-player-shell[data-course-theme="light"] :is(input, textarea, [contenteditable="true"]):not(:where(
+  [data-course-read-panel] *,
+  [data-course-notes-panel] *,
+  [data-notes-theme] *,
+  [data-mindmap-theme] *,
+  [data-course-ai-panel] *,
+  [data-course-ai-theme] *,
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel] *,
+  [data-course-audio-player] *,
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"] *,
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-notes-panel],
+  [data-notes-theme],
+  [data-mindmap-theme],
+  [data-course-ai-panel],
+  [data-course-ai-theme],
+  [data-course-brain-panel],
+  [data-course-experiment-panel],
+  [data-course-audio-player],
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-viewer-audio],
+  [data-course-theme-surface="dark"],
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host]
+))::placeholder {
+  color: var(--dc-course-theme-placeholder);
+  opacity: 1;
+}
+.course-player-shell[data-course-theme="light"] :is(input[type="checkbox"], input[type="radio"]):not(:where(
+  [data-course-read-panel] *,
+  [data-course-notes-panel] *,
+  [data-notes-theme] *,
+  [data-mindmap-theme] *,
+  [data-course-ai-panel] *,
+  [data-course-ai-theme] *,
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel] *,
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-read-panel],
+  [data-course-notes-panel],
+  [data-notes-theme],
+  [data-mindmap-theme],
+  [data-course-ai-panel],
+  [data-course-ai-theme],
+  [data-course-brain-panel],
+  [data-course-experiment-panel],
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-gate-personal-access],
+  [data-course-sketch-host],
+  [data-course-sketch-host] *
+)) {
+  accent-color: #4f46e5;
+}
+.course-player-shell[data-course-theme="light"] :is(button:disabled, input:disabled, textarea:disabled, select:disabled, [aria-disabled="true"]):not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-accent-action],
+  [data-course-accent-action] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  opacity: 0.62;
+}
+.course-player-shell[data-course-theme="light"] :is(button, a, input, textarea, select):focus-visible:not(:where(
+  [data-course-read-panel],
+  [data-course-read-panel] *,
+  [data-course-notes-panel],
+  [data-course-notes-panel] *,
+  [data-notes-theme],
+  [data-notes-theme] *,
+  [data-mindmap-theme],
+  [data-mindmap-theme] *,
+  [data-course-ai-panel],
+  [data-course-ai-panel] *,
+  [data-course-ai-theme],
+  [data-course-ai-theme] *,
+  [data-course-brain-panel],
+  [data-course-brain-panel] *,
+  [data-course-experiment-panel],
+  [data-course-experiment-panel] *,
+  [data-course-audio-player],
+  [data-course-audio-player] *,
+  [data-course-dock],
+  [data-course-dock] *,
+  [data-course-peek-dock],
+  [data-course-peek-dock] *,
+  [data-course-image-viewer],
+  [data-course-image-viewer] *,
+  [data-course-viewer-audio],
+  [data-course-viewer-audio] *,
+  [data-course-theme-surface="dark"],
+  [data-course-theme-surface="dark"] *,
+  [data-course-gate-personal-access],
+  [data-course-gate-personal-access] *,
+  [data-course-sketch-host],
+  [data-course-sketch-host] *,
+  [data-course-viewer],
+  [data-course-viewer] *,
+  [data-course-sketch-panel],
+  [data-course-sketch-panel] *,
+  [data-course-peek-rail],
+  [data-course-peek-rail] *
+)) {
+  outline-color: #4f46e5;
+}
+
+/* Marked accent buttons keep an intentional ink choice. The pale My Modules
+   violet gradient stays exactly as designed, while its text changes to deep
+   violet for AA contrast instead of white-on-lavender. */
+.course-player-shell[data-course-theme="light"] [data-course-accent-action="violet"],
+.course-player-shell[data-course-theme="light"] [data-course-accent-action="violet"] * {
+  color: #160b35 !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-accent-action="light"] {
+  color: #0f172a;
+}
+
+/* The gated-access form and Live Experiments intentionally remain dark islands
+   in Light Player mode. Their own inputs, menus and neutral utility classes
+   must not inherit the surrounding light remaps. */
+.course-player-shell[data-course-theme="light"] [data-course-gate-personal-access],
+.course-player-shell[data-course-theme="light"] [data-course-experiment-panel] {
+  --course-text: #f8fafc;
+  --course-muted: #cbd5e1;
+  --course-border: rgba(255, 255, 255, 0.14);
+  --dc-flat-row: rgba(255, 255, 255, 0.055);
+  --dc-flat-row-hover: rgba(255, 255, 255, 0.1);
+  --dc-flat-row-line: rgba(255, 255, 255, 0.1);
+  --dc-flat-ink: #ffffff;
+  --dc-flat-ink-sub: rgba(255, 255, 255, 0.72);
+  --dc-flat-board: #0b1120;
+  --dc-flat-ink-label: rgba(255, 255, 255, 0.6);
+  --dc-flat-box: rgba(255, 255, 255, 0.035);
+  color: #f8fafc;
+  color-scheme: dark;
+}
+.course-player-shell[data-course-theme="light"] [data-course-gate-personal-access] {
+  background: linear-gradient(180deg, #172033, #101827);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.course-player-shell[data-course-theme="light"] [data-course-experiment-panel] {
+  background-color: #080b16;
+  background-image: radial-gradient(100% 80% at 50% 0%, rgba(56, 189, 248, 0.07), transparent 65%);
+}
+.course-player-shell[data-course-theme="light"] [data-course-brain-panel] {
+  color-scheme: light;
+}
+.course-player-shell[data-course-theme="light"] [data-brain-self-composer] {
+  color-scheme: dark;
+}
+.course-player-shell[data-course-theme="light"] [data-course-audio-player] {
+  color-scheme: dark;
+}
+.course-player-shell[data-course-theme="light"] [data-course-sketch-panel] {
+  color-scheme: dark;
+}
+
+/* Personal Modules' field surfaces follow the Player theme, while their violet
+   plates, tinted icon plates, and gradient actions remain recognizable. */
+.course-player-shell[data-course-theme="light"] [data-course-personal-modules] {
+  color: #0f172a;
+}
+.course-player-shell[data-course-theme="light"] [data-personal-form-error] {
+  background: rgba(190, 18, 60, 0.08) !important;
+  border-color: rgba(190, 18, 60, 0.18) !important;
+  color: #9f1239 !important;
+}
+.course-player-shell[data-course-theme="light"] [data-personal-delete-resource]:hover:not(:disabled) {
+  color: #be123c !important;
+}
+.course-player-shell[data-course-theme="light"] [data-personal-downgrade-readable] {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(180, 83, 9, 0.25);
+}
+
+/* ── Read: feature-scoped palette (independent of the Player preference) ── */
+[data-course-read-panel][data-course-read-theme="dark"] {
+  color-scheme: dark;
+  --course-text: #f8fafc;
+  --course-muted: #cbd5e1;
+  --course-border: rgba(255, 255, 255, 0.14);
+}
+[data-course-read-panel][data-course-read-theme="light"] {
+  background: #f6f7fb;
+  color: #0f172a;
+  color-scheme: light;
+  --course-text: #0f172a;
+  --course-muted: #475569;
+  --course-border: rgba(15, 23, 42, 0.14);
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="bg-slate-950"], [class~="bg-slate-950/95"], [class~="bg-slate-900"], [class~="bg-slate-900/95"]
+) {
+  background-color: #ffffff;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="bg-white/10"], [class~="bg-white/15"], [class~="bg-white/[0.03]"], [class~="bg-white/[0.04]"],
+  [class~="bg-white/[0.045]"], [class~="bg-white/[0.05]"], [class~="bg-white/[0.06]"], [class~="bg-white/[0.07]"], [class~="bg-white/[0.08]"]
+) {
+  background-color: rgba(15, 23, 42, 0.055);
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class*="border-white/"], [class~="border-slate-800"], [class~="border-slate-900"]
+) {
+  border-color: rgba(15, 23, 42, 0.15);
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-white"], [class~="text-white/95"], [class~="text-white/90"], [class~="text-white/85"], [class~="text-white/80"]
+) {
+  color: #0f172a;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-white/75"], [class~="text-white/70"], [class~="text-white/65"], [class~="text-white/60"],
+  [class~="text-white/50"], [class~="text-white/45"], [class~="text-white/40"], [class~="text-white/35"], [class~="text-white/30"],
+  [class~="text-slate-200"], [class~="text-slate-300"], [class~="text-slate-400"]
+) {
+  color: #334155;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-amber-50"], [class~="text-amber-100"], [class~="text-amber-100/80"], [class~="text-amber-200"],
+  [class~="text-amber-200/80"], [class~="text-amber-300"], [class~="text-amber-300/90"]
+) {
+  color: #92400e;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-violet-100"], [class~="text-violet-200"], [class~="text-violet-200/80"], [class~="text-violet-200/90"], [class~="text-violet-300"]
+) {
+  color: #5b21b6;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-emerald-50"], [class~="text-emerald-100"], [class~="text-emerald-200"], [class~="text-emerald-200/90"], [class~="text-emerald-300"], [class~="text-emerald-300/80"], [class~="text-emerald-400"]
+) {
+  color: #065f46;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class~="text-rose-50"], [class~="text-rose-100"], [class~="text-rose-200"], [class~="text-rose-300"], [class~="text-rose-400"]
+) {
+  color: #9f1239;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(input:not([type="file"]), textarea, select) {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  color-scheme: light;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(input, textarea)::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(button[class~="bg-violet-500"], button[class~="bg-emerald-500"], button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]) {
+  color: #ffffff;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+),
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+) * {
+  color: #ffffff;
+}
+[data-course-read-panel][data-course-read-theme="light"] button[class~="bg-violet-500"] {
+  background-color: #6d28d9;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(button[class~="bg-emerald-500"], button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]) {
+  background-color: #047857;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class*="hover:bg-white/"], [class*="hover:bg-black/"]
+):hover {
+  background-color: rgba(15, 23, 42, 0.07);
+}
+[data-course-read-panel][data-course-read-theme="light"] [class*="hover:text-white"]:hover {
+  color: #0f172a;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+):hover,
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+):hover * {
+  color: #ffffff;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+):hover,
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  button[class~="bg-violet-500"], button[class~="bg-emerald-500"],
+  button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]
+):hover * {
+  color: #ffffff;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class*="hover:text-violet-200"], [class*="group-hover:text-violet-200"]
+):hover,
+[data-course-read-panel][data-course-read-theme="light"] .group:hover [class*="group-hover:text-violet-200"] {
+  color: #5b21b6;
+}
+[data-course-read-panel][data-course-read-theme="light"] [class*="hover:text-rose-200"]:hover {
+  color: #9f1239;
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(
+  [class*="ring-violet-"], [class*="ring-emerald-"]
+) {
+  --tw-ring-color: rgba(79, 70, 229, 0.48);
+}
+[data-course-read-panel][data-course-read-theme="light"] :is(button[class~="bg-violet-500"], button[class~="bg-emerald-500"], button[class~="bg-emerald-500/80"], button[class~="bg-emerald-500/85"]):hover {
+  filter: brightness(1.08);
+}
+
+/* The shared card CSS is intentionally dark by default. Its light palette is
+   applied only inside a feature whose OWN preference is Light. Accent colors
+   retain their meaning, but are deep enough to read on white. */
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card {
+  --resource-accent: #6d28d9;
+  --resource-accent-soft: rgba(124, 58, 237, 0.1);
+  --resource-accent-line: rgba(109, 40, 217, 0.25);
+  background-color: #ffffff;
+  color: #0f172a;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card--note {
+  --resource-accent: #92400e;
+  --resource-accent-soft: rgba(245, 158, 11, 0.1);
+  --resource-accent-line: rgba(180, 83, 9, 0.25);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card--mind-map {
+  --resource-accent: #5b21b6;
+  --resource-accent-soft: rgba(124, 58, 237, 0.1);
+  --resource-accent-line: rgba(91, 33, 182, 0.24);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card__open {
+  color: #0f172a;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-resource-card__title, .study-library-empty h2, .study-library-notice__title) {
+  color: #0f172a;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-resource-card__context, .study-resource-card__topic, .study-resource-card__topic-value, .study-resource-card__source) {
+  color: #334155;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-resource-card__detail, .study-resource-card__timestamp, .study-resource-card__metadata-item, .study-library-empty p, .study-library-notice__message, .study-resource-card__rename-help) {
+  color: #475569;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-resource-card__source, .study-resource-card__metadata-item, .study-resource-card__delete, .study-resource-card__rename-actions button, .study-library-notice__retry) {
+  border-color: rgba(15, 23, 42, 0.13);
+  background-color: #f8fafc;
+  color: #334155;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card__rename-input {
+  background: #ffffff;
+  color: #0f172a;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card__rename-input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-resource-card__rename-actions button:last-child {
+  background: var(--resource-accent-soft);
+  color: var(--resource-accent);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-resource-card__skeleton-type, .study-resource-card__skeleton-title, .study-resource-card__skeleton-line, .study-resource-card__skeleton-footer) {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.04));
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) :is(.study-library-empty, .study-library-notice) {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.94));
+  color: #0f172a;
+  box-shadow: inset 0 1px rgba(15, 23, 42, 0.035);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-library-notice--error {
+  border-color: rgba(180, 83, 9, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-library-empty__icon {
+  color: #5b21b6;
+  border-color: rgba(91, 33, 182, 0.22);
+  background: rgba(124, 58, 237, 0.09);
+}
+:is(
+  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
+  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
+  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
+) .study-library-empty[data-resource-kind="note"] .study-library-empty__icon {
+  color: #92400e;
+  border-color: rgba(180, 83, 9, 0.24);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* Notes' list, master viewer and compose page each carry the NOTES preference;
+   none inherit the Player or Read theme. */
+[data-course-notes-panel][data-notes-theme="light"] {
+  --dc-flat-ink: #0b1220;
+  --dc-flat-board: #f5f6fa;
+  --dc-flat-ink-sub: rgba(11, 18, 32, 0.62);
+  --dc-flat-ink-body: rgba(15, 23, 42, 0.86);
+  --dc-flat-ink-title: #0f172a;
+  --dc-flat-ink-label: #475569;
+  --dc-flat-board-head: #f1f5f9;
+  --dc-flat-line: rgba(15, 23, 42, 0.14);
+  --dc-flat-box: rgba(15, 23, 42, 0.035);
+  --dc-flat-row-line: rgba(15, 23, 42, 0.1);
+  --course-text: #0f172a;
+  --course-muted: #475569;
+  --course-border: rgba(15, 23, 42, 0.14);
+  --course-soft: rgba(15, 23, 42, 0.06);
+  --course-soft-hover: rgba(15, 23, 42, 0.09);
+  --course-strong: rgba(15, 23, 42, 0.22);
+  background: #ffffff;
+  color: #0f172a;
+  color-scheme: light;
+}
+[data-course-notes-panel][data-notes-theme="dark"] {
+  --dc-flat-ink: #ffffff;
+  --dc-flat-board: #0b1120;
+  --dc-flat-ink-sub: rgba(255, 255, 255, 0.68);
+  --dc-flat-ink-body: rgba(255, 255, 255, 0.86);
+  --dc-flat-ink-title: rgba(255, 255, 255, 0.94);
+  --dc-flat-ink-label: rgba(255, 255, 255, 0.68);
+  --dc-flat-board-head: #111a2b;
+  --dc-flat-line: rgba(255, 255, 255, 0.12);
+  --dc-flat-box: rgba(255, 255, 255, 0.035);
+  --dc-flat-row-line: rgba(255, 255, 255, 0.1);
+  background: #0b1120;
+  color: #e5e7eb;
+  color-scheme: dark;
+  --course-text: #e5e7eb;
+  --course-muted: #cbd5e1;
+  --course-border: #334155;
+  --course-soft: rgba(255, 255, 255, 0.06);
+  --course-soft-hover: rgba(255, 255, 255, 0.1);
+  --course-strong: rgba(255, 255, 255, 0.24);
+}
+[data-course-notes-panel][data-notes-theme="dark"] :is(
+  [class~="bg-white"], [class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-indigo-50"]
+) {
+  background-color: #111a2b;
+}
+[data-course-notes-panel][data-notes-theme="dark"] :is([class~="border-slate-100"], [class~="border-slate-200"]) {
+  border-color: #243244;
+}
+[data-course-notes-panel][data-notes-theme="dark"] :is(
+  [class~="text-slate-500"], [class~="text-slate-600"], [class~="text-slate-700"]
+) {
+  color: #cbd5e1;
+}
+[data-course-notes-panel][data-notes-theme="dark"] :is([class~="text-indigo-700"], [class~="text-indigo-600"]) {
+  color: #a5b4fc;
+}
+[data-course-notes-panel][data-notes-theme="light"] [class~="text-rose-400"] { color: #be123c; }
+[data-course-notes-panel][data-notes-theme="light"] [class~="text-amber-400"] { color: #92400e; }
+[data-course-notes-panel][data-notes-theme="light"] [class~="text-slate-300"] { color: #475569; }
+[data-course-master-note-viewer][data-notes-theme="light"] {
+  --dc-flat-ink: #0b1220;
+  --dc-flat-board: #f5f6fa;
+  background: #ffffff;
+  color: #0f172a;
+  color-scheme: light;
+}
+[data-course-master-note-viewer][data-notes-theme="dark"] {
+  --dc-flat-ink: #ffffff;
+  --dc-flat-board: #0b1120;
+  background: #0b1120;
+  color: #e5e7eb;
+  color-scheme: dark;
+}
+[data-course-master-note-viewer][data-notes-theme="dark"] :is(
+  [class~="border-slate-100"], [class~="border-slate-200"]
+) { border-color: #243244; }
+[data-course-master-note-viewer][data-notes-theme="dark"] :is(
+  [class~="text-slate-500"], [class~="text-slate-600"], [class~="text-slate-700"]
+) { color: #cbd5e1; }
+[data-course-master-note-viewer][data-notes-theme="dark"] :is(
+  [class~="text-indigo-700"], [class~="text-indigo-600"]
+) { color: #a5b4fc; }
+[data-course-master-note-viewer][data-notes-theme="dark"] :is(
+  [class~="bg-indigo-50"], [class~="bg-white"]
+) { background-color: #111a2b; }
+
+.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card {
+  --resource-accent: #f5ad42;
+  --resource-accent-soft: rgba(245, 173, 66, 0.14);
+  --resource-accent-line: rgba(245, 173, 66, 0.32);
+  background-color: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card__open { color: rgba(255, 255, 255, 0.94); }
+.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card__title { color: #ffffff; }
+.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] :is(.study-resource-card__context, .study-resource-card__topic) { color: rgba(235, 242, 255, 0.82); }
+.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] :is(.study-resource-card__detail, .study-resource-card__timestamp, .study-resource-card__metadata-item) { color: rgba(255, 255, 255, 0.78); }
+
+/* Mind Map maintains its own palette even when the Player preference changes. */
+.course-mindmap-shell[data-mindmap-theme="dark"] {
+  --dc-flat-ink: #ffffff;
+  --dc-flat-board: #0b1120;
+  --dc-flat-ink-sub: rgba(255, 255, 255, 0.68);
+  --dc-flat-board-head: #0d1424;
+  --dc-flat-line: rgba(255, 255, 255, 0.12);
+  --dc-flat-sheet: linear-gradient(180deg, rgba(15, 19, 36, 0.98), rgba(8, 11, 22, 0.99));
+  --dc-flat-sheet-shadow: 0 40px 90px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --dc-flat-blur-sheet: blur(22px) saturate(150%);
+  --dc-flat-violet-deep: #8b5cf6;
+  --dc-flat-box: rgba(255, 255, 255, 0.035);
+  --dc-flat-row-line: rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
+  --mm-bg: transparent;
+  --mm-surface: rgba(9, 12, 24, 0.62);
+  --mm-surface-blur: blur(18px) saturate(150%);
+  --mm-surface-rim: inset 0 1px 1px rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --mm-border: rgba(255, 255, 255, 0.12);
+  --mm-text: #ffffff;
+  --mm-muted: rgba(255, 255, 255, 0.72);
+  --mm-soft: rgba(9, 12, 24, 0.62);
+  --mm-soft-hover: rgba(255, 255, 255, 0.14);
+  background-color: transparent;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] {
+  --dc-flat-ink: #0b1220;
+  --dc-flat-board: #f5f6fa;
+  --dc-flat-ink-sub: rgba(11, 18, 32, 0.62);
+  --dc-flat-board-head: #eceef6;
+  --dc-flat-line: rgba(15, 23, 42, 0.14);
+  --dc-flat-sheet: linear-gradient(180deg, #ffffff, #f4f5fb);
+  --dc-flat-sheet-shadow: 0 40px 90px rgba(15, 23, 42, 0.16), inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --dc-flat-blur-sheet: blur(14px) saturate(140%);
+  --dc-flat-violet-deep: rgba(109, 40, 217, 0.2);
+  --dc-flat-box: rgba(15, 23, 42, 0.035);
+  --dc-flat-row-line: rgba(15, 23, 42, 0.1);
+  color-scheme: light;
+}
+.course-player-shell[data-course-theme="light"] .course-mindmap-shell[data-mindmap-theme="dark"] {
+  background-color: #0b1120;
+  background-image: linear-gradient(180deg, #111827 0%, #0b1120 100%);
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-library] {
+  background-color: #f8fafc;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] {
+  color: #0f172a;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-root="true"] {
+  color: #ffffff;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-depth="3"] [data-mind-node-body] {
+  border-color: rgba(15, 23, 42, 0.2);
+}
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-input]::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool:disabled {
+  opacity: 0.62;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-violet,
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-mm-active="true"] {
+  background: rgba(124, 58, 237, 0.12);
+  color: #5b21b6;
+  box-shadow: inset 0 0 0 1px rgba(91, 33, 182, 0.3);
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-emerald {
+  background: rgba(5, 150, 105, 0.11);
+  color: #047857;
+  box-shadow: inset 0 0 0 1px rgba(4, 120, 87, 0.3);
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-danger:hover:not(:disabled) {
+  color: #be123c;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saving"] {
+  color: #92400e;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saved"] {
+  color: #047857;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="error"] {
+  color: #be123c;
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), inset 0 1px rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu .mm-menu-head {
+  color: #475569;
+  opacity: 1;
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu .mm-menu-note {
+  color: #334155;
+  opacity: 1;
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu .mm-menu-item:hover {
+  background: rgba(15, 23, 42, 0.07);
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu .mm-menu-item[aria-checked="true"] {
+  background: rgba(124, 58, 237, 0.12);
+  color: #4c1d95;
+}
+[data-course-theme-portal][data-menu-theme="light"].mm-menu .mm-menu-sep {
+  background: rgba(15, 23, 42, 0.18);
+  opacity: 1;
+}
+
+/* BlockNote already owns Notes' full light/dark palette. The same preference
+   now travels with its body portal, and this fallback retains matching surfaces. */
+[data-course-notes-panel][data-notes-theme="light"] [data-course-notes-legacy-fallback] {
+  background: #f8fafc;
+  color: #0f172a;
+  color-scheme: light;
+}
+[data-course-notes-panel][data-notes-theme="dark"] [data-course-notes-legacy-fallback] {
+  background: #0b1120;
+  color: #e5e7eb;
+  color-scheme: dark;
+}
+[data-course-notes-panel][data-notes-theme="light"] [data-course-notes-editor-loading] {
+  background: #f8fafc;
+}
+[data-course-notes-panel][data-notes-theme="dark"] [data-course-notes-editor-loading] {
+  background: #0b1120;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] .course-rich-surface,
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-note-heading] {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] button,
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] [data-glass-surface] {
+  color: #334155;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] [data-glass-surface] > div:nth-child(2) {
+  background: rgba(241, 245, 249, 0.96) !important;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] [data-glass-surface] > div:nth-child(4) {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12) !important;
+}
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] button:hover,
+.course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-course-rich-toolbar] button:hover [data-glass-surface] {
+  color: #0f172a;
+}
+[data-course-theme-portal][data-notes-theme="light"] [data-course-rich-menu-surface] {
+  color: #0f172a;
+}
+[data-course-theme-portal][data-notes-theme="light"] [data-course-rich-menu-surface] > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.98) !important;
+}
+[data-course-theme-portal][data-notes-theme="light"] [data-course-rich-menu-surface] :is(button, [role="menuitem"], label) {
+  color: #0f172a;
+}
+[data-course-theme-portal][data-notes-theme="light"] [data-course-rich-menu-surface] [class*="border-white/"] {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+[data-course-theme-portal][data-notes-theme="light"] [data-course-rich-menu-surface] [class*="text-white/"] {
+  color: #334155;
+}
+[data-course-theme-portal][data-notes-theme="dark"] [data-course-rich-menu-surface] > div:nth-child(2) {
+  background: rgba(17, 26, 43, 0.98) !important;
+}
+
+/* Theme travels on each body portal. Light destructive confirmations use a
+   clean paper surface and dark copy; dark confirmations keep the established
+   deep glass plate and rose action. */
+[data-course-confirm-dialog][data-course-confirm-theme="light"] {
+  color-scheme: light;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-backdrop] {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-card] {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.2), 0 0 48px -18px rgba(244, 63, 94, 0.2);
+  color: #0f172a;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-card] > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.98) !important;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-card] > div:nth-child(4) {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08) !important;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-title] {
+  color: #0f172a;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-message] {
+  color: #334155;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-detail] {
+  background: #f1f5f9;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
+  color: #334155;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-cancel] {
+  color: #1e293b;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-cancel] [data-glass-surface] {
+  color: #1e293b;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="light"] [data-course-confirm-cancel] [data-glass-surface] > div:nth-child(2) {
+  background: rgba(241, 245, 249, 0.96) !important;
+}
+
+/* AI Chat has its own saved theme. Do not let Player utility remaps cross its
+   root, but keep its native fields and its own Light accents readable. */
+[data-course-ai-panel][data-course-ai-theme="dark"] {
+  background: #0b0b16;
+  color: #f8fafc;
+  color-scheme: dark;
+}
+[data-course-ai-panel][data-course-ai-theme="light"] { color-scheme: light; }
+[data-course-ai-panel][data-course-ai-theme="light"] :is(
+  [class~="text-white/95"], [class~="text-white/90"], [class~="text-white/85"], [class~="text-white/80"], [class~="text-white/75"], [class~="text-white/70"], [class~="text-white/65"], [class~="text-white/60"]
+) { color: #334155; }
+[data-course-ai-panel][data-course-ai-theme="light"] :is(
+  [class~="text-white/50"], [class~="text-white/45"], [class~="text-white/40"], [class~="text-white/35"], [class~="text-white/30"], [class~="text-white/25"]
+) { color: #475569; }
+[data-course-ai-panel][data-course-ai-theme="light"] :is([class~="text-violet-100"], [class~="text-violet-200"], [class~="text-violet-300"]) { color: #5b21b6; }
+[data-course-ai-panel][data-course-ai-theme="light"] button[class~="bg-violet-600"] { color: #ffffff; }
+[data-course-ai-panel][data-course-ai-theme="light"] textarea::placeholder { color: #64748b; opacity: 1; }
+
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] {
+  color-scheme: dark;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-backdrop] {
+  background: rgba(3, 6, 14, 0.72);
+  backdrop-filter: blur(3px) saturate(120%);
+  -webkit-backdrop-filter: blur(3px) saturate(120%);
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-card] {
+  background: linear-gradient(180deg, rgba(15, 19, 36, 0.98), rgba(8, 11, 22, 0.99));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 60px -18px rgba(244, 63, 94, 0.45);
+  color: #f8fafc;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-card] > div:nth-child(2) {
+  background: rgba(9, 12, 24, 0.34) !important;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-card] > div:nth-child(4) {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-title] { color: #f8fafc; }
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-message] { color: #cbd5e1; }
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-detail] {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-cancel],
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-cancel] [data-glass-surface] {
+  color: #f8fafc;
+}
+[data-course-confirm-dialog][data-course-confirm-theme="dark"] [data-course-confirm-cancel] [data-glass-surface] > div:nth-child(2) {
+  background: rgba(30, 41, 59, 0.94) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-player-shell[data-course-theme="light"] [data-glass-surface],
+  .course-player-shell[data-course-theme="light"] [data-course-personal-modules] *,
+  .study-resource-card,
+  .mm-tool,
+  .mm-menu {
+    transition-duration: 0.01ms;
+  }
+}

@@ -60,10 +60,9 @@
 // The double-tap delete is measured the same way (two taps on the same node
 // within 350ms), which makes it work identically for mouse, touch and pen.
 //
-// ── Theme: dark, always ─────────────────────────────────────────────────
-// The map is dark like the rest of the app. The per-window sun/moon switch
-// and the light palette it selected are gone with the app-wide light theme,
-// so there is nothing left to follow or override.
+// ── Theme: independently persisted ──────────────────────────────────────
+// Each learner's map theme is saved separately from Player and Read. New
+// preferences start Light; a previously saved Dark choice remains intact.
 //
 // ── The toolbar (the top strip, like the notes editor) ────────────────────
 // ONE ICON PER CONTROL — the bar carries no words at all. From the left:
@@ -75,9 +74,9 @@
 //   maps pill   this module's map list (icon + name + count).
 //   then, right-aligned: auto-arrange, the ALIGN menu (how the boxes are
 //   laid out — tree / one line / one column — and how a long label fits,
-//   wrap or clipped to one line), fit-to-screen, delete-branch and the
-//   double-tap-delete arm switch. (The light/dark flip is gone: the map is
-//   dark like the rest of the app.)
+//   wrap or clipped to one line), fit-to-screen, delete-branch, the
+//   independently persisted sun/moon theme switch, and the optional
+//   double-tap-delete arm switch.
 // There are no +/− zoom buttons any more: the canvas is pinched (and panned)
 // straight with the fingers, and Fit re-frames the whole map in one tap.
 // The strip sits ABOVE the canvas (toolbar first, diagram below), the same
@@ -181,9 +180,10 @@ import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./
 // ── Theme ─────────────────────────────────────────────────────────────────
 
 /**
- * The map's palette (Part 1 §8/§9): genuine dark AND light. Light mode paints
- * a WHITE canvas with a zoom-participating grid; dark keeps the existing dark
- * Course Player treatment. This is a real palette switch — no CSS inversion.
+ * The map's palette (Part 1 §8/§9): genuine dark AND light. New preferences
+ * start Light with a WHITE canvas and zoom-participating grid; an existing
+ * Dark choice retains its treatment. The feature saves separately from Player
+ * and Read, using real palette tokens rather than CSS inversion.
  */
 export type MindMapTheme = "dark" | "light";
 
@@ -561,6 +561,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           }`}
           data-mind-node-body={id}
           data-mind-node-theme={theme}
+          data-mind-node-root={isRoot ? "true" : undefined}
         >
           {body}
         </div>
@@ -573,6 +574,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           contentClassName="flex h-full w-full flex-col overflow-hidden px-2.5 pt-1.5"
           data-mind-node-body={id}
           data-mind-node-theme={theme}
+          data-mind-node-root={isRoot ? "true" : undefined}
         >
           {body}
         </GlassSurface>
@@ -878,6 +880,8 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
       aria-label={label}
       className="mm-menu fixed"
       data-mm-menu
+      data-course-theme-portal=""
+      data-course-theme={theme}
       data-menu-theme={theme}
       style={{ left, width, maxHeight, top: anchor.bottom + 8 }}
     >
@@ -1568,9 +1572,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
           ICON: the cloud-save beacon (tinted by the save state, blinking
           while there is a message to read), the map pill, then the tools —
           auto-arrange, the align menu, fit-to-screen, delete-branch and the
-          double-tap-delete arm switch. There is no close button — the dock
-          tab is the way out. (The light/dark flip is gone: the map is dark
-          like the rest of the app.)
+          double-tap-delete arm switch. The sun/moon control keeps this
+          feature's saved palette independent from the Player and Read themes.
+          There is no close button — the dock tab is the way out.
 
           There are no +/− zoom buttons: the canvas is pinched (and panned)
           straight with the fingers, and Fit re-frames the whole map in one
@@ -2129,6 +2133,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           tapped. Portalled to <body> so the clipped canvas sheet never cuts
           it off, and it is always above the player overlay + dock. */}
       <ConfirmDeleteDialog
+        theme={mindTheme}
         open={Boolean(deleteTargetId)}
         title="Delete this branch?"
         message={
@@ -2147,6 +2152,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
       {/* ── Whole-map delete confirmation (map library) ─────────────────── */}
       <ConfirmDeleteDialog
+        theme={mindTheme}
         open={Boolean(deleteMapKey)}
         title="Delete this mind map?"
         message={

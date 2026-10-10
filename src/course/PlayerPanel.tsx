@@ -229,7 +229,7 @@ export default function PlayerPanel({
   onHideStatusBarChange,
   legacyFooterDock,
   onLegacyFooterDockChange,
-  playerTheme = "dark",
+  playerTheme = "light",
   onPlayerThemeChange,
   sketchCleanLook = false,
   onSketchCleanLookChange,

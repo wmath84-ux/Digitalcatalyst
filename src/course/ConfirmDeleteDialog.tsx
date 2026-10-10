@@ -30,8 +30,11 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { lockBodyScroll, unlockBodyScroll } from "../components/ui/overlayBounds";
+import type { CoursePlayerTheme } from "./playerPreferences";
 
 interface CourseConfirmDialogProps {
+  /** The feature theme must travel with this portal; it cannot inherit from its caller. */
+  theme?: CoursePlayerTheme;
   open: boolean;
   title: string;
   message: string;
@@ -44,6 +47,7 @@ interface CourseConfirmDialogProps {
 }
 
 export default function CourseConfirmDialog({
+  theme = "light",
   open,
   title,
   message,
@@ -83,6 +87,8 @@ export default function CourseConfirmDialog({
       className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto"
       style={{ paddingTop: topPad, paddingBottom: "max(env(safe-area-inset-bottom, 0px), 1rem)", paddingLeft: "max(env(safe-area-inset-left, 0px), 1rem)", paddingRight: "max(env(safe-area-inset-right, 0px), 1rem)" }}
       data-course-confirm-dialog
+      data-course-confirm-theme={theme}
+      data-course-theme={theme}
       data-course-confirm-open="true"
       role="presentation"
     >
@@ -92,6 +98,7 @@ export default function CourseConfirmDialog({
         aria-hidden="true"
         onClick={onCancel}
         data-course-confirm-backdrop
+        data-course-theme={theme}
       />
 
       <GlassSurface
@@ -102,6 +109,7 @@ export default function CourseConfirmDialog({
         className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden text-white animate-scaleIn"
         style={{ maxHeight: "max(18rem, min(70vh, 70dvh))" }}
         data-course-confirm-card
+        data-course-theme={theme}
       >
         <div className="max-h-[inherit] overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div className="flex items-start gap-3">
@@ -112,10 +120,10 @@ export default function CourseConfirmDialog({
               <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-black leading-snug text-white sm:text-lg" data-course-confirm-title>
+              <h3 className="text-base font-black leading-snug text-white sm:text-lg" data-course-confirm-title data-course-theme={theme}>
                 {title}
               </h3>
-              <p className="mt-1 text-[13px] leading-relaxed text-white/70 sm:text-sm" data-course-confirm-message>
+              <p className="mt-1 text-[13px] leading-relaxed text-white/70 sm:text-sm" data-course-confirm-message data-course-theme={theme}>
                 {message}
               </p>
             </div>
@@ -125,6 +133,7 @@ export default function CourseConfirmDialog({
             <p
               className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-white/75"
               data-course-confirm-detail
+              data-course-theme={theme}
             >
               {detail}
             </p>

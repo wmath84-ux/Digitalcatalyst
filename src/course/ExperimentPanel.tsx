@@ -147,6 +147,7 @@ export default function ExperimentPanel({
     <div
       className="relative flex h-full min-h-0 flex-col px-3 py-3"
       data-course-experiment-panel=""
+      data-course-theme-surface="dark"
       data-experiment-screen="library"
     >
       {/* MASTER / SELF segmented control — the same contract as Notes, Mind Map

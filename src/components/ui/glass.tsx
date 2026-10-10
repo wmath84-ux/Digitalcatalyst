@@ -548,6 +548,7 @@ export function GlassSurface({
     <div
       className={cn("relative", className)}
       style={{ borderRadius: radius, ...style }}
+      data-glass-surface=""
       {...props}
     >
       <div

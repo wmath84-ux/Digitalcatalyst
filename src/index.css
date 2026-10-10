@@ -1998,12 +1998,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   isolation: isolate;
 }
 /* ── Mind map — scoped dark / white palette ───────────────────────────────
-   The mind map panel tracks the Course Player theme by default and can be
-   flipped independently from its own toolbar (the sun/moon button next to
-   Fit), so a learner can read a dark lesson while brainstorming on white —
-   or keep the map dark on a bright white course. The variables inherit
-   through the canvas dots, node borders, toolbar tiles and the SVG edge
-   strokes without touching the site or player theme. */
+   Its palette is persisted independently from the Player and Read features;
+   new preferences open Light, while an existing Dark choice remains saved.
+   The sun/moon control lets a learner brainstorm on white beside a dark
+   lesson, or keep the map dark on a bright white course. These variables
+   travel through the canvas dots, node borders, toolbar tiles and SVG edges
+   without changing the site or Player theme. */
 .course-mindmap-shell {
   /* Wave 9: the map paints NO canvas plate. It sits on the shared Black Ice
      backdrop like the rest of the player, and every tile / pill / menu is the
@@ -7125,14 +7125,15 @@ html[data-course-player-active="true"] {
    Real palette switching — NO CSS colour inversion of any kind. The
    shell flips a single attribute, `data-course-theme="light"`, and every
    surface that reads the `--dc-flat-*` / `--course-*` tokens re-skins itself
-   from a true light palette declared here. Dark stays the default; the two
-   palettes are siblings, never a transformation of each other.
+   from a true light palette declared here. Light is the fallback for new
+   preferences; an existing Dark choice is preserved. The palettes are
+   siblings, never a transformation of each other.
 
    Scope: the shell attribute only affects tokens the player re-points at its
    own surfaces. Third-party media (YouTube's black, a PDF's white, Excalidraw
    content, PNG/SVG assets) is never recoloured, so real documents keep their
-   original appearance. The course-progress bar (§11) is deliberately NOT
-   listed here — its paint is untouched in this pass. */
+   original appearance. The feature-scoped courseTheme.css completes targeted
+   controls such as the course-progress rail without repainting media. */
 .course-player-shell[data-course-theme="light"] {
   /* Plates — paper, not board */
   --dc-flat-board: #f5f6fa;
