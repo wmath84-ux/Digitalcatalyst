@@ -136,11 +136,15 @@ import {
   CloudCheck,
   CloudUpload,
   Columns3,
+  LayoutTemplate,
   Layers,
   Maximize,
   Moon,
   Network,
+  Palette,
   Plus,
+  RotateCcw,
+  Square,
   Rows3,
   Sparkles,
   Sun,
@@ -159,18 +163,22 @@ import {
   layoutMindMap,
   maxDepth,
   moveNodeSubtree,
+  BRANCH_PALETTE,
+  branchIndexMap,
   normalizeArrangement,
+  readableInkOn,
   removeNode,
   rootId,
+  setNodeStyle,
   setNodeTopic,
   type MindMap,
   type MindMapArrangement,
+  type MindNodeStyle,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import type { CourseModule } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
-import { GlassSurface } from "../components/ui/glass";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
 import MasterSelfControl from "./MasterSelfControl";
@@ -210,6 +218,27 @@ export type MindMapTextFit = "wrap" | "clip";
 
 const arrangementStorageKey = "dc.mindMapArrangement";
 const textFitStorageKey = "dc.mindMapTextFit";
+const lookStorageKey = "dc.mindMapLook";
+
+/**
+ * How a box is drawn. `boxed` is the classic outlined card; `modern` is
+ * text-first: no outline, a faint rectangle behind the words and a coloured
+ * underline for the branch. A per-device VIEW choice — switching it never
+ * touches the map's content.
+ */
+export type MindMapLook = "boxed" | "modern";
+
+const loadLook = (): MindMapLook => {
+  try {
+    return localStorage.getItem(lookStorageKey) === "modern" ? "modern" : "boxed";
+  } catch {
+    return "boxed";
+  }
+};
+
+/** Swatches offered by the node colour menu. */
+const BOX_COLOURS = ["#ffffff", "#f8fafc", "#fef3c7", "#dcfce7", "#dbeafe", "#ede9fe", "#fce7f3", "#1e293b"];
+const TEXT_COLOURS = ["#0f172a", "#ffffff", "#4f46e5", "#047857", "#b45309", "#be123c"];
 
 const loadArrangement = (): MindMapArrangement => normalizeArrangement(
   (() => {
@@ -256,10 +285,67 @@ interface MindNodeData extends Record<string, unknown> {
    * the same rule, so the reserved space always matches what is painted.
    */
   textFit: MindMapTextFit;
+  /** The look the box is drawn in (a view choice, not map data). */
+  look: MindMapLook;
+  /** Resolved box fill: the learner's colour, or the look's default. */
+  fill: string;
+  /** Resolved ink: the learner's text colour, or whichever reads on the fill. */
+  ink: string;
+  /** True when the learner set a box colour on this node. */
+  customFill: boolean;
+  /** The branch wire into this node, when the look or the learner sets one. */
+  branch: string | null;
   onAddChild: (id: string) => void;
+  /** Escape / a blank draft: back out of an edit (a brand-new node is removed). */
+  onCancelEdit: (id: string) => void;
   onOpenEditor: (id: string) => void;
   onCloseEditor: (id: string) => void;
   onCommitTopic: (id: string, topic: string) => void;
+}
+
+/**
+ * The fill and ink for one box. A learner's colour always wins; otherwise the
+ * look decides. The ink is judged against the SOLID colour the box sits on
+ * (the custom fill, or the opaque base the translucent default paints over),
+ * so text always follows the real background and the active theme.
+ */
+function paintFor(
+  look: MindMapLook,
+  theme: MindMapTheme,
+  isRoot: boolean,
+  style: MindNodeStyle | undefined,
+): { fill: string; ink: string; customFill: boolean } {
+  const light = theme === "light";
+  const customFill = style?.bg ?? null;
+  const inkBase =
+    customFill ??
+    (isRoot
+      ? look === "boxed"
+        ? "#4f46e5"
+        : light
+          ? "#e0e7ff"
+          : "#312e81"
+      : light
+        ? "#ffffff"
+        : "#0b1220");
+  const defaultFill = isRoot
+    ? look === "boxed"
+      ? "#4f46e5"
+      : light
+        ? "rgba(79, 70, 229, 0.12)"
+        : "rgba(129, 140, 248, 0.18)"
+    : look === "boxed"
+      ? light
+        ? "#ffffff"
+        : "rgba(255, 255, 255, 0.1)"
+      : light
+        ? "rgba(15, 23, 42, 0.045)"
+        : "rgba(255, 255, 255, 0.06)";
+  return {
+    fill: customFill ?? defaultFill,
+    ink: style?.text ?? readableInkOn(inkBase),
+    customFill: customFill != null,
+  };
 }
 
 /** A pointer that travelled further than this many px was a drag, not a tap. */
@@ -313,7 +399,7 @@ const EMPTY_FACING: Record<string, "left" | "right"> = Object.freeze({});
  * inside the node carry the `nodrag` class so pressing them never starts a
  * drag, and taps that end on a button are left to the button's own click.
  */
-function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
+function MindNode({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
   const {
     topic,
     depth,
@@ -324,9 +410,15 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     editing,
     theme,
     textFit,
+    look,
+    fill,
+    ink,
+    customFill,
+    branch,
     onAddChild,
     onOpenEditor,
     onCloseEditor,
+    onCancelEdit,
     onCommitTopic,
   } = data;
 
@@ -410,13 +502,30 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   // alone. The centre is the one solid box — indigo, the same meaning colour
   // every primary action on the site uses — so it stays the boldest thing
   // on screen without a painted gradient.
-  const tone = isRoot
-    ? "border-violet-300/60 bg-indigo-600 text-white"
+  // ── How the box is drawn ──────────────────────────────────────────────
+  // Every colour is an INLINE style now (no class cascade to fight): the fill
+  // and ink come from `paintFor`, so a learner's colour and the theme default
+  // go through the same renderer. Boxed keeps the outlined card; modern drops
+  // the outline and draws a coloured underline in the branch colour instead.
+  const boxed = look === "boxed";
+  const accent = branch ?? "#6366f1";
+  const boxedBorder = isRoot
+    ? "rgba(196, 181, 253, 0.6)"
     : depth === 1
-      ? "border-violet-400/50 text-white"
+      ? "rgba(167, 139, 250, 0.5)"
       : depth === 2
-        ? "border-indigo-400/35 text-white"
-        : "border-white/15 text-white";
+        ? "rgba(129, 140, 248, 0.35)"
+        : theme === "light"
+          ? "rgba(15, 23, 42, 0.2)"
+          : "rgba(255, 255, 255, 0.15)";
+  const ringShadow = editing
+    ? "0 0 0 2px #8b5cf6"
+    : selected
+      ? "0 0 0 2px rgba(167, 139, 250, 0.85)"
+      : null;
+  const underlineShadow = boxed ? null : `inset 0 ${selected || editing ? -3 : -2}px 0 ${accent}`;
+  const boxShadow = [underlineShadow, ringShadow].filter(Boolean).join(", ") || undefined;
+  const showPlus = (selected || editing) && !dragging;
 
   // ── Which way the box faces ────────────────────────────────────────────
   // `facing` is the GEOMETRY — which side of its parent the box actually ended
@@ -487,13 +596,15 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
             draftRef.current = event.target.value;
           }}
           onBlur={() => {
-            // A blank / whitespace-only rename is treated as "cancel" so
-            // accidentally tapping outside the field never blanks a node.
-            // `setNodeTopic` itself would silently no-op, which made the
-            // rename feel broken in the old editor.
+            // A blank / whitespace-only draft backs out instead of blanking the
+            // node (a brand-new node that is still blank is removed).
             settledRef.current = true;
             const trimmed = draftRef.current.trim();
-            if (trimmed && trimmed !== topic) onCommitTopic(id, trimmed);
+            if (!trimmed) {
+              onCancelEdit(id);
+              return;
+            }
+            if (trimmed !== topic) onCommitTopic(id, trimmed);
             onCloseEditor(id);
           }}
           onKeyDown={(event) => {
@@ -501,21 +612,26 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
               event.preventDefault();
               settledRef.current = true;
               const trimmed = draftRef.current.trim();
-              if (trimmed) onCommitTopic(id, trimmed);
-              onCloseEditor(id);
+              if (trimmed) {
+                onCommitTopic(id, trimmed);
+                onCloseEditor(id);
+              } else {
+                onCancelEdit(id);
+              }
             }
             if (event.key === "Escape") {
               event.preventDefault();
-              // A cancel is still a settlement — the teardown safety net
-              // must not "rescue" the draft the learner just discarded.
+              // A cancel is still a settlement: the teardown safety net must
+              // not "rescue" the draft the learner just discarded.
               settledRef.current = true;
-              onCloseEditor(id);
+              onCancelEdit(id);
             }
             // React Flow would otherwise treat typing as a canvas shortcut.
             event.stopPropagation();
           }}
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
+          style={{ color: "inherit" }}
           className="nodrag w-full min-w-0 resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-inherit outline-none placeholder:text-white/40"
           placeholder="Idea likhein…"
           aria-label="Node ka text badlein"
@@ -535,8 +651,20 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
 
   return (
     <div
-      className="group relative h-full w-full cursor-grab active:cursor-grabbing"
+      className={`group relative h-full w-full cursor-grab active:cursor-grabbing ${dragging ? "opacity-90" : ""}`}
       data-mind-node={id}
+      data-mind-node-state={editing ? "editing" : dragging ? "dragging" : selected ? "selected" : "idle"}
+      tabIndex={0}
+      role="group"
+      aria-label={isRoot ? `Central idea: ${topic}` : topic}
+      onKeyDown={(event) => {
+        // Keyboard select: Enter/Space on the node itself opens its editor.
+        if (event.target !== event.currentTarget || editing) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpenEditor(id);
+        }
+      }}
       data-mind-node-depth={depth}
       data-mind-node-side={side ?? "center"}
       data-mind-node-facing={facing ?? "center"}
@@ -553,34 +681,27 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       <Handle type="source" position={Position.Left} id="src-left" isConnectable={false} style={handleStyle} />
       <Handle type="source" position={Position.Right} id="src-right" isConnectable={false} style={handleStyle} />
 
-      {/* Wave 9: the centre box is the one SOLID surface (indigo, the site's
-          primary meaning colour); every other box is the pack's GlassSurface
-          on the shared backdrop, in both map themes. */}
-      {isRoot ? (
-        <div
-          className={`flex h-full w-full flex-col overflow-hidden rounded-xl border px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
-            selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[var(--dc-bd-base)]" : ""
-          }`}
-          data-mind-node-body={id}
-          data-mind-node-theme={theme}
-          data-mind-node-root={isRoot ? "true" : undefined}
-        >
-          {body}
-        </div>
-      ) : (
-        <GlassSurface
-          radius={12}
-          className={`h-full w-full overflow-hidden rounded-xl border text-[13px] font-semibold leading-[17px] transition ${tone} ${
-            selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[var(--dc-bd-base)]" : ""
-          }`}
-          contentClassName="flex h-full w-full flex-col overflow-hidden px-2.5 pt-1.5"
-          data-mind-node-body={id}
-          data-mind-node-theme={theme}
-          data-mind-node-root={isRoot ? "true" : undefined}
-        >
-          {body}
-        </GlassSurface>
-      )}
+      {/* One renderer for both looks: the box is a plain element whose fill,
+          ink and border are inline, so a learner's colour and the theme
+          default cannot be overridden by a stray class or CSS rule. */}
+      <div
+        className={`flex h-full w-full flex-col overflow-hidden px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${
+          boxed ? "rounded-xl border" : "rounded-md"
+        }`}
+        style={{
+          background: fill,
+          color: ink,
+          borderColor: boxed ? boxedBorder : "transparent",
+          boxShadow,
+        }}
+        data-mind-node-body={id}
+        data-mind-node-theme={theme}
+        data-mind-node-look={look}
+        data-mind-node-root={isRoot ? "true" : undefined}
+        data-mind-node-custom={customFill ? "true" : "false"}
+      >
+        {body}
+      </div>
 
       {/* ── The anchor dot: which face this box is wired to ───────────────
           A small mark on the edge that faces the parent, i.e. exactly where
@@ -594,28 +715,33 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           aria-hidden="true"
           data-mind-node-anchor={id}
           data-anchor-side={facesLeft ? "right" : "left"}
+          style={branch ? { background: branch } : undefined}
           className={`pointer-events-none absolute top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full ${
             facesLeft ? "-right-[3.5px]" : "-left-[3.5px]"
           }`}
         />
       )}
 
-      {/* ── The `+`: one tap appends a child to THIS node ──────────────── */}
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onAddChild(id);
-        }}
-        className={`nodrag absolute top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-violet-300/40 bg-indigo-600 text-white transition hover:scale-110 hover:bg-indigo-500 active:scale-95 ${
-          facesLeft ? "-left-3.5" : "-right-3.5"
-        }`}
-        aria-label={`${isRoot ? "Central idea" : topic} ke andar nayi branch jodein`}
-        title="Nayi branch jodein"
-        data-mind-node-add={id}
-      >
-        <Plus size={14} strokeWidth={3} />
-      </button>
+      {/* ── The `+`: one tap appends a child to THIS node. Hidden until the
+          node is selected or a creation is in progress, so the canvas stays
+          clean; a cancelled creation removes its node instead of leaving one. */}
+      {showPlus ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddChild(id);
+          }}
+          className={`nodrag absolute top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-violet-300/40 bg-indigo-600 text-white transition hover:scale-110 hover:bg-indigo-500 active:scale-95 ${
+            facesLeft ? "-left-3.5" : "-right-3.5"
+          }`}
+          aria-label={`${isRoot ? "Central idea" : topic} ke andar nayi branch jodein`}
+          title="Nayi branch jodein"
+          data-mind-node-add={id}
+        >
+          <Plus size={14} strokeWidth={3} />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -795,6 +921,62 @@ const SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
  * so it never covers the diagram it is styling.
  */
 const MENU_WIDTH_PX = 224;
+
+/** One row of colour swatches (plus default and a native custom picker). */
+function ColourSwatches({
+  label,
+  value,
+  options,
+  onPick,
+  allowDefault,
+}: {
+  label: string;
+  value: string | null | undefined;
+  options: readonly string[];
+  onPick: (colour: string | null) => void;
+  allowDefault?: boolean;
+}) {
+  const chip = "grid h-6 w-6 shrink-0 place-items-center rounded-full border border-black/20 transition hover:scale-110";
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5">
+      {allowDefault ? (
+        <button
+          type="button"
+          className={`${chip} bg-white text-[10px] font-bold text-slate-500`}
+          aria-label={`${label}: default`}
+          aria-pressed={!value}
+          title="Default"
+          onClick={() => onPick(null)}
+        >
+          /
+        </button>
+      ) : null}
+      {options.map((colour) => (
+        <button
+          key={colour}
+          type="button"
+          className={chip}
+          style={{
+            background: colour,
+            boxShadow: value === colour ? "0 0 0 2px #ffffff, 0 0 0 3.5px #7c3aed" : undefined,
+          }}
+          aria-label={`${label} ${colour}`}
+          aria-pressed={value === colour}
+          title={colour}
+          onClick={() => onPick(colour)}
+        />
+      ))}
+      <input
+        type="color"
+        className="h-6 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+        aria-label={`${label} — custom`}
+        title="Custom colour"
+        value={value ?? "#808080"}
+        onChange={(event) => onPick(event.target.value)}
+      />
+    </div>
+  );
+}
 
 interface ToolbarMenuProps {
   open: boolean;
@@ -1042,6 +1224,13 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // Firestore.
   const [arrangement, setArrangement] = useState<MindMapArrangement>(loadArrangement);
   const [textFit, setTextFit] = useState<MindMapTextFit>(loadTextFit);
+  // Boxed (classic) or Modern look — a per-device view, like the alignment.
+  const [look, setLook] = useState<MindMapLook>(loadLook);
+  const [styleMenuOpen, setStyleMenuOpen] = useState(false);
+  const styleAnchorRef = useRef<HTMLButtonElement>(null);
+  // The node a `+` just created and that is still being named. Backing out of
+  // that first edit removes it, so a cancelled `+` never leaves a stray node.
+  const freshIdRef = useRef<string | null>(null);
   // Which tool drop-down is open. Only one at a time, and both are portalled
   // to the body so the clipped status strip cannot cut them in half.
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
@@ -1083,6 +1272,19 @@ function MindMapCanvas(props: MindMapPanelProps) {
       /* ignore */
     }
   }, [arrangement]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(lookStorageKey, look);
+    } catch {
+      /* ignore */
+    }
+  }, [look]);
+
+  // The colour menu is about the selected node: no selection, no menu.
+  useEffect(() => {
+    if (selectedId == null) setStyleMenuOpen(false);
+  }, [selectedId]);
 
   useEffect(() => {
     try {
@@ -1270,6 +1472,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       // Drop the new node straight into rename mode — `+` then type is the
       // whole point of the interaction.
       if (createdId) {
+        freshIdRef.current = createdId;
         setSelectedId(createdId);
         setEditingId(createdId);
       }
@@ -1310,11 +1513,46 @@ function MindMapCanvas(props: MindMapPanelProps) {
     setEditingId(id);
   }, []);
 
-  const handleCloseEditor = useCallback((id: string) => setEditingId((current) => (current === id ? null : current)), []);
+  const handleCloseEditor = useCallback((id: string) => {
+    if (freshIdRef.current === id) freshIdRef.current = null;
+    setEditingId((current) => (current === id ? null : current));
+  }, []);
+
+  /**
+   * Escape, or a blank draft: the learner backed out of naming a node. A node
+   * that `+` just created is removed again (it never really existed); any other
+   * node simply stops being edited, keeping its text.
+   */
+  const handleCancelEdit = useCallback(
+    (id: string) => {
+      if (freshIdRef.current === id) {
+        freshIdRef.current = null;
+        onMindChange((current) => removeNode(current, id));
+        setSelectedId((current) => (current === id ? null : current));
+      }
+      setEditingId((current) => (current === id ? null : current));
+    },
+    [onMindChange],
+  );
 
   const handleCommitTopic = useCallback(
-    (id: string, topic: string) => onMindChange((current) => setNodeTopic(current, id, topic)),
+    (id: string, topic: string) => {
+      if (freshIdRef.current === id) freshIdRef.current = null;
+      onMindChange((current) => setNodeTopic(current, id, topic));
+    },
     [onMindChange],
+  );
+
+  // ── Node colours ───────────────────────────────────────────────────────
+  // Writes only the selected node's (or the centre's) colour keys; a reset
+  // clears them so the node falls back to the look's default.
+  const applyStyle = useCallback(
+    (patch: Parameters<typeof setNodeStyle>[2]) => {
+      if (selectedId == null) return;
+      const target = selectedId;
+      onMindChange((current) => setNodeStyle(current, target, patch));
+    },
+    [selectedId, onMindChange],
   );
 
   // ── One-click clean-up ─────────────────────────────────────────────────
@@ -1367,55 +1605,94 @@ function MindMapCanvas(props: MindMapPanelProps) {
     : null;
 
   // ── React Flow nodes + edges, derived from the layout ──────────────────
+  // Per-node colour overrides, keyed by id (the centre included).
+  const styleById = useMemo(() => {
+    const map = new Map<string, MindNodeStyle | undefined>([[rootId(), mind.rootStyle]]);
+    for (const node of mind.nodes) map.set(String(node.id), node.style);
+    return map;
+  }, [mind.nodes, mind.rootStyle]);
+
+  // The wire INTO each node. A learner's branch colour applies to that one
+  // wire only. In Modern look an unset wire takes its top-level branch colour
+  // from the palette, so every branch reads as one coordinated colour.
+  const branchIndex = useMemo(() => branchIndexMap(mind), [mind]);
+  const wireById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const node of mind.nodes) {
+      const id = String(node.id);
+      if (node.style?.edge) {
+        map.set(id, node.style.edge);
+        continue;
+      }
+      const index = branchIndex.get(id);
+      map.set(
+        id,
+        look === "modern" && index != null ? BRANCH_PALETTE[index % BRANCH_PALETTE.length] : null,
+      );
+    }
+    return map;
+  }, [mind.nodes, branchIndex, look]);
+
+  const selectedStyle = selectedId == null ? undefined : styleById.get(String(selectedId));
+
   const layoutNodes: Node<MindNodeData>[] = useMemo(() => {
     const topicById = new Map<string, string>([[rootId(), mind.rootTopic]]);
     for (const node of mind.nodes) topicById.set(String(node.id), node.topic);
 
-    return layout.nodes.map((placed) => ({
-      id: placed.id,
-      type: "mindNode",
-      position: { x: placed.x, y: placed.y },
-      // Explicit box size lets React Flow route ropes from known geometry
-      // instead of waiting on a ResizeObserver that often misses inside a
-      // just-opened (or still-animating) overlay sheet.
-      width: placed.width,
-      height: placed.height,
-      initialWidth: placed.width,
-      initialHeight: placed.height,
-      // Hand placement: the learner can drag any node anywhere on the
-      // canvas and the drop is committed on release (see onNodeDragStop).
-      draggable: true,
-      selectable: true,
-      // While a node's editor is open its box is allowed to grow with the
-      // wrapping draft (fixed boxes would clip the extra lines — the body
-      // keeps overflow-hidden for its rounded corners). The layout
-      // re-measures on commit, so neighbours step out of the way the moment
-      // the edit lands.
-      style:
-        editingId === placed.id
-          ? { width: placed.width, minHeight: placed.height, height: "auto" }
-          : { width: placed.width, height: placed.height },
-      data: {
-        topic: topicById.get(placed.id) || "Idea",
-        depth: placed.depth,
-        side: placed.side,
-        // Live drag overrides win while the finger is down (see syncDragFacing);
-        // otherwise the layout's resolved geometry decides. The centre has no
-        // parent to face, so it keeps `null` and renders no anchor dot.
-        facing: placed.isRoot ? null : (facingOverride[placed.id] ?? placed.facing),
-        collapsed: placed.collapsed,
-        childCount: placed.childCount,
-        isRoot: placed.isRoot,
-        selected: selectedId === placed.id,
-        editing: editingId === placed.id,
-        theme: mindTheme,
-        textFit,
-        onAddChild: handleAddChild,
-        onOpenEditor: handleOpenEditor,
-        onCloseEditor: handleCloseEditor,
-        onCommitTopic: handleCommitTopic,
-      },
-    }));
+    return layout.nodes.map((placed) => {
+      const paint = paintFor(look, mindTheme, placed.isRoot, styleById.get(placed.id));
+      return {
+        id: placed.id,
+        type: "mindNode",
+        position: { x: placed.x, y: placed.y },
+        // Explicit box size lets React Flow route ropes from known geometry
+        // instead of waiting on a ResizeObserver that often misses inside a
+        // just-opened (or still-animating) overlay sheet.
+        width: placed.width,
+        height: placed.height,
+        initialWidth: placed.width,
+        initialHeight: placed.height,
+        // Hand placement: the learner can drag any node anywhere on the
+        // canvas and the drop is committed on release (see onNodeDragStop).
+        draggable: true,
+        selectable: true,
+        // While a node's editor is open its box is allowed to grow with the
+        // wrapping draft (fixed boxes would clip the extra lines — the body
+        // keeps overflow-hidden for its rounded corners). The layout
+        // re-measures on commit, so neighbours step out of the way the moment
+        // the edit lands.
+        style:
+          editingId === placed.id
+            ? { width: placed.width, minHeight: placed.height, height: "auto" }
+            : { width: placed.width, height: placed.height },
+        data: {
+          topic: topicById.get(placed.id) || "Idea",
+          depth: placed.depth,
+          side: placed.side,
+          // Live drag overrides win while the finger is down (see syncDragFacing);
+          // otherwise the layout's resolved geometry decides. The centre has no
+          // parent to face, so it keeps `null` and renders no anchor dot.
+          facing: placed.isRoot ? null : (facingOverride[placed.id] ?? placed.facing),
+          collapsed: placed.collapsed,
+          childCount: placed.childCount,
+          isRoot: placed.isRoot,
+          selected: selectedId === placed.id,
+          editing: editingId === placed.id,
+          theme: mindTheme,
+          textFit,
+          look,
+          fill: paint.fill,
+          ink: paint.ink,
+          customFill: paint.customFill,
+          branch: wireById.get(placed.id) ?? null,
+          onAddChild: handleAddChild,
+          onOpenEditor: handleOpenEditor,
+          onCloseEditor: handleCloseEditor,
+          onCancelEdit: handleCancelEdit,
+          onCommitTopic: handleCommitTopic,
+        },
+      };
+    });
   }, [
     layout,
     facingOverride,
@@ -1425,10 +1702,14 @@ function MindMapCanvas(props: MindMapPanelProps) {
     editingId,
     mindTheme,
     textFit,
+    look,
+    styleById,
+    wireById,
     handleAddChild,
     requestDelete,
     handleOpenEditor,
     handleCloseEditor,
+    handleCancelEdit,
     handleCommitTopic,
   ]);
 
@@ -1482,12 +1763,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
         // receives it on the edge facing its parent, the parent exports from
         // the edge facing the child. Both come from `facing` — the RESOLVED
         // geometry of the two boxes — and never from the wing the branch was
-        // created on. Keying these on the stored side is what made a node
-        // dragged across its parent keep wiring backwards, which turned the
-        // whole map into a knot of crossing ropes.
-        // The stroke reads per-theme CSS variables off the shell so a theme
-        // flip recolours every wire without re-deriving the edges.
+        // created on (see the layout notes in utils/mindMapTree.js).
+        // An explicit or palette wire colour wins; otherwise the theme's
+        // per-side variable colours the rope.
         const goesLeft = (facingOverride[edge.target] ?? edge.facing ?? "right") === "left";
+        const wire = wireById.get(edge.target) ?? null;
         return {
           id: edge.id,
           source: edge.source,
@@ -1499,12 +1779,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
           type: "rope",
           animated: false,
           style: {
-            stroke: goesLeft ? "var(--mm-edge-left)" : "var(--mm-edge-right)",
-            strokeWidth: 2.4,
+            stroke: wire ?? (goesLeft ? "var(--mm-edge-left)" : "var(--mm-edge-right)"),
+            strokeWidth: look === "modern" ? 2.2 : 2.4,
           },
         };
       }),
-    [layout.edges, facingOverride],
+    [layout.edges, facingOverride, wireById, look],
   );
 
   // ── Wires must remeasure whenever the canvas becomes a real box ────────
@@ -1674,6 +1954,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             ref={saveAnchorRef}
             onClick={() => {
               setAlignMenuOpen(false);
+              setStyleMenuOpen(false);
               setSaveMenuOpen((open) => !open);
             }}
             aria-expanded={saveMenuOpen}
@@ -1736,21 +2017,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
             onClick={() => {
               setAlignMenuOpen(false);
               setSaveMenuOpen(false);
+              setStyleMenuOpen(false);
               setLibraryOpen((open) => !open);
             }}
             aria-expanded={libraryOpen}
-            className={`mm-pill ${libraryOpen ? "mm-tool-violet" : ""}`}
-            aria-label="Is module ke saare mind maps"
-            title="Maps — is module ke sabhi mind maps"
+            aria-label={`Maps — ${activeMapName} (${maps.length})`}
+            title={`Maps — ${activeMapName}`}
+            className={`mm-tool ${libraryOpen ? "mm-tool-violet" : ""}`}
             data-course-mindmap-maps
             data-map-count={maps.length}
             data-active-map={activeMapKey}
           >
             <Layers />
-            <span className="min-w-0 truncate normal-case" data-mm-map-name>
-              {activeMapName}
-            </span>
-            <span className="mm-pill-count">{maps.length}</span>
           </button>
 
           {/* The node / level readout is the one thing left as words, and
@@ -1794,6 +2072,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             ref={alignAnchorRef}
             onClick={() => {
               setSaveMenuOpen(false);
+              setStyleMenuOpen(false);
               setAlignMenuOpen((open) => !open);
             }}
             aria-expanded={alignMenuOpen}
@@ -1807,6 +2086,36 @@ function MindMapCanvas(props: MindMapPanelProps) {
           >
             <AlignHorizontalJustifyCenter />
           </button>
+          <ToolbarMenu
+            open={styleMenuOpen && selectedId != null}
+            anchorRef={styleAnchorRef}
+            onClose={() => setStyleMenuOpen(false)}
+            theme={mindTheme}
+            label="Node colours"
+          >
+            <p className="mm-menu-head">Box colour</p>
+            <ColourSwatches label="Box colour" value={selectedStyle?.bg} options={BOX_COLOURS} onPick={(colour) => applyStyle({ bg: colour })} allowDefault />
+            <p className="mm-menu-head">Text colour</p>
+            <ColourSwatches label="Text colour" value={selectedStyle?.text} options={TEXT_COLOURS} onPick={(colour) => applyStyle({ text: colour })} allowDefault />
+            {selectedId !== rootId() ? (
+              <>
+                <p className="mm-menu-head">Branch line</p>
+                <ColourSwatches label="Branch colour" value={selectedStyle?.edge} options={BRANCH_PALETTE} onPick={(colour) => applyStyle({ edge: colour })} allowDefault />
+              </>
+            ) : null}
+            <div className="mm-menu-sep" />
+            <button
+              type="button"
+              className="mm-menu-item"
+              onClick={() => applyStyle({ bg: null, text: null, edge: null })}
+              disabled={!selectedStyle}
+              data-course-mindmap-style-reset
+            >
+              <RotateCcw />
+              <span>Default colours</span>
+            </button>
+          </ToolbarMenu>
+
           <ToolbarMenu
             open={alignMenuOpen}
             anchorRef={alignAnchorRef}
@@ -1863,6 +2172,19 @@ function MindMapCanvas(props: MindMapPanelProps) {
             ))}
           </ToolbarMenu>
 
+          {/* ── Look: boxed (classic) or modern (text-first) ───────────── */}
+          <button
+            type="button"
+            onClick={() => setLook((current) => (current === "modern" ? "boxed" : "modern"))}
+            aria-pressed={look === "modern"}
+            aria-label={look === "modern" ? "Modern look on — classic boxes par jaayein" : "Modern look par jaayein"}
+            title={look === "modern" ? "Modern look (on) — classic boxes" : "Modern look"}
+            className={`mm-tool ${look === "modern" ? "mm-tool-violet" : ""}`}
+            data-course-mindmap-look={look}
+          >
+            {look === "modern" ? <LayoutTemplate /> : <Square />}
+          </button>
+
           {/* Fit-to-screen: re-frames the whole diagram in one tap, and it
               is the only zoom affordance left on the bar now that +/− are
               gone (fingers pinch, a mouse wheel still zooms). Violet-tinted
@@ -1879,6 +2201,27 @@ function MindMapCanvas(props: MindMapPanelProps) {
           >
             <Maximize />
           </button>
+
+          {/* ── Node colours: visible only while a node is selected ───── */}
+          {selectedId != null ? (
+            <button
+              type="button"
+              ref={styleAnchorRef}
+              onClick={() => {
+                setAlignMenuOpen(false);
+                setSaveMenuOpen(false);
+                setStyleMenuOpen((open) => !open);
+              }}
+              aria-expanded={styleMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Selected node ke rang"
+              title="Node colours — box, text aur branch line"
+              className={`mm-tool ${styleMenuOpen ? "mm-tool-violet" : ""}`}
+              data-course-mindmap-style
+            >
+              <Palette />
+            </button>
+          ) : null}
 
           {/* ── Delete the selected branch ──────────────────────────────
               Tap (or drag) a node to select it, then this removes the
@@ -1936,6 +2279,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
           minZoom={0.15}
           maxZoom={2.5}
           nodesDraggable
+          // Deletion goes through the confirmation overlay only.
+          deleteKeyCode={null}
           nodesConnectable={false}
           edgesFocusable={false}
           // A pointer that moves less than this many px still counts as a

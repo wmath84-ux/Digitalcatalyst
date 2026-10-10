@@ -569,7 +569,9 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
   assert.doesNotMatch(toolbar, /justify-between/);
   // The content keeps its width so the strip scrolls instead of squeezing.
   assert.match(toolbar, /flex min-w-max flex-1 items-center/);
-  assert.match(toolbar, /<span className="min-w-0 truncate normal-case" data-mm-map-name>/);
+  // The map switcher is an icon now (the module-name box is gone); its name lives in the label.
+  assert.match(toolbar, /data-course-mindmap-maps/);
+  assert.doesNotMatch(toolbar, /data-mm-map-name/);
   // …and any offset a browser still managed to set is cleared on open.
   assert.match(panel, /if \(strip && strip\.scrollLeft !== 0\) strip\.scrollLeft = 0;/);
   assert.match(panel, /const statusRef = useRef<HTMLDivElement>\(null\);/);

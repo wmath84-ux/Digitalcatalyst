@@ -1454,18 +1454,8 @@
   -webkit-backdrop-filter: none;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
 }
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] {
-  color: #0f172a;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-root="true"] {
-  color: #ffffff;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] > div:nth-child(2) {
-  background: rgba(255, 255, 255, 0.9) !important;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-depth="3"] [data-mind-node-body] {
-  border-color: rgba(15, 23, 42, 0.2);
-}
+/* Node ink and fills are inline now (see paintFor in MindMapPanel.tsx) so a
+   learner's colour is never overridden by a class or a !important rule here. */
 .course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-input]::placeholder {
   color: #64748b;
   opacity: 1;

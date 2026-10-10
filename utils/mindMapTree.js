@@ -83,6 +83,124 @@ export const sanitizeTopic = (value) => flatten(value).slice(0, MAX_TOPIC_LENGTH
 
 export const sanitizeTitle = (value) => flatten(value).slice(0, 120);
 
+// ── Node colours ──────────────────────────────────────────────────────────
+// Per-node colour overrides. Only what the learner explicitly picked is stored
+// (`bg` = box colour, `text` = ink, `edge` = the branch wire INTO the node);
+// anything unset keeps the theme's default, so old maps load unchanged and a
+// reset simply drops the key.
+
+/** The branch palette: each top-level branch takes the next colour in order. */
+export const BRANCH_PALETTE = Object.freeze([
+  "#6366f1",
+  "#0ea5e9",
+  "#10b981",
+  "#f59e0b",
+  "#ec4899",
+  "#8b5cf6",
+  "#14b8a6",
+  "#f97316",
+]);
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** A lower-case `#rrggbb` string, or null for anything else. */
+export const sanitizeColor = (value) =>
+  typeof value === "string" && HEX_COLOR_RE.test(value.trim()) ? value.trim().toLowerCase() : null;
+
+/** Keep only the valid colour keys; null when nothing survives (so it can be omitted). */
+export const sanitizeNodeStyle = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  const bg = sanitizeColor(raw.bg);
+  const text = sanitizeColor(raw.text);
+  const edge = sanitizeColor(raw.edge);
+  if (bg) out.bg = bg;
+  if (text) out.text = text;
+  if (edge) out.edge = edge;
+  return Object.keys(out).length ? out : null;
+};
+
+/**
+ * Set or reset colours on ONE node (or the centre when `id` is the root).
+ * `patch` keys: `bg`, `text`, `edge`. A `null`/invalid value clears that key;
+ * a key that is absent from `patch` is left alone. Returns the same object when
+ * nothing actually changed.
+ */
+export const setNodeStyle = (mind, id, patch = {}) => {
+  if (!isMindMap(mind)) return mind;
+  const isRoot = String(id) === ROOT_ID;
+  const target = isRoot ? null : findNode(mind, id);
+  if (!isRoot && !target) return mind;
+
+  const next = { ...((isRoot ? mind.rootStyle : target.style) || {}) };
+  for (const key of ["bg", "text", "edge"]) {
+    if (!(key in patch)) continue;
+    const value = patch[key] == null ? null : sanitizeColor(patch[key]);
+    if (value) next[key] = value;
+    else delete next[key];
+  }
+  if (isRoot) delete next.edge;
+  const style = Object.keys(next).length ? next : null;
+  const before = JSON.stringify((isRoot ? mind.rootStyle : target.style) || null);
+  if (before === JSON.stringify(style)) return mind;
+
+  if (isRoot) {
+    const { rootStyle: _old, ...rest } = mind;
+    return style ? { ...rest, rootStyle: style } : rest;
+  }
+  return {
+    ...mind,
+    nodes: mind.nodes.map((node) => {
+      if (String(node.id) !== String(id)) return node;
+      const { style: _previous, ...rest } = node;
+      return style ? { ...rest, style } : rest;
+    }),
+  };
+};
+
+/**
+ * Which top-level branch each node belongs to, as an index into the centre's
+ * children (in map order). The centre itself is not in the map. Used to give
+ * every branch its own colour from BRANCH_PALETTE.
+ */
+export const branchIndexMap = (mind) => {
+  const parentOf = new Map((mind?.nodes || []).map((node) => [String(node.id), String(node.parentId)]));
+  const indexOfBranch = new Map();
+  (mind?.nodes || []).forEach((node) => {
+    if (String(node.parentId) === ROOT_ID) indexOfBranch.set(String(node.id), indexOfBranch.size);
+  });
+  const out = new Map();
+  for (const node of mind?.nodes || []) {
+    let cur = String(node.id);
+    for (let guard = 0; guard <= MAX_MIND_MAP_NODES && !indexOfBranch.has(cur); guard += 1) {
+      const up = parentOf.get(cur);
+      if (up == null) break;
+      cur = up;
+    }
+    if (indexOfBranch.has(cur)) out.set(String(node.id), indexOfBranch.get(cur));
+  }
+  return out;
+};
+
+const relativeLuminance = (hex) => {
+  const channel = (offset) => {
+    const v = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+};
+
+/**
+ * The ink that reads best on a given opaque `#rrggbb` background (WCAG
+ * contrast: the dark ink wins above the luminance crossover, the light ink
+ * below it). Anything that is not a valid hex falls back to the dark ink.
+ */
+export const readableInkOn = (bg) => {
+  const hex = sanitizeColor(bg);
+  if (!hex) return "#0f172a";
+  return relativeLuminance(hex) > 0.179 ? "#0f172a" : "#ffffff";
+};
+
 // ── Manual positions ──────────────────────────────────────────────────────
 // The learner can drag any node anywhere. Those coordinates are written into
 // Firestore, so they are coerced to a finite number, rounded to one decimal
@@ -951,6 +1069,7 @@ export const parseMindMap = (raw) => {
           const fx = sanitizePosition(node.fx);
           const fy = sanitizePosition(node.fy);
           const paired = fx != null && fy != null;
+          const style = sanitizeNodeStyle(node.style);
           return {
             id: String(node.id),
             topic: sanitizeTopic(node.topic) || "Idea",
@@ -959,6 +1078,7 @@ export const parseMindMap = (raw) => {
             collapsed: Boolean(node.collapsed),
             fx: paired ? fx : null,
             fy: paired ? fy : null,
+            ...(style ? { style } : {}),
           };
         })
     : [];
@@ -983,12 +1103,17 @@ export const parseMindMap = (raw) => {
   const rootY = sanitizePosition(raw.rootY);
   const rootPlaced = rootX != null && rootY != null;
 
+  // The centre's own colours. The centre has no branch, so `edge` is dropped.
+  const rootStyle = sanitizeNodeStyle(raw.rootStyle);
+  if (rootStyle) delete rootStyle.edge;
+
   return {
     version: MIND_MAP_VERSION,
     title: sanitizeTitle(raw.title),
     rootTopic: sanitizeTopic(raw.rootTopic) || "Central idea",
     rootX: rootPlaced ? rootX : null,
     rootY: rootPlaced ? rootY : null,
+    ...(rootStyle && Object.keys(rootStyle).length ? { rootStyle } : {}),
     nodes: nodes.filter((node) => reachable.has(node.id)),
   };
 };
@@ -1008,6 +1133,7 @@ export const toFirestoreMindMap = (mind, meta = {}) => {
     // every device. `null` (auto-placed) is a Firestore-safe value.
     rootX: safe.rootX,
     rootY: safe.rootY,
+    ...(safe.rootStyle ? { rootStyle: safe.rootStyle } : {}),
     nodes: safe.nodes.map((node) => ({
       id: node.id,
       topic: node.topic,
@@ -1016,6 +1142,7 @@ export const toFirestoreMindMap = (mind, meta = {}) => {
       collapsed: node.collapsed,
       fx: node.fx,
       fy: node.fy,
+      ...(node.style ? { style: node.style } : {}),
     })),
     nodeCount: safe.nodes.length + 1,
     updatedAt: typeof meta.updatedAt === "number" ? meta.updatedAt : Date.now(),

@@ -24,6 +24,15 @@ export interface MindMapNode {
   collapsed: boolean;
   fx: number | null;
   fy: number | null;
+  /** Optional colour overrides; absent = the theme default. */
+  style?: MindNodeStyle;
+}
+
+/** Explicit per-node colours. `bg` box colour, `text` ink, `edge` branch wire into the node. */
+export interface MindNodeStyle {
+  bg?: string;
+  text?: string;
+  edge?: string;
 }
 
 /** A whole mind map, as stored in Firestore and as held in editor state. */
@@ -34,6 +43,8 @@ export interface MindMap {
   /** Manual position of the centre box, or null when it rides the layout. */
   rootX?: number | null;
   rootY?: number | null;
+  /** Optional colour overrides for the centre box (no `edge`). */
+  rootStyle?: MindNodeStyle;
   nodes: MindMapNode[];
 }
 
@@ -207,6 +218,22 @@ export function setNodeTopic(mind: MindMap, id: string | number, topic: string):
  * Pin a node (root included) to a hand-dragged position. Non-finite
  * coordinates are refused; finite ones are rounded and clamped.
  */
+/** A partial colour change: `null` clears that key back to the default. */
+export interface MindStylePatch {
+  bg?: string | null;
+  text?: string | null;
+  edge?: string | null;
+}
+
+export const BRANCH_PALETTE: readonly string[];
+export function sanitizeColor(value: unknown): string | null;
+export function sanitizeNodeStyle(raw: unknown): MindNodeStyle | null;
+/** Set/reset colours on one node (or the centre). Null / invalid clears a key. */
+export function setNodeStyle(mind: MindMap, id: string | number, patch: MindStylePatch): MindMap;
+/** Node id → index of its top-level branch (order of the centre's children). */
+export function branchIndexMap(mind: MindMap): Map<string, number>;
+/** `#0f172a` or `#ffffff`, whichever reads best on an opaque `#rrggbb`. */
+export function readableInkOn(bg: string): string;
 export function setNodePosition(mind: MindMap, id: string | number, x: number, y: number): MindMap;
 
 /**
