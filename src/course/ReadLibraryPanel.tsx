@@ -236,6 +236,9 @@ export default function ReadLibraryPanel({
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [moduleDraft, setModuleDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  // "Save a copy" of a course PDF into the learner's own annotations library.
+  const [copyState, setCopyState] = useState<"idle" | "saving" | "error">("idle");
+  const [copyError, setCopyError] = useState("");
   const [libraryMode, setLibraryMode] = useState<"course" | "mine">("course");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeModule, setComposeModule] = useState("");
@@ -388,9 +391,41 @@ export default function ReadLibraryPanel({
     }
   }, []);
 
+  /**
+   * Course PDFs keep their marks only on this device. "Save a copy" turns the
+   * course PDF into the learner's own PDF through the same link-import path the
+   * Read tab already uses (CORS read + %PDF check, then the learner upload
+   * pipeline). The copy is then annotated and synced like any Your-annotations
+   * PDF. The course original is never modified.
+   */
+  const saveCourseCopy = useCallback(async () => {
+    const entry = activeEntry;
+    if (!entry || entry.presentation.kind !== "pdfjs") return;
+    const url = entry.presentation.sourceUrl;
+    setCopyState("saving");
+    setCopyError("");
+    const result = await fetchPdfFromUrl({ raw: url, url }, undefined);
+    if (!result.ok) {
+      setCopyState("error");
+      setCopyError(result.error.message);
+      return;
+    }
+    const stored = await readUploadsRef.current.uploadPdfs([result.pdf.file]);
+    if (!stored.length) {
+      setCopyState("error");
+      setCopyError("The copy could not be saved to your account. Check your connection and try again.");
+      return;
+    }
+    setCopyState("idle");
+    setNotice(`“${stored[0].name}” is in Your annotations — annotate it and it saves to your account.`);
+    setActiveId(withKind("learner", stored[0].id));
+  }, [activeEntry]);
+
   const closeReader = useCallback(() => {
     setActiveId(null);
     setLeaveBlocked(false);
+    setCopyState("idle");
+    setCopyError("");
     setAnnotationState("idle");
     annotationApiRef.current = null;
   }, []);
@@ -945,6 +980,19 @@ export default function ReadLibraryPanel({
                       <span className="hidden sm:inline">Open in Drive</span>
                     </a>
                   ) : null}
+                  {activeEntry?.presentation.kind === "pdfjs" ? (
+                    <button
+                      type="button"
+                      onClick={() => void saveCourseCopy()}
+                      disabled={copyState === "saving"}
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[11px] font-semibold text-white hover:bg-white/10 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      data-course-read-save-copy
+                      title="Keep your own copy of this PDF in Your annotations, so your marks are saved to your account"
+                    >
+                      <CloudUpload size={13} aria-hidden="true" />
+                      <span>{copyState === "saving" ? "Saving copy…" : "Save a copy"}</span>
+                    </button>
+                  ) : null}
                 </>
               )}
             </div>
@@ -970,6 +1018,18 @@ export default function ReadLibraryPanel({
                 </button>
                 <button type="button" onClick={closeReader} className="rounded-lg px-2.5 py-1 font-bold text-amber-100/80 underline underline-offset-2 hover:text-white">
                   Leave anyway
+                </button>
+              </div>
+            ) : null}
+
+            {copyState === "error" && copyError ? (
+              <div className="z-10 flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100 sm:px-4" role="alert" data-course-read-copy-error>
+                <span className="min-w-0 flex-1">{copyError}</span>
+                <button type="button" onClick={() => void saveCourseCopy()} className="rounded-lg border border-amber-200/40 px-2.5 py-1 font-bold hover:bg-amber-200/15">
+                  Retry
+                </button>
+                <button type="button" onClick={() => setCopyState("idle")} className="rounded-lg px-2.5 py-1 font-bold text-amber-100/80 underline underline-offset-2 hover:text-white">
+                  Dismiss
                 </button>
               </div>
             ) : null}
