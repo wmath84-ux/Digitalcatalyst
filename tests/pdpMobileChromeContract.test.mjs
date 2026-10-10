@@ -28,7 +28,7 @@ test("the actual gallery keeps its pinned glass settings; copy is not nested in 
 
 test("the product page removes decorative badges and duplicate thumb purchase controls", () => {
   assert.doesNotMatch(pdp, /Live catalog|EmojiBurst|data-pdp-thumb-bar|data-pdp-thumb-checkout|Build your purchase/);
-  assert.match(pdp, /hasPurchaseBuilder \? \([\s\S]*?<PdpPurchaseBuilder\s+compact[\s\S]*?\) : \(/);
+  assert.match(pdp, /hasPurchaseBuilder \? <PdpPurchaseBuilder[\s\S]*?compact/);
   assert.match(pdp, /aria-label="View product image fullscreen"/);
   assert.match(pdp, /data-pdp-tabbar className="dc-pdp-tabs"/);
 });
@@ -47,7 +47,7 @@ test("only gallery thumbs need drag scrolling; detail choices are bounded button
   assert.match(pdp, /<div data-pdp-thumbs ref=\{thumbs\.ref\} onPointerDown=\{thumbs\.onPointerDown\}/);
   assert.match(pdp, /aria-pressed=\{tab === item\.value\} onClick=\{\(\) => onTab\(item\.value\)\}/);
   assert.doesNotMatch(pdp, /tabStrip|GlassToggleGroup/);
-  assert.match(read("src/pdp-minimal.css"), /\.dc-pdp-tabs \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(read("src/pdp-minimal.css"), /\.dc-pdp-tabs \{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
 });
 
 /* ------------------------------------------------------------------ */

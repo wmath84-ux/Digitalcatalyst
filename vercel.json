@@ -23,6 +23,14 @@
       "destination": "/api/referral-leaderboard?route=manifest"
     },
     {
+      "source": "/api/account/preferences",
+      "destination": "/api/referral-leaderboard?route=account/preferences"
+    },
+    {
+      "source": "/api/public-profile",
+      "destination": "/api/referral-leaderboard?route=public-profile"
+    },
+    {
       "source": "/api/brand-icon",
       "destination": "/api/referral-leaderboard?route=brand-icon"
     },

@@ -18,6 +18,9 @@ export type CourseAccessSource =
 export interface CourseAccessInput {
   product: {
     id?: string | null;
+    documentId?: string | null;
+    paidUpdates?: unknown[] | null;
+    requireBaseCourseForUpdate?: boolean;
     canonicalModules?: unknown[] | null;
     courseContent?: unknown[] | null;
   } | null;
@@ -35,6 +38,8 @@ export interface CourseAccessInput {
 /** The resolver's output. */
 export interface CourseAccessResolution {
   hasFullProductAccess: boolean;
+  hasPurchasedFullProduct?: boolean;
+  hasSubscriptionProductAccess?: boolean;
   ownedModuleIds: Set<string>;
   ownedResourceIds: Set<string>;
   ownedUpdateIds: Set<string>;
@@ -77,6 +82,7 @@ export interface OwnershipSets {
 
 export const collectEntitlementOwnership: (
   entitlementRecords: ReadonlyArray<unknown> | null | undefined,
+  now?: number,
 ) => OwnershipSets;
 
 export const collectModules: (tree: unknown[] | null | undefined) => unknown[];

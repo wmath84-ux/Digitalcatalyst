@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { Bell, Lock, Sparkles, UserRound } from "lucide-react";
 import { db, getFirebaseStorage } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
@@ -9,15 +8,12 @@ import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
-import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 import { resolveFeaturePrice } from "../../utils/featurePricing";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../subscription/data/fallbackCatalog";
 import { loadSubscriptionCatalog } from "../subscription/utils/loadSubscriptionCatalog";
 import type { SubscriptionCatalog } from "../subscription/utils/subscriptionCatalog";
 import ProfileLayout, {
-  BaseModal,
   EditModal,
-  PreferenceRow,
   PLAN_LABELS,
   TIER_LABELS,
   type MembershipTier,
@@ -25,7 +21,7 @@ import ProfileLayout, {
   type SubscriptionSnapshot,
 } from "./ProfileLayout";
 
-type Modal = "edit" | "settings" | null;
+type Modal = "edit" | null;
 
 const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_TYPES: Record<string, string> = {
@@ -43,16 +39,9 @@ function profilePhotoContentType(file: File): string | null {
   return PROFILE_PHOTO_TYPES[extension] || null;
 }
 
-/** Notification + privacy switches stored on `users/{uid}.preferences`.
- *  Exported so the dedicated Settings page (`#/settings`) reads and writes
- *  exactly the same shape instead of keeping a second copy of it. */
-export type Preferences = {
-  push: boolean;
-  email: boolean;
-  promotions: boolean;
-  profileVisible: boolean;
-  shareActivity: boolean;
-};
+// Backwards-compatible type exports; Settings no longer imports this route.
+export { DEFAULT_PREFERENCES } from "../../utils/userPreferences";
+export type { Preferences } from "../../utils/userPreferences";
 
 type MembershipState = {
   tier: MembershipTier;
@@ -60,14 +49,6 @@ type MembershipState = {
   active: boolean;
   expired: boolean;
   subscriber: boolean;
-};
-
-export const DEFAULT_PREFERENCES: Preferences = {
-  push: true,
-  email: true,
-  promotions: false,
-  profileVisible: true,
-  shareActivity: true,
 };
 
 /**
@@ -111,10 +92,6 @@ export default function ProfileApp() {
   const { ownedProductIds: fullOwnedIds, accessibleProductIds, signedIn } = useOwnedProducts();
   const canonicalOwnedIds = accessibleProductIds || fullOwnedIds;
   const [modal, setModal] = useState<Modal>(null);
-  // Account notifications/privacy preferences are stored on the user record.
-  // The clean-background preference is shared app-wide through its context.
-  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
-  const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [referralUsed, setReferralUsed] = useState(false);
@@ -146,7 +123,6 @@ export default function ProfileApp() {
     if (!user) return undefined;
     const unsubscribeProfile = onSnapshot(doc(db, "users", user.id), (snapshot) => {
       const data = snapshot.data() || {};
-      setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences || {}) });
       setReferralCode(String(data.referralCode || ""));
       setReferralUsed(Math.max(0, Number(data.referralUsedCount || 0)) >= 1);
 
@@ -275,19 +251,6 @@ export default function ProfileApp() {
 
   if (!user) return null;
 
-  const savePreferences = async (next: Preferences) => {
-    setPreferences(next);
-    setPreferencesSaving(true);
-    try {
-      await setDoc(doc(db, "users", user.id), { preferences: next, updatedAt: serverTimestamp() }, { merge: true });
-    } catch (error) {
-      console.error("Preference save failed", error);
-      setMessage("Preferences could not be saved.");
-    } finally {
-      setPreferencesSaving(false);
-    }
-  };
-
   const handleProfilePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0] || null;
     event.currentTarget.value = "";
@@ -323,33 +286,6 @@ export default function ProfileApp() {
       setPhotoError("Could not upload the photo. Check your connection and try again.");
     } finally {
       setPhotoUploading(false);
-    }
-  };
-
-  // The Push notifications switch must actually register/remove this device,
-  // otherwise the preference is cosmetic and system notifications never arrive.
-  const handlePushToggle = async (checked: boolean) => {
-    setPreferencesSaving(true);
-    try {
-      if (checked) {
-        const enabled = await ensureSavedWebPushSubscription(user.id);
-        const permission = typeof window !== "undefined" ? window.Notification.permission : "denied";
-        if (!enabled || permission !== "granted") {
-          setMessage("Notifications are blocked in your browser. Enable them in the browser's site settings, then try again.");
-          setPreferences((current) => ({ ...current, push: false }));
-          await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: false }, updatedAt: serverTimestamp() }, { merge: true });
-          return;
-        }
-      } else {
-        await removeWebPushSubscription(user.id);
-      }
-      await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: checked }, updatedAt: serverTimestamp() }, { merge: true });
-      setPreferences((current) => ({ ...current, push: checked }));
-    } catch (error) {
-      console.error("Push preference change failed", error);
-      setMessage("Could not update push notifications.");
-    } finally {
-      setPreferencesSaving(false);
     }
   };
 
@@ -450,8 +386,8 @@ export default function ProfileApp() {
               onOpenCourse: (id) => { window.location.hash = `#/course/${encodeURIComponent(id)}`; },
               onOpenPurchases: () => { window.location.hash = "#/store/purchases"; },
             }}
-            onOpenSettings={() => setModal("settings")}
-            saving={preferencesSaving}
+            onOpenSettings={() => { window.location.hash = "#/settings"; }}
+            saving={photoUploading}
             message={message}
             onLogout={() => void logout().finally(() => { window.location.hash = "#/auth?mode=login"; })}
             isAdmin={String(user.role || "") === "admin" && String(user.email || "").trim().toLowerCase() === APPROVED_ADMIN_EMAIL}
@@ -473,17 +409,7 @@ export default function ProfileApp() {
             }}
           />
         )}
-        {modal === "settings" && (
-          <BaseModal title="Preferences" onClose={() => setModal(null)}>
-            <div className="space-y-2">
-              <PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void handlePushToggle(checked)} />
-              <PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} />
-              <PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} />
-              <PreferenceRow icon={<UserRound />} label="Public profile" checked={preferences.profileVisible} onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })} />
-              <PreferenceRow icon={<Lock />} label="Share learning activity" checked={preferences.shareActivity} onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })} />
-            </div>
-          </BaseModal>
-        )}
+
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ test("every notification category maps to exactly one filter", () => {
 test("the bell page renders the five filter chips with per-filter counts", () => {
   assert.match(page, /filterCounts/);
   assert.match(page, /counts\[getNotificationFilterKey\(item\)\] \+= 1/);
-  assert.match(page, /visibleItems = useMemo\(\(\) => filterNotifications\(items, activeFilter\)/);
+  assert.match(page, /visibleItems = useMemo\(\(\) => filterNotifications\(allowedItems, activeFilter\)/);
   // The chips come from the single shared order constant (all, product,
   // mayday, subscription, updates) so page and helper cannot drift.
   assert.match(page, /NOTIFICATION_FILTER_ORDER\.map\(\(key\) =>/);
@@ -136,10 +136,10 @@ test("foreground local notifications use the same deep links", () => {
   // canonical schedule carries the migrated target's link, the legacy path
   // falls back to the section+item URL the old planner understood.
   assert.match(main, /const itemUrl = `\/\$\{itemDeepLink\(item\)\}`/);
-  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`\)/);
+  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`, user\.id\)/);
   // FlowPath: the same call carries the server-agreed tag (activity id +
   // kind) so the tray entry and the FCM push collapse instead of stacking.
-  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `flowpath-\$\{item\.itemId\}-\$\{item\.kind\}`\)/);
+  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `flowpath-\$\{item\.itemId\}-\$\{item\.kind\}`, user\.id\)/);
   // Content notifications (new product / unlock / course update) are
   // SERVER-generated now — the client must not run its own baseline diff
   // (that was the repeating "Product unlocked" bug).

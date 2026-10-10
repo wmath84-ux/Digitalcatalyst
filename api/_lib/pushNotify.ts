@@ -1,3 +1,5 @@
+import { userNotificationPolicy, createNotificationPreferenceReader } from "./notificationPreferences.js";
+import { queueNotificationEmail } from "./notificationEmail.js";
 // api/_lib/pushNotify.ts
 //
 // Shared web-push delivery helpers for the API functions. Kept out of the
@@ -10,7 +12,7 @@ import { setVapidDetails, sendNotification } from "./webpush.js";
 import type { Firestore } from "firebase-admin/firestore";
 import { getNotificationBrandChrome } from "./branding.js";
 
-export type PushPayload = { title: string; body: string; tag?: string; url?: string; icon?: string; badge?: string; category?: string; section?: string; targetType?: string; largeIcon?: string };
+export type PushPayload = { title: string; body: string; tag?: string; url?: string; icon?: string; badge?: string; category?: string; section?: string; targetType?: string; largeIcon?: string; marketing?: boolean; type?: string; eventId?: string };
 
 const NOTIF_BASE = (() => {
   const envUrl = (process.env.SITE_URL || process.env.VERCEL_URL || "").trim();
@@ -104,7 +106,9 @@ const sendToSubscriptionDoc = async (item: SubscriptionDoc, payloadString: strin
 
 /** Push to every stored device of one user. Returns devices reached. */
 export async function pushToUser(db: Firestore, uid: string, payload: PushPayload): Promise<number> {
+  await queueNotificationEmail(db, uid, payload).catch((error) => console.warn("[email] could not queue notification", error));
   if (!pushConfigured()) return 0;
+  if (!(await userNotificationPolicy(db, uid, payload)).push) return 0;
   const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
   const payloadString = await serializePushPayload(payload, "eduvora");
   let sent = 0;
@@ -118,6 +122,13 @@ export async function pushToAllDevices(db: Firestore, payload: PushPayload): Pro
   const snapshot = await db.collectionGroup("webPushSubscriptions").get();
   const payloadString = await serializePushPayload(payload, "eduvora-content");
   let sent = 0;
-  for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-  return { sent, devices: snapshot.size };
+  let devices = 0;
+  const readPolicy = createNotificationPreferenceReader(db);
+  for (const item of snapshot.docs) {
+    const uid = String(item.data()?.uid || item.ref.parent.parent?.id || "");
+    if (!uid || !(await readPolicy(uid, payload)).push) continue;
+    devices += 1;
+    sent += await sendToSubscriptionDoc(item, payloadString);
+  }
+  return { sent, devices };
 }

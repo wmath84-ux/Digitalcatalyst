@@ -1,3 +1,4 @@
+import { isActiveOwnershipRecord } from "./contentOwnership.js";
 // utils/entitlements.js
 //
 // Part 6 — Canonical entitlement engine. Pure functions only (no
@@ -204,10 +205,7 @@ export const isQuoteReplayable = (quote) => {
  * trivially true when status === "active".
  */
 export const isEntitlementActive = (record, now = Date.now()) => {
-  if (!record) return false;
-  if (record.status !== "active") return false;
-  if (typeof record.expiresAt === "number" && record.expiresAt <= now) return false;
-  return true;
+  return Boolean(record?.status === "active" && isActiveOwnershipRecord(record, now));
 };
 
 /**

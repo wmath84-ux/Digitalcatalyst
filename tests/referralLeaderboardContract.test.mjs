@@ -248,12 +248,15 @@ test("verified subscription provisioning generates a stable unique referral", ()
   assert.match(referrals, /collection\("users"\).*referralCode/s);
 });
 
-test("leaderboard falls back to the public cache when the API is unavailable", () => {
-  assert.match(leaderboard, /publicLeaderboard/);
+test("only the server can use leaderboard cache after fresh privacy verification", () => {
+  assert.doesNotMatch(leaderboard, /getDoc\(|doc\(db,\s*["']publicLeaderboard/);
   assert.match(leaderboard, /Could not open leaderboard/);
   const api = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
   assert.match(api, /publicLeaderboard/);
+  assert.match(api, /normalizeUserPreferences\(user\.data\(\)\?\.preferences\)\.profileVisible/);
   assert.match(api, /subscriptionPlanId/);
+  const rules = fs.readFileSync("firestore.rules", "utf8");
+  assert.match(rules, /match \/publicLeaderboard\/\{docId\}\s*\{\s*allow read, write: if false/);
 });
 
 test("users cannot forge their referral or subscription identity", () => {

@@ -1,3 +1,5 @@
+import { apiFetch } from "../src/utils/apiBase";
+import { captureDevicePushGate } from "./deviceNotificationPreference";
 /// <reference types="vite/client" />
 import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -80,13 +82,16 @@ export const isWebPushSupported = () =>
   && 'PushManager' in window
   && 'Notification' in window;
 
+const bounded = async <T>(promise: Promise<T>, ms = 10000): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([promise, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Device connection timed out.")), ms); })]); }
+  finally { if (timer) clearTimeout(timer); }
+};
+
 export const isServiceWorkerReady = async () => {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    const registration = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000)),
-    ]);
+    const registration = await bounded(navigator.serviceWorker.ready, 5000);
     return registration || null;
   } catch {
     return null;
@@ -98,7 +103,7 @@ export const getCurrentPushSubscription = async (): Promise<PushSubscription | n
   const registration = await isServiceWorkerReady();
   if (!registration) return null;
   try {
-    return await registration.pushManager.getSubscription();
+    return await bounded(registration.pushManager.getSubscription());
   } catch {
     return null;
   }
@@ -129,7 +134,7 @@ export const subscribeToWebPush = async (): Promise<PushSubscription | null> => 
   if (permission !== 'granted') return null;
 
   try {
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await bounded(registration.pushManager.getSubscription());
     if (subscription) {
       const applicationServerKey = subscription.options?.applicationServerKey;
       const activeKeyBytes = applicationServerKey
@@ -140,56 +145,54 @@ export const subscribeToWebPush = async (): Promise<PushSubscription | null> => 
         && activeKeyBytes!.length === wantedKey.length
         && activeKeyBytes!.every((byte, index) => byte === wantedKey[index]);
       if (sameKey) return subscription;
-      await subscription.unsubscribe();
+      await bounded(subscription.unsubscribe());
     }
 
-    subscription = await registration.pushManager.subscribe({
+    subscription = await bounded(registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(WEB_PUSH_VAPID_PUBLIC_KEY),
-    });
+    }));
     return subscription;
   } catch {
     return null;
   }
 };
 
-const saveViaApi = async (uid: string, record: StoredWebPushSubscription): Promise<boolean> => {
-  const token = await auth.currentUser?.getIdToken(true);
-  if (!token) return false;
-  const response = await fetch('/api/push/subscribe', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...record, uid }),
-  });
-  const payload = await response.json().catch(() => ({})) as { ok?: boolean };
-  return Boolean(response.ok && payload.ok);
+const saveViaApi = async (uid: string, record: StoredWebPushSubscription): Promise<"saved" | "unavailable" | "rejected"> => {
+  if (auth.currentUser?.uid !== uid) return "rejected";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const token = await bounded(auth.currentUser.getIdToken(true));
+    if (!token || auth.currentUser?.uid !== uid || controller.signal.aborted) return "rejected";
+    const response = await apiFetch('/api/push/subscribe', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...record, uid }), signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => null) as { ok?: boolean } | null;
+    if (response.ok && payload?.ok) return auth.currentUser?.uid === uid ? "saved" : "rejected";
+    // Do not bypass an explicit authorization/schema refusal through a cached
+    // SDK token. Legacy unavailable routes may use an owner-only cloud write.
+    return response.status >= 400 && response.status < 500 && response.status !== 404 ? "rejected" : "unavailable";
+  } catch { return "unavailable"; }
+  finally { clearTimeout(timer); }
 };
 
 const saveViaFirestore = async (uid: string, record: StoredWebPushSubscription, documentId: string): Promise<boolean> => {
-  await setDoc(doc(db, 'users', uid, 'webPushSubscriptions', documentId), { ...record, uid }, { merge: true });
-  return true;
+  if (auth.currentUser?.uid !== uid) return false;
+  await bounded(setDoc(doc(db, 'users', uid, 'webPushSubscriptions', documentId), { ...record, uid }, { merge: true }));
+  return auth.currentUser?.uid === uid;
 };
 
 export const saveWebPushSubscription = async (uid: string, subscription: PushSubscription): Promise<boolean> => {
-  if (!uid || !subscription) return false;
+  if (!uid || !subscription || auth.currentUser?.uid !== uid) return false;
   const record = buildSubscriptionRecord(subscription);
   const documentId = hashString(subscription.endpoint);
-  // Admin API first so a missing/outdated Firestore rules deploy cannot block
-  // the YouTube-style system notification path.
-  try {
-    if (await saveViaApi(uid, record)) return true;
-  } catch {
-    // Fall through to the client SDK write.
-  }
-  try {
-    return await saveViaFirestore(uid, record, documentId);
-  } catch {
-    try {
-      return await saveViaApi(uid, record);
-    } catch {
-      return false;
-    }
-  }
+  const result = await saveViaApi(uid, record);
+  if (result === "saved") return true;
+  if (result === "rejected" || auth.currentUser?.uid !== uid) return false;
+  try { return await saveViaFirestore(uid, record, documentId); }
+  catch { return (await saveViaApi(uid, record)) === "saved"; }
 };
 
 function getContextualIconForTag(tag: string): string {
@@ -211,8 +214,10 @@ export const showLocalSystemNotification = async (
   body: string,
   url = '/#/notifications',
   tag = `eduvora-local-${Date.now()}`,
+  uid?: string,
 ): Promise<boolean> => {
-  if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
+  const allowed = captureDevicePushGate(uid);
+  if (!allowed() || !isWebPushSupported() || window.Notification.permission !== 'granted') return false;
   // Left small icon always app badge, right large icon contextual per notification type
   const contextual = getContextualIconForTag(tag);
   const icon = contextual || getBrandNotificationIcon();
@@ -226,6 +231,7 @@ export const showLocalSystemNotification = async (
   };
   try {
     const registration = await isServiceWorkerReady();
+    if (!allowed()) return false;
     if (registration) {
       await registration.showNotification(title, options);
       return true;
@@ -233,6 +239,7 @@ export const showLocalSystemNotification = async (
     new Notification(title, options);
     return true;
   } catch {
+    if (!allowed()) return false;
     try {
       new Notification(title, options);
       return true;
@@ -254,9 +261,9 @@ export const showLocalSystemNotification = async (
  * immediately when it is `denied`), so we let it decide instead of
  * pre-filtering on `granted`.
  */
-export const ensureSavedWebPushSubscription = async (uid: string): Promise<boolean> => {
-  if (!uid || !isWebPushSupported()) return false;
-  if (window.Notification.permission === 'denied') return false;
+export const ensureSavedWebPushSubscription = async (uid: string, options: { requestPermission?: boolean } = {}): Promise<boolean> => {
+  if (!uid || auth.currentUser?.uid !== uid || !isWebPushSupported()) return false;
+  if (window.Notification.permission === 'denied' || (options.requestPermission === false && window.Notification.permission !== 'granted')) return false;
   const subscription = await subscribeToWebPush();
   if (!subscription) return false;
   return saveWebPushSubscription(uid, subscription);
@@ -274,7 +281,7 @@ export const removeWebPushSubscription = async (uid: string, endpoint?: string):
   }
   if (subscription) {
     try {
-      await subscription.unsubscribe();
+      await bounded(subscription.unsubscribe());
     } catch {
       return false;
     }

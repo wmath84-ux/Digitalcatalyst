@@ -1,3 +1,6 @@
+import { userNotificationPolicy, createNotificationPreferenceReader } from "../_lib/notificationPreferences.js";
+import { queueNotificationEmail, deliverNotificationEmails } from "../_lib/notificationEmail.js";
+import { notificationPolicy } from "../../utils/userPreferences.js";
 // api/cron/subscription-renewals.ts
 //
 // The project's single push scheduler (kept on this filename/path because the
@@ -131,6 +134,9 @@ function getContextualLargeIconForCron(tag: string, category?: string, section?:
 }
 
 async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string; category?: string; section?: string; targetType?: string }) {
+  const notification = { title, body, ...target };
+  await queueNotificationEmail(db, uid, notification).catch((error) => console.warn("[email] notification queue failed", error));
+  if (!(await userNotificationPolicy(db, uid, notification)).push) return 0;
   // Fan out to Web Push AND FCM in parallel. Left small icon always app logo, right large icon contextual per type.
   const brand = await getNotificationBrandChrome();
   const largeIcon = getContextualLargeIconForCron(target?.tag || "", target?.category, target?.section);
@@ -203,8 +209,15 @@ async function sendPushToAll(db: Firestore, payload: PushPayload) {
             largeIcon,
           });
           let sent = 0;
-          for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-          return { sent, devices: snapshot.size };
+          let devices = 0;
+          const readPolicy = createNotificationPreferenceReader(db);
+          for (const item of snapshot.docs) {
+            const uid = String(item.data()?.uid || item.ref.parent.parent?.id || "");
+            if (!uid || !(await readPolicy(uid, payload as any)).push) continue;
+            devices += 1;
+            sent += await sendToSubscriptionDoc(item, payloadString);
+          }
+          return { sent, devices };
         })()
       : Promise.resolve({ sent: 0, devices: 0 }),
     fcmPushToAllDevices(db, fcmPayload),
@@ -559,10 +572,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // (api/push/send product-created) writes the same doc id — this is
           // the catch-up for products that slipped past that path.
           const users = await db.collection("users").get();
+          const eligibleUsers = users.docs.filter((userDoc) => notificationPolicy(userDoc.data()?.preferences, { category: "store" }).inbox);
           const docId = `content:product:${product.id}`;
-          for (let offset = 0; offset < users.docs.length; offset += 450) {
+          for (let offset = 0; offset < eligibleUsers.length; offset += 450) {
             const batch = db.batch();
-            users.docs.slice(offset, offset + 450).forEach((userDoc: QueryDocumentSnapshot) => batch.set(userDoc.ref.collection("notifications").doc(docId), {
+            eligibleUsers.slice(offset, offset + 450).forEach((userDoc: QueryDocumentSnapshot) => batch.set(userDoc.ref.collection("notifications").doc(docId), {
               id: docId,
               title,
               body: product.title,
@@ -574,6 +588,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }, { merge: true }));
             await batch.commit();
           }
+          await Promise.all(eligibleUsers.map((userDoc) => queueNotificationEmail(db, userDoc.id, { title, body: product.title,
+            category: "store", tag: docId, eventId: docId, url: `/#/product/${product.id}` }).catch((error) => console.warn("[email] campaign queue failed", error))));
           announced += 1;
         }
         for (const update of diff.updatedProducts.slice(0, 10)) {
@@ -629,7 +645,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // re-covers the same window — late is recoverable, skipped is not.
     await runStateRef.set({ lastRunAt: now, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
 
-    return res.status(200).json({ ok: true, ...summary });
+    const email = await deliverNotificationEmails(db).catch((error) => {
+      console.warn("[email] notification delivery will retry", error);
+      return { sent: 0, failed: 1, skipped: 0 };
+    });
+    return res.status(200).json({ ok: true, ...summary, email });
   } catch (error) {
     return errorResponse(res, error, "Could not process scheduled push jobs.");
   }

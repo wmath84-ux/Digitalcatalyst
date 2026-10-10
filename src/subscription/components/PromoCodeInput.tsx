@@ -186,7 +186,7 @@ export default function PromoCodeInput({
         </motion.div>
       ) : (
         <div>
-          <label className="mb-1.5 block text-[11px] font-bold text-white/55">{label}</label>
+          <label htmlFor={inputId} className="mb-1.5 block text-[11px] font-bold text-white/55">{label}</label>
           <motion.div
             key={shake}
             animate={shake > 0 ? { x: [-4, 4, -3, 3, 0] } : undefined}
@@ -194,6 +194,7 @@ export default function PromoCodeInput({
             className="flex items-center gap-2"
           >
             <GlassInput
+              id={inputId}
               icon={<Icon className="h-4 w-4 shrink-0" />}
               type="text"
               value={value}

@@ -246,18 +246,10 @@ test("grantEntitlementsFromQuote marks the payment intent as verified", () => {
   assert.match(entitlementsCode, /PAYMENT_INTENTS_COLLECTION\s*=\s*"_paymentIntents"/);
 });
 
-test("grantEntitlementsFromQuote is idempotent — skips existing entitlement docs", () => {
-  // The writer must read each entitlement doc and skip the ones that
-  // already exist, rather than overwriting them. Match the behaviour,
-  // not one particular variable name: this previously pinned a literal
-  // `existing.exists`, so renaming the snapshot to `entitlementSnaps`
-  // failed the test while the guarantee was completely intact.
+test("grantEntitlementsFromQuote preserves active grants and verified replays, but a fresh paid order may replace expired access", () => {
   const codeOnly = stripComments(entitlements);
-  const skipExisting = /if\s*\(\s*[A-Za-z_$][\w$]*(?:\[[^\]]+\])?\.exists\s*\)\s*continue\s*;?/;
-  assert.match(codeOnly, skipExisting, "an existing entitlement doc must be skipped, not rewritten");
-  // The skip has to apply to the entitlement docs specifically.
-  assert.match(codeOnly, /entitlementSnaps\[index\]\.exists\s*\)\s*continue/);
-  // ...and to the legacy dual-write, or a replay would duplicate those.
+  assert.match(codeOnly, /const existing = entitlementSnaps\[index\]/);
+  assert.match(codeOnly, /existing\.exists && \(replayed \|\| isActiveOwnershipRecord\(existing\.data\(\), now\)\)\) continue/);
   assert.match(codeOnly, /legacyPurchaseSnaps\[index\]\.exists\s*\)\s*continue/);
 });
 

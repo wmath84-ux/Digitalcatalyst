@@ -20,7 +20,7 @@ const stubs = {
   CatalogContext: `import { products as catalog } from '${data}'; const params = new URLSearchParams(location.search); const products=params.has('fractional')?catalog.map(item=>item.id==='pdf'?{...item,price:123456.99,originalPrice:199999.99}:item):catalog; const purchasedIds = new Set(['course']); export const useCatalog = () => ({products:params.has('empty')||params.has('loading')?[]:products,purchasedIds,loading:params.has('loading'),error:null});`,
   BrandingContext: `export const useBranding = () => ({appName:'Digital Catalyst',logoUrl:'',homeGradientFrom:'#4f46e5',homeGradientTo:'#7c3aed'});`,
   useUnreadNotificationCount: `export const useUnreadNotificationCount = () => 0;`,
-  useCourseAccess: `const params = new URLSearchParams(location.search); const resolution = {hasFullProductAccess:false,ownedUpdateIds:new Set(),ownedModuleIds:new Set(params.has('moduleOwned')?['algebra']:[]),ownedResourceIds:new Set(params.has('resourceOwned')?['notebook']:[])}; export const useCourseAccess = () => ({resolution});`,
+  useCourseAccess: `const params = new URLSearchParams(location.search); const resolution = {hasFullProductAccess:params.has('owned'),ownedUpdateIds:new Set(params.has('updateOwned')?['revision-update']:[]),ownedModuleIds:new Set(params.has('moduleOwned')?['algebra']:[]),ownedResourceIds:new Set(params.has('resourceOwned')?['notebook']:[])}; export const useCourseAccess = () => ({resolution});`,
   useProductReviews: `const params = new URLSearchParams(location.search); const reviews=params.has('reviews')?Array.from({length:12},(_,index)=>({id:'review-'+index,productId:params.get('product')||'course',rating:5,comment:'Clear, practical lessons with helpful examples.',name:'Learner '+(index+1),initials:'L',date:'9 Oct 2026',avatarColor:'',verifiedPurchase:index===0,createdAtMs:1000-index})):[]; export const useHomepageProductReviews = () => ({reviews:[]}); export const usePublishedProductReviews = () => ({reviews});`,
   useHomeBanners: `export const useHomeBanners = () => ({banners:[],usingCustom:false});`,
   webPush: `export const ensureSavedWebPushSubscription = async () => {}; export const subscribeToWebPush = async () => {};`,
@@ -271,7 +271,7 @@ check("minimal PDP has one primary action, flat metadata/details, one descriptio
     assert.equal(await page.locator("[data-pdp-stack] .dc-simple-panel, [data-pdp-meta] .dc-scene-plate, [data-pdp-meta-item] svg").count(), 0);
     assert.equal(await page.getByText("Live catalog", { exact: true }).count(), 0);
     assert.equal(await page.getByText("Focused lessons and practical examples you can revisit at your own pace.", { exact: true }).count(), 1);
-    assert.deepEqual(await page.locator("[data-pdp-tabbar] button").allTextContents(), ["About", "Content"]);
+    assert.deepEqual(await page.locator("[data-pdp-tabbar] button").allTextContents(), ["About", "Content", "Paid"]);
     await assertContained(page, "[data-pdp-tabbar] button", "[data-pdp-tabbar]", `detail controls fit at ${width}`);
     await assertContained(page, "[data-pdp-buy] .dc-pdp-current-price, [data-pdp-buy] .dc-pdp-original-price", "[data-pdp-price-box]", `prices fit at ${width}`);
     const price = await page.locator("[data-pdp-buy] .dc-pdp-current-price").evaluate((node) => ({ text: node.textContent, size: parseFloat(getComputedStyle(node).fontSize), weight: Number(getComputedStyle(node).fontWeight) }));
@@ -328,13 +328,18 @@ check("owned, upgrade-owned and unavailable PDPs do not repeat purchase or libra
       assert.equal(await page.locator(primaryPurchase).textContent(), "Coming soon");
       assert.equal(await page.locator("output").textContent(), "");
     } else if (query === "owned&upgrade") {
-      assert.equal(await page.locator("[data-pdp-buy] .dc-pdp-current-price").textContent(), "₹249");
-      await page.locator("[data-pdp-upgrade-checkout]").click();
+      assert.equal(await page.locator("[data-pdp-library-primary]").count(), 1);
+      await page.locator("[data-pdp-remaining-paid]").click();
+      await page.locator('[data-pdp-paid-item="update:revision-update"] input').check();
+      await page.waitForFunction(() => document.querySelector('[data-pdp-order-summary][data-pricing-status="verified"]'));
+      assert.match(await page.locator("[data-pdp-summary-total]").textContent(), /₹249/);
+      await page.locator("[data-pdp-cta-button]").click();
       const checkout = await receipt(page);
       assert.equal(checkout.purchaseKind, "paid_update");
       assert.equal(checkout.updateId, "revision-update");
       assert.equal(checkout.finalPrice, 249);
-      await page.locator("[data-pdp-library-secondary]").click();
+      await page.locator('[data-pdp-paid-item="update:revision-update"] input').uncheck();
+      await page.locator("[data-pdp-library-primary]").click();
       assert.equal(await page.locator("output").textContent(), "course:course");
     } else {
       await page.locator("[data-pdp-library-primary]").click();
@@ -432,8 +437,10 @@ check("flat content rows support nested accordion navigation without losing the 
   await page.close();
   const owned = await open("page=pdp&options&owned", 320);
   await owned.page.getByRole("button", { name: "Content", exact: true }).click();
-  assert.equal(await owned.page.locator('[data-pdp-curriculum-module][data-paid="true"]').count(), 1);
-  assert.match(await owned.page.locator("[data-pdp-curriculum]").textContent(), /Paid upgrade/);
+  assert.equal(await owned.page.locator('[data-pdp-curriculum-module][data-paid="true"]').count(), 0);
+  await owned.page.getByRole("button", { name: "Paid", exact: true }).click();
+  assert.equal(await owned.page.locator('[data-pdp-paid-item="update:revision-update"]').count(), 1);
+  assert.match(await owned.page.locator("[data-pdp-paid-content]").textContent(), /Revision pack/);
   assert.deepEqual(owned.errors, []);
   await owned.page.close();
 });

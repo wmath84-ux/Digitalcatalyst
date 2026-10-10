@@ -1,3 +1,4 @@
+import { canonicalOwnershipScopes, isActiveOwnershipRecord, isFullProductPurchase, ownershipTimestamp } from "../../utils/contentOwnership";
 // src/hooks/useCourseAccess.ts
 //
 // Part 10 — the single React hook that wires the Part 10
@@ -32,7 +33,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
-import { subscribeShared, subscribeSharedDoc } from "../lib/sharedSnapshot";
+import { retrySharedCollection, retrySharedDoc, subscribeShared, subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { useAuth } from "../context/AuthContext";
 import { collectLibraryProductIds } from "../../utils/libraryOwnership";
 import {
@@ -77,11 +78,7 @@ const EMPTY_PLAN: SubscriptionPlanContext = {
   resourceIds: [],
 };
 
-const timestampMillis = (value: unknown) => {
-  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") return (value as { toMillis: () => number }).toMillis();
-  const number = Number(value || 0);
-  return Number.isFinite(number) ? number : 0;
-};
+const timestampMillis = ownershipTimestamp;
 
 interface UseCourseAccessArgs {
   /** The product to resolve access for. Required. */
@@ -110,6 +107,8 @@ interface UseCourseAccessResult {
   hasActiveSubscription: boolean;
   /** The active subscription record (or null). */
   subscription: SubscriptionRecordShape | null;
+  error: string | null;
+  retry: () => void;
 }
 
 interface EntitlementDoc {
@@ -121,7 +120,9 @@ interface EntitlementDoc {
   updateId?: string | null;
   status?: string;
   planId?: string | null;
+  source?: string;
   featureId?: string | null;
+  expiresAt?: number;
 }
 
 /**
@@ -133,16 +134,41 @@ interface EntitlementDoc {
  *   const { resolution, loading } = useCourseAccess({ product });
  *   if (resolution.accessibleModuleIds.has(moduleId)) ...
  */
-export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, skip = false }: UseCourseAccessArgs): UseCourseAccessResult => {
+export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = false }: UseCourseAccessArgs): UseCourseAccessResult => {
   const { user } = useAuth();
   const uid = user?.id || null;
+  const currentUid = useRef(uid);
+  currentUid.current = uid;
 
   const [entitlementDocs, setEntitlementDocs] = useState<EntitlementDoc[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionRecordShape | null>(null);
   const [legacyProductIds, setLegacyProductIds] = useState<string[]>([]);
-  const [legacyUpdateIds, setLegacyUpdateIds] = useState<string[]>([]);
+  const [legacyUpdateByProduct, setLegacyUpdateByProduct] = useState<Record<string, string[]>>({});
   const [legacyPurchaseProductIds, setLegacyPurchaseProductIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(Boolean(uid));
+  const [sync, setSync] = useState<{ uid: string | null; ready: string[]; errors: Record<string, string> }>({ uid: null, ready: [], errors: {} });
+  const [now, setNow] = useState(() => Date.now());
+  const sourceStatus = (source: string, error: unknown) => setSync((previous) => {
+    const current = previous.uid === uid ? previous : { uid, ready: [], errors: {} };
+    const errors = { ...current.errors };
+    if (error) errors[source] = "Your content access could not be verified. Check your connection and retry.";
+    else delete errors[source];
+    return { uid, ready: [...new Set([...current.ready, source])], errors };
+  });
+  const error = uid && !skip && sync.uid === uid ? Object.values(sync.errors)[0] || null : null;
+  const loading = Boolean(uid && !skip && !error && (sync.uid !== uid || sync.ready.length < 4));
+  const retry = () => {
+    if (!uid) return;
+    setSync({ uid, ready: [], errors: {} });
+    retrySharedCollection(`entitlements:${uid}`);
+    retrySharedDoc(`users/${uid}/subscription/current`);
+    retrySharedDoc(`users/${uid}`);
+    retrySharedCollection(`users/${uid}/purchases`);
+  };
+  useEffect(() => {
+    if (!uid || skip) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [uid, skip]);
 
   // Subscribe to canonical entitlements (Part 6 / Part 9).
   useEffect(() => {
@@ -158,6 +184,8 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
       `entitlements:${uid}`,
       () => query(collection(db, "entitlements"), where("uid", "==", uid)),
       (entries, err) => {
+        if (currentUid.current !== uid) return;
+        sourceStatus("entitlements", err);
         if (err) {
           console.warn("[useCourseAccess] entitlement sync failed", err);
           setEntitlementDocs([]);
@@ -168,22 +196,24 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
           // The doc id is `uid__<entitlementId>`; the
           // server-authoritative shape is on the doc body.
           return {
-            uid: String(data.uid || uid),
+            uid: String(data.uid || ""),
             productId: data.productId ?? null,
             kind: data.kind ? String(data.kind) : undefined,
             moduleId: data.moduleId ?? null,
             resourceId: data.resourceId ?? null,
             updateId: data.updateId ?? null,
-            status: data.status ? String(data.status) : undefined,
-            planId: data.planId ?? null,
+            status: data.status === undefined || data.status === null ? undefined : typeof data.status === "string" ? data.status : "invalid",
+            planId: data.planId ?? data.subscriptionPlanId ?? null,
+            source: data.source ? String(data.source) : undefined,
             featureId: data.featureId ?? null,
+            expiresAt: data.expiresAt === undefined || data.expiresAt === null ? undefined : timestampMillis(data.expiresAt),
           };
         });
         setEntitlementDocs(docs);
       },
     );
     return () => unsubscribe();
-  }, [uid]);
+  }, [uid, skip]);
 
   // Subscribe to the current subscription record (Part 9).
   useEffect(() => {
@@ -195,6 +225,8 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
       `users/${uid}/subscription/current`,
       () => doc(db, "users", uid, "subscription", "current"),
       (snapshotData, _exists, err) => {
+        if (currentUid.current !== uid) return;
+        sourceStatus("subscription", err);
         if (err) {
           console.warn("[useCourseAccess] subscription sync failed", err);
           setSubscription(null);
@@ -210,7 +242,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
           uid: String(data.uid || uid),
           planId: data.planId ? String(data.planId) : undefined,
           cycle: data.cycle === "yearly" ? "yearly" : "monthly",
-          status: data.status ? String(data.status) : undefined,
+          status: data.status === undefined || data.status === null ? undefined : typeof data.status === "string" ? data.status : "invalid",
           expiresAt: timestampMillis(data.expiresAt),
           activatedAt: timestampMillis(data.activatedAt),
           autoRenew: Boolean(data.autoRenew),
@@ -220,7 +252,7 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
       },
     );
     return () => unsubscribe();
-  }, [uid]);
+  }, [uid, skip]);
 
   // Subscribe to the legacy `users/{uid}` doc (Part 6
   // dual-writer) for `purchasedProductIds` +
@@ -228,32 +260,31 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
   useEffect(() => {
     if (skip || !uid) {
       setLegacyProductIds([]);
-      setLegacyUpdateIds([]);
+      setLegacyUpdateByProduct({});
       return undefined;
     }
     const unsubscribe = subscribeSharedDoc(
       `users/${uid}`,
       () => doc(db, "users", uid),
       (snapshotData, _exists, err) => {
+        if (currentUid.current !== uid) return;
+        sourceStatus("account", err);
         if (err) {
           console.warn("[useCourseAccess] user-doc sync failed", err);
           setLegacyProductIds([]);
-          setLegacyUpdateIds([]);
+          setLegacyUpdateByProduct({});
           return;
         }
         const data = snapshotData || {};
         const productIds = Array.isArray(data.purchasedProductIds) ? data.purchasedProductIds.map(String) : [];
         const updateMap = (data.purchasedProductUpdateIds || {}) as Record<string, unknown>;
-        const updateIds: string[] = [];
-        for (const value of Object.values(updateMap)) {
-          if (Array.isArray(value)) updateIds.push(...value.map(String));
-        }
+        const updateIds = Object.fromEntries(Object.entries(updateMap).filter(([, value]) => Array.isArray(value)).map(([id, value]) => [id, (value as unknown[]).map(String)]));
         setLegacyProductIds(productIds);
-        setLegacyUpdateIds(updateIds);
+        setLegacyUpdateByProduct(updateIds);
       },
     );
     return () => unsubscribe();
-  }, [uid]);
+  }, [uid, skip]);
 
   // Subscribe to the legacy `users/{uid}/purchases/*` subcollection
   // (Part 6 dual-writer) for base product ownership.
@@ -266,6 +297,8 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
       `users/${uid}/purchases`,
       () => collection(db, "users", uid, "purchases"),
       (entries, err) => {
+        if (currentUid.current !== uid) return;
+        sourceStatus("purchases", err);
         if (err) {
           console.warn("[useCourseAccess] purchases subcollection sync failed", err);
           setLegacyPurchaseProductIds([]);
@@ -277,47 +310,42 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
           // Per-Part 6: the base product purchase is stored
           // at docId = productId. We also look at
           // productDocumentId for the same.
-          const id = String(data.productDocumentId || item.id);
+          if (data.planId || data.subscriptionPlanId || data.source === "subscription") return;
+          if (!isActiveOwnershipRecord(data) || !isFullProductPurchase({ ...data, productDocumentId: data.productDocumentId || data.productId || item.id })) return;
+          const id = String(data.productDocumentId || data.productId || item.id);
           if (id) ids.add(id);
         });
         setLegacyPurchaseProductIds(Array.from(ids));
       },
     );
     return () => unsubscribe();
-  }, [uid]);
-
-  // The "loading" state is true until the entitlement +
-  // subscription listeners have all fired at least once.
-  useEffect(() => {
-    if (skip || !uid) {
-      setLoading(false);
-      return;
-    }
-    // We only flip `loading` false after a tick so the first
-    // render shows the loading skeleton. Subscriptions are
-    // immediate; a 50ms debounce is enough.
-    const timer = setTimeout(() => setLoading(false), 50);
-    return () => clearTimeout(timer);
-  }, [uid]);
+  }, [uid, skip]);
 
   // Compute the active subscription context (only when the
   // subscription is currently active).
   const planContext: SubscriptionPlanContext = useMemo(() => {
-    if (!subscription || !isSubscriptionRecordActive(subscription)) return EMPTY_PLAN;
+    if (!subscription || !isSubscriptionRecordActive(subscription, now)) return EMPTY_PLAN;
     return {
       productIds: subscription.includedProductIds || [],
-      moduleIds: (subscription.includedModuleKeys || []).map((key) => String(key).split(":").pop() || "").filter(Boolean),
+      moduleIds: (subscription.includedModuleKeys || []).filter((key) => {
+        const item = product as { id?: string; documentId?: string } | null;
+        return [item?.id, item?.documentId].filter(Boolean).some((id) => String(key).startsWith(`${id}:`));
+      }).map((key) => String(key).slice(String(key).indexOf(":") + 1)).filter(Boolean),
       resourceIds: [],
     };
-  }, [subscription]);
+  }, [subscription, product, now]);
 
   // Compute the resolution. Pure — recomputed only when the
   // inputs change.
   const resolution = useMemo<CourseAccessResolution>(() => {
-    if (!uid || !product) return EMPTY_RESOLUTION;
-    const entitlements = collectEntitlementOwnership(entitlementDocs);
-    const ownedProductIds = new Set<string>([...entitlements.ownedProductIds, ...legacyProductIds, ...legacyPurchaseProductIds]);
-    const ownedUpdateIds = new Set<string>([...entitlements.ownedUpdateIds, ...legacyUpdateIds]);
+    if (!uid || skip || !product || loading || error) return EMPTY_RESOLUTION;
+    const item = product as { id?: string; documentId?: string };
+    const aliases = new Set([item.id, item.documentId].filter(Boolean).map(String));
+    const canonical = entitlementDocs.filter((record) => record.uid === uid && record.productId && aliases.has(String(record.productId)));
+    const authority = canonicalOwnershipScopes(canonical);
+    const entitlements = collectEntitlementOwnership(canonical, now);
+    const ownedProductIds = new Set<string>([...entitlements.ownedProductIds, ...[...legacyProductIds, ...legacyPurchaseProductIds].filter((id) => !authority.full || !aliases.has(id))]);
+    const ownedUpdateIds = new Set<string>([...entitlements.ownedUpdateIds, ...[...aliases].flatMap((id) => legacyUpdateByProduct[id] || []).filter((id) => !authority.updates.has(id))]);
     return resolveCourseAccess({
       product: product as Parameters<typeof resolveCourseAccess>[0]["product"],
       ownedProductIds: Array.from(ownedProductIds),
@@ -328,19 +356,21 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
       subscriptionModuleIds: planContext.moduleIds,
       subscriptionResourceIds: planContext.resourceIds,
       requireBaseCourseForUpdate,
+      now,
     });
-  }, [uid, product, entitlementDocs, legacyProductIds, legacyPurchaseProductIds, legacyUpdateIds, planContext, requireBaseCourseForUpdate]);
+  }, [uid, product, entitlementDocs, legacyProductIds, legacyPurchaseProductIds, legacyUpdateByProduct, planContext, requireBaseCourseForUpdate, loading, error, now, skip]);
 
-  const hasActiveSubscription = Boolean(
-    subscription && isSubscriptionRecordActive(subscription),
-  );
+  const currentSubscription = uid && !skip && !loading && !error && subscription?.uid === uid ? subscription : null;
+  const hasActiveSubscription = Boolean(currentSubscription && isSubscriptionRecordActive(currentSubscription, now));
 
   return {
     resolution,
     loading,
     signedIn: Boolean(uid),
     hasActiveSubscription,
-    subscription,
+    subscription: currentSubscription,
+    error,
+    retry,
   };
 };
 
@@ -352,101 +382,59 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true, sk
  */
 export const useOwnedProducts = (): {
   ownedProductIds: string[];
-  /** Any active purchased scope, including individual modules/resources. */
+  /** Any active scope, including individual modules/resources. */
   accessibleProductIds: string[];
   permanentProductIds: string[];
   loading: boolean;
   error: string | null;
   signedIn: boolean;
+  retry: () => void;
 } => {
   const { user } = useAuth();
   const uid = user?.id || null;
   const currentUid = useRef(uid);
   currentUid.current = uid;
-  const [entitlementUid, setEntitlementUid] = useState<string | null>(null);
-  const [subscriptionUid, setSubscriptionUid] = useState<string | null>(null);
-  const [entitlementError, setEntitlementError] = useState<string | null>(null);
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
-  const [entitlementProductIds, setEntitlementProductIds] = useState<string[]>([]);
-  const [scopedProductIds, setScopedProductIds] = useState<string[]>([]);
-  const [subscriptionProductIds, setSubscriptionProductIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(Boolean(uid));
-
+  const [entitlements, setEntitlements] = useState<{ uid: string | null; records: Record<string, unknown>[]; error: string | null }>({ uid: null, records: [], error: null });
+  const [membership, setMembership] = useState<{ uid: string | null; record: SubscriptionRecordShape | null; error: string | null }>({ uid: null, record: null, error: null });
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!uid) {
-      setEntitlementProductIds([]);
-      setScopedProductIds([]);
-      setLoading(false);
-      return undefined;
-    }
-    setLoading(true);
-    setEntitlementError(null);
-    setSubscriptionError(null);
-    setEntitlementProductIds([]);
-    setScopedProductIds([]);
-    // Same shared listener as `useCourseAccess` above — the Profile library
-    // and an open course player no longer bill the entitlements query twice.
-    const unsubscribe = subscribeShared(
-      `entitlements:${uid}`,
-      () => query(collection(db, "entitlements"), where("uid", "==", uid)),
-      (entries, err) => {
-        if (currentUid.current !== uid) return;
-        setEntitlementUid(uid);
-        if (err) {
-          setEntitlementError("Purchased access could not be refreshed. Please retry.");
-          setLoading(false);
-          return;
-        }
-        setEntitlementError(null);
-        const ids = collectLibraryProductIds(entries.map((item) => item.data));
-        setEntitlementProductIds(ids.full);
-        setScopedProductIds(ids.any);
-        setLoading(false);
-
-      },
-    );
-    return () => unsubscribe();
+    if (!uid) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
   }, [uid]);
-
-  // Subscription products are time-limited ownership, but they must still be
-  // visible in the learner's library and open without showing another buy
-  // button while the membership is active.
   useEffect(() => {
-    if (!uid) {
-      setSubscriptionProductIds([]);
-      return undefined;
-    }
-    return subscribeSharedDoc(
-      `users/${uid}/subscription/current`,
-      () => doc(db, "users", uid, "subscription", "current"),
-      (snapshotData, exists, err) => {
-        if (currentUid.current !== uid) return;
-        setSubscriptionUid(uid);
-        if (err) {
-          setSubscriptionError("Membership access could not be refreshed. Please retry.");
-          setSubscriptionProductIds([]);
-          return;
-        }
-        setSubscriptionError(null);
-        const data = snapshotData || {};
-        const record: SubscriptionRecordShape = {
-          status: data.status ? String(data.status) : undefined,
-          expiresAt: timestampMillis(data.expiresAt),
-        };
-        setSubscriptionProductIds(
-          exists && isSubscriptionRecordActive(record) && Array.isArray(data.includedProductIds)
-            ? data.includedProductIds.map(String)
-            : [],
-        );
-      },
-    );
+    if (!uid) return;
+    return subscribeShared(`entitlements:${uid}`, () => query(collection(db, "entitlements"), where("uid", "==", uid)), (entries, err) => {
+      if (currentUid.current !== uid) return;
+      setEntitlements({ uid, records: err ? [] : entries.map((item) => item.data).filter((data) => data.uid === uid),
+        error: err ? "Purchased access could not be refreshed. Please retry." : null });
+    });
   }, [uid]);
-
-  const ownedProductIds = useMemo(
-    () => Array.from(new Set([...(entitlementUid === uid ? entitlementProductIds : []), ...(subscriptionUid === uid ? subscriptionProductIds : [])])),
-    [entitlementProductIds, subscriptionProductIds, entitlementUid, subscriptionUid, uid],
-  );
-
-  const accessibleProductIds = useMemo(() => Array.from(new Set([...ownedProductIds, ...(entitlementUid === uid ? scopedProductIds : [])])), [ownedProductIds, scopedProductIds, entitlementUid, uid]);
-  return { ownedProductIds, accessibleProductIds, permanentProductIds: entitlementUid === uid ? entitlementProductIds : [], loading: Boolean(uid) && (loading || entitlementUid !== uid || subscriptionUid !== uid), error: entitlementError || subscriptionError, signedIn: Boolean(uid) };
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeSharedDoc(`users/${uid}/subscription/current`, () => doc(db, "users", uid, "subscription", "current"), (data, exists, err) => {
+      if (currentUid.current !== uid) return;
+      setMembership({ uid, record: !err && exists && data && (!data.uid || data.uid === uid) ? {
+        status: data.status === undefined || data.status === null ? undefined : typeof data.status === "string" ? data.status : "invalid", expiresAt: timestampMillis(data.expiresAt),
+        includedProductIds: Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : [],
+        includedModuleKeys: Array.isArray(data.includedModuleKeys) ? data.includedModuleKeys.map(String) : [],
+      } : null, error: err ? "Membership access could not be refreshed. Please retry." : null });
+    });
+  }, [uid]);
+  const error = uid ? (entitlements.uid === uid ? entitlements.error : null) || (membership.uid === uid ? membership.error : null) : null;
+  const loading = Boolean(uid && !error && (entitlements.uid !== uid || membership.uid !== uid));
+  const ready = Boolean(uid && !loading && !error);
+  const purchased = useMemo(() => collectLibraryProductIds(ready ? entitlements.records : [], now), [entitlements, now, ready]);
+  const subscription = ready && isSubscriptionRecordActive(membership.record, now) ? membership.record : null;
+  const ownedProductIds = [...new Set([...purchased.full, ...(subscription?.includedProductIds || [])])];
+  const scopedMembershipProducts = (subscription?.includedModuleKeys || []).map((key) => String(key).split(":")[0]).filter(Boolean);
+  const accessibleProductIds = [...new Set([...ownedProductIds, ...purchased.any, ...scopedMembershipProducts])];
+  const retry = () => {
+    if (!uid) return;
+    setEntitlements({ uid: null, records: [], error: null });
+    setMembership({ uid: null, record: null, error: null });
+    retrySharedCollection(`entitlements:${uid}`);
+    retrySharedDoc(`users/${uid}/subscription/current`);
+  };
+  return { ownedProductIds, accessibleProductIds, permanentProductIds: purchased.full, loading, error, signedIn: Boolean(uid), retry };
 };

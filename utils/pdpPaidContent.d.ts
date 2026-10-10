@@ -1,0 +1,30 @@
+import type { Product } from "../src/data/products";
+import type { CourseAccessResolution, CourseAccessSource } from "./courseAccess";
+export type PaidContentKind = "selected_modules" | "selected_resources" | "paid_update";
+export type PaidContentRow = {
+  key: string;
+  id: string;
+  kind: PaidContentKind;
+  title: string;
+  description: string;
+  details: string[];
+  regularPrice: number | null;
+  effectivePrice: number | null;
+  estimated: boolean;
+  includedInBase: boolean;
+  requiresBase: boolean;
+  selectable: boolean;
+  acquiredCount: number;
+  contentCount: number;
+  owned: boolean;
+  ownershipLabel: string;
+  accessSource: CourseAccessSource | "included";
+  prerequisites?: string[];
+  accessNote?: string;
+};
+export function buildPdpPaidContent(input: {
+  product: Product;
+  isProductOwned?: boolean;
+  ownedUpdateIds?: ReadonlySet<string> | readonly string[];
+  resolution?: Partial<CourseAccessResolution>;
+}): { available: PaidContentRow[]; owned: PaidContentRow[]; ownedModuleIds: Set<string>; ownedResourceIds: Set<string> };

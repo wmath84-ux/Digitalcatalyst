@@ -1,3 +1,5 @@
+import { useUserPreferences } from "../settings/useUserPreferences";
+import { notificationPolicy } from "../../utils/userPreferences";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
@@ -41,7 +43,7 @@ import {
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, CheckIcon } from "./icons";
-import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
+import { isWebPushSupported } from "../../utils/webPush";
 import { ensureExactAlarmPermission, getExactAlarmPermissionStatus, isAndroidNative } from "../utils/capacitorBridge";
 
 function ExactAlarmCard() {
@@ -366,6 +368,7 @@ export default function NotificationsPage({
   onNavigateFooter,
 }: NotificationsPageProps) {
   const { user } = useAuth();
+  const accountSettings = useUserPreferences(user?.id);
   const viewerKey = user?.id || "guest";
   const [items, setItems] = useState<SiteNotification[]>(() => loadSiteNotifications(viewerKey));
   const [activeFilter, setActiveFilter] = useState<NotificationFilterKey>("all");
@@ -404,15 +407,18 @@ export default function NotificationsPage({
     }
   };
 
+  const allowedItems = useMemo(() => items.filter((item) => notificationPolicy(accountSettings.preferences, { category: item.category,
+    type: item.category === "store" ? "product-created" : undefined }).inbox), [items, accountSettings.preferences]);
+
   const filterCounts = useMemo(() => {
-    const counts: Record<NotificationFilterKey, number> = { all: items.length, product: 0, mayday: 0, subscription: 0, updates: 0 };
-    items.forEach((item) => {
+    const counts: Record<NotificationFilterKey, number> = { all: allowedItems.length, product: 0, mayday: 0, subscription: 0, updates: 0 };
+    allowedItems.forEach((item) => {
       counts[getNotificationFilterKey(item)] += 1;
     });
     return counts;
-  }, [items]);
+  }, [allowedItems]);
 
-  const visibleItems = useMemo(() => filterNotifications(items, activeFilter), [activeFilter, items]);
+  const visibleItems = useMemo(() => filterNotifications(allowedItems, activeFilter), [activeFilter, allowedItems]);
 
   // ── Incremental rendering (perf pass 2026-09-08) ────────────────────────
   // Every card is a framer-motion element inside an AnimatePresence, so the
@@ -435,26 +441,15 @@ export default function NotificationsPage({
     setItems(loadSiteNotifications(viewerKey));
   }, [viewerKey]);
 
+  // Device permission and account consent are managed together on Settings.
+  // Opening an inbox must never silently re-enable a saved opt-out.
+  const enableNotifications = () => { window.location.hash = "#/settings"; };
   useEffect(() => {
-    if (!user) return;
-    void ensureSavedWebPushSubscription(user.id).then(() => {
-      if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
-    });
-  }, [user]);
-
-  const enableNotifications = async () => {
-    if (!user) return;
-    await ensureSavedWebPushSubscription(user.id);
-    if (typeof window !== "undefined" && isWebPushSupported()) {
-      const permission = window.Notification.permission;
-      setPushPermission(permission);
-      if (permission === "granted") {
-        toast({ title: "Notifications enabled", description: "You'll now receive alerts on this device.", variant: "success" });
-      } else if (permission === "denied") {
-        toast({ title: "Notifications blocked", description: "Enable them in your browser's site settings.", variant: "warning" });
-      }
-    }
-  };
+    const refresh = () => setPushPermission(isWebPushSupported() ? window.Notification.permission : "unsupported");
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
 
   // Every notification is generated on the SERVER by the real-time push
   // system (renewals, My Day activity reminders, product unlocks, new-product
@@ -486,7 +481,7 @@ export default function NotificationsPage({
     saveSiteNotifications(viewerKey, items);
   }, [items, viewerKey]);
 
-  const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+  const unread = useMemo(() => allowedItems.filter((item) => !item.read).length, [allowedItems]);
   const markAllRead = () => {
     const remoteIds = items.filter((item) => !item.read && item.remoteNotificationId).map((item) => item.remoteNotificationId!);
     setItems((current) => current.map((item) => ({ ...item, read: true })));
@@ -582,18 +577,18 @@ export default function NotificationsPage({
 
         <main data-notifications-content data-footer-nav-space className="flex-1 overflow-y-auto md:px-8">
 
-          {pushPermission === "default" && (
+          {(pushPermission === "default" || !accountSettings.preferences.push) && (
             <GlassCard className="mx-4 mt-1" contentClassName="flex items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-white">Get alerts on your phone</p>
-                <p className="mt-0.5 text-xs text-white/55">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
+                <p className="text-sm font-bold text-white">{accountSettings.preferences.push ? "Connect this device" : "Push is turned off"}</p>
+                <p className="mt-0.5 text-xs text-white/55">Manage your account preference and this device's permission in Settings.</p>
               </div>
               <button
                 type="button"
                 onClick={() => void enableNotifications()}
                 className="shrink-0 rounded-full bg-indigo-600 px-3 py-2 text-xs font-black text-white transition hover:bg-indigo-500"
               >
-                Enable
+                Settings
               </button>
             </GlassCard>
           )}

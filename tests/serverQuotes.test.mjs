@@ -203,7 +203,7 @@ test("computeOwnedEntitlementIds collects product ids, update ids, and entitleme
   ];
   const ids = computeOwnedEntitlementIds(docs);
   assert.ok(ids.has("p1"));
-  assert.ok(ids.has("p2"));
+  assert.ok(!ids.has("p2"), "an update names its parent but never grants the full product");
   assert.ok(ids.has("p2__update__u1"));
   assert.ok(ids.has("res_1"));
 });
@@ -794,4 +794,13 @@ test("subscription selection with no products (feature-only) still builds a quot
   assert.equal(out.ok, true, out.reason || "");
   assert.equal(out.quote.cashPayable, 49900);
   assert.equal(out.quote.verifiedLineItems.length, 2);
+});
+
+
+test("full-product published zero is valid, junk is not free, and sale cannot exceed MRP", () => {
+  const selection = { purchaseKind: "full_product", productIds: ["course"], moduleIds: [], resourceIds: [], featureIds: [], couponCode: null };
+  const calculate = (product) => buildQuote({ uid: "buyer", selection, products: new Map([["course", { id: "course", title: "Course", isVisible: true, inStock: true, ...product }]]), quoteId: "q", now: Date.now() });
+  assert.equal(calculate({ price: 0 }).quote.cashPayable, 0); assert.equal(calculate({ isFree: true }).quote.cashPayable, 0);
+  assert.equal(calculate({ price: "missing" }).ok, false); assert.equal(calculate({}).ok, false);
+  assert.equal(calculate({ price: 300, salePrice: 999 }).quote.cashPayable, 30000);
 });

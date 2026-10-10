@@ -1,0 +1,11 @@
+export type PreferenceKey = "push" | "email" | "promotions" | "profileVisible" | "shareActivity";
+export type Preferences = Record<PreferenceKey, boolean>;
+export const PREFERENCE_KEYS: readonly PreferenceKey[];
+export const DEFAULT_PREFERENCES: Readonly<Preferences>;
+export function normalizeUserPreferences(input: unknown, options?: { requireActivityConsent?: boolean }): Preferences;
+export function validatePreferencePatch(input: unknown): { key: PreferenceKey; value: boolean };
+export type NotificationPolicyPayload = { marketing?: boolean; type?: string; category?: string; tag?: string };
+export function isPromotionalNotification(payload?: NotificationPolicyPayload): boolean;
+export function notificationPolicy(input: unknown, payload?: NotificationPolicyPayload): { inbox: boolean; push: boolean; email: boolean; publicProfile: boolean; publicActivity: boolean };
+export function publicProfileIdentity(uid: string, data?: Record<string, unknown>): { uid: string; name: string; photoURL?: string } | null;
+export function publicLearningSummary(records: unknown[]): { coursesStarted: number; completedItems: number };

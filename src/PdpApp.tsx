@@ -1,3 +1,4 @@
+import { commerceContentTree } from "../utils/contentOwnership";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
@@ -15,9 +16,11 @@ import { PopoverItem } from "./components/ui/glass-popover";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
-import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
+import { buildCheckoutSelection, computeSummary, normalizeModuleSelectionIds } from "../utils/pdpSelection";
 import { PaymentButton } from "./components/ui/PaymentButton";
-import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
+import PdpPaidContent from "./components/pdp/PdpPaidContent";
+import { buildPdpPaidContent, type PaidContentRow } from "../utils/pdpPaidContent";
+import PdpPurchaseBuilder, { type PdpSelectionRequest } from "./components/pdp/PdpPurchaseBuilder";
 import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./components/pdp/PdpSelectionSummary";
 import { pdpSelectionKey, usePdpQuote } from "./pdp/usePdpQuote";
 import { paiseToRupees } from "./utils/money";
@@ -60,16 +63,17 @@ interface ProductDetailProps {
   ownedUpdateIds?: Set<string>;
 }
 
-type DetailTab = "Description" | "Curriculum";
+type DetailTab = "Description" | "Curriculum" | "Paid";
 
 type CurriculumModule = {
   id: string;
   title: string;
   paid?: boolean;
+  includeInBundle?: boolean;
   paidUpdateId?: string;
   paidUpdateTitle?: string;
   paidUpdatePrice?: string;
-  resources?: Array<{ id: string; name: string; type: string }>;
+  resources?: Array<{ id: string; name: string; type: string; includeInBundle?: boolean; paidUpdateId?: string }>;
   modules?: CurriculumModule[];
 };
 
@@ -223,7 +227,7 @@ function PremiumProductContent({
   purchasedIds,
   ownedUpdateIds,
 }: ProductDetailProps & { product: Product }) {
-  const { resolution } = useCourseAccess({ product });
+  const { resolution, loading: accessLoading, error: accessError, retry: retryAccess } = useCourseAccess({ product });
   const { user } = useAuth();
   const { appName } = useBranding();
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
@@ -260,10 +264,14 @@ function PremiumProductContent({
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<PdpSelectionSnapshot | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<(PdpSelectionSnapshot & { viewerId: string | null }) | null>(null);
+  const [paidSelectionRequest, setPaidSelectionRequest] = useState<PdpSelectionRequest | undefined>();
+  const activePaidSelectionRequest = paidSelectionRequest?.viewerId === (user?.id || null) && paidSelectionRequest.productId === product.id ? paidSelectionRequest : undefined;
+  useEffect(() => { setSelectedOrder(null); setPaidSelectionRequest(undefined); }, [product.id, user?.id]);
   const handleSelectionChange = useCallback((next: PdpSelectionSnapshot) => {
-    setSelectedOrder((previous) => previous && JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
-  }, []);
+    const scoped = { ...next, viewerId: user?.id || null };
+    setSelectedOrder((previous) => previous && JSON.stringify(previous) === JSON.stringify(scoped) ? previous : scoped);
+  }, [user?.id]);
   const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -367,9 +375,9 @@ function PremiumProductContent({
     || Boolean(product.documentId && ownedKeys.has(product.documentId))
     || resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
-  const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
-  const ownedModuleIds = resolution.ownedModuleIds;
-  const ownedResourceIds = resolution.ownedResourceIds;
+  const paidContent = useMemo(() => buildPdpPaidContent({ product, isProductOwned, ownedUpdateIds: updates, resolution }), [product, isProductOwned, updates, resolution]);
+  const ownedModuleIds = paidContent.ownedModuleIds;
+  const ownedResourceIds = paidContent.ownedResourceIds;
   const identity = getProductPresentation(product);
   const instructorLabel = getProductInstructorLabel(product);
   const related = useMemo(() => getRelatedProducts(product, products, 12), [product, products]);
@@ -378,10 +386,8 @@ function PremiumProductContent({
     () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules as CurriculumModule[],
     [collectedModules],
   );
-  const { modules, mode: curriculumMode } = useMemo(
-    () => filterCurriculumForPdp(collectedModules as unknown as CurriculumModule[], { isProductOwned, ownedUpdateIds: updates }) as { modules: CurriculumModule[]; mode: CurriculumViewMode },
-    [collectedModules, isProductOwned, updates],
-  );
+  const modules = includedCurriculum;
+  const curriculumMode: CurriculumViewMode = "included";
   const { modulesCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);
 
   useEffect(() => {
@@ -400,20 +406,26 @@ function PremiumProductContent({
   const unavailable = product.availableForSale === false && !isProductOwned;
 
   const defaultOrder = useMemo<PdpSelectionSnapshot>(() => {
-    const update = isProductOwned ? availablePaidUpdates[0] : undefined;
-    const mode = update ? "paid_update" : "full_product";
-    const selectedIds = new Set(update ? [update.id] : []);
-    const selection = buildCheckoutSelection({ product, mode, selectedIds, paidUpdateId: update?.id || null, returnRoute: `#/product/${encodeURIComponent(product.id)}` });
-    const summary = computeSummary({ product: isFreeProduct(product) ? { ...product, isFree: true } : product, mode, selectedIds, modules: product.canonicalModules || [], paidUpdates: product.paidUpdates || [], isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds });
+    const mode = "full_product";
+    const selection = buildCheckoutSelection({ product, mode, selectedIds: [], returnRoute: `#/product/${encodeURIComponent(product.id)}` });
+    const summary = computeSummary({ product: isFreeProduct(product) ? { ...product, isFree: true } : product, mode, selectedIds: [], modules: product.canonicalModules || [], paidUpdates: product.paidUpdates || [], isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds });
     return { selection, summary, valid: summary.selectedCount > 0, rules: [] };
-  }, [product, isProductOwned, availablePaidUpdates, updates, ownedModuleIds, ownedResourceIds]);
-  const order = !isProductOwned && selectedOrder ? selectedOrder : defaultOrder;
+  }, [product, isProductOwned, updates, ownedModuleIds, ownedResourceIds]);
+  const selectedForThisProduct = selectedOrder?.viewerId === (user?.id || null) && selectedOrder?.selection.productIds.some((id) => id === product.id || id === product.documentId);
+  const order = selectedOrder && selectedForThisProduct ? selectedOrder : defaultOrder;
+  const requestedPaidSelection = activePaidSelectionRequest ? buildCheckoutSelection({
+    product, mode: activePaidSelectionRequest.mode, selectedIds: activePaidSelectionRequest.ids,
+    paidUpdateId: activePaidSelectionRequest.mode === "paid_update" ? activePaidSelectionRequest.ids[0] || null : null,
+    returnRoute: `#/product/${encodeURIComponent(product.id)}`,
+  }) : null;
+  const paidSelection = requestedPaidSelection || order.selection;
+  const applyingPaidSelection = Boolean(activePaidSelectionRequest?.ids.length && requestedPaidSelection && pdpSelectionKey(requestedPaidSelection) !== pdpSelectionKey(order.selection));
   const purchaseMode = order.summary.mode;
   const quoteSelection = { ...order.selection, productIds: [product.documentId || product.id] };
-  const pricing = usePdpQuote({ selection: quoteSelection, uid: user?.id || null, enabled: Boolean(user) && order.valid && !unavailable && (!isProductOwned || Boolean(availablePaidUpdates[0])), chargeable: order.summary.effectiveSubtotal > 0 });
-  const pricingView: PdpPricingView = { ...pricing, selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }) };
+  const pricing = usePdpQuote({ selection: quoteSelection, uid: user?.id || null, enabled: Boolean(user) && !accessLoading && !accessError && !applyingPaidSelection && order.valid && !unavailable && (!isProductOwned || purchaseMode !== "full_product"), chargeable: order.summary.effectiveSubtotal > 0 });
+  const pricingView: PdpPricingView = { ...pricing, ...(user && (accessLoading || applyingPaidSelection) ? { status: "loading" as const, quote: null } : {}), ...(accessError ? { status: "error" as const, error: accessError } : {}), selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }) };
   const pricingBusy = pricing.status === "loading" || pricing.applying;
-  const pricingBlocked = pricingBusy || pricing.status === "error";
+  const pricingBlocked = pricingBusy || pricing.status === "error" || Boolean(user && (accessLoading || accessError || applyingPaidSelection));
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
     const withCoupon = { ...selection, productIds: [product.documentId || product.id], couponCode: summary.effectiveSubtotal > 0 ? pricing.appliedCode : null };
     if (user && (!pricing.quote || pdpSelectionKey(withCoupon) !== pricingView.selectionKey)) return;
@@ -422,10 +434,32 @@ function PremiumProductContent({
     else if (selection.purchaseKind === "full_product") onCheckout(payable, withCoupon.couponCode);
   };
 
-  // Directly buy the first available paid upgrade — used once the base course
-  // is owned and the "Select course modules" section is no longer shown.
-  const handleBuyUpgrade = () => {
-    if (availablePaidUpdates[0]) handlePreview(order.selection, order.summary);
+  const choosePaidContent = (row: PaidContentRow, checked: boolean) => {
+    if (!row.selectable || row.owned || unavailable) return;
+    const currentIds = row.kind === paidSelection.purchaseKind ? row.kind === "paid_update" ? [paidSelection.updateId].filter((id): id is string => Boolean(id))
+      : row.kind === "selected_modules" ? paidSelection.moduleIds : paidSelection.resourceIds : [];
+    const ids = new Set(currentIds);
+    if (row.kind === "paid_update") ids.clear();
+    if (checked) ids.add(row.id); else ids.delete(row.id);
+    const normalized = row.kind === "selected_modules" ? normalizeModuleSelectionIds([...ids], commerceContentTree(product), { isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds }) : ids;
+    if (!normalized.size) setSelectedOrder(null);
+    setPaidSelectionRequest((current) => ({ productId: product.id, viewerId: user?.id || null, revision: (current?.revision || 0) + 1, mode: row.kind, ids: [...normalized] }));
+  };
+  useEffect(() => {
+    if (!activePaidSelectionRequest || accessLoading || accessError) return;
+    const acquired = activePaidSelectionRequest.mode === "selected_modules" ? ownedModuleIds
+      : activePaidSelectionRequest.mode === "selected_resources" ? ownedResourceIds
+      : new Set(paidContent.owned.filter((row) => row.kind === "paid_update").map((row) => row.id));
+    const remaining = activePaidSelectionRequest.ids.filter((id) => !acquired.has(id));
+    if (remaining.length === activePaidSelectionRequest.ids.length) return;
+    const normalized = activePaidSelectionRequest.mode === "selected_modules" ? [...normalizeModuleSelectionIds(remaining, commerceContentTree(product), { isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds })] : remaining;
+    if (!normalized.length) setSelectedOrder(null);
+    setPaidSelectionRequest({ ...activePaidSelectionRequest, ids: normalized, revision: activePaidSelectionRequest.revision + 1 });
+  }, [activePaidSelectionRequest, accessLoading, accessError, ownedModuleIds, ownedResourceIds, paidContent, product, isProductOwned, updates]);
+  const reviewPaidSelection = () => {
+    const section = document.getElementById("pdp-purchase-review");
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+    section?.focus({ preventScroll: true });
   };
 
   const copyLink = async () => {
@@ -480,7 +514,7 @@ function PremiumProductContent({
     if (!unavailable && !pricingBlocked) handlePreview(order.selection, order.summary);
   };
   const productIsFree = isFreeProduct(product);
-  const canShowCouponInput = !isProductOwned && !unavailable && order.valid && shouldShowCouponInput({
+  const canShowCouponInput = (!isProductOwned || order.selection.purchaseKind !== "full_product") && !unavailable && order.valid && shouldShowCouponInput({
     purchaseKind: order.selection.purchaseKind,
     payablePaise: Math.round(order.summary.effectiveSubtotal * 100),
     isFree: order.selection.purchaseKind === "full_product" && productIsFree,
@@ -585,9 +619,8 @@ function PremiumProductContent({
   const includedItems = buildIncludedSummaries(includedCurriculum, modulesCount);
   const ratingSummary = getProductRatingSummary(product, productReviews);
   const highlights = [...new Set((product.features || []).map((feature) => feature.trim()).filter(Boolean))];
-  const hasPurchaseBuilder = !isProductOwned && !unavailable && Boolean(product.canonicalModules?.length);
-  const firstAvailableUpdate = availablePaidUpdates[0];
-  const updateBenefits = firstAvailableUpdate ? buildUpdateBenefits(firstAvailableUpdate) : [];
+  const hasScopedSelection = (purchaseMode !== "full_product" && order.summary.selectedCount > 0) || Boolean(activePaidSelectionRequest?.ids.length);
+  const hasPurchaseBuilder = !unavailable && Boolean(product.canonicalModules?.length || product.courseContent?.length || product.paidUpdates?.length) && (!isProductOwned || hasScopedSelection);
 
   if (showReviewsPage) {
     return (
@@ -700,43 +733,27 @@ function PremiumProductContent({
             </dl>
           )}
 
-          {isProductOwned ? (
-            firstAvailableUpdate ? (
-              <section data-pdp-upgrade-box className="dc-pdp-purchase">
-                <p className="dc-pdp-type-label">Update available</p>
-                <h2 className="dc-pdp-update-title">{firstAvailableUpdate.title}</h2>
-                {firstAvailableUpdate.description?.trim() ? <p className="dc-pdp-selection-note">{firstAvailableUpdate.description.trim()}</p> : null}
-                {updateBenefits.length > 0 ? <p className="dc-pdp-selection-note">Includes {updateBenefits.join(" · ")}</p> : null}
-                <PdpSelectionSummary snapshot={order} pricing={pricingView} />
-                <PaymentButton block className="dc-pdp-primary" icon={null} disabled={pricingBlocked} onClick={handleBuyUpgrade} data-pdp-upgrade-checkout="" label="Get update" />
-                {onOpenCourse ? <button type="button" data-pdp-library-secondary className="dc-pdp-text-action" onClick={() => onOpenCourse(product)}>{identity.libraryAction}</button> : null}
-              </section>
-            ) : onOpenCourse ? (
-              <button type="button" data-pdp-library-primary onClick={() => onOpenCourse(product)} className="dc-pdp-library-cta">{identity.libraryAction}</button>
-            ) : null
+          {isProductOwned && !hasScopedSelection ? (
+            <section data-pdp-owned-access>
+              {onOpenCourse ? <button type="button" data-pdp-library-primary onClick={() => onOpenCourse(product)} className="dc-pdp-library-cta">{identity.libraryAction}</button> : null}
+              {paidContent.available.length ? <button type="button" data-pdp-remaining-paid className="dc-pdp-text-action" onClick={() => { setActiveTab("Paid"); document.querySelector("[data-pdp-details]")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{paidContent.available.length} paid item{paidContent.available.length === 1 ? "" : "s"} not yet owned · View Paid</button> : null}
+            </section>
           ) : (
-            <section data-pdp-price-box className="dc-pdp-purchase">
-              {hasPurchaseBuilder ? (
-                <PdpPurchaseBuilder
-                  compact
-                  product={product}
-                  isProductOwned={isProductOwned}
-                  ownedUpdateIds={updates}
-                  ownedModuleIds={ownedModuleIds}
-                  ownedResourceIds={ownedResourceIds}
-                  returnRoute={`#/product/${encodeURIComponent(product.id)}`}
-                  onPreview={handlePreview}
-                  onSelectionChange={handleSelectionChange}
-                  pricing={pricingView}
-                  couponEntry={couponEntry}
-                />
-              ) : (
-                <>
-                  {couponEntry}
-                  <PdpSelectionSummary snapshot={order} pricing={pricingView} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
-                  <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
-                </>
-              )}
+            <section data-pdp-price-box id="pdp-purchase-review" tabIndex={-1} className="dc-pdp-purchase">
+              {hasPurchaseBuilder ? <PdpPurchaseBuilder
+                key={`${product.id}:${user?.id || "guest"}`}
+                compact product={product} isProductOwned={isProductOwned}
+                ownedUpdateIds={updates} ownedModuleIds={ownedModuleIds} ownedResourceIds={ownedResourceIds}
+                selectionRequest={activePaidSelectionRequest}
+                returnRoute={`#/product/${encodeURIComponent(product.id)}`}
+                onPreview={handlePreview} onSelectionChange={handleSelectionChange}
+                pricing={pricingView} couponEntry={couponEntry}
+              /> : <>
+                {couponEntry}
+                <PdpSelectionSummary snapshot={order} pricing={pricingView} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
+                <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
+              </>}
+              {accessError ? <p className="dc-pdp-pricing-error">{accessError} <button type="button" className="dc-pdp-text-action" onClick={retryAccess}>Retry access check</button></p> : null}
               {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not available for purchase yet.</p> : null}
             </section>
           )}
@@ -769,7 +786,10 @@ function PremiumProductContent({
         </section>
 
         <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
-          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule}
+            paidContent={<PdpPaidContent available={paidContent.available} owned={paidContent.owned} selection={paidSelection}
+              signedIn={Boolean(user)} loading={accessLoading} error={accessError || undefined} onRetry={retryAccess} unavailable={unavailable}
+              onChoose={choosePaidContent} onReview={reviewPaidSelection} />} />
           <ReviewsCard
             mode="preview"
             product={product}
@@ -876,15 +896,6 @@ function formatResourceType(type: string): string {
   return labels[normalized] || normalized.replace(/[_-]+/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-function buildUpdateBenefits(update: NonNullable<Product["paidUpdates"]>[number]): string[] {
-  const modules = update.includedModuleIds?.length || 0;
-  const resources = update.includedResourceIds?.length || 0;
-  return [
-    modules > 0 ? `${modules} module${modules === 1 ? "" : "s"}` : null,
-    resources > 0 ? `${resources} resource${resources === 1 ? "" : "s"}` : null,
-  ].filter((item): item is string => Boolean(item));
-}
-
 const GENERIC_PRODUCT_IMAGE = /^(?:hero(?:-main|-\d+)?|related-\d+|gallery-\d+|product-(?:pdf|video|ebook|live))$/i;
 const TOPIC_IMAGE_RULES: Array<{ file: RegExp; product: RegExp }> = [
   { file: /chemical[-_ ]reactions?/i, product: /\bchemical\s+reactions?\b/i },
@@ -974,10 +985,11 @@ function ProductDescription({ text }: { text: string }) {
   );
 }
 
-function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
+function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule, paidContent }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void; paidContent: import("react").ReactNode }) {
   const tabs: { value: DetailTab; label: string }[] = [
     { value: "Description", label: "About" },
     { value: "Curriculum", label: "Content" },
+    { value: "Paid", label: "Paid" },
   ];
   return (
     <section data-pdp-details>
@@ -1014,6 +1026,7 @@ function DetailsCard({ product, modules, curriculumMode, includedItems, highligh
             </div>
           )
         )}
+        {tab === "Paid" && paidContent}
       </div>
     </section>
   );
@@ -1264,13 +1277,15 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
   const resourceSource = Array.isArray(module.resources) ? module.resources : Array.isArray(module.files) ? module.files : [];
   const resources = resourceSource.map((item, index) => {
     const resource = (item || {}) as Record<string, unknown>;
-    if (resource.visibility === "hidden" || resource.accessLevel === "hidden") return null;
+    if (resource.visibility === "hidden" || resource.active === false || resource.accessLevel === "hidden") return null;
     return {
       id: String(resource.id || `${id}-r-${index}`),
       name: String(resource.name || resource.title || "Resource"),
       type: String(resource.type || "file"),
+      includeInBundle: resource.includeInBundle !== false,
+      paidUpdateId: resource.paidUpdateId ? String(resource.paidUpdateId) : undefined,
     };
-  }).filter((resource): resource is { id: string; name: string; type: string } => resource !== null);
+  }).filter((resource): resource is { id: string; name: string; type: string; includeInBundle: boolean; paidUpdateId: string | undefined } => resource !== null);
   const modules = (Array.isArray(module.modules) ? module.modules : []).map((child) => asCurriculumModule(child, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
   const paid = isPaidUpgradeModule(module, paidModuleIds);
   const update = paid ? resolvePaidUpdateForModule(module, product.paidUpdates || []) : null;
@@ -1281,6 +1296,7 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
     id: id || title,
     title,
     paid,
+    includeInBundle: module.includeInBundle !== false,
     paidUpdateId: paidUpdateId || undefined,
     paidUpdateTitle: paidUpdateTitle || undefined,
     paidUpdatePrice: paidUpdatePrice || undefined,
@@ -1291,12 +1307,10 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
 
 export const collectCurriculumModules = (product: Product): CurriculumModule[] => {
   const paidModuleIds = collectPaidModuleIdSet(product.paidUpdates || []);
-  const canonical = (product.canonicalModules || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
-  if (canonical.length > 0) return canonical;
-  // CatalogContext retains a legacy demo tree for older Course Player routes.
-  // Never present that shared demo data as this live product's curriculum.
-  const courseContent = product.courseContent === fullDemoCourseContent ? [] : (product.courseContent || []);
-  return courseContent.map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
+  // Catalogue membership is mapped before presentation strips price fields,
+  // so resource-only updates cannot masquerade as base-course content.
+  const source = product.courseContent === fullDemoCourseContent ? { ...product, courseContent: [] } : product;
+  return commerceContentTree(source).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
 };
 
 

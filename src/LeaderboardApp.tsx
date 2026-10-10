@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
 import { LoaderCircle } from "lucide-react";
 import "./leaderboard-minimal.css";
 import Header from "./components/Header";
@@ -7,7 +6,6 @@ import BottomNav from "./components/BottomNav";
 import { useCatalog } from "./context/CatalogContext";
 import { useCommerce } from "./context/CommerceContext";
 import { useBranding } from "./context/BrandingContext";
-import { db } from "../firebase";
 import { apiFetch } from "./utils/apiBase";
 
 type SubscriberRow = {
@@ -76,7 +74,6 @@ export default function LeaderboardApp() {
   const [copiedReferralCode, setCopiedReferralCode] = useState("");
   const [copyError, setCopyError] = useState("");
   const [revision, setRevision] = useState(0);
-  const [cachedData, setCachedData] = useState(false);
 
   const copyReferralCode = async (code: string) => {
     if (!code) return;
@@ -103,7 +100,6 @@ export default function LeaderboardApp() {
     const load = async () => {
       setLoading(true);
       setError("");
-      setCachedData(false);
       try {
         const response = await apiFetch("/api/referral-leaderboard");
         const data = (await response.json().catch(() => ({}))) as {
@@ -128,29 +124,9 @@ export default function LeaderboardApp() {
             : data.error || "Could not open leaderboard.";
         throw new Error(reason);
       } catch (loadError) {
-        try {
-          const cached = await getDoc(
-            doc(db, "publicLeaderboard", "referrals")
-          );
-          const payload = cached.exists() ? cached.data() || {} : {};
-          const cachedSubscribers = Array.isArray(payload.subscribers)
-            ? payload.subscribers
-            : [];
-          const cachedUsers = Array.isArray(payload.users) ? payload.users : [];
-          if (
-            cached.exists() &&
-            (cachedSubscribers.length > 0 || cachedUsers.length > 0)
-          ) {
-            if (!cancelled) {
-              setSubscribers(cachedSubscribers as SubscriberRow[]);
-              setUsers(cachedUsers as UserRow[]);
-              setCachedData(true);
-            }
-            return;
-          }
-        } catch {
-          // Both the live API and the public cache are unavailable.
-        }
+        // Only the server may use cached rows: it verifies each learner's
+        // CURRENT privacy preference before returning them. An unchecked
+        // Firestore fallback could republish a profile after it was hidden.
         const message =
           loadError instanceof Error && loadError.message
             ? loadError.message
@@ -280,12 +256,6 @@ export default function LeaderboardApp() {
                 Default referral benefit: ₹250. Each available ID is single-use,
                 excludes its owner, and applies to eligible subscriptions.
                 Checkout verifies the configured reduction and final payable.
-              </p>
-            ) : null}
-            {cachedData ? (
-              <p role="status" className="dc-leaderboard-note">
-                Showing the saved leaderboard. Live data is currently
-                unavailable.
               </p>
             ) : null}
             {copyError ? (

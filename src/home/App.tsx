@@ -24,7 +24,6 @@ import { useCatalog } from "../context/CatalogContext";
 import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 import { useHomeBanners } from "./hooks/useHomeBanners";
-import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/webPush";
 import "./home.css";
 
 /**
@@ -176,16 +175,6 @@ export default function App({
   const [progressLoading, setProgressLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Ask for notification permission the moment a user lands on Home (app open).
-  // Signed-in users are also subscribed + saved so purchase unlocks, renewals and
-  // announcements reach this device as system notifications.
-  useEffect(() => {
-    if (user) {
-      void ensureSavedWebPushSubscription(user.id);
-    } else {
-      void subscribeToWebPush();
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) { setProgressRecords([]); setProgressLoading(false); return undefined; }

@@ -1,3 +1,4 @@
+import { captureDevicePushGate, canShowDevicePush } from "../../utils/deviceNotificationPreference";
 // src/utils/capacitorBridge.ts
 //
 // Glue between the web build and the Capacitor / TWA Android shell.
@@ -96,91 +97,128 @@ export async function ensureReminderChannel(): Promise<void> {
   return reminderChannelPromise;
 }
 
-let registeredForPush = false;
+type PushRegistrationResult = { ok: boolean; reason?: string };
+type RegistrationAttempt = {
+  uid?: string; requestPermission: boolean;
+  getIdToken: () => Promise<string | null>;
+  finish: (result: PushRegistrationResult) => void;
+  promise: Promise<PushRegistrationResult>;
+  controller: AbortController;
+};
+let listenerSetup: Promise<void> | null = null;
+let activeRegistration: RegistrationAttempt | null = null;
 
-/** Register for FCM push on the installed Android TWA.
- *  No-op on web (the service worker flow handles that). */
-export async function registerForPush(getIdToken: () => Promise<string | null>): Promise<{ ok: boolean; reason?: string }> {
+export async function getNativePushPermission(): Promise<"granted" | "denied" | "prompt" | "unsupported"> {
+  if (!isAndroidNative()) return "unsupported";
+  const status = await PushNotifications.checkPermissions();
+  return status.receive === "granted" ? "granted" : status.receive === "denied" ? "denied" : "prompt";
+}
+
+async function installPushListeners() {
+  if (listenerSetup) return listenerSetup;
+  const handles: { remove: () => Promise<void> }[] = [];
+  const setup = (async () => {
+    try {
+      handles.push(await PushNotifications.addListener("registration", async (token: Token) => {
+        // Capture THIS attempt before awaiting auth/network. A late response
+        // from an old account or timed-out request must never acknowledge a retry.
+        const attempt = activeRegistration;
+        if (!attempt) return;
+        try {
+          const idToken = await attempt.getIdToken();
+          if (!idToken) { attempt.finish({ ok: false, reason: "signed-out" }); return; }
+          const response = await apiFetch("/api/push/fcm-register", {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ action: "fcm-register", token: token.value, appVersion: "1.0.0",
+              locale: typeof navigator !== "undefined" ? navigator.language : "en", platform: "android" }),
+            signal: attempt.controller.signal,
+          });
+          const result = await response.json().catch(() => null);
+          attempt.finish(response.ok && result?.ok && (!attempt.uid || result.uid === attempt.uid)
+            ? { ok: true } : { ok: false, reason: "registration-failed" });
+        } catch { attempt.finish({ ok: false, reason: "registration-failed" }); }
+      }));
+      handles.push(await PushNotifications.addListener("registrationError", () => activeRegistration?.finish({ ok: false, reason: "registration-failed" })));
+      handles.push(await PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
+        const url = (action.notification.data?.url as string) || "/";
+        const hashIndex = url.indexOf("#");
+        if (hashIndex >= 0 && typeof window !== "undefined") window.location.hash = url.slice(hashIndex);
+      }));
+      handles.push(await PushNotifications.addListener("pushNotificationReceived", (notification: PushNotificationSchema) => {
+        if (canShowDevicePush()) void renderForegroundPush(notification);
+      }));
+    } catch (error) {
+      await Promise.all(handles.map((handle) => handle.remove().catch(() => undefined)));
+      throw error;
+    }
+  })();
+  listenerSetup = setup;
+  try { await setup; }
+  catch (error) { if (listenerSetup === setup) listenerSetup = null; throw error; }
+}
+
+/** No automatic permission prompts. Connection means an acknowledged cloud
+ * registration, not merely register() returning. All setup work is single-flight
+ * and UID-scoped; listener installation/partial failures are retryable. */
+export async function registerForPush(getIdToken: () => Promise<string | null>, options: { requestPermission?: boolean; uid?: string } = {}): Promise<PushRegistrationResult> {
   if (!isAndroidNative()) return { ok: false, reason: "not-native" };
-  await ensureReminderChannel();
-  if (registeredForPush) return { ok: true };
-  try {
-    let permStatus = await PushNotifications.checkPermissions();
-    if (permStatus.receive === "prompt") {
-      permStatus = await PushNotifications.requestPermissions();
-    }
-    if (permStatus.receive !== "granted") {
-      return { ok: false, reason: "permission-denied" };
-    }
-    // Register the listener BEFORE calling register(). Capacitor fires the
-    // initial `registration` token event as soon as `register()` completes,
-    // and a listener attached afterwards can miss that first event — which
-    // left `users/{uid}/fcmTokens` empty (the symptom: app closed → no FCM
-    // wake-up → no notification until the app was opened and the foreground
-    // clock did the work). The listener fires again on every token rotation,
-    // and we dedupe on the server (the FCM register endpoint hashes the
-    // token into the doc id).
-    await PushNotifications.addListener("registration", async (token: Token) => {
-      try {
-        const idToken = await getIdToken();
-        if (!idToken) return;
-        // Routed through /api/push/fcm-register → /api/push/send via a
-        // Vercel rewrite (vercel.json). The action field picks the
-        // fcm-register branch on the server so we don't need a
-        // dedicated Vercel function (the Hobby plan caps at 12).
-        await apiFetch("/api/push/fcm-register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({
-            action: "fcm-register",
-            token: token.value,
-            appVersion: "1.0.0",
-            locale: typeof navigator !== "undefined" ? navigator.language : "en",
-            platform: "android",
-          }),
-        });
-      } catch (err) {
-        // The TWA will retry on the next register call; do not throw.
-        console.warn("[push] fcm-register failed", err);
-      }
-    });
-
-    await PushNotifications.register();
-
-    // Tap handler — a user tapping the system notification while
-    // the app is in the background re-opens with the deep link.
-    await PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
-      const url = (action.notification.data?.url as string) || "/";
-      const hashIndex = url.indexOf("#");
-      if (hashIndex >= 0 && typeof window !== "undefined") {
-        window.location.hash = url.slice(hashIndex);
-      }
-    });
-
-    // Foreground notifications — Capacitor's LocalNotifications
-    // plugin renders a system-tray notification with the right
-    // icon and tag, even when the app is open.
-    await PushNotifications.addListener("pushNotificationReceived", (notification: PushNotificationSchema) => {
-      // Render with the local plugin so the user sees the chrome
-      // (icon, tag, vibration) the same way a real local alarm
-      // would render. The data payload carries the deep link.
-      void renderForegroundPush(notification);
-    });
-
-    registeredForPush = true;
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: err instanceof Error ? err.message : "unknown" };
+  const requestPermission = options.requestPermission !== false;
+  if (activeRegistration) {
+    const previous = activeRegistration;
+    if (previous.uid === options.uid && (!requestPermission || previous.requestPermission)) return previous.promise;
+    // Explicit setup is not swallowed by a check-only startup, and changing
+    // users cannot inherit another user's successful acknowledgement.
+    await previous.promise;
+    return registerForPush(getIdToken, options);
   }
+  let resolve!: (result: PushRegistrationResult) => void;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let settled = false;
+  const promise = new Promise<PushRegistrationResult>((done) => { resolve = done; });
+  const attempt: RegistrationAttempt = {
+    uid: options.uid, requestPermission, getIdToken, promise, controller: new AbortController(),
+    finish(result) {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (activeRegistration === attempt) activeRegistration = null;
+      attempt.controller.abort();
+      resolve(result);
+    },
+  };
+  activeRegistration = attempt;
+  void (async () => {
+    try {
+      let permission = await PushNotifications.checkPermissions();
+      if ((permission.receive === "prompt" || permission.receive === "prompt-with-rationale") && requestPermission) permission = await PushNotifications.requestPermissions();
+      if (permission.receive !== "granted") { attempt.finish({ ok: false, reason: "permission-denied" }); return; }
+      timer = setTimeout(() => attempt.finish({ ok: false, reason: "registration-timeout" }), 12000);
+      await ensureReminderChannel();
+      if (settled) return;
+      await installPushListeners();
+      if (settled) return;
+      await PushNotifications.register();
+      // Completion is driven only by registration + authenticated server ACK.
+    } catch (error) { attempt.finish({ ok: false, reason: error instanceof Error ? error.message : "registration-failed" }); }
+  })();
+  return promise;
+}
+
+/** Account push opt-out also cancels alarms already armed on this phone. It
+ * does not modify scheduledItems, My Day tasks or FlowPath content. */
+export async function cancelPendingDeviceAlarms(): Promise<void> {
+  if (!isAndroidNative()) return;
+  const pending = await LocalNotifications.getPending();
+  if (pending.notifications.length) await cancelLocalAlarms(pending.notifications.map((item) => item.id));
 }
 
 async function renderForegroundPush(notification: PushNotificationSchema) {
+  const allowed = captureDevicePushGate(notification.data?.uid as string | undefined);
+  if (!allowed()) return;
   try {
     await ensureReminderChannel();
     const granted = await LocalNotifications.checkPermissions();
-    if (granted.display !== "granted") {
-      await LocalNotifications.requestPermissions();
-    }
+    if (granted.display !== "granted" || !allowed()) return;
     const id = Math.floor(Math.random() * 2_000_000_000);
     const data = (notification.data || {}) as Record<string, string>;
     // Right side contextual icon based on notification type, left is always app logo (ic_stat_eduvora)
@@ -212,6 +250,7 @@ async function renderForegroundPush(notification: PushNotificationSchema) {
 // ------------------------------------------------------------------ local alarms
 
 export type LocalAlarmItem = {
+  uid?: string;
   /** Stable id used as the alarm id. Must be unique per item per day. */
   id: number;
   /** Epoch ms when the alarm should fire. */
@@ -352,7 +391,8 @@ export async function ensureExactAlarmPermission(): Promise<boolean> {
 }
 
 export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean> {
-  if (!isAndroidNative()) return false;
+  const allowed = captureDevicePushGate(item.uid);
+  if (!isAndroidNative() || !allowed()) return false;
   try {
     // Android 8+ drops notifications posted to a non-existent channel.
     await ensureReminderChannel();
@@ -368,11 +408,8 @@ export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean>
     // skip the local tick; FCM + the foreground clock keep delivering,
     // and the user grants exact alarms explicitly (ExactAlarmCard).
     if ((await getExactAlarmPermissionStatus()) === "denied") return false;
-    let granted = await LocalNotifications.checkPermissions();
-    if (granted.display !== "granted") {
-      granted = await LocalNotifications.requestPermissions();
-    }
-    if (granted.display !== "granted") return false;
+    const granted = await LocalNotifications.checkPermissions();
+    if (granted.display !== "granted" || !allowed()) return false;
 
     const schedule: LocalNotificationSchema = {
       id: item.id,
@@ -386,7 +423,9 @@ export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean>
       extra: { url: item.url, tag: item.tag },
       channelId: REMINDER_CHANNEL_ID,
     };
+    if (!allowed()) return false;
     await LocalNotifications.schedule({ notifications: [schedule] });
+    if (!allowed()) { await cancelLocalAlarms([item.id]); return false; }
     return true;
   } catch (err) {
     console.warn("[push] scheduleLocalAlarm failed", err);

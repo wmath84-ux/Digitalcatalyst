@@ -311,7 +311,7 @@
 
 /* Bounded tabs and plain sections replace cards within cards. */
 [data-pdp-root] [data-pdp-stack] { gap: 2rem; }
-[data-pdp-root] .dc-pdp-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--pdp-border); }
+[data-pdp-root] .dc-pdp-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--pdp-border); }
 [data-pdp-root] .dc-pdp-tabs button {
   min-width: 0;
   min-height: 3rem;
@@ -421,3 +421,44 @@
 [data-pdp-root] .dc-pdp-summary-total > .dc-pdp-price-line { justify-content: end; }
 [data-pdp-root] .dc-pdp-selection-rules { display: grid; gap: 0.4rem; margin-top: 0.75rem; color: #b9c4d5; font-size: 0.75rem; line-height: 1.65; }
 [data-pdp-root] .dc-pdp-pricing-error { margin-top: 0.75rem; color: #f4bfbe; font-size: 0.8125rem; line-height: 1.6; }
+
+/* Paid: remaining content first, a real divider, then acquired scopes.
+   All choices feed the one verified purchase review above — no row buy buttons. */
+[data-pdp-root] .dc-pdp-paid-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .45rem; }
+[data-pdp-root] .dc-pdp-paid-heading h3 { font-size: 1rem; font-weight: 680; letter-spacing: -.02em; margin: 0; }
+[data-pdp-root] .dc-pdp-paid-heading > span { color: var(--pdp-muted); font-size: .73rem; }
+[data-pdp-root] .dc-pdp-paid-list { list-style: none; padding: 0; margin: .85rem 0 0; }
+[data-pdp-root] .dc-pdp-paid-list > li { display: flex; align-items: flex-start; justify-content: space-between; gap: .9rem; padding: 1.1rem 0; border-bottom: 1px solid var(--pdp-border); min-width: 0; }
+[data-pdp-root] .dc-pdp-paid-list > li:last-child { border-bottom: 0; }
+[data-pdp-root] .dc-pdp-paid-choice { display: flex; flex: 1; align-items: flex-start; gap: .75rem; min-width: 0; }
+[data-pdp-root] .dc-pdp-paid-choice > input { appearance: auto; accent-color: #a995fa; width: 1.1rem; height: 1.1rem; flex-shrink: 0; margin: 1.05rem 0 0; cursor: pointer; }
+[data-pdp-root] .dc-pdp-paid-choice > input:disabled { cursor: not-allowed; opacity: .45; }
+[data-pdp-root] .dc-pdp-paid-copy { flex: 1; min-width: 0; }
+[data-pdp-root] .dc-pdp-paid-copy :is(label, h4) { display: block; font-size: .9rem; font-weight: 600; color: #f3f5fa; line-height: 1.55; overflow-wrap: anywhere; margin: .3rem 0 0; }
+[data-pdp-root] .dc-pdp-paid-copy > label { cursor: pointer; padding-block: .1rem; }
+[data-pdp-root] .dc-pdp-paid-copy > p { font-size: .76rem; color: var(--pdp-muted); line-height: 1.65; margin-top: .35rem; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-paid-type { font-size: .63rem; color: #9ca8bc; letter-spacing: .02em; }
+[data-pdp-root] .dc-pdp-paid-copy > .dc-pdp-paid-rule { font-size: .7rem; color: #bdb4dc; margin-top: .45rem; }
+[data-pdp-root] .dc-pdp-paid-copy > .dc-pdp-paid-partial { color: #ddcfaa; font-size: .7rem; }
+[data-pdp-root] .dc-pdp-paid-price { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: .25rem; max-width: 31%; font-variant-numeric: tabular-nums; padding-top: 1.2rem; text-align: right; }
+[data-pdp-root] .dc-pdp-paid-price strong { font-size: .95rem; font-weight: 700; color: #f8fafc; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-paid-price :is(s, span) { font-size: .67rem; color: var(--pdp-muted); line-height: 1.6; }
+[data-pdp-root] .dc-pdp-paid-includes { margin-top: .6rem; color: var(--pdp-muted); font-size: .73rem; line-height: 1.65; }
+[data-pdp-root] .dc-pdp-paid-includes > summary { min-height: 2.3rem; display: list-item; cursor: pointer; padding-block: .3rem; color: #c3b7f0; }
+[data-pdp-root] .dc-pdp-paid-includes > ul { padding-left: 1rem; list-style: disc; display: grid; gap: .25rem; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-paid-divider { border: 0; border-top: 1px solid #c1baff44; margin: 2rem 0 1.5rem; }
+[data-pdp-root] .dc-pdp-owned-label { flex: 0 0 auto; margin-top: 1.2rem; color: #b5c8b9; font-size: .67rem; padding: .2rem .5rem; border: 1px solid #b5c8b92c; border-radius: .3rem; }
+[data-pdp-root] .dc-pdp-owned-list > li { padding-inline: 0; }
+[data-pdp-root] .dc-pdp-owned-list .dc-pdp-paid-type { color: #9aafa3; }
+[data-pdp-root] .dc-pdp-paid-review { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .7rem 1.5rem; border-top: 1px solid var(--pdp-border); padding-top: 1rem; margin-top: .5rem; }
+[data-pdp-root] .dc-pdp-paid-review p { color: var(--pdp-muted); font-size: .75rem; line-height: 1.65; flex: 1 1 20rem; }
+[data-pdp-root] [data-pdp-owned-access] { display: grid; gap: .65rem; }
+[data-pdp-root] [data-pdp-remaining-paid] { text-align: left; font-size: .78rem; }
+[data-pdp-root] #pdp-purchase-review { scroll-margin-top: 1.5rem; outline: none; }
+[data-pdp-root] #pdp-purchase-review:focus-visible { outline: 2px solid #bca9ff; outline-offset: .5rem; }
+[data-pdp-root] .dc-pdp-paid-error { color: #e4b8b8; font-size: .8rem; line-height: 1.6; }
+@media (max-width: 360px) {
+  [data-pdp-root] .dc-pdp-paid-list > li { flex-wrap: wrap; gap: .2rem; }
+  [data-pdp-root] .dc-pdp-paid-choice { flex-basis: 100%; }
+  [data-pdp-root] .dc-pdp-paid-price { flex-direction: row; align-items: baseline; justify-content: end; gap: .5rem; margin-left: auto; max-width: 100%; padding-top: .3rem; }
+}

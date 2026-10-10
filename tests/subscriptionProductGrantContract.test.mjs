@@ -109,7 +109,7 @@ test("course access accepts Firestore document id as an alias of the public prod
 
   assert.equal(result.hasFullProductAccess, true);
   assert.equal(result.accessibleModuleIds.has("m-1"), true);
-  assert.equal(result.moduleAccessSources["m-1"], "full_product");
+  assert.equal(result.moduleAccessSources["m-1"], "subscription");
 });
 
 test("product ids survive quote, payment intent, replay, and subscription activation", () => {
@@ -144,8 +144,8 @@ test("active subscription products appear in the learner library", () => {
   const hook = read("src/hooks/useCourseAccess.ts");
   const purchases = read("src/components/OtherTabs.tsx");
 
-  assert.match(hook, /setSubscriptionProductIds/);
-  assert.match(hook, /isSubscriptionRecordActive\(record\)/);
+  assert.match(hook, /setMembership/);
+  assert.match(hook, /isSubscriptionRecordActive\(membership\.record, now\)/);
   assert.match(hook, /data\.includedProductIds\.map\(String\)/);
   assert.match(purchases, /product\.documentId/);
 });

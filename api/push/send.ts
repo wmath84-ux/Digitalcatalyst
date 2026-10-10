@@ -1,3 +1,6 @@
+import { notificationPolicy } from "../../utils/userPreferences.js";
+import { createNotificationPreferenceReader } from "../_lib/notificationPreferences.js";
+import { queueNotificationEmail } from "../_lib/notificationEmail.js";
 // api/push/send.ts
 //
 // Server-side push dispatcher — dual mode (Web Push + FCM).
@@ -102,12 +105,13 @@ async function findProductBuyerIds(db: Firestore, productId: string): Promise<st
 
 async function writeNewProductBellEntries(db: Firestore, productId: string, entry: ReturnType<typeof buildProductInventoryEntry>) {
   const users = await db.collection("users").get();
+  const eligibleUsers = users.docs.filter((user) => notificationPolicy(user.data()?.preferences, { category: "store" }).inbox);
   const docId = `content:product:${productId}`;
   // Keep below Firestore's 500-operation batch ceiling and cover every user,
   // not just the first page of accounts.
-  for (let offset = 0; offset < users.docs.length; offset += 450) {
+  for (let offset = 0; offset < eligibleUsers.length; offset += 450) {
     const batch = db.batch();
-    users.docs.slice(offset, offset + 450).forEach((user: QueryDocumentSnapshot) => batch.set(user.ref.collection("notifications").doc(docId), {
+    eligibleUsers.slice(offset, offset + 450).forEach((user: QueryDocumentSnapshot) => batch.set(user.ref.collection("notifications").doc(docId), {
       id: docId,
       title: entry.free ? "New free product available" : "New product added",
       body: entry.title,
@@ -119,7 +123,11 @@ async function writeNewProductBellEntries(db: Firestore, productId: string, entr
     }, { merge: true }));
     await batch.commit();
   }
-  return users.size;
+  await Promise.all(eligibleUsers.map((user) => queueNotificationEmail(db, user.id, {
+    title: entry.free ? "New free product available" : "New product added", body: entry.title,
+    category: "store", tag: docId, eventId: docId, url: PRODUCT_URL(productId),
+  }).catch((error) => console.warn("[email] product announcement queue failed", error))));
+  return eligibleUsers.length;
 }
 
 async function handleProductAction(req: VercelRequest, res: VercelResponse, action: "product-created" | "product-updated") {
@@ -274,6 +282,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload: PushPayload & Record<string, unknown> = {
       title,
       body,
+      marketing: true,
+      category: "announcement",
       tag: safeText(req.body?.tag, 60) || undefined,
       icon: safeText(req.body?.icon, 300) || brand.icon,
       badge: safeText(req.body?.badge, 300) || brand.badge,
@@ -282,6 +292,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fcmPayload: FcmPayload = {
       title: payload.title,
       body: payload.body,
+      marketing: true,
+      category: "announcement",
       tag: payload.tag as string | undefined,
       url: payload.url as string | undefined,
       icon: payload.icon as string | undefined,
@@ -289,6 +301,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
     const payloadString = JSON.stringify(payload);
 
+    const endpointOwners = new Map<string, string>();
+    const readPolicy = createNotificationPreferenceReader(db);
     let subscriptions: PushSub[] = Array.isArray(req.body?.subscriptions)
       ? (req.body.subscriptions as unknown[]).filter(isPushSub)
       : [];
@@ -301,6 +315,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? await db.collectionGroup('webPushSubscriptions').get()
         : await db.collection('users').doc(uid).collection('webPushSubscriptions').get();
 
+      for (const item of snapshot.docs) endpointOwners.set(String(item.data()?.endpoint || ""), String(item.data()?.uid || item.ref.parent.parent?.id || uid));
       subscriptions = snapshot.docs
         .map((item: QueryDocumentSnapshot) => item.data())
         .filter((data: unknown): data is Record<string, unknown> => Boolean(data))
@@ -322,6 +337,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const out: Array<{ endpoint: string; status: string; error?: string }> = [];
         for (const subscription of subscriptions) {
           try {
+            let recipientUid = endpointOwners.get(subscription.endpoint);
+            if (!recipientUid) {
+              const owners = await db.collectionGroup("webPushSubscriptions").where("endpoint", "==", subscription.endpoint).limit(1).get();
+              const owner = owners.docs[0];
+              recipientUid = owner ? String(owner.data()?.uid || owner.ref.parent.parent?.id || "") : "";
+            }
+            if (!recipientUid || !(await readPolicy(recipientUid, payload)).push) {
+              out.push({ endpoint: subscription.endpoint, status: "skipped:opted-out-or-unregistered" });
+              continue;
+            }
             await sendNotification(subscription, payloadString, { TTL: 60 * 60 * 24 });
             out.push({ endpoint: subscription.endpoint, status: 'sent' });
           } catch (error) {
@@ -345,7 +370,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       ok: true,
       sent,
-      failed: results.length - sent,
+      failed: results.filter((result) => result.status.startsWith("failed:")).length,
+      skipped: results.filter((result) => result.status.startsWith("skipped:")).length,
       results,
       fcm: { sent: fcmSummary },
     });

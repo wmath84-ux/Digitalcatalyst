@@ -1,1 +1,1 @@
-export declare function collectLibraryProductIds(entries: unknown): { full: string[]; any: string[] };
+export declare function collectLibraryProductIds(entries: unknown, now?: number): { full: string[]; any: string[] };

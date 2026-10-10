@@ -1,3 +1,5 @@
+import { useUserPreferences } from "../settings/useUserPreferences";
+import { notificationPolicy } from "../../utils/userPreferences";
 import { useEffect, useMemo, useState } from "react";
 import { collection } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -17,9 +19,10 @@ export const notificationsKey = (uid: string) => `users/${uid}/notifications`;
 
 export function useUnreadNotificationCount(): number | null {
   const { user, loading } = useAuth();
+  const { preferences } = useUserPreferences(user?.id);
   const viewerKey = user?.id || "guest";
   const [localItems, setLocalItems] = useState<SiteNotification[]>(() => loadSiteNotifications(viewerKey));
-  const [cloudUnreadIds, setCloudUnreadIds] = useState<string[]>([]);
+  const [cloudUnreadItems, setCloudUnreadItems] = useState<Array<{ id: string; category?: string }>>([]);
 
   useEffect(() => {
     const refresh = () => setLocalItems(loadSiteNotifications(viewerKey));
@@ -38,18 +41,19 @@ export function useUnreadNotificationCount(): number | null {
   }, [viewerKey]);
 
   useEffect(() => {
-    if (!user) { setCloudUnreadIds([]); return undefined; }
+    if (!user) { setCloudUnreadItems([]); return undefined; }
     return subscribeShared(notificationsKey(user.id), () => collection(db, "users", user.id, "notifications"), (docs, error) => {
-      if (error) { setCloudUnreadIds([]); return; }
-      setCloudUnreadIds(docs.filter((item) => item.data.read !== true).map((item) => item.id));
+      if (error) { setCloudUnreadItems([]); return; }
+      setCloudUnreadItems(docs.filter((item) => item.data.read !== true).map((item) => ({ id: item.id, category: item.data.category })));
     });
   }, [user]);
 
   const count = useMemo(() => {
-    const ids = new Set(localItems.filter((item) => !item.read).map((item) => item.id));
-    cloudUnreadIds.forEach((id) => ids.add(id));
+    const allowed = (item: { category?: string }) => notificationPolicy(preferences, { category: item.category }).inbox;
+    const ids = new Set(localItems.filter((item) => !item.read && allowed(item)).map((item) => item.id));
+    cloudUnreadItems.filter(allowed).forEach((item) => ids.add(item.id));
     return ids.size;
-  }, [cloudUnreadIds, localItems]);
+  }, [cloudUnreadItems, localItems, preferences]);
 
   return loading ? null : count;
 }

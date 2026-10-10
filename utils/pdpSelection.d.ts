@@ -157,3 +157,5 @@ export declare const __testHelpers: {
   arr: (v: unknown) => unknown[];
   isObject: (v: unknown) => boolean;
 };
+
+export function normalizeModuleSelectionIds(ids: readonly string[], modules: readonly CanonicalCourseModule[], ownership: OwnershipState): Set<string>;

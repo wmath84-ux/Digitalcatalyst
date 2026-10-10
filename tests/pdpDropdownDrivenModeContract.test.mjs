@@ -32,7 +32,8 @@ test("the Full course / Modules tab bar and the inline module list are removed",
 
 test("the purchase mode is derived from the dropdown selection, not an initialised tab state", () => {
   assert.match(builder, /selectedModuleIds\.size > 0\s*\?\s*"selected_modules"/);
-  assert.match(builder, /isProductOwned && availableModes\.includes\("paid_update"\)/);
+  assert.match(builder, /isProductOwned\s*\? "full_product"/);
+  assert.match(builder, /selectionRequest/); // upgrades are explicit Paid choices, never automatic purchases
   assert.match(builder, /availableModes\.includes\("full_product"\)/);
   assert.doesNotMatch(builder, /const \[mode, setMode\]/);
 });

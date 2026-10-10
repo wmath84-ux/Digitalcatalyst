@@ -1,3 +1,4 @@
+import { commerceContentTree, isActiveOwnershipRecord, isBundleIncluded, isFullProductPurchase, isPaidContent } from "./contentOwnership.js";
 // utils/courseAccess.js
 //
 // Part 10 — single canonical course-access resolver. Pure (no
@@ -84,7 +85,7 @@ const collectResources = (tree) => {
   const out = [];
   const visit = (node) => {
     if (!isObject(node)) return;
-    for (const file of arr(node.files)) out.push(file);
+    for (const file of arr(node.resources || node.files)) out.push(file);
     for (const child of arr(node.modules)) visit(child);
   };
   for (const node of arr(tree)) visit(node);
@@ -104,7 +105,7 @@ const findModuleById = (tree, id) => {
 const findResourceById = (tree, id) => {
   for (const node of arr(tree)) {
     if (!isObject(node)) continue;
-    for (const file of arr(node.files)) {
+    for (const file of arr(node.resources || node.files)) {
       if (file.id === id) return file;
     }
     const inner = findResourceById(node.modules, id);
@@ -176,8 +177,9 @@ const itemUpdateId = (item) => {
 export const resolveCourseAccess = (input = {}) => {
   const now = Number.isFinite(input.now) ? Number(input.now) : Date.now();
   const product = isObject(input.product) ? input.product : null;
-  const modules = collectModules(product?.canonicalModules || product?.courseContent || []);
-  const resources = collectResources(product?.canonicalModules || product?.courseContent || []);
+  const tree = commerceContentTree(product);
+  const modules = collectModules(tree);
+  const resources = collectResources(tree);
   const moduleIndex = new Map(modules.map((m) => [String(m.id), m]));
   const resourceIndex = new Map(resources.map((r) => [String(r.id), r]));
 
@@ -197,9 +199,9 @@ export const resolveCourseAccess = (input = {}) => {
     .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index);
   // Full product access comes from EITHER a base purchase OR an
   // active subscription that grants the base product.
-  const hasFullProductAccess = productIdentityIds.some(
-    (productId) => ownedProductIds.has(productId) || subscriptionProductIds.has(productId),
-  );
+  const hasPurchasedFullProduct = productIdentityIds.some((id) => ownedProductIds.has(id));
+  const hasSubscriptionProductAccess = productIdentityIds.some((id) => subscriptionProductIds.has(id));
+  const hasFullProductAccess = hasPurchasedFullProduct || hasSubscriptionProductAccess;
 
   // Modules the user owns via per-module purchase OR subscription.
   // `ownedModuleIds` is the union of the two (for the
@@ -208,144 +210,95 @@ export const resolveCourseAccess = (input = {}) => {
   const combinedOwnedModules = new Set(ownedModuleIds);
   for (const id of subscriptionModuleIds) combinedOwnedModules.add(id);
 
-  // Per-module access source.
-  const moduleAccessSources = {};
-  const markSource = (id, source) => {
-    if (!id) return;
-    const current = moduleAccessSources[id];
-    // Order matters: paid > subscription > free. We pick the
-    // strongest source the user has.
-    if (current === "full_product" || current === "module_purchase") return;
-    if (source === "full_product" || source === "module_purchase") {
-      moduleAccessSources[id] = source;
-      return;
+  // Paid catalogue membership and parent scopes are resolved once. Owning the
+  // free/base bundle does not grant optional modules or future paid updates.
+  const parentIds = new Map();
+  const resourceParents = new Map();
+  const hiddenIds = new Set();
+  const indexTree = (nodes, parentId = null, parentHidden = false) => {
+    for (const module of arr(nodes)) {
+      if (!isObject(module)) continue;
+      const id = String(module.id);
+      parentIds.set(id, parentId || module.parentModuleId || null);
+      const hidden = parentHidden || module.active === false || module.visibility === "hidden" || moduleAccessLevel(module) === "hidden";
+      if (hidden) hiddenIds.add(id);
+      for (const resource of arr(module.resources || module.files)) resourceParents.set(String(resource.id), id);
+      indexTree(module.modules, id, hidden);
     }
-    if (current === "subscription" && source === "resource_purchase") {
-      // A per-resource purchase is the strongest source for
-      // a resource, but for a module, the subscription
-      // grant wins. Keep `current` as-is.
-      return;
-    }
-    if (current === "subscription" && source === "paid_update") {
-      // paid_update is a stronger source than subscription
-      // (it's a permanent purchase). Override.
-      moduleAccessSources[id] = source;
-      return;
-    }
-    if (!current) moduleAccessSources[id] = source;
   };
-
-  for (const m of modules) {
-    const id = String(m.id);
-    const level = moduleAccessLevel(m);
-    if (level === "hidden") {
-      markSource(id, "locked");
+  indexTree(tree);
+  const updateByModule = new Map();
+  const updateByResource = new Map();
+  for (const update of arr(product?.paidUpdates)) {
+    if (!isObject(update) || update.active === false || update.visibility === "hidden") continue;
+    for (const id of arr(update.includedModuleIds)) updateByModule.set(String(id), String(update.id));
+    for (const id of arr(update.includedResourceIds)) updateByResource.set(String(id), String(update.id));
+  }
+  const ancestors = (id) => {
+    const ids = [];
+    const seen = new Set([id]);
+    let parent = parentIds.get(id);
+    while (parent && !seen.has(parent)) { ids.push(parent); seen.add(parent); parent = parentIds.get(parent); }
+    return ids;
+  };
+  const updateForModule = (module) => {
+    const ids = [String(module.id), ...ancestors(String(module.id))];
+    for (const id of ids) {
+      const node = moduleIndex.get(id);
+      const updateId = updateByModule.get(id) || itemUpdateId(node);
+      if (updateId) return updateId;
+    }
+    return null;
+  };
+  const inheritedModuleGrant = (id, grants) => {
+    for (const scope of [id, ...ancestors(id)]) {
+      if (grants.has(scope)) return true;
+      if (!isBundleIncluded(moduleIndex.get(scope))) return false;
+    }
+    return false;
+  };
+  const requireBaseCourseForUpdate = input.requireBaseCourseForUpdate ?? product?.requireBaseCourseForUpdate ?? true;
+  const moduleAccessSources = {};
+  for (const module of modules) {
+    const id = String(module.id);
+    const lineage = [id, ...ancestors(id)];
+    const updateId = updateForModule(module);
+    if (hiddenIds.has(id)) { moduleAccessSources[id] = "locked"; continue; }
+    if (ownedModuleIds.has(id) || (!updateId && !isPaidContent(module) && inheritedModuleGrant(id, ownedModuleIds))) {
+      moduleAccessSources[id] = "module_purchase";
       continue;
     }
-    if (level === "included") {
-      // Free with the base. Open if the user owns the base
-      // (or a subscription grants it) or the user owns the
-      // module directly.
-      if (hasFullProductAccess) {
-        markSource(id, "full_product");
-        continue;
-      }
-      if (ownedModuleIds.has(id)) {
-        markSource(id, "module_purchase");
-        continue;
-      }
-      if (subscriptionModuleIds.has(id)) {
-        markSource(id, "subscription");
-        continue;
-      }
-      markSource(id, "locked");
+    if (updateId && ownedUpdateIds.has(updateId) && (!requireBaseCourseForUpdate || hasFullProductAccess)) {
+      moduleAccessSources[id] = "paid_update";
+      combinedOwnedModules.add(id);
       continue;
     }
-    // paidUpdate or purchasable: the user must own the
-    // module, or the base product, or the subscription must
-    // grant it. Subscription wins over paid_update only when
-    // the user has both, but a direct per-module purchase
-    // is the strongest.
-    if (ownedModuleIds.has(id)) {
-      markSource(id, "module_purchase");
+    if (subscriptionModuleIds.has(id) || (!updateId && !isPaidContent(module) && inheritedModuleGrant(id, subscriptionModuleIds))) {
+      moduleAccessSources[id] = "subscription";
       continue;
     }
-    if (hasFullProductAccess) {
-      markSource(id, "full_product");
-      continue;
-    }
-    if (subscriptionModuleIds.has(id)) {
-      markSource(id, "subscription");
-      continue;
-    }
-    // Otherwise still locked.
-    markSource(id, "locked");
+    const bundleIncluded = !updateId && lineage.every((ancestor) => isBundleIncluded(moduleIndex.get(ancestor)));
+    moduleAccessSources[id] = bundleIncluded && hasPurchasedFullProduct ? "full_product"
+      : bundleIncluded && hasSubscriptionProductAccess ? "subscription" : "locked";
   }
 
-  // Paid updates: owned when the user has them in their
-  // entitlements, OR the user owns the base product, OR the
-  // subscription grants the base product.
-  // The `requireBaseCourseForUpdate` flag (admin-set) further
-  // gates the case where the user only owns the update.
-  const requireBaseCourseForUpdate = input.requireBaseCourseForUpdate !== false;
-  for (const m of modules) {
-    const id = String(m.id);
-    const level = moduleAccessLevel(m);
-    const updateId = itemUpdateId(m);
-    if (level !== "paidUpdate" && !updateId) continue;
-    if (!updateId) continue;
-    if (ownedUpdateIds.has(updateId)) {
-      // Update owned outright.
-      if (!moduleAccessSources[id] || moduleAccessSources[id] === "locked") {
-        moduleAccessSources[id] = "paid_update";
-      }
-      continue;
-    }
-    if (hasFullProductAccess) {
-      // Base course owned; updates are accessible when the
-      // product's `requireBaseCourseForUpdate` flag is on.
-      if (requireBaseCourseForUpdate) {
-        if (!moduleAccessSources[id] || moduleAccessSources[id] === "locked") {
-          moduleAccessSources[id] = "full_product";
-        }
-      }
-    }
-  }
-
-  // Resources: own per-resource purchase OR subscription grant.
   const resourceAccessSources = {};
-  for (const r of resources) {
-    const id = String(r.id);
-    const level = resourceAccessLevel(r);
-    if (level === "hidden") {
+  for (const resource of resources) {
+    const id = String(resource.id);
+    const parentId = resourceParents.get(id);
+    const updateId = updateByResource.get(id) || itemUpdateId(resource) || updateForModule(moduleIndex.get(parentId) || {});
+    if (resource.active === false || resource.visibility === "hidden" || resourceAccessLevel(resource) === "hidden" || hiddenIds.has(parentId)) {
       resourceAccessSources[id] = "locked";
-      continue;
-    }
-    if (level === "included") {
-      if (hasFullProductAccess) {
-        resourceAccessSources[id] = "full_product";
-        continue;
-      }
-      if (ownedResourceIds.has(id)) {
-        resourceAccessSources[id] = "resource_purchase";
-        continue;
-      }
-      resourceAccessSources[id] = "locked";
-      continue;
-    }
-    if (ownedResourceIds.has(id) || subscriptionResourceIds.has(id)) {
-      resourceAccessSources[id] = subscriptionResourceIds.has(id) ? "subscription" : "resource_purchase";
-      continue;
-    }
-    if (hasFullProductAccess && level === "purchasable") {
-      // Per-Part 1, "purchasable" items open with the base
-      // product (unlike paidUpdate which is gated). The PDP
-      // builder, however, decides which the user actually
-      // buys.
-      resourceAccessSources[id] = "full_product";
-      continue;
-    }
-    resourceAccessSources[id] = "locked";
+    } else if (ownedResourceIds.has(id)) {
+      resourceAccessSources[id] = "resource_purchase";
+    } else if (subscriptionResourceIds.has(id)) {
+      resourceAccessSources[id] = "subscription";
+    } else if (updateId && ownedUpdateIds.has(updateId) && (!requireBaseCourseForUpdate || hasFullProductAccess)) {
+      resourceAccessSources[id] = "paid_update";
+    } else if (!updateId && !isPaidContent(resource) && resource.includeInBundle !== false) {
+      const source = moduleAccessSources[parentId];
+      resourceAccessSources[id] = ["full_product", "module_purchase", "subscription"].includes(source) ? source : "locked";
+    } else resourceAccessSources[id] = "locked";
   }
 
   // Preview-enabled modules open without ownership. They do NOT
@@ -382,7 +335,9 @@ export const resolveCourseAccess = (input = {}) => {
     const id = String(r.id);
     if (
       resourceAccessSources[id] === "full_product" ||
+      resourceAccessSources[id] === "module_purchase" ||
       resourceAccessSources[id] === "resource_purchase" ||
+      resourceAccessSources[id] === "paid_update" ||
       resourceAccessSources[id] === "subscription"
     ) {
       accessibleResourceIds.add(id);
@@ -398,7 +353,7 @@ export const resolveCourseAccess = (input = {}) => {
   }
 
   const subscriptionGrantedModuleIds = new Set(subscriptionModuleIds);
-  for (const id of subscriptionModuleIds) subscriptionGrantedModuleIds.add(id);
+  for (const module of modules) if (moduleAccessSources[String(module.id)] === "subscription") subscriptionGrantedModuleIds.add(String(module.id));
 
   // Dependency evaluation: a module is "dependency-blocked"
   // when (a) it is in `accessibleModuleIds` AND (b) one of its
@@ -414,6 +369,8 @@ export const resolveCourseAccess = (input = {}) => {
 
   return {
     hasFullProductAccess,
+    hasPurchasedFullProduct,
+    hasSubscriptionProductAccess,
     ownedModuleIds: combinedOwnedModules,
     ownedResourceIds: new Set(ownedResourceIds),
     ownedUpdateIds: new Set(ownedUpdateIds),
@@ -452,7 +409,7 @@ export const isSubscriptionRecordActive = (record, now = Date.now()) => {
  * and `ownedResourceIds` sets. `entitlementRecords` is the
  * array of docs (raw).
  */
-export const collectEntitlementOwnership = (entitlementRecords) => {
+export const collectEntitlementOwnership = (entitlementRecords, now = Date.now()) => {
   const out = {
     ownedProductIds: new Set(),
     ownedUpdateIds: new Set(),
@@ -461,15 +418,15 @@ export const collectEntitlementOwnership = (entitlementRecords) => {
   };
   for (const record of arr(entitlementRecords)) {
     if (!isObject(record)) continue;
-    if (record.status && record.status !== "active") continue;
+    if (!isActiveOwnershipRecord(record, now) || record.planId || record.subscriptionPlanId || record.source === "subscription") continue;
     const kind = String(record.kind || "");
-    if (kind === "full_product" && record.productId) {
+    if (isFullProductPurchase(record) && record.productId) {
       out.ownedProductIds.add(String(record.productId));
-    } else if (kind === "paid_update" && record.updateId) {
+    } else if ((kind === "paid_update" || kind === "free") && record.updateId) {
       out.ownedUpdateIds.add(String(record.updateId));
-    } else if (kind === "module" && record.moduleId) {
+    } else if ((kind === "module" || kind === "free") && record.moduleId) {
       out.ownedModuleIds.add(String(record.moduleId));
-    } else if (kind === "resource" && record.resourceId) {
+    } else if ((kind === "resource" || kind === "free") && record.resourceId) {
       out.ownedResourceIds.add(String(record.resourceId));
     } else if (kind === "subscription") {
       // The subscription writer persists a `subscription`

@@ -187,7 +187,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     function protectedUserFieldsUnchanged() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds', 'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt', 'referralUsedCount', 'referralUsedAt']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds', 'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt', 'referralUsedCount', 'referralUsedAt', 'preferences', 'preferencesRevision', 'preferencesUpdatedAt']);
     }
     function communityVerificationAllowedOnCreate() {
       return isAdmin()
@@ -229,9 +229,10 @@ service cloud.firestore {
       }
     }
 
+    // Internal cache is served only through the API, which checks current
+    // profile visibility. Direct reads could disclose withdrawn public data.
     match /publicLeaderboard/{docId} {
-      allow read: if true;
-      allow write: if false;
+      allow read, write: if false;
     }
 
     // Shareable Study Pack snapshots. Public/unlisted docs are readable by
@@ -285,11 +286,9 @@ service cloud.firestore {
 
       match /purchases/{productId} {
         allow read: if isOwner(uid) || isAdmin();
-        allow create: if isOwner(uid)
-          && request.resource.data.productId == int(productId)
-          && request.resource.data.status in ['Completed', 'Verified', 'Active']
-          && request.resource.data.source in ['razorpay', 'educoin', 'manual_admin'];
-        allow update, delete: if isAdmin();
+        // Receipts are access evidence. Only verified payment/free-grant
+        // server handlers (Admin SDK), never the purchaser, may create them.
+        allow create, update, delete: if isAdmin();
       }
 
       match /coinTransactions/{transactionId} {

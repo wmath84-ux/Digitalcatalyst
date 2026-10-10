@@ -13,3 +13,12 @@ test('revoked and subscription-derived grants cannot become permanent lifetime p
 test('invalid entries are ignored and actual product identifiers are deduplicated',()=>{
   assert.deepEqual(collectLibraryProductIds([null,[],{},'invalid',{kind:'full_product',productId:' '},{kind:'selected_resources',productId:0},{kind:'selected_modules',productId:'0'}]),{full:[],any:['0']});
 });
+
+test('canonical module/resource kinds are discovered without full-product overgrant',()=>{
+  const result=collectLibraryProductIds([{kind:'module',productId:'modules',moduleId:'m1',status:'active'},{kind:'resource',productId:'resources',resourceId:'r1',status:'active'}]);
+  assert.deepEqual(result.full,[]);assert.deepEqual(result.any,['modules','resources']);
+});
+test('library discovery respects explicit duration and malformed expiry',()=>{
+  const result=collectLibraryProductIds([{kind:'module',productId:'expired',expiresAt:900},{kind:'full_product',productId:'invalid',expiresAt:'broken'},{kind:'module',productId:'active',expiresAt:2000},{kind:'resource',productId:'lifetime',expiresAt:null}],1000);
+  assert.deepEqual(result.full,[]);assert.deepEqual(result.any,['active','lifetime']);
+});

@@ -37,6 +37,7 @@ const ALLOWED_ORIGIN_SUFFIXES = [
   "localhost",
   "127.0.0.1",
   "vercel.app",
+  "e2b.app",
   "web.app",
   "firebaseapp.com",
 ] as const;
@@ -81,7 +82,7 @@ export function applyCors(request: VercelRequest, response: VercelResponse): boo
   response.setHeader("Access-Control-Allow-Credentials", "true");
   response.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS",
+    "GET, POST, PATCH, OPTIONS",
   );
   response.setHeader(
     "Access-Control-Allow-Headers",

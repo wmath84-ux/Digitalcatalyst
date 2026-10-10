@@ -222,13 +222,9 @@ check(
     );
     await pending.page.close();
     const cached = await open("page=leaderboard&leaderError&cache");
-    await cached.page
-      .getByText("Showing the saved leaderboard.", { exact: false })
-      .waitFor();
-    assert.equal(
-      await cached.page.locator("[data-leaderboard-member]").count(),
-      45
-    );
+    // Unverified direct Firestore cache must never republish a hidden profile.
+    await cached.page.getByRole("heading", { name: "Leaderboard unavailable" }).waitFor();
+    assert.equal(await cached.page.locator("[data-leaderboard-member]").count(), 0);
     await cached.page.close();
     const { page, errors } = await open("page=leaderboard&leaderError");
     await page
