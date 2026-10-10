@@ -105,11 +105,13 @@ test("narrow desktop splits collapse to a single readable column", () => {
   assert.match(css, /@container dc-rev \(max-width: 859px\)[\s\S]*display: block !important/);
 });
 
-test("main profile is container-aware and stats never become thin strips", () => {
-  assert.match(mainProfile, /data-profile-stats/);
-  assert.match(css, /\[data-profile-layout\]\s*\{[^}]*container-name: dc-profile/);
-  assert.match(css, /@container dc-profile \(max-width: 479px\)[\s\S]*\[data-profile-stats\][\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@container dc-profile \(max-width: 719px\)[\s\S]*\[data-profile-layout\][\s\S]*display: block !important/);
+test("main profile keeps its stats as a fixed 3-cell row that never collapses to a thin strip", () => {
+  // The account profile renders its shortcut row as `.dc-account-stats`
+  // (three equal cells with a real tap height), not the older container layout.
+  assert.match(mainProfile, /<nav aria-label="Profile shortcuts" className="dc-account-stats">/);
+  const profileCss = read("src/profile/profile-minimal.css");
+  assert.match(profileCss, /\.dc-account-stats \{ display: grid; grid-template-columns: repeat\(3, minmax\(0,1fr\)\);/);
+  assert.match(profileCss, /\.dc-account-stats button \{[^}]*min-height: 4\.25rem;/);
 });
 
 test("shared desktop shell stacks a side panel on narrow content", () => {

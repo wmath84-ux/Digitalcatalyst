@@ -64,7 +64,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
-import DesktopPeekDock, { isHomeDockRoute } from "./glass-dock/DesktopPeekDock";
+import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";

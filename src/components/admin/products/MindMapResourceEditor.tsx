@@ -1,668 +1,307 @@
 "use client";
 
-// Admin · Product editor — Mind Map Resource Editor.
+// Admin · Product editor — Mind Map resource editor.
 //
-// This component provides the admin interface for creating and editing Mind Map
-// resources. It offers two creation modes:
-//   1. Copy/Paste Code — for importing mind map data from AI-generated code
-//   2. Build From Scratch — for creating mind maps using the visual editor
-//
-// Both modes produce the same canonical mind map data format that is compatible
-// with the Course Player's Mind Map renderer.
+// Two ways to create the map, both producing the same canonical MindMap that
+// the Course Player renders:
+//   1. Paste JSON (AI-generated or hand-written). Validation uses the shared
+//      validator in utils/mindMapImport.js — the same one the Course Player's
+//      AI / JSON import uses — so both editors accept exactly the same input.
+//   2. Build From Scratch — the same MindMapPanel the Course Player uses.
 
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { Check, Copy, AlertCircle, Brain, Code2, Plus, Trash2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect, lazy, Suspense } from "react";
+import { Check, Copy, AlertCircle, Brain, Code2, Plus } from "lucide-react";
 import { Field, SecondaryButton } from "@/components/admin/ui";
-import { lazy, Suspense } from "react";
-import { GlassSurface } from "../../../components/ui/glass";
-
-// Lazy load the MindMapPanel to avoid bundling the heavy React Flow library
-// unless the scratch builder is actually used
-const MindMapPanel = lazy(() => import("../../../course/MindMapPanel"));
 import {
   createMindMap,
   parseMindMap,
   isMindMap,
   type MindMap,
   MIND_MAP_VERSION,
-  MAX_MIND_MAP_NODES,
-  MAX_TOPIC_LENGTH,
-  sanitizeTopic,
-  sanitizeTitle,
   rootId,
 } from "../../../../utils/mindMapTree";
+import {
+  MIND_MAP_AI_PROMPT,
+  describeMindMapStats,
+  formatMindMapIssue,
+  validateMindMapJson,
+  validateMindMapObject,
+  type MindMapValidation,
+} from "../../../../utils/mindMapImport.js";
 import type { ProductResource } from "@/lib/admin/types";
 
-/**
- * Validation result for mind map code import.
- */
-interface ValidationResult {
-  valid: boolean;
-  mindMap?: MindMap;
-  errors: string[];
-  warnings: string[];
-}
+// Lazy: the React Flow canvas is only bundled when the scratch builder opens.
+const MindMapPanel = lazy(() => import("../../../course/MindMapPanel"));
 
-/**
- * Schema for the AI prompt generation.
- * This matches the canonical mind map structure that the application can consume.
- */
-const MIND_MAP_SCHEMA = {
-  version: MIND_MAP_VERSION,
-  title: "string (optional, max 120 chars)",
-  rootTopic: "string (required, max 400 chars)",
-  nodes: "array of node objects",
-  nodeStructure: {
-    id: "string (required, unique)",
-    topic: "string (required, max 400 chars)",
-    parentId: "string or null (required, references another node id or null for root children)",
-    side: "'left' | 'right' | null (optional, for root-level children)",
-    collapsed: "boolean (optional, default false)",
-    fx: "number or null (optional, manual x position)",
-    fy: "number or null (optional, manual y position)",
-  },
-  constraints: {
-    maxNodes: MAX_MIND_MAP_NODES,
-    maxTopicLength: MAX_TOPIC_LENGTH,
-    rootId: rootId(),
-  },
-};
-
-/**
- * Generate an AI prompt that will produce mind map data in the exact format
- * that this application can consume.
- */
-const generateAIPrompt = (): string => {
-  return `Generate a valid mind map data structure for a Digitalcatalyst course. 
-
-REQUIREMENTS:
-- Output ONLY a valid JSON object, no explanations, no markdown, no extra text
-- The JSON must match this exact schema:
-
-{
-  "version": ${MIND_MAP_VERSION},
-  "title": "string (optional, max 120 chars)",
-  "rootTopic": "string (required, max 400 chars) - the central idea",
-  "nodes": [
-    {
-      "id": "string (required, unique, cannot be '${rootId()}')",
-      "topic": "string (required, max 400 chars)",
-      "parentId": "string or null (required, use '${rootId()}' for root children, null for root)",
-      "side": "left" | "right" | null (optional, only for direct root children)",
-      "collapsed": boolean (optional, default false),
-      "fx": number | null (optional, manual x position),
-      "fy": number | null (optional, manual y position)
-    }
-  ]
-}
-
-CONSTRAINTS:
-- Maximum ${MAX_MIND_MAP_NODES} total nodes (including root)
-- Maximum ${MAX_TOPIC_LENGTH} characters per topic
-- All node IDs must be unique strings
-- parentId must reference an existing node or '${rootId()}' for root children
-- No circular references allowed
-- Root node is implied by rootTopic, don't include it in nodes array
-- Use meaningful, educational topics for a course mind map
-
-EXAMPLE OUTPUT:
-{
-  "version": ${MIND_MAP_VERSION},
-  "title": "Mathematics Fundamentals",
-  "rootTopic": "Mathematics",
-  "nodes": [
-    {"id": "n1", "topic": "Algebra", "parentId": "${rootId()}", "side": "right"},
-    {"id": "n2", "topic": "Geometry", "parentId": "${rootId()}", "side": "left"},
-    {"id": "n3", "topic": "Equations", "parentId": "n1"},
-    {"id": "n4", "topic": "Shapes", "parentId": "n2"}
-  ]
-}`;
-};
-
-/**
- * Validate and parse mind map code into the canonical format.
- */
-const validateMindMapCode = (code: string): ValidationResult => {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  
-  // Basic validation
-  if (!code || !code.trim()) {
-    errors.push("Code is empty");
-    return { valid: false, errors, warnings };
-  }
-
-  try {
-    // Try to parse as JSON
-    let parsed;
-    try {
-      parsed = JSON.parse(code.trim());
-    } catch (e) {
-      errors.push(`Invalid JSON: ${e instanceof Error ? e.message : 'Syntax error'}`);
-      return { valid: false, errors, warnings };
-    }
-
-    // Validate structure
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      errors.push("Root must be an object");
-      return { valid: false, errors, warnings };
-    }
-
-    // Check version
-    if (parsed.version !== undefined && parsed.version !== MIND_MAP_VERSION) {
-      warnings.push(`Version ${parsed.version} may need migration (expected ${MIND_MAP_VERSION})`);
-    }
-
-    // Check rootTopic
-    if (!parsed.rootTopic || typeof parsed.rootTopic !== "string") {
-      errors.push("rootTopic is required and must be a string");
-      return { valid: false, errors, warnings };
-    }
-
-    if (parsed.rootTopic.length > MAX_TOPIC_LENGTH) {
-      errors.push(`rootTopic exceeds maximum length of ${MAX_TOPIC_LENGTH} characters`);
-      return { valid: false, errors, warnings };
-    }
-
-    // Validate title
-    if (parsed.title !== undefined) {
-      if (typeof parsed.title !== "string") {
-        errors.push("title must be a string");
-        return { valid: false, errors, warnings };
-      }
-      if (parsed.title.length > 120) {
-        warnings.push("title exceeds recommended length of 120 characters");
-      }
-    }
-
-    // Validate nodes
-    if (!Array.isArray(parsed.nodes)) {
-      errors.push("nodes must be an array");
-      return { valid: false, errors, warnings };
-    }
-
-    // Check total node count (root + nodes array)
-    if (parsed.nodes.length + 1 > MAX_MIND_MAP_NODES) {
-      errors.push(`Total nodes (${parsed.nodes.length + 1}) exceeds maximum of ${MAX_MIND_MAP_NODES}`);
-      return { valid: false, errors, warnings };
-    }
-
-    const nodeIds = new Set<string>();
-    const nodeMap = new Map<string, any>();
-
-    // Validate each node
-    for (const node of parsed.nodes) {
-      if (!node || typeof node !== "object") {
-        errors.push("Each node must be an object");
-        return { valid: false, errors, warnings };
-      }
-
-      // Check id
-      if (!node.id || typeof node.id !== "string") {
-        errors.push("Each node must have a string id");
-        return { valid: false, errors, warnings };
-      }
-
-      if (node.id === rootId()) {
-        errors.push(`Node ID cannot be '${rootId()}' (reserved for root)`);
-        return { valid: false, errors, warnings };
-      }
-
-      if (nodeIds.has(node.id)) {
-        errors.push(`Duplicate node ID: ${node.id}`);
-        return { valid: false, errors, warnings };
-      }
-      nodeIds.add(node.id);
-      nodeMap.set(node.id, node);
-
-      // Check topic
-      if (!node.topic || typeof node.topic !== "string") {
-        errors.push(`Node ${node.id} must have a string topic`);
-        return { valid: false, errors, warnings };
-      }
-
-      if (node.topic.length > MAX_TOPIC_LENGTH) {
-        warnings.push(`Node ${node.id} topic exceeds maximum length of ${MAX_TOPIC_LENGTH} characters`);
-      }
-
-      // Check parentId
-      if (node.parentId === undefined || node.parentId === null) {
-        // This is allowed for nodes that should be attached to root
-        node.parentId = rootId();
-      } else if (typeof node.parentId !== "string") {
-        errors.push(`Node ${node.id} parentId must be a string or null`);
-        return { valid: false, errors, warnings };
-      }
-
-      // Check side
-      if (node.side !== undefined && node.side !== null && !["left", "right"].includes(node.side)) {
-        warnings.push(`Node ${node.id} side should be 'left', 'right', or null`);
-      }
-
-      // Check collapsed
-      if (node.collapsed !== undefined && typeof node.collapsed !== "boolean") {
-        warnings.push(`Node ${node.id} collapsed should be boolean`);
-      }
-
-      // Check fx/fy
-      if (node.fx !== undefined && typeof node.fx !== "number" && node.fx !== null) {
-        warnings.push(`Node ${node.id} fx should be number or null`);
-      }
-      if (node.fy !== undefined && typeof node.fy !== "number" && node.fy !== null) {
-        warnings.push(`Node ${node.id} fy should be number or null`);
-      }
-    }
-
-    // Check for circular references and orphaned nodes
-    // Build a parent-child graph
-    const childrenMap = new Map<string, string[]>();
-    for (const node of parsed.nodes) {
-      const parentId = node.parentId || rootId();
-      if (!childrenMap.has(parentId)) {
-        childrenMap.set(parentId, []);
-      }
-      childrenMap.get(parentId)!.push(node.id);
-    }
-
-    // Check that all parentIds reference existing nodes (except root)
-    for (const node of parsed.nodes) {
-      const parentId = node.parentId || rootId();
-      if (parentId !== rootId() && !nodeIds.has(parentId) && !childrenMap.has(parentId)) {
-        errors.push(`Node ${node.id} references non-existent parent: ${parentId}`);
-        return { valid: false, errors, warnings };
-      }
-    }
-
-    // Check for circular references using DFS
-    const hasCycle = (startId: string, visited: Set<string> = new Set()): boolean => {
-      if (visited.has(startId)) return true;
-      visited.add(startId);
-      
-      const children = childrenMap.get(startId) || [];
-      for (const childId of children) {
-        if (hasCycle(childId, new Set(visited))) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Check for cycles starting from root children
-    const rootChildren = childrenMap.get(rootId()) || [];
-    for (const childId of rootChildren) {
-      if (hasCycle(childId)) {
-        errors.push("Circular reference detected in node hierarchy");
-        return { valid: false, errors, warnings };
-      }
-    }
-
-    // If we got here, the structure is valid
-    // Parse through the canonical parser to ensure compatibility
-    const canonicalMindMap = parseMindMap(parsed);
-    
-    return {
-      valid: true,
-      mindMap: canonicalMindMap,
-      errors: [],
-      warnings: warnings.length > 0 ? warnings : [],
-    };
-
-  } catch (error) {
-    errors.push(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return { valid: false, errors, warnings };
-  }
-};
-
-/**
- * Default AI prompt for mind map generation.
- */
-const DEFAULT_AI_PROMPT = generateAIPrompt();
+const EMPTY_VALIDATION: MindMapValidation = { valid: false, errors: [], warnings: [], mindMap: null, stats: null };
 
 interface MindMapResourceEditorProps {
   resource: ProductResource;
   onChange: (patch: Partial<ProductResource>) => void;
 }
 
-export default function MindMapResourceEditor({
-  resource,
-  onChange,
-}: MindMapResourceEditorProps) {
+export default function MindMapResourceEditor({ resource, onChange }: MindMapResourceEditorProps) {
   const [mode, setMode] = useState<"code" | "scratch">("code");
-  const [codeInput, setCodeInput] = useState<string>("");
-  const [validationResult, setValidationResult] = useState<ValidationResult>({ valid: false, errors: [], warnings: [] });
-  const [showAIPrompt, setShowAIPrompt] = useState<boolean>(false);
-  const [editorKey, setEditorKey] = useState<number>(0); // Force remount
-  
-  // State for scratch editor mode
-  const [currentMindMap, setCurrentMindMap] = useState<MindMap | null>(null);
-  const [editorLoaded, setEditorLoaded] = useState<boolean>(false);
-  
-  // Initialize code input from existing mind map data
+  const [jsonText, setJsonText] = useState<string>("");
+  // Validation is stored together with the text it was run against, so the
+  // Save action can never use a result for text that has since changed.
+  const [checked, setChecked] = useState<{ text: string; result: MindMapValidation } | null>(null);
+  const [showPrompt, setShowPrompt] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [scratchMap, setScratchMap] = useState<MindMap | null>(null);
+
+  // Load the saved map into the JSON box once (or when a different map is saved).
   useEffect(() => {
     if (resource.mindMapData) {
-      try {
-        setCodeInput(JSON.stringify(resource.mindMapData, null, 2));
-        const result = validateMindMapCode(JSON.stringify(resource.mindMapData));
-        setValidationResult(result);
-      } catch {
-        setCodeInput("");
-        setValidationResult({ valid: false, errors: ["Invalid existing mind map data"], warnings: [] });
-      }
+      const text = JSON.stringify(resource.mindMapData, null, 2);
+      setJsonText(text);
+      setChecked({ text, result: validateMindMapJson(text) });
     } else {
-      setCodeInput("");
-      setValidationResult({ valid: false, errors: [], warnings: [] });
+      setJsonText("");
+      setChecked(null);
     }
   }, [resource.mindMapData]);
 
-  // Initialize scratch editor when switching to scratch mode
+  // Scratch builder state: start from the saved map, or a fresh map titled after the resource.
   useEffect(() => {
-    if (mode === "scratch") {
-      if (resource.mindMapData) {
-        try {
-          const parsed = parseMindMap(resource.mindMapData);
-          setCurrentMindMap(parsed);
-        } catch {
-          // Create new mind map with resource name as root topic
-          setCurrentMindMap(createMindMap(
-            resource.mindMapRootTopic || resource.name || "Central Idea",
-            resource.name || "Untitled Mind Map"
-          ));
-        }
-      } else {
-        // Create new mind map with resource name as root topic
-        setCurrentMindMap(createMindMap(
-          resource.name || "Central Idea",
-          resource.name || "Untitled Mind Map"
-        ));
+    if (mode !== "scratch") return;
+    if (resource.mindMapData) {
+      try {
+        setScratchMap(parseMindMap(resource.mindMapData));
+        return;
+      } catch {
+        // fall through to a fresh map
       }
-      setEditorLoaded(true);
     }
+    setScratchMap(createMindMap(resource.name || "Central Idea", resource.name || "Untitled Mind Map"));
   }, [mode, resource.mindMapData, resource.mindMapRootTopic, resource.name]);
 
-  // Handle AI prompt copy
-  const handleCopyAIPrompt = useCallback(() => {
-    navigator.clipboard.writeText(DEFAULT_AI_PROMPT).then(() => {
-      // Could show a toast here
-    }).catch(() => {
-      // Handle error
-    });
-  }, []);
+  const current: MindMapValidation = useMemo(() => {
+    if (!checked) return EMPTY_VALIDATION;
+    return checked.text === jsonText ? checked.result : EMPTY_VALIDATION;
+  }, [checked, jsonText]);
 
-  // Handle code validation
-  const handleValidateCode = useCallback((code: string) => {
-    const result = validateMindMapCode(code);
-    setValidationResult(result);
+  const runValidation = useCallback((text: string) => {
+    const result = validateMindMapJson(text);
+    setChecked({ text, result });
     return result;
   }, []);
 
-  // Handle code change
-  const handleCodeChange = useCallback((code: string) => {
-    setCodeInput(code);
-    // Debounce validation for better performance
-    const result = validateMindMapCode(code);
-    setValidationResult(result);
+  const handleJsonChange = useCallback((text: string) => {
+    setJsonText(text);
+    setChecked(null);
   }, []);
 
-  // Handle save from code mode
-  const handleSaveFromCode = useCallback(() => {
-    const result = handleValidateCode(codeInput);
-    if (!result.valid || !result.mindMap) {
-      return false;
-    }
+  const handleStartEmpty = useCallback(() => {
+    const text = JSON.stringify({ version: MIND_MAP_VERSION, title: "", rootTopic: "Central Idea", nodes: [] }, null, 2);
+    setJsonText(text);
+    setChecked({ text, result: validateMindMapJson(text) });
+  }, []);
 
-    // Update resource with validated mind map data
+  const handleSaveFromJson = useCallback(() => {
+    const result = runValidation(jsonText);
+    if (!result.valid || !result.mindMap) return;
     onChange({
-      mindMapData: result.mindMap,
+      mindMapData: result.mindMap as unknown as Record<string, unknown>,
       mindMapSourceMode: "code_import",
       mindMapRootTopic: result.mindMap.rootTopic,
-      name: resource.name || result.mindMap.title || result.mindMap.rootTopic || "Untitled Mind Map",
-      url: "", // Mind maps don't have URLs
-      provider: "Mind Map",
-    });
-
-    return true;
-  }, [codeInput, resource.name, onChange, handleValidateCode]);
-
-  // Handle mind map changes in scratch editor
-  const handleMindMapChange = useCallback((updater: MindMap | ((current: MindMap) => MindMap)) => {
-    setCurrentMindMap(prev => {
-      const next = typeof updater === "function" ? updater(prev || createMindMap()) : updater;
-      return next;
-    });
-  }, []);
-
-  // Handle save from scratch mode
-  const handleSaveFromScratch = useCallback(() => {
-    if (!currentMindMap) return;
-    
-    onChange({
-      mindMapData: currentMindMap,
-      mindMapSourceMode: "scratch_builder",
-      mindMapRootTopic: currentMindMap.rootTopic,
-      name: resource.name || currentMindMap.title || currentMindMap.rootTopic || "Untitled Mind Map",
       url: "",
       provider: "Mind Map",
     });
-  }, [currentMindMap, resource.name, onChange]);
+  }, [jsonText, onChange, runValidation]);
 
-  // Handle mode switch
-  const handleSwitchToCode = useCallback(() => {
-    setMode("code");
-    setEditorLoaded(false); // Reset editor state when switching away
+  const handleScratchChange = useCallback((updater: MindMap | ((current: MindMap) => MindMap)) => {
+    setScratchMap((prev) => (typeof updater === "function" ? updater(prev || createMindMap()) : updater));
   }, []);
 
-  const handleSwitchToScratch = useCallback(() => {
-    setMode("scratch");
-    setEditorLoaded(true);
+  const handleSaveFromScratch = useCallback(() => {
+    if (!scratchMap || !scratchMap.rootTopic) return;
+    // Same validator as the JSON path: the saved map must pass the shared schema.
+    const check = validateMindMapObject(scratchMap);
+    if (!check.valid || !check.mindMap) return;
+    onChange({
+      mindMapData: check.mindMap as unknown as Record<string, unknown>,
+      mindMapSourceMode: "scratch_builder",
+      mindMapRootTopic: check.mindMap.rootTopic,
+      url: "",
+      provider: "Mind Map",
+    });
+  }, [scratchMap, onChange]);
+
+  const handleCopyPrompt = useCallback(() => {
+    navigator.clipboard?.writeText(MIND_MAP_AI_PROMPT).then(
+      () => { setCopied(true); setTimeout(() => setCopied(false), 1500); },
+      () => undefined,
+    );
   }, []);
 
-  // Check if the current resource has valid mind map data
-  const hasValidMindMapData = useMemo(() => {
-    if (!resource.mindMapData) return false;
-    return isMindMap(resource.mindMapData);
-  }, [resource.mindMapData]);
+  const jsonReady = mode === "code" && current.valid && Boolean(current.mindMap);
+  const scratchReady = mode === "scratch" && Boolean(scratchMap && scratchMap.rootTopic);
+  const savedReady = Boolean(resource.mindMapData) && validateMindMapObject(resource.mindMapData).valid;
+  const isReady = mode === "code" ? jsonReady : scratchReady || savedReady;
 
-  // Check if the resource is ready for publishing
-  const isReady = useMemo(() => {
-    if (mode === "code") {
-      return validationResult.valid && validationResult.mindMap !== undefined;
-    }
-    // For scratch mode, check if we have a valid mind map
-    return currentMindMap !== null && isMindMap(currentMindMap);
-  }, [mode, validationResult, currentMindMap]);
+  const tabClass = (active: boolean) =>
+    `flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+      active ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+    }`;
 
   return (
     <div className="space-y-4" data-admin-mindmap-editor>
-      {/* Mode selection */}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3" data-admin-mindmap-mode-selector>
-        <p className="text-sm font-semibold text-indigo-950 mb-3">
-          Create Mind Map
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleSwitchToCode}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition ${mode === "code" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
-            data-admin-mindmap-mode="code"
-          >
+        <p className="mb-3 text-sm font-semibold text-indigo-950">Create Mind Map</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setMode("code")} className={tabClass(mode === "code")} data-admin-mindmap-mode="code">
             <Code2 size={16} />
-            Copy / Paste Code
+            Copy / Paste JSON
           </button>
-          <button
-            type="button"
-            onClick={handleSwitchToScratch}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition ${mode === "scratch" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
-            data-admin-mindmap-mode="scratch"
-          >
+          <button type="button" onClick={() => setMode("scratch")} className={tabClass(mode === "scratch")} data-admin-mindmap-mode="scratch">
             <Brain size={16} />
             Build From Scratch
           </button>
         </div>
         <p className="mt-2 text-xs text-slate-600">
-          {mode === "code" 
-            ? "Paste AI-generated mind map code in the canonical format"
-            : "Use the visual editor to create your mind map from scratch"}
+          {mode === "code"
+            ? "Paste AI-generated or hand-written mind map JSON below, then Validate. Save unlocks only when the JSON is valid."
+            : "Use the same visual Mind Map editor the learners use. Save stores the map on this resource."}
         </p>
       </div>
 
-      {/* Code Mode */}
       {mode === "code" && (
         <div className="space-y-3" data-admin-mindmap-code-mode>
-          {/* AI Prompt Section */}
           <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <p className="text-sm font-semibold text-violet-900">AI Prompt</p>
-              <SecondaryButton
-                className="h-8 px-3 text-xs"
-                onClick={() => setShowAIPrompt(!showAIPrompt)}
-              >
-                {showAIPrompt ? "Hide" : "Show AI Prompt"}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-violet-900">AI prompt</p>
+              <SecondaryButton className="h-8 px-3 text-xs" onClick={() => setShowPrompt((v) => !v)}>
+                {showPrompt ? "Hide prompt" : "Show AI prompt"}
               </SecondaryButton>
             </div>
-            
-            {showAIPrompt && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-600">
-                  Copy this prompt to generate mind map code that works with this application.
-                </p>
-                <div className="relative">
-                  <textarea
-                    className="w-full rounded-lg border border-violet-200 bg-white p-3 text-xs font-mono leading-5 min-h-[120px] resize-none"
-                    value={DEFAULT_AI_PROMPT}
-                    readOnly
-                    rows={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCopyAIPrompt}
-                    className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-violet-600 text-white text-xs active:bg-violet-700"
-                    title="Copy AI Prompt"
-                  >
-                    <Copy size={12} />
-                  </button>
-                </div>
+            {showPrompt && (
+              <div className="relative">
+                <p className="mb-2 text-xs text-slate-600">Give this prompt to an AI assistant, then paste its JSON answer below.</p>
+                <textarea
+                  readOnly
+                  rows={8}
+                  value={MIND_MAP_AI_PROMPT}
+                  className="w-full resize-y rounded-lg border border-violet-200 bg-white p-3 font-mono text-xs leading-5 text-slate-900"
+                  style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyPrompt}
+                  className="absolute right-2 top-9 inline-flex h-7 items-center gap-1 rounded-full bg-violet-600 px-2 text-xs font-semibold text-white active:bg-violet-700"
+                  title="Copy AI prompt"
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
               </div>
             )}
           </div>
 
-          {/* Code Input */}
           <Field
-            label="Mind Map Code"
+            label="Mind map JSON"
             required
-            hint={validationResult.errors.length > 0 
-              ? "Fix the errors below to continue"
-              : validationResult.warnings.length > 0
-                ? `⚠️ ${validationResult.warnings.length} warning(s)`
-                : "Paste valid mind map JSON code"}
+            hint="Paste the JSON here. It is separate from the resource name below."
           >
             <textarea
-              className={`min-h-[200px] font-mono text-sm ${validationResult.valid ? "border-emerald-300 bg-emerald-50/20" : validationResult.errors.length > 0 ? "border-red-300 bg-red-50/20" : "border-slate-200 bg-white"}`}
-              value={codeInput}
-              onChange={(e) => handleCodeChange(e.target.value)}
-              placeholder={`{
-  "version": ${MIND_MAP_VERSION},
-  "title": "My Mind Map",
-  "rootTopic": "Central Idea",
-  "nodes": [
-    {"id": "n1", "topic": "Main Topic", "parentId": "${rootId()}"}
-  ]
-}`}
+              value={jsonText}
+              onChange={(event) => handleJsonChange(event.target.value)}
+              spellCheck={false}
+              aria-label="Mind map JSON"
+              data-admin-mindmap-json
+              placeholder={`{\n  "version": ${MIND_MAP_VERSION},\n  "title": "My Mind Map",\n  "rootTopic": "Central Idea",\n  "nodes": [\n    {"id": "n1", "topic": "Main Topic", "parentId": "${rootId()}"}\n  ]\n}`}
+              className={`block w-full min-h-[320px] resize-y whitespace-pre overflow-auto rounded-lg border bg-white p-3 font-mono text-[13px] leading-5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                !jsonText.trim()
+                  ? "border-slate-200"
+                  : current.valid
+                    ? "border-emerald-300 bg-emerald-50/20"
+                    : checked && checked.text === jsonText && !checked.result.valid
+                      ? "border-red-300 bg-red-50/20"
+                      : "border-slate-300"
+              }`}
+              style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
             />
           </Field>
 
-          {/* Validation Results */}
-          {validationResult.errors.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50/40 p-3" role="alert">
-              <p className="text-sm font-semibold text-red-800 mb-2">
-                <AlertCircle size={16} className="inline mr-1" />
-                Validation Errors
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-xs text-red-700">
-                {validationResult.errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {validationResult.warnings.length > 0 && validationResult.errors.length === 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-              <p className="text-sm font-semibold text-amber-800 mb-2">
-                ⚠️ Warnings
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-xs text-amber-700">
-                {validationResult.warnings.map((warning, index) => (
-                  <li key={index}>{warning}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Code Mode Actions */}
           <div className="flex flex-wrap gap-2">
-            <SecondaryButton
-              className="h-9 px-4 text-sm"
-              disabled={!codeInput.trim()}
-              onClick={() => handleCodeChange("{\n  \"version\": " + MIND_MAP_VERSION + ",\n  \"title\": \"\",\n  \"rootTopic\": \"Central Idea\",\n  \"nodes\": []\n}")}
-            >
+            <SecondaryButton className="h-9 px-4 text-sm" onClick={handleStartEmpty}>
               <Plus size={16} />
-              Start Empty
+              Start empty
             </SecondaryButton>
-            
-            <SecondaryButton
-              className="h-9 px-4 text-sm"
-              disabled={!codeInput.trim()}
-              onClick={() => handleValidateCode(codeInput)}
-            >
+            <SecondaryButton className="h-9 px-4 text-sm" disabled={!jsonText.trim()} onClick={() => runValidation(jsonText)}>
               <Check size={16} />
               Validate
             </SecondaryButton>
-
             <button
               type="button"
-              className="h-9 rounded-lg border border-emerald-200 bg-emerald-600 px-4 text-sm font-semibold text-white active:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!validationResult.valid || !validationResult.mindMap}
-              onClick={handleSaveFromCode}
+              className="h-9 rounded-lg border border-emerald-200 bg-emerald-600 px-4 text-sm font-semibold text-white active:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!jsonReady}
+              onClick={handleSaveFromJson}
             >
-              <Check size={16} />
-              Save Mind Map
+              <Check size={16} className="mr-1 inline" />
+              Save mind map
             </button>
           </div>
+
+          {checked && checked.text === jsonText && !current.valid && current.errors.length > 0 && (
+            <div className="rounded-lg border border-red-200 bg-red-50/60 p-3" role="alert" data-admin-mindmap-errors>
+              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-red-800">
+                <AlertCircle size={16} />
+                {current.errors.length} problem{current.errors.length === 1 ? "" : "s"} — fix to continue
+              </p>
+              <ul className="list-disc space-y-1 pl-5 font-mono text-xs text-red-800">
+                {current.errors.map((error, index) => (
+                  <li key={index}>{formatMindMapIssue(error)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {current.valid && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900" data-admin-mindmap-valid>
+              <p className="flex items-center gap-1 font-semibold">
+                <Check size={16} />
+                Valid mind map · {describeMindMapStats(current.stats)}
+              </p>
+            </div>
+          )}
+
+          {current.warnings.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-900" data-admin-mindmap-warnings>
+              <p className="mb-1 font-semibold">Warnings (saved as read)</p>
+              <ul className="list-disc space-y-1 pl-5 font-mono">
+                {current.warnings.map((warning, index) => (
+                  <li key={index}>{formatMindMapIssue(warning)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Scratch Mode */}
       {mode === "scratch" && (
         <div className="space-y-3" data-admin-mindmap-scratch-mode>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
-            <p className="text-sm text-indigo-800 mb-3">
-              The visual Mind Map Editor provides the same full functionality that learners use in the Course Player.
-              Create nodes, connect them, edit labels, style, zoom, pan, and more.
-            </p>
-            
-            <div className="flex flex-wrap gap-2 mb-4">
-              <SecondaryButton
-                className="h-8 px-3 text-xs"
-                onClick={handleSwitchToCode}
-              >
+            <div className="mb-3 flex flex-wrap gap-2">
+              <SecondaryButton className="h-8 px-3 text-xs" onClick={() => setMode("code")}>
                 <Code2 size={14} />
-                Switch to Code Mode
+                Switch to JSON
               </SecondaryButton>
             </div>
-
-            {/* Mind Map Editor Integration */}
-            <div className="rounded-lg border border-indigo-200 bg-white p-2 min-h-[400px]">
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-full">
-                  <GlassSurface className="p-6 text-center">
-                    <Brain size={32} className="mx-auto text-indigo-400 animate-pulse" />
-                    <p className="text-sm text-slate-500 mt-2">Loading Mind Map Editor...</p>
-                  </GlassSurface>
-                </div>
-              }>
+            <div className="min-h-[400px] rounded-lg border border-indigo-200 bg-white p-2">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center p-6 text-center">
+                    <div>
+                      <Brain size={32} className="mx-auto animate-pulse text-indigo-400" />
+                      <p className="mt-2 text-sm text-slate-500">Loading Mind Map editor…</p>
+                    </div>
+                  </div>
+                }
+              >
                 <MindMapPanel
-                  mind={currentMindMap}
-                  onMindChange={handleMindMapChange}
+                  mind={scratchMap ?? createMindMap()}
+                  onMindChange={handleScratchChange}
                   status="ready"
                   errorMessage={null}
                   onFlush={handleSaveFromScratch}
@@ -684,52 +323,42 @@ export default function MindMapResourceEditor({
                 />
               </Suspense>
             </div>
-
-            {/* Scratch mode save button */}
-            <div className="flex gap-2">
+            <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                className="h-9 rounded-lg border border-emerald-200 bg-emerald-600 px-4 text-sm font-semibold text-white active:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!currentMindMap || !currentMindMap.rootTopic}
+                className="h-9 rounded-lg border border-emerald-200 bg-emerald-600 px-4 text-sm font-semibold text-white active:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!scratchReady || !isMindMap(scratchMap)}
                 onClick={handleSaveFromScratch}
               >
-                <Check size={16} />
-                Save Mind Map
+                <Check size={16} className="mr-1 inline" />
+                Save mind map
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Resource Name Field (common to both modes) */}
-      <Field
-        label="Resource name"
-        required
-        hint="The name that will appear in the Course Player library"
-      >
+      <Field label="Resource name" required hint="The name that appears in the Course Player library">
         <input
-          className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm"
+          className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900"
+          style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
           value={resource.name || ""}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="e.g., Chapter 1: Algebra Fundamentals"
+          placeholder="e.g., Chapter 1: Algebra fundamentals"
         />
       </Field>
 
-      {/* Status indicator */}
       <div className={`rounded-lg border p-3 text-sm ${isReady ? "border-emerald-200 bg-emerald-50/40 text-emerald-800" : "border-amber-200 bg-amber-50/40 text-amber-800"}`}>
         {isReady ? (
-          <p className="flex items-center gap-2">
-            <Check size={16} />
-            Mind Map is ready for publishing
-          </p>
+          <p className="flex items-center gap-2"><Check size={16} />Mind map is ready for publishing</p>
         ) : (
           <p className="flex items-center gap-2">
             <AlertCircle size={16} />
-            {mode === "code" 
-              ? validationResult.errors.length > 0 
-                ? `Fix ${validationResult.errors.length} error(s) to continue`
-                : "Complete the mind map code"
-              : "Create your mind map using the editor"}
+            {mode === "code"
+              ? current.errors.length > 0
+                ? `Fix ${current.errors.length} problem(s) to continue`
+                : "Paste the JSON and press Validate"
+              : "Create your map, then press Save mind map"}
           </p>
         )}
       </div>

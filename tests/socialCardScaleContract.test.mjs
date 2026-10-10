@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const css = fs.readFileSync(path.join(ROOT, "src/home/components/social-profile-card.css"), "utf8");
 const cardSource = fs.readFileSync(path.join(ROOT, "src/home/components/SocialProfileCard.tsx"), "utf8");
-const homeApp = fs.readFileSync(path.join(ROOT, "src/home/App.tsx"), "utf8");
+const homeApp = fs.readFileSync(path.join(ROOT, "src/home/components/FeedbackExperiencePage.tsx"), "utf8");
 const brandingPage = fs.readFileSync(path.join(ROOT, "src/admin/pages/BrandingPage.tsx"), "utf8");
 
 const PX_PER_REM = 16;

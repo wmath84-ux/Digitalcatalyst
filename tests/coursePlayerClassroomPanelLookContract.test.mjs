@@ -155,17 +155,11 @@ test("the HUD / control-tray material is the room's — and where it still float
   assert.match(css, /\[data-course-dock\] \[data-glass-dock\] \{[^}]*var\(--dc-flat-shadow-tray\) !important/s);
 });
 
-test("the rows, their states and their ink are the room's", () => {
-  // RoomSheet rows + DeskPanel module/lesson rows.
-  assert.ok(css.includes("rgba(255, 255, 255, 0.04)"), "row plate");
-  assert.ok(css.includes("rgba(255, 255, 255, 0.09)"), "row hover");
-  assert.ok(css.includes("rgba(255, 255, 255, 0.08)"), "row hairline");
-  assert.ok(css.includes("rgba(255, 255, 255, 0.18)"), "row hover hairline");
-  assert.ok(css.includes("rgba(255, 255, 255, 0.94)"), "title ink");
-  assert.ok(css.includes("rgba(255, 255, 255, 0.45)"), "sub ink");
-  assert.match(css, /border-radius: 16px;/, "the room's 16px row radius");
-  // Browsed module = cyan, playing/open lesson = violet, locked = amber.
-  assert.match(css, /\[data-course-overlay-module\]\[data-selected="true"\][^}]*--dc-flat-cyan-wash/s);
+test("the shared branched menu takes its ink, accent and states from the room's tokens", () => {
+  const menuCss = read("src/components/branched-menu/BranchedMenu.css");
+  assert.match(menuCss, /--bm-ink: var\(--course-text/, "ink follows the course text token");
+  assert.match(menuCss, /--bm-accent: var\(--dc-flat-cyan/, "the accent is the room's cyan");
+  assert.match(css, /--dc-flat-cyan:/, "the room defines the cyan token the menu reads");
   assert.match(css, /\[data-course-sheet-row\]\[data-selected="true"\][^}]*--dc-flat-violet-wash/s);
   assert.match(css, /\[data-course-sheet-row\]\[data-locked="true"\][^}]*rgba\(245, 158, 11, 0\.32\)/s);
 });
@@ -181,7 +175,7 @@ test("the five surface accents are the room's five", () => {
   assert.match(css, /--dc-flat-amber: #f59e0b;/);
   assert.match(css, /--dc-flat-done: #6ee7b7;/);
   // The shared notes card carries the wall's amber accent as CSS variables.
-  assert.match(css, /\.course-player-shell \[data-course-notes-grid\] \[data-course-note\]\.study-resource-card \{[^}]*--resource-accent-soft: var\(--dc-flat-amber-wash\)/s);
+  assert.match(css, /--dc-flat-amber-wash:/);
 });
 
 test("the backdrop, scrollbars and type rendering are the room's", () => {
@@ -272,32 +266,14 @@ test("the connector is the ONLY rule that positions anything, and it is inert", 
 
 /* ── 3b. The owner's two structural asks ────────────────────────────────── */
 
-test("a module and its own content stay visibly connected, as in the room's chooser", () => {
-  // The room drew an expanded module's lessons as a sublist: a dashed hairline
-  // down the left, cyan parent, violet content. The flat list is one flat
-  // column, so the rail is painted in the file rows' own left gutter.
-  const rail = ALL_RULES.find((rule) => /data-row-kind="file"\]::before$/.test(rule.selector));
-  const painted = Object.fromEntries(declarations(rail.body).map((d) => [d.property, d.value]));
-  assert.match(painted["border-left"], /1px dashed rgba\(255, 255, 255, 0\.14\)/, "the room's dashed hairline");
-  assert.equal(painted.left, "3px", "inside the row's own px-2 gutter, clear of its icon plate");
-  // It bridges the list's 6px `space-y-1.5` gap so a run of lessons reads as
-  // one connected rail rather than as dashes with holes in them.
-  assert.equal(painted.top, "-6px");
-  assert.equal(painted.bottom, "-6px");
-
-  // …and it stops at a module's last lesson instead of claiming the next one.
-  const trimmed = ALL_RULES.filter((rule) => isConnector(rule) && /bottom: 0/.test(rule.body));
-  assert.ok(trimmed.length >= 1, "the rail is trimmed at the end of a group");
-  assert.ok(
-    trimmed.some((rule) => /:has\(\+ \[data-row-kind="module"\]\)/.test(rule.selector)),
-    "the trim looks ahead for the next module row",
-  );
-  assert.ok(trimmed.some((rule) => /:last-child/.test(rule.selector)), "…and for the end of the list");
-
-  // Cyan parent, violet content — the desk's own two-column accent pairing.
-  assert.match(css, /\[data-course-overlay-module\]\[data-selected="true"\] \{[^}]*--dc-flat-cyan-wash/s);
-  assert.match(css, /\[data-course-sheet-row\]\[data-row-kind="file"\] \{[^}]*rgba\(167, 139, 250, 0\.07\)/s);
-  assert.match(css, /\[data-course-sheet-row\]\[data-selected="true"\][^}]*--dc-flat-violet-wash/s);
+test("the branched menu draws its own connected branch lines", () => {
+  // The Modules, Notes and Mind Map libraries share one menu whose branch
+  // lines, elbows and active draw come from the React Bits design.
+  const menuCss = read("src/components/branched-menu/BranchedMenu.css");
+  assert.match(menuCss, /--bm-line:/, "a branch line colour token");
+  assert.match(menuCss, /--bm-indent:/, "a per-level indent token");
+  assert.match(menuCss, /--bm-draw:/, "the active branch draw timing");
+  assert.match(menuCss, /\.branched-menu__item\[data-active\]/, "the active branch is accent-coloured");
 });
 
 test("nothing floats: the dock and the rails are solid plates", () => {
@@ -394,9 +370,9 @@ test("each attribute hook the port paints is one the flat player renders", () =>
   for (const attr of [
     "data-course-lesson-pane", "data-course-study-pane",
     "data-course-sheet-row",
-    "data-course-panel-row", "data-course-panel-section-label", "data-course-overlay-module",
-    "data-course-overlay-file", "data-course-dock", "data-glass-dock", "data-course-note",
-    "data-course-notes-grid", "data-course-mindmap-library", "data-course-mindmap-map-card",
+    "data-course-panel-row", "data-course-panel-section-label",
+    "data-course-dock", "data-glass-dock",
+    "data-course-mindmap-library",
     "data-course-editor-zoom", "data-course-image-viewer", "data-course-viewer-audio",
     "data-course-confirm-card", "data-course-confirm-backdrop",
   ]) {

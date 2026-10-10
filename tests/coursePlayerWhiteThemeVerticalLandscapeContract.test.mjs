@@ -86,7 +86,8 @@ test("the Course Player light palette is comprehensive, feature-scoped, and impo
   assert.match(themeStyles, /data-course-settings-trigger/);
   assert.match(themeStyles, /data-course-notes-panel.*data-notes-theme/);
   assert.match(themeStyles, /data-course-theme-portal.*data-menu-theme.*mm-menu/);
-  assert.match(themeStyles, /data-mind-node-root="true"/);
+  // Node ink and fills are inline (paintFor in MindMapPanel), so the palette checks the body hook.
+  assert.match(fs.readFileSync("src/course/MindMapPanel.tsx", "utf8"), /data-mind-node-body=\{id\}/);
   assert.ok(themeStyles.includes('.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-library]'), "Mind Map's library overlay follows its own light theme");
   assert.ok(themeStyles.includes('.course-player-shell[data-course-theme="light"] .course-mindmap-shell[data-mindmap-theme="dark"]'), "a Dark map keeps its own dark canvas in a Light Player");
   assert.ok(themeStyles.includes('.course-player-shell [data-course-notes-panel][data-notes-theme="light"] .course-rich-surface'), "the legacy Notes editor overrides dark Player chrome");

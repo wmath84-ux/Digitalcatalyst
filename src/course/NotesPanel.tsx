@@ -2,16 +2,15 @@
 //
 // Course Player notes panel.
 //
-//   - Saved notes use the shared premium study-resource card from
-//     ./StudyResourceCard: a single activation opens the existing BlockNote
-//     editor, while a double-click/double-tap or keyboard shortcut renames the
-//     note inline. The compact responsive grid shows real course hierarchy,
-//     note context, provenance and timestamps without truncating the identity.
+//   - Saved notes and master notes share one listing, the Branched Menu
+//     (./branched-menu): MASTER notes group by their course module chain, SELF
+//     notes group under "My Modules" or their official module, and notes with no
+//     module context sit under "Unfiled notes". A single activation opens the
+//     note (the BlockNote editor for SELF, read-only for MASTER).
 //   - The single "+" button opens the same white block-document page
 //     (BlockNote, see ./NoteEditor) that fills the notes pane. While the editor
 //     is open the pane is a slim bar (status · Cancel · Save), then the page.
-//   - Delete remains a two-step action from the card and is confirmed before
-//     the note is removed.
+//   - Delete asks for confirmation in a dialog before the note is removed.
 //   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) is
 //     sanitised and imported as blocks; what the editor cannot hold (tables,
 //     images, …) is preserved verbatim, never dropped.
@@ -34,7 +33,7 @@
 // map restarts on its library.
 
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Moon, Plus, Sun, X } from "lucide-react";
+import { Check, FileText, Moon, NotebookPen, Plus, Sun, X } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
@@ -45,8 +44,10 @@ import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession
 import { useCourseTheme, useMasterSelfPreference, type CoursePlayerTheme } from "./playerPreferences";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
-import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
-import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./studyResourceContext";
+import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
+import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
+import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
+import { courseModuleSegments, personalModuleSegments } from "./studyResourceContext";
 import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
 
 // The editor (BlockNote + its stylesheet) is a separate chunk: the player and
@@ -102,21 +103,18 @@ interface NotesPanelProps {
 // pipeline so nothing in the library ever disappears after the upgrade.
 const noteHtml = (note: CoursePlayerNote) => note.html || plainToRichText(note.text || "");
 const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) || note.text || "";
-const masterNotePreview = (note: MasterCourseNote) => richTextToPlain(note.bodyHtml || "");
+
+const NOTE_COLOR = "#f59e0b";
+const MASTER_TAG_COLOR = "#93c5fd";
+const SELF_TAG_COLOR = "#c4b5fd";
+/** Notes captured without any module context. */
+const UNFILED_SEGMENT: BranchSegment = { key: "unfiled", label: "Unfiled notes" };
 
 const noteCardTitle = (note: CoursePlayerNote) => {
   const html = noteHtml(note);
   const { heading } = splitFirstHeading(html);
   const firstBlock = richTextToPlain(firstRichTextBlock(html));
   return (heading || firstBlock || notePreview(note) || `Untitled · ${String(note.id).slice(0, 8)}`).trim().slice(0, 120);
-};
-
-const noteCardTopic = (note: CoursePlayerNote, title: string) => {
-  const html = noteHtml(note);
-  const { heading, body } = splitFirstHeading(html);
-  const fullText = notePreview(note);
-  const text = heading ? richTextToPlain(body) : fullText.slice(title.length).replace(/^[\s:|·—–-]+/, "").trim();
-  return text.trim().slice(0, 220);
 };
 
 const aiKindLabel = (note: CoursePlayerNote) => {
@@ -252,7 +250,6 @@ export default function NotesPanel({
   onAdd,
   onEdit,
   onDelete,
-  courseTitle = "",
   modules = [],
   personalModules = [],
   onRetrySync,
@@ -488,6 +485,81 @@ export default function NotesPanel({
     }
   };
 
+  // ── Library tree: one Branched Menu per collection ────────────────────
+  // MASTER notes group by their real course-module chain; SELF notes group by
+  // the learner's own module (under "My Modules") or by the official chain they
+  // were captured from. Notes with no module context stay in "Unfiled notes".
+  const masterTree: BranchedMenuItem[] = buildBranchTree(
+    masterNotes.map((note): BranchEntry => {
+      const path = courseModuleSegments(modules, note.moduleId);
+      const words = (note.bodyHtml || "").trim().split(/\s+/).filter(Boolean).length;
+      return {
+        path: path.length ? path : [UNFILED_SEGMENT],
+        item: {
+          value: `master:${note.id}`,
+          label: note.title || "Untitled master note",
+          icon: <FileText size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: NOTE_COLOR,
+          tag: { label: "MASTER", color: MASTER_TAG_COLOR },
+          meta: words ? `${words} words` : undefined,
+          description: `Master note. ${note.title || "Untitled master note"}. Read only.`,
+          dataAttrs: { "data-course-master-note-open": "", "data-note-id": note.resourceId },
+        },
+      };
+    }),
+    { sectionMeta: ({ count }) => <span>{count}</span> },
+  );
+
+  const selfTree: BranchedMenuItem[] = buildBranchTree(
+    notes.map((note): BranchEntry => {
+      const isPersonal = Boolean(note.personalModuleId || note.personalResourceId);
+      const path = isPersonal
+        ? personalModuleSegments(personalModules, note.personalModuleId || note.moduleId)
+        : courseModuleSegments(modules, note.moduleId);
+      const title = noteCardTitle(note);
+      const wordCount = notePreview(note).trim().split(/\s+/).filter(Boolean).length;
+      const metadata = [
+        wordCount ? `${wordCount} words` : "",
+        note.links?.length ? `${note.links.length} linked` : "",
+        aiKindLabel(note),
+      ].filter(Boolean);
+      return {
+        path: path.length ? path : [UNFILED_SEGMENT],
+        item: {
+          value: `note:${note.id}`,
+          label: title,
+          icon: <NotebookPen size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: NOTE_COLOR,
+          tag: { label: "SELF", color: SELF_TAG_COLOR },
+          meta: metadata.length ? metadata.join(" · ") : undefined,
+          description: `Note. ${title}. Your own note.`,
+          onRename: (nextTitle) => {
+            const html = noteHtml(note);
+            const split = splitFirstHeading(html);
+            // Notes without a heading keep their original body; the new
+            // explicit title is added above it.
+            onEdit(note.id, combineHtml(nextTitle, split.heading ? split.body : html));
+          },
+          onDelete: () => setPendingDeleteId(note.id),
+          deleteLabel: `Delete note ${title}`,
+          dataAttrs: { "data-course-note-open": "", "data-note-id": note.id },
+        },
+      };
+    }),
+  );
+
+  const masterOpen = useBranchedOpen(masterTree);
+  const selfOpen = useBranchedOpen(selfTree);
+  // Opening a note from elsewhere (the Modules library, a signal) reveals its branch.
+  useEffect(() => {
+    if (viewingMasterNoteId) masterOpen.reveal(ancestorSectionValues(masterTree, `master:${viewingMasterNoteId}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingMasterNoteId]);
+  useEffect(() => {
+    if (editingId) selfOpen.reveal(ancestorSectionValues(selfTree, `note:${editingId}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
+
   // MASTER resources open in the same BlockNote renderer in read-only mode;
   // they never enter the SELF editor state or the learner-note persistence hook.
   if (viewingMasterNote) {
@@ -679,27 +751,20 @@ export default function NotesPanel({
 
             {activeCollection === "master" ? (
               masterNotes.length > 0 ? (
-                <ul className="grid min-w-0 gap-3" data-course-master-notes-grid data-study-resource-grid>
-                  {masterNotes.map((note) => {
-                    const wordCount = (note.bodyHtml || "").trim().split(/\s+/).filter(Boolean).length;
-                    return (
-                      <li key={note.id} className="min-w-0 min-h-[212px]" data-course-master-note-card>
-                        <StudyResourceCard
-                          kind="note"
-                          resourceId={note.resourceId}
-                          title={note.title || "Untitled master note"}
-                          contextPath={[courseTitle, ...note.modulePath].filter(Boolean)}
-                          contextDetail="Admin-authored course note · read only"
-                          metadata={[wordCount ? `${wordCount} words` : ""].filter(Boolean)}
-                          sourceLabel="MASTER"
-                          createdAt={note.createdAt}
-                          updatedAt={note.updatedAt}
-                          onOpen={() => setViewingMasterNoteId(note.id)}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+                <BranchedMenu
+                  items={masterTree}
+                  openValues={masterOpen.openValues}
+                  onToggle={masterOpen.toggle}
+                  onSelect={(value) => {
+                    const note = masterNotes.find((entry) => `master:${entry.id}` === value);
+                    if (note) setViewingMasterNoteId(note.id);
+                  }}
+                  ariaLabel="Master course notes"
+                  fullWidth
+                  rowHeight={40}
+                  className="notes-library-menu"
+                  dataAttrs={{ "data-course-master-notes-grid": "", "data-listing": "notes-master" }}
+                />
               ) : (
                 <StudyLibraryEmptyState
                   kind="note"
@@ -726,65 +791,23 @@ export default function NotesPanel({
             ) : null}
 
             {notes.length > 0 ? (
-              <ul className="grid min-w-0 gap-3" data-course-notes-grid="true" data-study-resource-grid>
-                {notes.map((note) => {
-                  const title = noteCardTitle(note);
-                  const topic = noteCardTopic(note, title);
-                  const isPersonal = Boolean(note.personalModuleId || note.personalResourceId);
-                  const hierarchy = isPersonal
-                    ? resolvePersonalResourceContext(
-                        personalModules,
-                        note.personalModuleId || note.moduleId,
-                        note.personalResourceId || note.resourceId,
-                      )
-                    : resolveCourseResourceContext(modules, note.moduleId, note.resourceId);
-                  const contextPath = [
-                    courseTitle,
-                    ...(isPersonal ? ["My Modules", ...hierarchy.modulePath] : hierarchy.modulePath),
-                  ].filter(Boolean);
-                  const wordCount = notePreview(note).trim().split(/\s+/).filter(Boolean).length;
-                  const metadata = [
-                    wordCount ? `${wordCount} words` : "",
-                    note.links?.length ? `${note.links.length} linked ${note.links.length === 1 ? "note" : "notes"}` : "",
-                    aiKindLabel(note),
-                  ].filter(Boolean);
-                  return (
-                    <li key={note.id} className="min-w-0 min-h-[212px]">
-                      <StudyResourceCard
-                        kind="note"
-                        resourceId={note.id}
-                        title={title}
-                        contextPath={contextPath}
-                        contextDetail={hierarchy.resourceName ? `Lesson · ${hierarchy.resourceName}` : undefined}
-                        topic={topic || undefined}
-                        topicLabel="Note context"
-                        metadata={metadata}
-                        sourceLabel="Self"
-                        createdAt={note.createdAt}
-                        updatedAt={note.updatedAt}
-                        onOpen={() => startEdit(note)}
-                        onRename={(nextTitle) => {
-                          const html = noteHtml(note);
-                          const split = splitFirstHeading(html);
-                          // Notes without a heading keep their original body;
-                          // the new explicit title is added above it.
-                          onEdit(note.id, combineHtml(nextTitle, split.heading ? split.body : html));
-                        }}
-                        onDelete={() => setPendingDeleteId(note.id)}
-                        deleteLabel={`Delete note ${title}`}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
+              <BranchedMenu
+                items={selfTree}
+                openValues={selfOpen.openValues}
+                onToggle={selfOpen.toggle}
+                activeValue={editingId ? `note:${editingId}` : null}
+                onSelect={(value) => {
+                  const note = notes.find((entry) => `note:${entry.id}` === value);
+                  if (note) startEdit(note);
+                }}
+                ariaLabel="Your notes"
+                fullWidth
+                rowHeight={40}
+                className="notes-library-menu"
+                dataAttrs={{ "data-course-notes-grid": "true", "data-listing": "notes-self" }}
+              />
             ) : syncState?.status === "loading" ? (
-              <ul className="grid min-w-0 gap-3" data-course-notes-list data-course-notes-grid="true" data-study-resource-grid aria-busy="true">
-                {[0, 1, 2].map((index) => (
-                  <li key={index} className="min-w-0 min-h-[212px]">
-                    <StudyResourceCardSkeleton kind="note" />
-                  </li>
-                ))}
-              </ul>
+              <BranchedMenuSkeleton rows={4} label="Loading your notes" />
             ) : syncState?.status === "error" ? (
               <>
                 <StudyLibraryNotice

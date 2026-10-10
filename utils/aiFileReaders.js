@@ -56,6 +56,7 @@ export const AI_FILE_TYPES = Object.freeze([
   "google_form",
   "embed",
   "mindmap",
+  "mind_map",
   "brain",
 ]);
 
@@ -73,6 +74,7 @@ export const AI_FILE_LABELS = Object.freeze({
   google_form: "form",
   embed: "embedded page",
   mindmap: "mind map",
+  mind_map: "mind map",
   brain: "practice set",
 });
 
@@ -236,6 +238,16 @@ export const AI_FILE_READERS = Object.freeze({
       "I can only read this page's public article text — app screens and login-walled pages have nothing readable in them. A screenshot of the part you mean works.",
   }),
   mindmap: entry("mindmap", {
+    via: "in-document",
+    payload: true,
+    hasReadPath: true,
+    visual: true,
+    fallback: "screenshot",
+    reason:
+      "This mind map's branches aren't stored where I can read them, so I can only use its title. A screenshot of the branch you mean works.",
+  }),
+  // The admin's name for the same mind map (see utils/mindMapResourceMapping.js).
+  mind_map: entry("mind_map", {
     via: "in-document",
     payload: true,
     hasReadPath: true,
@@ -465,7 +477,7 @@ export const aiPayloadText = (resource) => {
     return "";
   }
 
-  if (type === "mindmap") {
+  if (type === "mindmap" || type === "mind_map") {
     const mind = row.mind ?? row.mindMap ?? row.tree ?? asRecord(row.metadata).mind;
     const text = mindMapToText(mind);
     if (text.trim().length >= 2) return text.trim();

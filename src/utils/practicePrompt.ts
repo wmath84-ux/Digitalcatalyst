@@ -65,6 +65,14 @@ export const PRACTICE_PROMPT_RULES: string[] = [
   "4 options per question, exactly one correct",
 ];
 
+const EXPLANATION_REQUIRED = `EXPLANATION — REQUIRED ON EVERY QUESTION (this is not optional)
+- Every question must end with its own "Explanation:" line of 1–3 sentences: why the correct option is right, and (where it helps) why the most tempting wrong option is wrong.
+- The app saves this line and shows it to the student after they answer. A question without it is rejected by the importer — so never skip it, not even for the easiest question.`;
+
+const EXPLANATION_OPTIONAL = `EXPLANATION — ADD ON EVERY QUESTION (recommended)
+- Add an "Explanation:" line of 1–3 sentences after each question's options: why the correct option is right, and (where it helps) why the most tempting wrong option is wrong.
+- The app shows this line to the student after they answer. It is strongly recommended, but a question without it is still imported.`;
+
 export interface PracticePromptOptions {
   /** The chapter / topic the questions must test, e.g. "Photosynthesis". */
   topic: string;
@@ -74,6 +82,13 @@ export interface PracticePromptOptions {
   count?: number;
   /** Language of the questions: English | Hinglish | Hindi. */
   language?: string;
+  /**
+   * Whether the explanation line is demanded. The admin set requires it (the
+   * publish rule refuses a set without one), so the default is "required". The
+   * learner Bulk Import accepts questions without one, so it asks for it as a
+   * recommendation and the prompt says so.
+   */
+  explanation?: "required" | "optional";
 }
 
 const clampCount = (value: unknown): number => {
@@ -88,7 +103,13 @@ const clampCount = (value: unknown): number => {
  * prompts, lettered options, a ✓ on the right answer and an explanation on
  * every question.
  */
-export const buildPracticeAiPrompt = ({ topic, level, count, language }: PracticePromptOptions): string => {
+export const buildPracticeAiPrompt = ({
+  topic,
+  level,
+  count,
+  language,
+  explanation = "required",
+}: PracticePromptOptions): string => {
   const subject = String(topic || "").trim() || PRACTICE_PROMPT_TOPIC_PLACEHOLDER;
   const klass = String(level || "").trim() || PRACTICE_PROMPT_LEVEL_PLACEHOLDER;
   const total = clampCount(count);
@@ -106,9 +127,7 @@ WHAT TO WRITE
 - Keep options short (a word, number, formula or half-line), not paragraphs.
 - Every question must have one unambiguous correct answer. Check the maths, units, symbols and spelling before answering — a wrong key is worse than one fewer question.
 
-EXPLANATION — REQUIRED ON EVERY QUESTION (this is not optional)
-- Every question must end with its own "Explanation:" line of 1–3 sentences: why the correct option is right, and (where it helps) why the most tempting wrong option is wrong.
-- The app saves this line and shows it to the student after they answer. A question without it is rejected by the importer — so never skip it, not even for the easiest question.
+${explanation === "optional" ? EXPLANATION_OPTIONAL : EXPLANATION_REQUIRED}
 
 REPLY FORMAT (strict)
 - Plain text only: no tables, no markdown (no **bold**, no ## headings), no HTML, no code fences, no images.

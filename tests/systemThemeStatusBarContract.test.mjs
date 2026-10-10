@@ -38,7 +38,11 @@ test("src/utils/themeColor.ts synchronizes with system theme and notifies native
   assert.match(themeColorTs, /prefers-color-scheme: dark/);
   assert.match(themeColorTs, /export function syncSystemThemeColor/);
   assert.match(themeColorTs, /export function setThemeColor/);
-  assert.match(themeColorTs, /AppStatusBar/);
+  // The native call moved to the single coordinator; themeColor.ts only reports overrides.
+  assert.match(themeColorTs, /setSystemBarOverride/);
+  const systemBars = read("src/utils/systemBars.ts");
+  assert.match(systemBars, /AppStatusBar/);
+  assert.match(systemBars, /setSystemBars/);
 });
 
 test("Android color resources define light and night status bar colors without blue fallback", () => {

@@ -213,7 +213,7 @@ test("the AI allowance card has one destination on Usage Limits, not Revision Pr
   assert.match(main, /hash\.startsWith\(PROFILE_HASH\)[\s\S]*?<ProfileApp/);
   assert.doesNotMatch(profile, /AiQuotaCard/);
   assert.match(usagePage, /import AiQuotaCard/);
-  assert.match(usagePage, /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
+  assert.match(usagePage, /<AiQuotaCard uid=\{user\.id\} material="home" minimal \/>/);
   assert.match(usagePage, /data-school-ai-visible="true"/);
   assert.match(revisionApp, /case "profile":[\s\S]{0,120}<RevisionProfilePage/);
   assert.doesNotMatch(revisionProfile, /AiQuotaCard/);

@@ -124,7 +124,7 @@ test("the old landscape split machinery is gone — the lesson keeps full width"
 
 test("the mind map follows the ACTIVE module, not just the selected file", () => {
   assert.match(coursePlayer, /const collectModuleIdByFileId = \(modules: CourseModule\[\]\): Record<string, string> =>/);
-  assert.match(coursePlayer, /const activeMindMapModuleId = selectedFile\s*\? moduleIdByFileId\[String\(selectedFile\.id\)\] \|\| selectedFile\.personalModuleId \|\| undefined\s*: undefined;/);
+  assert.match(coursePlayer, /const activeMindMapModuleId = mindMapModuleOverride\s*\|\| \(selectedFile \? moduleIdByFileId\[String\(selectedFile\.id\)\] \|\| selectedFile\.personalModuleId \|\| undefined : undefined\);/);
   assert.match(coursePlayer, /moduleId: activeMindMapModuleId,/);
 });
 
@@ -400,7 +400,7 @@ test("every node opens the inline editor on a single tap (no separate pencil)", 
   assert.match(panel, /onPointerUp=\{handlePointerUp\}/);
   assert.match(panel, /onOpenEditor\(id\);/);
   // The click that trails a real drag must not pop the editor open.
-  assert.match(panel, /if \(dragMovedRef\.current\) return;/);
+  assert.match(panel, /if \(dragMovedRef\.current[\s\S]{0,40}return;/);
 });
 
 test("the mind map has a persisted light/dark pick and a genuine light palette", () => {
@@ -409,7 +409,7 @@ test("the mind map has a persisted light/dark pick and a genuine light palette",
   // per-user theme layer the rest of the player uses (persisted, never a
   // per-visit session override and never a CSS inversion).
   assert.match(panel, /export type MindMapTheme = "dark" \| "light";/);
-  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
   assert.match(panel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
@@ -569,7 +569,9 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
   assert.doesNotMatch(toolbar, /justify-between/);
   // The content keeps its width so the strip scrolls instead of squeezing.
   assert.match(toolbar, /flex min-w-max flex-1 items-center/);
-  assert.match(toolbar, /<span className="min-w-0 truncate normal-case" data-mm-map-name>/);
+  // The map switcher is an icon now (the module-name box is gone); its name lives in the label.
+  assert.match(toolbar, /data-course-mindmap-maps/);
+  assert.doesNotMatch(toolbar, /data-mm-map-name/);
   // …and any offset a browser still managed to set is cleared on open.
   assert.match(panel, /if \(strip && strip\.scrollLeft !== 0\) strip\.scrollLeft = 0;/);
   assert.match(panel, /const statusRef = useRef<HTMLDivElement>\(null\);/);
@@ -577,7 +579,7 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
 
 test("the toolbar stays hidden until a specific map is opened", () => {
   // The library is the home screen: no strip until a map is on the canvas.
-  assert.match(panel, /\{libraryOpen \? null : \(/);
+  assert.match(panel, /\{libraryOpen (\|\| readOnlyMaster )?\? null : \(/);
 });
 
 test("the toolbar rides at the top of the sheet, like the notes editor", () => {

@@ -50,6 +50,12 @@
   --code-mut: #9a978a;
   --inline-code-bg: #f1efe7;
 
+  /* light-only colours that must flip with the theme (were hard-coded) */
+  --side: #f2f1eb;          /* chats drawer / sidebar */
+  --err-text: #b4392f;      /* error text + icon */
+  --ok-text: #2f7d54;       /* saved / success text + icon */
+  --on-ink: #ffffff;        /* text on an --ink fill */
+
   /* shadows — restrained */
   --sh-xs: 0 1px 2px rgba(24, 22, 14, 0.05);
   --sh-sm: 0 1px 2px rgba(24, 22, 14, 0.06), 0 2px 8px -2px rgba(24, 22, 14, 0.07);
@@ -132,6 +138,11 @@
   --code-ink: #e8e8ec;
   --code-mut: #7a7a85;
   --inline-code-bg: #2a2a30;
+
+  --side: #18181d;
+  --err-text: #f87171;
+  --ok-text: #4ade80;
+  --on-ink: #1a1a1f;        /* an --ink fill is LIGHT in dark, so its label is dark */
 
   /* shadows — deeper for dark */
   --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -650,7 +661,7 @@ html.kb-open .lumen-root .composer-disclaimer {
   border-radius: 50%;
   border: 1.5px solid var(--surface);
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   cursor: pointer;
   opacity: 0;
   transform: scale(0.7);

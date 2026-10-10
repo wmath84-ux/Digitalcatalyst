@@ -42,8 +42,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const panel = readSource("src/course/MindMapPanel.tsx");
-const resourceCard = readSource("src/course/StudyResourceCard.tsx");
-const resourceCardStyles = readSource("src/course/study-resource-card.css");
+const resourceCard = readSource("src/components/branched-menu/BranchedMenu.tsx");
+const resourceCardStyles = readSource("src/components/branched-menu/BranchedMenu.css");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const styles = readSource("src/index.css");
@@ -274,15 +274,14 @@ test("the learner returns to the map they had open in that module", () => {
 // 2c. Many maps per module — the panel and the player
 // ---------------------------------------------------------------------------
 
-test("the panel ships a notes-style card list of the module's maps", () => {
+test("the panel ships a shared branched list of the module's maps", () => {
   assert.match(panel, /data-course-mindmap-maps/, "a switcher must open the library");
   assert.match(panel, /data-course-mindmap-library/);
-  assert.match(panel, /StudyResourceCard/);
+  assert.match(panel, /<BranchedMenu\b/);
   assert.match(panel, /data-course-mindmap-new/);
-  assert.match(resourceCard, /data-course-mindmap-map-card/);
-  assert.match(resourceCard, /data-course-mindmap-rename-input/);
-  assert.match(resourceCard, /data-course-mindmap-delete-map/);
-  assert.match(resourceCard, /data-course-mindmap-open-map/);
+  assert.match(panel, /data-course-mindmap-open-map/);
+  assert.match(resourceCard, /data-branched-rename-input/);
+  assert.match(resourceCard, /data-branched-delete/);
   // The library slides over the canvas so the diagram surface stays clean
   // when it is closed — the mind map tab has no header of its own.
   //
@@ -350,17 +349,12 @@ test("the rules tie every map document id to its own map key", () => {
 // width (`repeat(auto-fill, minmax(…))`); the library had no such rule.
 // ---------------------------------------------------------------------------
 
-test("both study libraries share a content-aware, no-overflow responsive grid", () => {
-  assert.match(notesPanel, /data-course-notes-grid="true"/);
-  const grids = [...panel.matchAll(/data-course-mindmap-map-grid="true"/g)];
-  assert.equal(grids.length, 2, "map cards and loading skeletons share one grid contract");
-
-  const gridRules = [...styles.matchAll(/\[(?:data-course-notes-grid|data-course-mindmap-map-grid)\](?:,\s*\[data-course-(?:notes|mindmap-map)-grid\])?\s*\{[^}]*\}/g)];
-  assert.ok(gridRules.length >= 1, "responsive library grid rules exist");
-  assert.match(gridRules[0][0], /repeat\(auto-fill,\s*minmax\(min\(100%,\s*260px\),\s*1fr\)\)/);
-  assert.match(gridRules[0][0], /align-items:\s*stretch/);
-  assert.doesNotMatch(gridRules[0][0], /grid-template-columns:\s*repeat\((2|3)/, "no viewport-counted columns");
-  assert.match(resourceCardStyles, /min-height: 212px/);
+test("both mind-map collections and the notes list share the branched menu", () => {
+  assert.match(notesPanel, /data-course-notes-grid": "true"|data-course-notes-grid="true"/);
+  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 2, "SELF and MASTER maps each render one menu");
+  assert.match(panel, /data-course-mindmap-map-grid": "true"|data-course-mindmap-map-grid="true"/);
+  assert.match(resourceCardStyles, /overflow-wrap: anywhere/);
+  assert.doesNotMatch(resourceCardStyles, /text-overflow: ellipsis/);
   assert.doesNotMatch(panel, /aspect-square/);
   assert.doesNotMatch(panel, /grid-cols-2|sm:grid-cols-3/);
 });
@@ -373,15 +367,12 @@ test("the library is still mounted inside the right-side sheet", () => {
   assert.match(panel, /data-course-mindmap-library/);
 });
 
-test("map cards use the shared spacious study-resource surface and real map context", () => {
-  assert.match(panel, /StudyResourceCard/);
-  assert.match(resourceCard, /data-course-mindmap-map-card/);
-  assert.match(panel, /topicLabel="Root topic"/);
-  assert.match(resourceCardStyles, /min-height: 212px/);
-  assert.match(resourceCardStyles, /--resource-accent: #b9a0ff/);
-  assert.match(resourceCardStyles, /study-resource-card\[data-active="true"\]/);
+test("map rows use the shared surface with the violet mind-map accent and light palette", () => {
+  assert.match(panel, /<BranchedMenu\b/);
+  assert.match(panel, /const MAP_COLOR = "#a78bfa"/);
+  assert.match(resourceCardStyles, /\.branched-menu__item\[data-active\]/);
   assert.doesNotMatch(panel, /aspect-square/);
-  // A light palette exists now (Part 1 §8); the shared card surface stays
+  // A light palette exists now (Part 1 §8); the shared surface stays
   // theme-agnostic and the light sheet re-points tokens, never inverts.
   assert.match(styles, /data-mindmap-theme="light"/);
   assert.doesNotMatch(styles, /filter: invert/);

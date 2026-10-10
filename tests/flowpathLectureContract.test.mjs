@@ -277,28 +277,22 @@ test("LecturePicker collects all queued lectures into one flowpath.bulk call", (
 /*  Client: FlowPathView wiring                                       */
 /* ------------------------------------------------------------------ */
 
-test("FlowPathView opens the LecturePicker from the + radial menu", () => {
-  // Picking "Lecture" in the radial menu sets lecturePickerOpen
-  // = true and skips the regular CreateModal entirely.
+test("FlowPathView opens the LecturePicker from the stair Plus menu (Courses · Schedule Lecture)", () => {
+  // Picking "Schedule Lecture" in the CreateMenuPanel sets lecturePickerOpen = true.
   assert.match(flowpathView, /LecturePicker/);
   assert.match(flowpathView, /setLecturePickerOpen\(true\)/);
-  assert.match(flowpathView, /id === "lecture"/);
+  assert.match(flowpathView, /id === "schedule-lecture"/);
 });
 
-test("FlowPathView also exposes a dedicated 'Lectures' button in the BottomDock", () => {
-  // The user explicitly asked for "kon sa module kab dekhna
-  // hai" — a direct shortcut is friendlier than going through
-  // the + menu.
-  assert.match(bottomDock, /onPlanLectures/);
-  assert.match(bottomDock, /Lectures/);
-  assert.match(flowpathView, /onPlanLectures/);
-  assert.match(flowpathView, /setLecturePickerOpen\(true\)/);
+test("the footer dock stays Home-only; lecture planning is reached from the Plus menu, not a dock button", () => {
+  // Decision: the footer shows only Home (user request). No dock Lectures button,
+  // and no dead dock props left behind.
+  assert.doesNotMatch(bottomDock, /onPlanLectures|Lectures/);
+  assert.match(flowpathView, /<BottomDock onNavigateToHome=\{onNavigateToHome\} \/>/);
 });
 
-test("FlowPathView's radial menu includes a 'Lecture' entry with the cyan accent", () => {
-  // Same surface as the other 6 kinds. The icon is BookOpen
-  // (the lecture metaphor).
-  assert.match(flowpathView, /id: "lecture"/);
-  assert.match(flowpathView, /label: "Lecture"/);
+test("FlowPathView's Plus menu includes a 'Schedule Lecture' entry under Courses with the cyan accent", () => {
+  assert.match(flowpathView, /title: "Courses"/);
+  assert.match(flowpathView, /id: "schedule-lecture", label: "Schedule Lecture"/);
   assert.match(flowpathView, /#22d3ee/);
 });

@@ -18,6 +18,11 @@
 // in-document, downscaled data URL so the "upload a cover" flow never dead-ends.
 
 import {
+  mindMapBudget,
+  MY_COURSE_MAX_MIND_MAP_BYTES,
+  MY_MIND_MAP_MAX_BYTES,
+} from "../../utils/myCourseDoc.js";
+import {
   collection,
   deleteDoc,
   doc,
@@ -198,6 +203,11 @@ const parseResource = (raw: unknown): MyCourseResource | null => {
       : undefined,
     practiceQuestions: type === "brain" ? questions : undefined,
     interactiveHtml: type === "interactive" && typeof source.interactiveHtml === "string" ? source.interactiveHtml : undefined,
+    // A learner's own mind map keeps its JSON (validated again by the reader in
+    // the Experiment page before anything is drawn).
+    mindMapData: type === "mind_map" && source.mindMapData && typeof source.mindMapData === "object" && !Array.isArray(source.mindMapData)
+      ? (source.mindMapData as Record<string, unknown>)
+      : undefined,
     createdAt: asNumber(source.createdAt, 0),
     updatedAt: asNumber(source.updatedAt, 0),
   };
@@ -317,6 +327,14 @@ export const myCourseExperimentBudgetError = (course: MyCourse): string | null =
   }
   if (total > MY_COURSE_MAX_EXPERIMENT_BYTES) {
     return `The experiments in this course add up to ${(total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_EXPERIMENT_BYTES / 1024).toFixed(0)} KB. Host one of them and paste its link, or split the course.`;
+  }
+  // Learner mind maps are stored in the same course document: same kind of cap.
+  const maps = mindMapBudget(course.modules);
+  if (maps.over) {
+    return `“${maps.over.name}” is ${(maps.over.bytes / 1024).toFixed(0)} KB — one mind map may be at most ${(MY_MIND_MAP_MAX_BYTES / 1024).toFixed(0)} KB. Split it into two maps or shorten the topics.`;
+  }
+  if (maps.total > MY_COURSE_MAX_MIND_MAP_BYTES) {
+    return `Your mind maps in this course add up to ${(maps.total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_MIND_MAP_BYTES / 1024).toFixed(0)} KB. Remove or split one of them.`;
   }
   // A lesson that cannot render is worse than no lesson: every experiment needs
   // something to show (inline source, or a hosted https link).

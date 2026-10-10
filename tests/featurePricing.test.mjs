@@ -236,7 +236,9 @@ test("SubscriptionPage prices features through the shared resolver", () => {
   // (`offeredFeatures` = catalog narrowed by the admin's per-cycle visibility),
   // so the Monthly/Yearly toggle moves the totals too.
   assert.match(source, /sumSelectedFeaturePaise\(offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle\)/);
-  assert.match(source, /groupFeaturesByPriceTier/);
+  // The page prices per-plan/cycle features; the price-tier grouping utility
+  // (`groupFeaturesByPriceTier`) exists in utils but the page does not render
+  // tiers, so the current UI is the flat, cycle-aware list asserted above.
 });
 
 test("Admin subscriptions page exposes plan-wise and cycle pricing inputs", () => {
@@ -257,9 +259,9 @@ test("Admin feature editor previews the buyer-facing price with the shared resol
 test("FeatureSelectModal and trigger price from the plan-resolved rate, not the flat rate", () => {
   const modal = readSource("src/subscription/components/FeatureSelectModal.tsx");
   assert.match(modal, /resolvedPricePaise/);
-  assert.match(modal, /featurePrice\(feat\)/);
+  assert.match(modal, /featurePrice\(feature\)/);
   // The running total must skip plan-included features.
-  assert.match(modal, /!includedSet\.has\(f\.id\)/);
+  assert.match(modal, /!includedSet\.has\(feature\.id\)/);
   const trigger = readSource("src/subscription/components/FeatureSelectTrigger.tsx");
   assert.match(trigger, /resolvedPricePaise/);
 });

@@ -8,7 +8,7 @@ import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type 
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import {
-  SELF_PRACTICE_SETS_COURSE_ID,
+  findSelfPracticeCourse,
   placeSelfPracticeSet,
   selfPracticeSetsFromCourses,
 } from "../utils/selfPracticeSets.js";
@@ -17,6 +17,7 @@ import {
 import {
   SELF_EXPERIMENTS_COURSE_ID,
   placeSelfExperiment,
+  placeSelfMindMap,
   selfExperimentCourseFile,
   selfExperimentsFromCourses,
 } from "./utils/selfExperiments";
@@ -44,7 +45,6 @@ import CoursePeekDock from "./course/CoursePeekDock";
 // all read this same state — no feature carries its own keyboard detection.
 import { CourseKeyboardProvider } from "./course/useCourseKeyboard";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
-import ModuleFolderBurst from "./course/ModuleFolderBurst";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
 import { toast } from "./components/ui/glass-toast";
 import { trackFeatureEvent } from "./utils/featureAnalytics";
@@ -57,6 +57,7 @@ import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseQuestion, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
+import { isMasterMindMapFile, masterMindMapView } from "../utils/courseMindMaps.js";
 import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
@@ -95,9 +96,23 @@ import {
   type CoursePlaybackStore,
 } from "./course/playbackState";
 import CourseResourceLibrary from "./course/CourseResourceLibrary";
+import { courseModuleSegments } from "./course/studyResourceContext";
 import type { MasterCourseNote } from "./types/course";
 import { collectMasterCourseNotes } from "./course/masterNotes";
 import { Settings } from "lucide-react";
+
+/** A MASTER mind map in the library: its module chain plus the file to open (when it is a file). */
+interface MasterMindMapEntry {
+  mapKey: string;
+  title: string;
+  rootTopic: string;
+  nodeCount: number;
+  updatedAt: number;
+  createdAt: number;
+  segments: { key: string; label: string }[];
+  moduleId: string;
+  file?: CourseFile;
+}
 
 interface CoursePlayerProps {
   product: Product;
@@ -690,6 +705,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         title: experiment.title,
         moduleTitle: experiment.moduleTitle,
         file: selfExperimentCourseFile(experiment),
+        kind: experiment.kind,
       })),
     [myLibrary.courses, storageProductId],
   );
@@ -711,6 +727,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           (module.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(module.paidUpdateId || module.id)));
         for (const file of module.files || []) {
           if (file.accessLevel === "hidden") continue;
+          // A MASTER mind map is listed beside the experiments with the same lock
+          // rule. It opens in the LOWER pane (the Mind Map tab), never upstairs.
+          if (isMasterMindMapFile(file)) {
+            if (!file.mindMapData) continue;
+            items.push({
+              id: String(file.id),
+              title: String(file.name || "Mind map"),
+              moduleTitle: String(module.title || ""),
+              locked:
+                moduleLocked ||
+                (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(file.paidUpdateId || file.id))),
+              file,
+              kind: "mind_map",
+            });
+            continue;
+          }
           if (!isExperimentFileType(file.type)) continue;
           if (!experimentHasSource(file.interactiveHtml, file.url)) continue;
           items.push({
@@ -721,6 +753,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               moduleLocked ||
               (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(file.paidUpdateId || file.id))),
             file,
+            kind: "experiment",
           });
         }
         visit(module.modules || []);
@@ -1051,9 +1084,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // called unconditionally (React's rules of hooks) and treats a missing
   // module id as "nothing to load yet".
   const moduleIdByFileId = useMemo(() => collectModuleIdByFileId(modules), [modules]);
-  const activeMindMapModuleId = selectedFile
-    ? moduleIdByFileId[String(selectedFile.id)] || selectedFile.personalModuleId || undefined
-    : undefined;
+  // The module whose mind-map library is showing when the learner opened a map
+  // from the Modules library (no file selected). Cleared by any file selection.
+  const [mindMapModuleOverride, setMindMapModuleOverride] = useState<string | null>(null);
+  // The MASTER mind map open in the LOWER study pane (Mind Map tab). It never
+  // touches `selectedFile`, so the upper lesson pane keeps its video/content.
+  const [masterMapKey, setMasterMapKey] = useState<string | null>(null);
+  const activeMindMapModuleId = mindMapModuleOverride
+    || (selectedFile ? moduleIdByFileId[String(selectedFile.id)] || selectedFile.personalModuleId || undefined : undefined);
 
   // Personal curriculum is lazy by design. Load it only when a visible note or
   // active personal map needs real breadcrumbs; ordinary course playback
@@ -1096,10 +1134,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       questions: MyCourseQuestion[];
     }): Promise<{ ok: boolean; message?: string }> => {
       if (!user?.id) return { ok: false, message: "Please sign in to save practice sets." };
-      const coursesNow = myLibrary.state === "loading"
-        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
-        : myLibrary.courses;
-      const existing = coursesNow.find((entry) => entry.id === SELF_PRACTICE_SETS_COURSE_ID) || null;
+      // Never write the shelf from a list that did not load: the save replaces
+      // the whole course document, so a guessed-empty shelf would erase the
+      // learner's other sets. Refuse honestly instead.
+      if (myLibrary.state === "error") {
+        return { ok: false, message: "Your Study Library could not be read, so this set was not saved. Reload and try again." };
+      }
+      let coursesNow = myLibrary.courses;
+      if (myLibrary.state === "loading") {
+        try {
+          coursesNow = await fetchMyCourses(user.id);
+        } catch {
+          return { ok: false, message: "Could not reach your Study Library to save this set. Check your connection and try again." };
+        }
+      }
+      const existing = findSelfPracticeCourse(coursesNow);
       const placed = placeSelfPracticeSet(
         {
           course: existing,
@@ -1191,6 +1240,53 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
   );
 
+  /**
+   * A learner's own mind map from the Experiment page's “+”. Same shelf course,
+   * same player scope, same save path as an experiment. Resolves `ok` only after
+   * the library write has committed, so the success toast is never early.
+   */
+  const createSelfMindMap = useCallback(
+    async ({
+      name,
+      mindMapData,
+    }: {
+      name: string;
+      mindMapData: Record<string, unknown>;
+    }): Promise<{ ok: boolean; message?: string }> => {
+      if (!user?.id) return { ok: false, message: "Please sign in to save mind maps." };
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SELF_EXPERIMENTS_COURSE_ID) || null;
+      const placed = placeSelfMindMap(
+        {
+          course: existing,
+          uid: user.id,
+          productId: storageProductId,
+          courseTitle: product.title,
+          moduleTitle: activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "",
+          name,
+          mindMapData,
+        },
+        {
+          createCourse: (ownerUid, courseTitle) => createMyCourse(ownerUid, courseTitle),
+          createModule: (moduleTitle) => createMyModule(moduleTitle),
+          createResource: (type) => createMyResource(type),
+        },
+      );
+      if (!placed.course) return { ok: false, message: placed.issues[0] || "Could not build the mind map." };
+      const result = await myLibrary.save(placed.course);
+      if (!result.ok) return { ok: false, message: result.message };
+      toast({
+        title: "Mind map saved",
+        description: `“${name}” is saved to My Study Library.`,
+        variant: "success",
+      });
+      return { ok: true };
+    },
+    [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
+  );
+
   const personalMapModule = activeMindMapModuleId
     ? personalModules.modules.find((module) => String(module.id) === String(activeMindMapModuleId))
     : undefined;
@@ -1236,7 +1332,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
   
   const isReady = Object.values(readinessStages).every(Boolean);
-  const failedStage = Object.entries(readinessStages).find(([_, ready]) => !ready)?.[0];
 
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as
@@ -1642,6 +1737,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }, [storageProductId, progressRef, user]);
 
   const selectFile = (file: CourseFile) => {
+    setMindMapModuleOverride(null);
+    setMasterMapKey(null);
     // A Brain resource is not a document to open — it is the practice set on
     // the Brain tab, so selecting it takes the learner there instead of
     // handing an un-viewable type to the viewer stack.
@@ -1905,23 +2002,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Part 1 §10 — MASTER mind maps are the course-published mind-map resources
   // (embedded Whimsical maps + mindmap files), projected read-only. They reuse
   // the existing course tree (no new store); SELF stays the learner's own maps.
-  const masterMindMaps = useMemo(() => {
-    if (isMine) return [] as { mapKey: string; title: string; rootTopic: string; nodeCount: number; updatedAt: number; createdAt: number }[];
-    const out: { mapKey: string; title: string; rootTopic: string; nodeCount: number; updatedAt: number; createdAt: number }[] = [];
+  // Only maps in modules the learner can open are listed, each carrying its
+  // real module chain so the library groups it under the right module.
+  const masterMindMaps = useMemo<MasterMindMapEntry[]>(() => {
+    if (isMine) return [];
+    const out: MasterMindMapEntry[] = [];
     const walk = (mods: CourseModule[]) => {
       for (const m of mods) {
-        if (m.embedContentTypeId === "whimsical_mindmap" && m.embedContentUrl) {
-          out.push({ mapKey: `master-${m.id}`, title: m.title || "Master mind map", rootTopic: m.title || "", nodeCount: 0, updatedAt: 0, createdAt: 0 });
-        }
-        for (const f of m.files || []) {
-          if (f.type === "mindmap") out.push({ mapKey: `master-${f.id}`, title: f.name || "Master mind map", rootTopic: f.name || "", nodeCount: 0, updatedAt: 0, createdAt: 0 });
+        const moduleUnlocked = resolution.accessibleModuleIds.has(String(m.id)) || resolution.previewModuleIds.has(String(m.id));
+        if (moduleUnlocked) {
+          const segments = courseModuleSegments(modules, m.id);
+          if (m.embedContentTypeId === "whimsical_mindmap" && m.embedContentUrl) {
+            out.push({ mapKey: `master-${m.id}`, title: m.title || "Master mind map", rootTopic: m.title || "", nodeCount: 0, updatedAt: 0, createdAt: 0, segments, moduleId: String(m.id) });
+          }
+          for (const f of m.files || []) {
+            if (f.type !== "mindmap" && !isMasterMindMapFile(f)) continue;
+            if (!resolution.accessibleResourceIds.has(String(f.id)) && !moduleUnlocked) continue;
+            const nodeCount = isMasterMindMapFile(f) ? masterMindMapView(f)?.nodeCount ?? 0 : 0;
+            out.push({ mapKey: `master-${f.id}`, title: f.name || "Master mind map", rootTopic: f.name || "", nodeCount, updatedAt: 0, createdAt: 0, segments, moduleId: String(m.id), file: f });
+          }
         }
         walk(m.modules || []);
       }
     };
     walk(modules);
     return out;
-  }, [modules, isMine]);
+  }, [modules, isMine, resolution.accessibleModuleIds, resolution.previewModuleIds, resolution.accessibleResourceIds]);
 
   // Signal to open a specific master note in the NotesPanel. Each increment
   // with a new id triggers the panel to switch to the master note viewer.
@@ -1934,34 +2040,75 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
   }, []);
 
-  const handleOpenMindMapResourceFromLibrary = useCallback((_file: CourseFile, _modulePath: string[]) => {
-    // Switch to the Mind Map tab — the existing per-module mind map panel
-    // handles the map data. For admin-authored mind_map resources, the map
-    // tab shows the module's mind map which can be edited by the learner.
+  const handleOpenMindMapResourceFromLibrary = useCallback((file: CourseFile, _modulePath: string[]) => {
+    // Switch to the Mind Map tab on the module that owns this map — the
+    // override keeps the library on that module even though no file is open.
+    setMindMapModuleOverride(moduleIdByFileId[String(file.id)] || file.personalModuleId || null);
+    // An admin mind map opens its own read-only view in this lower pane.
+    setMasterMapKey(isMasterMindMapFile(file) ? `master-${file.id}` : null);
+    setDockTab("mindmap");
+    splitDeckRef.current?.activateStudy();
+  }, [moduleIdByFileId]);
+
+  // A MASTER map opened from the Mind Map library: a map file opens through the
+  // same selection path as a lesson (so its module becomes the active one),
+  // then the Mind Map tab shows it. Embedded maps have no file: they open on
+  // their module's map library instead.
+  const handleOpenMasterMap = useCallback((mapKey: string) => {
+    const entry = masterMindMaps.find((item) => item.mapKey === mapKey);
+    if (!entry) return;
+    if (entry.file && isMasterMindMapFile(entry.file)) {
+      // Admin mind map: shown read-only in the LOWER pane. The upper lesson
+      // pane is left exactly as it was.
+      setMasterMapKey(entry.mapKey);
+      setMindMapModuleOverride(entry.moduleId);
+    } else if (entry.file) {
+      selectFile(entry.file);
+    } else {
+      setMindMapModuleOverride(entry.moduleId);
+    }
+    setDockTab("mindmap");
+    splitDeckRef.current?.activateStudy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [masterMindMaps]);
+  /** A learner's own map opened from the Experiment page (SELF). Lower pane only. */
+  const openSelfMindMap = useCallback((id: string) => {
+    setMasterMapKey(`self-${id}`);
     setDockTab("mindmap");
     splitDeckRef.current?.activateStudy();
   }, []);
-
-  // Does the course have any structured library resources (notes, mind_maps)?
-  // If yes, the library replaces the flat module list. If no, the existing
-  // expand/collapse SnapList remains (preserving the zero-change path for
-  // courses that only have URL-based lessons).
-  const hasLibraryResources = useMemo(() => {
-    if (libraryMasterNotes.length > 0) return true;
-    const visit = (nodes: CourseModule[]): boolean => {
-      for (const module of nodes) {
-        const files = module.files || [];
-        for (const file of files) {
-          if (file.type === "note" || file.type === "mind_map") return true;
-        }
-        if (visit(module.modules || [])) return true;
-      }
-      return false;
+  const masterMapView = useMemo(() => {
+    if (!masterMapKey) return null;
+    if (masterMapKey.startsWith("self-")) {
+      const item = selfExperimentItems.find((entry) => `self-${entry.id}` === masterMapKey && entry.file?.type === "mind_map");
+      if (!item?.file) return null;
+      const view = masterMindMapView(item.file);
+      return {
+        key: masterMapKey,
+        title: item.title,
+        mind: view?.mind ?? null,
+        error: view?.error ?? null,
+      };
+    }
+    const entry = masterMindMaps.find((item) => item.mapKey === masterMapKey && isMasterMindMapFile(item.file));
+    if (!entry?.file) return null;
+    const view = masterMindMapView(entry.file);
+    return {
+      key: entry.mapKey,
+      title: entry.title,
+      mind: view?.mind ?? null,
+      error: view?.error ?? null,
     };
-    return visit(modules);
-  }, [modules, libraryMasterNotes.length]);
+  }, [masterMapKey, masterMindMaps, selfExperimentItems]);
 
-  const resourceLibraryPanel = hasLibraryResources ? (
+  // The structured library is the Modules tab for every course: it groups the
+  // real module tree (with notes, mind maps and lessons in each module), and
+  // the learner's own "My Modules" entry sits at its root. An empty course
+  // shows the library's own empty state.
+  const libraryPersonalEntry = isMine || !personalModulesEntry
+    ? null
+    : { ...personalModulesEntry, onOpen: openPersonalModules };
+  const resourceLibraryPanel = (
     <CourseResourceLibrary
       modules={modules}
       courseTitle={product.title}
@@ -1975,8 +2122,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onSelectFile={selectFile}
       onOpenMasterNote={handleOpenMasterNoteFromLibrary}
       onOpenMindMapResource={handleOpenMindMapResourceFromLibrary}
+      personalEntry={libraryPersonalEntry}
     />
-  ) : null;
+  );
 
   /**
    * The study pane's content — the seven tabs (Modules / Brain / Notes /
@@ -2054,6 +2202,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onRetryMaps={mindMap.reload}
           uid={user?.id ?? null}
           masterMaps={masterMindMaps}
+          onOpenMasterMap={handleOpenMasterMap}
+          masterMap={masterMapView}
+          onCloseMasterMap={() => setMasterMapKey(null)}
           landscape={useLandscapeRails}
           // True only while the mind map tab is the one on screen. Within one
           // player visit the panel restores the learner's last view (library
@@ -2178,10 +2329,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           masterExperiments={masterExperimentItems}
           selfExperiments={selfExperimentItems}
           onCreateSelfExperiment={createSelfExperiment}
+          onCreateSelfMindMap={createSelfMindMap}
           selfExperimentSeed={{
             name: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
           }}
           onOpen={(experiment, source) => {
+            // A mind map never opens in the upper lesson pane: it is drawn in the
+            // lower Mind Map tab, from the same master/self routes the library uses.
+            if (experiment.kind === "mind_map") {
+              if (source === "self") openSelfMindMap(experiment.id);
+              else handleOpenMasterMap(`master-${experiment.id}`);
+              return;
+            }
             if (source === "self") selectPersonalFile(experiment.file);
             else selectFile(experiment.file);
           }}
@@ -2471,11 +2630,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           the writing surface. */}
       {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} /> : null}
       {snowMode ? <SnowOverlay /> : null}
-      {/* ── Uiverse "Card" folder burst on the Module dock button ──────────
-          The existing Module tab is untouched; on click the uiverse
-          folder-card (great-wombat-13) appears above it, plays the exact
-          open animation in full, then closes back into icon form. */}
-      <ModuleFolderBurst />
     </div>
     )}
     {addOfficialOpen ? (

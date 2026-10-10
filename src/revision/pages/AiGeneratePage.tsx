@@ -24,6 +24,7 @@ import {
   type RevisionBankStatus,
 } from "../engine/cloudRevisionService";
 import TestBankLimitGate from "../components/TestBankLimitGate";
+import { FatZebraButton } from "../../components/ui/FatZebraButton";
 import type { Difficulty } from "../engine/store";
 
 type Props = { uid: string; route: string; hasAccess?: boolean; onRequireAccess?: () => boolean };

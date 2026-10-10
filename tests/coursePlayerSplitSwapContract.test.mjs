@@ -42,7 +42,7 @@ test("the lower pane's split-file host is gone with it", () => {
 });
 
 test("a single press still opens the file in the upper area", () => {
-  assert.match(OVERLAY, /press: fileLocked \? undefined : \(\) => onSelectFile\(file\)/);
+  assert.match(read("src/course/CourseResourceLibrary.tsx"), /else if \(resource\.file\) onSelectFile\(resource\.file\);/);
 });
 
 /* ── the divider's switch ────────────────────────────────────────────────── */

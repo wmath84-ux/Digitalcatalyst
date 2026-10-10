@@ -87,3 +87,12 @@ export const sanitizeMyCourseModule: (
 export const sanitizeMyCourseDoc: (uid: string, raw: unknown) => SanitizeResult;
 export const countMyCourseModules: (modules: unknown) => number;
 export const countMyCourseResources: (modules: unknown) => number;
+
+/** Per-map and whole-course caps for learner mind maps (stored once in the course document). */
+export declare const MY_MIND_MAP_MAX_BYTES: number;
+export declare const MY_COURSE_MAX_MIND_MAP_BYTES: number;
+/** UTF-8 size of every learner mind map in the tree, and the first over-size map. */
+export declare const mindMapBudget: (modules: unknown) => {
+  total: number;
+  over: { id: string; name: string; bytes: number } | null;
+};

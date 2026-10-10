@@ -47,12 +47,13 @@ test("every server push path attaches the branding logo as icon", () => {
   assert.doesNotMatch(pushTest, /icon: "\/icons\/icon-192x192\.png"/);
 });
 
-test("service worker prefers the admin branding logo over shipped default icons", () => {
+test("service worker always uses the admin branding logo as the system-alert icon", () => {
+  // Decision: system alerts always carry the brand logo; payload icons are ignored.
   assert.match(sw, /resolveNotificationIcon/);
-  assert.match(sw, /SHIPPED_DEFAULT_ICONS/);
+  assert.doesNotMatch(sw, /SHIPPED_DEFAULT_ICONS/);
   assert.match(sw, /branding-update/);
   assert.match(sw, /\/api\/brand-icon\?size=192/);
-  assert.match(sw, /const icon = resolveNotificationIcon\(data\.icon\)/);
+  assert.match(sw, /const icon = resolveNotificationIcon\(\)/);
 });
 
 test("local system notifications use the branding logo; in-app rows use per-notification icons", () => {

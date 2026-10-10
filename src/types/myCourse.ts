@@ -54,6 +54,11 @@ export interface MyCourseResource {
   size?: number;
   /** How the file got here: a pasted link or an upload. */
   source?: "link" | "upload";
+  /**
+   * Learner mind map JSON (type "mind_map" only): the same shape the admin
+   * stores and `utils/mindMapImport.js` validates. Absent when it did not pass.
+   */
+  mindMapData?: Record<string, unknown>;
   /** Brain practice-set title (type "brain" only). */
   practiceTitle?: string;
   /** Brain practice-set questions (type "brain" only). */

@@ -127,6 +127,7 @@ import { BottomDock } from "./BottomDock";
 import {
   BellRing,
   CalendarClock,
+  BookOpen,
   CalendarPlus,
   CheckSquare,
   FileUp,
@@ -185,6 +186,12 @@ const FLOW_CREATE_SECTIONS: CreateMenuSection[] = [
     items: [
       { id: "schedule-test", label: "Schedule Test", icon: CalendarPlus, color: "#34d399" },
       { id: "import-test", label: "Import Test", icon: FileUp, color: "#f5b969" },
+    ],
+  },
+  {
+    title: "Courses",
+    items: [
+      { id: "schedule-lecture", label: "Schedule Lecture", icon: BookOpen, color: "#22d3ee" },
     ],
   },
 ];
@@ -529,6 +536,11 @@ export function FlowPathView({ onNavigateToHome, openCurveRef, isDarkMode = true
         setImportModalOpen(true);
         return;
       }
+      if (id === "schedule-lecture") {
+        // Same 3-step LecturePicker the dock's lecture planner used.
+        setLecturePickerOpen(true);
+        return;
+      }
     },
     [createPanelMenu]
   );
@@ -801,19 +813,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef, isDarkMode = true
         onChange={setCurve}
       />
 
-      <BottomDock
-        onCreateType={(type) => {
-          if (type === ("lecture" as unknown as ActivityType)) {
-            setLecturePickerOpen(true);
-            return;
-          }
-          setCreateType({ type, afterId: currentId });
-        }}
-        onPlanLectures={() => setLecturePickerOpen(true)}
-        onStub={(group, label) => toast.info(`${group} · ${label} — coming soon`)}
-        onNavigateToHome={onNavigateToHome}
-        onOpenCurve={() => setCurveOpen(true)}
-      />
+      <BottomDock onNavigateToHome={onNavigateToHome} />
 
     </div>
   );

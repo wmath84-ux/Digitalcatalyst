@@ -94,7 +94,7 @@ test("FlowPath's inline toast became the shared glass toast host", () => {
   const v = read("src/components/flowpath/FlowPathView.tsx");
   assert.doesNotMatch(v, /setToast/, "FlowPath still owns toast state");
   assert.match(v, /toast\.success\(/);
-  assert.match(v, /toast\.info\(/);
+  // (toast.info was only the unused "coming soon" dock stub, removed with the dock's dead props.)
   assert.match(v, /from "\.\.\/ui\/glass-toast"/);
   // one host for every route, mounted next to the palette in the same provider tree
   const main = read("src/main.tsx");
@@ -110,9 +110,10 @@ test("revision and My Day pickers use the pack's selectable components", () => {
   assert.doesNotMatch(bank, /setView\("tests"\)/);
 
   const gen = read("src/revision/pages/AiGeneratePage.tsx");
-  assert.match(gen, /<GlassTile/);
+  // GlassTile was removed from the UI; the mode grid is plain buttons whose
+  // selected state is the border/fill class keyed on questionMode.
   assert.match(gen, /data-rev-question-mode-grid/);
-  assert.doesNotMatch(gen, /aria-pressed=\{questionMode/, "selected state must come from the pack");
+  assert.match(gen, /questionMode === m\.value\s*\?\s*"border-indigo-400 bg-indigo-500\/15"/);
 
   const cfg = read("src/revision/components/AiConfigForm.tsx");
   assert.match(cfg, /<GlassTile/);

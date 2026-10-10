@@ -1,0 +1,130 @@
+/*
+ * Shared Course Player library states — the empty, loading and sync-error
+ * notices used by every listing built on the Branched Menu (Modules, Notes,
+ * Mind Maps). Moved out of the retired study-resource card stylesheet.
+ */
+
+.study-library-empty {
+  display: flex;
+  min-height: 120px;
+  align-items: center;
+  gap: 14px;
+  border: 1px dashed var(--course-border, rgba(255, 255, 255, 0.14));
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--course-text, #fff);
+}
+
+.study-library-empty__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 16px;
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+}
+
+.study-library-empty[data-resource-kind="note"] .study-library-empty__icon {
+  border-color: rgba(245, 173, 66, 0.3);
+  background: rgba(245, 173, 66, 0.12);
+  color: #fbbf68;
+}
+
+.study-library-empty h2 {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.study-library-empty p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.study-library-notice {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 11px 12px;
+  color: #fff;
+}
+
+.study-library-notice--error {
+  border-color: rgba(251, 146, 60, 0.28);
+  background: rgba(245, 158, 11, 0.085);
+}
+
+.study-library-notice__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #c4b5fd;
+}
+
+.study-library-notice--error .study-library-notice__icon { color: #fdba74; }
+.study-library-notice--loading .study-library-notice__icon svg { animation: study-resource-pulse 1.4s ease-in-out infinite; }
+
+.study-library-notice__title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.study-library-notice__message {
+  margin: 3px 0 0;
+  color: rgba(255, 255, 255, 0.69);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.study-library-notice__retry {
+  min-height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 11px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@keyframes study-resource-pulse {
+  50% { opacity: 0.45; }
+}
+
+
+
+@media (max-width: 480px) {
+  .study-library-empty { min-height: 170px; gap: 12px; padding: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-library-notice--loading .study-library-notice__icon svg {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.study-library-notice__retry:focus-visible {
+  outline: 2px solid var(--course-accent, #a78bfa);
+  outline-offset: 2px;
+}

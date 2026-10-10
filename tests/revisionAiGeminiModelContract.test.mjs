@@ -116,7 +116,8 @@ test("the model dropdown lists every model a connected key can use", () => {
   const form = fs.readFileSync("src/revision/components/AiConfigForm.tsx", "utf8");
   assert.match(form, /refreshModels/);
   assert.match(form, /allModels\.map/);
-  assert.match(form, /<select/);
+  // The dropdown is the Recall select (RecallSelectTrigger) over the same list.
+  assert.match(form, /<RecallSelectTrigger aria-label="Model"/);
 });
 
 // ---------------------------------------------------------------------------

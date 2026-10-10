@@ -26,6 +26,8 @@ export type ResourceType =
   | "google_form"
   | "embed"
   | "mindmap"
+  /** Admin name for the same mind map; adapters treat it exactly like `mindmap`. */
+  | "mind_map"
   /** The Brain practice set: no URL, its content is the imported questions. */
   | "brain";
 

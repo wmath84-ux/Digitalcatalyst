@@ -23,7 +23,9 @@ const docs = read("docs/read-resources.md");
 test("Read is additive without changing the official CourseFileType or Note-aware content alias", () => {
   const official = courseTypes.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(official);
-  assert.equal([...official[1].matchAll(/"([a-z_]+)"/g)].length, 13);
+  // 13 official course types + `mind_map`, the admin's name for a mind map (its learner twin is `mindmap`).
+  assert.equal([...official[1].matchAll(/"([a-z_]+)"/g)].length, 14);
+  assert.ok(official[1].includes('"mind_map"'));
   assert.ok(!official[1].includes('"read"'));
   assert.ok(!official[1].includes('"note"'));
   assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType \| CourseNoteResourceFileType;/);
@@ -37,7 +39,8 @@ test("Read has its own Course Player dock tab and is excluded from lesson select
   assert.match(overlay, /\{ key: "read", label: "Read", heading: "Read library"/);
   assert.match(overlay, /collectAccessibleReadResources\(props\.modules, unlocked, props\.ownedUpdateIds, props\.productId\)/);
   assert.match(overlay, /unlockedModuleIds\(props\.modules, props\.accessibleModuleIds, props\.ownedUpdateIds\)/);
-  assert.match(overlay, /file\.type !== "read" && file\.type !== "note" && isVisibleFile\(file\)/);
+  assert.match(read("src/course/CourseResourceLibrary.tsx"), /READ_RESOURCE_FILE_TYPE\) continue;/);
+  assert.match(read("src/course/CourseResourceLibrary.tsx"), /isVisibleFile\(file\)/);
   assert.match(player, /allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.type !== "note"/);
   assert.match(player, /item\.type !== "read" &&\s*item\.type !== "note"/);
   assert.match(embed, /if \(file\.type === "read"\) return \{ url: "", kind: "none" \}/);

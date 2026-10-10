@@ -107,17 +107,23 @@ test("registry values are a subset of the CourseFileType union in src/types/cour
   for (const type of ALL_PERSONAL_COURSE_TYPES) {
     assert.ok(declaredTypes.includes(type), `${type} must stay inside CourseFileType`);
   }
-  // The registry is a deliberate SUBSET: `brain` (the admin-imported practice
-  // sets behind the Course Player's Brain tab) is course-content only — a
-  // learner never picks it when adding their own material — so it must stay in
-  // the union and out of the personal registry. Any OTHER new type must be
-  // added to the registry, which is what this keeps honest.
+  // The registry is a deliberate SUBSET. Two admin-only types sit in the union
+  // but never in a learner's registry, because a learner never picks them:
+  //   • `brain` — the admin-imported practice set behind the Brain tab;
+  //   • `mind_map` — the admin's name for a mind map. The Course Player calls
+  //     the same content `mindmap`, and utils/mindMapResourceMapping.js maps
+  //     one to the other.
+  // Any OTHER type outside the registry is still a bug, which this keeps honest.
+  const ADMIN_ONLY_TYPES = ["brain", "mind_map"];
   assert.ok(declaredTypes.includes("brain"), "the union must carry the admin-only brain type");
+  assert.ok(declaredTypes.includes("mind_map"), "the union must carry the admin mind map type");
   assert.deepEqual(
-    declaredTypes.filter((type) => !ALL_PERSONAL_COURSE_TYPES.includes(type)),
-    ["brain"],
-    "only brain may sit outside the personal-course registry",
+    declaredTypes.filter((type) => !ALL_PERSONAL_COURSE_TYPES.includes(type)).sort(),
+    [...ADMIN_ONLY_TYPES].sort(),
+    "only the admin-only types may sit outside the personal-course registry",
   );
+  const mapping = readSource("utils/mindMapResourceMapping.js");
+  assert.match(mapping, /if \(adminType === "mind_map"\) return "mindmap";/, "the admin mind_map type maps to the player's mindmap");
 });
 
 // ---------------------------------------------------------------------------
@@ -496,7 +502,7 @@ test("AI availability is derived from the reader registry, never from a copy", (
 test("the reader registry covers every course file type the player can hold", () => {
   const playerTypes = new Set([
     "youtube", "video", "audio", "pdf", "doc", "sheet", "slides",
-    "ebook", "image", "google_form", "embed", "mindmap", "brain",
+    "ebook", "image", "google_form", "embed", "mindmap", "mind_map", "brain",
   ]);
   assert.deepEqual([...AI_FILE_TYPES].sort(), [...playerTypes].sort());
   for (const type of AI_FILE_TYPES) {

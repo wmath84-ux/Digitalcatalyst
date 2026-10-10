@@ -4,18 +4,12 @@ import { HomeIcon } from "../icons";
 
 interface BottomDockProps {
   onNavigateToHome?: () => void;
-  // Kept for compatibility — previous versions used these for Create menu
-  onCreateType?: (type: any) => void;
-  onPlanLectures?: () => void;
-  onStub?: (group: string, label: string) => void;
-  onOpenCurve?: () => void;
 }
 
 export function BottomDock({ onNavigateToHome }: BottomDockProps) {
   const homeRef = useRef<HTMLButtonElement>(null);
 
-  // User request: footer navigation mein keval Home button dikhega (Create removed, My Day/Revision removed)
-  // Plus icons on stairs open the upgraded create dropdown directly on flow
+  // Footer shows Home only. Create and Schedule Lecture live in the stair Plus menu.
   const items: GlassDockItem[] = [
     { id: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B", buttonRef: homeRef },
   ];

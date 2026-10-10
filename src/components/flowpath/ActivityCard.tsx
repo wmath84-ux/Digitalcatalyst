@@ -128,8 +128,10 @@ function relativeDay(timeLabel: string | undefined): string {
 }
 
 /** Type-specific footer block — the part that makes each kind look different. */
-function KindFooter({ activity, color }: { activity: Activity; color: string }) {
+function KindFooter({ activity, color, isDarkMode }: { activity: Activity; color: string; isDarkMode: boolean }) {
   const kind = activity.flowKind ?? activity.type;
+  const textSecondary = isDarkMode ? "text-slate-100" : "text-slate-700";
+  const textFaint = isDarkMode ? "text-slate-300/80" : "text-slate-500";
 
   switch (activity.type) {
     case "task": {
@@ -301,7 +303,6 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
   const textPrimary = isDarkMode ? "text-white" : "text-slate-900";
   const textSecondary = isDarkMode ? "text-slate-100" : "text-slate-700";
   const textMuted = isDarkMode ? "text-slate-200" : "text-slate-600";
-  const textFaint = isDarkMode ? "text-slate-300/80" : "text-slate-500";
   // Notes render their body inside the quote-style footer; every other kind
   // shows the scheduling-time description as its own always-visible line.
   const showDescriptionLine = description.length > 0 && activity.type !== "note";
@@ -494,7 +495,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
             </p>
           )}
 
-          <KindFooter activity={activity} color={meta.color} />
+          <KindFooter activity={activity} color={meta.color} isDarkMode={isDarkMode} />
         </div>
       </GlassSurface>
     </motion.div>

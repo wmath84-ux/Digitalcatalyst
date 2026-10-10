@@ -113,9 +113,9 @@ test("desktop peek dock: click, tap and drag all reveal the same dock", () => {
   assert.match(desktop, /const id = idAtPoint\(event\.clientX, event\.clientY\)/);
   assert.match(desktop, /if \(id\) navigate\(id\)/);
   assert.match(desktop, /elementsFromPoint/);
-  // A tap-pinned dock closes on a selection; a mouse pick keeps the old
-  // behaviour (the dock stays while the pointer rests in it).
-  assert.match(desktop, /if \(pointerTypeRef\.current !== ["']mouse["']\) close\(\)/);
+  // Any selection — tap, touch or mouse — ends the interaction and re-minimizes
+  // the dock: navigate() closes before it changes the hash.
+  assert.match(desktop, /const navigate = useCallback\(\(id: string\) => \{[\s\S]*?close\(\)\s*window\.location\.hash = tab\.hash/);
 });
 
 test("course peek dock: the touch tap and the drag release still behave", () => {

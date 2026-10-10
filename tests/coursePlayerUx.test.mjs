@@ -43,8 +43,8 @@ const overlay = readSource("src/course/CourseOverlay.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
-const resourceCard = readSource("src/course/StudyResourceCard.tsx");
-const resourceCardStyles = readSource("src/course/study-resource-card.css");
+const resourceCard = readSource("src/components/branched-menu/BranchedMenu.tsx");
+const resourceCardStyles = readSource("src/components/branched-menu/BranchedMenu.css");
 const notesStore = readSource("src/course/notesStore.ts");
 const notesHook = readSource("src/course/useCourseNotes.ts");
 const notesCloud = readSource("src/course/cloudNotes.ts");
@@ -189,22 +189,21 @@ test("NotesPanel supports add, edit, and delete via a single + button", () => {
   assert.match(notesPanel, /data-course-note-edit-input/);
   assert.match(notesPanel, /data-course-note-edit-save/);
   assert.match(notesPanel, /data-course-note-edit-cancel/);
-  assert.match(resourceCard, /data-course-note-delete/);
-  assert.match(notesPanel, /onOpen=\{\(\) => startEdit\(note\)\}/);
+  assert.match(resourceCard, /data-branched-delete/);
+  assert.match(notesPanel, /onSelect=\{\(value\) => \{/);
+  assert.match(notesPanel, /startEdit\(note\)/);
 });
 
-test("NotesPanel renders responsive study-resource cards and matching library states", () => {
-  assert.match(notesPanel, /data-course-notes-list/);
+test("NotesPanel renders the shared branched menu and matching library states", () => {
   assert.match(notesPanel, /data-course-notes-grid/);
-  assert.match(notesPanel, /StudyResourceCard/);
-  assert.match(notesPanel, /StudyResourceCardSkeleton/);
+  assert.match(notesPanel, /<BranchedMenu\b/);
+  assert.match(notesPanel, /BranchedMenuSkeleton/);
   assert.match(notesPanel, /StudyLibraryEmptyState/);
   assert.match(notesPanel, /StudyLibraryNotice/);
-  assert.match(resourceCard, /data-course-note-delete/);
-  assert.match(resourceCard, /data-course-note-open/);
-  assert.match(resourceCard, /data-study-resource-title/);
-  assert.match(resourceCardStyles, /min-height: 212px/);
-  assert.match(resourceCardStyles, /font-size: 17px/);
+  assert.match(notesPanel, /data-course-note-open/);
+  assert.match(resourceCard, /data-branched-delete/);
+  assert.match(resourceCard, /data-branched-rename-button/);
+  assert.match(resourceCardStyles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(notesPanel, /aspect-square/);
   assert.doesNotMatch(notesPanel, /grid-cols-2/);
   assert.doesNotMatch(notesPanel, /PremiumEditIcon|PremiumDeleteIcon/);
@@ -317,9 +316,10 @@ test("CoursePlayer shows the preview-mode badge when preview modules are present
 // footer dock's Module / Paid tabs carry the same contract now)
 // ---------------------------------------------------------------------------
 
-test("CourseOverlay marks preview-only modules with the preview icon", () => {
-  assert.match(overlay, /data-preview/);
-  assert.match(overlay, /<Eye size=\{13\} className="text-sky-300"/);
+test("the Modules library marks preview-only modules with the preview icon", () => {
+  const library = readSource("src/course/CourseResourceLibrary.tsx");
+  assert.match(library, /"data-preview": built\.moduleMeta\.get\(key\)\?\.preview/);
+  assert.match(library, /<Eye size=\{12\} aria-label="Preview"/);
 });
 
 test("CoursePlayer wires the resolver's accessible/owned state into CourseOverlay", () => {
@@ -338,8 +338,10 @@ test("CoursePlayer routes a single module's 'buy' click back to the parent's onP
 // Bottom dock + overlay (redesign)
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer's footer dock carries the eight study tabs (Player + Sketch included)", () => {
-  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "player", "sketch"]) {
+test("CoursePlayer's footer dock carries the nine study tabs (Experiment + Sketch + Read included)", () => {
+  // Part 20: the Live Experiment tab took the Settings slot. Player settings are
+  // opened from the top rail trigger (see the FormChromeViewport contract).
+  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "experiment", "sketch", "read"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
   // The footer is the home page's GlassDock itself — no course-specific
@@ -359,11 +361,11 @@ test("The study pane swaps the active tab's content in place", () => {
   assert.match(overlay, /key=\{tab\}/);
 });
 
-test("Modules overlay lists available modules with their files", () => {
-  assert.match(overlay, /data-course-overlay-list/);
-  assert.match(overlay, /"data-mode": listModeAttr/);
-  assert.match(overlay, /data-course-overlay-module/);
-  assert.match(overlay, /data-course-overlay-file/);
+test("the Modules library lists available modules with their files", () => {
+  const library = readSource("src/course/CourseResourceLibrary.tsx");
+  assert.match(library, /data-course-library-module/);
+  assert.match(library, /data-library-resource/);
+  assert.match(library, /data-resource-kind/);
   // The old Resources panel is gone — a Brain button sits in its dock slot.
   assert.doesNotMatch(overlay, /mode === "resources"/);
   assert.match(overlay, /key: "brain"/);
@@ -378,16 +380,12 @@ test("Brain and AI dock tabs are dummy placeholders for now", () => {
   assert.match(overlay, /key: "ai"/);
 });
 
-test("Modules overlay only lists unlocked modules — locked/paid modules live in the Paid tab", () => {
-  // The "Module" tab must not double-list purchasable content: locked and
-  // paid modules are filtered out of the wire tree and surfaced through the
-  // dedicated "Paid" dock tab instead.
-  assert.match(overlay, /unlockedModuleIds/);
-  assert.match(overlay, /accessibleModuleIds\.has\(String\(node\.id\)\)/);
-  assert.match(overlay, /isPaidLocked\(node, ownedUpdateIds\)/);
-  // A locked parent hides its nested children so no orphaned branch remains.
-  assert.match(overlay, /ancestorLocked/);
-  assert.match(overlay, /unlocked\.has\(String\(module\.id\)\)/);
+test("the Modules library keeps locked content visible but disabled; paid modules live in the Paid tab", () => {
+  const library = readSource("src/course/CourseResourceLibrary.tsx");
+  assert.match(library, /disabled: resource\.locked/);
+  assert.match(library, /"data-locked": built\.moduleMeta\.get\(key\)\?\.locked/);
+  assert.match(overlay, /isPaidLocked\(module, ownedUpdateIds\)/);
+  assert.match(overlay, /const listRows = paidRows;/);
 });
 
 test("Course overlay lists modules and files as dock-style buttons (home footer look)", () => {

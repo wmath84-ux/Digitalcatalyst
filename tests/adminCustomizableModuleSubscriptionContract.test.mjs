@@ -15,11 +15,11 @@ test("PDP module selector has checkboxes, individual prices and dynamic selected
   // (the duplicate inline list + tabs were removed); it keeps the checkbox
   // semantics, per-module prices and the dynamic selected total, while the
   // builder still pipes the same selection into the order summary.
-  assert.match(moduleModal, /role="checkbox"/);
-  assert.match(moduleModal, /aria-checked/);
+  assert.match(moduleModal, /type="checkbox"/); // native checkboxes carry the checked state
+  assert.match(moduleModal, /checked=\{/);
   assert.match(moduleModal, /getModuleEffectivePrice/);
   assert.match(moduleModal, /selectedTotal/);
-  assert.match(moduleModal, /selectedIds\.length} of \{modules\.length\} selected/);
+  assert.match(moduleModal, /\{selected\.length\} selected · Estimate/);
   assert.match(builder, /getModuleEffectivePrice/);
   assert.match(builder, /selectedTotal/);
   assert.match(builder, /Total due today/);

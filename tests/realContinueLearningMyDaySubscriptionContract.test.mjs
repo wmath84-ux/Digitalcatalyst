@@ -25,7 +25,7 @@ test("Continue Learning shows at most two courses, most recently opened first", 
   assert.match(home, /const CONTINUE_LEARNING_LIMIT = 2;/);
   assert.match(home, /\.slice\(0, CONTINUE_LEARNING_LIMIT\)/);
   // Most recently opened first.
-  assert.match(home, /\.sort\(\(a, b\) => b\.updatedAt - a\.updatedAt\)/);
+  assert.match(home, /\.sort\(\(left, right\) => right\.updatedAt - left\.updatedAt\)/);
   // Entries are built from live progress records joined against the live
   // catalog, so a product added in the future needs no code change and a
   // stale record for a deleted product is dropped.
@@ -42,12 +42,14 @@ test("Continue Learning renders every provided course as its own stacked card", 
   assert.match(section, /items: ContinueLearningItem\[\]/);
   assert.match(section, /items\.map\(\(item\) =>/);
   assert.match(section, /ContinueLearningCard/);
-  // Stacked layout, not a single fixed card.
-  assert.match(section, /space-y-3/);
+  // Responsive grid: one card per course (single column on phones, auto-fit columns on tablets/desktop).
+  assert.match(section, /dc-home-continue-grid/);
   // Renders nothing when the learner has not started anything.
   assert.match(section, /if \(items\.length === 0\) return null;/);
   // Per-card progress stays clamped to a sane 0-100 range.
-  assert.match(section, /Math\.max\(0, Math\.min\(100, item\.progress\)\)/);
+  // Progress is clamped by the shared clampProgress helper (same 0–100 rule, one implementation).
+  assert.match(section, /clampProgress\(item\.progress\)/);
+  assert.match(fs.readFileSync("src/home/data/homeDashboardData.ts", "utf8"), /Math\.max\(0, Math\.min\(100, value\)\)/);
 });
 
 test("subscription exposes only the paid My Day feature", () => {
@@ -66,8 +68,8 @@ test("subscription exposes only the paid My Day feature", () => {
 });
 
 test("bonus product picker uses every live catalog product with real price and checkbox", () => {
-  assert.match(subscription, /products=\{availableProducts\}/);
-  assert.match(productModal, /products\.map\(\(product\)/);
+  assert.match(subscription, /products=\{subscriptionDisplayProducts\}/);
+  assert.match(productModal, /filtered\.map\(\(product\)/);
   assert.match(productModal, /product\.price/);
   assert.match(productModal, /checked/);
   assert.match(server, /collection\("siteProducts"\)/);

@@ -114,7 +114,7 @@ test("the scheduler records its run only after every job succeeds", () => {
   // The write must be the last thing before the response — a handler
   // that throws halfway must leave the window open for a retry.
   const writeIndex = cron.indexOf("runStateRef.set({ lastRunAt: now");
-  const responseIndex = cron.indexOf("return res.status(200).json({ ok: true, ...summary })");
+  const responseIndex = cron.indexOf("return res.status(200).json({ ok: true, ...summary, email })");
   assert.ok(writeIndex > 0 && writeIndex < responseIndex, "lastRunAt must be written just before the success response");
   assert.ok(writeIndex > cron.indexOf("3. content announces"), "lastRunAt must be written after all three jobs");
 });

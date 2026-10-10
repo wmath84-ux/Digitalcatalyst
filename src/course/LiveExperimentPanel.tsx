@@ -15,7 +15,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { FlaskConical, Plus, Lock, Eye } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
-import ExperimentStage from "./ExperimentStage";
 import type { CourseFile, CourseModule } from "../types/course";
 import type { MyCourse, MyCourseModule } from "../types/myCourse";
 import type { CourseAccessResolution } from "../../utils/courseAccess";
@@ -129,7 +128,7 @@ export default function LiveExperimentPanel({
                 items.push({
                   file: {
                     id: resource.id,
-                    name: resource.title || "Untitled Experiment",
+                    name: resource.name || "Untitled Experiment",
                     type: "interactive",
                     interactiveHtml: resource.interactiveHtml,
                     moduleId: module.id,
@@ -200,7 +199,7 @@ export default function LiveExperimentPanel({
             </p>
             {mode === "self" && onCreateNew && (
               <GlassButton
-                variant="primary"
+                variant="capsule"
                 className="mt-4"
                 onClick={onCreateNew}
               >

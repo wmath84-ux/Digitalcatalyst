@@ -74,14 +74,9 @@
   background-color: rgba(139, 92, 246, 0.055);
   box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.14);
 }
-.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-selected="true"],
-.course-player-shell[data-course-theme="light"] [data-course-overlay-file][data-selected="true"] {
+.course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-selected="true"] {
   background-color: rgba(124, 58, 237, 0.12);
   box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.32), 0 0 18px -8px rgba(109, 40, 217, 0.22);
-}
-.course-player-shell[data-course-theme="light"] [data-course-overlay-module][data-selected="true"] {
-  background-color: rgba(8, 145, 178, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.26);
 }
 .course-player-shell[data-course-theme="light"] [data-course-sheet-row][data-locked="true"] {
   box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.28);
@@ -1244,104 +1239,38 @@
 /* The shared card CSS is intentionally dark by default. Its light palette is
    applied only inside a feature whose OWN preference is Light. Accent colors
    retain their meaning, but are deep enough to read on white. */
+
+
+
+
 :is(
   .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
   .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
   .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card {
-  --resource-accent: #6d28d9;
-  --resource-accent-soft: rgba(124, 58, 237, 0.1);
-  --resource-accent-line: rgba(109, 40, 217, 0.25);
-  background-color: #ffffff;
-  color: #0f172a;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card--note {
-  --resource-accent: #92400e;
-  --resource-accent-soft: rgba(245, 158, 11, 0.1);
-  --resource-accent-line: rgba(180, 83, 9, 0.25);
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card--mind-map {
-  --resource-accent: #5b21b6;
-  --resource-accent-soft: rgba(124, 58, 237, 0.1);
-  --resource-accent-line: rgba(91, 33, 182, 0.24);
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card__open {
+) :is(.study-library-empty h2, .study-library-notice__title) {
   color: #0f172a;
 }
+
 :is(
   .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
   .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
   .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) :is(.study-resource-card__title, .study-library-empty h2, .study-library-notice__title) {
-  color: #0f172a;
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) :is(.study-resource-card__context, .study-resource-card__topic, .study-resource-card__topic-value, .study-resource-card__source) {
-  color: #334155;
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) :is(.study-resource-card__detail, .study-resource-card__timestamp, .study-resource-card__metadata-item, .study-library-empty p, .study-library-notice__message, .study-resource-card__rename-help) {
+) :is(.study-library-empty p, .study-library-notice__message) {
   color: #475569;
 }
 :is(
   .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
   .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
   .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) :is(.study-resource-card__source, .study-resource-card__metadata-item, .study-resource-card__delete, .study-resource-card__rename-actions button, .study-library-notice__retry) {
+) :is(.study-library-notice__retry) {
   border-color: rgba(15, 23, 42, 0.13);
   background-color: #f8fafc;
   color: #334155;
 }
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card__rename-input {
-  background: #ffffff;
-  color: #0f172a;
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card__rename-input::placeholder {
-  color: #64748b;
-  opacity: 1;
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) .study-resource-card__rename-actions button:last-child {
-  background: var(--resource-accent-soft);
-  color: var(--resource-accent);
-}
-:is(
-  .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
-  .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
-  .course-player-shell .course-mindmap-shell[data-mindmap-theme="light"]
-) :is(.study-resource-card__skeleton-type, .study-resource-card__skeleton-title, .study-resource-card__skeleton-line, .study-resource-card__skeleton-footer) {
-  background: linear-gradient(90deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.04));
-}
+
+
+
+
 :is(
   .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
   .course-player-shell [data-course-read-panel][data-course-read-theme="light"],
@@ -1469,18 +1398,11 @@
   [class~="bg-indigo-50"], [class~="bg-white"]
 ) { background-color: #111a2b; }
 
-.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card {
-  --resource-accent: #f5ad42;
-  --resource-accent-soft: rgba(245, 173, 66, 0.14);
-  --resource-accent-line: rgba(245, 173, 66, 0.32);
-  background-color: rgba(255, 255, 255, 0.045);
-  color: rgba(255, 255, 255, 0.94);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-}
-.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card__open { color: rgba(255, 255, 255, 0.94); }
-.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] .study-resource-card__title { color: #ffffff; }
-.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] :is(.study-resource-card__context, .study-resource-card__topic) { color: rgba(235, 242, 255, 0.82); }
-.course-player-shell [data-course-notes-panel][data-notes-theme="dark"] :is(.study-resource-card__detail, .study-resource-card__timestamp, .study-resource-card__metadata-item) { color: rgba(255, 255, 255, 0.78); }
+
+
+
+
+
 
 /* Mind Map maintains its own palette even when the Player preference changes. */
 .course-mindmap-shell[data-mindmap-theme="dark"] {
@@ -1532,18 +1454,8 @@
   -webkit-backdrop-filter: none;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
 }
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] {
-  color: #0f172a;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-root="true"] {
-  color: #ffffff;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-body][data-mind-node-theme="light"] > div:nth-child(2) {
-  background: rgba(255, 255, 255, 0.9) !important;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-depth="3"] [data-mind-node-body] {
-  border-color: rgba(15, 23, 42, 0.2);
-}
+/* Node ink and fills are inline now (see paintFor in MindMapPanel.tsx) so a
+   learner's colour is never overridden by a class or a !important rule here. */
 .course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-input]::placeholder {
   color: #64748b;
   opacity: 1;
@@ -1759,11 +1671,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .course-player-shell[data-course-theme="light"] [data-glass-surface],
-  .course-player-shell[data-course-theme="light"] [data-course-personal-modules] *,
-  .study-resource-card,
-  .mm-tool,
-  .mm-menu {
-    transition-duration: 0.01ms;
-  }
+  
 }

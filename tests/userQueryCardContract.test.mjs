@@ -529,14 +529,14 @@ test("every control is a real, labelled control", async () => {
 
 // ── 8. the page around the card is untouched ───────────────────────────────
 test("Explore user queries navigates to the queries page instead of a blank view", () => {
-  const home = source("src/home/App.tsx");
+  const home = source("src/home/components/FeedbackExperiencePage.tsx");
   const main = source("src/main.tsx");
   const enter = source("src/components/PageEnter.tsx");
   assert.match(home, /data-home-explore-queries/);
   assert.match(home, /window\.location\.hash = "#\/queries"/);
   assert.match(main, /hash\.startsWith\(QUERIES_HASH\)/);
   assert.match(main, /<PageEnter pageKey=\{pageEnterAppKey\(hash\)\}>[\s\S]*?<UserQueriesPage/);
-  assert.match(enter, /path\.startsWith\("#\/queries"\) return "#\/queries"/);
+  assert.match(enter, /path\.startsWith\("#\/queries"\)\) return "#\/queries"/);
   assert.match(pageSource, /data-queries-page/);
 });
 

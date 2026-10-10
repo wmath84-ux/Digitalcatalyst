@@ -28,6 +28,7 @@ import {
 } from "../../../../utils/practiceSet.js";
 import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
 import { normalizeResourceUrl, productExperimentBudget, productExperimentBudgetError } from "../../../../utils/productMapping";
+import { formatMindMapIssue, validateMindMapObject } from "../../../../utils/mindMapImport.js";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import { getFirebaseStorage } from "../../../../firebase";
 import {
@@ -288,6 +289,16 @@ export function ProductEditor({ productId }: { productId?: string }) {
                 : "a safe public HTTPS URL";
             add(`Read resource “${r.name || "Untitled resource"}” in “${m.title}” needs ${expected}.`, "modules", learnerVisible);
           }
+        } else if (r.type === "mind_map") {
+          // A mind map has no link: its content is the map itself. Checked with
+          // the same validator the Mind Map editor and the JSON import use, so an
+          // invalid map is named with its field path instead of a generic URL error.
+          const mapCheck = validateMindMapObject(r.mindMapData);
+          if (!mapCheck.valid) {
+            const first = formatMindMapIssue(mapCheck.errors[0]);
+            const more = mapCheck.errors.length > 1 ? ` (+${mapCheck.errors.length - 1} more)` : "";
+            add(`Mind map “${r.name || "Untitled resource"}” in “${m.title}” is not valid — ${first}${more}.`, "modules", learnerVisible);
+          }
         } else if (!normalizeResourceUrl(r.url, r.type)) {
           add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "modules", learnerVisible);
         }
@@ -425,6 +436,20 @@ export function ProductEditor({ productId }: { productId?: string }) {
               fileSize: resource.readFileSize,
             }),
             readSourceKind,
+            sortOrder: index,
+            paidUpdateId,
+          };
+        }
+        if (resource.type === "mind_map") {
+          // The map is the content, so there is no link to normalise. The map
+          // was validated above; keep it (and its source mode) byte-for-byte.
+          return {
+            ...resource,
+            url: "",
+            embedUrl: "",
+            youtubeUrl: "",
+            youtubeVideoId: "",
+            mindMapRootTopic: (resource.mindMapRootTopic || "").trim(),
             sortOrder: index,
             paidUpdateId,
           };

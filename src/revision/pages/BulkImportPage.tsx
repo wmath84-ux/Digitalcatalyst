@@ -12,7 +12,18 @@ import { useExitGuard } from "../components/ExitGuardContext";
 import { Button } from "../recall/components/ui/button";
 import { Input } from "../recall/components/ui/input";
 import { Textarea } from "../recall/components/ui/textarea";
-import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
+import {
+  parseQuestionTextDetailed,
+  stripCodeFenceLines,
+  type ParseProblem,
+  type ParsedQuestion,
+} from "../engine/bulkParser";
+import {
+  buildPracticeAiPrompt,
+  PRACTICE_PROMPT_LANGUAGES,
+  PRACTICE_PROMPT_LEVELS,
+} from "../../utils/practicePrompt";
+import { MAX_PRACTICE_QUESTIONS } from "../../../utils/practiceSet.js";
 import { createCustomTest, deleteCustomTestLocal } from "../engine/customTestService";
 import {
   persistCustomTestToBank,
@@ -42,6 +53,36 @@ D) Hydrogen`;
 
 type PreviewItem = ParsedQuestion & { key: string };
 
+/**
+ * Copy text to the clipboard. Tries the async Clipboard API first, then the
+ * legacy execCommand path (some in-app browsers block the first one). Returns
+ * false when both are blocked, so the caller can show the text to copy by hand.
+ */
+async function copyText(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    /* fall through to the legacy path */
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 /** What an import without a subject label is filed under (never invented). */
 const IMPORT_SUBJECT_LABEL = "My Imports";
 
@@ -63,14 +104,62 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
   const [saving, setSaving] = useState(false);
   const [bankGate, setBankGate] = useState<RevisionBankStatus | null>(null);
   const [ready, setReady] = useState<{ testId: number; count: number; pendingSync: boolean } | null>(null);
+  /** Blocks the parser could not read, each with the line it starts on. */
+  const [problems, setProblems] = useState<ParseProblem[]>([]);
+
+  // AI command inputs. Nothing here is saved; they only shape the command text.
+  const [aiLevel, setAiLevel] = useState("");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiCount, setAiCount] = useState("");
+  const [aiLanguage, setAiLanguage] = useState("");
+  const [aiCopy, setAiCopy] = useState<{ tone: "ok" | "err"; message: string } | null>(null);
+  const [showCommand, setShowCommand] = useState(false);
+
+  /** Topic falls back to the chapter, then the test name, so the command is never generic by accident. */
+  const fallbackTopic = chapterName.trim() || title.trim();
+  const aiPrompt = useMemo(
+    () =>
+      buildPracticeAiPrompt({
+        topic: aiTopic.trim() || fallbackTopic,
+        level: aiLevel.trim(),
+        count: aiCount.trim() ? Number(aiCount) : undefined,
+        language: aiLanguage,
+        explanation: "optional",
+      }),
+    [aiTopic, fallbackTopic, aiLevel, aiCount, aiLanguage],
+  );
+
+  const copyCommand = async () => {
+    const ok = await copyText(aiPrompt);
+    if (ok) {
+      setAiCopy({
+        tone: "ok",
+        message:
+          "Copied. Paste it into ChatGPT, Gemini or Claude, then paste the AI’s reply into the box below and tap Parse questions.",
+      });
+    } else {
+      setShowCommand(true);
+      setAiCopy({
+        tone: "err",
+        message:
+          "Your browser blocked automatic copying. The command is shown below — tap inside it, select all and copy it by hand.",
+      });
+    }
+  };
 
   const undetected = useMemo(() => preview.filter((p) => p.correctIndex < 0).length, [preview]);
 
   const parse = () => {
     setNotice(null);
-    const parsed = parseQuestionText(text);
+    // Same shared parser as the admin importer; AI code-fence lines are dropped first.
+    const { questions: parsed, problems: found } = parseQuestionTextDetailed(stripCodeFenceLines(text));
+    setProblems(found);
     if (parsed.length === 0) {
-      setNotice("No questions found. Check the format and try again.");
+      setNotice(
+        found.length > 0
+          ? `No questions could be read. ${found.length} block${found.length === 1 ? "" : "s"} need fixing — see the reasons below.`
+          : "No questions found. Each question needs a numbered prompt (1.) and lettered options (A. B. …).",
+      );
       setNoticeTone("err");
       return;
     }
@@ -245,14 +334,159 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 </label>
               </div>
 
+              {/* Step 1 — the AI command. It is built from the shared practice prompt,
+                  so the format it asks for is exactly what the parser below reads. */}
+              <section
+                data-rev-ai-command
+                aria-labelledby="rev-ai-command-title"
+                className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container-low p-3 sm:p-4"
+              >
+                <div className="flex items-start gap-2">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-on-primary-container">
+                    <SparklesIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 id="rev-ai-command-title" className="text-sm font-bold text-on-surface">
+                      1. Get questions from an AI
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-on-surface-variant">
+                      Fill in what you need, copy the command, and paste it into ChatGPT, Gemini or Claude. Fields you
+                      leave empty are left out of the command.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-semibold text-on-surface-variant">Class / level</span>
+                    <Input
+                      data-rev-ai-level
+                      className="h-11 rounded-xl"
+                      placeholder="e.g. Class 10 (CBSE) — optional"
+                      value={aiLevel}
+                      onChange={(event) => setAiLevel(event.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-semibold text-on-surface-variant">Topic</span>
+                    <Input
+                      data-rev-ai-topic
+                      className="h-11 rounded-xl"
+                      placeholder={fallbackTopic ? `Uses “${fallbackTopic}”` : "e.g. Photosynthesis"}
+                      value={aiTopic}
+                      onChange={(event) => setAiTopic(event.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-semibold text-on-surface-variant">Number of questions</span>
+                    <Input
+                      data-rev-ai-count
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_PRACTICE_QUESTIONS}
+                      className="h-11 rounded-xl"
+                      placeholder="Default 10"
+                      value={aiCount}
+                      onChange={(event) => setAiCount(event.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-semibold text-on-surface-variant">Language of questions</span>
+                    <select
+                      data-rev-ai-language
+                      className="h-11 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      value={aiLanguage}
+                      onChange={(event) => setAiLanguage(event.target.value)}
+                    >
+                      <option value="">Not set (English)</option>
+                      {PRACTICE_PROMPT_LANGUAGES.map((language) => (
+                        <option key={language} value={language}>
+                          {language}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5" aria-label="Class quick-fill">
+                  {PRACTICE_PROMPT_LEVELS.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setAiLevel(level)}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                        aiLevel === level
+                          ? "border-primary bg-primary-soft text-on-primary-container"
+                          : "border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-high"
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" className="flex-1" onClick={() => void copyCommand()} data-rev-copy-ai-command>
+                    <SparklesIcon className="h-4 w-4" /> Copy AI command
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    aria-expanded={showCommand}
+                    onClick={() => setShowCommand((open) => !open)}
+                  >
+                    {showCommand ? "Hide command" : "Show command"}
+                  </Button>
+                </div>
+
+                {aiCopy ? (
+                  <p
+                    role={aiCopy.tone === "err" ? "alert" : "status"}
+                    className={`rounded-xl px-3 py-2 text-xs font-medium leading-relaxed ${
+                      aiCopy.tone === "err"
+                        ? "bg-error-container text-on-error-container"
+                        : "bg-tertiary-container text-on-tertiary-container"
+                    }`}
+                  >
+                    {aiCopy.message}
+                  </p>
+                ) : null}
+
+                {showCommand ? (
+                  <label className="block space-y-1.5">
+                    <span className="block text-xs font-semibold text-on-surface-variant">
+                      AI command (tap inside, select all, copy)
+                    </span>
+                    <Textarea
+                      readOnly
+                      rows={8}
+                      data-rev-ai-command-text
+                      className="resize-y rounded-xl font-mono text-xs leading-relaxed"
+                      value={aiPrompt}
+                      onFocus={(event) => event.currentTarget.select()}
+                      aria-label="AI command text"
+                    />
+                  </label>
+                ) : null}
+              </section>
+
+              {/* Step 2 — the AI's reply (or any questions) goes here. */}
               <label className="block space-y-1.5">
-                <span className="block text-sm font-semibold text-on-surface-variant">Questions and answer key</span>
+                <span className="block text-sm font-semibold text-on-surface-variant">
+                  2. Paste the AI reply or your questions
+                </span>
                 <Textarea
+                  data-rev-import-paste
                   rows={9}
                   className="min-h-56 resize-y rounded-xl font-mono text-xs leading-relaxed"
                   placeholder={SAMPLE}
                   value={text}
-                  onChange={(event) => setText(event.target.value)}
+                  onChange={(event) => {
+                    setText(event.target.value);
+                    setProblems([]);
+                  }}
                   aria-label="Paste questions and answers"
                 />
               </label>
@@ -285,6 +519,19 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                   }`}
                 >
                   {notice}
+                </div>
+              ) : null}
+
+              {problems.length > 0 ? (
+                <div role="alert" data-rev-import-problems className="rounded-xl bg-error-container px-3 py-2.5 text-sm text-on-error-container">
+                  <p className="font-semibold">Fix these blocks, then parse again:</p>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-relaxed">
+                    {problems.map((problem, index) => (
+                      <li key={`${problem.line}-${index}`}>
+                        <span className="font-semibold">Line {problem.line}:</span> {problem.message}.
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
             </RecallCard>

@@ -132,6 +132,47 @@ const normalizePublicHttpsUrl = (value) => {
   }
 };
 
+/**
+ * A GitHub-hosted PDF, as the browser can actually read it.
+ *
+ * `github.com/{owner}/{repo}/blob/{ref}/{path}.pdf` is an HTML viewer page, not
+ * the PDF, and github.com sends no CORS header, so PDF.js can never read it.
+ * The same file lives at `raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}`,
+ * which DOES allow cross-origin reads. Only `.pdf` paths are rewritten: any
+ * other GitHub page is left alone (it is a web page, not a PDF). Query
+ * parameters (e.g. a `token` for a private repo) are kept; the fragment is not.
+ * Limitation: the ref is taken as one path segment (`main`, a tag, a commit).
+ */
+export const githubRawPdfUrl = (value) => {
+  let url;
+  try {
+    url = new URL(String(value || "").trim());
+  } catch {
+    return "";
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return "";
+  const host = url.hostname.toLowerCase();
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (host === "github.com" || host === "www.github.com") {
+    if (parts.length < 5) return "";
+    const [owner, repo, mode, ref, ...rest] = parts;
+    if (mode !== "blob" && mode !== "raw") return "";
+    if (!/\.pdf$/i.test(rest[rest.length - 1] || "")) return "";
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${rest.join("/")}${url.search}`;
+  }
+  return "";
+};
+
+/** True when a normalized http(s) URL names a PDF by its path. */
+export const isPdfSourceUrl = (value) => {
+  try {
+    const url = new URL(String(value || ""));
+    return /\.pdf$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+};
+
 const googleDriveFileId = (value) => {
   const normalized = normalizePublicHttpsUrl(value);
   if (!normalized) return "";
@@ -205,8 +246,9 @@ export const normalizeReadResourceUrl = (value, sourceKind, options = {}) => {
     return id ? `https://drive.google.com/file/d/${id}/view` : "";
   }
   // Direct PDFs and generic embeds accept public HTTPS URLs only. The generic
-  // embed editor takes a URL, never HTML or an iframe snippet.
-  return normalizePublicHttpsUrl(value);
+  // embed editor takes a URL, never HTML or an iframe snippet. A GitHub blob
+  // PDF is rewritten to its readable raw address first (see githubRawPdfUrl).
+  return normalizePublicHttpsUrl(githubRawPdfUrl(value) || value);
 };
 
 export const readSourceLabel = (sourceKind) => {
@@ -243,7 +285,9 @@ export const getReadResourcePresentation = (resource, options = {}) => {
     fileSize: resource.readFileSize,
   });
   if (!sourceUrl) return null;
-  if (sourceKind === "embed_url") {
+  // A generic embed whose address is a PDF is still a PDF: it goes to the PDF.js
+  // viewer, never to the plain frame. Anything else stays a sandboxed web page.
+  if (sourceKind === "embed_url" && !isPdfSourceUrl(sourceUrl)) {
     return {
       kind: "embed",
       sourceKind,
@@ -277,7 +321,7 @@ export const getReadResourcePresentation = (resource, options = {}) => {
     sourceKind,
     sourceUrl,
     originalUrl: sourceUrl,
-    label: readSourceLabel(sourceKind),
+    label: readSourceLabel(sourceKind === "embed_url" ? "pdf_url" : sourceKind),
   };
 };
 

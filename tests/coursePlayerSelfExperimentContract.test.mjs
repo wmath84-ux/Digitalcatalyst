@@ -48,8 +48,9 @@ const HTML = `<!doctype html><html><head><meta name="viewport" content="width=de
 const factories = () => {
   let id = 0;
   return {
+    // Like the real createMyCourse: a GENERATED id. The experiment shelf must pin its own fixed id.
     createCourse: (uid, title) => ({
-      id: SELF_EXPERIMENTS_COURSE_ID,
+      id: `course_gen_${++id}`,
       uid,
       title,
       description: "",

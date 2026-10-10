@@ -221,7 +221,7 @@ export default function Composer({
               aria-label="Stop generating"
               title="Stop generating"
               className={cn(
-                "focus-ring flex flex-none items-center justify-center rounded-[10px] bg-[--ink] text-white transition-colors hover:bg-[#000000]",
+                "focus-ring flex flex-none items-center justify-center rounded-[10px] bg-[--ink] text-[--on-ink] transition-colors hover:bg-[#000000]",
                 micro ? "h-[28px] w-[28px]" : "h-[32px] w-[32px]"
               )}
             >

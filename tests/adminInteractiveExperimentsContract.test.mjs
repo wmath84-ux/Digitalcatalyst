@@ -101,7 +101,7 @@ const makeModule = (resources) => ({
 // ---------------------------------------------------------------------------
 
 test("ProductResource grows by exactly the experiment (type + inline source)", () => {
-  assert.match(adminTypes, /\| "interactive";/);
+  assert.match(adminTypes, /\| "interactive"\n/);
   assert.match(adminTypes, /interactiveHtml\?: string;/);
   assert.match(commerceTypes, /\| "interactive"\n/);
   assert.match(commerceTypes, /interactiveHtml\?: string;/);
@@ -117,15 +117,15 @@ test("the resource card treats the experiment like content, not like a link", ()
   // Ready = inline source OR a hosted page, with no blocking issues.
   assert.match(modulesEditor, /const isExperiment = resource\.type === "interactive";/);
   assert.match(modulesEditor, /const experimentReady = isExperiment && \(Boolean\(experimentHtml\.trim\(\)\) \|\| experimentHosted\) && experimentErrors\.length === 0;/);
-  assert.match(modulesEditor, /const readyForPlayer = isBrain \? brainReady : isExperiment \? experimentReady : isNote \? noteReady : Boolean\(cleanUrl\);/);
+  assert.match(modulesEditor, /const readyForPlayer = isBrain \? brainExplained : isExperiment \? experimentReady : isNote \? noteReady : isMindMap \? mindMapReady : Boolean\(cleanUrl\);/);
   // Its own pill, its own amber draft state, its own hosted-link field.
   assert.match(modulesEditor, /"Source required"/);
   assert.match(modulesEditor, /"Experiment ready"/);
   assert.match(modulesEditor, /Hosted experiment link \(optional\)/);
   // The generic "add a valid public URL" warning must not fire for it…
-  assert.match(modulesEditor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote \?/);
+  assert.match(modulesEditor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote && !isMindMap \?/);
   // …and an inline-only experiment offers no "Open URL" button.
-  assert.match(modulesEditor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \?/);
+  assert.match(modulesEditor, /\{!isBrain && !isMindMap && \(!isExperiment \|\| cleanUrl\) \?/);
 });
 
 // ---------------------------------------------------------------------------

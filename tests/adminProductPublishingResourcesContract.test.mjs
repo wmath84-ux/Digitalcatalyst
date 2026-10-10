@@ -117,7 +117,7 @@ test("learners see gated Master notes in a separate read-only collection while S
   assert.match(notesPanel, /MASTER/);
   assert.match(notesPanel, /SELF/);
   assert.match(notesPanel, /useState<"master" \| "self">\(\(\) =>[\s\S]*?"master"/);
-  assert.match(notesPanel, /onOpen=\{\(\) => setViewingMasterNoteId\(note\.id\)\}/);
+  assert.match(notesPanel, /onSelect=\{\(value\) => \{[\s\S]*?setViewingMasterNoteId\(note\.id\)/);
   assert.match(notesPanel, /readOnly/);
   assert.match(notesPanel, /onAdd\(html\)/);
   assert.match(notesPanel, /onEdit\(editingId, html\)/);

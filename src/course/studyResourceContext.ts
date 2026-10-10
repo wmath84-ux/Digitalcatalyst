@@ -1,4 +1,5 @@
 import type { CourseModule } from "../types/course";
+import type { BranchSegment } from "../components/branched-menu/branchedTree";
 import type { PersonalCourseModule } from "../types/personalCourse";
 
 export interface StudyResourceContext {
@@ -88,4 +89,45 @@ export function formatStudyTimestamp(timestamp?: number | null): { short: string
     minute: "2-digit",
   }).format(date);
   return { short, full };
+}
+
+/**
+ * The real module chain (outermost first) for a course module id, keyed by the
+ * stored module ids. The Branched Menu groups notes and maps by this chain, so
+ * two modules that share a title never merge into one section.
+ */
+export function courseModuleSegments(
+  modules: CourseModule[],
+  moduleId?: string | null,
+): BranchSegment[] {
+  const wanted = String(moduleId || "");
+  if (!wanted) return [];
+  let found: BranchSegment[] | null = null;
+  const visit = (nodes: CourseModule[], parents: BranchSegment[]): void => {
+    for (const module of nodes || []) {
+      if (found) return;
+      const segment = { key: String(module.id), label: cleanTitle(module.title) || "Untitled module" };
+      const chain = [...parents, segment];
+      if (String(module.id) === wanted) {
+        found = chain;
+        return;
+      }
+      visit(module.modules || [], chain);
+    }
+  };
+  visit(modules || [], []);
+  return found ?? [];
+}
+
+/** Root segment for the learner's own content, and its module segment. */
+export const PERSONAL_ROOT_SEGMENT: BranchSegment = { key: "personal-root", label: "My Modules" };
+
+export function personalModuleSegments(
+  modules: PersonalCourseModule[],
+  moduleId?: string | null,
+): BranchSegment[] {
+  const wanted = String(moduleId || "");
+  const module = wanted ? (modules || []).find((entry) => String(entry.id) === wanted) : undefined;
+  if (!module) return [PERSONAL_ROOT_SEGMENT];
+  return [PERSONAL_ROOT_SEGMENT, { key: String(module.id), label: cleanTitle(module.title) || "Untitled module" }];
 }

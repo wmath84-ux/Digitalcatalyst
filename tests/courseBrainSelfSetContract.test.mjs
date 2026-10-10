@@ -218,9 +218,9 @@ test("the schema carries the tag through a Firestore round trip", () => {
 // ---------------------------------------------------------------------------
 
 test("the composer reuses the admin's CMD and the shared paste parser", () => {
-  assert.match(composer, /import \{ buildPracticeAiPrompt, PRACTICE_PROMPT_RULES \} from "@\/utils\/practicePrompt";/);
-  assert.match(composer, /import \{ parseQuestionText \} from "@\/revision\/engine\/bulkParser";/);
-  assert.match(composer, /buildPracticeAiPrompt\(\{ topic: aiTopic, level: aiLevel, count: 10 \}\)/);
+  assert.match(composer, /PRACTICE_PROMPT_RULES,\s*buildPracticeAiPrompt,\s*\} from "@\/utils\/practicePrompt";/);
+  assert.match(composer, /import \{ parsePracticeImport, type PracticeImportResult \} from "\.\.\/utils\/practiceImport\.ts";/);
+  assert.match(composer, /buildPracticeAiPrompt\(\{ topic: aiTopic, level: aiLevel, count: Number\(aiCount\), language: aiLanguage \}\)/);
   assert.match(composer, /data-brain-self-topic/);
   assert.match(composer, /data-brain-self-level/);
   assert.match(composer, /data-brain-self-prompt-text/);
@@ -274,7 +274,7 @@ Explanation: Plants take in CO₂ and release O₂.`),
   assert.equal(withExplanation[0].topic, "Photosynthesis");
   assert.equal(selfPracticeSetIssues(withExplanation).length, 0);
   // Create is disabled until the draft is complete.
-  assert.match(composer, /const canCreate = Boolean\(title\.trim\(\)\) && summary\.createReady && !busy;/);
+  assert.match(composer, /const canCreate = Boolean\(title\.trim\(\)\) && createReady && !busy;/);
   assert.match(composer, /disabled=\{!canCreate\}/);
   assert.match(composer, /data-brain-self-create/);
 });

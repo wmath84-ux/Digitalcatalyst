@@ -19,6 +19,7 @@ import { normalizePlanStudyPacks } from "../../../utils/studyPacks.js";
 import { sanitizeReadUploadsForProduct } from "../../../utils/readResources.js";
 import { canonicalProductResourceType } from "../../../utils/productResourceTypes.js";
 import { MAX_NOTE_HTML_LENGTH } from "../../../utils/courseNotes.js";
+import { describeOversizeProductDocument } from "../../../utils/productFirestoreDoc.js";
 import { apiFetch } from "../../utils/apiBase";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
@@ -293,6 +294,12 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
     paidUpdates,
     updatedAt: serverTimestamp(),
   });
+  // Firestore rejects any document over 1 MiB with an unreadable invalid-argument
+  // error AFTER the admin has waited. Mind maps, notes and experiments are all
+  // stored inside this one document (some twice), so refuse here with a readable
+  // message that names the largest fields — before anything is written.
+  const oversize = describeOversizeProductDocument(payload);
+  if (oversize) throw new ApiError(oversize, 400);
   await setDoc(ref, payload, { merge: true });
   return { ...normalizedBody, ...mapped.adminProduct, id: ref.id, status: requestedStatus, visibility };
 }

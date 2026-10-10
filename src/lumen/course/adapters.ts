@@ -199,6 +199,7 @@ const REGISTRY: Record<ResourceType, ResourceContextAdapter> = {
   google_form: GoogleFormAdapter,
   embed: EmbedAdapter,
   mindmap: MindmapAdapter,
+  mind_map: { ...MindmapAdapter, type: "mind_map" },
   brain: BrainAdapter,
 };
 

@@ -78,7 +78,8 @@ test("the My Day foreground clock records what the device delivered", () => {
   const block = main.slice(main.indexOf("const alarmArmed = isAndroidNative()"));
   assert.match(block, /recordDeviceNotification\(user\.id, \{/);
   assert.match(block, /deviceNotificationDocId\("myday", item\)/);
-  assert.match(block, /if \(!displayed && !armed\) return;/);
+  // A failed display is retried (not recorded) while device push is allowed.
+  assert.match(block, /if \(!displayed && !armed && canShowDevicePush\(user\.id\)\) return;/);
 });
 
 test("the FlowPath foreground clock records what the device delivered", () => {

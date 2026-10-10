@@ -25,10 +25,11 @@
 // column, no nested cards. It scrolls inside itself because the Brain page
 // lives in the Split Deck's study pane, which can be any height.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Copy,
+  FileText,
   ListPlus,
   LoaderCircle,
   Plus,
@@ -37,8 +38,13 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { parseQuestionText } from "@/revision/engine/bulkParser";
-import { buildPracticeAiPrompt, PRACTICE_PROMPT_RULES } from "@/utils/practicePrompt";
+import {
+  PRACTICE_PROMPT_LANGUAGES,
+  PRACTICE_PROMPT_LEVELS,
+  PRACTICE_PROMPT_RULES,
+  buildPracticeAiPrompt,
+} from "@/utils/practicePrompt";
+import { parsePracticeImport, type PracticeImportResult } from "../utils/practiceImport.ts";
 import {
   MAX_PRACTICE_OPTIONS,
   MAX_PRACTICE_QUESTIONS,
@@ -53,6 +59,13 @@ import {
 import type { MyCourseQuestion } from "../types/myCourse";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+const PASTE_PLACEHOLDER = `1. What is 2 + 2?
+A. 3
+B. 4 ✓
+C. 5
+D. 6
+Explanation: Adding 2 and 2 gives 4.`;
 
 const fieldClass =
   "w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[13px] font-semibold text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/70";
@@ -80,30 +93,67 @@ export default function SelfPracticeSetComposer({
   const [title, setTitle] = useState(defaultName);
   const [aiTopic, setAiTopic] = useState(topic);
   const [aiLevel, setAiLevel] = useState(level);
+  const [aiCount, setAiCount] = useState("10");
+  const [aiLanguage, setAiLanguage] = useState(PRACTICE_PROMPT_LANGUAGES[0]);
   const [promptEdit, setPromptEdit] = useState("");
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [paste, setPaste] = useState("");
+  /**
+   * The last Parse press: the exact text it read and what it found. Preview,
+   * errors and Create all come from this snapshot, so what the learner
+   * checked is exactly what gets saved — editing the paste makes it stale.
+   */
+  const [parsed, setParsed] = useState<{ source: string; result: PracticeImportResult } | null>(null);
   const [manual, setManual] = useState<MyCourseQuestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Guards a double tap before React re-renders the disabled button.
+  const submitting = useRef(false);
 
   const generatedPrompt = useMemo(
-    () => buildPracticeAiPrompt({ topic: aiTopic, level: aiLevel, count: 10 }),
-    [aiTopic, aiLevel],
+    () => buildPracticeAiPrompt({ topic: aiTopic, level: aiLevel, count: Number(aiCount), language: aiLanguage }),
+    [aiTopic, aiLevel, aiCount, aiLanguage],
   );
   // Editing the CMD wins; editing a field above rebuilds it — the admin panel's
   // exact behaviour, so the two surfaces feel like the same tool.
   const promptText = promptEdit || generatedPrompt;
 
-  /** What the pasted text parses to, previewed before Create is pressed. */
-  const parsed = useMemo(() => (paste.trim() ? parseQuestionText(paste) : []), [paste]);
+  /** The Parse result only counts while the pasted text is still the text it read. */
+  const parseFresh = parsed !== null && parsed.source === paste;
+  const parseResult = parseFresh ? parsed.result : null;
   const pasteQuestions = useMemo(
-    () => selfPracticeQuestionsFromParsed(parsed, { topic: aiTopic }),
-    [parsed, aiTopic],
+    () => (parseResult ? selfPracticeQuestionsFromParsed(parseResult.questions, { topic: aiTopic }) : []),
+    [parseResult, aiTopic],
   );
   const questions = mode === "ai" ? pasteQuestions : manual;
   const summary = useMemo(() => selfPracticeSetSummary(questions), [questions]);
-  const canCreate = Boolean(title.trim()) && summary.createReady && !busy;
+  const createReady = mode === "ai" ? Boolean(parseResult?.createReady) && pasteQuestions.length > 0 : summary.createReady;
+  const canCreate = Boolean(title.trim()) && createReady && !busy;
+
+  const runParse = () => {
+    setError(null);
+    setCopyNote(null);
+    setParsed({ source: paste, result: parsePracticeImport(paste) });
+  };
+
+  /** The one status line under the form — says exactly what Create will do. */
+  const statusLine = (() => {
+    if (mode === "manual") {
+      return summary.total === 0
+        ? "No questions yet — add one below."
+        : summary.createReady
+          ? `${summary.total} question${summary.total === 1 ? "" : "s"} ready — Create saves the set to My Study Library.`
+          : `${summary.ready} of ${summary.total} ready — fix the rest, then Create.`;
+    }
+    if (!paste.trim()) return "Paste the AI’s reply, then press Parse to check it.";
+    if (!parseFresh) return "The reply changed — press Parse again to check it.";
+    if (!parseResult?.createReady) {
+      const count = parseResult?.errors.length ?? 0;
+      return `${count} thing${count === 1 ? "" : "s"} to fix before Create.`;
+    }
+    const total = pasteQuestions.length;
+    return `${total} question${total === 1 ? "" : "s"} parsed and ready — Create saves the set to My Study Library.`;
+  })();
 
   const copyPrompt = async () => {
     let ok = false;
@@ -117,7 +167,7 @@ export default function SelfPracticeSetComposer({
     }
     setCopyNote(
       ok
-        ? "CMD copied — paste it into any AI, then paste the reply below and press Create."
+        ? "CMD copied — paste it into any AI, then paste the reply below, press Parse and check the preview before Create."
         : "Clipboard blocked — select the CMD text and copy it manually.",
     );
   };
@@ -142,16 +192,28 @@ export default function SelfPracticeSetComposer({
   };
 
   const submit = async () => {
+    if (submitting.current) return;
     setError(null);
     setCopyNote(null);
     if (!title.trim()) {
       setError("Give your practice set a name first.");
       return;
     }
-    if (summary.issues.length) {
+    if (mode === "ai") {
+      if (!parseFresh) {
+        setError(paste.trim() ? "The reply changed since the last Parse — press Parse again first." : "Paste the AI’s reply, press Parse, then Create.");
+        return;
+      }
+      if (!parseResult?.createReady) {
+        const errors = parseResult?.errors ?? [];
+        setError(`Fix these first — ${errors.slice(0, 3).join(" · ")}${errors.length > 3 ? ` · +${errors.length - 3} more` : ""}`);
+        return;
+      }
+    } else if (summary.issues.length) {
       setError(`Finish these first — ${summary.issues.slice(0, 3).join(" · ")}${summary.issues.length > 3 ? ` · +${summary.issues.length - 3} more` : ""}`);
       return;
     }
+    submitting.current = true;
     setBusy(true);
     try {
       const result = await onCreate({ title: title.trim(), questions });
@@ -163,6 +225,7 @@ export default function SelfPracticeSetComposer({
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Could not save the set. Please try again.");
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   };
@@ -264,6 +327,57 @@ export default function SelfPracticeSetComposer({
                     />
                   </label>
                 </div>
+                <div className="flex flex-wrap gap-1" aria-label="Class or exam level">
+                  {PRACTICE_PROMPT_LEVELS.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => {
+                        setAiLevel(item);
+                        setPromptEdit("");
+                      }}
+                      className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-violet-100 hover:bg-white/20"
+                      data-brain-self-level-chip={item}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">How many questions</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_PRACTICE_QUESTIONS}
+                      value={aiCount}
+                      onChange={(event) => {
+                        setAiCount(event.currentTarget.value);
+                        setPromptEdit("");
+                      }}
+                      className={`${fieldClass} h-10`}
+                      data-brain-self-count
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Language of the questions</span>
+                    <select
+                      value={aiLanguage}
+                      onChange={(event) => {
+                        setAiLanguage(event.currentTarget.value);
+                        setPromptEdit("");
+                      }}
+                      className={`${fieldClass} h-10 appearance-none`}
+                      data-brain-self-language
+                    >
+                      {PRACTICE_PROMPT_LANGUAGES.map((item) => (
+                        <option key={item} value={item} className="bg-slate-900">
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {PRACTICE_PROMPT_RULES.map((rule) => (
                     <span key={rule} className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-semibold text-violet-100" data-brain-self-rule>
@@ -304,10 +418,10 @@ export default function SelfPracticeSetComposer({
                 ) : null}
               </div>
 
-              {/* Step 2 — paste the reply and create. */}
+              {/* Step 2 — paste the reply, press Parse, check every question, then Create. */}
               <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-brain-self-paste>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-slate-300">
-                  Step 2 · Paste the AI&apos;s reply
+                  Step 2 · Paste the AI&apos;s reply, then press Parse
                 </p>
                 <textarea
                   value={paste}
@@ -316,16 +430,105 @@ export default function SelfPracticeSetComposer({
                     setError(null);
                   }}
                   rows={6}
-                  placeholder={"1. What is 2 + 2?\nA. 3\nB. 4 ✓\nC. 5\nD. 6\nExplanation: Adding 2 and 2 gives 4."}
-                  className="w-full resize-y rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 font-mono text-[11px] leading-5 text-white outline-none placeholder:text-slate-600 focus:border-emerald-400/70"
+                  placeholder={PASTE_PLACEHOLDER}
+                  aria-label="Paste the AI reply"
+                  className="w-full resize-y rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 font-mono text-[12px] leading-5 text-white outline-none placeholder:text-slate-600 focus:border-emerald-400/70"
                   data-brain-self-paste-input
                 />
-                {parsed.length ? (
-                  <p className="rounded-lg bg-emerald-400/10 px-2 py-1.5 text-[11px] font-semibold text-emerald-100" data-brain-self-preview>
-                    Detected {parsed.length} question{parsed.length === 1 ? "" : "s"} ·{" "}
-                    {parsed.filter((question) => question.correctIndex >= 0).length} with a marked answer ·{" "}
-                    {parsed.filter((question) => question.explanation).length} with an explanation (required on every question).
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={runParse}
+                    disabled={!paste.trim() || busy}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-[11px] font-black text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    data-brain-self-parse
+                  >
+                    <FileText size={13} /> Parse questions
+                  </button>
+                  {paste.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaste("");
+                        setParsed(null);
+                        setError(null);
+                      }}
+                      className="inline-flex h-9 items-center rounded-lg px-3 text-[11px] font-black text-slate-300 hover:bg-white/10 hover:text-white"
+                    >
+                      Clear reply
+                    </button>
+                  ) : null}
+                </div>
+
+                {!paste.trim() ? null : !parseFresh ? (
+                  <p className="rounded-lg bg-white/[0.05] px-2 py-1.5 text-[11px] font-semibold text-slate-300" data-brain-self-stale>
+                    The reply changed since the last Parse — press Parse questions to check it again.
                   </p>
+                ) : null}
+
+                {parseResult && parseResult.questions.length > 0 ? (
+                  <p className="rounded-lg bg-emerald-400/10 px-2 py-1.5 text-[11px] font-semibold text-emerald-100" data-brain-self-preview>
+                    Parsed {parseResult.questions.length} question{parseResult.questions.length === 1 ? "" : "s"} ·{" "}
+                    {parseResult.questions.filter((question) => question.correctIndex >= 0).length} with a marked answer ·{" "}
+                    {parseResult.questions.filter((question) => question.explanation.trim()).length} with an explanation
+                  </p>
+                ) : null}
+
+                {parseResult && parseResult.warnings.length > 0 ? (
+                  <ul className="space-y-1 rounded-lg border border-sky-400/30 bg-sky-400/[0.07] p-2 text-[11px] font-semibold text-sky-100" data-brain-self-parse-warnings>
+                    {parseResult.warnings.map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {parseResult && parseResult.errors.length > 0 ? (
+                  <ul className="space-y-1 rounded-lg border border-amber-400/30 bg-amber-400/[0.07] p-2 text-[11px] font-semibold text-amber-100" data-brain-self-parse-errors role="alert">
+                    {parseResult.errors.map((message) => (
+                      <li key={message} className="break-words">
+                        {message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {parseResult && parseResult.questions.length > 0 ? (
+                  <div className="space-y-2" data-brain-self-preview-list>
+                    {parseResult.questions.map((question, index) => (
+                      <div
+                        key={`${index}-${question.prompt}`}
+                        className="space-y-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                        data-brain-self-preview-question
+                      >
+                        <p className="break-words text-[12px] font-bold text-white">
+                          <span className="mr-2 text-slate-400">{index + 1}.</span>
+                          {question.prompt}
+                        </p>
+                        <ul className="space-y-1">
+                          {question.options.map((option, optionIndex) => {
+                            const correct = optionIndex === question.correctIndex;
+                            return (
+                              <li
+                                key={optionIndex}
+                                className={`flex items-start gap-2 text-[11px] ${correct ? "font-bold text-emerald-200" : "text-slate-300"}`}
+                                data-correct={correct ? "true" : "false"}
+                              >
+                                <span className="w-4 shrink-0 font-black">{OPTION_LETTERS[optionIndex] || optionIndex + 1}.</span>
+                                <span className="min-w-0 flex-1 break-words">{option || <em className="text-slate-500">(empty)</em>}</span>
+                                {correct ? <CheckCircle2 size={12} className="mt-0.5 shrink-0" aria-label="Correct answer" /> : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        {question.correctIndex < 0 ? (
+                          <p className="text-[11px] font-semibold text-amber-200">No answer marked.</p>
+                        ) : null}
+                        <p className="break-words text-[11px] text-slate-300">
+                          <span className="font-bold text-slate-200">Explanation: </span>
+                          {question.explanation.trim() ? question.explanation : <span className="text-amber-200">missing</span>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
               </div>
             </>
@@ -472,11 +675,7 @@ export default function SelfPracticeSetComposer({
 
         <div className="shrink-0 border-t border-white/10 px-4 py-3">
           <p className="mb-2 text-[10px] font-semibold text-slate-400" data-brain-self-status>
-            {summary.total === 0
-              ? "No questions yet — copy the CMD above, or write one yourself."
-              : summary.createReady
-                ? `${summary.total} question${summary.total === 1 ? "" : "s"} ready — Create saves the set to My Study Library.`
-                : `${summary.ready} of ${summary.total} ready — fix the rest, then Create.`}
+            {statusLine}
           </p>
           <button
             type="button"

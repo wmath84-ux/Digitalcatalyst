@@ -16,6 +16,8 @@
 // drift, and `tests/myStudyLibraryAllAccountsContract.test.mjs` pins them to the
 // numbers in `src/types/myCourse.ts` and to the numbers in firestore.rules.
 
+import { validateMindMapObject } from "./mindMapImport.js";
+
 /** Keep in sync with `src/types/myCourse.ts` (pinned by a contract test). */
 export const MY_COURSE_SCHEMA_VERSION = 1;
 export const MY_COURSE_TITLE_MAX = 120;
@@ -95,6 +97,24 @@ export const sanitizeMyCourseResource = (raw) => {
   if (type === "brain") {
     resource.practiceTitle = clamp(source.practiceTitle, MY_RESOURCE_NAME_MAX);
     resource.practiceQuestions = questions;
+  }
+  // Scope tags. A resource made from the Course Player (an experiment from the
+  // Experiment page's “+”, a practice set from the Brain tab) carries the
+  // player scope it belongs to. The SELF lists filter on these tags, so the
+  // save API must keep them — dropping one here makes a saved item vanish from
+  // its page the moment the write goes through /api/my-courses.
+  const experimentScope = clamp(source.experimentSourceProductId, 200);
+  if (experimentScope) resource.experimentSourceProductId = experimentScope;
+  const practiceScope = clamp(source.practiceSourceProductId, 200);
+  if (practiceScope) resource.practiceSourceProductId = practiceScope;
+  if (type === "mind_map") {
+    // A learner's own mind map IS its JSON (the same shape the admin stores
+    // and the shared validator checks). Kept only when it validates, so the
+    // Experiment page never receives a map it cannot draw.
+    const data = source.mindMapData;
+    if (data && typeof data === "object" && !Array.isArray(data) && validateMindMapObject(data).valid) {
+      resource.mindMapData = data;
+    }
   }
   if (type === "interactive") {
     // The experiment IS its HTML (see src/utils/experimentSpec.ts). Stored as
@@ -179,6 +199,33 @@ export const experimentBudget = (modules) => {
   return { total, over };
 };
 
+/** Per-map and whole-course caps for learner mind maps (stored once here). */
+export const MY_MIND_MAP_MAX_BYTES = 300 * 1024;
+export const MY_COURSE_MAX_MIND_MAP_BYTES = 512 * 1024;
+
+/** UTF-8 size of every learner mind map in the tree, and the first over-size map. */
+export const mindMapBudget = (modules) => {
+  let total = 0;
+  let over = null;
+  const visit = (list) => {
+    if (!Array.isArray(list)) return;
+    for (const module of list) {
+      if (!module || typeof module !== "object") continue;
+      for (const resource of (Array.isArray(module.resources) ? module.resources : [])) {
+        if (!resource || resource.type !== "mind_map" || !resource.mindMapData) continue;
+        const bytes = byteLength(JSON.stringify(resource.mindMapData));
+        total += bytes;
+        if (!over && bytes > MY_MIND_MAP_MAX_BYTES) {
+          over = { id: resource.id, name: resource.name || "Untitled mind map", bytes };
+        }
+      }
+      visit(module.modules);
+    }
+  };
+  visit(modules);
+  return { total, over };
+};
+
 /**
  * Build the exact document that is written to `users/{uid}/myCourses/{id}`.
  *
@@ -233,6 +280,22 @@ export const sanitizeMyCourseDoc = (uid, raw) => {
       ok: false,
       code: "EXPERIMENTS_TOO_LARGE",
       message: `This course's experiments add up to ${(experiments.total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_EXPERIMENT_BYTES / 1024).toFixed(0)} KB. Host one of them and use its link, or split the course.`,
+    };
+  }
+
+  const maps = mindMapBudget(modules);
+  if (maps.over) {
+    return {
+      ok: false,
+      code: "MIND_MAP_TOO_LARGE",
+      message: `“${maps.over.name}” is ${(maps.over.bytes / 1024).toFixed(0)} KB — one mind map may be at most ${(MY_MIND_MAP_MAX_BYTES / 1024).toFixed(0)} KB. Split it into two maps or shorten the topics.`,
+    };
+  }
+  if (maps.total > MY_COURSE_MAX_MIND_MAP_BYTES) {
+    return {
+      ok: false,
+      code: "MIND_MAPS_TOO_LARGE",
+      message: `Your mind maps in this course add up to ${(maps.total / 1024).toFixed(0)} KB — the limit is ${(MY_COURSE_MAX_MIND_MAP_BYTES / 1024).toFixed(0)} KB. Remove or split one of them.`,
     };
   }
 

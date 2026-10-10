@@ -46,6 +46,29 @@ export const SELF_PRACTICE_SETS_COURSE_DESCRIPTION =
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const toText = (value) => (value === null || value === undefined ? "" : String(value)).replace(/\s+/g, " ").trim();
 
+/**
+ * Is this library course the learner's practice-set shelf course?
+ *
+ * The canonical id is `my-practice-sets`. Earlier builds created the shelf
+ * course through `createMyCourse`, which gives a generated `course_…` id, so
+ * the reader never found it again: every set was written and then invisible,
+ * and each save made another course. A course with the shelf title and a
+ * generated id is therefore the SAME shelf — its sets are read and new sets
+ * join it, so nothing is orphaned and nothing is duplicated.
+ */
+export const isSelfPracticeCourse = (course) => {
+  if (!isObject(course)) return false;
+  const id = String(course.id || "");
+  if (id === SELF_PRACTICE_SETS_COURSE_ID) return true;
+  return id.startsWith("course_") && toText(course.title) === SELF_PRACTICE_SETS_COURSE_TITLE;
+};
+
+/** The course new sets are written into: the canonical shelf, else a legacy one, else null. */
+export const findSelfPracticeCourse = (courses) => {
+  const matches = (Array.isArray(courses) ? courses : []).filter(isSelfPracticeCourse);
+  return matches.find((course) => String(course.id) === SELF_PRACTICE_SETS_COURSE_ID) || matches[0] || null;
+};
+
 /** Deep-clone a course so a draft never mutates the live shelf snapshot. */
 const cloneCourse = (course) =>
   typeof structuredClone === "function" ? structuredClone(course) : JSON.parse(JSON.stringify(course));
@@ -159,7 +182,7 @@ export const selfPracticeSetsFromCourses = (courses, productId) => {
   if (!scope) return [];
   const sets = [];
   for (const course of Array.isArray(courses) ? courses : []) {
-    if (!isObject(course) || String(course.id) !== SELF_PRACTICE_SETS_COURSE_ID) continue;
+    if (!isSelfPracticeCourse(course)) continue;
     visitSelfCourse(course.modules, scope, sets);
   }
   return sets.filter((set) => Boolean(set.id));
@@ -196,11 +219,14 @@ export const placeSelfPracticeSet = (input, factories) => {
   const now = Date.now();
 
   let working;
-  if (isObject(source.course) && String(source.course.id) === SELF_PRACTICE_SETS_COURSE_ID) {
+  if (isObject(source.course) && isSelfPracticeCourse(source.course)) {
     working = cloneCourse(source.course);
   } else {
     if (!uid) return { course: null, resource: null, issues: ["sign in to save practice sets"] };
     working = makeCourse(uid, SELF_PRACTICE_SETS_COURSE_TITLE);
+    // ONE fixed id for the shelf, so the next read and the next save find it.
+    // The document factory generates a random id by default.
+    working.id = SELF_PRACTICE_SETS_COURSE_ID;
     working.description = SELF_PRACTICE_SETS_COURSE_DESCRIPTION;
     working.modules = [];
   }

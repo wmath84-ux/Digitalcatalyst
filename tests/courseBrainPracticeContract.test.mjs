@@ -73,6 +73,8 @@ const resourceTypeRegistry = read("utils/productResourceTypes.js");
 const importer = read("src/components/admin/products/PracticeSetImportPanel.tsx");
 const productEditor = read("src/components/admin/products/ProductEditor.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
+const visibility = read("src/course/fileVisibility.ts");
+const library = read("src/course/CourseResourceLibrary.tsx");
 const playerApp = read("src/CoursePlayerApp.tsx");
 const brainPanel = read("src/course/CourseBrainPanel.tsx");
 const brainDeck = read("src/course/BrainQuestionDeck.tsx");
@@ -275,18 +277,20 @@ test("picking Brain swaps the URL fields for the importer", () => {
   assert.match(editor, /\{isBrain \? \(\s*\n\s*<PracticeSetImportPanel/);
   assert.match(editor, /practiceTitle: title \|\| undefined,/);
   // The URL-only publish rule must not fire for a type that has no URL. The
-  // Interactive 2D experiment is the second such type, so both conditions name
-  // it next to Brain (Brain's own behaviour is unchanged).
-  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote \? \(/);
-  assert.match(editor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
+  // Interactive 2D experiment, the note and the mind map (its content is
+  // mindMapData) are the other such types, so every condition names them next
+  // to Brain. Brain's own behaviour is unchanged.
+  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote && !isMindMap \? \(/);
+  assert.match(editor, /\{!isBrain && !isMindMap && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
   // …and a ready / incomplete set is spelled out on the resource card.
   assert.match(editor, /const brainReady = isBrain && practiceQuestionsReady\(resource\.practiceQuestions\);/);
 });
 
 test("the importer is the revision bulk-import flow, plus hand-written questions", () => {
-  assert.match(importer, /import \{ parseQuestionText \} from "@\/revision\/engine\/bulkParser";/, "the SAME parser the revision importer uses");
+  assert.match(importer, /import \{ parsePracticeImport \} from "@\/utils\/practiceImport";/, "the SAME parse-and-validate step the composer uses");
   assert.match(importer, /from "\.\.\/\.\.\/\.\.\/\.\.\/utils\/practiceSet\.js"/, "and the SAME normaliser the player reads");
-  assert.match(importer, /const preview = useMemo\(\(\) => \(paste\.trim\(\) \? parseQuestionText\(paste\) : \[\]\), \[paste\]\);/);
+  assert.match(importer, /const parsedPaste = useMemo\(\(\) => \(paste\.trim\(\) \? parsePracticeImport\(paste\) : null\), \[paste\]\);/);
+  assert.match(importer, /data-practice-paste-errors/, "parser problems are listed by line, never dropped silently");
   assert.match(importer, /data-practice-paste/);
   assert.match(importer, /data-practice-import/);
   assert.match(importer, /Add question manually/, "create/add by hand, not only bulk paste");
@@ -550,10 +554,13 @@ test("the Brain tab hosts the panel and keeps the placeholder as a fallback", ()
 });
 
 test("a brain resource is visible and reachable without a URL", () => {
-  assert.match(overlay, /const isBrainFile = \(file: CourseFile\) => file\.type === "brain" && \(file\.practiceQuestions\?\.length \?\? 0\) > 0;/);
-  assert.match(overlay, /\(isBrainFile\(file\) \|\| Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\)/);
-  assert.match(overlay, /if \(file\.type === "brain"\) return Brain;/);
-  assert.match(overlay, /subtitle: isBrainFile\(file\) \? `\$\{file\.practiceQuestions\?\.length \?\? 0\} practice questions` : file\.type,/);
+  // The visibility rule lives in one shared module (fileVisibility.ts) used by
+  // the Modules library; the library shows the Brain icon and practice count.
+  assert.match(visibility, /export const isBrainFile = \(file: CourseFile\) => file\.type === "brain" && \(file\.practiceQuestions\?\.length \?\? 0\) > 0;/);
+  assert.match(visibility, /\(isBrainFile\(file\) \|\| Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\)/);
+  assert.match(library, /case "brain": return Brain;/);
+  assert.match(library, /\$\{qCount\} practice/);
+  assert.match(library, /isVisibleFile\(file\)/);
 });
 
 test("selecting a brain resource opens the Brain tab instead of the viewer stack", () => {

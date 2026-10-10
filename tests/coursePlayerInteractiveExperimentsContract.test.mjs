@@ -55,6 +55,8 @@ const read = (path) => readFileSync(path, "utf8");
 const courseTypes = read("src/types/course.ts");
 const player = read("src/CoursePlayerApp.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
+const visibility = read("src/course/fileVisibility.ts");
+const library = read("src/course/CourseResourceLibrary.tsx");
 const viewer = read("src/course/ResourceViewer.tsx");
 const stage = read("src/course/ExperimentStage.tsx");
 const adapter = read("src/lib/myCourseAdapter.ts");
@@ -75,7 +77,10 @@ test("the experiment is its own union member and CourseFileType keeps its 13 off
   const union = courseTypes.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(union, "CourseFileType union must stay declared in src/types/course.ts");
   const declared = [...union[1].matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
-  assert.equal(declared.length, 13, "the official catalogue has exactly 13 file types");
+  // 13 official catalogue types + `mind_map`, the admin's own name for a mind map
+  // (mapped to the player's `mindmap`, see utils/mindMapResourceMapping.js).
+  assert.equal(declared.length, 14, "the 13 official file types plus the admin mind_map alias");
+  assert.ok(declared.includes("mind_map"), "the admin mind_map alias is a declared member");
   assert.ok(!declared.includes("interactive"), "the experiment must NOT be an official CourseFileType");
 
   assert.match(courseTypes, /export const EXPERIMENT_FILE_TYPE = "interactive" as const;/);
@@ -247,10 +252,10 @@ test("the shared sanitiser keeps the source, and the firestore rule does not nee
 // ---------------------------------------------------------------------------
 
 test("the Modules tab shows an experiment and gives it its own icon", () => {
-  assert.match(overlay, /const isExperimentFile = \(file: CourseFile\) =>/);
-  assert.match(overlay, /file\.type === "interactive"/);
-  assert.match(overlay, /const isVisibleFile = \(file: CourseFile\) =>\s*\n\s*file\.accessLevel !== "hidden" && \(hasUrlContent\(file\) \|\| isExperimentFile\(file\)\);/);
-  assert.match(overlay, /if \(file\.type === "interactive"\) return FlaskConical;/);
+  assert.match(visibility, /export const isExperimentFile = \(file: CourseFile\) =>/);
+  assert.match(visibility, /file\.type === "interactive"/);
+  assert.match(visibility, /export const isVisibleFile = \(file: CourseFile\) =>\s*\n\s*file\.accessLevel !== "hidden" && \(hasUrlContent\(file\) \|\| isExperimentFile\(file\)\);/);
+  assert.match(library, /case "interactive": return FlaskConical;/);
 });
 
 test("the viewer stack opens experiments and never a URL-less type it cannot render", () => {
@@ -283,7 +288,7 @@ test("the viewer stack opens experiments and never a URL-less type it cannot ren
 // ---------------------------------------------------------------------------
 
 test("My Study Library offers the type and wires the whole prompt → paste → preview flow", () => {
-  assert.match(editor, /\{ id: "interactive", label: "Interactive 2D experiment", icon: FlaskConical, hint: "Make it with AI — one HTML file" \}/);
+  assert.match(editor, /\{\s*id: "interactive",\s*label: "Interactive 2D experiment",\s*icon: FlaskConical,\s*hint: "Make it with AI — one HTML file",?\s*\}/);
   assert.match(editor, /\{isExperiment \? \(\s*\n\s*<MyCourseExperimentEditor/);
   assert.match(editor, /import \{ experimentBlockingIssues \} from "\.\.\/utils\/experimentSpec";/);
   for (const hook of [

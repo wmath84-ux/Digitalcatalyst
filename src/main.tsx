@@ -123,6 +123,7 @@ import type { PaidCourseUpdate } from "./types/course";
 import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { syncSystemThemeColor } from "./utils/themeColor";
+import { startSystemBarSync } from "./utils/systemBars";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit, ROUTE_HISTORY_KEY } from "./utils/routeHistory";
 import { captureExcalidrawLibraryReturn } from "../utils/excalidrawLibraryLink.js";
@@ -1663,6 +1664,9 @@ function RootPage(): ReactNode {
   // Runtime theme switches are handled automatically by the system theme listener in themeColor.ts.
   useEffect(() => {
     syncSystemThemeColor();
+    // One coordinator samples the page on screen and drives the Android status
+    // and navigation bars plus theme-color (see utils/systemBars.ts).
+    return startSystemBarSync();
   }, []);
 
   // Installed mobile PWA cold start: the hash is normalised to #/home on

@@ -66,7 +66,7 @@ test("the builder gives modules and resources full CRUD, confirmations and non-d
   assert.match(editor, /removeNode/);
   assert.match(editor, /moveNode/);
   assert.match(editor, /updateNode/);
-  assert.match(editor, /ConfirmDialog/);
+  assert.match(editor, /ContentDialog/); // delete confirmation renders in ContentDialog
   assert.match(editor, /data-my-module-add-child/);
   assert.match(editor, /Move module up/);
   assert.match(editor, /Move module down/);

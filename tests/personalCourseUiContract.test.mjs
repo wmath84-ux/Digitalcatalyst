@@ -24,9 +24,11 @@ test("the Modules tab hosts a My Modules entry row under the official curriculum
   // The entry is appended to the SAME list rows the modules tab already
   // renders (dock row look + scroll-snap), never a separate floating UI.
   assert.match(overlay, /personalModulesEntry/);
-  assert.match(overlay, /data-course-personal-entry/);
-  assert.match(overlay, /"My Modules"/);
-  assert.match(overlay, /kind: "personal-entry"/);
+  const library = readFileSync("src/course/CourseResourceLibrary.tsx", "utf8");
+  assert.match(library, /data-course-personal-entry/);
+  assert.match(library, /"My Modules"/);
+  assert.match(library, /personal-modules-entry/);
+  assert.match(player, /personalEntry=\{libraryPersonalEntry\}/);
 });
 
 test("opening My Modules swaps the Modules tab body in place, like the mind-map/player panels", () => {

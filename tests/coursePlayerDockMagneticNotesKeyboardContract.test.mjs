@@ -428,14 +428,14 @@ test("The deck never unmounts — there is no off state to hand over to", () => 
 });
 
 test("The divider is fixed yellow; the peek rail wears the active tab colour", () => {
-  // The eight tab colours, straight from the dock's own list.
+  // The tab colours, straight from the dock's own list (Experiment holds the pink slot since Part 20).
   assert.match(overlay, /\{ key: "modules"[\s\S]*?color: "#FFBE0B"/);
   assert.match(overlay, /\{ key: "brain"[\s\S]*?color: "#34D399"/);
   assert.match(overlay, /\{ key: "notes"[\s\S]*?color: "#3A86FF"/);
   assert.match(overlay, /\{ key: "mindmap"[\s\S]*?color: "#B388FF"/);
   assert.match(overlay, /\{ key: "ai"[\s\S]*?color: "#22D3EE"/);
   assert.match(overlay, /\{ key: "paid"[\s\S]*?color: "#C9A96E"/);
-  assert.match(overlay, /\{ key: "player"[\s\S]*?color: "#FF6BF5"/);
+  assert.match(overlay, /\{ key: "experiment"[\s\S]*?color: "#FF6BF5"/);
   assert.match(overlay, /\{ key: "sketch"[\s\S]*?color: "#F97316"/);
   // The divider's core line is ALWAYS yellow — never the tab colour.
   assert.match(splitMotion, /export const DIVIDER_LINE = "#FFBE0B";/);
@@ -479,7 +479,7 @@ test("The split surfaces are built from the player's own glass tokens", () => {
 });
 
 test("Notes, mind map and the Player panel keep their tiling inside the pane", () => {
-  assert.match(styles, /\[data-course-notes-grid\],\s*\n\[data-course-mindmap-map-grid\]\s*\{\s*grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, 260px\), 1fr\)\)/);
+  assert.match(readSource("src/components/branched-menu/BranchedMenu.css"), /max-width: min\(var\(--bm-w\), 100%\)/);
   assert.match(studyPanels, /data-solid-panel=\{solid \? "true" : "false"\}/);
   // The sketch canvas is opaque for the same reason the notes grid is: a
   // frosted pane behind a drawing surface is unreadable.
