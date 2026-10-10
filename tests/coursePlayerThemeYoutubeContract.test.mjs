@@ -8,25 +8,32 @@ const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const resourceViewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
 const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
 const styles = fs.readFileSync("src/index.css", "utf8");
+const preferences = fs.readFileSync("src/course/playerPreferences.tsx", "utf8");
+const themeStyles = fs.readFileSync("src/course/courseTheme.css", "utf8");
 
-test("The Player tab has no theme toggle — the app is dark only", () => {
-  // The "Light theme" Glass Switch row is gone, along with the state, the
-  // storage key and the `data-course-theme` hook that carried it.
-  assert.doesNotMatch(playerPanel, /Light theme/);
-  assert.doesNotMatch(playerPanel, /data-course-theme/);
-  assert.doesNotMatch(coursePlayer, /onThemeChange/);
-  assert.doesNotMatch(coursePlayer, /dc\.coursePlayerTheme/);
-  assert.doesNotMatch(coursePlayer, /courseThemeStorageKey/);
-  // The player still pins the native controls to the dark rendering.
-  assert.match(coursePlayer, /const browserColorScheme = "dark" as const;/);
+test("The Player theme toggle defaults to light and persists independently from other feature themes", () => {
+  assert.match(playerPanel, /Light appearance/);
+  assert.match(playerPanel, /onPlayerThemeChange/);
+  assert.match(playerPanel, /playerTheme = "light"/);
+  assert.match(coursePlayer, /useCourseTheme\("player", user\?\.id \?\? null\)/);
+  assert.match(preferences, /fallback: CoursePlayerTheme = "light"/);
+  assert.match(preferences, /prefKey\("courseTheme", feature, uid\)/);
+  assert.match(preferences, /stored === "light" \|\| stored === "dark" \? stored : fallback/);
+  assert.match(coursePlayer, /style=\{\{ colorScheme: playerThemeCtl\.theme \}\}/);
+  assert.doesNotMatch(coursePlayer, /const browserColorScheme = "dark" as const/);
 });
 
-test("Course Player palette is scoped to the shell (dark default + genuine light)", () => {
+test("Course Player theme styling follows its own root and leaves independent surfaces alone", () => {
   assert.match(styles, /\.course-player-shell\s*\{/);
-  // Part 1 §6/§23: a real light palette exists, scoped to the shell attribute
-  // (never a CSS inversion); dark stays the default.
   assert.match(styles, /\.course-player-shell\[data-course-theme="light"\]/);
-  assert.doesNotMatch(styles, /filter: invert/);
+  assert.doesNotMatch(themeStyles, /filter: invert/);
+  for (const boundary of [
+    "data-course-read-panel", "data-course-notes-panel", "data-mindmap-theme",
+    "data-course-ai-theme", "data-course-brain-panel", "data-course-experiment-panel",
+    'data-course-theme-surface="dark"', "data-course-dock", "data-course-viewer",
+  ]) {
+    assert.ok(themeStyles.includes(boundary), `missing independent theme boundary ${boundary}`);
+  }
   for (const variable of ["--course-bg", "--course-surface", "--course-panel", "--course-text", "--course-muted", "--course-border"]) {
     assert.match(styles, new RegExp(variable), `missing ${variable}`);
   }

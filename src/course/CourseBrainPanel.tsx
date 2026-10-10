@@ -480,7 +480,7 @@ export default function CourseBrainPanel({
             SELF   = the learner's own sets, made here or in the Study Library. */}
         <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wide text-white/50">Practice sets</p>
+            <p className="text-[11px] font-black uppercase tracking-wide" style={{ color: BRAIN.inkSoft }}>Practice sets</p>
           </div>
           <div className="flex items-center" style={{ gap: S(8) }}>
             {/* The “+” exists ONLY while SELF is the open filter (owner brief,
@@ -495,8 +495,8 @@ export default function CourseBrainPanel({
                 aria-label="Create your own practice set"
                 title="Create your own practice set"
                 data-brain-self-add=""
-                className="grid shrink-0 place-items-center rounded-lg text-white ring-1 ring-white/20 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-                style={{ height: S(34), width: S(34) }}
+                className="grid shrink-0 place-items-center rounded-lg transition hover:bg-black/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+                style={{ height: S(34), width: S(34), color: BRAIN.ink, boxShadow: `inset 0 0 0 1px ${BRAIN.line}` }}
               >
                 <Plus style={{ height: S(16), width: S(16) }} />
               </button>

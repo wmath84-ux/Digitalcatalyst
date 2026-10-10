@@ -1166,6 +1166,7 @@ export default function ReadLibraryPanel({
       ) : null}
 
       <CourseConfirmDialog
+        theme={readThemeCtl.theme}
         open={Boolean(confirmDelete)}
         title="Delete this PDF?"
         message={`“${confirmDelete?.name || "This PDF"}” will be removed from Your annotations, along with the annotations saved in it. This can't be undone.`}

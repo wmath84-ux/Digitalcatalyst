@@ -656,7 +656,8 @@
    `filter: invert`. Colours transition; layout, content and the toolbar's
    structure do not.
    ──────────────────────────────────────────────────────────────────────── */
-[data-notes-theme="dark"] .dc-note {
+[data-notes-theme="dark"] .dc-note,
+.dc-note[data-notes-theme="dark"] {
   --dc-note-paper: #0b1120;
   --dc-note-ink: #e5e7eb;
   --dc-note-ink-soft: #cbd5e1;
@@ -680,7 +681,9 @@
 /* The floating formatting toolbar is hard-set white in the light sheet; give
    it a dark surface here. The dock toolbar already uses --dc-note-paper. */
 [data-notes-theme="dark"] .dc-note .bn-toolbar,
-[data-notes-theme="dark"] .dc-note .bn-ak-toolbar {
+[data-notes-theme="dark"] .dc-note .bn-ak-toolbar,
+.dc-note[data-notes-theme="dark"] .bn-toolbar,
+.dc-note[data-notes-theme="dark"] .bn-ak-toolbar {
   background: #111a2b;
 }
 /* Colour-only transitions: the palette eases over ~160ms, layout never moves. */

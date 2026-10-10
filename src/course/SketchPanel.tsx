@@ -58,6 +58,7 @@ import { MainMenu, Sidebar } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { BookMarked, Check, ChevronDown, Layers, Moon, Pencil, Plus, RotateCcw, Sun, Trash2 } from "lucide-react";
 import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
+import type { CoursePlayerTheme } from "./playerPreferences";
 import type { SketchScene } from "../../utils/sketchScene";
 // The learner's PERSONAL LIBRARY (the editor ships the panel but no storage —
 // see the hook's header) plus the "Add to Excalidraw" return link it installs.
@@ -287,6 +288,8 @@ export interface SketchPanelProps {
   resourceId?: string | null;
   /** Resource name for Quick Sketch association */
   resourceName?: string | null;
+  /** Player chrome theme for the shared delete dialog; independent of canvasColor. */
+  playerTheme?: CoursePlayerTheme;
 }
 
 /**
@@ -674,6 +677,7 @@ export default function SketchPanel({
   moduleId = null,
   resourceId = null,
   resourceName = null,
+  playerTheme = "light",
 }: SketchPanelProps) {
   /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -873,6 +877,7 @@ export default function SketchPanel({
     <div
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden"
       data-course-sketch-panel
+      data-course-theme={playerTheme}
       data-sketch-scope={scoped ? "module" : "none"}
       data-sketch-clean={cleanLook ? "true" : "false"}
     >
@@ -1057,6 +1062,7 @@ export default function SketchPanel({
           actual canvas. Only the red confirm removes it; Cancel / backdrop /
           Escape never do. The rest of the library is untouched. */}
       <ConfirmDeleteDialog
+        theme={playerTheme}
         open={confirmDeleteOpen}
         title="Delete this Canvas?"
         message={`Delete Canvas "${activeBoardTitle}"?`}

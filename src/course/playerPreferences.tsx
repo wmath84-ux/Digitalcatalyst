@@ -57,7 +57,7 @@ const prefKey = (kind: string, feature: string, uid?: string | null) =>
 export const loadCourseTheme = (
   feature: ThemedFeature,
   uid?: string | null,
-  fallback: CoursePlayerTheme = "dark",
+  fallback: CoursePlayerTheme = "light",
 ): CoursePlayerTheme => {
   const stored = safeGet(prefKey("courseTheme", feature, uid));
   return stored === "light" || stored === "dark" ? stored : fallback;
@@ -75,7 +75,7 @@ export const persistCourseTheme = (
 export function useCourseTheme(
   feature: ThemedFeature,
   uid?: string | null,
-  fallback: CoursePlayerTheme = "dark",
+  fallback: CoursePlayerTheme = "light",
 ) {
   const [theme, setTheme] = useState<CoursePlayerTheme>(() =>
     loadCourseTheme(feature, uid, fallback),

@@ -92,7 +92,7 @@ export default function GatePersonalAccess({ fileId, fileUrl, fileName, productI
   };
 
   return (
-    <div data-course-gate-personal-access className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div data-course-gate-personal-access data-course-theme-surface="dark" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-white">
         <Mail size={14} className="text-cyan-200" /> Gate personal access
       </h3>

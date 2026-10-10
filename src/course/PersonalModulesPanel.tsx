@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import type { CourseFile, CourseFileType } from "../types/course";
 import type { PersonalModulesController } from "../hooks/usePersonalModules";
+import type { CoursePlayerTheme } from "./playerPreferences";
 import { personalResourceToCourseFile, type PersonalCourseModule, type PersonalCourseResource } from "../lib/personalCourseClient";
 import {
   personalCourseTypeLabel,
@@ -75,6 +76,8 @@ interface PersonalModulesPanelProps {
   personal: PersonalModulesController;
   productTitle: string;
   landscape: boolean;
+  /** The persisted Course Player appearance, not a separate My Modules preference. */
+  playerTheme?: CoursePlayerTheme;
   /** Open a personal resource in the existing ResourceViewer stack. */
   onOpenPersonalFile: (file: CourseFile, context: { moduleTitle: string }) => void;
   /** Open the account-wide central workspace. */
@@ -145,6 +148,7 @@ function PrimaryButton({ busy = false, children, ...props }: { busy?: boolean } 
       type="button"
       className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-xs font-black text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
       style={{ background: "linear-gradient(180deg,#B388FF,#9D6BFF)", boxShadow: "0 8px 24px #B388FF2E" }}
+      data-course-accent-action="violet"
       {...props}
     >
       {busy ? <RefreshCw size={15} className="animate-spin" /> : null}
@@ -189,7 +193,7 @@ function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove
   );
 }
 
-export default function PersonalModulesPanel({ personal, productTitle, onOpenPersonalFile, onOpenLibrary, onExit }: PersonalModulesPanelProps) {
+export default function PersonalModulesPanel({ personal, productTitle, playerTheme = "light", onOpenPersonalFile, onOpenLibrary, onExit }: PersonalModulesPanelProps) {
   const { access, usage, modules } = personal;
   const limits = access?.limits ?? null;
   const entitled = Boolean(access?.entitled);
@@ -400,6 +404,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
               type="button"
               className="rounded-2xl px-5 py-3 text-xs font-black text-white transition-transform active:scale-95"
               style={{ background: "linear-gradient(180deg,#B388FF,#9D6BFF)" }}
+              data-course-accent-action="violet"
               onClick={() => personal.reload()}
             >
               Try again
@@ -436,6 +441,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
                   type="button"
                   className="rounded-2xl px-5 py-3 text-xs font-black text-white transition-transform active:scale-95"
                   style={{ background: "linear-gradient(180deg,#B388FF,#9D6BFF)" }}
+                  data-course-accent-action="violet"
                   onClick={() => { trackFeatureEvent("upgrade_clicked"); goToSubscription(); }}
                 >
                   View subscription plans
@@ -836,7 +842,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
 
   // ── The pane body (owned by the Course Player's Modules tab) ───────────
   return (
-    <div className="flex h-full min-h-0 flex-col" data-course-personal-modules>
+    <div className="flex h-full min-h-0 flex-col" data-course-personal-modules data-course-theme={playerTheme}>
       <div className="flex items-center gap-2 px-4 pb-0 pt-3">
         <button
           type="button"
@@ -871,6 +877,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
       </div>
 
       <CourseConfirmDialog
+        theme={playerTheme}
         open={Boolean(confirm)}
         title={confirm?.kind === "module" ? "Delete this module?" : "Delete this resource?"}
         message={

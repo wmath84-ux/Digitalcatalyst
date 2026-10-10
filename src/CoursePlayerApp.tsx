@@ -1758,10 +1758,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // content — that keeps its own rule from the Player tab, unchanged).
   const canMarkCompleteTop = Boolean(selectedFile) && !activeFileIsPersonal;
   const useLandscapeRails = isLandscape;
-  // The player is dark only, so the native controls (scrollbars, inputs, the
-  // OS file picker) always resolve to the dark rendering.
-  const browserColorScheme = "dark" as const;
-
   // The desktop/mobile switch only means something for embedded documents —
   // a video or an image renders identically either way.
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
@@ -2081,6 +2077,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             pendingSync={sketch.pendingSync}
             scoped={sketch.scoped}
             onChange={sketch.updateScene}
+            playerTheme={playerThemeCtl.theme}
             canvasColor={sketch.canvasColor}
             onCanvasColorChange={sketch.setCanvasColor}
             boardName={activeMindMapModuleTitle || product.title}
@@ -2120,6 +2117,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           personal={personalModules}
           productTitle={product.title}
           landscape={useLandscapeRails}
+          playerTheme={playerThemeCtl.theme}
           onOpenPersonalFile={selectPersonalFile}
           onOpenLibrary={() => {
             trackFeatureEvent("library_opened", { surface: "course_player" });
@@ -2239,7 +2237,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         Show a staged loading UI until all critical data is ready. This
         prevents broken UI, flickering, and race conditions. */}
     {!isReady && (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]">
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]"
+        data-course-player-loading
+        data-course-theme={playerThemeCtl.theme}
+      >
         <div className="flex flex-col items-center gap-4 px-6">
           {/* Animated loading indicator */}
           <div className="relative h-16 w-16">
@@ -2288,7 +2290,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             "data-course-statusbar-hidden": courseFullscreen ? "true" : "false",
           }
         : {})}
-      style={{ colorScheme: playerThemeCtl.theme === "light" ? "light" : browserColorScheme }}
+      style={{ colorScheme: playerThemeCtl.theme }}
     >
       {/* ── TOP PROGRESS + SETTINGS RAIL — Part 19 ─────────────────────────
           Combined control: 2W wide (double the original progress bar width).
