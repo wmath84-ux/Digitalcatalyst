@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { READ_PDFJS_VERSION } from "../../utils/readResources.js";
+import { checkPdfSource, type PdfSourceCheck } from "./pdfSourceCheck";
 
 interface PdfViewerEventBus {
   on: (eventName: string, listener: (event: unknown) => void) => void;
@@ -63,6 +64,31 @@ const readPageFromStorage = (storageKey: string) => {
 };
 
 /**
+ * PDF.js 6.x builds its text-search patterns with `RegExp.escape` (ES2025),
+ * which older browsers do not have — search then fails with a page error. The
+ * viewer runs in its own same-origin realm, so the fallback is installed on the
+ * frame's `RegExp` (never on the app's). Only added when missing; semantics
+ * follow the spec: syntax characters are backslashed, `-` and other
+ * punctuation get \x escapes so the result is valid with and without the `u` flag.
+ */
+export function installRegExpEscape(win: { RegExp: RegExpConstructor } | null | undefined): void {
+  const ctor = win?.RegExp as (RegExpConstructor & { escape?: (value: string) => string }) | undefined;
+  if (!ctor || typeof ctor.escape === "function") return;
+  const SYNTAX = /[\\^$.*+?()[\]{}|/]/;
+  const escapeChar = (ch: string) => {
+    if (SYNTAX.test(ch)) return `\\${ch}`;
+    const code = ch.charCodeAt(0);
+    return code > 0xff ? `\\u${code.toString(16).padStart(4, "0")}` : `\\x${code.toString(16).padStart(2, "0")}`;
+  };
+  Object.defineProperty(ctor, "escape", {
+    configurable: true,
+    writable: true,
+    value: (value: string) =>
+      String(value).replace(/[\\^$.*+?()[\]{}|/]|[-,!"#%&'():;<=>@`~\s]|^[0-9a-zA-Z]/g, (ch) => escapeChar(ch)),
+  });
+}
+
+/**
  * Locally bundled PDF.js Generic Viewer. The npm component is intentionally
  * imported only when this component mounts (a learner opens an actual PDF).
  *
@@ -79,6 +105,7 @@ export default function PdfJsGenericViewer({
   initialPage = 1,
   onPageChange,
   onAnnotationApi,
+  originalUrl,
 }: {
   src: string;
   title: string;
@@ -87,10 +114,16 @@ export default function PdfJsGenericViewer({
   initialPage?: number;
   onPageChange: (page: number) => void;
   onAnnotationApi?: (api: PdfAnnotationApi | null) => void;
+  /** The link the learner can open in a new tab when the viewer cannot read the file. */
+  originalUrl?: string;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const initialPageRef = useRef(initialPage);
   const [error, setError] = useState("");
+  // Why the source was refused before the viewer started (CORS, 404, not a PDF…).
+  const [problem, setProblem] = useState<Extract<PdfSourceCheck, { ok: false }> | null>(null);
+  // Bumped by Retry: re-runs the check and the viewer mount.
+  const [attempt, setAttempt] = useState(0);
   // Kept in a ref so a parent that passes an inline callback can never remount
   // the viewer (the mount effect must depend on the document only).
   const annotationApiRef = useRef(onAnnotationApi);
@@ -111,6 +144,15 @@ export default function PdfJsGenericViewer({
 
     const mount = async () => {
       try {
+        // Refuse a source that is not a readable PDF BEFORE the viewer starts,
+        // so the learner gets a specific reason and a way out — never a blank
+        // or silently different viewer.
+        const verdict = await checkPdfSource(src);
+        if (cancelled) return;
+        if (!verdict.ok) {
+          setProblem(verdict);
+          return;
+        }
         // Load the package's own custom-element module from the same-origin,
         // versioned asset tree. A runtime URL deliberately bypasses Vite's
         // `new URL(import.meta.url)` asset rewriting, which would emit a second
@@ -142,6 +184,8 @@ export default function PdfJsGenericViewer({
 
         const initialized = await element.initPromise;
         if (cancelled) return;
+        // The viewer's own realm: `contentWindow` is typed as Window, which does not declare RegExp.
+        installRegExpEscape((element.iframe?.contentWindow as unknown as { RegExp: RegExpConstructor } | null) ?? null);
         const viewerApp = initialized?.viewerApp;
         eventBus = viewerApp?.eventBus;
         if (eventBus) {
@@ -250,6 +294,7 @@ export default function PdfJsGenericViewer({
     };
 
     setError("");
+    setProblem(null);
     void mount();
     return () => {
       cancelled = true;
@@ -259,11 +304,42 @@ export default function PdfJsGenericViewer({
       annotationApiRef.current?.(null);
       element?.remove();
     };
-  }, [src, title, storageKey]);
+  }, [src, title, storageKey, attempt]);
 
   return (
     <div className="relative h-full min-h-0 w-full overflow-hidden bg-slate-950" data-read-pdfjs-viewer>
       <div ref={hostRef} className="h-full min-h-0 w-full" />
+      {problem ? (
+        <div className="absolute inset-0 grid place-items-center bg-slate-950 p-6 text-center" role="alert" data-read-pdf-problem={problem.kind}>
+          <div className="max-w-md space-y-3">
+            <p className="text-sm font-bold text-white">This PDF could not be opened</p>
+            <p className="text-xs leading-5 text-slate-300">{problem.message}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {problem.retryable ? (
+                <button
+                  type="button"
+                  onClick={() => setAttempt((count) => count + 1)}
+                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+                  data-read-pdf-retry
+                >
+                  Retry
+                </button>
+              ) : null}
+              {originalUrl ? (
+                <a
+                  href={originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                  data-read-pdf-open-original
+                >
+                  Open original link
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
       {error ? (
         <div className="absolute inset-0 grid place-items-center bg-slate-950 p-6 text-center" role="alert">
           <div className="max-w-md space-y-2">

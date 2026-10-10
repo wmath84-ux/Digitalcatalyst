@@ -998,6 +998,7 @@ export default function ReadLibraryPanel({
                   resourceId={activeEntry.id}
                   initialPage={activePage}
                   onPageChange={reportCoursePage}
+                  originalUrl={activeEntry.presentation.originalUrl}
                 />
               ) : activeEntry && activeEntry.presentation.kind === "drive" ? (
                 /*
