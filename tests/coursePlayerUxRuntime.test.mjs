@@ -29,7 +29,7 @@ const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
-const resourceCard = readSource("src/course/StudyResourceCard.tsx");
+const resourceCard = readSource("src/components/branched-menu/BranchedMenu.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
 const notesHook = readSource("src/course/useCourseNotes.ts");
 const notesCloud = readSource("src/course/cloudNotes.ts");
@@ -68,8 +68,8 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-sheet-row",
     "data-course-overlay-tab",
     "data-course-overlay-list",
-    "data-course-overlay-module",
-    "data-course-overlay-file",
+    "data-course-library-module",
+    "data-library-resource",
     "data-course-overlay-buy-module",
     "data-course-overlay-buy-update",
     "data-course-overlay-paid",
@@ -81,12 +81,12 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-notes-input",
     "data-course-notes-save",
     "data-course-notes-list",
-    "data-course-note",
+    "data-course-note-open",
     "data-course-note-edit",
     "data-course-note-edit-input",
     "data-course-note-edit-save",
     "data-course-note-edit-cancel",
-    "data-course-note-delete",
+    "data-branched-delete",
     // Resource Viewer
     "data-course-viewer",
     "data-course-viewer-empty",
@@ -108,7 +108,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-image-download",
   ];
   for (const hook of hooks) {
-    const allSources = [coursePlayer, playerPanel, overlay, audioPlayer, chargingButton, notesPanel, resourceCard, resourceViewer, imageViewer].join("\n");
+    const allSources = [coursePlayer, playerPanel, overlay, audioPlayer, chargingButton, notesPanel, resourceCard, readSource("src/course/CourseResourceLibrary.tsx"), resourceViewer, imageViewer].join("\n");
     assert.ok(allSources.includes(hook), `missing data attribute ${hook}`);
   }
 });

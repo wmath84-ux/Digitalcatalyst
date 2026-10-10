@@ -73,6 +73,8 @@ const resourceTypeRegistry = read("utils/productResourceTypes.js");
 const importer = read("src/components/admin/products/PracticeSetImportPanel.tsx");
 const productEditor = read("src/components/admin/products/ProductEditor.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
+const visibility = read("src/course/fileVisibility.ts");
+const library = read("src/course/CourseResourceLibrary.tsx");
 const playerApp = read("src/CoursePlayerApp.tsx");
 const brainPanel = read("src/course/CourseBrainPanel.tsx");
 const brainDeck = read("src/course/BrainQuestionDeck.tsx");
@@ -550,10 +552,13 @@ test("the Brain tab hosts the panel and keeps the placeholder as a fallback", ()
 });
 
 test("a brain resource is visible and reachable without a URL", () => {
-  assert.match(overlay, /const isBrainFile = \(file: CourseFile\) => file\.type === "brain" && \(file\.practiceQuestions\?\.length \?\? 0\) > 0;/);
-  assert.match(overlay, /\(isBrainFile\(file\) \|\| Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\)/);
-  assert.match(overlay, /if \(file\.type === "brain"\) return Brain;/);
-  assert.match(overlay, /subtitle: isBrainFile\(file\) \? `\$\{file\.practiceQuestions\?\.length \?\? 0\} practice questions` : file\.type,/);
+  // The visibility rule lives in one shared module (fileVisibility.ts) used by
+  // the Modules library; the library shows the Brain icon and practice count.
+  assert.match(visibility, /export const isBrainFile = \(file: CourseFile\) => file\.type === "brain" && \(file\.practiceQuestions\?\.length \?\? 0\) > 0;/);
+  assert.match(visibility, /\(isBrainFile\(file\) \|\| Boolean\(file\.url \|\| file\.embedUrl \|\| file\.youtubeUrl \|\| file\.youtubeVideoId\)\)/);
+  assert.match(library, /case "brain": return Brain;/);
+  assert.match(library, /\$\{qCount\} practice/);
+  assert.match(library, /isVisibleFile\(file\)/);
 });
 
 test("selecting a brain resource opens the Brain tab instead of the viewer stack", () => {

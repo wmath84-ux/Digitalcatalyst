@@ -1682,34 +1682,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    and desktop gain columns only while each card still has room for its real
    title, curriculum context and metadata. `min(100%, …)` keeps a narrow pane
    from creating horizontal overflow without shrinking its type. */
-[data-course-notes-grid],
-[data-course-mindmap-map-grid] {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  align-items: stretch;
-}
-
-@media (min-width: 1100px) {
-  [data-course-notes-grid],
-  [data-course-mindmap-map-grid] {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
-  }
-}
-
 /* While the map library is open the diagram underneath remains mounted for
    React Flow measurements, but is hidden from the resource-card surface. */
 [data-course-mindmap-canvas][data-library-open="true"] > .react-flow {
   visibility: hidden;
-}
-
-[data-course-notes-grid] [data-course-note] {
-  color: var(--course-text);
-  --course-note-hover: var(--course-soft);
-  outline-color: rgb(245 158 11 / 0.65);
-}
-
-[data-course-notes-grid] [data-course-note]:focus-within {
-  outline: 2px solid;
-  outline-offset: 2px;
 }
 
 /* Course Player — overlay content swap (tab switch) */

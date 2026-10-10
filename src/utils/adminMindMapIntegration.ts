@@ -178,7 +178,7 @@ export function getMindMapDataFromCourseFile(file: CourseFile): MindMap | null {
 }
 
 /**
- * Create a StudyResourceCard-compatible data structure from an admin mind map resource.
+ * Create a library-compatible data structure from an admin mind map resource.
  * This allows admin-created mind maps to appear in the Course Player's Mind Map Library.
  */
 export function createStudyResourceFromAdminMindMap(

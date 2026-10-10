@@ -194,18 +194,17 @@ test("The notes editor is a large rich-text surface", () => {
   assert.match(notesPanel, /data-course-notes-add/);
 });
 
-test("a saved note uses the shared responsive study-resource card grid", () => {
-  const resourceCard = readSource("src/course/StudyResourceCard.tsx");
-  const cardStyles = readSource("src/course/study-resource-card.css");
-  assert.match(notesPanel, /data-course-notes-list/);
+test("a saved note uses the shared branched menu", () => {
+  const resourceCard = readSource("src/components/branched-menu/BranchedMenu.tsx");
+  const cardStyles = readSource("src/components/branched-menu/BranchedMenu.css");
   assert.match(notesPanel, /data-course-notes-grid/);
-  assert.match(notesPanel, /<StudyResourceCard\s+kind="note"/);
+  assert.match(notesPanel, /<BranchedMenu\b/);
   assert.doesNotMatch(notesPanel, /aspect-square|grid-cols-2/);
   assert.match(notesPanel, /const notePreview = \(note: CoursePlayerNote\)/);
   assert.match(notesPanel, /richTextToPlain/);
-  assert.match(resourceCard, /data-study-resource-card/);
-  assert.match(cardStyles, /min-height: 212px/);
-  assert.match(styles, /\[data-course-notes-grid\],\s*\n\[data-course-mindmap-map-grid\]/);
+  assert.match(resourceCard, /data-branched-leaf/);
+  assert.match(cardStyles, /overflow-wrap: anywhere/);
+  assert.match(readSource("src/components/branched-menu/BranchedMenu.css"), /max-width: min\(var\(--bm-w\), 100%\)/);
 });
 
 test("Pasting from anywhere keeps the exact formatting", () => {

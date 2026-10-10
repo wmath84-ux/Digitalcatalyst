@@ -61,6 +61,8 @@ export interface MindMapSummary {
   nodeCount: number;
   updatedAt: number;
   createdAt: number;
+  /** MASTER maps only: the course module chain the map belongs to (outermost first). */
+  segments?: { key: string; label: string }[];
 }
 
 export interface UseCourseMindMapInput {

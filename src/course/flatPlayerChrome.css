@@ -274,15 +274,9 @@
   }
 }
 
-/* A module being browsed lit CYAN on the desk; the lesson actually playing lit
-   VIOLET with a bloom. The flat lists keep the same two states, keyed off the
-   attributes they already carry. */
-.course-player-shell [data-course-overlay-module][data-selected="true"] {
-  background-color: var(--dc-flat-cyan-wash);
-  box-shadow: inset 0 0 0 1px var(--dc-flat-cyan-line);
-}
-.course-player-shell [data-course-sheet-row][data-selected="true"],
-.course-player-shell [data-course-overlay-file][data-selected="true"] {
+/* The selected row (Paid list) lights VIOLET with a bloom. The library menu
+   carries its own selected state (see branched-menu/BranchedMenu.css). */
+.course-player-shell [data-course-sheet-row][data-selected="true"] {
   background-color: var(--dc-flat-violet-wash);
   box-shadow:
     inset 0 0 0 1px var(--dc-flat-violet-line),
@@ -413,21 +407,7 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13) !important;
 }
 
-/* ── 9. Notes: the notes wall ──────────────────────────────────────────────
-   Resource cards share a structure, with the note accent kept amber. */
-.course-player-shell [data-course-notes-grid] [data-course-note].study-resource-card {
-  --resource-accent: var(--dc-flat-amber);
-  --resource-accent-soft: var(--dc-flat-amber-wash);
-  --resource-accent-line: var(--dc-flat-amber-line);
-  background-color: var(--dc-flat-row);
-  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
-  outline-color: var(--dc-flat-amber-line);
-}
-.course-player-shell [data-course-notes-grid] [data-course-note].study-resource-card[data-active="true"] {
-  box-shadow:
-    inset 0 0 0 1px var(--dc-flat-amber-line),
-    0 0 24px -8px rgba(245, 158, 11, 0.6);
-}
+/* ── 9. Notes: the writing surface ───────────────────────────────────────── */
 /* The writing surface itself is the board's near-black — the room's most
    restful plate, and the reason long notes stopped fighting the scene. */
 .course-player-shell .course-rich-surface,
@@ -450,8 +430,7 @@
 }
 
 /* ── 10. Mind map: the mind wall ───────────────────────────────────────────
-   The library overlay is the room's floating chooser. Its cards share the
-   study-resource layout while keeping the violet mind-map accent. */
+   The library overlay is the room's floating chooser. */
 .course-player-shell [data-course-mindmap-library] {
   background-color: rgba(8, 11, 22, 0.96);
   background-image: var(--dc-flat-sheet);
@@ -460,17 +439,6 @@
   box-shadow:
     var(--dc-flat-sheet-shadow),
     0 0 60px -18px var(--dc-flat-violet-deep);
-}
-.course-player-shell [data-course-mindmap-map-card].study-resource-card {
-  --resource-accent: var(--dc-flat-violet);
-  --resource-accent-soft: var(--dc-flat-violet-wash);
-  --resource-accent-line: var(--dc-flat-violet-line);
-  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
-}
-.course-player-shell [data-course-mindmap-map-card].study-resource-card[data-active="true"] {
-  box-shadow:
-    inset 0 0 0 1px var(--dc-flat-violet-line),
-    0 0 22px -6px rgba(139, 92, 246, 0.55);
 }
 /* The map's node/level readout is the room's white/45 sub-ink. (It is a bare
    <span>, not a pill — nothing is painted behind it.) */

@@ -174,7 +174,9 @@ import { GlassSurface } from "../components/ui/glass";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
 import MasterSelfControl from "./MasterSelfControl";
-import { StudyLibraryEmptyState, StudyLibraryNotice, StudyResourceCard, StudyResourceCardSkeleton } from "./StudyResourceCard";
+import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
+import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
+import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
 import { resolveCourseResourceContext, resolvePersonalResourceContext } from "./studyResourceContext";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
@@ -916,6 +918,10 @@ const TEXT_FIT_OPTIONS: { value: MindMapTextFit; label: string; hint: string; Ic
 
 // ── Panel ─────────────────────────────────────────────────────────────────
 
+const MAP_COLOR = "#a78bfa";
+const SELF_MAP_TAG = "#c4b5fd";
+const MASTER_MAP_TAG = "#93c5fd";
+
 export interface MindMapPanelProps {
   mind: MindMap;
   onMindChange: (updater: MindMap | ((current: MindMap) => MindMap)) => void;
@@ -969,6 +975,8 @@ export interface MindMapPanelProps {
   uid?: string | null;
   /** Course/admin-provided MASTER mind maps (Part 1 §10). Read-only here. */
   masterMaps?: MindMapSummary[];
+  /** Open a MASTER map's own resource (its lesson page), by its map key. */
+  onOpenMasterMap?: (mapKey: string) => void;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
@@ -995,6 +1003,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onRetryMaps,
     uid = null,
     masterMaps = [],
+  onOpenMasterMap,
   } = props;
   /** The map library sheet (grid of this module's maps) is the HOME screen:
    *  it is open by default (fresh player entry) so the learner picks a map to
@@ -1557,6 +1566,65 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const hasCachedMapIndex = maps.some((entry) => entry.updatedAt > 0 || entry.createdAt > 0 || entry.mapKey !== "main");
   const showMapSkeleton = mapsLoading && !hasCachedMapIndex;
 
+  // ── Map library tree (Branched Menu) ──────────────────────────────────
+  // Both collections sit under the course → module chain they belong to:
+  // self maps under this module, master maps under their own module. Each
+  // row is one map; MASTER maps are read-only, SELF maps rename and delete.
+  const selfContext: BranchSegment[] = libraryContextPath.map((label, index) => ({ key: `ctx:${index}`, label }));
+  const selfTree: BranchedMenuItem[] = buildBranchTree(
+    maps.map((entry): BranchEntry => {
+      const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
+      const rootTopic = entry.rootTopic.trim();
+      return {
+        path: selfContext,
+        item: {
+          value: `map:${entry.mapKey}`,
+          label: title,
+          icon: <Network size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: MAP_COLOR,
+          tag: { label: "SELF", color: SELF_MAP_TAG },
+          meta: `${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`,
+          description: `Mind map. ${title}.${rootTopic && rootTopic !== title ? ` Root topic: ${rootTopic}.` : ""}`,
+          onRename: (nextTitle) => onRenameMap?.(entry.mapKey, nextTitle),
+          onDelete: () => requestMapDelete(entry.mapKey),
+          deleteLabel: `Delete mind map ${title}`,
+          dataAttrs: { "data-course-mindmap-open-map": entry.mapKey, "data-map-key": entry.mapKey },
+        },
+      };
+    }),
+    { sectionMeta: ({ count }) => <span>{count}</span> },
+  );
+
+  const masterTree: BranchedMenuItem[] = buildBranchTree(
+    masterMaps.map((entry): BranchEntry => {
+      const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
+      const path: BranchSegment[] = entry.segments?.length
+        ? [{ key: "course", label: courseTitle || "Course" }, ...entry.segments]
+        : [{ key: "course", label: courseTitle || "Course" }];
+      return {
+        path,
+        item: {
+          value: `master:${entry.mapKey}`,
+          label: title,
+          icon: <Network size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: MAP_COLOR,
+          tag: { label: "MASTER", color: MASTER_MAP_TAG },
+          meta: `${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`,
+          description: `Master mind map. ${title}. Read only.`,
+          dataAttrs: { "data-course-mindmap-master-open": entry.mapKey },
+        },
+      };
+    }),
+    { sectionMeta: ({ count }) => <span>{count}</span> },
+  );
+
+  const selfOpen = useBranchedOpen(selfTree);
+  const masterOpen = useBranchedOpen(masterTree);
+  useEffect(() => {
+    if (activeMapKey) selfOpen.reveal(ancestorSectionValues(selfTree, `map:${activeMapKey}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMapKey]);
+
   return (
     <div
       className="course-mindmap-shell relative flex h-full w-full flex-col overflow-hidden"
@@ -2005,28 +2073,20 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 </div>
                 {masterSelfCtl.mode === "master" ? (
                   masterMaps.length > 0 ? (
-                    <ul className="grid min-w-0 gap-3" data-course-mindmap-master-grid data-study-resource-grid>
-                      {masterMaps.map((entry) => {
-                        const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
-                        return (
-                          <li key={entry.mapKey} className="min-w-0 min-h-[212px]">
-                            <StudyResourceCard
-                              kind="mind-map"
-                              resourceId={entry.mapKey}
-                              title={title}
-                              contextPath={libraryContextPath}
-                              metadata={[`${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`]}
-                              sourceLabel="MASTER"
-                              updatedAt={entry.updatedAt}
-                              createdAt={entry.createdAt}
-                              onOpen={() => {
-                                /* Master maps are read-only in this pass. */
-                              }}
-                            />
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <BranchedMenu
+                      items={masterTree}
+                      openValues={masterOpen.openValues}
+                      onToggle={masterOpen.toggle}
+                      onSelect={(value) => {
+                        const key = value.startsWith("master:") ? value.slice("master:".length) : "";
+                        if (key) onOpenMasterMap?.(key);
+                      }}
+                      ariaLabel="Master mind maps"
+                      fullWidth
+                      rowHeight={40}
+                      className="mindmap-library-menu"
+                      dataAttrs={{ "data-course-mindmap-master-grid": "", "data-listing": "mindmap-master" }}
+                    />
                   ) : (
                     <StudyLibraryEmptyState
                       kind="mind-map"
@@ -2048,46 +2108,28 @@ function MindMapCanvas(props: MindMapPanelProps) {
                     state="error"
                     title="Mind map sync needs attention"
                     message={errorMessage || "Your local map copy stays available. Try again when your connection is ready."}
-                    onRetry={() => { onRetryMaps?.(); onFlush?.(); }}
+                    onRetry={onRetryMaps}
                   />
                 ) : null}
 
                 {showMapSkeleton ? (
-                  <ul className="grid min-w-0 gap-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true" data-study-resource-grid aria-busy="true">
-                    {[0, 1, 2].map((index) => (
-                      <li key={index} className="min-w-0 min-h-[212px]">
-                        <StudyResourceCardSkeleton kind="mind-map" />
-                      </li>
-                    ))}
-                  </ul>
+                  <BranchedMenuSkeleton rows={4} label="Loading your mind maps" />
                 ) : maps.length > 0 ? (
-                  <ul className="grid min-w-0 gap-3" data-course-mindmap-map-grid="true" data-study-resource-grid>
-                    {maps.map((entry) => {
-                      const title = entry.title.trim() || entry.rootTopic.trim() || `Map · ${entry.mapKey}`;
-                      const rootTopic = entry.rootTopic.trim();
-                      return (
-                        <li key={entry.mapKey} className="min-w-0 min-h-[212px]">
-                          <StudyResourceCard
-                            kind="mind-map"
-                            resourceId={entry.mapKey}
-                            title={title}
-                            contextPath={libraryContextPath}
-                            topic={rootTopic && rootTopic !== title ? rootTopic : undefined}
-                            topicLabel="Root topic"
-                            metadata={[`${entry.nodeCount} ${entry.nodeCount === 1 ? "node" : "nodes"}`]}
-                            sourceLabel="Self"
-                            updatedAt={entry.updatedAt}
-                            createdAt={entry.createdAt}
-                            active={entry.mapKey === activeMapKey}
-                            onOpen={() => openMap(entry.mapKey)}
-                            onRename={(nextTitle) => onRenameMap?.(entry.mapKey, nextTitle)}
-                            onDelete={() => requestMapDelete(entry.mapKey)}
-                            deleteLabel={`Delete mind map ${title}`}
-                          />
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <BranchedMenu
+                    items={selfTree}
+                    openValues={selfOpen.openValues}
+                    onToggle={selfOpen.toggle}
+                    activeValue={activeMapKey ? `map:${activeMapKey}` : null}
+                    onSelect={(value) => {
+                      const key = value.startsWith("map:") ? value.slice("map:".length) : "";
+                      if (key) openMap(key);
+                    }}
+                    ariaLabel="Your mind maps"
+                    fullWidth
+                    rowHeight={40}
+                    className="mindmap-library-menu"
+                    dataAttrs={{ "data-course-mindmap-map-grid": "true", "data-listing": "mindmap-self" }}
+                  />
                 ) : status === "error" ? (
                   <StudyLibraryEmptyState
                     kind="mind-map"

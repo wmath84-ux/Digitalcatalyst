@@ -55,6 +55,8 @@ const read = (path) => readFileSync(path, "utf8");
 const courseTypes = read("src/types/course.ts");
 const player = read("src/CoursePlayerApp.tsx");
 const overlay = read("src/course/CourseOverlay.tsx");
+const visibility = read("src/course/fileVisibility.ts");
+const library = read("src/course/CourseResourceLibrary.tsx");
 const viewer = read("src/course/ResourceViewer.tsx");
 const stage = read("src/course/ExperimentStage.tsx");
 const adapter = read("src/lib/myCourseAdapter.ts");
@@ -247,10 +249,10 @@ test("the shared sanitiser keeps the source, and the firestore rule does not nee
 // ---------------------------------------------------------------------------
 
 test("the Modules tab shows an experiment and gives it its own icon", () => {
-  assert.match(overlay, /const isExperimentFile = \(file: CourseFile\) =>/);
-  assert.match(overlay, /file\.type === "interactive"/);
-  assert.match(overlay, /const isVisibleFile = \(file: CourseFile\) =>\s*\n\s*file\.accessLevel !== "hidden" && \(hasUrlContent\(file\) \|\| isExperimentFile\(file\)\);/);
-  assert.match(overlay, /if \(file\.type === "interactive"\) return FlaskConical;/);
+  assert.match(visibility, /export const isExperimentFile = \(file: CourseFile\) =>/);
+  assert.match(visibility, /file\.type === "interactive"/);
+  assert.match(visibility, /export const isVisibleFile = \(file: CourseFile\) =>\s*\n\s*file\.accessLevel !== "hidden" && \(hasUrlContent\(file\) \|\| isExperimentFile\(file\)\);/);
+  assert.match(library, /case "interactive": return FlaskConical;/);
 });
 
 test("the viewer stack opens experiments and never a URL-less type it cannot render", () => {

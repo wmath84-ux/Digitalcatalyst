@@ -124,7 +124,7 @@ test("the old landscape split machinery is gone — the lesson keeps full width"
 
 test("the mind map follows the ACTIVE module, not just the selected file", () => {
   assert.match(coursePlayer, /const collectModuleIdByFileId = \(modules: CourseModule\[\]\): Record<string, string> =>/);
-  assert.match(coursePlayer, /const activeMindMapModuleId = selectedFile\s*\? moduleIdByFileId\[String\(selectedFile\.id\)\] \|\| selectedFile\.personalModuleId \|\| undefined\s*: undefined;/);
+  assert.match(coursePlayer, /const activeMindMapModuleId = mindMapModuleOverride\s*\|\| \(selectedFile \? moduleIdByFileId\[String\(selectedFile\.id\)\] \|\| selectedFile\.personalModuleId \|\| undefined : undefined\);/);
   assert.match(coursePlayer, /moduleId: activeMindMapModuleId,/);
 });
 

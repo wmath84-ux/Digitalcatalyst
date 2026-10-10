@@ -37,7 +37,8 @@ test("Read has its own Course Player dock tab and is excluded from lesson select
   assert.match(overlay, /\{ key: "read", label: "Read", heading: "Read library"/);
   assert.match(overlay, /collectAccessibleReadResources\(props\.modules, unlocked, props\.ownedUpdateIds, props\.productId\)/);
   assert.match(overlay, /unlockedModuleIds\(props\.modules, props\.accessibleModuleIds, props\.ownedUpdateIds\)/);
-  assert.match(overlay, /file\.type !== "read" && file\.type !== "note" && isVisibleFile\(file\)/);
+  assert.match(read("src/course/CourseResourceLibrary.tsx"), /READ_RESOURCE_FILE_TYPE\) continue;/);
+  assert.match(read("src/course/CourseResourceLibrary.tsx"), /isVisibleFile\(file\)/);
   assert.match(player, /allFiles\(modules\)\.filter\(\(file\) => file\.type !== "read" && file\.type !== "note"/);
   assert.match(player, /item\.type !== "read" &&\s*item\.type !== "note"/);
   assert.match(embed, /if \(file\.type === "read"\) return \{ url: "", kind: "none" \}/);

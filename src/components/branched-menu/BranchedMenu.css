@@ -1,0 +1,442 @@
+/*
+ * Branched Menu — the Course Player's one listing system.
+ * Ported from the React Bits "Branched Menu" (reactbits.dev/c/micro/branched-menu).
+ * Geometry, fold timing, draw animation and the marker are the reference's; the
+ * colours resolve from the Course Player theme tokens so light and dark both work.
+ */
+
+.branched-menu {
+  --bm-w: 240px;
+  --bm-ink: var(--course-text, #f5f5f5);
+  --bm-accent: var(--dc-flat-cyan, #22d3ee);
+  --bm-line: color-mix(in srgb, var(--bm-ink) 24%, transparent);
+  --bm-font: 14px;
+  --bm-row: 36px;
+  --bm-indent: 40px;
+  --bm-trunk: 14px;
+  --bm-r: 10px;
+  --bm-line-w: 1.5px;
+  --bm-draw: 400ms;
+  --bm-fold: 300ms;
+  --bm-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --bm-muted: color-mix(in srgb, var(--bm-ink) 58%, transparent);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  max-width: min(var(--bm-w), 100%);
+  min-width: 0;
+  padding-left: 14px;
+  color: var(--bm-ink);
+  font-family: inherit;
+  font-size: var(--bm-font);
+  line-height: 1.2;
+}
+
+.branched-menu--full {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* The menu's own spine, as in the reference. */
+.branched-menu::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to bottom, var(--bm-line) 0%, var(--bm-line) 55%, transparent 100%);
+}
+
+/* The accent marker sits on the open top-level section that holds the selection. */
+.branched-menu__marker {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  z-index: 1;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--bm-accent);
+  opacity: 0;
+  transition: top 220ms var(--bm-ease-out), opacity 150ms ease;
+}
+
+.branched-menu__marker[data-on] {
+  opacity: 1;
+}
+
+.branched-menu__tree {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Top-level section heads (the reference's heads) ─────────────────── */
+
+.branched-menu__row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.branched-menu__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 9px 0;
+  border: 0;
+  background: none;
+  color: var(--bm-muted);
+  font: inherit;
+  font-size: calc(var(--bm-font) + 1px);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 200ms ease;
+}
+
+.branched-menu__head[aria-disabled="true"] {
+  cursor: default;
+}
+
+.branched-menu__node[data-open] > .branched-menu__row > .branched-menu__head,
+.branched-menu__head[data-active] {
+  color: var(--bm-ink);
+}
+
+.branched-menu__head:focus-visible,
+.branched-menu__item:focus-visible,
+.branched-menu__action:focus-visible {
+  outline: 2px solid var(--bm-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .branched-menu__head:hover {
+    color: var(--bm-ink);
+  }
+}
+
+/* ── Folding ─────────────────────────────────────────────────────────── */
+
+.branched-menu__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--bm-fold) var(--bm-ease-out);
+}
+
+.branched-menu__node[data-open] > .branched-menu__body {
+  grid-template-rows: 1fr;
+}
+
+.branched-menu__fold {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Nested rows: the branch connectors ─────────────────────────────── */
+
+/* Every nested row (a child of an expanded section) gets its own elbow. */
+.branched-menu__row--connected {
+  min-height: var(--bm-row);
+}
+
+.branched-menu__lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.branched-menu__base,
+.branched-menu__reach {
+  fill: none;
+  stroke-width: var(--bm-line-w);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.branched-menu__base {
+  stroke: var(--bm-line);
+}
+
+.branched-menu__reach {
+  stroke: var(--bm-accent);
+  transition: stroke-dashoffset var(--bm-draw) var(--bm-ease-out);
+}
+
+/* The trunk continues past this node to its later siblings (the elbow of the
+   LAST child stops, exactly like the reference's trunk). The continuation
+   starts where this row's own vertical segment ends (rowY − radius). */
+.branched-menu__node[data-connected]:not([data-last])::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--bm-row) / 2 - var(--bm-r));
+  bottom: 0;
+  left: var(--bm-trunk);
+  width: var(--bm-line-w);
+  background: var(--bm-line);
+  pointer-events: none;
+}
+
+.branched-menu__node[data-connected] {
+  position: relative;
+}
+
+.branched-menu__node[data-connected] > .branched-menu__body > .branched-menu__fold > .branched-menu__tree {
+  position: relative;
+}
+
+/* ── Child rows ──────────────────────────────────────────────────────── */
+
+.branched-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--bm-row);
+  margin: 0;
+  padding: 0 8px 0 var(--bm-indent);
+  border: 0;
+  background: none;
+  color: var(--bm-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 200ms ease;
+}
+
+.branched-menu__item--section {
+  font-weight: 500;
+}
+
+.branched-menu__item[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.branched-menu__node[data-open] > .branched-menu__row > .branched-menu__item--section,
+.branched-menu__node[data-holds-active] > .branched-menu__row > .branched-menu__item--section {
+  color: var(--bm-ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .branched-menu__item:hover {
+    color: var(--bm-ink);
+  }
+}
+
+.branched-menu__item[data-active] {
+  color: var(--bm-accent);
+  font-weight: 500;
+}
+
+.branched-menu__leaf-wrap {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.branched-menu__leaf-wrap--root {
+  padding-left: 0;
+}
+
+.branched-menu__row .branched-menu__leaf-wrap {
+  flex: 1 1 auto;
+}
+
+/* The leaf accent colour travels on the icon; the active state tints the label. */
+.branched-menu__item[data-branched-leaf] .branched-menu__icon {
+  color: var(--bm-leaf, var(--bm-accent));
+}
+
+.branched-menu__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* Long names wrap onto as many lines as they need (never truncated or clipped). */
+.branched-menu__label,
+.branched-menu__head-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.branched-menu__head-label {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.branched-menu__head .branched-menu__head-label {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.branched-menu__meta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bm-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.branched-menu__tag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.branched-menu__caret {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--bm-muted);
+  transition: transform var(--bm-fold) var(--bm-ease-out);
+}
+
+.branched-menu__caret[data-open] {
+  transform: rotate(180deg);
+}
+
+.branched-menu__caret svg {
+  display: block;
+}
+
+/* ── Row actions (rename / delete) ──────────────────────────────────── */
+
+.branched-menu__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.branched-menu__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--bm-muted);
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .branched-menu__action:hover {
+    color: var(--bm-ink);
+    background: color-mix(in srgb, var(--bm-ink) 8%, transparent);
+  }
+}
+
+.branched-menu__action--danger:hover {
+  color: #fca5a5;
+}
+
+.branched-menu__action--save {
+  color: var(--bm-accent);
+}
+
+/* ── Inline rename ──────────────────────────────────────────────────── */
+
+.branched-menu__rename {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: var(--bm-row);
+  padding: 0 4px 0 var(--bm-indent);
+  box-sizing: border-box;
+}
+
+.branched-menu__rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--bm-accent) 60%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bm-ink) 6%, transparent);
+  color: var(--bm-ink);
+  font: inherit;
+  font-size: var(--bm-font);
+  outline: none;
+}
+
+/* ── Loading skeleton (same rhythm as the rows) ─────────────────────── */
+
+.branched-menu-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0 10px 14px;
+}
+
+.branched-menu-skeleton__row {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bm-ink, #fff) 9%, transparent);
+  animation: branched-menu-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes branched-menu-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branched-menu__marker,
+  .branched-menu__body,
+  .branched-menu__reach,
+  .branched-menu__caret,
+  .branched-menu__head,
+  .branched-menu__item {
+    transition: none;
+  }
+
+  .branched-menu-skeleton__row {
+    animation: none;
+  }
+}

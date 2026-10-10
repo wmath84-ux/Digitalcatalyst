@@ -39,18 +39,15 @@
 //                 old player header + ⚙ settings popover carried, in one list.
 
 import {
-  useCallback,
-  useEffect,
   useMemo,
   useRef,
-  useState,
   type ComponentType,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, FileText, FlaskConical, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
@@ -66,69 +63,10 @@ import { AiTabIcon } from "./studyTabIcons";
 export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read";
 export type DockOrientation = "portrait" | "landscape";
 
-const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
-
-const moduleFiles = (module: CourseModule): CourseFile[] => {
-  const embedded = module.embedContentUrl ? [{
-    id: `${module.id}__embedded-page`,
-    name: module.embedContentTypeLabel || (module.embedContentTypeId === "github_page" ? "Interactive GitHub Page" : "Embedded resource"),
-    type: module.embedContentTypeId === "google_doc" ? "doc" as const : module.embedContentTypeId === "whimsical_mindmap" ? "mindmap" as const : "embed" as const,
-    url: module.embedContentUrl,
-    embedUrl: module.embedContentUrl,
-    provider: module.embedContentTypeId || "external",
-    accessLevel: module.accessLevel,
-    paidUpdateId: module.paidUpdateId,
-    paidUpdateTitle: module.paidUpdateTitle,
-    paidUpdatePrice: module.paidUpdatePrice,
-    paidUpdateCoinPrice: module.paidUpdateCoinPrice,
-  }] : [];
-  return [...embedded, ...(module.files || [])];
-};
-
 type FlatModule = { module: CourseModule; depth: number };
 
 const flattenModules = (modules: CourseModule[], depth = 0): FlatModule[] =>
   modules.flatMap((module) => [{ module, depth }, ...flattenModules(module.modules || [], depth + 1)]);
-
-/**
- * A `brain` resource is the ONE official file type with no URL — its content is
- * the practice set the admin imported (`practiceQuestions`). It is visible
- * exactly when it holds at least one question.
- */
-const isBrainFile = (file: CourseFile) => file.type === "brain" && (file.practiceQuestions?.length ?? 0) > 0;
-
-/**
- * The OFFICIAL catalogue's visibility rule: a lesson shows when it has a URL —
- * with a Brain set as the one URL-less official type (it counts when it holds
- * questions). `tests/courseBrainPracticeContract.test.mjs` pins this exact
- * expression, because it is what keeps a Brain set out of the viewer stack.
- */
-const hasUrlContent = (file: CourseFile) =>
-  (isBrainFile(file) || Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId));
-
-/**
- * …and an `interactive` 2D experiment is the LEARNER-authored URL-less type:
- * its content is its own HTML (`interactiveHtml`, stored in the course
- * document) or a hosted page. The Modules tab must show both, or a lesson the
- * learner built never appears in their own course.
- */
-const isExperimentFile = (file: CourseFile) =>
-  file.type === "interactive"
-  && (Boolean(String(file.interactiveHtml || "").trim()) || /^https:\/\//i.test(String(file.url || "").trim()));
-
-const isVisibleFile = (file: CourseFile) =>
-  file.accessLevel !== "hidden" && (hasUrlContent(file) || isExperimentFile(file));
-
-const fileIcon = (file: CourseFile) => {
-  if (file.type === "brain") return Brain;
-  if (file.type === "interactive") return FlaskConical;
-  if (file.type === "youtube" || file.type === "video" || file.type === "audio") return PlayCircle;
-  if (file.type === "pdf" || file.type === "ebook") return FileText;
-  if (file.type === "sheet") return FileSpreadsheet;
-  if (file.type === "google_form") return FormInput;
-  if (file.type === "embed" || file.type === "mindmap") return Link2;
-  return File;
-};
 
 const isPaidLocked = (module: CourseModule, ownedUpdateIds: Set<string>) =>
   module.accessLevel === "paidUpdate" && Boolean(module.paidUpdateId) && !ownedUpdateIds.has(String(module.paidUpdateId));
@@ -544,139 +482,11 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
   const activeTab = dockTabRecord(tab);
   const {
     modules,
-    selectedFileId,
     ownedUpdateIds,
-    accessibleModuleIds,
-    previewModuleIds,
     updates,
-    onSelectFile,
     onBuyModule,
     onBuyUpdate,
   } = args;
-
-  // ── Module / Resource rows ─────────────────────────────────────────────
-  const flatModules = useMemo(() => flattenModules(modules), [modules]);
-
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const toggleModule = useCallback((moduleId: string) => {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(moduleId)) next.delete(moduleId);
-      else next.add(moduleId);
-      return next;
-    });
-  }, []);
-
-  const listMode = tab === "modules" ? "modules" : null;
-
-  const moduleRows = useMemo(() => {
-    if (!listMode) return [];
-    const tabColor = activeTab.color;
-    const rows: SheetRowSpec[] = [];
-    // Only unlocked modules are shown — locked / paid modules live in the
-    // dedicated "Paid" tab.
-    const unlocked = unlockedModuleIds(modules, accessibleModuleIds, ownedUpdateIds);
-    const visible = flatModules.filter(({ module }) => unlocked.has(String(module.id)));
-
-    for (const { module, depth } of visible) {
-      const files = moduleFiles(module).filter((file) => file.type !== "read" && file.type !== "note" && isVisibleFile(file));
-      const moduleId = String(module.id);
-      const accessible = accessibleModuleIds.has(moduleId);
-      const preview = previewModuleIds.has(moduleId);
-      const paidNotOwned = isPaidLocked(module, ownedUpdateIds);
-      const locked = !accessible || paidNotOwned;
-      const open = expanded.has(moduleId);
-      const holdsSelected = files.some((file) => file.id === selectedFileId);
-
-      rows.push({
-        id: `module-${moduleId}`,
-        kind: "module",
-        icon: <span className="text-[11px] font-black">{depth + 1}</span>,
-        color: tabColor,
-        title: module.title,
-        subtitle: `${files.length} ${files.length === 1 ? "file" : "files"}`,
-        selected: holdsSelected,
-        extra: (
-          <>
-            {preview ? <Eye size={13} className="text-sky-300" /> : null}
-            {locked && !preview ? <LockKeyhole size={13} className="text-amber-400" /> : null}
-            {files.length > 0 ? (
-              open ? <ChevronDown size={15} className="text-[var(--course-muted)]" /> : <ChevronRight size={15} className="text-[var(--course-muted)]" />
-            ) : null}
-          </>
-        ),
-        // The module button expands / collapses its files.
-        press: () => toggleModule(moduleId),
-        dataAttrs: {
-          "data-course-overlay-module": "",
-          "data-module-id": moduleId,
-          "data-locked": locked ? "true" : "false",
-          "data-preview": preview ? "true" : "false",
-        },
-      });
-
-      if (open) {
-        for (const file of files) {
-          const Icon = fileIcon(file);
-          const fileLocked = locked || (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(updateKey(file)));
-          rows.push({
-            id: `file-${file.id}`,
-            kind: "file",
-            icon: <Icon size={20} />,
-            color: tabColor,
-            title: file.name,
-            // A Brain resource IS its question set, so the row says how much
-            // practice it holds instead of printing the raw type.
-            subtitle: isBrainFile(file) ? `${file.practiceQuestions?.length ?? 0} practice questions` : file.type,
-            selected: selectedFileId === file.id,
-            extra: fileLocked ? <LockKeyhole size={12} className="text-amber-400" /> : null,
-            press: fileLocked ? undefined : () => onSelectFile(file),
-            dataAttrs: {
-              "data-course-overlay-file": "",
-              "data-file-id": file.id,
-              "data-locked": fileLocked ? "true" : "false",
-            },
-          });
-        }
-      }
-    }
-    // "My Modules" — the learner's own study content for this course, as a
-    // native list row under the official curriculum (same 44px plate, same
-    // scroll-snap behaviour). It only appears when the parent has mounted the
-    // feature; the parent's panel owns every state it can be in (locked /
-    // at-limit / creating…), so the row is always safe to press.
-    const entry = args.personalModulesEntry;
-    if (entry) {
-      rows.push({
-        id: "personal-modules-entry",
-        kind: "personal-entry",
-        icon: <Library size={20} />,
-        color: "#B388FF",
-        title: "My Modules",
-        subtitle: entry.subtitle,
-        selected: false,
-        extra: entry.locked ? <LockKeyhole size={13} className="text-violet-300" /> : <ChevronRight size={15} className="text-[var(--course-muted)]" />,
-        press: () => args.onOpenPersonalModules?.(),
-        dataAttrs: {
-          "data-course-personal-entry": "",
-          "data-personal-locked": entry.locked ? "true" : "false",
-        },
-      });
-    }
-    return rows;
-  }, [listMode, activeTab.color, flatModules, expanded, toggleModule, modules, accessibleModuleIds, ownedUpdateIds, previewModuleIds, selectedFileId, onSelectFile, args]);
-
-  // Keep the module holding the open file expanded by default.
-  useEffect(() => {
-    if (!selectedFileId) return;
-    const owner = flatModules.find(({ module }) => moduleFiles(module).some((file) => file.id === selectedFileId));
-    if (owner) {
-      const id = String(owner.module.id);
-      setExpanded((current) => (current.has(id) ? current : new Set(current).add(id)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFileId, flatModules]);
 
   // ── Paid rows ──────────────────────────────────────────────────────────
   const paidRows = useMemo(() => {
@@ -714,12 +524,11 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     return rows;
   }, [tab, modules, ownedUpdateIds, updates, onBuyUpdate, onBuyModule]);
 
-  const listRows = tab === "paid" ? paidRows : moduleRows;
-  const listModeAttr = tab === "paid" ? "paid" : listMode;
-  const emptyMessage =
-    tab === "paid"
-      ? "No paid content for this course."
-      : "No modules to show yet.";
+  // The Modules tab is the structured library (see `resourceLibraryPanel`);
+  // this builder only supplies the Paid list.
+  const listRows = paidRows;
+  const listModeAttr = tab === "paid" ? "paid" : null;
+  const emptyMessage = "No paid content for this course.";
 
   return { activeTab, listRows, listModeAttr, emptyMessage };
 }
