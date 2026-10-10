@@ -214,8 +214,9 @@ export const restoreStatusBarFromCoursePlayer = (): void => {
       fullscreenEnteredByPlayer = false;
       void exitFullscreen().finally(() => notifyFullscreenChange());
     }
-    if (originalThemeColor !== null) setThemeColor(originalThemeColor);
-    else syncSystemThemeColor();
+    // Give the bars back to the page on screen. (The stored original is the
+    // colour that was painted at entry — replaying it would pin a stale colour.)
+    syncSystemThemeColor();
     const styleMeta = document.querySelector<HTMLMetaElement>(STATUS_BAR_STYLE_SELECTOR);
     if (styleMeta && originalStatusBarStyle !== null) styleMeta.content = originalStatusBarStyle;
   }

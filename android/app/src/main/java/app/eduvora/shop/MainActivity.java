@@ -166,21 +166,15 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * Synchronize the native status bar appearance and icon contrast directly
-     * with the device's system theme (light mode -> white bar with dark icons,
-     * dark mode -> black bar with light icons).
+     * Re-apply the bar state the web layer last requested (see
+     * {@code AppStatusBarPlugin.reapplyLast}). It used to force the system-theme
+     * black/white here on every resume and rotation, which overwrote the page's
+     * colours; now there is one writer of the bar colours.
      */
     public void syncStatusBarThemeWithSystem() {
-        if (AppFullscreenPlugin.isImmersiveActive()) {
-            return;
-        }
         runOnUiThread(() -> {
             try {
-                int nightModeFlags = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-                boolean isNight = (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES);
-                int statusBarColor = isNight ? 0xFF000000 : 0xFFFFFFFF;
-                boolean darkIcons = !isNight;
-                AppStatusBarPlugin.applyStatusBar(this, statusBarColor, darkIcons);
+                AppStatusBarPlugin.reapplyLast(this);
             } catch (Exception ignored) {}
         });
     }
