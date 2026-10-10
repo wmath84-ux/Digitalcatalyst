@@ -56,7 +56,7 @@ test("paid curriculum rows retain a distinct, plainly labelled amber appearance"
   assert.match(pdp, /data-paid=\{paid \? "true" : "false"\}/);
   assert.match(pdp, /Paid upgrade/);
   assert.match(pdp, /data-pdp-curriculum-upgrade-hint/);
-  assert.match(css, /\[data-paid="true"\] > \.dc-pdp-module-heading \{ color: #f9dfa8/);
+  assert.match(css, /\[data-paid="true"\] > \.dc-pdp-module-heading \{ color: var\(--pdp-t-f9dfa8, #f9dfa8\)/);
   assert.doesNotMatch(pdp, /Crown|LockKeyhole|bg-amber-500\/15/);
 });
 

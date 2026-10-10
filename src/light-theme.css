@@ -269,3 +269,109 @@ html[data-theme="light"] :is(input, textarea, select):not([type="checkbox"]):not
 html[data-theme="light"] :is(input, textarea, select):focus-visible {
   outline-color: #4f46e5;
 }
+
+/* ── 9. Home QA fixes (tablet, mobile, side rail) ─────────────────────────── */
+/* Segmented control (category chips, Store filters): the plate is light, so
+   inactive labels take ink instead of the restored white. The active pill
+   keeps its own white on the accent fill. */
+html[data-theme="light"] .dc-segment [data-toggle]:not([aria-pressed="true"]),
+html[data-theme="light"] .dc-segment button:not([aria-pressed="true"]) {
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] .dc-segment [data-toggle][aria-pressed="true"],
+html[data-theme="light"] .dc-segment button[aria-pressed="true"] {
+  color: #ffffff;
+}
+
+/* Hero art: luminosity blending is a dark-hero device. On the light slide it
+   turns artwork gray, so the art sits normally and fades in from the right. */
+html[data-theme="light"] .dc-home-hero-art {
+  mix-blend-mode: normal;
+  opacity: 0.95;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+          mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+}
+
+/* Search field inside the header: a light fill and ink border, not a
+   transparent well on a white plate. The input stays transparent. */
+html[data-theme="light"] .dc-scene-field:has(input) {
+  background-color: rgba(15, 23, 42, 0.045);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-scene-field input,
+html[data-theme="light"] .dc-scene-field input.bg-transparent {
+  background-color: transparent;
+  color: var(--dc-ink);
+}
+
+/* Ink-with-shadow text (section links such as "View all") carries a dark
+   halo meant for dark plates. On light it reads as a smudge, so drop it. */
+html[data-theme="light"] .dc-scene-ink {
+  text-shadow: none;
+}
+
+/* glass.css pins the ink scale to white inside every card and plate, and that
+   scale is inherited by children. Light cards and plates take ink back. */
+html[data-theme="light"][data-glass="on"] .dc-scene-plate,
+html[data-theme="light"][data-glass="on"] .dc-glass-card {
+  --dc-ink-1: #0f172a;
+  --dc-ink-2: #334155;
+  --dc-ink-3: #5b6679;
+}
+
+/* Dock glyphs keep each tab's accent, which is a neon tone on a light plate
+   (about 2:1). Darkening only the glyph SVGs in light mode lifts them to
+   roughly 4.5:1 without touching the plate or the other icons. */
+html[data-theme="light"] [data-glass-dock-item] svg {
+  filter: brightness(0.6) saturate(1.2);
+}
+
+/* Tailwind alpha-white text (text-white/40, /60, /65, /80) is meant for dark
+   plates. Inside the product page it sits on light plates, so it becomes ink
+   at a contrast-safe weight. Each value clears 4.5:1 on white. */
+html[data-theme="light"] [data-pdp-root] [class*="text-white/80"] { color: #334155; }
+html[data-theme="light"] [data-pdp-root] [class*="text-white/65"],
+html[data-theme="light"] [data-pdp-root] [class*="text-white/60"] { color: #475569; }
+html[data-theme="light"] [data-pdp-root] [class*="text-white/40"] { color: #5b6679; }
+
+/* ── 10. Product detail (PDP) light surfaces ───────────────────────────────
+   pdp-minimal.css keeps its dark literals as var() fallbacks; these values
+   are the light equivalents. The lightbox stays dark on purpose. */
+html[data-theme="light"] [data-pdp-root] {
+  --pdp-border: rgba(15, 23, 42, 0.12);
+  --pdp-muted: #475569;
+  --pdp-accent: #4338ca;
+  --pdp-cta-bg: #4338ca;
+  --pdp-cta-ink: #ffffff;
+  --pdp-cta-hover: #3730a3;
+  --pdp-b-111724: #ffffff;
+  --pdp-b-161d2c: #f8fafc;
+  --pdp-b-171e2c: #f8fafc;
+  --pdp-b-rgba-10-14-24-0-85: rgba(255, 255, 255, 0.85);
+  --pdp-b-rgba-10-14-24-0-96: rgba(255, 255, 255, 0.96);
+  --pdp-b-rgba-226-232-240-0-06: rgba(15, 23, 42, 0.04);
+  --pdp-l-b5c8b92c: rgba(6, 95, 70, 0.18);
+  --pdp-l-c1baff44: rgba(79, 70, 229, 0.27);
+  --pdp-t-9aafa3: #065f46;
+  --pdp-t-9ca8bc: #475569;
+  --pdp-t-a7d9c8: #065f46;
+  --pdp-t-b2bcce: #475569;
+  --pdp-t-b5c8b9: #065f46;
+  --pdp-t-b9c4d5: #475569;
+  --pdp-t-bdb4dc: #475569;
+  --pdp-t-c3b7f0: #5b21b6;
+  --pdp-t-c4cede: #475569;
+  --pdp-t-cbd5e1: #334155;
+  --pdp-t-d0d7e3: #334155;
+  --pdp-t-ddcfaa: #78350f;
+  --pdp-t-e0dcff: #4c1d95;
+  --pdp-t-e4b8b8: #9f1239;
+  --pdp-t-e4e9f2: #1e293b;
+  --pdp-t-e6eaf2: #1e293b;
+  --pdp-t-f2cb7c: #92400e;
+  --pdp-t-f3f5fa: #0f172a;
+  --pdp-t-f4bfbe: #9f1239;
+  --pdp-t-f8fafc: #0f172a;
+  --pdp-t-f9dfa8: #92400e;
+  --pdp-t-fff: #0f172a;
+}
