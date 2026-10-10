@@ -81,7 +81,7 @@ function Sidebar({
     <aside
       aria-label="Chats"
       className={cn(
-        "flex h-full flex-col border-r border-[--border] bg-[#f2f1eb]",
+        "flex h-full flex-col border-r border-[--border] bg-[--side]",
         mode === "drawer" ? "anim-drawer w-[min(272px,88%)] shadow-[var(--sh-pop)]" : "w-[252px] xl:w-[264px]"
       )}
     >

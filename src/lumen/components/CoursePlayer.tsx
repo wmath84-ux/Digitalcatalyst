@@ -75,7 +75,7 @@ const MediaScrubber = memo(function MediaScrubber({
           courseBridge.setPlaying(next);
         }}
         aria-label={playing ? "Pause" : "Play"}
-        className="focus-ring flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[--ink] text-white transition-colors hover:bg-[#000]"
+        className="focus-ring flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[--ink] text-[--on-ink] transition-colors hover:bg-[#000]"
       >
         {playing ? <Pause size={12} fill="currentColor" aria-hidden="true" /> : <Play size={12} fill="currentColor" className="ml-0.5" aria-hidden="true" />}
       </button>

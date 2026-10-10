@@ -28,9 +28,9 @@ function SyncBadge({
           : state === "loading" ? "Loading…"
             : "Saved to cloud";
   const tone =
-    state === "error" ? "text-[#b4392f]"
+    state === "error" ? "text-[--err-text]"
       : state === "saving" || state === "loading" ? "text-[--ink-3]"
-        : "text-[#2f7d54]";
+        : "text-[--ok-text]";
   const Icon = state === "error" ? CloudOff : state === "saving" || state === "loading" ? LoaderCircle : Cloud;
   const titleText = state === "error" ? "Cloud save failed — tap to retry" : label;
   const className = cn(

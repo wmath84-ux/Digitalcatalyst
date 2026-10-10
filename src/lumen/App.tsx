@@ -105,7 +105,9 @@ function LumenChatInner({
   const shortLabel = courseShort || courseTitle;
 
   // Light/Dark theme — reuses the Course Player's shared, per-user theme layer.
-  const lumenThemeCtl = useCourseTheme("ai", learnerUid, "light");
+  // The AI page opens in Dark by default. The stored choice (set by the header
+  // toggle, per learner) always wins; this fallback only applies when none is saved.
+  const lumenThemeCtl = useCourseTheme("ai", learnerUid, "dark");
   // Cloud-backed chat history. Before this hook the whole conversation list
   // lived in React state and vanished the moment the player unmounted — the
   // reported "course player ke andar jo AI chats hote hain vah save nahin ho
@@ -625,7 +627,7 @@ function LumenChatInner({
         scale,
         logging: false,
         useCORS: true,
-        backgroundColor: "#f7f6f2",
+        backgroundColor: rootRef.current?.classList.contains("lumen-dark") ? "#1a1a1f" : "#f7f6f2",
         windowWidth: document.documentElement.clientWidth,
         windowHeight: window.innerHeight,
         x: Math.max(0, Math.round(r.x)),
@@ -717,7 +719,7 @@ function LumenChatInner({
               happened and offer the one action that retries it. */}
           {chatSyncError && (
             <div className="flex flex-none items-start gap-2 border-b border-[--border] bg-[--surface] px-3 py-2 text-[12px] leading-snug text-[--ink-2]" role="status">
-              <CloudOff size={14} aria-hidden="true" className="mt-px flex-none text-[#b4392f]" />
+              <CloudOff size={14} aria-hidden="true" className="mt-px flex-none text-[--err-text]" />
               <span className="min-w-0 flex-1">{chatSyncError}</span>
               <button
                 type="button"
