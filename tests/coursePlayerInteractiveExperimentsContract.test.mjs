@@ -77,7 +77,10 @@ test("the experiment is its own union member and CourseFileType keeps its 13 off
   const union = courseTypes.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(union, "CourseFileType union must stay declared in src/types/course.ts");
   const declared = [...union[1].matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
-  assert.equal(declared.length, 13, "the official catalogue has exactly 13 file types");
+  // 13 official catalogue types + `mind_map`, the admin's own name for a mind map
+  // (mapped to the player's `mindmap`, see utils/mindMapResourceMapping.js).
+  assert.equal(declared.length, 14, "the 13 official file types plus the admin mind_map alias");
+  assert.ok(declared.includes("mind_map"), "the admin mind_map alias is a declared member");
   assert.ok(!declared.includes("interactive"), "the experiment must NOT be an official CourseFileType");
 
   assert.match(courseTypes, /export const EXPERIMENT_FILE_TYPE = "interactive" as const;/);
@@ -285,7 +288,7 @@ test("the viewer stack opens experiments and never a URL-less type it cannot ren
 // ---------------------------------------------------------------------------
 
 test("My Study Library offers the type and wires the whole prompt → paste → preview flow", () => {
-  assert.match(editor, /\{ id: "interactive", label: "Interactive 2D experiment", icon: FlaskConical, hint: "Make it with AI — one HTML file" \}/);
+  assert.match(editor, /\{\s*id: "interactive",\s*label: "Interactive 2D experiment",\s*icon: FlaskConical,\s*hint: "Make it with AI — one HTML file",?\s*\}/);
   assert.match(editor, /\{isExperiment \? \(\s*\n\s*<MyCourseExperimentEditor/);
   assert.match(editor, /import \{ experimentBlockingIssues \} from "\.\.\/utils\/experimentSpec";/);
   for (const hook of [

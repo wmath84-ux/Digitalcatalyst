@@ -338,8 +338,10 @@ test("CoursePlayer routes a single module's 'buy' click back to the parent's onP
 // Bottom dock + overlay (redesign)
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer's footer dock carries the eight study tabs (Player + Sketch included)", () => {
-  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "player", "sketch"]) {
+test("CoursePlayer's footer dock carries the nine study tabs (Experiment + Sketch + Read included)", () => {
+  // Part 20: the Live Experiment tab took the Settings slot. Player settings are
+  // opened from the top rail trigger (see the FormChromeViewport contract).
+  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "experiment", "sketch", "read"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
   // The footer is the home page's GlassDock itself — no course-specific

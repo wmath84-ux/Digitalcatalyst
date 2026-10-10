@@ -113,8 +113,8 @@ test("the landscape shell is the same split deck — no toggle chrome to reach",
   // The only two settings rows the header's ⚙ popover mixed in are gone.
   assert.doesNotMatch(coursePlayer, /settingsRow\("File bars"/);
   assert.doesNotMatch(coursePlayer, /settingsRow\("Player bars"/);
-  // Every remaining preference lives in the footer dock's Player tab.
-  assert.match(overlay, /key: "player"/);
+  // Every remaining preference lives in the Player tab, opened from the top rail's Settings trigger.
+  assert.match(coursePlayer, /handleDockTabChange\("player"\);/);
 });
 
 // ---------------------------------------------------------------------------
