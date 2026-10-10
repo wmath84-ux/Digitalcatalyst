@@ -35,6 +35,7 @@
 import { normalizePracticeQuestions, practiceQuestionsReady } from "./practiceSet.js";
 import { normalizeReadResourceUrl, normalizeReadSourceKind } from "./readResources.js";
 import { canonicalProductResourceType, isNoteResourceType } from "./productResourceTypes.js";
+import { validateMindMapObject } from "./mindMapImport.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isString = (v) => typeof v === "string";
@@ -108,7 +109,7 @@ const normResourceType = (v) => {
     s === "ebook" ||
     s === "github_pages" || s === "whimsical" || s === "iframe" ||
     s === "brain" || s === "interactive" || s === "read" || s === "note" ||
-    s === "doc" || s === "sheet" || s === "embed" || s === "mindmap"
+    s === "doc" || s === "sheet" || s === "embed" || s === "mindmap" || s === "mind_map"
   ) return s;
   return "embed";
 };
@@ -193,7 +194,37 @@ const isExperimentResourceType = (type) => type === "interactive";
 const experimentHtmlOf = (raw) => (raw && typeof raw.interactiveHtml === "string" ? raw.interactiveHtml : "");
 
 /** A Brain resource is publishable when it holds a complete, answerable set. */
+/**
+ * Mind map resources (`type: "mind_map"`) carry their map IN the resource, not
+ * at a URL. A map is storable only when it passes the shared AI/JSON validator,
+ * so the learner tree never receives a half-formed map.
+ */
+const storableMindMapOf = (raw) => {
+  const data = raw && raw.mindMapData;
+  if (!data || typeof data !== "object") return null;
+  const result = validateMindMapObject(data);
+  return result.valid ? result.mindMap : null;
+};
+
+/**
+ * Mind map fields carried through the resource mappers. `strict` (storage and
+ * the learner tree) keeps only a valid map; the editor reload keeps the raw
+ * object so an admin can see and repair a draft instead of losing it.
+ */
+const mindMapFieldsOf = (raw, type, { strict = true } = {}) => {
+  if (type !== "mind_map" || !raw) return {};
+  const mindMapData = strict
+    ? storableMindMapOf(raw)
+    : (raw.mindMapData && typeof raw.mindMapData === "object" ? raw.mindMapData : null);
+  return {
+    mindMapData: mindMapData || undefined,
+    mindMapSourceMode: str(raw.mindMapSourceMode) || undefined,
+    mindMapRootTopic: str(raw.mindMapRootTopic) || undefined,
+  };
+};
+
 const isUsableResource = (type, url, youtubeVideoId, raw) => {
+  if (type === "mind_map") return Boolean(storableMindMapOf(raw));
   if (isBrainResourceType(type)) return practiceQuestionsReady(raw && raw.practiceQuestions);
   if (isNoteResourceType(type)) return Boolean(noteHtmlOf(raw).trim() || str(raw && raw.name).trim());
   if (type === "read") return Boolean(readResourceUrlOf(raw));
@@ -490,6 +521,7 @@ export const editorResourceToCanonical = (raw) => {
     // separate from the user-owned notes collection.
     ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
+    ...mindMapFieldsOf(raw, type),
   };
 };
 
@@ -608,6 +640,7 @@ export const editorResourceToFirestore = (raw) => {
     // admin-owned course resource throughout publishing.
     ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
+    ...mindMapFieldsOf(raw, type),
   };
   // Firestore rejects `undefined` field values outright, so the optional
   // slots above (embedUrl / youtubeUrl / youtubeVideoId / paidUpdatePrice)
@@ -789,6 +822,7 @@ export const firestoreResourceToEditor = (raw) => {
     // exposing the canonical `note` type in the editor.
     ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
+    ...mindMapFieldsOf(raw, type, { strict: false }),
     parentModuleId: raw.parentModuleId === null || raw.parentModuleId === undefined || raw.parentModuleId === ""
       ? null
       : str(raw.parentModuleId),
@@ -950,6 +984,7 @@ export const firestoreResourceToCanonical = (raw) => {
     interactiveHtml: isExperimentResourceType(type) ? experimentHtmlOf(raw) || undefined : undefined,
     ...noteMetadataOf(raw, type),
     ...readMetadataOf(raw, type),
+    ...mindMapFieldsOf(raw, type),
   };
 };
 
@@ -1061,6 +1096,7 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     interactiveHtml: isExperimentResourceType(toPlayerResourceType(r.type)) ? experimentHtmlOf(r) || undefined : undefined,
     ...noteMetadataOf(r, toPlayerResourceType(r.type)),
     ...readMetadataOf(r, toPlayerResourceType(r.type)),
+    ...mindMapFieldsOf(r, toPlayerResourceType(r.type)),
   };
 };
 

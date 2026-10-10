@@ -152,6 +152,7 @@ import {
   TriangleAlert,
   Type,
   WrapText,
+  FileJson,
 } from "lucide-react";
 import {
   addChildNode,
@@ -177,6 +178,7 @@ import {
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
+import MindMapJsonImportDialog from "./MindMapJsonImport";
 import type { CourseModule } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
@@ -1196,6 +1198,20 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const [libraryOpen, setLibraryOpen] = useState(
     () => getCoursePanelSession().mindMapView !== "canvas",
   );
+  // AI / JSON import: the dialog is closed by default. `undoSnapshot` holds the
+  // map that was on the canvas before a JSON replacement, so it can be restored.
+  const [jsonImportOpen, setJsonImportOpen] = useState(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<MindMap | null>(null);
+  const applyJsonMap = useCallback((next: MindMap) => {
+    setUndoSnapshot(mind);
+    onMindChange(() => next);
+  }, [mind, onMindChange]);
+  const undoJsonMap = useCallback(() => {
+    if (!undoSnapshot) return;
+    const snapshot = undoSnapshot;
+    setUndoSnapshot(null);
+    onMindChange(() => snapshot);
+  }, [undoSnapshot, onMindChange]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Deletion is always gated behind a confirmation overlay — a branch (toolbar
@@ -1911,6 +1927,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
       data-course-mindmap
       data-mindmap-theme={mindTheme}
     >
+      <MindMapJsonImportDialog
+        open={jsonImportOpen}
+        currentMind={mind}
+        onClose={() => setJsonImportOpen(false)}
+        onGenerate={applyJsonMap}
+      />
       {/* The toolbar only exists on the canvas — while the library is open
           (no specific map chosen yet) there is no strip. It rides at the TOP
           of the sheet, exactly like the notes editor: toolbar first, canvas
@@ -1933,6 +1955,22 @@ function MindMapCanvas(props: MindMapPanelProps) {
           or clipping. Any stale offset a browser hands it (soft keyboard,
           orientation flip, reopen) is reset when the sheet opens, so the
           bar always paints from its left edge. */}
+      {undoSnapshot ? (
+        <div
+          role="status"
+          className="flex shrink-0 items-center gap-2 border-b border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-900"
+          data-course-mindmap-json-undo
+        >
+          <span className="mr-auto">Map replaced from JSON.</span>
+          <button
+            type="button"
+            onClick={undoJsonMap}
+            className="rounded-md border border-violet-300 bg-white px-2.5 py-1 font-semibold text-violet-900 hover:bg-violet-100"
+          >
+            Undo
+          </button>
+        </div>
+      ) : null}
       {libraryOpen ? null : (
       <div
         ref={statusRef}
@@ -1968,6 +2006,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
           >
             {status === "saving" ? <CloudUpload /> : status === "saved" ? <CloudCheck /> : status === "error" ? <CloudAlert /> : <Cloud />}
             {saveBlink ? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" /> : null}
+          </button>
+          {/* AI / JSON import — opens the same prompt + validator the admin
+              Mind Map editor uses. Nothing changes until a valid map is confirmed. */}
+          <button
+            type="button"
+            onClick={() => setJsonImportOpen(true)}
+            className="mm-tool"
+            aria-label="AI / JSON import"
+            title="AI / JSON import"
+            data-course-mindmap-json-import
+          >
+            <FileJson size={16} />
           </button>
           <ToolbarMenu
             open={saveMenuOpen}

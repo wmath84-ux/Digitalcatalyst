@@ -37,12 +37,14 @@ import {
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
+  groupFeaturesByPriceTier,
   resolveFeaturePrice,
   resolveFeaturesForPlan,
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
 import { featuresForPlanCycle, planVisibleCycles } from "../../../utils/subscriptionVisibility";
 import PlanComparisonTable from "./PlanComparisonTable";
+import FeaturePricingTiers from "./FeaturePricingTiers";
 import "../subscription-minimal.css";
 import {
   evaluatePlanChange,
@@ -376,6 +378,11 @@ export default function SubscriptionPage({
   const offeredFeatures = useMemo(
     () => featuresForPlanCycle(rawFeatures, selectedPlanId, cycle, cycleVisibilityOptions),
     [cycleVisibilityOptions, rawFeatures, selectedPlanId, cycle]
+  );
+  /** Price tiers for the offered features, re-priced for the active plan + cycle. */
+  const featurePriceTiers = useMemo(
+    () => groupFeaturesByPriceTier(offeredFeatures, selectedPlanId, cycle),
+    [offeredFeatures, selectedPlanId, cycle]
   );
   const offeredFeatureIdSet = useMemo(
     () => new Set(offeredFeatures.map((feature) => String(feature.id))),
@@ -1104,6 +1111,23 @@ export default function SubscriptionPage({
                           </button>
                         </div>
                       </section>
+                      {featurePriceTiers.length > 0 ? (
+                        <section className="dc-subscription-section" data-subscription-price-tiers>
+                          <FeaturePricingTiers
+                            tiers={featurePriceTiers}
+                            cycle={cycle}
+                            selectedIds={selectedFeatureIds}
+                            purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
+                            onToggleTier={(featureIds, allSelected) =>
+                              setSelectedFeatureIds((current) =>
+                                allSelected
+                                  ? current.filter((id) => !featureIds.includes(id))
+                                  : Array.from(new Set([...current, ...featureIds]))
+                              )
+                            }
+                          />
+                        </section>
+                      ) : null}
                       {canShowCouponInput || !isFreeSelection ? (
                         <section className="dc-subscription-section" data-subscription-discounts>
                           <h2>Discount code</h2>

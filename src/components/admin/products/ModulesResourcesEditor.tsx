@@ -58,6 +58,7 @@ import {
   READ_PDF_MAX_BYTES,
 } from "../../../../utils/readResources.js";
 import type { PaidUpdate, ProductModule, ProductResource } from "@/lib/admin/types";
+import { validateMindMapObject } from "../../../../utils/mindMapImport.js";
 
 type ReadUploadResult = { url: string; storagePath: string; fileName: string; fileSize: number };
 
@@ -821,7 +822,9 @@ function ResourceCard({
   const isMindMap = resource.type === "mind_map";
   const noteHtmlLength = String(resource.noteHtml || "").length;
   const noteReady = isNote && Boolean(resource.name.trim()) && noteHtmlLength <= MAX_NOTE_HTML_LENGTH;
-  const mindMapReady = isMindMap && Boolean(resource.name.trim()) && Boolean(resource.mindMapData);
+  // Ready only when the stored map passes the same validator the editor and the
+  // product save use — a stale or malformed map must not show as "ready".
+  const mindMapReady = isMindMap && Boolean(resource.name.trim()) && validateMindMapObject(resource.mindMapData).valid;
   const experimentHtml = isExperiment ? String(resource.interactiveHtml || "") : "";
   const experimentHosted = isExperiment && Boolean(cleanUrl);
   const experimentErrors = isExperiment && experimentHtml.trim() ? experimentBlockingIssues(experimentHtml) : [];
