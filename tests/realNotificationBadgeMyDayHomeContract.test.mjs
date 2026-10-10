@@ -11,7 +11,7 @@ test("shared notification badge combines local and cloud unread IDs without doub
   assert.match(hook, /loadSiteNotifications/);
   assert.match(hook, /collection\(db, "users", user\.id, "notifications"\)/);
   assert.match(hook, /new Set\(localItems\.filter/);
-  assert.match(hook, /cloudUnreadIds\.forEach/);
+  assert.match(hook, /cloudUnreadItems\.filter\(allowed\)\.forEach\(\(item\) => ids\.add\(item\.id\)\)/);
   assert.match(header, /useUnreadNotificationCount/);
   assert.match(header, /99\+/);
 });
