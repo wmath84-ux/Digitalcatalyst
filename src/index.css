@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Scope Tailwind `dark:` to the app theme (html.dark), not the OS setting, so a
+   dark-OS visitor on the default Light theme still gets Light. */
+@custom-variant dark (&:where(.dark, .dark *));
 @import "./revision/recall-tokens.css";
 /* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
    utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
