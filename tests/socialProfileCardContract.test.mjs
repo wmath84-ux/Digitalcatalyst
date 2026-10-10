@@ -45,7 +45,8 @@ const css = fs.readFileSync("src/home/components/social-profile-card.css", "utf8
 const cssRules = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const storeGlass = fs.readFileSync("src/store-glass.css", "utf8");
 const glassTokens = fs.readFileSync("src/glass.css", "utf8");
-const homeApp = fs.readFileSync("src/home/App.tsx", "utf8");
+const homeApp = fs.readFileSync("src/home/components/FeedbackExperiencePage.tsx", "utf8");
+const homeCss = fs.readFileSync("src/home/home.css", "utf8");
 const brandingPage = fs.readFileSync("src/admin/pages/BrandingPage.tsx", "utf8");
 const brandingUtil = fs.readFileSync("src/utils/branding.ts", "utf8");
 
@@ -62,8 +63,11 @@ test("the social card box matches the feedback wall box at every breakpoint", ()
   assert.equal(boxes.filter((box) => box.includes("w-full")).length, 2);
   // Same horizontal padding on both sections, so the two cards line up
   // edge to edge on every screen size.
-  assert.match(homeApp, /data-home-sticker-wall className="mt-8 px-4 md:px-8"/);
-  assert.match(homeApp, /data-home-social-card-section className="mt-8 px-4[^"]*md:px-8"/);
+  // Both sections take the same shared feedback-section width rule, so the
+  // horizontal inset is identical by construction.
+  assert.match(homeApp, /data-home-sticker-wall className="dc-home-feedback-wall-section"/);
+  assert.match(homeApp, /data-home-social-card-section className="dc-home-feedback-social-section"/);
+  assert.match(homeCss, /\.dc-home-feedback-wall-section,\s*\.dc-home-feedback-social-section \{/);
   assert.match(homeApp, /data-home-social-slot/);
 });
 
