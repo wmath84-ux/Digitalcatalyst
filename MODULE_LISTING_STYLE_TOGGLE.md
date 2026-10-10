@@ -1,5 +1,11 @@
 # Module Listing Style Toggle — Classic vs Modern
 
+> **Update (2026-10-10):** the default is now **Modern (ON)** for anyone with no
+> saved choice, and the switch also drives the Course Player's animated
+> Gradient Waves background (ON = waves, OFF = legacy backdrop). A saved
+> Classic/OFF choice is respected and never overwritten. See
+> [`COURSE_PLAYER_GRADIENT_WAVES_REPORT.md`](./COURSE_PLAYER_GRADIENT_WAVES_REPORT.md).
+
 ## ✅ Implementation Complete
 
 ### Summary

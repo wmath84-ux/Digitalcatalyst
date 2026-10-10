@@ -27,6 +27,7 @@
 //      left to hide.
 
 import { BookmarkPlus, ExternalLink, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
@@ -233,7 +234,7 @@ export default function PlayerPanel({
   onPlayerThemeChange,
   sketchCleanLook = false,
   onSketchCleanLookChange,
-  moduleListingStyle = "classic",
+  moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
   onModuleListingStyleChange,
   gateFile = null,
   productId = null,
@@ -438,8 +439,11 @@ export default function PlayerPanel({
         {/* Sketch "Clean / Optimised Look" (Part 1 §25) — OFF by default and
             remembered per user. Re-arranges the Sketch workspace only. */}
         {onSketchCleanLookChange ? settingsRow("Sketch Clean / Optimised Look", sketchCleanLook, (next) => onSketchCleanLookChange(next), "sketchClean") : null}
-        {/* Module listing style — classic (simple list, DEFAULT) vs modern
-            (magnifying dock-style icons). Remembered per user. */}
+        {/* "Modern module listing" — ON (DEFAULT when nothing is saved) =
+            magnifying dock-style module icons + the landing page's animated
+            Gradient Waves behind the player's content area. OFF = classic
+            list + the legacy player backdrop. Applies instantly, remembered
+            per user; an explicitly saved OFF is never overridden. */}
         {onModuleListingStyleChange ? settingsRow("Modern module listing", moduleListingStyle === "modern", (next) => onModuleListingStyleChange(next ? "modern" : "classic"), "moduleStyle") : null}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.

@@ -1,0 +1,76 @@
+/* src/course/courseGradientWaves.css
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Course Player × React Bits Gradient Waves (Player settings → "Modern module
+ * listing" ON). The animated layer itself is src/course/
+ * CourseGradientWavesBackground.tsx, mounted behind the stage at z-index -1.
+ *
+ * The stage is otherwise fully covered by the lesson pane (the board) and the
+ * study pane (the desk), both painted as OPAQUE plates by flatPlayerChrome.css
+ * / the light theme in index.css — so with nothing else the waves would be
+ * invisible. While the waves are ON (and ONLY then — every rule below is
+ * scoped to `[data-course-waves="on"]`), those two plates turn into light
+ * tinted scrims of the SAME colours, so the waves animate through them:
+ *
+ *   dark  · board 0.22 / desk 0.30 navy; writing surfaces (data-solid-panel:
+ *           notes, mind map, brain, AI, player, sketch) 0.58 navy.
+ *   light · board 0.30 / desk 0.36 paper; writing surfaces 0.66 paper.
+ *
+ * Why so light: React Bits' shader writes premultiplied alpha that FADES with
+ * fog depth, so the field is already a low-key wash over the player's own
+ * backdrop — measured in a real browser, the brightest dark-theme pixel under
+ * the 0.22 scrim keeps white ink above 7 : 1 and the most saturated light-theme
+ * pixel keeps slate ink above 10 : 1 (WCAG AA needs 4.5 : 1). List rows, cards
+ * and inputs keep their own fills on top, so contrast only goes up from there.
+ *
+ * Media keeps its own paint: YouTube's black, a PDF's / Google page's white,
+ * images, audio and every iframe sit on top of the pane exactly as before. The
+ * dock, peek rails, divider, rows, sheets, dialogs and popovers are untouched.
+ *
+ * With the switch OFF the attribute reads "off", none of this matches, and the
+ * legacy backdrop + opaque plates come back exactly as they were.
+ *
+ * PAINT ONLY — no geometry, no z-index, no pointer-events on existing nodes.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dark (default) palette ─────────────────────────────────────────────── */
+.course-player-shell[data-course-player][data-course-waves="on"] [data-course-lesson-pane] {
+  background-color: rgba(6, 9, 16, 0.22);
+  background-image:
+    radial-gradient(120% 60% at 50% -8%, rgba(56, 189, 248, 0.08) 0, transparent 60%),
+    linear-gradient(180deg, rgba(10, 15, 28, 0.2) 0%, rgba(6, 9, 16, 0) 34%);
+}
+.course-player-shell[data-course-player][data-course-waves="on"] [data-course-study-pane] {
+  background-color: rgba(7, 10, 20, 0.3);
+  background-image: linear-gradient(180deg, rgba(11, 16, 36, 0.12) 0%, rgba(7, 10, 20, 0.12) 100%);
+}
+.course-player-shell[data-course-player][data-course-waves="on"] [data-course-study-pane][data-solid-panel="true"] {
+  background-color: rgba(6, 9, 16, 0.58);
+  background-image: linear-gradient(180deg, rgba(13, 20, 36, 0.06) 0%, rgba(6, 9, 16, 0.08) 100%);
+}
+
+/* ── Light palette ──────────────────────────────────────────────────────── */
+.course-player-shell[data-course-player][data-course-waves="on"][data-course-theme="light"] [data-course-lesson-pane] {
+  background-color: rgba(248, 250, 252, 0.3);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(246, 247, 251, 0) 100%);
+}
+.course-player-shell[data-course-player][data-course-waves="on"][data-course-theme="light"] [data-course-study-pane] {
+  background-color: rgba(243, 245, 250, 0.36);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(241, 243, 248, 0.08) 100%);
+}
+.course-player-shell[data-course-player][data-course-waves="on"][data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+  background-color: rgba(250, 251, 254, 0.66);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(244, 245, 251, 0.06) 100%);
+}
+
+/* ── Touch devices: no live blur over a live shader ─────────────────────────
+   The study pane's GlassSurface carries a backdrop blur. Over an animated
+   WebGL canvas the compositor would have to re-blur the pane on EVERY frame —
+   the single most expensive thing a phone / tablet GPU could do here. The
+   scrim above already supplies the contrast, so on coarse pointers the blur
+   stage is dropped while the waves are on. Desktop GPUs keep the frost. */
+@media (pointer: coarse) {
+  .course-player-shell[data-course-player][data-course-waves="on"] [data-course-study-pane] > [data-glass-surface] > div:first-child {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

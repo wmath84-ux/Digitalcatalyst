@@ -171,12 +171,31 @@ export function useMasterSelfPreference(
 }
 
 // ── Module Listing Style (classic vs modern) ───────────────────────────
+//
+// Player settings → "Modern module listing". ONE switch drives TWO things:
+//   · the module list's look (modern = magnifying dock icons, classic = list),
+//   · the Course Player's animated background — ON paints the landing page's
+//     React Bits Gradient Waves behind the content area, OFF restores the
+//     legacy player backdrop (see src/course/CourseGradientWavesBackground.tsx).
+//
+// Default: ON ("modern") for a new install and for any learner who has never
+// saved a choice. The default is only a READ fallback — nothing is written on
+// load, so an explicitly saved OFF ("classic") is never overwritten when the
+// app starts, and a learner without a saved value keeps following the default.
+
+/** Fallback used when no choice has been saved for this learner/device. */
+export const DEFAULT_MODULE_LISTING_STYLE: ModuleListingStyle = "modern";
+
+const moduleListingKey = (uid?: string | null) => prefKey("moduleStyle", "listing", uid);
+
+/** True when the "Modern module listing" switch is ON. */
+export const isModernModuleListing = (style: ModuleListingStyle) => style === "modern";
 
 export const loadModuleListingStyle = (
   uid?: string | null,
-  fallback: ModuleListingStyle = "classic",
+  fallback: ModuleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 ): ModuleListingStyle => {
-  const stored = safeGet(prefKey("moduleStyle", "listing", uid));
+  const stored = safeGet(moduleListingKey(uid));
   return stored === "classic" || stored === "modern" ? stored : fallback;
 };
 
@@ -184,19 +203,33 @@ export const persistModuleListingStyle = (
   style: ModuleListingStyle,
   uid?: string | null,
 ) => {
-  safeSet(prefKey("moduleStyle", "listing", uid), style);
+  safeSet(moduleListingKey(uid), style);
 };
 
-/** Live, persisted module listing style preference (classic = simple list, modern = magnifying icons). */
+/** Live, persisted module listing style preference (classic = simple list, modern = magnifying icons + Gradient Waves background). */
 export function useModuleListingStyle(
   uid?: string | null,
-  fallback: ModuleListingStyle = "classic",
+  fallback: ModuleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 ) {
   const [style, setStyleState] = useState<ModuleListingStyle>(() =>
     loadModuleListingStyle(uid, fallback),
   );
   useEffect(() => {
     setStyleState(loadModuleListingStyle(uid, fallback));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  // Another tab/window of the app changed the same learner's switch → follow
+  // it live, so two open players never disagree about the background.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = moduleListingKey(uid);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== key && event.key !== null) return;
+      setStyleState(loadModuleListingStyle(uid, fallback));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
