@@ -277,10 +277,11 @@ test("picking Brain swaps the URL fields for the importer", () => {
   assert.match(editor, /\{isBrain \? \(\s*\n\s*<PracticeSetImportPanel/);
   assert.match(editor, /practiceTitle: title \|\| undefined,/);
   // The URL-only publish rule must not fire for a type that has no URL. The
-  // Interactive 2D experiment is the second such type, so both conditions name
-  // it next to Brain (Brain's own behaviour is unchanged).
-  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote \? \(/);
-  assert.match(editor, /\{!isBrain && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
+  // Interactive 2D experiment, the note and the mind map (its content is
+  // mindMapData) are the other such types, so every condition names them next
+  // to Brain. Brain's own behaviour is unchanged.
+  assert.match(editor, /\{!cleanUrl && !isBrain && !isExperiment && !isNote && !isMindMap \? \(/);
+  assert.match(editor, /\{!isBrain && !isMindMap && \(!isExperiment \|\| cleanUrl\) \? \(\s*\n\s*<SecondaryButton/);
   // …and a ready / incomplete set is spelled out on the resource card.
   assert.match(editor, /const brainReady = isBrain && practiceQuestionsReady\(resource\.practiceQuestions\);/);
 });

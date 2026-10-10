@@ -1329,7 +1329,8 @@ function ResourceCard({
       <div className="flex flex-wrap gap-2">
         {/* An inline-only experiment has no URL to open — the button appears
             only when a hosted link is set. */}
-        {!isBrain && (!isExperiment || cleanUrl) ? (
+        {/* A mind map keeps its content in the editor, never behind a link. */}
+        {!isBrain && !isMindMap && (!isExperiment || cleanUrl) ? (
           <SecondaryButton
             className="h-9 px-3 text-xs"
             disabled={!cleanUrl}
