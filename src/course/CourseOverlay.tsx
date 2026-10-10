@@ -48,6 +48,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FlaskConical, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PenLine, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
@@ -259,7 +260,7 @@ function SnapList({
   rows,
   empty,
   dataAttrs,
-  moduleListingStyle = "classic",
+  moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 }: {
   rows: SheetRowSpec[];
   empty?: ReactNode;
@@ -781,7 +782,7 @@ export function StudyContent({
   experimentPanel,
   sketchPanel,
   resourceLibraryPanel,
-  moduleListingStyle = "classic",
+  moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -937,7 +938,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       rows={listRows}
       empty={emptyMessage}
       listModeAttr={listModeAttr}
-      moduleListingStyle={props.moduleListingStyle ?? "classic"}
+      moduleListingStyle={props.moduleListingStyle ?? DEFAULT_MODULE_LISTING_STYLE}
       notesPanel={
         // The panel owns its own circular "+" (bottom-right of the grid) —
         // the pane carries no header at all, so there is nowhere else for

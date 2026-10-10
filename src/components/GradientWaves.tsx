@@ -27,6 +27,15 @@ export interface GradientWavesProps {
   grain?: boolean;
   grainIntensity?: number;
   className?: string;
+  /**
+   * [Digitalcatalyst] Upper bound for the drawing-buffer pixel ratio. React
+   * Bits hard-codes `Math.min(devicePixelRatio, 2)`, which stays the default
+   * here, so the landing page renders exactly as published. The Course Player
+   * passes a lower cap on phones/tablets: the waves are a soft, low-frequency
+   * field, so fewer shaded pixels look the same while the raymarch costs far
+   * less GPU time next to a playing lesson.
+   */
+  maxDpr?: number;
 }
 
 const hexToRgb = (hex: string): [number, number, number] => {
@@ -181,10 +190,15 @@ const GradientWaves: React.FC<GradientWavesProps> = ({
   parallaxStrength = 0.5,
   grain = true,
   grainIntensity = 0.05,
-  className = ''
+  className = '',
+  maxDpr = 2
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const enableMouseRef = useRef<boolean>(mouseInteraction);
+  // [Digitalcatalyst] Read once by the mount effect (the renderer is created a
+  // single time per mount, exactly like React Bits), so a changing value never
+  // tears down and re-creates the WebGL context.
+  const maxDprRef = useRef<number>(maxDpr);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -195,7 +209,7 @@ const GradientWaves: React.FC<GradientWavesProps> = ({
       alpha: true,
       premultipliedAlpha: true,
       antialias: false,
-      dpr: Math.min(window.devicePixelRatio || 1, 2)
+      dpr: Math.min(window.devicePixelRatio || 1, Math.max(0.5, maxDprRef.current))
     });
 
     const gl = renderer.gl;

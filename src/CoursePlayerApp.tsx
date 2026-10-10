@@ -62,7 +62,8 @@ import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
-import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle } from "./course/playerPreferences";
+import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle, isModernModuleListing, DEFAULT_MODULE_LISTING_STYLE } from "./course/playerPreferences";
+import CourseGradientWavesBackground from "./course/CourseGradientWavesBackground";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -620,7 +621,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // from the shared course-player preference layer (never CSS inversion).
   const playerThemeCtl = useCourseTheme("player", user?.id ?? null);
   const sketchCleanLookCtl = usePersistedBooleanPreference("sketchCleanLook", user?.id ?? null, false);
-  const moduleListingStyleCtl = useModuleListingStyle(user?.id ?? null, "classic");
+  // Player settings → "Modern module listing": ON (the default when nothing
+  // has been saved) = modern module list + the landing page's animated
+  // Gradient Waves behind the content area; OFF = classic list + the legacy
+  // player backdrop. A saved choice is only ever read here, never re-written.
+  const moduleListingStyleCtl = useModuleListingStyle(user?.id ?? null, DEFAULT_MODULE_LISTING_STYLE);
+  const gradientWavesOn = isModernModuleListing(moduleListingStyleCtl.style);
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -2283,6 +2289,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-col overflow-hidden text-[var(--course-text)]"
       data-course-player
       data-course-theme={playerThemeCtl.theme}
+      data-course-waves={gradientWavesOn ? "on" : "off"}
       data-orientation={useLandscapeRails ? "landscape" : "portrait"}
       {...(useLandscapeRails
         ? {
@@ -2392,7 +2399,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       {/* The stage: portrait = lesson above the study pane (column), landscape
           = lesson left of the study pane (row) — the split always activates
           from the RIGHT in landscape, never from the bottom. */}
-      <div className={`relative flex min-h-0 min-w-0 flex-1 ${useLandscapeRails ? "flex-row" : "flex-col"}`}>
+      <div className={`relative flex min-h-0 min-w-0 flex-1 ${useLandscapeRails ? "flex-row" : "flex-col"}`} data-course-stage>
+      {/* ── Animated background — React Bits Gradient Waves ───────────────
+          The landing page's own component, behind the content area only (the
+          stage — never the top rail). Click-through, z-index -1 inside the
+          fixed shell, so panes, dock, overlays and dialogs all stay above it.
+          Mounted only while "Modern module listing" is ON; OFF unmounts it
+          (GPU context released) and the legacy backdrop shows again. */}
+      {gradientWavesOn ? <CourseGradientWavesBackground /> : null}
       <section
         id="course-viewer"
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
