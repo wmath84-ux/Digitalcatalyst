@@ -316,7 +316,9 @@ test("the toolbar ends just above the footer navigation — measured, never assu
 
 test("menus portal to <body> (never clipped by the player) and clamp to the visible area", () => {
   assert.match(editor, /portalElements=\{portalElements\}/);
-  assert.match(editor, /\{ default: typeof document !== "undefined" \? document\.body : undefined \}/);
+  // The portal is a scoped host (carries the Notes theme tokens) appended to body; body is only the fallback.
+  assert.match(editor, /\{ default: portalHost \?\? \(typeof document !== "undefined" \? document\.body : undefined\) \}/);
+  assert.match(editor, /document\.body\.appendChild\(portalHost\)/);
   assert.match(editor, /const visibleRect = \(\) =>/);
   assert.match(editor, /\[data-note-dock\]/);
   assert.match(editor, /withVisibleBoundary/);

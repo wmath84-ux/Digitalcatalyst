@@ -42,27 +42,12 @@ test("FlowPath's dark palette sets color-scheme, and the display font is supplie
   assert.match(indexCss, /\.font-display\s*\{[\s\S]*font-family: "Sora"/);
 });
 
-test("dock Home / MyDay / Revision radial items navigate to real pages", () => {
-  // Home quick links
-  assert.match(bottomDock, /"home-purchase": "#\/store\/purchases"/);
-  assert.match(bottomDock, /"home-store": "#\/store"/);
-  assert.match(bottomDock, /"home-subscription": "#\/subscription"/);
-  assert.match(bottomDock, /"home-profile": "#\/profile"/);
-  assert.match(bottomDock, /"home-wishlist": "#\/favorites"/);
-  assert.match(bottomDock, /"home-cart": "#\/cart"/);
-  // MyDay sections (MyDay reads ?section=)
-  assert.match(bottomDock, /day: "#\/my-day"/);
-  assert.match(bottomDock, /"day-task": "#\/my-day\?section=tasks"/);
-  assert.match(bottomDock, /"day-schedule": "#\/my-day\?section=schedule"/);
-  assert.match(bottomDock, /"day-reminder": "#\/my-day\?section=reminders"/);
-  assert.match(bottomDock, /"day-note": "#\/my-day\?section=notes"/);
-  // Revision pages
-  assert.match(bottomDock, /"rev-dashboard": "#\/revision"/);
-  assert.match(bottomDock, /"rev-bank": "#\/revision\/bank"/);
-  assert.match(bottomDock, /"rev-progress": "#\/revision\/progress"/);
-  assert.match(bottomDock, /"rev-profile": "#\/revision\/profile"/);
-  // Selecting an item performs a real navigation.
-  assert.match(bottomDock, /window\.location\.hash = route;/);
+test("footer dock is Home only; the radial Home/MyDay/Revision routes stay removed", () => {
+  // Decision (user request, a1b4e10): the footer dock shows only Home. The radial
+  // home-* / day-* / rev-* routes are not restored.
+  assert.match(bottomDock, /id: "home", label: "Home"/);
+  assert.match(bottomDock, /if \(id === "home" && onNavigateToHome\) onNavigateToHome\(\);/);
+  assert.doesNotMatch(bottomDock, /"home-purchase"|"day-task"|"rev-dashboard"/);
 });
 
 test("home header keeps the leaderboard action; FlowPath stays reachable from the nav chrome", () => {

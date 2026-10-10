@@ -1262,7 +1262,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
   
   const isReady = Object.values(readinessStages).every(Boolean);
-  const failedStage = Object.entries(readinessStages).find(([_, ready]) => !ready)?.[0];
 
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as

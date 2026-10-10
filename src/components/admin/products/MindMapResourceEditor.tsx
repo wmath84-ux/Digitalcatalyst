@@ -11,10 +11,9 @@
 // with the Course Player's Mind Map renderer.
 
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Check, Copy, AlertCircle, Brain, Code2, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, AlertCircle, Brain, Code2, Plus } from "lucide-react";
 import { Field, SecondaryButton } from "@/components/admin/ui";
 import { lazy, Suspense } from "react";
-import { GlassSurface } from "../../../components/ui/glass";
 
 // Lazy load the MindMapPanel to avoid bundling the heavy React Flow library
 // unless the scratch builder is actually used
@@ -27,8 +26,6 @@ import {
   MIND_MAP_VERSION,
   MAX_MIND_MAP_NODES,
   MAX_TOPIC_LENGTH,
-  sanitizeTopic,
-  sanitizeTitle,
   rootId,
 } from "../../../../utils/mindMapTree";
 import type { ProductResource } from "@/lib/admin/types";
@@ -43,30 +40,6 @@ interface ValidationResult {
   warnings: string[];
 }
 
-/**
- * Schema for the AI prompt generation.
- * This matches the canonical mind map structure that the application can consume.
- */
-const MIND_MAP_SCHEMA = {
-  version: MIND_MAP_VERSION,
-  title: "string (optional, max 120 chars)",
-  rootTopic: "string (required, max 400 chars)",
-  nodes: "array of node objects",
-  nodeStructure: {
-    id: "string (required, unique)",
-    topic: "string (required, max 400 chars)",
-    parentId: "string or null (required, references another node id or null for root children)",
-    side: "'left' | 'right' | null (optional, for root-level children)",
-    collapsed: "boolean (optional, default false)",
-    fx: "number or null (optional, manual x position)",
-    fy: "number or null (optional, manual y position)",
-  },
-  constraints: {
-    maxNodes: MAX_MIND_MAP_NODES,
-    maxTopicLength: MAX_TOPIC_LENGTH,
-    rootId: rootId(),
-  },
-};
 
 /**
  * Generate an AI prompt that will produce mind map data in the exact format
@@ -331,11 +304,9 @@ export default function MindMapResourceEditor({
   const [codeInput, setCodeInput] = useState<string>("");
   const [validationResult, setValidationResult] = useState<ValidationResult>({ valid: false, errors: [], warnings: [] });
   const [showAIPrompt, setShowAIPrompt] = useState<boolean>(false);
-  const [editorKey, setEditorKey] = useState<number>(0); // Force remount
   
   // State for scratch editor mode
   const [currentMindMap, setCurrentMindMap] = useState<MindMap | null>(null);
-  const [editorLoaded, setEditorLoaded] = useState<boolean>(false);
   
   // Initialize code input from existing mind map data
   useEffect(() => {
@@ -375,7 +346,6 @@ export default function MindMapResourceEditor({
           resource.name || "Untitled Mind Map"
         ));
       }
-      setEditorLoaded(true);
     }
   }, [mode, resource.mindMapData, resource.mindMapRootTopic, resource.name]);
 
@@ -412,7 +382,7 @@ export default function MindMapResourceEditor({
 
     // Update resource with validated mind map data
     onChange({
-      mindMapData: result.mindMap,
+      mindMapData: result.mindMap as unknown as Record<string, unknown>,
       mindMapSourceMode: "code_import",
       mindMapRootTopic: result.mindMap.rootTopic,
       name: resource.name || result.mindMap.title || result.mindMap.rootTopic || "Untitled Mind Map",
@@ -436,7 +406,7 @@ export default function MindMapResourceEditor({
     if (!currentMindMap) return;
     
     onChange({
-      mindMapData: currentMindMap,
+      mindMapData: currentMindMap as unknown as Record<string, unknown>,
       mindMapSourceMode: "scratch_builder",
       mindMapRootTopic: currentMindMap.rootTopic,
       name: resource.name || currentMindMap.title || currentMindMap.rootTopic || "Untitled Mind Map",
@@ -448,19 +418,11 @@ export default function MindMapResourceEditor({
   // Handle mode switch
   const handleSwitchToCode = useCallback(() => {
     setMode("code");
-    setEditorLoaded(false); // Reset editor state when switching away
   }, []);
 
   const handleSwitchToScratch = useCallback(() => {
     setMode("scratch");
-    setEditorLoaded(true);
   }, []);
-
-  // Check if the current resource has valid mind map data
-  const hasValidMindMapData = useMemo(() => {
-    if (!resource.mindMapData) return false;
-    return isMindMap(resource.mindMapData);
-  }, [resource.mindMapData]);
 
   // Check if the resource is ready for publishing
   const isReady = useMemo(() => {
@@ -654,14 +616,14 @@ export default function MindMapResourceEditor({
             <div className="rounded-lg border border-indigo-200 bg-white p-2 min-h-[400px]">
               <Suspense fallback={
                 <div className="flex items-center justify-center h-full">
-                  <GlassSurface className="p-6 text-center">
+                  <div className="p-6 text-center">
                     <Brain size={32} className="mx-auto text-indigo-400 animate-pulse" />
                     <p className="text-sm text-slate-500 mt-2">Loading Mind Map Editor...</p>
-                  </GlassSurface>
+                  </div>
                 </div>
               }>
                 <MindMapPanel
-                  mind={currentMindMap}
+                  mind={currentMindMap ?? createMindMap()}
                   onMindChange={handleMindMapChange}
                   status="ready"
                   errorMessage={null}

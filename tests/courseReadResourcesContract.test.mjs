@@ -23,7 +23,9 @@ const docs = read("docs/read-resources.md");
 test("Read is additive without changing the official CourseFileType or Note-aware content alias", () => {
   const official = courseTypes.match(/export type CourseFileType =\s*([\s\S]*?);/);
   assert.ok(official);
-  assert.equal([...official[1].matchAll(/"([a-z_]+)"/g)].length, 13);
+  // 13 official course types + `mind_map`, the admin's name for a mind map (its learner twin is `mindmap`).
+  assert.equal([...official[1].matchAll(/"([a-z_]+)"/g)].length, 14);
+  assert.ok(official[1].includes('"mind_map"'));
   assert.ok(!official[1].includes('"read"'));
   assert.ok(!official[1].includes('"note"'));
   assert.match(courseTypes, /export type CourseContentFileType = CourseFileType \| CourseInteractiveFileType \| CourseNoteResourceFileType;/);

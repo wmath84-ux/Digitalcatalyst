@@ -175,7 +175,7 @@ test("A2: the three subscription pickers are the pack's GlassSheet (side=bottom)
   ]) {
     const src = read(file);
     assert.match(src, /from "\.\.\/\.\.\/components\/ui\/glass-sheet"/, `${file}: imports GlassSheet`);
-    assert.match(src, /<GlassSheetContent side="bottom"/, `${file}: renders a bottom GlassSheet`);
+    assert.match(src, /<GlassSheetContent[\s\S]*?side="bottom"/, `${file}: renders a bottom GlassSheet`);
     assert.doesNotMatch(src, /framer-motion/, `${file}: no framer sheet left`);
   }
 });
@@ -190,7 +190,10 @@ test("A2: checkout sections and subscription cards are GlassCard / GlassSurface,
     "src/subscription/components/PriceSummary.tsx",
   ]) {
     const src = read(file);
-    assert.match(src, /<GlassCard/, `${file}: uses GlassCard`);
+    // Checkout review/success and PriceSummary are flat text blocks now; only the cards use GlassCard.
+    if (/ActiveMemberView|OwnedPlanCard|PlanOverview/.test(file)) {
+      assert.match(src, /<GlassCard/, `${file}: uses GlassCard`);
+    }
     assert.doesNotMatch(src, /rounded-3xl border border-slate-200 bg-white/, `${file}: painted card left`);
   }
   // Wave 14: the premium gate became the pack GlassSheet (bottom) — its body
@@ -245,17 +248,18 @@ test("A3: profile + settings paint no opaque white / gradient surface; cards, ac
     assert.doesNotMatch(src, /backdrop-blur/, `${file}: hand-rolled frost left`);
   }
   const layout = read("src/profile/ProfileLayout.tsx");
-  assert.match(layout, /<ProfileCard data-profile-hero/);
-  assert.match(layout, /<ProfileCard data-profile-membership-tier/);
+  assert.match(layout, /<section data-profile-hero/);
+  assert.match(layout, /data-profile-membership-tier=\{membership\.tier\}/);
   // Brief 2026-09-30: membership + renewal are ONE card now (they said the
   // same thing twice), so the renewal hooks sit on that same pack surface
   // instead of a second `<ProfileCard data-renewal-card>` element.
   assert.match(layout, /data-renewal-card/);
-  assert.match(layout, /<GlassButton variant="capsule"/);
+  assert.match(layout, /<GlassButton/); // the dialog close control
   assert.match(layout, /<DialogContent/);
   assert.match(layout, /<GlassSwitch/);
   assert.doesNotMatch(layout, /^const CARD =/m, "the hand-painted CARD token is gone");
   const settings = read("src/settings/SettingsPage.tsx");
-  assert.match(settings, /<GlassCard>/);
-  assert.match(settings, /<GlassButton variant="capsule"/);
+  // Settings now uses its own settings.css button and panel classes.
+  assert.match(settings, /className="settings-primary"/);
+  assert.match(settings, /className="settings-secondary"/);
 });

@@ -88,7 +88,7 @@ test("the mind map theme pick is the shared persisted control, not a per-visit o
   assert.doesNotMatch(mindMapPanel, /mindMapThemeOverride/);
   assert.doesNotMatch(mindMapPanel, /setMindMapSessionTheme/);
   assert.doesNotMatch(mindMapPanel, /dc\.mindMapThemeOverride/);
-  assert.match(mindMapPanel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(mindMapPanel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
   assert.match(mindMapPanel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
 });
 

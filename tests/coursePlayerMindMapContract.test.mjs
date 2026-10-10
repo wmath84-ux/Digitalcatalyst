@@ -409,7 +409,7 @@ test("the mind map has a persisted light/dark pick and a genuine light palette",
   // per-user theme layer the rest of the player uses (persisted, never a
   // per-visit session override and never a CSS inversion).
   assert.match(panel, /export type MindMapTheme = "dark" \| "light";/);
-  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
   assert.match(panel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);

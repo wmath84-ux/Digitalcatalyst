@@ -18,7 +18,7 @@ import { cn } from "../utils/cn";
 const ICONS: Record<ResourceType, LucideIcon> = {
   youtube: MonitorPlay, video: Film, audio: AudioLines, pdf: FileText, doc: FileType2,
   sheet: FileSpreadsheet, slides: Presentation, ebook: FileText, image: ImageIcon,
-  google_form: ListChecks, embed: SquareCode, mindmap: Network,
+  google_form: ListChecks, embed: SquareCode, mindmap: Network, mind_map: Network,
   // A course file type without an icon here is a type the player cannot show.
   brain: Brain,
 };

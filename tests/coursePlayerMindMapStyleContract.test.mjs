@@ -18,7 +18,7 @@ const panel = fs.readFileSync("src/course/MindMapPanel.tsx", "utf8");
 const prefs = fs.readFileSync("src/course/playerPreferences.tsx", "utf8");
 
 test("the editor still defaults to the Light palette without touching the shared theme", () => {
-  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null\)/);
+  assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
   // The shared loader's fallback is Light; the editor never passes a Dark default.
   assert.match(prefs, /fallback: CoursePlayerTheme = "light",/);
   assert.doesNotMatch(panel, /useCourseTheme\("mindMap", uid \?\? null, "dark"\)/);

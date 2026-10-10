@@ -258,6 +258,6 @@ test("product detail keeps its media frame but removes nested glass info cards",
   assert.match(pdp, /<GlassSurface\b/);
   assert.match(pdp, /<section data-pdp-details/);
   assert.match(pdp, /<dl data-pdp-meta/);
-  assert.match(pdp, /<PdpPurchaseBuilder\s+compact/);
+  assert.match(pdp, /<PdpPurchaseBuilder[\s\S]*?\bcompact\b/);
   assert.doesNotMatch(pdp, /<GlassSurface[^>]*data-pdp-(meta|details|reviews)/);
 });

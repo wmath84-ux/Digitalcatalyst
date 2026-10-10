@@ -129,25 +129,8 @@ const normalizePushData = (payload) => {
   }
 };
 
-const SHIPPED_DEFAULT_ICONS = [
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-];
-
-const isShippedDefaultIcon = (url) => {
-  if (!url) return true;
-  return SHIPPED_DEFAULT_ICONS.some((item) => url === item || url.endsWith(item));
-};
-
-const resolveNotificationIcon = (payloadIcon) => {
-  const candidates = [payloadIcon, branding.logoUrl, '/api/brand-icon?size=192'];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim() && !isShippedDefaultIcon(candidate.trim())) {
-      return candidate.trim();
-    }
-  }
-  return branding.logoUrl || '/api/brand-icon?size=192';
-};
+// System alerts always carry the admin branding logo as their icon.
+const resolveNotificationIcon = () => branding.logoUrl || '/api/brand-icon?size=192';
 
 self.addEventListener('push', event => {
   let data;
@@ -163,7 +146,7 @@ self.addEventListener('push', event => {
   const category = data.category || '';
   // Push alerts use the admin branding logo as their icon; the shipped default
   // icons are only a fallback when no branding logo is available.
-  const icon = resolveNotificationIcon(data.icon);
+  const icon = resolveNotificationIcon();
   const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;

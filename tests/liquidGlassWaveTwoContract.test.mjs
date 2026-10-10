@@ -178,7 +178,8 @@ test("the rail's quick-stats card is glass and its CTAs are the registry button"
 // ── store search capsule ─────────────────────────────────────────────────────
 
 test("the store search keeps its public API and its tap-to-search contract", () => {
-  assert.match(searchBar, /export default function SearchBar\(\{ value, onChange, sort, onSortChange \}/);
+  // The original four props stay; the Store's filter/view props were added on top.
+  assert.match(searchBar, /export default function SearchBar\(\{\s*value,\s*onChange,\s*sort,\s*onSortChange,/);
   for (const anchor of [
     "data-store-search-trigger",
     'role="button"',

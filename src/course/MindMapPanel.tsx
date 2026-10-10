@@ -1216,7 +1216,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // Part 1 §8/§11 — the map's daylight/light-dark switch and its MASTER/SELF
   // filter, both remembered per user through the shared preference layer
   // (never ephemeral React state, never a CSS inversion).
-  const mindThemeCtl = useCourseTheme("mindMap", uid ?? null);
+  const mindThemeCtl = useCourseTheme("mindMap", uid ?? null, "light"); // Mind Map defaults to Light
   const mindTheme: MindMapTheme = mindThemeCtl.theme;
   const masterSelfCtl = useMasterSelfPreference("mindMap", uid ?? null, "master");
   // ── Align-menu choices (box arrangement + how a long label fits) ───────

@@ -502,7 +502,7 @@ test("AI availability is derived from the reader registry, never from a copy", (
 test("the reader registry covers every course file type the player can hold", () => {
   const playerTypes = new Set([
     "youtube", "video", "audio", "pdf", "doc", "sheet", "slides",
-    "ebook", "image", "google_form", "embed", "mindmap", "brain",
+    "ebook", "image", "google_form", "embed", "mindmap", "mind_map", "brain",
   ]);
   assert.deepEqual([...AI_FILE_TYPES].sort(), [...playerTypes].sort());
   for (const type of AI_FILE_TYPES) {
