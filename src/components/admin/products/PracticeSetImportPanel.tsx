@@ -169,6 +169,7 @@ export default function PracticeSetImportPanel({
   const parsedPaste = useMemo(() => (paste.trim() ? parsePracticeImport(paste) : null), [paste]);
   const preview = parsedPaste?.questions ?? [];
   const pasteErrors = parsedPaste?.errors ?? [];
+  const pasteWarnings = parsedPaste?.warnings ?? [];
 
   const commit = (next: ProductPracticeQuestion[], note: string | null) => {
     onChange({ questions: withIds(next), title });
@@ -478,6 +479,13 @@ export default function PracticeSetImportPanel({
             {preview.filter((question) => question.explanation).length} with an explanation (required on every question). Importing
             appends them below.
           </p>
+        ) : null}
+        {pasteWarnings.length ? (
+          <ul className="space-y-0.5 rounded-lg border border-sky-300 bg-sky-50 p-2 text-[11px] text-sky-900" data-practice-paste-warnings>
+            {pasteWarnings.map((message, index) => (
+              <li key={index}>{message}</li>
+            ))}
+          </ul>
         ) : null}
         {pasteErrors.length ? (
           <div

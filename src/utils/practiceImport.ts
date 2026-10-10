@@ -22,6 +22,8 @@ export interface PracticeImportResult {
   questions: ParsedQuestion[];
   /** Human-readable reasons, each naming the line or question it is about. */
   errors: string[];
+  /** Non-blocking notes (a repeated question text): shown, but Create stays enabled. */
+  warnings: string[];
   /** True only when there is at least one question and no error at all. */
   createReady: boolean;
 }
@@ -41,14 +43,14 @@ const normalizePrompt = (value: string): string => value.replace(/\s+/g, " ").tr
  */
 export const parsePracticeImport = (text: string): PracticeImportResult => {
   if (!String(text ?? "").trim()) {
-    return { questions: [], errors: [EMPTY_PASTE], createReady: false };
+    return { questions: [], errors: [EMPTY_PASTE], warnings: [], createReady: false };
   }
 
   const { questions, problems } = parseQuestionTextDetailed(text);
   const errors: string[] = problems.map((problem) => `Line ${problem.line}: ${problem.message}.`);
 
   if (questions.length === 0 && errors.length === 0) {
-    return { questions: [], errors: [NONE_FOUND], createReady: false };
+    return { questions: [], errors: [NONE_FOUND], warnings: [], createReady: false };
   }
 
   if (questions.length > MAX_PRACTICE_QUESTIONS) {
@@ -57,6 +59,7 @@ export const parsePracticeImport = (text: string): PracticeImportResult => {
     );
   }
 
+  const warnings: string[] = [];
   const seenPrompts = new Map<string, number>();
   questions.forEach((question, index) => {
     const number = index + 1;
@@ -92,7 +95,8 @@ export const parsePracticeImport = (text: string): PracticeImportResult => {
     const key = normalizePrompt(question.prompt);
     const firstSeen = seenPrompts.get(key);
     if (firstSeen !== undefined) {
-      errors.push(`${label}: repeats Q${firstSeen}’s question text — remove one of them`);
+      // A repeat is a warning, not a blocker: the teacher may keep it on purpose.
+      warnings.push(`${label}: repeats Q${firstSeen}’s question text — remove one if it is a copy`);
     } else {
       seenPrompts.set(key, number);
     }
@@ -101,6 +105,7 @@ export const parsePracticeImport = (text: string): PracticeImportResult => {
   return {
     questions,
     errors,
+    warnings,
     createReady: questions.length > 0 && errors.length === 0,
   };
 };

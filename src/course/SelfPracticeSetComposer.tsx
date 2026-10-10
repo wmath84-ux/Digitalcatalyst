@@ -474,6 +474,13 @@ export default function SelfPracticeSetComposer({
                   </p>
                 ) : null}
 
+                {parseResult && parseResult.warnings.length > 0 ? (
+                  <ul className="space-y-1 rounded-lg border border-sky-400/30 bg-sky-400/[0.07] p-2 text-[11px] font-semibold text-sky-100" data-brain-self-parse-warnings>
+                    {parseResult.warnings.map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                ) : null}
                 {parseResult && parseResult.errors.length > 0 ? (
                   <ul className="space-y-1 rounded-lg border border-amber-400/30 bg-amber-400/[0.07] p-2 text-[11px] font-semibold text-amber-100" data-brain-self-parse-errors role="alert">
                     {parseResult.errors.map((message) => (

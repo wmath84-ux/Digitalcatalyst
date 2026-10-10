@@ -216,15 +216,16 @@ D. 8`);
   assert.deepEqual(result.errors, ["Q3: no explanation — add an “Explanation:” line"]);
 });
 
-test("a duplicate question is reported against its first copy", () => {
+test("a duplicate question is a warning against its first copy, and does not block Create", () => {
   const result = parsePracticeImport(`${VALID}
 
 1. what is   2 + 2?
 A. 3
 B. 4 ✓
 Explanation: again.`);
-  assert.equal(result.createReady, false);
-  assert.ok(result.errors.includes("Q3: repeats Q1’s question text — remove one of them"), result.errors.join(" | "));
+  assert.equal(result.createReady, true, result.errors.join(" | "));
+  assert.deepEqual(result.errors, []);
+  assert.ok(result.warnings.some((w) => w.startsWith("Q3: repeats Q1’s question text")), result.warnings.join(" | "));
 });
 
 test("more than the 100-question ceiling is refused", () => {
