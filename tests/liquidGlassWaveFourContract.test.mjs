@@ -94,7 +94,7 @@ test("FlowPath's inline toast became the shared glass toast host", () => {
   const v = read("src/components/flowpath/FlowPathView.tsx");
   assert.doesNotMatch(v, /setToast/, "FlowPath still owns toast state");
   assert.match(v, /toast\.success\(/);
-  assert.match(v, /toast\.info\(/);
+  // (toast.info was only the unused "coming soon" dock stub, removed with the dock's dead props.)
   assert.match(v, /from "\.\.\/ui\/glass-toast"/);
   // one host for every route, mounted next to the palette in the same provider tree
   const main = read("src/main.tsx");
