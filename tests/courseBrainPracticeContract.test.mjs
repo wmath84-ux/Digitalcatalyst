@@ -286,9 +286,10 @@ test("picking Brain swaps the URL fields for the importer", () => {
 });
 
 test("the importer is the revision bulk-import flow, plus hand-written questions", () => {
-  assert.match(importer, /import \{ parseQuestionText \} from "@\/revision\/engine\/bulkParser";/, "the SAME parser the revision importer uses");
+  assert.match(importer, /import \{ parsePracticeImport \} from "@\/utils\/practiceImport";/, "the SAME parse-and-validate step the composer uses");
   assert.match(importer, /from "\.\.\/\.\.\/\.\.\/\.\.\/utils\/practiceSet\.js"/, "and the SAME normaliser the player reads");
-  assert.match(importer, /const preview = useMemo\(\(\) => \(paste\.trim\(\) \? parseQuestionText\(paste\) : \[\]\), \[paste\]\);/);
+  assert.match(importer, /const parsedPaste = useMemo\(\(\) => \(paste\.trim\(\) \? parsePracticeImport\(paste\) : null\), \[paste\]\);/);
+  assert.match(importer, /data-practice-paste-errors/, "parser problems are listed by line, never dropped silently");
   assert.match(importer, /data-practice-paste/);
   assert.match(importer, /data-practice-import/);
   assert.match(importer, /Add question manually/, "create/add by hand, not only bulk paste");

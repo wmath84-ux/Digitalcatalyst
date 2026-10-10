@@ -7,7 +7,7 @@
 // gives them the SAME bulk-import flow the learner-facing revision profile
 // page hosts (`src/revision/pages/BulkImportPage.tsx`):
 //
-//   paste the plain-text questions → the shared parser (`parseQuestionText`)
+//   paste the plain-text questions → the shared parser (`parsePracticeImport`)
 //   detects prompts, options, the correct answer and explanations → preview →
 //   edit anything → save.
 //
@@ -32,7 +32,7 @@
 import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, Copy, FileText, ListPlus, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { Field, Pill, SecondaryButton, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
-import { parseQuestionText } from "@/revision/engine/bulkParser";
+import { parsePracticeImport } from "@/utils/practiceImport";
 import {
   MAX_PRACTICE_OPTIONS,
   MAX_PRACTICE_QUESTIONS,
@@ -164,7 +164,11 @@ export default function PracticeSetImportPanel({
   const ready = questions.length > 0 && problems === 0;
 
   /** What the parser found in the textarea, previewed before it is committed. */
-  const preview = useMemo(() => (paste.trim() ? parseQuestionText(paste) : []), [paste]);
+  // The SAME parse-and-validate step the learner composer uses (utils/practiceImport):
+  // every block the parser could not read is reported by line, not dropped silently.
+  const parsedPaste = useMemo(() => (paste.trim() ? parsePracticeImport(paste) : null), [paste]);
+  const preview = parsedPaste?.questions ?? [];
+  const pasteErrors = parsedPaste?.errors ?? [];
 
   const commit = (next: ProductPracticeQuestion[], note: string | null) => {
     onChange({ questions: withIds(next), title });
@@ -474,6 +478,22 @@ export default function PracticeSetImportPanel({
             {preview.filter((question) => question.explanation).length} with an explanation (required on every question). Importing
             appends them below.
           </p>
+        ) : null}
+        {pasteErrors.length ? (
+          <div
+            className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900"
+            role="alert"
+            data-practice-paste-errors
+          >
+            <p className="font-bold">
+              {pasteErrors.length} thing{pasteErrors.length === 1 ? "" : "s"} to check in the pasted text
+            </p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {pasteErrors.map((message, index) => (
+                <li key={index}>{message}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {importError ? (
           <p className="rounded-lg bg-red-100 p-2 text-[11px] font-semibold text-red-700" data-practice-error>

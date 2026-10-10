@@ -191,6 +191,9 @@ export const placeSelfExperiment = (
   } else {
     if (!uid) return { course: null, resource: null, issues: ["sign in to save experiments"] };
     working = createCourse(uid, SELF_EXPERIMENTS_COURSE_TITLE);
+    // Pin the fixed id: createCourse would otherwise hand out a generated one,
+    // and the lookup above (and in placeSelfExperiment) would never find it again.
+    working.id = SELF_EXPERIMENTS_COURSE_ID;
     working.description = SELF_EXPERIMENTS_COURSE_DESCRIPTION;
     working.modules = [];
   }
