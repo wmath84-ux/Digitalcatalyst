@@ -257,7 +257,7 @@ test("Admin feature editor previews the buyer-facing price with the shared resol
 test("FeatureSelectModal and trigger price from the plan-resolved rate, not the flat rate", () => {
   const modal = readSource("src/subscription/components/FeatureSelectModal.tsx");
   assert.match(modal, /resolvedPricePaise/);
-  assert.match(modal, /featurePrice\(feat\)/);
+  assert.match(modal, /featurePrice\(feature\)/);
   // The running total must skip plan-included features.
   assert.match(modal, /!includedSet\.has\(f\.id\)/);
   const trigger = readSource("src/subscription/components/FeatureSelectTrigger.tsx");

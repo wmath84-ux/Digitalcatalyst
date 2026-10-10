@@ -29,7 +29,8 @@ test("learner/admin landing behavior remains intact", () => {
   // Landing is now the entry point for everyone in a browser; only an
   // installed mobile PWA goes straight to Home. This used to assert the
   // superseded "signed-in non-admin skips landing" rule.
-  assert.match(main, /installedMobilePwa && landingRouteRequested/);
+  // The installed PWA and the native APK WebView both skip the landing.
+  assert.match(main, /\(installedMobilePwa \|\| isNativeApp\(\)\) && landingRouteRequested/);
   // Admins stay exempt from the learner-only catalog splash.
   assert.match(main, /user\.role !== "admin" && catalogLoading/);
 });

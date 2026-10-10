@@ -58,7 +58,8 @@ test("the push tag equals the tag the app and the Android alarm use", () => {
   // as `<scheduleId>:<occurrenceKey>` by `toLegacyShapedDueItem` — same string.
   assert.match(main, /tag: `myday-\$\{item\.key\}-\$\{item\.section\}`/);
   assert.match(notifications, /key: `\$\{occurrence\.scheduleId\}:\$\{occurrence\.occurrenceKey\}`/);
-  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`\)/);
+  // The trailing `user.id` is the device push gate (sign-out silences the tag).
+  assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}-\$\{item\.section\}`, user\.id\)/);
 });
 
 test("delivery is recorded on the row, so the app stays silent afterwards", () => {

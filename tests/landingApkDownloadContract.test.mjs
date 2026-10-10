@@ -48,7 +48,7 @@ test("main builds verify and publish a signed APK to that exact release asset", 
   assert.match(workflow, /apksigner" verify --verbose/);
   assert.match(workflow, /gh release (?:upload|create) android-apk/);
   assert.match(workflow, /apk=android\/app\/build\/outputs\/apk\/release\/app-release\.apk/);
-  assert.match(gradle, /versionCode \(System\.getenv\('ANDROID_VERSION_CODE'\) \?: '1'\)\.toInteger\(\)/);
+  assert.match(gradle, /versionCode = \(System\.getenv\('ANDROID_VERSION_CODE'\) \?: '1'\)\.toInteger\(\)/);
 });
 
 test("every workflow stays parseable YAML", () => {

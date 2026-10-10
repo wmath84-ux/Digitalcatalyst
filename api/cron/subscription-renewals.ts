@@ -640,15 +640,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       summary.referralRepair = { error: true };
     }
 
-    // Record the run only after every job finished. If this handler
-    // throws halfway, `lastRunAt` stays where it was and the next run
-    // re-covers the same window — late is recoverable, skipped is not.
-    await runStateRef.set({ lastRunAt: now, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
-
     const email = await deliverNotificationEmails(db).catch((error) => {
       console.warn("[email] notification delivery will retry", error);
       return { sent: 0, failed: 1, skipped: 0 };
     });
+
+    // Record the run only after every job finished. If this handler
+    // throws halfway, `lastRunAt` stays where it was and the next run
+    // re-covers the same window — late is recoverable, skipped is not.
+    await runStateRef.set({ lastRunAt: now, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
     return res.status(200).json({ ok: true, ...summary, email });
   } catch (error) {
     return errorResponse(res, error, "Could not process scheduled push jobs.");

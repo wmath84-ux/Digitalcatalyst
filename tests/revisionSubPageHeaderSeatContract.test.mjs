@@ -100,10 +100,10 @@ test("the header is rendered above the page scroller, not inside it", () => {
   assert.match(revisionApp, /data-revision-scroll/);
   assert.match(css, /\.dc-desktop-shell \[data-revision-shell\] > \[data-revision-scroll\]/);
 
-  // AI Settings retains its feature-local back header; Bulk Import uses the
-  // common Recall page shell and leaves the host header/navigation untouched.
-  assert.match(aiSettings, /<PageShell[\s\S]*?backHref="#\/revision\/profile"/);
-  assert.doesNotMatch(aiSettings, /mergeIntoMainHeader/);
+  // AI Settings and Bulk Import both use the common Recall page shell; its back
+  // control returns to the Revision profile and the host header stays untouched.
+  assert.match(aiSettings, /<RecallPage[\s\S]*?onBack=\{\(\) => navigate\("#\/revision\/profile"\)\}/);
+  assert.doesNotMatch(aiSettings, /PageShell|AppHeader|mergeIntoMainHeader/);
   assert.match(bulkImport, /<RecallPage[\s\S]*?onBack=\{\(\) => navigate\("#\/revision\/profile"\)\}/);
   assert.doesNotMatch(bulkImport, /PageShell|AppHeader|mergeIntoMainHeader/);
 });
