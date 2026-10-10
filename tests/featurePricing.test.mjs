@@ -259,7 +259,7 @@ test("FeatureSelectModal and trigger price from the plan-resolved rate, not the 
   assert.match(modal, /resolvedPricePaise/);
   assert.match(modal, /featurePrice\(feature\)/);
   // The running total must skip plan-included features.
-  assert.match(modal, /!includedSet\.has\(f\.id\)/);
+  assert.match(modal, /!includedSet\.has\(feature\.id\)/);
   const trigger = readSource("src/subscription/components/FeatureSelectTrigger.tsx");
   assert.match(trigger, /resolvedPricePaise/);
 });
