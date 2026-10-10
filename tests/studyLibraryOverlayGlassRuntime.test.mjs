@@ -94,7 +94,8 @@ test("the profile material is the Profile card's own surface, layer for layer", 
 
   // tint 0.5 → the engine paints rgb(60,62,68) at 0.5 * 0.42 = 0.21, exactly
   // what the Cart card and the Profile cards compute.
-  assert.match(tint.style.background, /60,\s*62,\s*68,\s*0\.21/, tint.style.background);
+  // The material follows the app theme: the dark tint, or the light tint on the default light theme.
+  assert.match(tint.style.background, /(60,\s*62,\s*68|255,\s*255,\s*255),?\s*0\.21/, tint.style.background);
   // blur 14 → the inline frost carries the blur stage itself (14 * 0.7px in
   // float math): no CSS re-skin is involved anywhere.
   assert.match(frost.style.backdropFilter || "", /blur\(9\.7999\d*px\)/, frost.style.backdropFilter);

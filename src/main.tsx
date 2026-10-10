@@ -44,6 +44,13 @@ import "./course/courseTheme.css";
 // Course Player × Gradient Waves: pane scrims while "Modern module listing" is
 // ON. AFTER flatPlayerChrome.css + courseTheme.css, whose plates it re-tints.
 import "./course/courseGradientWaves.css";
+// Light colour theme (default). Token overrides scoped to html[data-theme="light"]
+// — no global invert filters. Imported last so it out-ranks the dark-first
+// layers above; lazily loaded route CSS is handled by the scoped specificity.
+import "./light-theme.css";
+// Apply the stored colour theme (light by default) before anything renders.
+initThemeMode();
+
 // ── Route-level code splitting (perf pass 2026-09-08) ───────────────────────
 // Every screen below used to be a STATIC import, so the single bundle carried
 // the admin console, the course player, the revision engine and the mind map
@@ -130,6 +137,7 @@ import { captureExcalidrawLibraryReturn } from "../utils/excalidrawLibraryLink.j
 import { isMyCourseEditorRoute, isMyCoursePlayerRoute, readMyCourseId, requiresAuthentication, resolveAuthSuccessDestination } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
+import { initThemeMode } from "./lib/theme";
 import AppShell from "./components/AppShell";
 import PageSkeleton, { type PageSkeletonBlock } from "./components/PageSkeleton";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
@@ -1436,12 +1444,11 @@ function RootPage(): ReactNode {
   useEffect(() => {
     const adminRoute = hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH);
     applyGlassTier(adminRoute ? "off" : detectGlassTier());
-    // The pack's own light/dark material, chosen by the user (header switch).
-    // The course player drives the scheme itself while it is mounted (its own
-    // sun/moon theme, Wave 7) and restores the stored preference on unmount,
-    // so the route-level re-apply must not fight it. (Child effects run before
-    // parent effects, so this would otherwise override the player's choice.)
-    if (!adminRoute && !hash.startsWith("#/course/")) applyGlassScheme();
+    // Colour theme for this route: the learner's stored choice (light by
+    // default), or dark where the route is pinned dark — admin, and the course
+    // player (which keeps its own light/dark palette). Re-applied on every route
+    // change so <html> never carries a stale theme into a pinned-dark route.
+    applyGlassScheme();
   }, [hash]);
 
   useEffect(() => {

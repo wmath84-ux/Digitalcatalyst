@@ -1,0 +1,271 @@
+/*
+ * Light colour theme — the app default (src/lib/theme.ts).
+ *
+ * Everything here is scoped to `html[data-theme="light"]`. The dark look is the
+ * untouched base, so dark mode, the admin console and the course player (both
+ * pinned dark, see resolveDocumentTheme) render exactly as before.
+ *
+ * Design rules
+ *  1. No global invert filters. Colour comes from semantic tokens, below.
+ *  2. Neutral "white" utilities (text-white, border-white/xx, bg-white/xx) read
+ *     Tailwind's `--color-white` variable. In light mode that variable becomes the
+ *     primary ink, so text, rules and translucent overlays all re-tint together.
+ *     Solid white surfaces are restored explicitly (`.bg-white`).
+ *  3. Saturated and dark solid plates (brand buttons, badges, gradients, dark
+ *     panels) keep white ink. They re-point `--color-white` back to white; the
+ *     variable inherits, so their white text stays white.
+ *  4. Specificity: lazily loaded route CSS (for example home.css) lands after this
+ *     file, so every rule here carries the `html[data-theme="light"]` prefix.
+ *
+ * Contrast (WCAG AA ≥ 4.5:1 for body text on the light surfaces):
+ *   ink #0f172a on #ffffff ≈ 17.9 : 1    ink #0f172a on #f8fafc ≈ 17.2 : 1
+ *   muted #475569 on #ffffff ≈ 7.6 : 1   faint #64748b on #f8fafc ≈ 4.5 : 1
+ *   brand #4f46e5 (indigo-600) on #ffffff ≈ 6.3 : 1 (text on brand: white ≈ 6.3 : 1)
+ * Disabled text (#94a3b8) is exempt from the AA text rule by WCAG.
+ */
+
+/* ── 1. Semantic tokens ──────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --dc-bg-primary: #ffffff;
+  --dc-bg-secondary: #f8fafc;   /* cards, panels */
+  --dc-bg-elevated: #ffffff;    /* popovers, sheets, dialogs */
+  --dc-bg-muted: #f1f5f9;       /* wells, inputs, skeletons */
+  --dc-backdrop-scrim: rgba(15, 23, 42, 0.45);
+
+  /* Typography */
+  --dc-ink: #0f172a;            /* primary text */
+  --dc-ink-muted: #475569;      /* secondary text */
+  --dc-ink-faint: #64748b;      /* tertiary / captions */
+  --dc-ink-disabled: #94a3b8;   /* disabled controls (exempt from AA) */
+
+  /* Borders & dividers */
+  --dc-line: #e2e8f0;
+  --dc-line-strong: #cbd5e1;
+
+  /* Shadows: soft ambient, never glows */
+  --dc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --dc-shadow-md: 0 4px 12px -4px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --dc-shadow-lg: 0 16px 36px -16px rgba(0, 0, 0, 0.12), 0 4px 10px -4px rgba(0, 0, 0, 0.06);
+
+  /* Brand / accent (kept; shades chosen for light grounds) */
+  --dc-brand: #4f46e5;          /* indigo-600: fills, rings */
+  --dc-brand-ink: #4338ca;      /* indigo-700: brand-coloured text */
+  --dc-brand-tint: rgba(79, 70, 229, 0.08);
+
+  /* Ink scale used across the app (defined in index.css :root as white-alpha). */
+  --dc-ink-1: #0f172a;          /* titles, prices — 17.9 : 1 on white */
+  --dc-ink-2: #334155;          /* body — 10.7 : 1 */
+  --dc-ink-3: #5b6679;          /* meta, captions — 6.0 : 1 */
+
+  /* Semantic accents, shaded for light grounds (text on white). */
+  --dc-accent-ink: #4338ca;     /* indigo-700 — 8.3 : 1 */
+  --dc-success-ink: #047857;    /* emerald-700 — 5.5 : 1 */
+  --dc-urgent-ink: #be123c;     /* rose-700 — 6.0 : 1 */
+  --dc-warn-ink: #b45309;       /* amber-700 — 5.0 : 1 */
+  --dc-success-soft: rgba(16, 185, 129, 0.12);
+  --dc-urgent-soft: rgba(244, 63, 94, 0.1);
+  --dc-warn-soft: rgba(245, 158, 11, 0.12);
+
+  /* Soft ambient elevation — neutral, low-alpha, no dark-mode glow. */
+  --dc-elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px -8px rgba(0, 0, 0, 0.08);
+  --dc-elev-2: 0 1px 3px rgba(0, 0, 0, 0.06), 0 10px 24px -16px rgba(0, 0, 0, 0.1);
+  --dc-elev-3: 0 2px 6px rgba(0, 0, 0, 0.06), 0 18px 36px -18px rgba(0, 0, 0, 0.12);
+  --dc-elev-accent: 0 8px 20px -12px rgba(79, 70, 229, 0.35);
+
+  /* Glass copy channel (glass.css): ink, alpha preserved. */
+  --dc-glass-ink-rgb: 15 23 42;
+
+  /* Remap Tailwind's white: the primary ink. See rule 2. */
+  --color-white: #0f172a;
+
+  /* Glass material: the frosted light lens used by headers and chrome */
+  --dc-chrome-glass: rgba(255, 255, 255, 0.72);
+  --dc-chrome-glass-blur: blur(18px) saturate(1.2);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+/* ── 2. Page base ─────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  background-color: var(--dc-bg-secondary);
+}
+html[data-theme="light"] body {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] ::selection {
+  background: rgba(79, 70, 229, 0.18);
+  color: var(--dc-ink);
+}
+
+/* The fixed Black Ice backdrop becomes a soft paper wash (same geometry). */
+html[data-theme="light"] .dc-clean-backdrop {
+  background-color: #f1f5f9;
+  background-image:
+    radial-gradient(70rem 48rem at 12% 0%, rgba(79, 70, 229, 0.08) 0%, transparent 65%),
+    radial-gradient(58rem 44rem at 104% 18%, rgba(124, 58, 237, 0.06) 0%, transparent 66%),
+    radial-gradient(70rem 48rem at 52% 112%, rgba(13, 148, 136, 0.07) 0%, transparent 66%),
+    linear-gradient(145deg, #ffffff 0%, #f5f7fb 53%, #eef2f7 100%);
+}
+html[data-theme="light"] .dc-clean-backdrop::before {
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(15, 23, 42, 0.035) 100%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.02) 0%, transparent 30%, rgba(15, 23, 42, 0.03) 100%);
+}
+
+/* ── 3. Surfaces that were hard-coded white-alpha or dark ─────────────────── */
+/* Solid white is a light surface on this theme (remap rule 2). */
+html[data-theme="light"] .bg-white {
+  background-color: #ffffff;
+}
+
+/* ── 4. White ink restored on saturated brand plates and solid black (rule 3) ─ */
+html[data-theme="light"] :is(
+  .bg-amber-500, .bg-amber-600, .bg-black, .bg-blue-500, .bg-blue-600, .bg-cyan-600,
+  .bg-emerald-500, .bg-emerald-600, .bg-fuchsia-600, .bg-indigo-500, .bg-indigo-600,
+  .bg-orange-500, .bg-pink-500, .bg-purple-500, .bg-red-500, .bg-red-600, .bg-rose-500,
+  .bg-rose-600, .bg-sky-500, .bg-teal-500, .bg-violet-500, .bg-violet-600, .from-amber-500,
+  .from-cyan-500, .from-emerald-500, .from-indigo-500, .from-indigo-600, .from-orange-500,
+  .from-rose-500, .from-violet-500, .from-violet-600, .to-blue-500, .to-blue-600, .to-cyan-500,
+  .to-cyan-600, .to-fuchsia-500, .to-fuchsia-600, .to-pink-500, .to-red-500, .via-violet-600
+) {
+  --color-white: #ffffff;
+}
+
+/* Dark slate/gray/neutral panels and arbitrary dark hex plates (the auth card,
+   header strips, dark cards) become light surfaces. Their copy has already been
+   remapped to ink above, so the pair stays legible. Saturated brand plates and
+   the bright #0b63ff blue are deliberately excluded. */
+html[data-theme="light"] :is(
+  [class*="bg-slate-950"], [class*="bg-slate-900"], [class*="bg-slate-800"],
+  [class*="bg-gray-950"], [class*="bg-gray-900"], [class*="bg-gray-800"],
+  [class*="bg-zinc-900"], [class*="bg-zinc-950"],
+  [class*="bg-neutral-900"], [class*="bg-neutral-800"],
+  [class*="bg-[#0"], [class*="bg-[#1"], [class*="bg-[#2"]
+):not([class*="bg-[#0b63ff]"]) {
+  background-color: rgba(255, 255, 255, 0.94);
+  background-image: none;
+}
+
+/* ── 5. Brand fills keep their identity; keep brand text readable ─────────── */
+html[data-theme="light"] .text-indigo-300,
+html[data-theme="light"] .text-indigo-200 {
+  color: var(--dc-brand-ink);
+}
+
+/* ── 6. Liquid Glass material on light (src/glass.css) ───────────────────────
+   The dark-first contrast plates are re-materialled as frosted white lenses.
+   Selectors carry `[data-glass="on"]` plus the theme attribute, so they out-rank
+   the `!important` navy plates in glass.css and still vanish with `?glass=off`. */
+html[data-theme="light"][data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(2),
+html[data-theme="light"][data-glass="on"] :where(.dc-scene-plate) > div[aria-hidden]:nth-of-type(2) {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.84) 55%, rgba(241, 245, 249, 0.88) 100%) !important;
+}
+
+html[data-theme="light"][data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(3),
+html[data-theme="light"][data-glass="on"] :where(.dc-scene-plate) > div[aria-hidden]:nth-of-type(3) {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, transparent 42%, transparent 64%, rgba(255, 255, 255, 0.2) 100%) !important;
+}
+
+html[data-theme="light"][data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4),
+html[data-theme="light"][data-glass="on"] :where(.dc-scene-plate) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.07),
+    0 0 0 1px rgba(15, 23, 42, 0.04) !important;
+}
+
+html[data-theme="light"][data-glass="on"] :where(.dc-glass-card),
+html[data-theme="light"][data-glass="on"] :where(.dc-scene-plate) {
+  box-shadow: var(--dc-shadow-md);
+}
+
+@media (hover: hover) {
+  html[data-theme="light"][data-glass="on"] :where(.dc-glass-card):hover,
+  html[data-theme="light"][data-glass="on"] :where(.dc-scene-plate:not(.dc-scene-plate--bar)):hover {
+    box-shadow: var(--dc-shadow-lg);
+  }
+}
+
+/* Bars (app header, rail, store filter strip) become frosted white chrome. */
+html[data-theme="light"][data-glass="on"] body .dc-scene-plate--bar {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.86) 100%) !important;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.06), var(--dc-shadow-sm) !important;
+}
+
+/* Non-glass fallbacks for the same plates and the dark rail. */
+html[data-theme="light"] .dc-scene-plate--bar {
+  background-color: rgba(255, 255, 255, 0.92);
+}
+html[data-theme="light"] .dc-glass-card {
+  background-color: var(--dc-bg-secondary);
+  border-color: var(--dc-line);
+}
+
+/* ── 7. Account pages (Profile, Purchases, Usage) — src/profile/profile-minimal.css
+   Those sheets hard-code dark copy colours. Light mode re-points their tokens and
+   the handful of text roles. Dark keeps its original values. */
+html[data-theme="light"] [data-profile-page],
+html[data-theme="light"] [data-account-profile],
+html[data-theme="light"] [data-purchases-page],
+html[data-theme="light"] [data-usage-limits-page] {
+  --account-border: #e2e8f0;
+  --account-muted: #475569;
+  --account-accent: #4338ca;
+  color: var(--dc-ink);
+  background: transparent;
+}
+html[data-theme="light"] .dc-account-header h1,
+html[data-theme="light"] .dc-account-layout h2,
+html[data-theme="light"] .dc-account-plan-name,
+html[data-theme="light"] .dc-account-facts dd,
+html[data-theme="light"] .dc-account-link-list button > span,
+html[data-theme="light"] .dc-account-referral code,
+html[data-theme="light"] .dc-account-disclosure summary,
+html[data-theme="light"] .dc-account-email,
+html[data-theme="light"] .dc-account-bio,
+html[data-theme="light"] .dc-account-notice {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-account-avatar {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+html[data-theme="light"] .dc-account-error { color: #9f1239; }
+html[data-theme="light"] .dc-account-logout { color: #be123c; }
+html[data-theme="light"] .dc-account-status.is-active { color: #047857; }
+html[data-theme="light"] .dc-account-status.is-expired { color: #b45309; }
+html[data-theme="light"] .dc-account-modal {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: var(--dc-shadow-lg);
+}
+html[data-theme="light"] .dc-account-preference-row { border-bottom-color: #e2e8f0; }
+html[data-theme="light"] .dc-account-primary {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: var(--dc-shadow-md);
+}
+html[data-theme="light"] .dc-account-primary:hover { background: #1e293b; }
+html[data-theme="light"] .dc-account-primary .uzp-pay__text { color: #ffffff; }
+
+/* ── 8. Form controls ─────────────────────────────────────────────────────── */
+html[data-theme="light"] :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :is(input, textarea)::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+html[data-theme="light"] :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+  background-color: #ffffff;
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] :is(input, textarea, select):focus-visible {
+  outline-color: #4f46e5;
+}
