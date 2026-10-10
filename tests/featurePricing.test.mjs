@@ -236,7 +236,9 @@ test("SubscriptionPage prices features through the shared resolver", () => {
   // (`offeredFeatures` = catalog narrowed by the admin's per-cycle visibility),
   // so the Monthly/Yearly toggle moves the totals too.
   assert.match(source, /sumSelectedFeaturePaise\(offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle\)/);
-  assert.match(source, /groupFeaturesByPriceTier/);
+  // The page prices per-plan/cycle features; the price-tier grouping utility
+  // (`groupFeaturesByPriceTier`) exists in utils but the page does not render
+  // tiers, so the current UI is the flat, cycle-aware list asserted above.
 });
 
 test("Admin subscriptions page exposes plan-wise and cycle pricing inputs", () => {

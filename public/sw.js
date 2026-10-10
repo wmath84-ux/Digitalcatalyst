@@ -149,38 +149,6 @@ const resolveNotificationIcon = (payloadIcon) => {
   return branding.logoUrl || '/api/brand-icon?size=192';
 };
 
-// Contextual large icon for Android right side — left small icon always app badge, right shows what notification is about
-const getContextualIcon = (tag, category, targetType, section) => {
-  const t = String(tag || "").toLowerCase();
-  const c = String(category || "").toLowerCase();
-  const tt = String(targetType || "").toLowerCase();
-  const s = String(section || "").toLowerCase();
-  if (s.includes("reminder")) return "/notif-icons/reminder.png";
-  if (s.includes("schedule")) return "/notif-icons/schedule.png";
-  if (s.includes("task")) return "/notif-icons/task.png";
-  if (t.includes("reminder") || c.includes("reminder")) return "/notif-icons/reminder.png";
-  if (t.includes("task") || c.includes("task") || tt.includes("task")) return "/notif-icons/task.png";
-  if (t.includes("schedule") || c.includes("schedule") || tt.includes("schedule")) return "/notif-icons/schedule.png";
-  if (t.includes("course") || c === "course" || tt === "course" || t.includes("lecture") || t.includes("revision") || t.includes("exam")) return "/notif-icons/course.png";
-  if (t.includes("store") || c === "store" || tt === "product") return "/notif-icons/store.png";
-  if (t.includes("unlock") || c === "unlock") return "/notif-icons/unlock.png";
-  if (t.includes("community") || c === "community") return "/notif-icons/community.png";
-  if (t.includes("announcement") || c === "announcement" || c === "reading") return "/notif-icons/announcement.png";
-  if (t.includes("subscription") || c === "subscription") return "/notif-icons/subscription.png";
-  if (t.includes("mayday") || c === "mayday") {
-    if (t.includes("schedule")) return "/notif-icons/schedule.png";
-    if (t.includes("reminder")) return "/notif-icons/reminder.png";
-    return "/notif-icons/task.png";
-  }
-  if (t.includes("flowpath")) {
-    if (t.includes("reminder")) return "/notif-icons/reminder.png";
-    if (t.includes("schedule")) return "/notif-icons/schedule.png";
-    if (t.includes("task")) return "/notif-icons/task.png";
-    return "/notif-icons/course.png";
-  }
-  return "";
-};
-
 self.addEventListener('push', event => {
   let data;
   try {
@@ -193,12 +161,9 @@ self.addEventListener('push', event => {
   const body = data.body || '';
   const tag = data.tag || data.notificationId || 'eduvora-push';
   const category = data.category || '';
-  const targetType = (data.target && data.target.type) || data.targetType || '';
-  const section = (data.target && data.target.section) || data.section || '';
-  // Left small icon always app badge, right large icon contextual per notification type
-  // Previously both sides showed same website logo — now right shows what notification is about
-  const contextualIcon = getContextualIcon(tag, category, targetType, section);
-  const icon = contextualIcon || resolveNotificationIcon(data.icon);
+  // Push alerts use the admin branding logo as their icon; the shipped default
+  // icons are only a fallback when no branding logo is available.
+  const icon = resolveNotificationIcon(data.icon);
   const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;
