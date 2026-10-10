@@ -69,6 +69,9 @@ const toCourseFile = (resource: MyCourseResource): CourseFile => ({
   // `interactive` files carry their source in the course document itself; the
   // player renders it in a sandboxed iframe (src/utils/experimentSpec.ts).
   interactiveHtml: resource.type === "interactive" ? resource.interactiveHtml || "" : undefined,
+  // A learner's mind map carries its JSON, drawn by the same read-only view as
+  // an admin master map (src/course/MindMapPanel.tsx via utils/courseMindMaps.js).
+  mindMapData: resource.type === "mind_map" ? resource.mindMapData : undefined,
   provider: resource.type === "interactive" ? "dc_experiment" : resource.source === "upload" ? "upload" : "link",
   accessLevel: "included",
   // No `source: "personal"` on purpose — this is not an official course's

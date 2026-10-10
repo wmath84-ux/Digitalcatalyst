@@ -21,7 +21,8 @@
 // Create that saves the experiment to the library immediately.
 
 import { useEffect, useState } from "react";
-import { FlaskConical, Hammer, LockKeyhole, Plus, Sparkles } from "lucide-react";
+import { FlaskConical, Hammer, LockKeyhole, Network, Plus, Sparkles } from "lucide-react";
+import SelfMindMapComposer from "./SelfMindMapComposer";
 import MasterSelfControl from "./MasterSelfControl";
 import ExperimentComposer from "./ExperimentComposer";
 import { useMasterSelfPreference } from "./playerPreferences";
@@ -38,6 +39,8 @@ export interface PlayerExperiment {
   file: CourseFile;
   /** A paid/unauthorised module's experiment — listed, not openable. */
   locked?: boolean;
+  /** What the item is: a 2D experiment (default) or a mind map (drawn in the lower pane). */
+  kind?: "experiment" | "mind_map";
 }
 
 export interface ExperimentPanelProps {
@@ -53,6 +56,11 @@ export interface ExperimentPanelProps {
    * and SELF stays read-only.
    */
   onCreateSelfExperiment?: (input: { name: string; html: string; url?: string }) => Promise<{ ok: boolean; message?: string }>;
+  /**
+   * Saves a mind map the learner pasted in (the “+” menu in SELF mode). Resolves
+   * `ok` only once the library write has committed. Omitted → no menu entry.
+   */
+  onCreateSelfMindMap?: (input: { name: string; mindMapData: Record<string, unknown> }) => Promise<{ ok: boolean; message?: string }>;
   /** Seeds the composer's name field (module being watched, else the course). */
   selfExperimentSeed?: { name?: string };
   uid?: string | null;
@@ -84,7 +92,7 @@ function ExperimentCard({
         className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
         style={{ background: "rgba(255,107,245,0.16)", color: "#FF6BF5" }}
       >
-        <FlaskConical size={18} />
+        {experiment.kind === "mind_map" ? <Network size={18} /> : <FlaskConical size={18} />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
@@ -92,7 +100,7 @@ function ExperimentCard({
           {experiment.locked ? <LockKeyhole size={13} className="shrink-0 text-amber-300" /> : null}
         </span>
         <span className="mt-0.5 block truncate text-[11px] font-semibold text-[var(--dc-flat-ink-sub)]">
-          {experiment.moduleTitle || "Live Experiment"} · 2D experiment
+          {experiment.moduleTitle || "Live Experiment"} · {experiment.kind === "mind_map" ? "Mind map" : "2D experiment"}
         </span>
       </span>
       <span
@@ -115,6 +123,7 @@ export default function ExperimentPanel({
   masterExperiments,
   onOpen,
   onCreateSelfExperiment,
+  onCreateSelfMindMap,
   selfExperimentSeed,
   uid,
 }: ExperimentPanelProps) {
@@ -123,6 +132,7 @@ export default function ExperimentPanel({
   const [composerOpen, setComposerOpen] = useState(false);
   /** A starter template's HTML, when the learner picked one in the menu. */
   const [seedHtml, setSeedHtml] = useState("");
+  const [mindMapOpen, setMindMapOpen] = useState(false);
 
   // The “+” belongs to SELF mode: switching back to MASTER closes the menu and
   // the composer, so a half-made experiment never floats over a list it cannot
@@ -131,6 +141,7 @@ export default function ExperimentPanel({
     if (masterSelfCtl.mode !== "self") {
       setMenuOpen(false);
       setComposerOpen(false);
+      setMindMapOpen(false);
       setSeedHtml("");
     }
   }, [masterSelfCtl.mode]);
@@ -162,7 +173,7 @@ export default function ExperimentPanel({
               always here. Made experiments are the learner's OWN, so tapping
               it from MASTER first opens the SELF filter — the list behind the
               dropdown is then exactly where the new experiment will land. */}
-          {onCreateSelfExperiment ? (
+          {onCreateSelfExperiment || onCreateSelfMindMap ? (
             <button
               type="button"
               onClick={() => {
@@ -218,6 +229,26 @@ export default function ExperimentPanel({
                 </span>
               </span>
             </button>
+            {onCreateSelfMindMap ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMindMapOpen(true);
+                }}
+                data-experiment-self-menu-item="mind-map"
+                className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-white/[0.07]"
+              >
+                <Network size={14} className="mt-0.5 shrink-0 text-cyan-300" />
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-black text-white">Mind map</span>
+                  <span className="block text-[10px] font-semibold leading-4 text-slate-400">
+                    Paste the JSON your AI wrote from the copied prompt. It is checked before it is saved.
+                  </span>
+                </span>
+              </button>
+            ) : null}
             <p className="px-2 pb-1 pt-2 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
               Or start from a template
             </p>
@@ -286,6 +317,14 @@ export default function ExperimentPanel({
           ))
         )}
       </div>
+
+      {mindMapOpen && onCreateSelfMindMap ? (
+        <SelfMindMapComposer
+          defaultName={selfExperimentSeed?.name || "My mind map"}
+          onClose={() => setMindMapOpen(false)}
+          onCreate={onCreateSelfMindMap}
+        />
+      ) : null}
 
       {composerOpen && onCreateSelfExperiment ? (
         <ExperimentComposer

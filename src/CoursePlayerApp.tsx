@@ -17,6 +17,7 @@ import {
 import {
   SELF_EXPERIMENTS_COURSE_ID,
   placeSelfExperiment,
+  placeSelfMindMap,
   selfExperimentCourseFile,
   selfExperimentsFromCourses,
 } from "./utils/selfExperiments";
@@ -704,6 +705,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         title: experiment.title,
         moduleTitle: experiment.moduleTitle,
         file: selfExperimentCourseFile(experiment),
+        kind: experiment.kind,
       })),
     [myLibrary.courses, storageProductId],
   );
@@ -725,6 +727,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           (module.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(module.paidUpdateId || module.id)));
         for (const file of module.files || []) {
           if (file.accessLevel === "hidden") continue;
+          // A MASTER mind map is listed beside the experiments with the same lock
+          // rule. It opens in the LOWER pane (the Mind Map tab), never upstairs.
+          if (isMasterMindMapFile(file)) {
+            if (!file.mindMapData) continue;
+            items.push({
+              id: String(file.id),
+              title: String(file.name || "Mind map"),
+              moduleTitle: String(module.title || ""),
+              locked:
+                moduleLocked ||
+                (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(file.paidUpdateId || file.id))),
+              file,
+              kind: "mind_map",
+            });
+            continue;
+          }
           if (!isExperimentFileType(file.type)) continue;
           if (!experimentHasSource(file.interactiveHtml, file.url)) continue;
           items.push({
@@ -735,6 +753,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               moduleLocked ||
               (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(String(file.paidUpdateId || file.id))),
             file,
+            kind: "experiment",
           });
         }
         visit(module.modules || []);
@@ -1213,6 +1232,53 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       trackFeatureEvent("experiment_created", { surface: "course_player" });
       toast({
         title: "Experiment created",
+        description: `“${name}” is saved to My Study Library.`,
+        variant: "success",
+      });
+      return { ok: true };
+    },
+    [user?.id, myLibrary, storageProductId, product.title, activeBrainModuleId, moduleTitleById],
+  );
+
+  /**
+   * A learner's own mind map from the Experiment page's “+”. Same shelf course,
+   * same player scope, same save path as an experiment. Resolves `ok` only after
+   * the library write has committed, so the success toast is never early.
+   */
+  const createSelfMindMap = useCallback(
+    async ({
+      name,
+      mindMapData,
+    }: {
+      name: string;
+      mindMapData: Record<string, unknown>;
+    }): Promise<{ ok: boolean; message?: string }> => {
+      if (!user?.id) return { ok: false, message: "Please sign in to save mind maps." };
+      const coursesNow = myLibrary.state === "loading"
+        ? await fetchMyCourses(user.id).catch(() => myLibrary.courses)
+        : myLibrary.courses;
+      const existing = coursesNow.find((entry) => entry.id === SELF_EXPERIMENTS_COURSE_ID) || null;
+      const placed = placeSelfMindMap(
+        {
+          course: existing,
+          uid: user.id,
+          productId: storageProductId,
+          courseTitle: product.title,
+          moduleTitle: activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "",
+          name,
+          mindMapData,
+        },
+        {
+          createCourse: (ownerUid, courseTitle) => createMyCourse(ownerUid, courseTitle),
+          createModule: (moduleTitle) => createMyModule(moduleTitle),
+          createResource: (type) => createMyResource(type),
+        },
+      );
+      if (!placed.course) return { ok: false, message: placed.issues[0] || "Could not build the mind map." };
+      const result = await myLibrary.save(placed.course);
+      if (!result.ok) return { ok: false, message: result.message };
+      toast({
+        title: "Mind map saved",
         description: `“${name}” is saved to My Study Library.`,
         variant: "success",
       });
@@ -2005,8 +2071,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     splitDeckRef.current?.activateStudy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [masterMindMaps]);
+  /** A learner's own map opened from the Experiment page (SELF). Lower pane only. */
+  const openSelfMindMap = useCallback((id: string) => {
+    setMasterMapKey(`self-${id}`);
+    setDockTab("mindmap");
+    splitDeckRef.current?.activateStudy();
+  }, []);
   const masterMapView = useMemo(() => {
     if (!masterMapKey) return null;
+    if (masterMapKey.startsWith("self-")) {
+      const item = selfExperimentItems.find((entry) => `self-${entry.id}` === masterMapKey && entry.file?.type === "mind_map");
+      if (!item?.file) return null;
+      const view = masterMindMapView(item.file);
+      return {
+        key: masterMapKey,
+        title: item.title,
+        mind: view?.mind ?? null,
+        error: view?.error ?? null,
+      };
+    }
     const entry = masterMindMaps.find((item) => item.mapKey === masterMapKey && isMasterMindMapFile(item.file));
     if (!entry?.file) return null;
     const view = masterMindMapView(entry.file);
@@ -2016,7 +2099,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       mind: view?.mind ?? null,
       error: view?.error ?? null,
     };
-  }, [masterMapKey, masterMindMaps]);
+  }, [masterMapKey, masterMindMaps, selfExperimentItems]);
 
   // The structured library is the Modules tab for every course: it groups the
   // real module tree (with notes, mind maps and lessons in each module), and
@@ -2246,10 +2329,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           masterExperiments={masterExperimentItems}
           selfExperiments={selfExperimentItems}
           onCreateSelfExperiment={createSelfExperiment}
+          onCreateSelfMindMap={createSelfMindMap}
           selfExperimentSeed={{
             name: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
           }}
           onOpen={(experiment, source) => {
+            // A mind map never opens in the upper lesson pane: it is drawn in the
+            // lower Mind Map tab, from the same master/self routes the library uses.
+            if (experiment.kind === "mind_map") {
+              if (source === "self") openSelfMindMap(experiment.id);
+              else handleOpenMasterMap(`master-${experiment.id}`);
+              return;
+            }
             if (source === "self") selectPersonalFile(experiment.file);
             else selectFile(experiment.file);
           }}

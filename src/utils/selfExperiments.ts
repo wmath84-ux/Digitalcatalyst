@@ -40,6 +40,7 @@ import {
   experimentByteLength,
   experimentHasSource,
 } from "./experimentSpec.ts";
+import { formatMindMapIssue, validateMindMapObject } from "../../utils/mindMapImport.js";
 import type { CourseFile } from "../types/course";
 import type { MyCourse, MyCourseModule, MyCourseResource, MyCourseResourceType } from "../types/myCourse";
 
@@ -51,15 +52,24 @@ export const SELF_EXPERIMENTS_COURSE_TITLE = "My experiments";
 export const SELF_EXPERIMENTS_COURSE_DESCRIPTION =
   "Interactive 2D experiments you created from the Course Player's Experiment page. Open one here to edit its code or preview it.";
 
-/** One experiment the player can list and open. */
+/**
+ * One item the Experiment page lists and opens: a learner's own 2D experiment
+ * (`kind: "experiment"`) or their own mind map (`kind: "mind_map"`, with the
+ * validated map JSON in `mindMapData`). Both share the same scope tag and the
+ * same “My experiments” shelf course.
+ */
 export interface SelfExperiment {
   id: string;
+  kind: SelfExperimentKind;
   moduleId: string;
   moduleTitle: string;
   title: string;
   html: string;
   url: string;
+  mindMapData?: Record<string, unknown>;
 }
+
+export type SelfExperimentKind = "experiment" | "mind_map";
 
 export interface SelfExperimentFactories {
   createCourse: (uid: string, title: string) => MyCourse;
@@ -80,6 +90,8 @@ export interface SelfExperimentPlacementInput {
   name?: string;
   html?: string;
   url?: string;
+  /** A learner mind map's JSON (`placeSelfMindMap` only). */
+  mindMapData?: Record<string, unknown>;
 }
 
 export interface SelfExperimentPlacement {
@@ -111,19 +123,49 @@ export const selfExperimentIssues = (html?: string | null, url?: string | null):
 export const selfExperimentReady = (html?: string | null, url?: string | null): boolean =>
   selfExperimentIssues(html, url).length === 0;
 
+/**
+ * Every reason a learner's mind map cannot be saved yet, named by path (the same
+ * wording the admin editor and the Mind Map JSON import use). Empty when it fits.
+ */
+export const selfMindMapIssues = (data: unknown): string[] => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return ["paste the mind map JSON first"];
+  const check = validateMindMapObject(data);
+  return check.valid ? [] : check.errors.map((issue) => formatMindMapIssue(issue));
+};
+
 const visitModules = (modules: MyCourseModule[] | null | undefined, scope: string, out: SelfExperiment[]) => {
   for (const module of Array.isArray(modules) ? modules : []) {
     if (!module) continue;
     for (const resource of Array.isArray(module.resources) ? module.resources : []) {
-      if (!resource || resource.type !== "interactive") continue;
+      if (!resource) continue;
       if (toText(resource.experimentSourceProductId) !== scope) continue;
+      const base = {
+        id: String(resource.id || ""),
+        moduleId: String(module.id || ""),
+        moduleTitle: toText(module.title) || SELF_EXPERIMENTS_COURSE_TITLE,
+      };
+      if (resource.type === "mind_map") {
+        // A map is listed only when its stored JSON still validates: an entry
+        // the page cannot draw would only ever show an error.
+        const data = resource.mindMapData;
+        if (!data || selfMindMapIssues(data).length) continue;
+        out.push({
+          ...base,
+          kind: "mind_map",
+          title: toText(resource.name) || "Mind map",
+          html: "",
+          url: "",
+          mindMapData: data as Record<string, unknown>,
+        });
+        continue;
+      }
+      if (resource.type !== "interactive") continue;
       const html = String(resource.interactiveHtml || "");
       const url = String(resource.url || "");
       if (!experimentHasSource(html, url)) continue;
       out.push({
-        id: String(resource.id || ""),
-        moduleId: String(module.id || ""),
-        moduleTitle: toText(module.title) || SELF_EXPERIMENTS_COURSE_TITLE,
+        ...base,
+        kind: "experiment",
         title: toText(resource.name) || "Experiment",
         html,
         url,
@@ -152,6 +194,56 @@ export const selfExperimentsFromCourses = (
 };
 
 /**
+ * Shared placement: find or create the “My experiments” course, the module for
+ * this source, and append ONE resource carrying the scope tag. Returns the course
+ * document to save (`myLibrary.save`) — or the reasons it cannot be placed.
+ */
+const placeInSelfCourse = (
+  source: SelfExperimentPlacementInput,
+  factories: SelfExperimentFactories,
+  resource: MyCourseResource,
+): SelfExperimentPlacement => {
+  const uid = toText(source.uid);
+  const courseTitle = toText(source.courseTitle);
+  const moduleTitle = toText(source.moduleTitle) || courseTitle || SELF_EXPERIMENTS_COURSE_TITLE;
+  const scope = toText(source.productId);
+  const now = Date.now();
+
+  let working: MyCourse;
+  if (source.course && String(source.course.id) === SELF_EXPERIMENTS_COURSE_ID) {
+    working = cloneCourse(source.course);
+  } else {
+    if (!uid) return { course: null, resource: null, issues: ["sign in to save experiments"] };
+    working = factories.createCourse(uid, SELF_EXPERIMENTS_COURSE_TITLE);
+    // Pin the fixed id: createCourse would otherwise hand out a generated one,
+    // and the lookup above (and in placeSelfExperiment) would never find it again.
+    working.id = SELF_EXPERIMENTS_COURSE_ID;
+    working.description = SELF_EXPERIMENTS_COURSE_DESCRIPTION;
+    working.modules = [];
+  }
+  if (!Array.isArray(working.modules)) working.modules = [];
+
+  const wanted = moduleTitle.toLowerCase();
+  let module = working.modules.find((entry) => toText(entry && entry.title).toLowerCase() === wanted);
+  if (!module) {
+    module = factories.createModule(moduleTitle);
+    module.resources = [];
+    working.modules = [...working.modules, module];
+  }
+  if (!Array.isArray(module.resources)) module.resources = [];
+
+  const placed: MyCourseResource = {
+    ...resource,
+    experimentSourceProductId: scope,
+  };
+  module.resources = [...module.resources, placed];
+  module.updatedAt = now;
+  working.updatedAt = now;
+
+  return { course: working, resource: placed, issues: [] };
+};
+
+/**
  * Put a finished experiment into the library: the “My experiments” course
  * (created on first use through `factories.createCourse`), one root module per
  * source — the module the learner was watching, else the course title — and
@@ -166,75 +258,82 @@ export const placeSelfExperiment = (
   factories: SelfExperimentFactories | null | undefined,
 ): SelfExperimentPlacement => {
   const source = input ?? {};
-  const createCourse = factories && typeof factories.createCourse === "function" ? factories.createCourse : null;
-  const createModule = factories && typeof factories.createModule === "function" ? factories.createModule : null;
-  const createResource = factories && typeof factories.createResource === "function" ? factories.createResource : null;
-  if (!createCourse || !createModule || !createResource) {
+  if (!isFactories(factories)) {
     return { course: null, resource: null, issues: ["this build cannot save experiments"] };
   }
-
   const html = String(source.html ?? "");
   const url = toText(source.url);
   const issues = selfExperimentIssues(html, url);
   if (issues.length) return { course: null, resource: null, issues };
 
-  const uid = toText(source.uid);
-  const courseTitle = toText(source.courseTitle);
   const name = toText(source.name) || "Experiment";
-  const moduleTitle = toText(source.moduleTitle) || courseTitle || SELF_EXPERIMENTS_COURSE_TITLE;
-  const scope = toText(source.productId);
-  const now = Date.now();
-
-  let working: MyCourse;
-  if (source.course && String(source.course.id) === SELF_EXPERIMENTS_COURSE_ID) {
-    working = cloneCourse(source.course);
-  } else {
-    if (!uid) return { course: null, resource: null, issues: ["sign in to save experiments"] };
-    working = createCourse(uid, SELF_EXPERIMENTS_COURSE_TITLE);
-    // Pin the fixed id: createCourse would otherwise hand out a generated one,
-    // and the lookup above (and in placeSelfExperiment) would never find it again.
-    working.id = SELF_EXPERIMENTS_COURSE_ID;
-    working.description = SELF_EXPERIMENTS_COURSE_DESCRIPTION;
-    working.modules = [];
-  }
-  if (!Array.isArray(working.modules)) working.modules = [];
-
-  const wanted = moduleTitle.toLowerCase();
-  let module = working.modules.find((entry) => toText(entry && entry.title).toLowerCase() === wanted);
-  if (!module) {
-    module = createModule(moduleTitle);
-    module.resources = [];
-    working.modules = [...working.modules, module];
-  }
-  if (!Array.isArray(module.resources)) module.resources = [];
-
-  const resource: MyCourseResource = {
-    ...createResource("interactive"),
+  const courseTitle = toText(source.courseTitle);
+  return placeInSelfCourse(source, factories, {
+    ...factories.createResource("interactive"),
     name,
     description: courseTitle ? `Created from Live Experiment · ${courseTitle}` : "Created from Live Experiment",
     interactiveHtml: html,
     url,
     size: experimentByteLength(html),
-    experimentSourceProductId: scope,
-  };
-  module.resources = [...module.resources, resource];
-  module.updatedAt = now;
-  working.updatedAt = now;
-
-  return { course: working, resource, issues: [] };
+  });
 };
+
+/**
+ * Put a learner's mind map into the library, in the same “My experiments” course
+ * and under the same player scope as the experiments, so it is listed in SELF
+ * for this course only and on every device. Refuses invalid JSON with the
+ * validator's path-level reasons.
+ */
+export const placeSelfMindMap = (
+  input: SelfExperimentPlacementInput | null | undefined,
+  factories: SelfExperimentFactories | null | undefined,
+): SelfExperimentPlacement => {
+  const source = input ?? {};
+  if (!isFactories(factories)) {
+    return { course: null, resource: null, issues: ["this build cannot save mind maps"] };
+  }
+  const issues = selfMindMapIssues(source.mindMapData);
+  if (issues.length) return { course: null, resource: null, issues };
+
+  const name = toText(source.name) || "Mind map";
+  const courseTitle = toText(source.courseTitle);
+  return placeInSelfCourse(source, factories, {
+    ...factories.createResource("mind_map"),
+    name,
+    description: courseTitle ? `Created from Live Experiment · ${courseTitle}` : "Created from Live Experiment",
+    mindMapData: source.mindMapData,
+    url: "",
+  });
+};
+
+const isFactories = (factories: SelfExperimentFactories | null | undefined): factories is SelfExperimentFactories =>
+  Boolean(
+    factories &&
+      typeof factories.createCourse === "function" &&
+      typeof factories.createModule === "function" &&
+      typeof factories.createResource === "function",
+  );
 
 /**
  * The stored experiment, as the Course Player's viewer stack wants it. Mirrors
  * the interactive branch of `myCourseAdapter.toCourseFile` — the player opens
  * it in the SAME sandboxed stage as an official experiment.
  */
-export const selfExperimentCourseFile = (experiment: SelfExperiment): CourseFile => ({
-  id: experiment.id,
-  name: experiment.title || "Experiment",
-  type: "interactive",
-  interactiveHtml: experiment.html,
-  url: experiment.url || undefined,
-  provider: "dc_experiment",
-  accessLevel: "included",
-});
+export const selfExperimentCourseFile = (experiment: SelfExperiment): CourseFile =>
+  experiment.kind === "mind_map"
+    ? {
+        id: experiment.id,
+        name: experiment.title || "Mind map",
+        type: "mind_map",
+        mindMapData: experiment.mindMapData,
+        accessLevel: "included",
+      }
+    : {
+        id: experiment.id,
+        name: experiment.title || "Experiment",
+        type: "interactive",
+        interactiveHtml: experiment.html,
+        url: experiment.url || undefined,
+        provider: "dc_experiment",
+        accessLevel: "included",
+      };
