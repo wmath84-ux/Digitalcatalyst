@@ -245,6 +245,21 @@ export function parseQuestionTextDetailed(text: string): ParseDetailedResult {
   return { questions, problems };
 }
 
+/**
+ * Blank the bare code-fence lines (```` ``` ```` or ```` ```text ````) that AI
+ * chat tools wrap a reply in. They are not part of the question format, and
+ * left in place they would be read as explanation text of the last question.
+ * Each fence becomes an empty line rather than being removed, so “Line N”
+ * numbers in parser problems still point at the text the user pasted.
+ */
+export function stripCodeFenceLines(text: string): string {
+  return String(text ?? "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => (/^\s*```[\w-]*\s*$/.test(line) ? "" : line))
+    .join("\n");
+}
+
 export function parseQuestionText(text: string): ParsedQuestion[] {
   return parseQuestionTextDetailed(text).questions;
 }
