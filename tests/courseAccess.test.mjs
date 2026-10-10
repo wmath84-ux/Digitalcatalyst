@@ -232,14 +232,16 @@ test("paid update: open the update, require base when configured", () => {
   let r = resolveCourseAccess({ product, now: NOW });
   assert.equal(r.accessibleModuleIds.has("m-1"), false);
   assert.equal(r.accessibleModuleIds.has("m-2"), false);
-  // Base owned (no requireBaseCourseForUpdate flag set → default
-  // true). The update is accessible.
+  // The base prerequisite is NOT an automatic purchase of paid updates.
   r = resolveCourseAccess({ product, ownedProductIds: ["p-1"], now: NOW });
-  assert.equal(r.accessibleModuleIds.has("m-1"), true);
-  assert.equal(r.accessibleModuleIds.has("m-2"), true);
-  assert.equal(r.moduleAccessSources["m-1"], "full_product");
-  // Update owned outright (no base).
+  assert.equal(r.accessibleModuleIds.has("m-1"), false);
+  assert.equal(r.accessibleModuleIds.has("m-2"), false);
+  assert.equal(r.moduleAccessSources["m-1"], "locked");
+  // A bought update still waits for its required base.
   r = resolveCourseAccess({ product, ownedUpdateIds: ["u-1"], now: NOW });
+  assert.equal(r.accessibleModuleIds.has("m-1"), false);
+  // Both genuine grants open the purchased update.
+  r = resolveCourseAccess({ product, ownedProductIds: ["p-1"], ownedUpdateIds: ["u-1"], now: NOW });
   assert.equal(r.accessibleModuleIds.has("m-1"), true);
   assert.equal(r.accessibleModuleIds.has("m-2"), true);
   assert.equal(r.moduleAccessSources["m-1"], "paid_update");
@@ -277,15 +279,13 @@ test("active subscription opens subscription-granted modules + product", () => {
     subscriptionModuleIds: ["m-1"],
     now: NOW,
   });
-  // The subscription grants full product access, so every
-  // module in the bundle is "full_product" (not "subscription").
-  // The subscription-granted set is still surfaced separately
-  // for the UI to render the "active subscription" badge.
+  // Bundle access through a plan is subscription access, not a permanent
+  // purchase. The UI must retain that source for truthful owned labels.
   assert.equal(r.hasFullProductAccess, true);
   assert.equal(r.accessibleModuleIds.has("m-1"), true);
   assert.equal(r.accessibleModuleIds.has("m-2"), true);
-  assert.equal(r.moduleAccessSources["m-1"], "full_product");
-  assert.equal(r.moduleAccessSources["m-2"], "full_product");
+  assert.equal(r.moduleAccessSources["m-1"], "subscription");
+  assert.equal(r.moduleAccessSources["m-2"], "subscription");
   assert.ok(r.subscriptionGrantedModuleIds.has("m-1"));
 });
 

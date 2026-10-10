@@ -40,11 +40,17 @@ test("PaymentGateway sends only quoteId to /api/razorpay/create-order", () => {
   // The body must contain only `{ quoteId }` — no productId,
   // productIds, or updateSelection. The component destructures
   // `quoteId` and passes it directly.
-  assert.match(paymentGateway, /apiRequest<CreateOrderResponse>\(\s*"\/api\/razorpay\/create-order"\s*,\s*\{\s*quoteId\s*\}\s*\)/);
+  assert.match(
+    paymentGateway,
+    /apiRequest<CreateOrderResponse>\(\s*"\/api\/razorpay\/create-order"\s*,\s*\{\s*quoteId\s*,?\s*\}\s*\)/
+  );
 });
 
 test("PaymentGateway sends the quoteId on the verify call too", () => {
-  assert.match(paymentGateway, /apiRequest<VerifyPaymentResponse>\(\s*"\/api\/razorpay\/verify-payment"\s*,\s*\{[\s\S]*?quoteId[\s\S]*?\}\s*\)/);
+  assert.match(
+    paymentGateway,
+    /apiRequest<VerifyPaymentResponse>\(\s*"\/api\/razorpay\/verify-payment"\s*,\s*\{[\s\S]*?quoteId[\s\S]*?\}\s*\)/
+  );
 });
 
 test("PaymentGateway surfaces grantedEntitlementIds from the verify response", () => {
@@ -89,12 +95,16 @@ test("CheckoutApp derives the quoteId from the canonical CheckoutContext", () =>
 
 test("CheckoutSuccessStep renders a real orderId from the verify-payment response", () => {
   assert.match(checkoutSuccess, /orderId\?:\s*string\s*\|\s*null/);
-  assert.match(checkoutSuccess, /<ReceiptRow\s+label="Order ID"\s+value=\{orderId \|\| quote\.quoteId\}/);
+  assert.match(
+    checkoutSuccess,
+    /<ReceiptRow\s+label="Order ID"\s+value=\{orderId \|\| quote\.quoteId\}/
+  );
 });
 
 test("CheckoutSuccessStep renders a real paymentId from the verify-payment response", () => {
   assert.match(checkoutSuccess, /paymentId\?:\s*string\s*\|\s*null/);
-  assert.match(checkoutSuccess, /<ReceiptRow\s+label="Payment ID"\s+value=\{paymentId \|\| "—"\}/);
+  assert.match(checkoutSuccess, /label="Payment ID"[\s\S]*?paymentId \|\|/);
+  assert.match(checkoutSuccess, /No payment required/);
 });
 
 test("CheckoutSuccessStep renders the granted entitlement ids with a data attribute", () => {
@@ -110,8 +120,8 @@ test("CheckoutSuccessStep renders the cash-paid total", () => {
 
 test("CheckoutSuccessStep renders the purchase kind", () => {
   assert.match(checkoutSuccess, /purchaseKind\?:\s*PurchaseKind/);
-  assert.match(checkoutSuccess, /<ReceiptRow\s+label="Purchase kind"/);
-  assert.match(checkoutSuccess, /PURCHASE_KIND_LABEL/);
+  assert.match(checkoutSuccess, /<ReceiptRow\s+label="Purchase"/);
+  assert.match(checkoutSuccess, /PURCHASE_TYPE_LABEL\[kind\]/);
 });
 
 test("CheckoutSuccessStep still renders itemised line items via CheckoutLineItemCard", () => {

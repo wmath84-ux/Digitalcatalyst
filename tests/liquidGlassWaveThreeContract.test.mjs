@@ -149,18 +149,13 @@ test("sort became the registry select", () => {
   assert.match(searchBar, /const SORT_OPTIONS = \["Recommended", "Price: Low to High", "Price: High to Low", "Top Rated", "Newest"\]/);
 });
 
-test("the product page keeps every pinned hook and swaps only the switcher", () => {
+test("the minimal product page keeps content hooks and bounded accessible detail controls", () => {
   const details = pdp.slice(pdp.indexOf("function DetailsCard"), pdp.indexOf("function CurriculumModuleRow"));
-  assert.match(details, /data-pdp-tabbar/, "the sticky tab bar the scroll logic measures");
-  assert.match(details, /rounded-t-\[23px\]/, "the stuck-state corner maths is untouched");
-  assert.match(details, /<GlassToggleGroup\b/);
-  // 2026-09-06 (PDP legibility): the strip also carries `dc-scene-plate`, the
-  // shared contrast backing from src/glass.css — the pack's frost disappears over
-  // the winter scene. `dc-segment` (light ink) and `shrink-0` (it must not shrink
-  // inside the scroller) are unchanged.
-  assert.match(details, /className="dc-segment dc-scene-plate shrink-0"/);
-  assert.match(details, /onTab\(next as DetailTab\)/, "the tab union type still narrows at the boundary");
-  assert.doesNotMatch(details, /bg-zinc-100\/70/, "the ad-hoc grey track is gone");
+  assert.match(details, /data-pdp-tabbar/);
+  assert.match(details, /aria-label="Product details"/);
+  assert.match(details, /aria-pressed=\{tab === item\.value\}/);
+  assert.match(details, /onTab\(item\.value\)/);
+  assert.doesNotMatch(details, /GlassToggleGroup|GlassSurface|SimplePanel/);
   for (const anchor of ["data-pdp-curriculum", "data-pdp-curriculum-mode", "data-pdp-curriculum-module", "data-pdp-curriculum-upgrade-hint"]) {
     assert.ok(pdp.includes(anchor), `PDP curriculum tests pin ${anchor}`);
   }
@@ -238,7 +233,9 @@ test("the deferred commerce files landed in Wave 12; admin stays out", () => {
   // pins the docs sensitivity: tint 0.25 · radius 24 · blur 4), not the raw registry card.
   assert.match(read("src/home/components/Reviews.tsx"), /from "\.\.\/\.\.\/components\/ui\/GlassCard"/);
   assert.match(read("src/home/components/ContinueLearning.tsx"), /from "\.\.\/\.\.\/components\/ui\/GlassCard"/);
-  assert.match(read("src/home/components/ProductCard.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-button"/);
+  const productCard = read("src/home/components/ProductCard.tsx");
+  assert.match(productCard, /from "\.\.\/\.\.\/components\/ui\/GlassCard"/);
+  assert.match(productCard, /aria-pressed=\{isFavorite\}/);
   const admin = fs.readdirSync("src/components/admin").filter((f) => f.endsWith(".tsx"));
   for (const file of admin) {
     // One sanctioned exception: `glass-toast` is the app-wide feedback BUS —

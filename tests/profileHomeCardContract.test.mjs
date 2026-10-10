@@ -46,7 +46,7 @@ test("the Home reference card is the pinned docs plate", () => {
   assert.match(homeCss, /\.dc-home-product-details,[\s\S]*?font-size: 11\.5px/);
 });
 
-test("every profile card wears the HOME plate via ProfileCard", () => {
+test("legacy ProfileCard stays pinned while the account layout keeps hooks without nested cards", () => {
   const card = read("src/profile/ProfileCard.tsx");
   assert.match(card, /tint=\{0\.25\}/);
   assert.match(card, /blur=\{0\}/);
@@ -64,6 +64,7 @@ test("every profile card wears the HOME plate via ProfileCard", () => {
   }
 
   const layout = read(PROFILE_FILES[0]);
+  assert.doesNotMatch(layout, /<ProfileCard|<GlassSurface/);
   for (const hook of ["data-profile-hero", "data-profile-membership-card", "data-profile-upgrade-card", "data-profile-referral", "data-profile-study-library", "data-renewal-card"]) {
     assert.ok(layout.includes(hook), `ProfileLayout keeps ${hook}`);
   }
@@ -96,7 +97,8 @@ test("the copy diet: the profile page's walls of text are gone", () => {
   assert.doesNotMatch(layout, /<ProfileRenewalCard/);
   assert.doesNotMatch(layout, /Membership renewal/);
   // One trust line survives (pinned by subscriptionRenewalContract).
-  assert.match(layout, /Renewal is manual and secure/);
+  assert.match(layout, /Renewal is manual/);
+  assert.match(layout, /Saved work is retained/);
 
   // The Usage Limits My Day card: one line per state, no three-chip stat row.
   const myDay = read("src/components/MyDayAllowanceCard.tsx");
@@ -117,7 +119,7 @@ test("the Usage Limits instances of the shared cards take the same material", ()
   assert.match(ai, /material\?: "store" \| "cart" \| "home"/);
   assert.match(ai, /"dc-scene-plate dc-profile-card relative text-white"/);
   assert.match(ai, /compact\?: boolean/);
-  assert.match(read("src/usage/UsageLimitsPage.tsx"), /<AiQuotaCard uid=\{user\.id\} material="home" \/>/);
+  assert.match(read("src/usage/UsageLimitsPage.tsx"), /<AiQuotaCard uid=\{user\.id\} material="home" minimal \/>/);
   assert.doesNotMatch(read("src/profile/App.tsx"), /AiQuotaCard|MyDayAllowanceCard/);
   // Revision keeps the default store material.
   assert.doesNotMatch(read("src/revision/pages/RevisionProfilePage.tsx"), /<AiQuotaCard[^>]*material=/);
@@ -131,7 +133,7 @@ test("the shared material still comes from ONE module — ui/glass", () => {
   assert.match(engine, /tint = 0\.5/, "default tint");
   assert.match(engine, /blur = 14/, "default blur");
   assert.match(engine, /saturation = 1\.6/, "default saturation");
-  for (const file of [PROFILE_FILES[0], "src/components/MyDayAllowanceCard.tsx", "src/components/AiQuotaCard.tsx"]) {
+  for (const file of ["src/components/MyDayAllowanceCard.tsx", "src/components/AiQuotaCard.tsx"]) {
     assert.match(read(file), /from "\.\.\/components\/ui\/glass"|from "\.\/ui\/glass"|ProfileCard"/, `${file} imports the pack surface`);
   }
 });

@@ -1,11 +1,12 @@
 // src/components/checkout/CheckoutLineItemCard.tsx
 //
-// Itemised line-item card used by the Checkout Review + Success pages.
+// Itemised line used by Checkout Review + Success, with an optional plain layout.
 // Each card shows: type, title, parent, regular price, sale price,
 // discount, effective total, and the already-owned badge when relevant.
 
 import { BadgeCheck, CircleCheck, Package, PackageOpen, Unlock } from "lucide-react";
 import { GlassCard } from "../ui/GlassCard";
+import { formatCheckoutMoney } from "./CheckoutSection";
 import type { CheckoutLineItem } from "../../types/commerce";
 import { formatPaise } from "../../utils/money";
 
@@ -35,15 +36,55 @@ const formatRupee = formatPaise;
 
 export interface CheckoutLineItemCardProps {
   line: CheckoutLineItem;
+  minimal?: boolean;
   /** When true, the card is read-only (Success page). */
   readOnly?: boolean;
 }
 
-export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineItemCardProps) {
+export default function CheckoutLineItemCard({
+  line,
+  readOnly,
+  minimal = false,
+}: CheckoutLineItemCardProps) {
   const Icon = KIND_ICON[line.kind] || Package;
   const label = KIND_LABEL[line.kind] || line.kind;
-  const hasSale = line.salePrice !== null && line.salePrice !== undefined && line.salePrice < line.regularPrice;
+  const hasSale =
+    line.salePrice !== null && line.salePrice !== undefined && line.salePrice < line.regularPrice;
   const discount = Math.max(0, line.regularPrice - line.effectivePrice);
+  if (minimal)
+    return (
+      <article
+        data-checkout-line-item
+        data-line-kind={line.kind}
+        data-line-id={line.id}
+        className="dc-checkout-item"
+      >
+        <div className="dc-checkout-item-copy">
+          <h3>
+            {line.title}
+            {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+          </h3>
+          <p className="dc-checkout-note">
+            {label}
+            {line.parentTitle ? ` · ${line.parentTitle}` : ""}
+          </p>
+          {line.alreadyOwned ? <p className="dc-checkout-note">Already owned · no charge</p> : null}
+          {line.detailItems?.length ? (
+            <ul className="dc-checkout-detail-list">
+              {line.detailItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <div className="dc-checkout-item-price">
+          {!line.alreadyOwned && line.regularPrice > line.effectivePrice ? (
+            <del>{formatCheckoutMoney(line.regularPrice)}</del>
+          ) : null}
+          <strong>{formatCheckoutMoney(line.alreadyOwned ? 0 : line.effectivePrice)}</strong>
+        </div>
+      </article>
+    );
   return (
     <GlassCard
       data-checkout-line-item
@@ -72,7 +113,9 @@ export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineIte
               </span>
             ) : null}
           </div>
-          <h3 className="mt-1 text-sm font-black text-white line-clamp-2 break-words">{line.title}</h3>
+          <h3 className="mt-1 text-sm font-black text-white line-clamp-2 break-words">
+            {line.title}
+          </h3>
           {line.parentTitle ? (
             <p className="mt-0.5 truncate text-xs text-white/55">From “{line.parentTitle}”</p>
           ) : null}
@@ -102,7 +145,9 @@ export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineIte
       {hasSale && !line.alreadyOwned ? (
         <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-[11px] text-white/75">
           <span>Sale saving</span>
-          <span className="font-black text-emerald-200">− {formatRupee(discount * line.quantity)}</span>
+          <span className="font-black text-emerald-200">
+            − {formatRupee(discount * line.quantity)}
+          </span>
         </div>
       ) : null}
     </GlassCard>

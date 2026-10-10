@@ -1,59 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EmojiBurstLayer, useEmojiBurst } from "./components/ui/EmojiBurst";
-import {
-  GlassToggleGroup,
-  GlassToggleItem,
-} from "./components/ui/glass-toggle-group";
+import { commerceContentTree } from "../utils/contentOwnership";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
-  BadgeCheck,
-  BookOpen,
-  Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Copy,
-  Crown,
   Expand,
-  GraduationCap,
-  Heart,
-  Layers,
-  LockKeyhole,
-  MessageCircle,
-  PackageOpen,
-  PlayCircle,
-  Send,
-  Share2,
-  ShoppingBag,
-  ShoppingCart,
   Star,
   X,
-  Zap,
 } from "lucide-react";
 import Header from "./components/Header";
 import { GlassSurface } from "./components/ui/glass";
 import { useDragScroll } from "@/hooks/useDragScroll";
-import { GlassButton } from "./components/ui/glass-button";
-import { SimplePanel } from "./components/ui/SimplePanel";
 import "./pdp-minimal.css";
 import { PopoverItem } from "./components/ui/glass-popover";
-import { GlassAccordion, GlassAccordionContent, GlassAccordionItem, GlassAccordionTrigger } from "./components/ui/glass-accordion";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
-import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
+import { buildCheckoutSelection, computeSummary, normalizeModuleSelectionIds } from "../utils/pdpSelection";
 import { PaymentButton } from "./components/ui/PaymentButton";
-import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
+import PdpPaidContent from "./components/pdp/PdpPaidContent";
+import { buildPdpPaidContent, type PaidContentRow } from "../utils/pdpPaidContent";
+import PdpPurchaseBuilder, { type PdpSelectionRequest } from "./components/pdp/PdpPurchaseBuilder";
+import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./components/pdp/PdpSelectionSummary";
+import { pdpSelectionKey, usePdpQuote } from "./pdp/usePdpQuote";
+import { paiseToRupees } from "./utils/money";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
 import { fullDemoCourseContent } from "./data/demoCourseContent";
 import { getProductClassLabel, getProductInstructorLabel, getProductPresentation, getProductSubjectLabel } from "./pdp/productPresentation";
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
-import { auth, db } from "../firebase";
+import { db } from "../firebase";
 import { apiFetch } from "./utils/apiBase";
-import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
+import PromoCodeInput from "./subscription/components/PromoCodeInput";
 import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
 import {
   collectPaidModuleIdSet,
@@ -84,22 +63,23 @@ interface ProductDetailProps {
   ownedUpdateIds?: Set<string>;
 }
 
-type DetailTab = "Description" | "Curriculum" | "Instructor";
+type DetailTab = "Description" | "Curriculum" | "Paid";
 
 type CurriculumModule = {
   id: string;
   title: string;
   paid?: boolean;
+  includeInBundle?: boolean;
   paidUpdateId?: string;
   paidUpdateTitle?: string;
   paidUpdatePrice?: string;
-  resources?: Array<{ id: string; name: string; type: string }>;
+  resources?: Array<{ id: string; name: string; type: string; includeInBundle?: boolean; paidUpdateId?: string }>;
   modules?: CurriculumModule[];
 };
 
 type CurriculumViewMode = "included" | "paid-upgrade";
 
-const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
+const formatPrice = (price: number) => `₹${price.toLocaleString("en-IN")}`;
 
 const GENERIC_CHAPTER_WORDS = new Set([
   "advanced", "all", "basic", "beginner", "board", "boards", "cbse", "complete", "concept",
@@ -219,7 +199,7 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
         />
         <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto md:px-8">
-          {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
+          {props.product ? <PremiumProductContent key={props.product.id} {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
         </main>
         <BottomNav
           active="store"
@@ -247,7 +227,7 @@ function PremiumProductContent({
   purchasedIds,
   ownedUpdateIds,
 }: ProductDetailProps & { product: Product }) {
-  const { resolution } = useCourseAccess({ product });
+  const { resolution, loading: accessLoading, error: accessError, retry: retryAccess } = useCourseAccess({ product });
   const { user } = useAuth();
   const { appName } = useBranding();
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
@@ -272,6 +252,7 @@ function PremiumProductContent({
   const [activeImage, setActiveImage] = useState(0);
   const [failedImageSources, setFailedImageSources] = useState<Set<string>>(() => new Set());
   const [loadedImageSource, setLoadedImageSource] = useState<string | null>(null);
+  const heroImageRef = useRef<HTMLImageElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const fullscreenCloseRef = useRef<HTMLButtonElement>(null);
   // Mouse parity: the gallery thumbs are a hidden-scrollbar rail, so a desktop
@@ -283,9 +264,14 @@ function PremiumProductContent({
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
-  const [couponStatus, setCouponStatus] = useState<"idle" | "applying" | "error">("idle");
-  const [couponErrorMessage, setCouponErrorMessage] = useState<string | null>(null);
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<(PdpSelectionSnapshot & { viewerId: string | null }) | null>(null);
+  const [paidSelectionRequest, setPaidSelectionRequest] = useState<PdpSelectionRequest | undefined>();
+  const activePaidSelectionRequest = paidSelectionRequest?.viewerId === (user?.id || null) && paidSelectionRequest.productId === product.id ? paidSelectionRequest : undefined;
+  useEffect(() => { setSelectedOrder(null); setPaidSelectionRequest(undefined); }, [product.id, user?.id]);
+  const handleSelectionChange = useCallback((next: PdpSelectionSnapshot) => {
+    const scoped = { ...next, viewerId: user?.id || null };
+    setSelectedOrder((previous) => previous && JSON.stringify(previous) === JSON.stringify(scoped) ? previous : scoped);
+  }, [user?.id]);
   const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -314,6 +300,16 @@ function PremiumProductContent({
     setLoadedImageSource(null);
     setExpandedImage(null);
   }, [product.id]);
+
+  // Cached images can finish before the reset effect (and their load event
+  // then never fires again). Reconcile the DOM image so artwork cannot stay
+  // permanently transparent, including when returning from the reviews view.
+  useEffect(() => {
+    const image = heroImageRef.current;
+    if (!selectedImage || !image?.complete) return;
+    if (image.naturalWidth > 0) setLoadedImageSource(selectedImage);
+    else setFailedImageSources((current) => current.has(selectedImage) ? current : new Set(current).add(selectedImage));
+  }, [product.id, selectedImage, showReviewsPage]);
 
   useEffect(() => {
     if (!expandedImage) return;
@@ -349,6 +345,13 @@ function PremiumProductContent({
       const target = event.target as Node | null;
       if (target && shareRef.current && !shareRef.current.contains(target)) setShareOpen(false);
     };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setShareOpen(false);
+      shareRef.current?.querySelector<HTMLButtonElement>("[aria-haspopup='menu']")?.focus();
+    };
+    const frame = window.requestAnimationFrame(() => shareRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus({ preventScroll: true }));
+    document.addEventListener("keydown", closeOnEscape);
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     document.addEventListener("mousedown", closeOnOutsidePointer);
     document.addEventListener("touchstart", closeOnOutsidePointer, { passive: true });
@@ -356,6 +359,8 @@ function PremiumProductContent({
     window.addEventListener("touchmove", closeOnOutsideScroll, { passive: true });
     window.addEventListener("wheel", closeOnOutsideScroll, { passive: true });
     return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", closeOnEscape);
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("mousedown", closeOnOutsidePointer);
       document.removeEventListener("touchstart", closeOnOutsidePointer);
@@ -370,24 +375,19 @@ function PremiumProductContent({
     || Boolean(product.documentId && ownedKeys.has(product.documentId))
     || resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
-  const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
-  const ownedModuleIds = resolution.ownedModuleIds;
-  const ownedResourceIds = resolution.ownedResourceIds;
+  const paidContent = useMemo(() => buildPdpPaidContent({ product, isProductOwned, ownedUpdateIds: updates, resolution }), [product, isProductOwned, updates, resolution]);
+  const ownedModuleIds = paidContent.ownedModuleIds;
+  const ownedResourceIds = paidContent.ownedResourceIds;
   const identity = getProductPresentation(product);
   const instructorLabel = getProductInstructorLabel(product);
   const related = useMemo(() => getRelatedProducts(product, products, 12), [product, products]);
-  const discount = product.originalPrice > product.price && product.originalPrice > 0
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
   const collectedModules = useMemo(() => collectCurriculumModules(product), [product]);
   const includedCurriculum = useMemo(
     () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules as CurriculumModule[],
     [collectedModules],
   );
-  const { modules, mode: curriculumMode } = useMemo(
-    () => filterCurriculumForPdp(collectedModules as unknown as CurriculumModule[], { isProductOwned, ownedUpdateIds: updates }) as { modules: CurriculumModule[]; mode: CurriculumViewMode },
-    [collectedModules, isProductOwned, updates],
-  );
+  const modules = includedCurriculum;
+  const curriculumMode: CurriculumViewMode = "included";
   const { modulesCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);
 
   useEffect(() => {
@@ -402,30 +402,64 @@ function PremiumProductContent({
     ? ""
     : `${window.location.origin}${window.location.pathname}#/product/${encodeURIComponent(product.id)}`;
   const favorite = favoriteIds.has(product.id);
-  const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
   const inCart = cartIds.has(product.id);
   const unavailable = product.availableForSale === false && !isProductOwned;
 
+  const defaultOrder = useMemo<PdpSelectionSnapshot>(() => {
+    const mode = "full_product";
+    const selection = buildCheckoutSelection({ product, mode, selectedIds: [], returnRoute: `#/product/${encodeURIComponent(product.id)}` });
+    const summary = computeSummary({ product: isFreeProduct(product) ? { ...product, isFree: true } : product, mode, selectedIds: [], modules: product.canonicalModules || [], paidUpdates: product.paidUpdates || [], isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds });
+    return { selection, summary, valid: summary.selectedCount > 0, rules: [] };
+  }, [product, isProductOwned, updates, ownedModuleIds, ownedResourceIds]);
+  const selectedForThisProduct = selectedOrder?.viewerId === (user?.id || null) && selectedOrder?.selection.productIds.some((id) => id === product.id || id === product.documentId);
+  const order = selectedOrder && selectedForThisProduct ? selectedOrder : defaultOrder;
+  const requestedPaidSelection = activePaidSelectionRequest ? buildCheckoutSelection({
+    product, mode: activePaidSelectionRequest.mode, selectedIds: activePaidSelectionRequest.ids,
+    paidUpdateId: activePaidSelectionRequest.mode === "paid_update" ? activePaidSelectionRequest.ids[0] || null : null,
+    returnRoute: `#/product/${encodeURIComponent(product.id)}`,
+  }) : null;
+  const paidSelection = requestedPaidSelection || order.selection;
+  const applyingPaidSelection = Boolean(activePaidSelectionRequest?.ids.length && requestedPaidSelection && pdpSelectionKey(requestedPaidSelection) !== pdpSelectionKey(order.selection));
+  const purchaseMode = order.summary.mode;
+  const quoteSelection = { ...order.selection, productIds: [product.documentId || product.id] };
+  const pricing = usePdpQuote({ selection: quoteSelection, uid: user?.id || null, enabled: Boolean(user) && !accessLoading && !accessError && !applyingPaidSelection && order.valid && !unavailable && (!isProductOwned || purchaseMode !== "full_product"), chargeable: order.summary.effectiveSubtotal > 0 });
+  const pricingView: PdpPricingView = { ...pricing, ...(user && (accessLoading || applyingPaidSelection) ? { status: "loading" as const, quote: null } : {}), ...(accessError ? { status: "error" as const, error: accessError } : {}), selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }) };
+  const pricingBusy = pricing.status === "loading" || pricing.applying;
+  const pricingBlocked = pricingBusy || pricing.status === "error" || Boolean(user && (accessLoading || accessError || applyingPaidSelection));
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
-    const withCoupon = appliedCoupon?.code ? { ...selection, couponCode: appliedCoupon.code } : selection;
-    if (onCheckoutSelection) onCheckoutSelection(withCoupon, summary.effectiveSubtotal);
-    else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
+    const withCoupon = { ...selection, productIds: [product.documentId || product.id], couponCode: summary.effectiveSubtotal > 0 ? pricing.appliedCode : null };
+    if (user && (!pricing.quote || pdpSelectionKey(withCoupon) !== pricingView.selectionKey)) return;
+    const payable = pricing.quote ? paiseToRupees(pricing.quote.cashPayable) : summary.effectiveSubtotal;
+    if (onCheckoutSelection) onCheckoutSelection(withCoupon, payable);
+    else if (selection.purchaseKind === "full_product") onCheckout(payable, withCoupon.couponCode);
   };
 
-  // Directly buy the first available paid upgrade — used once the base course
-  // is owned and the "Select course modules" section is no longer shown.
-  const handleBuyUpgrade = () => {
-    const update = availablePaidUpdates[0];
-    if (!update) return;
-    const selection = buildCheckoutSelection({
-      product,
-      mode: "paid_update",
-      selectedIds: new Set([update.id]),
-      paidUpdateId: update.id,
-      returnRoute: `#/product/${encodeURIComponent(product.id)}`,
-    });
-    if (onCheckoutSelection) onCheckoutSelection(selection, Number(update.cashPrice) || 0);
-    else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
+  const choosePaidContent = (row: PaidContentRow, checked: boolean) => {
+    if (!row.selectable || row.owned || unavailable) return;
+    const currentIds = row.kind === paidSelection.purchaseKind ? row.kind === "paid_update" ? [paidSelection.updateId].filter((id): id is string => Boolean(id))
+      : row.kind === "selected_modules" ? paidSelection.moduleIds : paidSelection.resourceIds : [];
+    const ids = new Set(currentIds);
+    if (row.kind === "paid_update") ids.clear();
+    if (checked) ids.add(row.id); else ids.delete(row.id);
+    const normalized = row.kind === "selected_modules" ? normalizeModuleSelectionIds([...ids], commerceContentTree(product), { isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds }) : ids;
+    if (!normalized.size) setSelectedOrder(null);
+    setPaidSelectionRequest((current) => ({ productId: product.id, viewerId: user?.id || null, revision: (current?.revision || 0) + 1, mode: row.kind, ids: [...normalized] }));
+  };
+  useEffect(() => {
+    if (!activePaidSelectionRequest || accessLoading || accessError) return;
+    const acquired = activePaidSelectionRequest.mode === "selected_modules" ? ownedModuleIds
+      : activePaidSelectionRequest.mode === "selected_resources" ? ownedResourceIds
+      : new Set(paidContent.owned.filter((row) => row.kind === "paid_update").map((row) => row.id));
+    const remaining = activePaidSelectionRequest.ids.filter((id) => !acquired.has(id));
+    if (remaining.length === activePaidSelectionRequest.ids.length) return;
+    const normalized = activePaidSelectionRequest.mode === "selected_modules" ? [...normalizeModuleSelectionIds(remaining, commerceContentTree(product), { isProductOwned, ownedUpdateIds: updates, ownedModuleIds, ownedResourceIds })] : remaining;
+    if (!normalized.length) setSelectedOrder(null);
+    setPaidSelectionRequest({ ...activePaidSelectionRequest, ids: normalized, revision: activePaidSelectionRequest.revision + 1 });
+  }, [activePaidSelectionRequest, accessLoading, accessError, ownedModuleIds, ownedResourceIds, paidContent, product, isProductOwned, updates]);
+  const reviewPaidSelection = () => {
+    const section = document.getElementById("pdp-purchase-review");
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+    section?.focus({ preventScroll: true });
   };
 
   const copyLink = async () => {
@@ -477,96 +511,20 @@ function PremiumProductContent({
   };
 
   const primaryAction = () => {
-    if (!unavailable) onCheckout(product.price, appliedCoupon?.code || null);
+    if (!unavailable && !pricingBlocked) handlePreview(order.selection, order.summary);
   };
-
-  // Coupon handling — mirrors the subscription page. The code is validated
-  // server-side by re-quoting through the existing /api/quotes/create endpoint
-  // (same Part 7 coupon engine + Part 4 quote engine the real checkout uses),
-  // so the buyer sees "Verified savings" before entering checkout. The applied
-  // code is carried into checkout.
-  const handleApplyCoupon = useCallback(
-    async (rawCode: string): Promise<PromoResult> => {
-      if (isProductOwned) {
-        return { valid: false, message: "You already own this product." };
-      }
-      const code = rawCode.trim().toUpperCase();
-      if (!code) return { valid: false, message: "Enter a coupon code." };
-      setCouponStatus("applying");
-      setCouponErrorMessage(null);
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) return { valid: false, message: "Please sign in to apply a coupon." };
-        const token = await firebaseUser.getIdToken(true);
-        const response = await apiFetch("/api/quotes/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            purchaseKind: "full_product",
-            productIds: [product.documentId || product.id],
-            moduleIds: [],
-            resourceIds: [],
-            updateId: null,
-            subscriptionPlanId: null,
-            billingCycle: null,
-            featureIds: [],
-            couponCode: code,
-            returnRoute: null,
-          }),
-        });
-        const data = await response.json().catch(() => ({})) as { ok?: boolean; quote?: { couponDiscount?: number }; error?: string };
-        if (!response.ok || !data.ok) {
-          const message = data.error || "This coupon could not be applied.";
-          setCouponStatus("error");
-          setCouponErrorMessage(message);
-          return { valid: false, message };
-        }
-        const discountPaise = Math.max(0, Math.round(Number(data.quote?.couponDiscount || 0)));
-        setCouponStatus("idle");
-        playSfxSuccess();
-        setAppliedCoupon({
-          code,
-          discountPaise,
-          label: discountPaise > 0 ? `Verified savings · ₹${Math.round(discountPaise / 100)} off` : "Coupon applied (no additional savings).",
-        });
-        return { valid: true, message: "Coupon applied." };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "This coupon could not be applied.";
-        setCouponStatus("error");
-        setCouponErrorMessage(message);
-        playSfxError();
-        return { valid: false, message };
-      }
-    },
-    [isProductOwned, product.documentId, product.id],
-  );
-
-  const handleRemoveCoupon = useCallback(() => {
-    setAppliedCoupon(null);
-    setCouponErrorMessage(null);
-    setCouponStatus("idle");
-  }, []);
-
-  // A coupon can only reduce money that is actually charged. Free
-  // products (admin `isFree` switch or a ₹0 effective price) never
-  // render the coupon field anywhere on the PDP.
   const productIsFree = isFreeProduct(product);
-  const canShowCouponInput = shouldShowCouponInput({
-    purchaseKind: "full_product",
-    payablePaise: Math.round((product.price || 0) * 100),
-    isFree: productIsFree,
+  const canShowCouponInput = (!isProductOwned || order.selection.purchaseKind !== "full_product") && !unavailable && order.valid && shouldShowCouponInput({
+    purchaseKind: order.selection.purchaseKind,
+    payablePaise: Math.round(order.summary.effectiveSubtotal * 100),
+    isFree: order.selection.purchaseKind === "full_product" && productIsFree,
   });
-
-  // If a product becomes free (or the buyer already owns it) while a
-  // coupon was applied, drop the code so nothing stale is carried
-  // into checkout.
-  useEffect(() => {
-    if (!canShowCouponInput && appliedCoupon) {
-      setAppliedCoupon(null);
-      setCouponErrorMessage(null);
-      setCouponStatus("idle");
-    }
-  }, [canShowCouponInput, appliedCoupon]);
+  const couponEntry = canShowCouponInput ? (
+    <details data-pdp-coupon className="dc-pdp-coupon">
+      <summary>Have a coupon?</summary>
+      <PromoCodeInput key={pdpSelectionKey({ ...order.selection, couponCode: null })} kind="coupon" label="Coupon code" placeholder="Enter code" appliedCode={pricing.appliedCode} appliedMessage={pricing.quote?.couponDiscount ? `Verified discount: ₹${paiseToRupees(pricing.quote.couponDiscount).toLocaleString("en-IN")}` : "Coupon verified for this selection"} errorMessage={pricing.couponError || null} onApply={pricing.applyCoupon} onRemove={pricing.removeCoupon} disabled={pricingBusy} />
+    </details>
+  ) : null;
 
   const submitReview = async () => {
     if (!user) {
@@ -655,17 +613,14 @@ function PremiumProductContent({
   const classLabel = getProductClassLabel(product);
   const subjectLabel = identity.subjectLabel;
   const metadataItems = [
-    classLabel ? { icon: classLabel.toLowerCase() === "lifetime access" ? BadgeCheck : GraduationCap, label: classLabel.toLowerCase() === "lifetime access" ? "Access" : "Level", text: classLabel } : null,
-    subjectLabel ? { icon: BookOpen, label: "Subject", text: subjectLabel } : null,
-    { icon: PackageOpen, label: "Format", text: identity.typeLabel },
-    modulesCount > 0 ? { icon: Layers, label: "Curriculum", text: `${modulesCount} module${modulesCount === 1 ? "" : "s"}` } : null,
-  ].filter((item): item is { icon: typeof BookOpen; label: string; text: string } => Boolean(item));
+    classLabel ? { label: classLabel.toLowerCase() === "lifetime access" ? "Access" : "Level", text: classLabel } : null,
+    subjectLabel ? { label: "Subject", text: subjectLabel } : null,
+  ].filter((item): item is { label: string; text: string } => Boolean(item));
   const includedItems = buildIncludedSummaries(includedCurriculum, modulesCount);
   const ratingSummary = getProductRatingSummary(product, productReviews);
-  const highlights = (product.features || []).map((feature) => feature.trim()).filter(Boolean);
-  const hasPurchaseBuilder = !isProductOwned && !unavailable && Boolean(product.canonicalModules?.length);
-  const firstAvailableUpdate = availablePaidUpdates[0];
-  const updateBenefits = firstAvailableUpdate ? buildUpdateBenefits(firstAvailableUpdate) : [];
+  const highlights = [...new Set((product.features || []).map((feature) => feature.trim()).filter(Boolean))];
+  const hasScopedSelection = (purchaseMode !== "full_product" && order.summary.selectedCount > 0) || Boolean(activePaidSelectionRequest?.ids.length);
+  const hasPurchaseBuilder = !unavailable && Boolean(product.canonicalModules?.length || product.courseContent?.length || product.paidUpdates?.length) && (!isProductOwned || hasScopedSelection);
 
   if (showReviewsPage) {
     return (
@@ -675,7 +630,7 @@ function PremiumProductContent({
             type="button"
             data-pdp-reviews-back
             onClick={backToProduct}
-            className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/80 transition hover:bg-white/[0.08] hover:text-white"
+            className="dc-pdp-text-action mb-4"
           >
             <ChevronRight aria-hidden="true" className="h-4 w-4 rotate-180" />
             Back to product
@@ -702,7 +657,7 @@ function PremiumProductContent({
 
   return (
     <div data-pdp-root className="relative pb-5 text-white">
-      <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink flex min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60">
+      <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60 sm:flex">
         <button type="button" onClick={onBack} className="min-h-9 shrink-0 px-1 transition hover:text-white">Store</button>
         <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
         <span className="shrink-0 text-white/65">{identity.typeLabel}</span>
@@ -710,19 +665,17 @@ function PremiumProductContent({
         <span aria-current="page" title={identity.title} className="min-w-0 flex-1 truncate font-semibold text-white">{identity.title}</span>
       </nav>
 
-      {/* Desktop places the media and long-form details in the main column,
-          with the decision panel in a stable right rail. On smaller screens the
-          same DOM order becomes a single product-first journey. */}
       <div data-pdp-body className="flex min-w-0 flex-col gap-6 px-4 pb-8 pt-4">
         <section data-pdp-gallery className="flex min-w-0 flex-col gap-3">
           <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate group relative overflow-hidden" contentClassName="relative">
-            <div data-pdp-media aria-busy={Boolean(selectedImage && loadedImageSource !== selectedImage)} className="relative aspect-[4/3] overflow-hidden">
+            <div data-pdp-media aria-busy={Boolean(selectedImage && loadedImageSource !== selectedImage)} className="relative aspect-[16/10] overflow-hidden">
               {selectedImage ? (
                 <>
                   {loadedImageSource !== selectedImage && <div aria-hidden="true" className="dc-pdp-image-loading absolute inset-0" />}
                   <img
                     key={selectedImage}
                     data-pdp-hero-img
+                    ref={heroImageRef}
                     src={selectedImage}
                     alt={identity.title}
                     loading="eager"
@@ -730,49 +683,16 @@ function PremiumProductContent({
                     decoding="async"
                     onLoad={() => setLoadedImageSource(selectedImage)}
                     onError={() => setFailedImageSources((current) => new Set(current).add(selectedImage))}
-                    className={`aspect-[4/3] w-full object-contain transition-opacity duration-200 ${loadedImageSource === selectedImage ? "opacity-100" : "opacity-0"}`}
+                    className={`h-full w-full object-contain transition-opacity duration-200 ${loadedImageSource === selectedImage ? "opacity-100" : "opacity-0"}`}
                   />
                 </>
-              ) : (
-                <ProductArtworkFallback product={product} title={identity.title} typeLabel={identity.typeLabel} />
-              )}
+              ) : <ProductArtworkFallback product={product} title={identity.title} typeLabel={identity.typeLabel} />}
             </div>
-            {product.status === "published" && (
-              <div className="dc-scene-plate dc-scene-plate--bar absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
-                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
-              </div>
-            )}
-            <div className="absolute right-3 top-3 flex gap-2">
-              {onToggleFavorite ? (
-                <span className="relative inline-flex">
-                  <EmojiBurstLayer particles={likeParticles} />
-                  <GlassButton
-                    type="button"
-                    onClick={() => { if (!favorite) likeBurst(); onToggleFavorite(product.id); }}
-                    aria-label={favorite ? "Remove from saved products" : "Save product"}
-                    aria-pressed={favorite}
-                    className="min-h-11 min-w-11 [&_.size-12]:size-9"
-                  >
-                    <Heart aria-hidden="true" className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
-                  </GlassButton>
-                </span>
-              ) : null}
-              {selectedImage ? (
-                <GlassButton
-                  type="button"
-                  onClick={() => setExpandedImage(selectedImage)}
-                  aria-label="View product image fullscreen"
-                  className="min-h-11 min-w-11 [&_.size-12]:size-9"
-                >
-                  <Expand aria-hidden="true" className="h-4 w-4" />
-                </GlassButton>
-              ) : null}
-            </div>
-            {visibleGallery.length > 1 && (
-              <div className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]" aria-live="polite">
-                {selectedImageIndex + 1} / {visibleGallery.length}
-              </div>
-            )}
+            {selectedImage ? (
+              <button type="button" onClick={() => setExpandedImage(selectedImage)} aria-label="View product image fullscreen" className="dc-pdp-image-expand">
+                <Expand aria-hidden="true" className="h-4 w-4" />
+              </button>
+            ) : null}
           </GlassSurface>
           {visibleGallery.length > 1 && (
             <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
@@ -783,7 +703,7 @@ function PremiumProductContent({
                   onClick={() => { setActiveImage(index); setLoadedImageSource(null); }}
                   aria-label={`Show product image ${index + 1}`}
                   aria-pressed={selectedImageIndex === index}
-                  className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${selectedImageIndex === index ? "border-indigo-300/80" : "border-transparent opacity-75 hover:opacity-100"}`}
+                  className={`h-14 min-w-14 overflow-hidden rounded-lg border-2 transition ${selectedImageIndex === index ? "border-indigo-300/80" : "border-transparent opacity-75 hover:opacity-100"}`}
                 >
                   <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
                 </button>
@@ -793,201 +713,83 @@ function PremiumProductContent({
         </section>
 
         <section data-pdp-buy className="flex min-w-0 flex-col gap-4">
-          <div data-pdp-titleblock className="dc-pdp-identity space-y-3">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-              <span className="dc-pdp-type-badge">{identity.typeLabel}</span>
-              <span className="dc-pdp-store-label">{appName}</span>
-            </div>
-            {instructorLabel ? (
-              <p className="text-xs text-white/65">By <span className="font-semibold text-white/85">{instructorLabel}</span></p>
+          <div data-pdp-titleblock className="dc-pdp-identity">
+            <p className="dc-pdp-type-label">{identity.typeLabel}</p>
+            <h1 className="dc-pdp-title">{identity.title}</h1>
+            {instructorLabel ? <p data-pdp-instructor className="dc-pdp-byline">By {instructorLabel}</p> : null}
+            {ratingSummary.hasRating ? (
+              <div className="dc-pdp-identity-rating">
+                <RatingStars rating={ratingSummary.rating} />
+                <button type="button" className="dc-pdp-text-action" onClick={() => document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                  {ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}
+                </button>
+              </div>
             ) : null}
-            <h1 className="dc-pdp-title font-black tracking-tight text-white">{identity.title}</h1>
-            {product.description?.trim() ? (
-              <p className="dc-pdp-summary text-sm leading-relaxed text-white/75">{product.description.trim()}</p>
-            ) : null}
-            <div className="dc-pdp-identity-rating flex flex-wrap items-center gap-2 text-xs">
-              {ratingSummary.hasRating ? (
-                <>
-                  <RatingStars rating={ratingSummary.rating} />
-                  <span className="font-bold text-white">{ratingSummary.rating.toFixed(1)}</span>
-                  <a href="#product-reviews" className="text-white/65 underline underline-offset-2">
-                    {ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}
-                  </a>
-                </>
-              ) : <span className="text-white/60">No ratings yet</span>}
-            </div>
           </div>
 
           {metadataItems.length > 0 && (
-            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3">
-              {metadataItems.map((item) => <Meta key={`${item.label}-${item.text}`} icon={item.icon} label={item.label} text={item.text} />)}
-            </GlassSurface>
+            <dl data-pdp-meta className="dc-pdp-meta-list">
+              {metadataItems.map((item) => <Meta key={item.label} label={item.label} text={item.text} />)}
+            </dl>
           )}
 
-          {isProductOwned ? (
-            firstAvailableUpdate ? (
-              <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-hidden text-white" contentClassName="p-5">
-                <div className="relative flex items-start gap-3">
-                  <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600/90 text-white">
-                    <Zap size={20} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-200">
-                      {identity.isCourse ? "Course upgrade available" : "Content upgrade available"}
-                    </p>
-                    <h2 className="mt-1 text-base font-bold leading-snug text-white">{firstAvailableUpdate.title}</h2>
-                    {firstAvailableUpdate.description?.trim() ? (
-                      <p className="mt-2 text-sm leading-relaxed text-white/75">{firstAvailableUpdate.description.trim()}</p>
-                    ) : updateBenefits.length > 0 ? (
-                      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75" aria-label="Included in this update">
-                        {updateBenefits.map((benefit) => <li key={benefit} className="flex items-center gap-1.5"><CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-emerald-400" />{benefit}</li>)}
-                      </ul>
-                    ) : (
-                      <p className="mt-2 text-sm leading-relaxed text-white/75">A published content update is available for this product.</p>
-                    )}
-                    {firstAvailableUpdate.description?.trim() && updateBenefits.length > 0 ? (
-                      <p className="mt-2 text-xs text-white/60">Includes {updateBenefits.join(" · ")}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <PaymentButton
-                  block
-                  className="relative mt-4"
-                  icon={<Zap size={18} />}
-                  onClick={handleBuyUpgrade}
-                  data-pdp-upgrade-checkout=""
-                  label={`Upgrade for ${formatPrice(firstAvailableUpdate.cashPrice)}`}
-                />
-                {onOpenCourse ? (
-                  <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
-                    <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                      <PlayCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span>{identity.libraryAction}</span>
-                    </span>
-                  </GlassButton>
-                ) : null}
-              </GlassSurface>
-            ) : onOpenCourse ? (
-              <button
-                type="button"
-                data-pdp-library-primary
-                onClick={() => onOpenCourse(product)}
-                className="dc-pdp-library-cta"
-              >
-                <PlayCircle aria-hidden="true" className="h-5 w-5 shrink-0" />
-                <span>{identity.libraryAction}</span>
-              </button>
-            ) : null
+          {isProductOwned && !hasScopedSelection ? (
+            <section data-pdp-owned-access>
+              {onOpenCourse ? <button type="button" data-pdp-library-primary onClick={() => onOpenCourse(product)} className="dc-pdp-library-cta">{identity.libraryAction}</button> : null}
+              {paidContent.available.length ? <button type="button" data-pdp-remaining-paid className="dc-pdp-text-action" onClick={() => { setActiveTab("Paid"); document.querySelector("[data-pdp-details]")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{paidContent.available.length} paid item{paidContent.available.length === 1 ? "" : "s"} not yet owned · View Paid</button> : null}
+            </section>
           ) : (
-            <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-visible text-white" data-pdp-price-box contentClassName="p-5">
-              <div className="relative flex flex-wrap items-end gap-x-2 gap-y-1">
-                {product.originalPrice > product.price && product.originalPrice > 0 ? <span className="mb-1 text-sm dc-anchor-price">{formatPrice(product.originalPrice)}</span> : null}
-                <span className="text-4xl tracking-tight dc-hero-price">{formatPrice(product.price)}</span>
-                {discount > 0 ? <span className="mb-1 text-xs font-semibold text-emerald-300">Save {discount}%</span> : null}
-              </div>
-              <PaymentButton
-                block
-                className="relative mt-4"
-                icon={<Zap size={18} />}
-                disabled={unavailable}
-                onClick={primaryAction}
-                data-pdp-checkout=""
-                label={unavailable ? "Coming soon" : productIsFree ? "Get access · Free" : `Get access · ${formatPrice(product.price)}`}
-              />
-              {!productIsFree && onAddToCart && (
-                <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart(product.id)} className="mt-2.5 w-full disabled:opacity-60 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold">
-                  <ShoppingCart aria-hidden="true" className="h-4 w-4" /> {inCart ? "In cart" : "Add to cart"}
-                </GlassButton>
-              )}
-              <div className="relative mt-3 flex justify-end">
-                <div ref={shareRef} className="relative">
-                  <GlassButton
-                    type="button"
-                    onClick={() => setShareOpen((value) => !value)}
-                    aria-label="Share product"
-                    aria-expanded={shareOpen}
-                    aria-haspopup="menu"
-                    className="min-h-11 min-w-11 [&_.size-12]:size-10"
-                  >
-                    <Share2 aria-hidden="true" className="h-4 w-4" />
-                  </GlassButton>
-                  <GlassSurface data-product-share radius={20} className="dc-scene-plate absolute right-0 top-12 z-50 w-60 max-w-[calc(100vw-2rem)] text-white" id="product-share-menu" contentClassName="py-1" hidden={!shareOpen}>
-                    <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
-                    <PopoverItem onClick={() => void shareNative()} className="text-xs font-medium"><Share2 aria-hidden="true" className="h-3.5 w-3.5" /> Share via device</PopoverItem>
-                    <PopoverItem onClick={() => shareTo("whatsapp")} className="text-xs font-medium"><MessageCircle aria-hidden="true" className="h-3.5 w-3.5" /> WhatsApp</PopoverItem>
-                    <PopoverItem onClick={() => shareTo("telegram")} className="text-xs font-medium"><Send aria-hidden="true" className="h-3.5 w-3.5" /> Telegram</PopoverItem>
-                    <PopoverItem onClick={() => void copyLink()} className="justify-between text-xs font-medium"><span className="flex items-center gap-3"><Copy aria-hidden="true" className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check aria-hidden="true" className="h-3.5 w-3.5 text-emerald-400" />}</PopoverItem>
-                  </GlassSurface>
-                </div>
-              </div>
-            </GlassSurface>
-          )}
-
-            {/* Thumb zone: once the buy box scrolls away the primary action
-                follows the user down the page, parked where the thumb rests
-                and clear of the (unchanged) footer dock. */}
-            {!isProductOwned && !unavailable ? (
-              <div data-pdp-thumb-bar className="dc-scene-plate dc-scene-plate--bar dc-thumb-bar flex items-center gap-3 md:hidden">
-                <div className="flex min-w-0 flex-col">
-                  <span className="text-[15px] dc-hero-price">{formatPrice(product.price)}</span>
-                  {product.originalPrice > product.price ? (
-                    <span className="text-[10.5px] dc-anchor-price">{formatPrice(product.originalPrice)}</span>
-                  ) : null}
-                </div>
-                {/* Sticky thumb CTA — the same payment component, so the
-                    follow-the-thumb action can never drift from the buy box. */}
-                <PaymentButton
-                  block
-                  className="min-w-0 flex-1"
-                  icon={<Zap size={18} />}
-                  onClick={primaryAction}
-                  data-pdp-thumb-checkout=""
-                  ariaLabel={productIsFree ? "Get free access" : `Get access for ${formatPrice(product.price)}`}
-                  label={productIsFree ? "Get access" : "Get access now"}
-                />
-              </div>
-            ) : null}
-
-            {unavailable && (
-              <div className="dc-scene-ink rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4 text-sm text-amber-200 backdrop-blur-xl">
-                This product is published for preview, but checkout is not enabled yet.
-              </div>
-            )}
-
-            {!isProductOwned && !unavailable && canShowCouponInput && (
-              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white" contentClassName="p-4">
-                <PromoCodeInput
-                  kind="coupon"
-                  label="Have a coupon? Enter the code below."
-                  placeholder="Enter coupon code"
-                  appliedCode={appliedCoupon?.code ?? null}
-                  appliedMessage={appliedCoupon?.label ?? null}
-                  errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-                  onApply={handleApplyCoupon}
-                  onRemove={handleRemoveCoupon}
-                />
-              </GlassSurface>
-            )}
-
-          </section>
-
-          <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
-          {hasPurchaseBuilder && (
-            <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase</h2><p className="dc-scene-ink text-xs dc-ink-3">Choose the full product or select available modules, resources, and paid updates.</p></div>
-              <PdpPurchaseBuilder
-                product={product}
-                isProductOwned={isProductOwned}
-                ownedUpdateIds={updates}
-                ownedModuleIds={ownedModuleIds}
-                ownedResourceIds={ownedResourceIds}
+            <section data-pdp-price-box id="pdp-purchase-review" tabIndex={-1} className="dc-pdp-purchase">
+              {hasPurchaseBuilder ? <PdpPurchaseBuilder
+                key={`${product.id}:${user?.id || "guest"}`}
+                compact product={product} isProductOwned={isProductOwned}
+                ownedUpdateIds={updates} ownedModuleIds={ownedModuleIds} ownedResourceIds={ownedResourceIds}
+                selectionRequest={activePaidSelectionRequest}
                 returnRoute={`#/product/${encodeURIComponent(product.id)}`}
-                onPreview={handlePreview}
-              />
+                onPreview={handlePreview} onSelectionChange={handleSelectionChange}
+                pricing={pricingView} couponEntry={couponEntry}
+              /> : <>
+                {couponEntry}
+                <PdpSelectionSummary snapshot={order} pricing={pricingView} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
+                <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
+              </>}
+              {accessError ? <p className="dc-pdp-pricing-error">{accessError} <button type="button" className="dc-pdp-text-action" onClick={retryAccess}>Retry access check</button></p> : null}
+              {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not available for purchase yet.</p> : null}
             </section>
           )}
 
-          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <div className="dc-pdp-secondary-actions">
+            {!isProductOwned && !productIsFree && !unavailable && purchaseMode === "full_product" && onAddToCart ? (
+              <button type="button" disabled={inCart} onClick={() => onAddToCart(product.id)} className="dc-pdp-text-action">{inCart ? "In cart" : "Add to cart"}</button>
+            ) : null}
+            {onToggleFavorite ? (
+              <button type="button" data-pdp-save aria-label={favorite ? "Remove from saved products" : "Save product"} aria-pressed={favorite} onClick={() => onToggleFavorite(product.id)} className="dc-pdp-text-action">{favorite ? "Saved" : "Save"}</button>
+            ) : null}
+            <div ref={shareRef}>
+              <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" aria-expanded={shareOpen} aria-controls="product-share-menu" aria-haspopup="menu" className="dc-pdp-text-action">Share</button>
+              <div data-product-share role="menu" id="product-share-menu" aria-label="Share product" className="dc-pdp-share-menu" hidden={!shareOpen} onKeyDown={(event) => {
+                if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='menuitem']"));
+                const current = items.indexOf(document.activeElement as HTMLButtonElement);
+                const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+                items[next]?.focus({ preventScroll: true });
+              }}>
+                <PopoverItem role="menuitem" onClick={() => void shareNative()}>Share via device</PopoverItem>
+                <PopoverItem role="menuitem" onClick={() => shareTo("whatsapp")}>WhatsApp</PopoverItem>
+                <PopoverItem role="menuitem" onClick={() => shareTo("telegram")}>Telegram</PopoverItem>
+                <PopoverItem role="menuitem" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</PopoverItem>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
+          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule}
+            paidContent={<PdpPaidContent available={paidContent.available} owned={paidContent.owned} selection={paidSelection}
+              signedIn={Boolean(user)} loading={accessLoading} error={accessError || undefined} onRetry={retryAccess} unavailable={unavailable}
+              onChoose={choosePaidContent} onReview={reviewPaidSelection} />} />
           <ReviewsCard
             mode="preview"
             product={product}
@@ -1005,8 +807,8 @@ function PremiumProductContent({
             onSubmit={() => void submitReview()}
           />
           {related.length > 0 && <RelatedProducts products={related} onNavigate={onNavigateToProduct} />}
-          </div>
         </div>
+      </div>
       {expandedImage && (
         <div
           data-pdp-lightbox
@@ -1094,15 +896,6 @@ function formatResourceType(type: string): string {
   return labels[normalized] || normalized.replace(/[_-]+/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-function buildUpdateBenefits(update: NonNullable<Product["paidUpdates"]>[number]): string[] {
-  const modules = update.includedModuleIds?.length || 0;
-  const resources = update.includedResourceIds?.length || 0;
-  return [
-    modules > 0 ? `${modules} module${modules === 1 ? "" : "s"}` : null,
-    resources > 0 ? `${resources} resource${resources === 1 ? "" : "s"}` : null,
-  ].filter((item): item is string => Boolean(item));
-}
-
 const GENERIC_PRODUCT_IMAGE = /^(?:hero(?:-main|-\d+)?|related-\d+|gallery-\d+|product-(?:pdf|video|ebook|live))$/i;
 const TOPIC_IMAGE_RULES: Array<{ file: RegExp; product: RegExp }> = [
   { file: /chemical[-_ ]reactions?/i, product: /\bchemical\s+reactions?\b/i },
@@ -1154,19 +947,8 @@ function getProductImageSources(product: Product): string[] {
     .filter((image) => imageSourceMatchesProduct(image, product));
 }
 
-function ProductArtworkFallback({ product, title, typeLabel, compact = false }: { product: Product; title: string; typeLabel: string; compact?: boolean }) {
-  const subject = getProductSubjectLabel(product);
-  return (
-    <div role="img" aria-label={`Artwork unavailable for ${title}`} className={`dc-pdp-artwork-fallback ${compact ? "dc-pdp-artwork-fallback--compact" : ""}`}>
-      <div className="dc-pdp-artwork-copy">
-        <span className="dc-pdp-artwork-type">{typeLabel}</span>
-        <BookOpen aria-hidden="true" className="dc-pdp-artwork-icon" />
-        <strong>{title}</strong>
-        {subject ? <span className="dc-pdp-artwork-subject">{subject}</span> : null}
-        <span className="dc-pdp-artwork-note">Product artwork unavailable</span>
-      </div>
-    </div>
-  );
+function ProductArtworkFallback({ title, compact = false }: { product: Product; title: string; typeLabel: string; compact?: boolean }) {
+  return <div role="img" aria-label={`Artwork unavailable for ${title}`} className={`dc-pdp-artwork-fallback ${compact ? "dc-pdp-artwork-fallback--compact" : ""}`}><span>Image unavailable</span></div>;
 }
 
 function ProductImageThumb({ product, source }: { product: Product; source: string | undefined }) {
@@ -1177,204 +959,110 @@ function ProductImageThumb({ product, source }: { product: Product; source: stri
   return <img src={source} alt={identity.title} loading="lazy" decoding="async" width={112} height={96} onError={() => setFailed(true)} className="h-24 w-28 shrink-0 object-contain" />;
 }
 
-function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
-  const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
-  const instructorLabel = getProductInstructorLabel(product);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const [tabBarStuck, setTabBarStuck] = useState(false);
-  // Mouse parity on the tab strip too: drag it sideways instead of hunting for
-  // Shift+wheel, and a drag never switches the tab it ends on.
-  const tabStrip = useDragScroll<HTMLDivElement>();
-
-  // Magnet behaviour: the tab bar is sticky inside the PDP scroll container,
-  // so it sticks just below the app header while the user scrolls through the
-  // card. A 1px sentinel above the bar flips the "stuck" styling the moment
-  // the bar reaches the top edge.
+function ProductDescription({ text }: { text: string }) {
+  const id = useId();
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || typeof IntersectionObserver === "undefined") return;
-    // Inside the desktop shell the page's own <main> no longer scrolls — the
-    // shell's [data-desktop-content] is the scrollport. Measuring against a
-    // non-scrolling ancestor would never flip the stuck styling on desktop.
-    const shellScroller = sentinel.closest<HTMLElement>("[data-desktop-content]");
-    const root = shellScroller || sentinel.closest<HTMLElement>("[data-pdp-scroll]");
-    // On desktop the bar seats one topbar + 0.75rem below the viewport top
-    // (see the PDP desktop block in index.css), so the stuck styling has to
-    // flip at that line, not at the scroller edge. On phone / tablet the bar
-    // seats at the scroller edge and the margin stays 0.
-    let rootMargin = "0px";
-    if (shellScroller) {
-      const topbar = parseFloat(getComputedStyle(shellScroller.closest("[data-desktop-shell]") || shellScroller).getPropertyValue("--desktop-topbar-height")) || 64;
-      rootMargin = `-${topbar + 12}px 0px 0px 0px`;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) setTabBarStuck(!entry.isIntersecting);
-      },
-      { root: root || null, threshold: 0, rootMargin },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, []);
-
-  // `overflow: clip` (with `overflow-hidden` kept in the class list as the
-  // legacy-Safari fallback) clips the rounded corners WITHOUT creating a
-  // scroll box — an `overflow-hidden` ancestor traps `position: sticky`,
-  // which is why the magnet tab bar below never seated under the header.
+    const element = ref.current;
+    if (!element) return;
+    let active = true;
+    const measure = () => {
+      if (active) setCanExpand(element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 4 + 1);
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    void document.fonts?.ready.then(measure);
+    return () => { active = false; observer?.disconnect(); };
+  }, [text]);
   return (
-    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="dc-scene-plate overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
-      <div ref={sentinelRef} aria-hidden className="h-px" />
-      <div
-        data-pdp-tabbar
-        data-stuck={tabBarStuck ? "true" : "false"}
-        className={`sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200 ${tabBarStuck ? "dc-scene-plate dc-scene-plate--bar bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
-      >
-        {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
-            the same control the store filter row uses — one sliding droplet
-            instead of repainting a white pill per click. The sticky bar around it
-            (`data-pdp-tabbar`, its stuck shadow, `rounded-t-[23px]`) is untouched,
-            and so is every `data-pdp-curriculum*` hook. `dc-segment` is the
-            light-theme ink in src/glass.css. */}
-        <div ref={tabStrip.ref} onPointerDown={tabStrip.onPointerDown} className="flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <GlassToggleGroup
-            className="dc-segment dc-scene-plate shrink-0"
-            value={tab}
-            onValueChange={(next) => onTab(next as DetailTab)}
-            aria-label="Product details"
-          >
-            {tabs.map((item) => (
-              <GlassToggleItem key={item} value={item} className="whitespace-nowrap px-3.5 py-2 text-xs font-semibold min-h-[38px]">
-                {item}
-              </GlassToggleItem>
-            ))}
-          </GlassToggleGroup>
-        </div>
+    <div>
+      <p ref={ref} id={id} className="dc-pdp-description" data-expanded={expanded}>{text}</p>
+      {canExpand ? <button type="button" aria-controls={id} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="dc-pdp-text-action">{expanded ? "Show less" : "Read more"}</button> : null}
+    </div>
+  );
+}
+
+function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule, paidContent }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void; paidContent: import("react").ReactNode }) {
+  const tabs: { value: DetailTab; label: string }[] = [
+    { value: "Description", label: "About" },
+    { value: "Curriculum", label: "Content" },
+    { value: "Paid", label: "Paid" },
+  ];
+  return (
+    <section data-pdp-details>
+      <div data-pdp-tabbar className="dc-pdp-tabs" role="group" aria-label="Product details">
+        {tabs.map((item) => (
+          <button key={item.value} type="button" aria-pressed={tab === item.value} onClick={() => onTab(item.value)}>{item.label}</button>
+        ))}
       </div>
-      <div className="p-4 pt-3" data-pdp-tab-content aria-live="polite">
+      <div data-pdp-tab-content aria-live="polite" className="dc-pdp-detail-content">
         {tab === "Description" && (
-          <div className="space-y-4">
-            <section>
-              <h2 className="dc-pdp-section-heading">{getProductPresentation(product).aboutHeading}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                {product.description?.trim() || "A description has not been added for this product yet."}
-              </p>
-            </section>
+          <div className="dc-pdp-detail-sections">
+            {product.description?.trim() ? <ProductDescription key={product.id} text={product.description.trim()} /> : null}
             {includedItems.length > 0 && (
-              <SimplePanel data-pdp-included className="dc-pdp-flat" contentClassName="p-4">
-                <h3 className="mb-3 text-sm font-semibold text-white">What's included</h3>
-                <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 sm:grid-cols-2">
-                  {includedItems.map((item) => <li key={item} className="flex min-w-0 items-start gap-2 text-sm leading-relaxed text-white/80"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" /><span>{item}</span></li>)}
-                </ul>
-              </SimplePanel>
+              <section data-pdp-included>
+                <h3 className="dc-pdp-section-heading">Includes</h3>
+                <ul className="dc-pdp-included-list">{includedItems.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
             )}
             {highlights.length > 0 && (
-              <SimplePanel data-pdp-highlights className="dc-pdp-flat" contentClassName="p-4">
-                <h3 className="mb-3 text-sm font-semibold text-white">Product highlights</h3>
-                <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 sm:grid-cols-2">
-                  {highlights.map((highlight) => <li key={highlight} className="flex min-w-0 items-start gap-2 text-sm leading-relaxed text-white/80"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" /><span>{highlight}</span></li>)}
-                </ul>
-              </SimplePanel>
+              <section data-pdp-highlights>
+                <h3 className="dc-pdp-section-heading">Highlights</h3>
+                <ul className="dc-pdp-highlight-list">{highlights.slice(0, 4).map((highlight) => <li key={highlight}>{highlight}</li>)}</ul>
+                {highlights.length > 4 ? <details className="dc-pdp-more-highlights"><summary>More highlights</summary><ul className="dc-pdp-highlight-list">{highlights.slice(4).map((highlight) => <li key={highlight}>{highlight}</li>)}</ul></details> : null}
+              </section>
             )}
+            {!product.description?.trim() && includedItems.length === 0 && highlights.length === 0 ? <EmptyDetail text="Details will be available soon." /> : null}
           </div>
         )}
         {tab === "Curriculum" && (
-          modules.length === 0 ? (
-            <EmptyDetail text={curriculumMode === "paid-upgrade" ? "Every published upgrade is already in your library." : "No curriculum has been published for this product yet."} />
-          ) : (
-            <div className="space-y-3" data-pdp-curriculum data-pdp-curriculum-mode={curriculumMode}>
-              {curriculumMode === "paid-upgrade" ? (
-                <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Paid upgrades</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-100/75">These modules are not part of the base product. Unlock them with a published paid update.</p>
-                </div>
-              ) : null}
-              <div className="space-y-2">
-                {modules.map((module, index) => (
-                  <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
-                ))}
-              </div>
+          modules.length === 0 ? <EmptyDetail text={curriculumMode === "paid-upgrade" ? "All updates are in your library." : "No content published yet."} /> : (
+            <div data-pdp-curriculum data-pdp-curriculum-mode={curriculumMode}>
+              {curriculumMode === "paid-upgrade" ? <p data-pdp-curriculum-upgrade-hint className="dc-pdp-paid-note">Available with a paid update.</p> : null}
+              {modules.map((module, index) => <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />)}
             </div>
           )
         )}
-        {tab === "Instructor" && (
-          instructorLabel ? (
-            <article data-pdp-instructor className="flex items-start gap-4">
-              <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/15 bg-indigo-500/15 text-base font-bold text-indigo-100">{initials(instructorLabel)}</div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-white/55">Instructor / provider</p>
-                <p className="mt-1 break-words font-semibold text-white">{instructorLabel}</p>
-              </div>
-            </article>
-          ) : <EmptyDetail text="Instructor or provider information has not been added yet." />
-        )}
+        {tab === "Paid" && paidContent}
       </div>
-    </GlassSurface>
+    </section>
   );
 }
 
 function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, depth = 0 }: { module: CurriculumModule; index: number; expandedModule: string | null; onExpandModule: (id: string | null) => void; depth?: number }) {
-  const open = expandedModule === module.id;
+  const panelId = useId();
   const childModules = module.modules || [];
   const resources = module.resources || [];
+  const open = expandedModule === module.id || Boolean(expandedModule && curriculumContainsId(childModules, expandedModule));
   const paid = Boolean(module.paid);
-  /* Wave 10: each module is the pack GlassAccordion (tint 0.4, radius 18), driven
-     by the same single `expandedModule` state as before, so only one module is
-     open at a time across every nesting level. A paid upgrade keeps its amber
-     meaning colour on the rim + text; the material itself is the pack's. */
   return (
-    <GlassAccordion
-      type="single"
-      value={open ? [module.id] : []}
-      onValueChange={(next) => onExpandModule(next.includes(module.id) ? module.id : null)}
-      className={paid ? "border border-amber-400/30 bg-amber-500/15" : ""}
-      style={{ marginLeft: depth ? depth * 12 : 0 }}
-      data-pdp-curriculum-module
-      data-module-id={module.id}
-      data-paid={paid ? "true" : "false"}
-    >
-      <GlassAccordionItem value={module.id} className="px-3">
-        <GlassAccordionTrigger className="gap-3 py-3">
-          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${paid ? "bg-amber-500" : "bg-indigo-600"}`}>{index + 1}</span>
-          <span className="min-w-0 flex-1">
-            <span className={`block text-[10px] font-semibold uppercase tracking-wide ${paid ? "text-amber-200/70" : "text-white/45"}`}>Module {String(index + 1).padStart(2, "0")}</span>
-            <span className={`mt-0.5 block break-words text-sm font-semibold leading-snug ${paid ? "text-amber-100" : "text-white"}`}>{module.title}</span>
-            {paid ? (
-              <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200">
-                  <LockKeyhole className="h-2.5 w-2.5" /> Paid upgrade
-                </span>
-                {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-200">{module.paidUpdatePrice}</span> : null}
-              </span>
-            ) : null}
-          </span>
-          {(resources.length > 0 || childModules.length > 0) && (
-            <span className={`shrink-0 text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>
-              {resources.length > 0 ? `${resources.length} resource${resources.length === 1 ? "" : "s"}` : null}
-              {resources.length > 0 && childModules.length > 0 ? " · " : null}
-              {childModules.length > 0 ? `${childModules.length} submodule${childModules.length === 1 ? "" : "s"}` : null}
-            </span>
-          )}
-          {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-400" /> : null}
-        </GlassAccordionTrigger>
-        <GlassAccordionContent className="space-y-2 pb-3">
-          {resources.map((resource) => (
-            <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>
-              <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-white/40"}`} />
-              <span className="min-w-0 flex-1 break-words">{resource.name}</span>
-              <span className={`shrink-0 text-[9px] uppercase tracking-wide ${paid ? "text-amber-300/70" : "text-white/55"}`}>{formatResourceType(resource.type)}</span>
-            </div>
-          ))}
-          {childModules.map((child, childIndex) => (
-            <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />
-          ))}
-          {resources.length === 0 && childModules.length === 0 ? <p className={`text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>Module details will appear here when published.</p> : null}
-        </GlassAccordionContent>
-      </GlassAccordionItem>
-    </GlassAccordion>
+    <div data-pdp-curriculum-module data-module-id={module.id} data-paid={paid ? "true" : "false"} className="dc-pdp-curriculum-row" data-depth={depth}>
+      <button type="button" className="dc-pdp-module-heading" aria-expanded={open} aria-controls={panelId} onClick={() => onExpandModule(open ? null : module.id)}>
+        <span aria-hidden="true" className="dc-pdp-module-index">{String(index + 1).padStart(2, "0")}</span>
+        <span className="dc-pdp-module-copy">
+          <span className="dc-pdp-module-name">{module.title}</span>
+          {paid ? <span className="dc-pdp-paid-note">Paid upgrade{module.paidUpdatePrice ? ` · ${module.paidUpdatePrice}` : ""}</span> : null}
+          {resources.length > 0 || childModules.length > 0 ? (
+            <span className="dc-pdp-module-count">{[resources.length > 0 ? `${resources.length} resource${resources.length === 1 ? "" : "s"}` : "", childModules.length > 0 ? `${childModules.length} submodule${childModules.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ")}</span>
+          ) : null}
+        </span>
+        <ChevronRight aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      <div id={panelId} hidden={!open} className="dc-pdp-module-content">
+        {open ? <>
+        {resources.map((resource) => <div key={resource.id} className="dc-pdp-resource"><span>{resource.name}</span><span>{formatResourceType(resource.type)}</span></div>)}
+        {childModules.map((child, childIndex) => <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />)}
+        {resources.length === 0 && childModules.length === 0 ? <p className="dc-pdp-selection-note">No resources yet.</p> : null}
+        </> : null}
+      </div>
+    </div>
   );
 }
 
-const REVIEW_PREVIEW_SIZE = 4;
+const REVIEW_PREVIEW_SIZE = 2;
 const REVIEW_PAGE_SIZE = 8;
 
 function getProductRatingSummary(product: Product, reviews: PublishedProductReview[]) {
@@ -1413,129 +1101,51 @@ function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, 
   const identity = getProductPresentation(product);
 
   return (
-    <GlassSurface
-      data-pdp-reviews
-      data-pdp-review-mode={mode}
-      id={mode === "preview" ? "product-reviews" : undefined}
-      radius={24}
-      tint={0.25}
-      blur={0}
-      className="dc-scene-plate scroll-mt-36 text-white"
-      contentClassName="p-4 sm:p-5"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section data-pdp-reviews data-pdp-review-mode={mode} id={mode === "preview" ? "product-reviews" : undefined} className="dc-pdp-review-section">
+      <header className="dc-pdp-section-header">
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-white">{mode === "full" ? "Reviews & Ratings" : "Ratings & Reviews"}</h2>
-          <p className="mt-1 break-words text-xs text-white/55">
-            {mode === "full" ? `Published feedback for ${identity.title}` : "Published feedback for this product"}
-          </p>
+          <h2 className="dc-pdp-section-heading">{mode === "full" ? "Reviews & Ratings" : "Reviews"}</h2>
+          {mode === "full" ? <p className="dc-pdp-selection-note">{identity.title}</p> : null}
         </div>
-        <button
-          type="button"
-          onClick={onToggleComposer}
-          aria-controls="pdp-review-composer"
-          aria-expanded={composerOpen}
-          className="dc-pdp-review-action"
-        >
-          {composerOpen ? "Cancel review" : canReview ? "Write a review" : "Sign in to review"}
+        <button type="button" onClick={onToggleComposer} aria-controls="pdp-review-composer" aria-expanded={composerOpen} className="dc-pdp-text-action">
+          {composerOpen ? "Cancel" : canReview ? "Write a review" : "Sign in to review"}
         </button>
-      </div>
-
-      <div data-pdp-rating-summary className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
-        {ratingSummary.hasRating ? (
-          <>
-            <div className="min-w-[4.5rem] text-center">
-              <span className="block text-3xl font-bold tabular-nums text-white">{ratingSummary.rating.toFixed(1)}</span>
-              <RatingStars rating={ratingSummary.rating} className="mt-1 justify-center" />
-            </div>
-            <div className="min-h-10 w-px self-stretch bg-white/10" aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white/85">{ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}</p>
-              <p className="mt-1 text-xs text-white/55">{ratingSummary.source === "catalog" ? "Catalog rating summary" : "Based on published reviews"}</p>
-            </div>
-          </>
-        ) : (
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white/85">No ratings yet</p>
-            <p className="mt-1 text-xs text-white/55">Be the first to share a rating.</p>
-          </div>
-        )}
-      </div>
-
-      {composerOpen && canReview && (
-        <SimplePanel id="pdp-review-composer" className="mt-4" contentClassName="p-4">
-          <p className="text-sm font-semibold text-white/85">Your rating</p>
-          <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Choose a rating">
-            {[1, 2, 3, 4, 5].map((value) => (
-              <GlassButton key={value} type="button" onClick={() => onRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} aria-pressed={value === rating} className="min-h-11 min-w-11 [&_.size-12]:size-9">
-                <Star aria-hidden="true" className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} />
-              </GlassButton>
-            ))}
-          </div>
-          <textarea
-            value={comment}
-            onChange={(event) => onComment(event.target.value.slice(0, 2000))}
-            rows={4}
-            maxLength={2000}
-            aria-label="Your product review"
-            placeholder="Share your experience with this product…"
-            className="dc-field mt-3 w-full resize-y rounded-2xl p-3 text-sm text-white outline-none placeholder:text-white/40 focus-visible:ring-2 focus-visible:ring-indigo-300"
-          />
-          <button type="button" disabled={submitting} onClick={onSubmit} className="dc-pdp-review-submit mt-3 w-full disabled:opacity-60">
-            {submitting ? "Submitting…" : "Submit review"}
-          </button>
-        </SimplePanel>
-      )}
-      {notice && <p role="status" aria-live="polite" className="mt-3 rounded-xl border border-indigo-300/10 bg-indigo-500/10 p-3 text-xs font-medium text-indigo-100">{notice}</p>}
-
-      {reviews.length > 0 ? (
-        <div
-          data-pdp-review-list
-          data-pdp-review-preview-limit={mode === "preview" ? REVIEW_PREVIEW_SIZE : undefined}
-          className="mt-4 grid grid-cols-1 gap-3"
-        >
-          {visibleReviews.map((review) => (
-            <SimplePanel className="dc-pdp-review min-w-0" key={review.id} contentClassName="p-4">
-              <article>
-                <div className="flex min-w-0 items-center gap-3">
-                  <div aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-white">
-                      <span className="min-w-0 break-words">{review.name}</span>
-                      {review.verifiedPurchase && <BadgeCheck aria-label="Verified purchase" className="h-4 w-4 shrink-0 text-emerald-400" />}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-white/55">{review.date}</p>
-                  </div>
-                  <RatingStars rating={review.rating} className="shrink-0" />
-                </div>
-                <p className="mt-3 break-words text-sm leading-relaxed text-white/80">“{review.comment}”</p>
-              </article>
-            </SimplePanel>
-          ))}
-          {remaining > 0 ? (
-            <GlassButton
-              variant="capsule"
-              type="button"
-              data-load-more-reviews
-              onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
-              className="min-h-11 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-semibold"
-            >
-              Show {Math.min(REVIEW_PAGE_SIZE, remaining)} more reviews
-            </GlassButton>
-          ) : null}
+      </header>
+      {mode === "full" && ratingSummary.hasRating ? (
+        <div data-pdp-rating-summary className="dc-pdp-review-summary">
+          <RatingStars rating={ratingSummary.rating} />
+          <span>{ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}</span>
         </div>
-      ) : (
-        <p className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-sm text-white/60">
-          No published written reviews yet.
-        </p>
-      )}
-
-      {mode === "preview" ? (
-        <button type="button" data-see-all-reviews onClick={onSeeAllReviews} className="dc-pdp-review-action mt-4 w-full">
-          See all reviews
-        </button>
       ) : null}
-    </GlassSurface>
+      {composerOpen && canReview && (
+        <div id="pdp-review-composer" className="dc-pdp-review-composer">
+          <p className="dc-pdp-selection-note">Your rating</p>
+          <div className="mt-2 flex gap-1" role="group" aria-label="Choose a rating">
+            {[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" onClick={() => onRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} aria-pressed={value === rating} className="dc-pdp-rating-choice"><Star aria-hidden="true" className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></button>)}
+          </div>
+          <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} aria-label="Your product review" placeholder="Your experience" className="dc-pdp-review-input" />
+          <button type="button" disabled={submitting} onClick={onSubmit} className="dc-pdp-review-submit">{submitting ? "Submitting…" : "Submit review"}</button>
+        </div>
+      )}
+      {notice ? <p role="status" aria-live="polite" className="dc-pdp-selection-note">{notice}</p> : null}
+      {reviews.length > 0 ? (
+        <div data-pdp-review-list data-pdp-review-preview-limit={mode === "preview" ? REVIEW_PREVIEW_SIZE : undefined}>
+          {visibleReviews.map((review) => (
+            <article className="dc-pdp-review" key={review.id}>
+              <header className="dc-pdp-review-header">
+                <div className="min-w-0"><p className="dc-pdp-review-name">{review.name}</p><p className="dc-pdp-review-date">{review.date}{review.verifiedPurchase ? <span className="dc-pdp-review-verified">Verified purchase</span> : null}</p></div>
+                <RatingStars rating={review.rating} />
+              </header>
+              <p className="dc-pdp-review-comment">{review.comment}</p>
+            </article>
+          ))}
+          {remaining > 0 ? <button type="button" data-load-more-reviews onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)} className="dc-pdp-text-action">Load more reviews</button> : null}
+        </div>
+      ) : <p className="dc-pdp-selection-note">No written reviews yet.</p>}
+      {mode === "preview" && reviews.length > 0 ? (
+        <button type="button" data-see-all-reviews onClick={onSeeAllReviews} className="dc-pdp-text-action">See all reviews</button>
+      ) : null}
+    </section>
   );
 }
 
@@ -1560,11 +1170,8 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
   };
 
   return (
-    <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-4 sm:p-5">
-      <header className="mb-4">
-        <h2 className="text-xl font-bold text-white">Related products</h2>
-        <p className="mt-1 text-xs text-white/55">More to explore from the same class and chapters</p>
-      </header>
+    <section data-pdp-related>
+      <h2 className="dc-pdp-section-heading mb-4">Related products</h2>
       <div data-pdp-related-list className="flex flex-col gap-5">
         {rows.map((rowProducts, rowIndex) => {
           if (rowProducts.length === 0) return null;
@@ -1577,8 +1184,8 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
           return (
             <section key={rowNumber} data-pdp-related-row={rowNumber} className="min-w-0">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 className="text-xs font-semibold text-white/65">Recommendations {rowNumber}</h3>
-                <div className="flex items-center gap-1.5" aria-label={`Slide controls for related products row ${rowNumber}`}>
+                <h3 className="sr-only">Related products, row {rowNumber}</h3>
+                {pages.length > 1 ? <div className="flex items-center gap-1.5" aria-label={`Slide controls for related products row ${rowNumber}`}>
                   <button
                     type="button"
                     data-pdp-related-prev={rowNumber}
@@ -1601,7 +1208,7 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
                   >
                     <ChevronRight aria-hidden="true" className="h-4 w-4" />
                   </button>
-                </div>
+                </div> : null}
               </div>
               <div id={viewportId} data-pdp-related-viewport className="min-w-0" aria-live="polite">
                 <div
@@ -1623,61 +1230,40 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
           );
         })}
       </div>
-    </GlassSurface>
+    </section>
   );
 }
 
 function RelatedProductCard({ item, onNavigate }: { item: Product; onNavigate: (product: Product) => void }) {
   const identity = getProductPresentation(item);
-  const image = getProductImageSources(item)[0];
+  const image = item.images?.find((source) => source.trim()) || item.image;
+  const finalPrice = isFreeProduct(item) ? 0 : item.price;
   return (
-    <SimplePanel
-      data-pdp-related-card
-      role="button"
-      tabIndex={0}
-      onClick={() => onNavigate(item)}
-      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate(item); } }}
-      aria-label={`View ${identity.title}`}
-      className="group min-w-0 cursor-pointer overflow-hidden text-left transition-colors hover:border-indigo-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300"
-      contentClassName="flex min-w-0 p-0"
-    >
+    <button type="button" data-pdp-related-card onClick={() => onNavigate(item)} aria-label={`View ${identity.title}`} className="dc-pdp-related-card">
       <ProductImageThumb product={item} source={image} />
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3">
+      <span className="dc-pdp-related-copy">
         <span className="dc-pdp-related-type">{identity.typeLabel}</span>
-        <span className="break-words text-sm font-semibold text-white">{identity.title}</span>
-        <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/60">
-          {item.reviews > 0 && item.rating > 0 ? <><RatingStars rating={item.rating} />{item.rating.toFixed(1)} · {item.reviews.toLocaleString("en-IN")} ratings</> : "No ratings yet"}
+        <span className="dc-pdp-related-title">{identity.title}</span>
+        {item.reviews > 0 && item.rating > 0 ? <span className="dc-pdp-related-rating"><RatingStars rating={item.rating} /><span>{item.reviews.toLocaleString("en-IN")} ratings</span></span> : null}
+        <span className="dc-pdp-price-line">
+          {Number.isFinite(item.originalPrice) && item.originalPrice > finalPrice && item.originalPrice > 0 ? <del className="dc-pdp-original-price">{formatPrice(item.originalPrice)}</del> : null}
+          <strong className="dc-pdp-related-price">{formatPrice(finalPrice)}</strong>
         </span>
-        <span className="font-semibold tabular-nums text-white">{formatPrice(item.price)}</span>
       </span>
-    </SimplePanel>
+    </button>
   );
 }
 
 function RatingStars({ rating, className = "" }: { rating: number; className?: string }) {
-  const safeRating = Math.max(0, Math.min(5, Number(rating) || 0));
-  return (
-    <span role="img" aria-label={`${safeRating.toFixed(1)} out of 5 stars`} className={`flex items-center gap-0.5 ${className}`}>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Star key={index} aria-hidden="true" className={`h-3.5 w-3.5 ${safeRating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-white/35"}`} />
-      ))}
-    </span>
-  );
+  const safeRating = Math.max(0, Math.min(5, rating));
+  return <span role="img" aria-label={`${safeRating.toFixed(1)} out of 5 stars`} className={`dc-pdp-rating ${className}`}><Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /><strong>{safeRating.toFixed(1)}</strong></span>;
 }
 
-function Meta({ icon: Icon, label, text }: { icon: typeof Clock; label: string; text: string }) {
-  return (
-    <div data-pdp-meta-item className="flex min-w-0 items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-      <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-indigo-200/80" />
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-white/50">{label}</span>
-        <span className="break-words text-xs font-semibold leading-snug text-white/85">{text}</span>
-      </span>
-    </div>
-  );
+function Meta({ label, text }: { label: string; text: string }) {
+  return <div data-pdp-meta-item><dt>{label}</dt><dd>{text}</dd></div>;
 }
 function EmptyDetail({ text }: { text: string }) {
-  return <SimplePanel data-pdp-empty-detail contentClassName="flex flex-col items-center py-6 text-center"><PackageOpen aria-hidden="true" className="h-6 w-6 text-white/40" /><p className="mt-2 max-w-md px-3 text-sm text-white/60">{text}</p></SimplePanel>;
+  return <p data-pdp-empty-detail className="dc-pdp-selection-note">{text}</p>;
 }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
@@ -1691,13 +1277,15 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
   const resourceSource = Array.isArray(module.resources) ? module.resources : Array.isArray(module.files) ? module.files : [];
   const resources = resourceSource.map((item, index) => {
     const resource = (item || {}) as Record<string, unknown>;
-    if (resource.visibility === "hidden" || resource.accessLevel === "hidden") return null;
+    if (resource.visibility === "hidden" || resource.active === false || resource.accessLevel === "hidden") return null;
     return {
       id: String(resource.id || `${id}-r-${index}`),
       name: String(resource.name || resource.title || "Resource"),
       type: String(resource.type || "file"),
+      includeInBundle: resource.includeInBundle !== false,
+      paidUpdateId: resource.paidUpdateId ? String(resource.paidUpdateId) : undefined,
     };
-  }).filter((resource): resource is { id: string; name: string; type: string } => resource !== null);
+  }).filter((resource): resource is { id: string; name: string; type: string; includeInBundle: boolean; paidUpdateId: string | undefined } => resource !== null);
   const modules = (Array.isArray(module.modules) ? module.modules : []).map((child) => asCurriculumModule(child, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
   const paid = isPaidUpgradeModule(module, paidModuleIds);
   const update = paid ? resolvePaidUpdateForModule(module, product.paidUpdates || []) : null;
@@ -1708,6 +1296,7 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
     id: id || title,
     title,
     paid,
+    includeInBundle: module.includeInBundle !== false,
     paidUpdateId: paidUpdateId || undefined,
     paidUpdateTitle: paidUpdateTitle || undefined,
     paidUpdatePrice: paidUpdatePrice || undefined,
@@ -1718,12 +1307,10 @@ const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<s
 
 export const collectCurriculumModules = (product: Product): CurriculumModule[] => {
   const paidModuleIds = collectPaidModuleIdSet(product.paidUpdates || []);
-  const canonical = (product.canonicalModules || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
-  if (canonical.length > 0) return canonical;
-  // CatalogContext retains a legacy demo tree for older Course Player routes.
-  // Never present that shared demo data as this live product's curriculum.
-  const courseContent = product.courseContent === fullDemoCourseContent ? [] : (product.courseContent || []);
-  return courseContent.map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
+  // Catalogue membership is mapped before presentation strips price fields,
+  // so resource-only updates cannot masquerade as base-course content.
+  const source = product.courseContent === fullDemoCourseContent ? { ...product, courseContent: [] } : product;
+  return commerceContentTree(source).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
 };
 
 
@@ -1734,9 +1321,8 @@ export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
 function MissingProduct({ onBack }: { onBack: () => void }) {
   return (
-    <div data-pdp-not-found className="grid min-h-[50vh] place-items-center px-6 py-10 text-center">
+    <div data-pdp-root data-pdp-not-found className="grid min-h-[50vh] place-items-center px-6 py-10 text-center">
       <div>
-        <ShoppingBag aria-hidden="true" className="mx-auto h-10 w-10 text-white/40" />
         <h1 className="mt-4 text-2xl font-bold text-white">Product not found</h1>
         <p className="mt-2 text-sm text-white/60">This product is no longer available in the live catalog.</p>
         <button type="button" onClick={onBack} className="dc-pdp-library-cta mt-5">Back to store</button>

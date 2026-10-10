@@ -1,21 +1,54 @@
 interface StepIndicatorProps {
   currentStep: number;
-  steps: { label: string; icon: string }[];
+  steps: { label: string; icon?: string }[];
+  minimal?: boolean;
 }
 
-export default function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
+export default function StepIndicator({ currentStep, steps, minimal = false }: StepIndicatorProps) {
   // Goal-gradient effect: a single continuous rail above the circles shows how
   // much of the checkout is already behind the user. Discrete circles alone
   // read as "three unrelated screens"; a filling rail reads as momentum, which
   // is what keeps people finishing a flow.
-  const progress = steps.length > 1
-    ? Math.min(100, Math.max(0, ((currentStep - 1) / (steps.length - 1)) * 100))
-    : 100;
+  const progress =
+    steps.length > 1
+      ? Math.min(100, Math.max(0, ((currentStep - 1) / (steps.length - 1)) * 100))
+      : 100;
 
+  if (minimal)
+    return (
+      <nav aria-label="Checkout steps" data-step-indicator className="dc-checkout-step-indicator">
+        <ol>
+          {steps.map((step, index) => (
+            <li
+              key={step.label}
+              aria-current={index + 1 === currentStep ? "step" : undefined}
+              data-step-state={
+                index + 1 < currentStep
+                  ? "complete"
+                  : index + 1 === currentStep
+                  ? "current"
+                  : "upcoming"
+              }
+            >
+              <span aria-hidden="true">{index + 1}</span>
+              <strong>{step.label}</strong>
+              {index + 1 < currentStep ? <span className="sr-only">Completed</span> : null}
+            </li>
+          ))}
+        </ol>
+      </nav>
+    );
   return (
     <div className="px-2 py-3" data-step-indicator>
       <div className="mb-3 flex items-center gap-2">
-        <div className="dc-goal-rail flex-1" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={currentStep} aria-label="Checkout progress">
+        <div
+          className="dc-goal-rail flex-1"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={steps.length}
+          aria-valuenow={currentStep}
+          aria-label="Checkout progress"
+        >
           <div className="dc-goal-fill" style={{ width: `${progress}%` }} />
         </div>
         <span className="shrink-0 text-[10px] font-black uppercase tracking-wide dc-ink-3">
@@ -23,51 +56,52 @@ export default function StepIndicator({ currentStep, steps }: StepIndicatorProps
         </span>
       </div>
       <div className="flex items-center justify-between">
-      {steps.map((step, index) => {
-        const stepNum = index + 1;
-        const isCompleted = stepNum < currentStep;
-        const isActive = stepNum === currentStep;
+        {steps.map((step, index) => {
+          const stepNum = index + 1;
+          const isCompleted = stepNum < currentStep;
+          const isActive = stepNum === currentStep;
 
-        return (
-          <div key={index} className="flex flex-1 items-center">
-            {/* Step circle */}
-            <div className="flex flex-col items-center flex-1">
-              <div
-                className={`
+          return (
+            <div key={index} className="flex flex-1 items-center">
+              {/* Step circle */}
+              <div className="flex flex-col items-center flex-1">
+                <div
+                  className={`
                   w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold
                   transition-all duration-300 border-2
-                  ${isCompleted
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : isActive
-                      ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-[var(--dc-elev-accent)]'
-                      : 'border-white/20 dc-ink-3'
+                  ${
+                    isCompleted
+                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      : isActive
+                      ? "bg-indigo-600 border-indigo-600 text-white scale-110 shadow-[var(--dc-elev-accent)]"
+                      : "border-white/20 dc-ink-3"
                   }
                 `}
-              >
-                {isCompleted ? '✓' : step.icon}
-              </div>
-              <span
-                className={`
+                >
+                  {isCompleted ? "✓" : step.icon}
+                </div>
+                <span
+                  className={`
                   text-[11px] mt-1.5 font-medium text-center leading-tight
-                  ${isActive ? 'text-indigo-200' : isCompleted ? 'text-emerald-300' : 'dc-ink-3'}
+                  ${isActive ? "text-indigo-200" : isCompleted ? "text-emerald-300" : "dc-ink-3"}
                 `}
-              >
-                {step.label}
-              </span>
-            </div>
+                >
+                  {step.label}
+                </span>
+              </div>
 
-            {/* Connector line */}
-            {index < steps.length - 1 && (
-              <div
-                className={`
+              {/* Connector line */}
+              {index < steps.length - 1 && (
+                <div
+                  className={`
                   h-0.5 flex-1 mx-1 -mt-5 rounded-full transition-all duration-500
-                  ${stepNum < currentStep ? 'bg-emerald-400' : 'bg-white/15'}
+                  ${stepNum < currentStep ? "bg-emerald-400" : "bg-white/15"}
                 `}
-              />
-            )}
-          </div>
-        );
-      })}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

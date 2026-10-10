@@ -1,3 +1,4 @@
+import { commerceContentTree, isBundleIncluded, isPaidContent, isFullProductPurchase } from "./contentOwnership.js";
 // utils/serverQuotes.js
 //
 // Server-side quote engine. NEVER trust a client-supplied price; the only
@@ -149,7 +150,7 @@ export const isModuleVisible = (m) => {
 export const isModulePurchasable = (m) => {
   if (!isObject(m)) return false;
   if (!isModuleVisible(m)) return false;
-  if (m.accessLevel === "paid_update") return false;
+  if (isPaidContent(m)) return false;
   // Every visible course module can be bought a la carte. Admin can still
   // hide a module or mark it as a paid update to keep it out of the picker.
   return true;
@@ -157,9 +158,8 @@ export const isModulePurchasable = (m) => {
 
 export const isResourcePurchasable = (r) => {
   if (!isObject(r)) return false;
-  if (r.visibility === "hidden") return false;
-  if (r.accessLevel === "hidden") return false;
-  if (r.accessLevel === "paid_update") return false;
+  if (r.visibility === "hidden" || r.active === false) return false;
+  if (r.accessLevel === "hidden" || isPaidContent(r)) return false;
   return r.individuallyPurchasable === true;
 };
 
@@ -214,6 +214,16 @@ export const isProductLive = (data) => {
   return true;
 };
 
+/** Unlike the legacy parser, this distinguishes a published zero from junk. */
+const publishedPricePaise = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const cleaned = typeof value === "string" ? value.replace(/[^0-9.-]/g, "") : String(value);
+  if (!cleaned) return null;
+  const number = Number(cleaned);
+  return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) : null;
+};
+
 // ---------------------------------------------------------------------------
 // Ownership
 // ---------------------------------------------------------------------------
@@ -228,7 +238,9 @@ export const computeOwnedEntitlementIds = (purchaseDocs) => {
   const ids = new Set();
   for (const doc of arr(purchaseDocs)) {
     if (!isObject(doc)) continue;
-    if (doc.productDocumentId) ids.add(String(doc.productDocumentId));
+    if (doc.productDocumentId && isFullProductPurchase(doc)) ids.add(String(doc.productDocumentId));
+    if (doc.moduleId) ids.add(String(doc.moduleId));
+    if (doc.resourceId) ids.add(String(doc.resourceId));
     if (doc.updateId && doc.productDocumentId) {
       ids.add(String(doc.productDocumentId) + "__update__" + String(doc.updateId));
     }
@@ -255,9 +267,10 @@ export const computeOwnedEntitlementIds = (purchaseDocs) => {
 export const isModuleOwned = (module, { isProductOwned, ownedUpdateIds, ownedEntitlementIds }) => {
   if (!isObject(module)) return false;
   if (ownedEntitlementIds instanceof Set && ownedEntitlementIds.has(String(module.entitlementId || module.id))) return true;
-  if (isProductOwned && module.includeInBundle !== false) return true;
-  if (module.accessLevel === "paid_update") {
+  if (isProductOwned && isBundleIncluded(module) && module.ancestorExcludedFromBundle !== true) return true;
+  if (isPaidContent(module)) {
     const updateSet = ownedUpdateIds instanceof Set ? ownedUpdateIds : new Set(ownedUpdateIds || []);
+    if (module.paidUpdateId && updateSet.has(String(module.paidUpdateId))) return true;
     if (module.entitlementId && updateSet.has(String(module.entitlementId))) return true;
     if (updateSet.has(String(module.id))) return true;
   }
@@ -266,6 +279,12 @@ export const isModuleOwned = (module, { isProductOwned, ownedUpdateIds, ownedEnt
 
 export const isResourceOwned = (resource, modules, { isProductOwned, ownedUpdateIds, ownedEntitlementIds }) => {
   if (!isObject(resource)) return false;
+  if (ownedEntitlementIds instanceof Set && (ownedEntitlementIds.has(String(resource.entitlementId || resource.id)) || ownedEntitlementIds.has(String(resource.id)))) return true;
+  if (resource.accessLevel === "paid_update" || resource.accessLevel === "paidUpdate" || resource.paidUpdateId) {
+    const updates = ownedUpdateIds instanceof Set ? ownedUpdateIds : new Set(ownedUpdateIds || []);
+    return updates.has(String(resource.paidUpdateId || resource.entitlementId || resource.id));
+  }
+  if (resource.includeInBundle === false) return false;
   const byId = new Map(arr(modules).filter(isObject).map((m) => [m.id, m]));
   const module = byId.get(String(resource.parentModuleId));
   if (!module) return false;
@@ -363,8 +382,9 @@ export const fullProductLineFromDoc = (productDoc) => {
       minPayablePaise: 0,
     };
   }
+  if (publishedPricePaise(productDoc.price ?? productDoc.regularPrice) === null) return null;
   const regularPaise = paiseRegularFromFields(productDoc);
-  const salePaise = paiseFromPriceFields(productDoc);
+  const salePaise = Math.min(regularPaise, paiseFromPriceFields(productDoc));
   // Honour an explicit ₹0 sale (free-during-sale) instead of falling back
   // to the regular price. paiseFromPriceFields already prefers salePrice
   // when it is present and parseable, including 0.
@@ -389,17 +409,18 @@ export const moduleLineFromRecord = (productId, productTitle, module, fallbackPa
   if (!isObject(module)) return null;
   if (!isModulePurchasable(module)) return null;
   const hasOwnPrice = module.cashPrice !== null && module.cashPrice !== undefined && module.cashPrice !== "";
-  const regularPaise = hasOwnPrice ? paiseFromRupeeString(module.cashPrice) : Math.max(0, Math.round(Number(fallbackPaise || 0)));
-  if (regularPaise < 0) return null;
-  const salePaise = paiseFromRupeeString(module.salePrice);
+  const regularPaise = hasOwnPrice ? publishedPricePaise(module.cashPrice) : Math.max(0, Math.round(Number(fallbackPaise || 0)));
+  if (regularPaise === null || !Number.isFinite(regularPaise)) return null;
+  const sale = publishedPricePaise(module.salePrice);
+  const salePaise = sale === null ? null : Math.min(regularPaise, sale);
   return {
     productId: String(productId),
     moduleId: String(module.id),
     title: String(module.title || "Module"),
     parentTitle: String(productTitle || ""),
     regularPaise,
-    salePaise: salePaise > 0 && salePaise < regularPaise ? salePaise : null,
-    effectivePaise: salePaise > 0 ? salePaise : regularPaise,
+    salePaise: salePaise !== null && salePaise < regularPaise ? salePaise : null,
+    effectivePaise: salePaise ?? regularPaise,
     coinPrice: Number(module.coinPrice || 0),
     entitlementId: String(module.entitlementId || module.id),
     requiredPreviousModuleIds: arr(module.requiredPreviousModuleIds).map(String),
@@ -414,9 +435,10 @@ export const moduleLineFromRecord = (productId, productTitle, module, fallbackPa
 export const resourceLineFromRecord = (productId, productTitle, parentModule, resource) => {
   if (!isObject(resource)) return null;
   if (!isResourcePurchasable(resource)) return null;
-  const regularPaise = paiseFromRupeeString(resource.cashPrice);
-  if (regularPaise < 0) return null;
-  const salePaise = paiseFromRupeeString(resource.salePrice);
+  const regularPaise = publishedPricePaise(resource.cashPrice);
+  if (regularPaise === null) return null;
+  const sale = publishedPricePaise(resource.salePrice);
+  const salePaise = sale === null ? null : Math.min(regularPaise, sale);
   return {
     productId: String(productId),
     resourceId: String(resource.id),
@@ -424,8 +446,8 @@ export const resourceLineFromRecord = (productId, productTitle, parentModule, re
     title: String(resource.name || "Resource"),
     parentTitle: String(parentModule && parentModule.title || ""),
     regularPaise,
-    salePaise: salePaise > 0 && salePaise < regularPaise ? salePaise : null,
-    effectivePaise: salePaise > 0 ? salePaise : regularPaise,
+    salePaise: salePaise !== null && salePaise < regularPaise ? salePaise : null,
+    effectivePaise: salePaise ?? regularPaise,
     coinPrice: Number(resource.coinPrice || 0),
     entitlementId: String(resource.entitlementId || resource.id),
   };
@@ -477,12 +499,7 @@ const parseDateMaybe = (value) => {
 // Top-level quote builder
 // ---------------------------------------------------------------------------
 
-const courseTreeFromDoc = (doc) => {
-  if (!isObject(doc)) return [];
-  if (arr(doc.courseContent).length) return doc.courseContent;
-  if (isObject(doc.adminProduct) && arr(doc.adminProduct.modules).length) return doc.adminProduct.modules;
-  return [];
-};
+const courseTreeFromDoc = commerceContentTree;
 
 const PURCHASE_KINDS = new Set([
   "full_product",
@@ -622,13 +639,28 @@ export const buildQuote = (input) => {
     const purchaseDocs = purchasesByProduct instanceof Map
       ? (purchasesByProduct.get(productId) || [])
       : (purchasesByProduct && purchasesByProduct[productId]) || [];
-    const updateIds = (purchasesByProduct instanceof Map
-      ? new Set()
-      : new Set());
-    // Build owned update ids from `purchasedProductUpdateIds[productId]`.
+    const updateIds = new Set(purchaseDocs.filter(isObject).map((record) => record.updateId).filter(Boolean).map(String));
     const ownedEntitlementIds = computeOwnedEntitlementIds(purchaseDocs);
-    // Also include per-product base ownership.
-    const isProductOwned = purchaseDocs.some((d) => isObject(d) && d.productDocumentId === productId);
+    const isProductOwned = purchaseDocs.some((record) => isObject(record) && record.productDocumentId === productId && isFullProductPurchase(record));
+    // Module grants include their non-paid descendants and resources; the
+    // parent id must not cause a dependency or a child to be charged again.
+    const ownModules = new Set(purchaseDocs.filter(isObject).map((record) => record.moduleId).filter(Boolean).map(String));
+    const inherit = (nodes, parentOwned = false) => {
+      for (const module of arr(nodes)) {
+        const owned = ownModules.has(String(module.id)) || (parentOwned && isBundleIncluded(module));
+        if (owned) {
+          ownedEntitlementIds.add(String(module.id));
+          if (module.entitlementId) ownedEntitlementIds.add(String(module.entitlementId));
+          for (const resource of arr(module.resources || module.files)) {
+            if (isPaidContent(resource) || resource.includeInBundle === false) continue;
+            ownedEntitlementIds.add(String(resource.id));
+            if (resource.entitlementId) ownedEntitlementIds.add(String(resource.entitlementId));
+          }
+        }
+        inherit(module.modules, owned);
+      }
+    };
+    inherit(courseTreeFromDoc(doc));
     ownershipByProduct.set(productId, { isProductOwned, ownedUpdateIds: updateIds, ownedEntitlementIds });
   }
 
@@ -800,7 +832,7 @@ export const buildQuote = (input) => {
       effectivePaise: line.effectivePaise,
       quantity: 1,
       entitlementId: String(update.id),
-      alreadyOwned: false, // guarded above by isProductOwned only
+      alreadyOwned: own.ownedUpdateIds.has(String(update.id)),
       minPayablePaise: 0,
       parentProductTitle: String(doc.title || ""),
       detailItems,

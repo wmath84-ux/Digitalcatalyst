@@ -1,3 +1,5 @@
+import { useUserPreferences } from "./settings/useUserPreferences";
+import { canShowDevicePush, setDeviceNotificationPreference } from "../utils/deviceNotificationPreference";
 import { StrictMode, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -63,6 +65,7 @@ const LeaderboardApp = lazyRoute(() => import("./LeaderboardApp"));
 const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
 const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
+const PublicProfilePage = lazyRoute(() => import("./settings/PublicProfilePage"));
 const UsageLimitsPage = lazyRoute(() => import("./usage/UsageLimitsPage"));
 const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
 // My Study Library's creation surfaces: the builder ("+" → new course / edit
@@ -167,6 +170,7 @@ import {
   isNativeApp,
   onLocalAlarmTap,
   registerForPush,
+  cancelPendingDeviceAlarms,
   scheduleLocalAlarm,
   cancelLocalAlarms,
   getAndroidLargeIconForCategory,
@@ -611,6 +615,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(NOTIFICATIONS_HASH)) return NotificationsPage;
   if (hash.startsWith(SEARCH_HASH)) return SearchPage;
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
+  if (hash.startsWith("#/learner/")) return PublicProfilePage;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
   if (hash.startsWith(USAGE_LIMITS_HASH)) return UsageLimitsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
@@ -745,7 +750,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     <AppShell
       active={resolveActiveFromHash(hash)}
       pageTitle={
-        hash.startsWith("#/flowpath")
+        hash.startsWith(LEADERBOARD_HASH)
+          ? "Leaderboard"
+          : hash.startsWith(MY_COURSE_HASH)
+            ? (isMyCourseEditorRoute(hash) && hash.split("?")[0].endsWith("/edit") ? "Edit course" : "Create course")
+          : hash.startsWith("#/flowpath")
           ? "FlowPath"
           : hash.startsWith(REVISION_HASH)
             ? "Revision"
@@ -760,7 +769,11 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
                     : undefined
       }
       pageSubtitle={
-        hash.startsWith("#/flowpath")
+        hash.startsWith(LEADERBOARD_HASH)
+          ? "Members and referral codes"
+          : hash.startsWith(MY_COURSE_HASH)
+            ? "Your modules and study resources"
+          : hash.startsWith("#/flowpath")
           ? "Your day. Your goals. One continuous flow."
           : hash.startsWith(REVISION_HASH)
             ? "Tests, smart recall & mastery"
@@ -788,6 +801,8 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
  */
 function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
+  const accountSettings = useUserPreferences(user?.id);
+  const systemNotificationsEnabled = Boolean(user && accountSettings.ready && !accountSettings.syncError && accountSettings.preferences.push);
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
@@ -890,18 +905,17 @@ function RootPage(): ReactNode {
   }, [skipLandingForInstalledApp]);
 
   useEffect(() => {
-    if (!user) return;
-    void ensureSavedWebPushSubscription(user.id);
+    setDeviceNotificationPreference(user?.id || null, systemNotificationsEnabled);
+    if (!systemNotificationsEnabled && isAndroidNative()) void cancelPendingDeviceAlarms().catch(() => undefined);
+    return () => { setDeviceNotificationPreference(null, false); };
+  }, [user?.id, systemNotificationsEnabled]);
 
-    // Android/Chrome may refuse a permission prompt started from an effect.
-    // Retry on the user's first real tap, which is a valid browser gesture.
-    // Once granted, this also refreshes the saved endpoint on every login.
-    const subscribeOnGesture = () => {
-      void ensureSavedWebPushSubscription(user.id);
-    };
-    window.addEventListener("pointerdown", subscribeOnGesture, { once: true, capture: true });
-    return () => window.removeEventListener("pointerdown", subscribeOnGesture, { capture: true });
-  }, [user]);
+  useEffect(() => {
+    if (!user || !systemNotificationsEnabled || isNativeApp()) return;
+    // Never request permission during app startup, Home navigation, or the
+    // first unrelated tap. Refresh only an already-consented device.
+    void ensureSavedWebPushSubscription(user.id, { requestPermission: false });
+  }, [user?.id, systemNotificationsEnabled]);
 
   // Capacitor / TWA wiring. On the installed Android app the web-push
   // helper is irrelevant (it can never wake the device reliably because
@@ -920,7 +934,7 @@ function RootPage(): ReactNode {
   }, []);
 
   useEffect(() => {
-    if (!user || !isNativeApp()) return undefined;
+    if (!user || !systemNotificationsEnabled || !isNativeApp()) return undefined;
     void ensureReminderChannel();
     void registerForPush(async () => {
       // The Firebase Auth id token is what /api/push/fcm-register expects.
@@ -929,12 +943,12 @@ function RootPage(): ReactNode {
       // auth.
       try {
         const { auth } = await import("../firebase");
-        if (!auth?.currentUser) return null;
+        if (!auth?.currentUser || auth.currentUser.uid !== user.id) return null;
         return await auth.currentUser.getIdToken(true);
       } catch {
         return null;
       }
-    });
+    }, { requestPermission: false, uid: user.id });
     // Tapping a local notification deep-links to its URL — the data we
     // pass when scheduling the alarm carries the same hash routes the
     // web uses (e.g. "/#/my-day?section=tasks&item=abc").
@@ -943,7 +957,7 @@ function RootPage(): ReactNode {
       if (hashIndex >= 0) window.location.hash = url.slice(hashIndex);
     });
     return undefined;
-  }, [user]);
+  }, [user?.id, systemNotificationsEnabled]);
 
   // Foreground safety net for My Day — now driven by the universal schedule.
   //
@@ -963,6 +977,7 @@ function RootPage(): ReactNode {
     let scheduleRows: ScheduledItem[] = [];
     let current: MyDayDocData | null = null;
     let source: "canonical" | "legacy" | "pending" = "pending";
+    let disposed = false;
     const pending = new Set<string>();
     const shownKey = `eduvora.myDaySystemNotifications.v1:${user.id}`;
     const readShown = (): Record<string, number> => {
@@ -1005,6 +1020,7 @@ function RootPage(): ReactNode {
       target?: { type?: "joplin"; scheduleId?: string; noteId?: string; notebookId?: string; tagId?: string; resourceId?: string };
     };
     const checkDue = () => {
+      if (disposed) return;
       if (source === "pending") return;
       const now = Date.now();
       const shown = readShown();
@@ -1040,6 +1056,7 @@ function RootPage(): ReactNode {
         // Left small icon always app logo, right large icon contextual per section (task/schedule/reminder)
         const alarmArmed = isAndroidNative()
           ? scheduleLocalAlarm({
+              uid: user.id,
               id: item.alarmId ?? alarmId(item.key),
               at: item.dueAt,
               title: item.title,
@@ -1050,13 +1067,14 @@ function RootPage(): ReactNode {
             } as LocalAlarmItem)
           : Promise.resolve(false);
         void Promise.all([
-          showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}-${item.section}`),
+          showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}-${item.section}`, user.id),
           alarmArmed,
         ])
           .then(([displayed, armed]) => {
+            if (disposed) return;
             // Do not dedupe a failed display (for example before permission is
             // granted); the next tick must be allowed to retry it.
-            if (!displayed && !armed) return;
+            if (!displayed && !armed && canShowDevicePush(user.id)) return;
             // The tray alert existed while the in-app alerts page stayed empty
             // ("Android notification aa rahe hain lekin alerts page per dikh
             // nahi rahe"). Mirror it into the bell with the SAME document id
@@ -1109,6 +1127,7 @@ function RootPage(): ReactNode {
     // exact-time guarantee: even if the server push never arrives, the
     // local AlarmManager fires on the dot.
     const scheduleUpcoming = () => {
+      if (disposed) return;
       if (!isAndroidNative() || source === "pending") return;
       const now = Date.now();
       const items: SchedulableAlert[] = source === "canonical"
@@ -1120,6 +1139,7 @@ function RootPage(): ReactNode {
       // ones still in the future. This keeps the schedule authoritative
       // against the latest rows — adding, moving or disabling a schedule
       // updates the alarms immediately.
+      if (!canShowDevicePush(user.id)) return;
       const seen = new Set<number>();
       for (const item of items) {
         if (item.dueAt <= now) continue;
@@ -1127,6 +1147,7 @@ function RootPage(): ReactNode {
         seen.add(id);
         const itemUrl = `/${itemDeepLink(item)}`;
         void scheduleLocalAlarm({
+          uid: user.id,
           id,
           at: item.dueAt,
           title: item.title,
@@ -1172,6 +1193,7 @@ function RootPage(): ReactNode {
       });
     };
     void loadMigrationMarker(user.id).then((marker) => {
+      if (disposed) return;
       if (isMigrationComplete(marker)) attachCanonical();
       else attachLegacy();
     });
@@ -1188,6 +1210,7 @@ function RootPage(): ReactNode {
     const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      disposed = true;
       unsubscribeSchedules();
       unsubscribeLegacy();
       window.removeEventListener(SCHEDULE_CHANGED_EVENT, onScheduleChanged);
@@ -1195,7 +1218,7 @@ function RootPage(): ReactNode {
       window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user]);
+  }, [user?.id, systemNotificationsEnabled]);
 
   // Foreground safety net for FlowPath — the parallel twin of the My Day
   // effect above. FlowPath reminders previously had NO notification wiring
@@ -1209,6 +1232,7 @@ function RootPage(): ReactNode {
   useEffect(() => {
     if (!user) return undefined;
     let current: FlowPathSchedulableItem[] = [];
+    let cancelled = false;
     const pending = new Set<string>();
     const shownKey = `eduvora.flowPathSystemNotifications.v1:${user.id}`;
     const readShown = (): Record<string, number> => {
@@ -1237,6 +1261,7 @@ function RootPage(): ReactNode {
       try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
     };
     const checkDue = () => {
+      if (cancelled) return;
       if (current.length === 0) return;
       const now = Date.now();
       const shown = readShown();
@@ -1261,6 +1286,7 @@ function RootPage(): ReactNode {
         const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
         const alarmArmed = isAndroidNative()
           ? scheduleLocalAlarm({
+              uid: user.id,
               id: flowAlarmId(item.key),
               at: item.dueAt,
               title: item.title,
@@ -1271,11 +1297,12 @@ function RootPage(): ReactNode {
             } as LocalAlarmItem)
           : Promise.resolve(false);
         void Promise.all([
-          showLocalSystemNotification(item.title, item.body, itemUrl, `flowpath-${item.itemId}-${item.kind}`),
+          showLocalSystemNotification(item.title, item.body, itemUrl, `flowpath-${item.itemId}-${item.kind}`, user.id),
           alarmArmed,
         ])
           .then(([displayed, armed]) => {
-            if (!displayed && !armed) return;
+            if (cancelled) return;
+            if (!displayed && !armed && canShowDevicePush(user.id)) return;
             // Same contract as the My Day block above: a FlowPath alert the
             // device delivered must also exist in the in-app alerts page, with
             // the id the server uses for the same activity so the two merge
@@ -1299,10 +1326,12 @@ function RootPage(): ReactNode {
       try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
     };
     const scheduleUpcoming = () => {
+      if (cancelled) return;
       if (!isAndroidNative() || current.length === 0) return;
       const now = Date.now();
       const shown = readShown();
       const items = collectUpcomingFlowPathItems(current, now, tzOffset(), shown, FLOWPATH_UPCOMING_HORIZON_MS);
+      if (!canShowDevicePush(user.id)) return;
       const seen = new Set<number>();
       for (const item of items) {
         if (item.dueAt <= now) continue;
@@ -1310,6 +1339,7 @@ function RootPage(): ReactNode {
         seen.add(id);
         const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
         void scheduleLocalAlarm({
+          uid: user.id,
           id,
           at: item.dueAt,
           title: item.title,
@@ -1333,7 +1363,6 @@ function RootPage(): ReactNode {
       checkDue();
       scheduleUpcoming();
     };
-    let cancelled = false;
     const poll = async () => {
       try {
         const res = await flowpathControl<{ items: FlowPathSchedulableItem[] }>({
@@ -1367,7 +1396,7 @@ function RootPage(): ReactNode {
       window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user]);
+  }, [user?.id, systemNotificationsEnabled]);
 
   // Renewal reminders, product unlocks, new-product announcements and course
   // content updates are all SERVER-GENERATED now (the GitHub Actions minute
@@ -1924,6 +1953,7 @@ function RootPage(): ReactNode {
     );
   }
   // Settings renders inside the desktop shell like the Profile page does.
+  if (hash.startsWith("#/learner/")) return <PublicProfilePage />;
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(USAGE_LIMITS_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><UsageLimitsPage /></PageEnter>;
   if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;

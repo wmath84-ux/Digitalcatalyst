@@ -1,6 +1,5 @@
 import type { Category } from "../types";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
-import { useDragScroll } from "../../hooks/useDragScroll";
 
 interface CategoryNavProps {
   categories: Category[];
@@ -8,18 +7,19 @@ interface CategoryNavProps {
   onSelect: (id: string) => void;
 }
 
-export default function CategoryNav({ categories, activeCategory, onSelect }: CategoryNavProps) {
-  // Keep touch scrolling and give desktop pointers the same drag behaviour.
-  const strip = useDragScroll<HTMLDivElement>();
+const categoryNames: Record<string, string> = {
+  all: "All products",
+  video: "Video courses",
+  pdf: "PDFs and notes",
+  ebook: "E-books",
+  live: "Live classes",
+};
 
+export default function CategoryNav({ categories, activeCategory, onSelect }: CategoryNavProps) {
   if (categories.length === 0) return null;
 
   return (
-    <div
-      ref={strip.ref}
-      onPointerDown={strip.onPointerDown}
-      className="dc-home-category-scroll no-scrollbar"
-    >
+    <div className="dc-home-category-scroll">
       <GlassToggleGroup
         className="dc-segment dc-scene-plate shrink-0 dc-home-category-group"
         value={activeCategory}
@@ -30,9 +30,10 @@ export default function CategoryNav({ categories, activeCategory, onSelect }: Ca
           <GlassToggleItem
             key={category.id}
             value={category.id}
+            title={categoryNames[category.id] || category.label}
+            aria-label={categoryNames[category.id] || category.label}
             className="dc-home-category-item whitespace-nowrap"
           >
-            {category.icon ? <span aria-hidden="true" className="dc-home-category-icon">{category.icon}</span> : null}
             <span>{category.label}</span>
           </GlassToggleItem>
         ))}

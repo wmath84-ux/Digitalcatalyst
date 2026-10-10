@@ -231,7 +231,7 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   // it is open (the top bar shows its own FlowPath title via AppShell).
   if (hash.startsWith("#/flowpath")) return "myday";
   if (hash.startsWith("#/revision")) return "revision";
-  if (hash.startsWith("#/study-library")) return "study";
+  if (hash.startsWith("#/study-library") || hash.startsWith("#/my-course/")) return "study";
   // The Settings page is its own route; without this the rail falls back to
   // "home" and no entry lights up while the learner is on it.
   if (hash.startsWith("#/settings")) return "settings";

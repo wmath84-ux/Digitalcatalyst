@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
+import { canonicalOwnershipScopes, isActiveOwnershipRecord, isFullProductPurchase } from "../../utils/contentOwnership";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { collection, onSnapshot, query, where, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import { subscribeShared } from "../lib/sharedSnapshot";
 import { PUBLISHED_REVIEWS_KEY, publishedReviewsQuery } from "../hooks/useProductReviews";
@@ -90,7 +91,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     searchKeywords,
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,
-    originalPrice: isFree ? 0 : Math.max(regularPrice, salePrice),
+    // Keep the configured regular price for display even when final access
+    // is free. Missing MRP remains zero; checkout authority stays server-side.
+    originalPrice: Math.max(regularPrice, salePrice),
     features: features.length > 0 ? features : undefined,
     price: isFree ? 0 : salePrice,
     isFree,
@@ -117,7 +120,25 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [baseProducts, setBaseProducts] = useState<Product[]>([]);
   const [ratingAggregates, setRatingAggregates] = useState<Map<string, { sum: number; count: number }>>(new Map());
-  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
+  const currentUid = useRef(user?.id);
+  currentUid.current = user?.id;
+  const [purchases, setPurchases] = useState<{ uid: string; records: { id: string; data: DocumentData }[] } | null>(null);
+  const [canonical, setCanonical] = useState<{ uid: string; records: DocumentData[] } | null>(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    return subscribeShared(`entitlements:${uid}`, () => query(collection(db, "entitlements"), where("uid", "==", uid)), (docs, error) => {
+      if (currentUid.current !== uid) return;
+      setCanonical(error ? null : { uid, records: docs.map((doc) => doc.data).filter((record) => record.uid === uid) });
+    });
+  }, [user?.id]);
+  const [ownershipNow, setOwnershipNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!user?.id) return;
+    const timer = window.setInterval(() => setOwnershipNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [user?.id]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -220,28 +241,47 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      setPurchasedIds(new Set());
+      setPurchases(null);
       return undefined;
     }
     // Shared with `useCourseAccess` (same subcollection, same shape), so the
     // player/PDP no longer re-download the learner's purchases alongside the
     // catalog's own copy.
     return subscribeShared(`users/${user.id}/purchases`, () => collection(db, "users", user.id, "purchases"), (docs, purchaseError) => {
+      if (currentUid.current !== user.id) return;
       if (purchaseError) {
         console.error("Purchase entitlement sync failed", purchaseError);
-        setPurchasedIds(new Set());
+        setPurchases(null);
         return;
       }
-      const ids = new Set<string>();
-      docs.forEach((item) => {
-        const data = item.data || {};
-        ids.add(String(item.id));
-        if (data.productDocumentId != null) ids.add(String(data.productDocumentId));
-        if (data.productId != null) ids.add(String(data.productId));
-      });
-      setPurchasedIds(ids);
+      setPurchases({ uid: user.id, records: docs });
     });
   }, [user]);
+
+  const purchasedIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!user || purchases?.uid !== user.id || canonical?.uid !== user.id) return ids;
+    const aliasesFor = (id: unknown) => {
+      const key = String(id || "");
+      const product = products.find((product) => product.id === key || product.documentId === key);
+      return new Set([key, product?.id, product?.documentId].filter(Boolean).map(String));
+    };
+    for (const record of canonical.records) {
+      if (record.planId || record.subscriptionPlanId || record.source === "subscription" || !isActiveOwnershipRecord(record, ownershipNow) || !isFullProductPurchase(record)) continue;
+      for (const alias of aliasesFor(record.productDocumentId || record.productId)) ids.add(alias);
+    }
+    for (const item of purchases.records) {
+      const data: DocumentData = { ...item.data, productDocumentId: item.data.productDocumentId || item.data.productId || item.id };
+      if (data.planId || data.subscriptionPlanId || data.source === "subscription") continue;
+      if (!isActiveOwnershipRecord(data, ownershipNow) || !isFullProductPurchase(data)) continue;
+      const aliases = aliasesFor(data.productDocumentId);
+      if (canonicalOwnershipScopes(canonical.records.filter((record) => aliases.has(String(record.productDocumentId || record.productId)))).full) continue;
+      ids.add(String(item.id));
+      if (data.productDocumentId != null) ids.add(String(data.productDocumentId));
+      if (data.productId != null) ids.add(String(data.productId));
+    }
+    return ids;
+  }, [user?.id, purchases, canonical, products, ownershipNow]);
 
   const value = useMemo(() => ({ products, purchasedIds, loading, error }), [products, purchasedIds, loading, error]);
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

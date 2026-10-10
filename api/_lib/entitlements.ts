@@ -1,3 +1,4 @@
+import { isActiveOwnershipRecord } from "../../utils/contentOwnership.js";
 // api/_lib/entitlements.ts
 //
 // Part 6 — Server-side entitlement writer. Runs the canonical
@@ -300,7 +301,11 @@ export const grantEntitlementsFromQuote = async (
       ? await Promise.all(entitlementTargets.map((target) => tx.get(target.ref)))
       : [];
     for (let index = 0; index < entitlementTargets.length; index += 1) {
-      if (entitlementSnaps[index].exists) continue; // idempotent
+      const existing = entitlementSnaps[index];
+      // A replay cannot restore a revoked grant. A genuinely NEW verified
+      // order can replace an inactive/elapsed scope; do not silently charge
+      // for a renewal then skip its grant just because the old doc exists.
+      if (existing.exists && (replayed || isActiveOwnershipRecord(existing.data(), now))) continue;
       const { record, ref } = entitlementTargets[index];
       entitlementWrites.push({ ref, data: { ...record, unlockedAt: nowTs } });
     }

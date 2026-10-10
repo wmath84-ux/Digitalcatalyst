@@ -1,3 +1,4 @@
+import { loadQuoteOwnership } from "./quoteOwnership.js";
 // api/_lib/quotes.ts
 //
 // Server-authoritative price-quote engine. The only place the canonical
@@ -156,59 +157,6 @@ const loadProducts = async (productIds: string[]): Promise<Map<string, Firestore
 };
 
 /**
- * Load the user's purchase docs and per-product update ids. Returns a
- * Map<productId, { purchaseDocs, updateIds }>.
- */
-const loadEntitlements = async (
-  uid: string,
-  productIds: string[],
-): Promise<Map<string, { purchaseDocs: FirestorePurchaseDoc[]; updateIds: string[] }>> => {
-  const db = adminDb();
-  const userRef = db.collection("users").doc(uid);
-  const userSnap = await userRef.get();
-  const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-  const purchasedUpdateIds = (userData.purchasedProductUpdateIds || {}) as Record<string, unknown>;
-  const purchasesMap = (userData.purchases || {}) as Record<string, unknown>;
-  void purchasesMap; // reserved for future per-line entitlement reads
-
-  const result = new Map<string, { purchaseDocs: FirestorePurchaseDoc[]; updateIds: string[] }>();
-  for (const productId of productIds) {
-    // The user's purchases subcollection: `users/{uid}/purchases/{productId}`
-    // carries the base-product purchase, and
-    // `users/{uid}/purchases/{productId}__update__{updateId}` carries
-    // the per-update entitlement.
-    const baseRef = userRef.collection("purchases").doc(productId);
-    const baseSnap = await baseRef.get();
-    const purchaseDocs: FirestorePurchaseDoc[] = [];
-    if (baseSnap.exists) {
-      purchaseDocs.push({ ...(baseSnap.data() || {}), productDocumentId: productId } as FirestorePurchaseDoc);
-    }
-    // Collect all update entitlements for this product via id-prefix scan.
-    // (We avoid a `select` on `updateId` here because Firestore Admin
-    // SDK requires a composite index for `where("productId", "==", X)
-    // && where("updateId", "!=", null)`. Instead we list documents in
-    // the user's `purchases` subcollection whose id starts with
-    // `${productId}__update__`.)
-    const prefix = `${productId}__update__`;
-    const listSnap = await userRef.collection("purchases").listDocuments();
-    for (const docRef of listSnap) {
-      if (!docRef.id.startsWith(prefix)) continue;
-      const dsnap = await docRef.get();
-      if (!dsnap.exists) continue;
-      const d = dsnap.data() || {};
-      const updateId = String(d.updateId || docRef.id.slice(prefix.length) || "");
-      if (!updateId) continue;
-      purchaseDocs.push({ ...d, productDocumentId: productId, updateId } as FirestorePurchaseDoc);
-    }
-    const updateIds = Array.isArray(purchasedUpdateIds[productId])
-      ? (purchasedUpdateIds[productId] as unknown[]).map((v) => String(v))
-      : [];
-    result.set(productId, { purchaseDocs, updateIds });
-  }
-  return result;
-};
-
-/**
  * The handler exposed via `api/quotes/create.ts`. Verifies the token,
  * loads products + entitlements, runs the pure engine, persists the
  * quote, and returns the canonical `ServerPriceQuote` (with an extra
@@ -237,65 +185,10 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
     const db = adminDb();
     const productIdsToLoad = resolveProductIdsToLoad(selection);
     const products = await loadProducts(productIdsToLoad);
-    const entitlements = await loadEntitlements(firebaseUser.uid, productIdsToLoad);
+    const entitlements = await loadQuoteOwnership(db, firebaseUser.uid, products);
 
-    // Build the `purchasesByProduct` map the pure engine expects. We
-    // augment each product's purchaseDocs with the user's per-product
-    // `purchasedProductUpdateIds[productId]` so the engine can detect
-    // "owned via paid update".
-    const purchasesByProduct = new Map<string, FirestorePurchaseDoc[]>();
-    for (const productId of productIdsToLoad) {
-      const entry = entitlements.get(productId);
-      const docs = [...(entry ? entry.purchaseDocs : [])];
-      // Add synthetic purchase docs for owned updates so the engine's
-      // `isModuleOwned` helper sees the update entitlements via the
-      // product doc's `purchasedProductUpdateIds` path. The engine
-      // also reads `ownedUpdateIds` directly (see below), so this is
-      // belt-and-braces.
-      purchasesByProduct.set(productId, docs);
-    }
-
-    // Build a per-product `ownedUpdateIds` set so the engine's
-    // dependency check sees paid-update ownership.
-    const ownedUpdateIdsByProduct = new Map<string, Set<string>>();
-    for (const productId of productIdsToLoad) {
-      const ids = entitlements.get(productId)?.updateIds || [];
-      ownedUpdateIdsByProduct.set(productId, new Set(ids));
-    }
-
-    // Run the pure engine. Inject ownership into each per-product
-    // sub-engine call by wrapping the product map with the engine's
-    // expected shape and feeding `ownedUpdateIds` via the product doc's
-    // `purchasedProductUpdateIds` field. (The engine reads
-    // `purchasedProductUpdateIds[productId]` from the user doc; we
-    // already loaded those via `loadEntitlements` and stored the
-    // resulting sets in `ownedUpdateIdsByProduct`. The engine currently
-    // reads `ownedUpdateIds` from the purchasesByProduct map; we
-    // attach the per-product update-id list as a virtual purchase doc
-    // that the engine will treat as a no-op for line building but use
-    // for ownership checks. Simpler: the engine helper
-    // `isModuleOwned` reads `ownedUpdateIds` from the ownership
-    // argument the engine builds internally. We extend that via
-    // a wrapper.)
     const wrappedPurchasesByProduct = new Map<string, FirestorePurchaseDoc[]>();
-    for (const productId of productIdsToLoad) {
-      const original = purchasesByProduct.get(productId) || [];
-      const updateIds = ownedUpdateIdsByProduct.get(productId) || new Set();
-      // Each owned update becomes a "synthetic" purchase doc that
-      // carries `updateId` so `computeOwnedEntitlementIds` picks it
-      // up. The actual `isModuleOwned` check is done by the engine
-      // via the `ownedUpdateIds` arg, which the engine also reads
-      // from the per-product `purchaseDocs` (via `isProductOwned`
-      // and per-update ids). The engine implementation in
-      // `utils/serverQuotes.js` already reads
-      // `ownedEntitlementIds` from the purchase docs, so this is
-      // the contract the engine honours.
-      const docs: FirestorePurchaseDoc[] = [...original];
-      for (const updateId of updateIds) {
-        docs.push({ productDocumentId: productId, updateId, entitlementId: `${productId}__update__${updateId}` });
-      }
-      wrappedPurchasesByProduct.set(productId, docs);
-    }
+    for (const [productId, ownership] of entitlements) wrappedPurchasesByProduct.set(productId, ownership.purchaseDocs);
 
     const quoteId = `Q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -314,21 +207,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       }
     }
 
-    // The pure engine only sees Map<id, doc>; the `ownedUpdateIds` it
-    // uses for `isModuleOwned` is currently empty in our call. To make
-    // the engine aware of paid-update ownership, we attach the
-    // update-id list to each product doc under the synthetic field
-    // `purchasedProductUpdateIds` (the engine reads it from the user
-    // doc normally; for the server-driven path we replicate it here).
-    const productsWithOwnership = new Map<string, FirestoreProductDoc>();
-    for (const [id, doc] of products.entries()) {
-      const ids = ownedUpdateIdsByProduct.get(id);
-      if (ids && ids.size > 0) {
-        productsWithOwnership.set(id, { ...doc, purchasedProductUpdateIds: { [id]: Array.from(ids) } } as FirestoreProductDoc);
-      } else {
-        productsWithOwnership.set(id, doc);
-      }
-    }
+    const productsWithOwnership = products;
 
     // -----------------------------------------------------------------
     // Part 7 — load the coupon (if any) and the user context the

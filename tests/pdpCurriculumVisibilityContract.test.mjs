@@ -51,13 +51,13 @@ test("PDP curriculum is filtered through the shared visibility helper", () => {
   assert.match(pdp, /Paid upgrade/);
 });
 
-test("paid curriculum rows use a distinct amber appearance", () => {
-  // Phase A6: no gradient plates anywhere — the paid row is a translucent
-  // amber tone over the glass, the index disc a solid amber.
-  assert.match(pdp, /border-amber-400\/30 bg-amber-500\/15/);
-  assert.match(pdp, /paid \? "bg-amber-500" : "bg-indigo-600"/);
-  assert.match(pdp, /LockKeyhole/);
+test("paid curriculum rows retain a distinct, plainly labelled amber appearance", () => {
+  const css = fs.readFileSync("src/pdp-minimal.css", "utf8");
+  assert.match(pdp, /data-paid=\{paid \? "true" : "false"\}/);
+  assert.match(pdp, /Paid upgrade/);
   assert.match(pdp, /data-pdp-curriculum-upgrade-hint/);
+  assert.match(css, /\[data-paid="true"\] > \.dc-pdp-module-heading \{ color: #f9dfa8/);
+  assert.doesNotMatch(pdp, /Crown|LockKeyhole|bg-amber-500\/15/);
 });
 
 test("before purchase, paid-update modules are dropped from the curriculum", () => {

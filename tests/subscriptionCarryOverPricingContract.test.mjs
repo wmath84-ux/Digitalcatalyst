@@ -91,8 +91,14 @@ test("the page computes membership-owned features/products and excludes them fro
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   assert.match(page, /membershipOwnedFeatureIds/);
   assert.match(page, /membershipOwnedProductIds/);
-  assert.match(page, /selectedFeatureIds\.filter\(\(id\) => !membershipOwnedFeatureIdSet\.has\(id\)\)/);
-  assert.match(page, /selectedCourseIds\.filter\(\(id\) => !membershipOwnedProductIdSet\.has\(id\)\)/);
+  assert.match(
+    page,
+    /selectedFeatureIds\.filter\(\(id\) => !membershipOwnedFeatureIdSet\.has\(id\)\)/
+  );
+  assert.match(
+    page,
+    /selectedCourseIds\.filter\(\(id\) => !membershipOwnedProductIdSet\.has\(id\)\)/
+  );
   // The summary shows a clear "Already purchased" row and the page banner
   // explicitly says nothing is charged again.
   assert.match(page, /data-subscription-carryover-note/);
@@ -105,10 +111,9 @@ test("the price summary renders already-purchased rows at ₹0", () => {
   const summary = read("src/subscription/components/PriceSummary.tsx");
   assert.match(summary, /alreadyOwnedFeatureTitles/);
   assert.match(summary, /alreadyOwnedProductTitles/);
-  assert.match(summary, /Already purchased features/);
-  assert.match(summary, /Already purchased courses/);
-  assert.match(summary, /₹0 — no charge/);
-  assert.match(summary, /data-subscription-owned-feature-names/);
+  assert.match(summary, /Already purchased · Carried over/);
+  assert.match(summary, /data-subscription-summary-owned/);
+  assert.match(summary, /<dd>₹0<\/dd>/);
 });
 
 test("the feature and course pickers treat membership-owned items as purchased", () => {
@@ -143,7 +148,7 @@ test("the quote engine keeps subscription already-owned lines visible at ₹0", 
 
 test("the checkout review labels carried-over items as already purchased", () => {
   const review = read("src/components/checkout/CheckoutReviewStep.tsx");
-  assert.match(review, /Already purchased — no charge/);
+  assert.match(review, /Already purchased · No charge/);
   assert.match(review, /alreadyOwned: Boolean\(pricedLine && pricedLine\.alreadyOwned\)/);
   assert.match(review, /Already purchased/);
 });
@@ -162,8 +167,15 @@ test("renewal and plan-change grants merge previously purchased access", () => {
   const writer = read("api/_lib/subscriptions.ts");
   // mergeSubscriptionAccess is used for add-ons AND now for renewals /
   // plan changes (the writer keeps every already-paid feature/product).
-  const occurrences = (writer.match(/const access = mergeSubscriptionAccess\(previousData, args\.plan, args\.selectedFeatureIds\)/g) || []).length;
-  assert.ok(occurrences >= 2, `expected merge in add-on + renewal/plan-change paths, got ${occurrences}`);
+  const occurrences = (
+    writer.match(
+      /const access = mergeSubscriptionAccess\(previousData, args\.plan, args\.selectedFeatureIds\)/g
+    ) || []
+  ).length;
+  assert.ok(
+    occurrences >= 2,
+    `expected merge in add-on + renewal/plan-change paths, got ${occurrences}`
+  );
   assert.match(writer, /features: access\.features/);
   assert.match(writer, /includedProductIds: access\.includedProductIds/);
   assert.match(writer, /subscriptionFeatures: access\.features/);

@@ -11,7 +11,7 @@
 //   · every course is a card drawn with the store's own product-card
 //     material, carrying the cover, the title, Play, Edit and Delete
 //     (owner brief 2026-09-29: a self-created course deletes from its card —
-//     through the same profile-card glass the Profile page wears)
+//     through a keyboard-accessible, native confirmation)
 //   · Play opens the SAME Course Player a purchased course opens, on the
 //     modules and practice the learner built.
 //
@@ -19,13 +19,11 @@
 // resource lists, filters or plan-usage panels — because the course itself
 // now carries all of that inside the player.
 
-import { useCallback, useMemo, useState } from "react";
-import {
-  ArrowLeft, ImagePlus, Layers3, Library, Plus, RefreshCw, Sparkles,
-} from "lucide-react";
+import { useCallback, useMemo, useState, useRef } from "react";
+import { ArrowLeft, Search, X } from "lucide-react";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
+import ContentDialog from "../components/ui/ContentDialog";
 import { toast } from "../components/ui/glass-toast";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
@@ -35,11 +33,15 @@ import { countModules, countResources } from "../lib/myCourseClient";
 import { trackFeatureEvent } from "../utils/featureAnalytics";
 import type { MyCourse } from "../types/myCourse";
 import MyCourseCard from "./MyCourseCard";
+import "../profile/profile-minimal.css";
+import "./study-library-minimal.css";
 
 /** Routes the library navigates to (kept in one place — see appRoutes.ts). */
 export const MY_COURSE_NEW_HASH = "#/my-course/new";
-export const myCoursePlayHash = (courseId: string) => `#/my-course/${encodeURIComponent(courseId)}`;
-export const myCourseEditHash = (courseId: string) => `#/my-course/${encodeURIComponent(courseId)}/edit`;
+export const myCoursePlayHash = (courseId: string) =>
+  `#/my-course/${encodeURIComponent(courseId)}`;
+export const myCourseEditHash = (courseId: string) =>
+  `#/my-course/${encodeURIComponent(courseId)}/edit`;
 
 const navigateFromBottom = (tab: TabKey) => {
   if (tab === "home") window.location.hash = "#/home";
@@ -61,17 +63,25 @@ export default function StudyLibraryPage() {
     const needle = query.trim().toLowerCase();
     if (!needle) return myCourses.courses;
     return myCourses.courses.filter((course) =>
-      `${course.title} ${course.description || ""}`.toLowerCase().includes(needle),
+      `${course.title} ${course.description || ""}`
+        .toLowerCase()
+        .includes(needle)
     );
   }, [myCourses.courses, query]);
 
   const totals = useMemo(
     () => ({
       courses: myCourses.courses.length,
-      modules: myCourses.courses.reduce((total, course) => total + countModules(course.modules), 0),
-      resources: myCourses.courses.reduce((total, course) => total + countResources(course.modules), 0),
+      modules: myCourses.courses.reduce(
+        (total, course) => total + countModules(course.modules),
+        0
+      ),
+      resources: myCourses.courses.reduce(
+        (total, course) => total + countResources(course.modules),
+        0
+      ),
     }),
-    [myCourses.courses],
+    [myCourses.courses]
   );
 
   const openCourse = useCallback((course: MyCourse) => {
@@ -84,234 +94,257 @@ export default function StudyLibraryPage() {
     window.location.hash = myCourseEditHash(course.id);
   }, []);
 
-  // Delete from the card (owner brief 2026-09-29). The card only ASKS — the
-  // course is removed after the confirmation, which wears the exact glass the
-  // Profile page's cards wear. The builder keeps its own Delete for edits.
+  // The card requests deletion; the native dialog keeps the named course,
+  // destructive rule, busy state and retry visible until the write succeeds.
   const [pendingDelete, setPendingDelete] = useState<MyCourse | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deletePendingRef = useRef(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
 
   const requestDelete = useCallback((course: MyCourse) => {
+    setDeleteError("");
     setPendingDelete(course);
   }, []);
 
   const confirmDelete = useCallback(async () => {
-    if (!pendingDelete || deleting) return;
+    if (!pendingDelete || deletePendingRef.current) return;
+    deletePendingRef.current = true;
+    setDeleteError("");
     setDeleting(true);
-    const result = await myCourses.remove(pendingDelete.id);
-    setDeleting(false);
-    setPendingDelete(null);
-    if (!result.ok) {
+    try {
+      const result = await myCourses.remove(pendingDelete.id);
+      if (!result.ok) {
+        setDeleteError(
+          result.message || "Course was not deleted. Please try again."
+        );
+        return;
+      }
+      setPendingDelete(null);
+      trackFeatureEvent("my_course_deleted", { surface: "study_library" });
       toast({
-        title: "The course was not deleted",
-        description: result.message,
-        variant: "error",
+        title: "Course deleted",
+        description: pendingDelete.title || "Untitled course",
+        variant: "success",
       });
-      return;
+    } catch {
+      setDeleteError(
+        "Course was not deleted. Please retry. Your course is still in the library."
+      );
+    } finally {
+      deletePendingRef.current = false;
+      setDeleting(false);
     }
-    trackFeatureEvent("my_course_deleted", { surface: "study_library" });
-    toast({ title: "Course deleted", description: `“${pendingDelete.title || "Untitled course"}” is gone.`, variant: "success" });
-  }, [deleting, myCourses, pendingDelete]);
+  }, [myCourses, pendingDelete]);
 
-  if (!user) {
+  if (!user)
     return (
-      <main className="grid min-h-screen place-items-center px-6 text-center text-white" data-study-library-page>
-        <div>
-          <Library className="mx-auto h-12 w-12 text-violet-300" />
-          <h1 className="mt-4 text-2xl font-black">Sign in to open your library</h1>
-        </div>
+      <main data-study-library-page className="dc-study-signed-out">
+        <h1>My Study Library</h1>
+        <p className="dc-account-note">Sign in to access your own courses.</p>
+        <button
+          type="button"
+          className="dc-account-primary"
+          onClick={() => {
+            window.location.hash =
+              "#/auth?mode=login&return=%23%2Fstudy-library";
+          }}
+        >
+          Sign in
+        </button>
       </main>
     );
-  }
 
   return (
     <div data-study-library-page className="min-h-screen text-white">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
+      <div
+        data-app-frame
+        className="relative mx-auto flex min-h-screen w-full flex-col"
+      >
         <Header
           cartCount={cartIds.size}
           notifCount={0}
-          title="Study Library"
-          subtitle="Courses you built"
-          onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
-          onNavigateToCart={() => { window.location.hash = "#/cart"; }}
-          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
+          onNavigateToSubscription={() => {
+            window.location.hash = "#/subscription";
+          }}
+          onNavigateToCart={() => {
+            window.location.hash = "#/cart";
+          }}
+          onNavigateToNotifications={() => {
+            window.location.hash = "#/notifications";
+          }}
         />
-
-        <main data-study-library-content className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-28 pt-3 sm:px-5 lg:px-7 xl:px-9">
-          <div className="mx-auto w-full max-w-[1500px] space-y-5">
-            <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => { window.location.hash = "#/profile"; }}
-                  className="mb-3 inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-black text-white/65 ring-1 ring-white/10 transition hover:bg-white/10"
-                >
-                  <ArrowLeft size={14} /> Profile
-                </button>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300">Your learning workspace</p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">My Study Library</h1>
-                <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-white/55">
-                  Apna course khud banayein — cover image, modules, resources aur Brain MCQ — aur use poore Course Player mein play karein.
+        <main
+          data-study-library-content
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
+          <div className="dc-study-layout">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = "#/profile";
+              }}
+              className="dc-account-text-action"
+            >
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Profile
+            </button>
+            <header className="dc-account-header">
+              <div>
+                <h1>My Study Library</h1>
+                <p className="dc-account-note">
+                  Courses you create and manage.
                 </p>
+                {myCourses.state === "ready" || myCourses.courses.length > 0 ? (
+                  <p data-study-library-count className="dc-account-note">
+                    {totals.courses} course{totals.courses === 1 ? "" : "s"} ·{" "}
+                    {totals.modules} module{totals.modules === 1 ? "" : "s"} ·{" "}
+                    {totals.resources} resource
+                    {totals.resources === 1 ? "" : "s"}
+                  </p>
+                ) : null}
               </div>
-
-              {totals.courses > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-black text-white/60">
-                    <Layers3 size={13} /> {totals.courses} course{totals.courses === 1 ? "" : "s"} · {totals.modules} module{totals.modules === 1 ? "" : "s"} · {totals.resources} resource{totals.resources === 1 ? "" : "s"}
-                  </span>
-                </div>
-              ) : null}
+              <button
+                type="button"
+                data-my-course-create
+                ref={createButtonRef}
+                className="dc-account-primary"
+                onClick={() => {
+                  window.location.hash = MY_COURSE_NEW_HASH;
+                }}
+              >
+                New course
+              </button>
             </header>
-
             {myCourses.state === "loading" && myCourses.courses.length === 0 ? (
               <LibrarySkeleton />
-            ) : myCourses.state === "error" && myCourses.courses.length === 0 ? (
-              <div className="grid min-h-72 place-items-center rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8 text-center">
-                <div>
-                  <RefreshCw className="mx-auto h-8 w-8 text-rose-200" />
-                  <p className="mt-3 font-black">Your library couldn't load</p>
-                  <p className="mt-1 text-sm text-white/60">
-                    {myCourses.error || "The server is temporarily unavailable. This usually resolves within a few seconds."}
-                  </p>
-                  <div className="mt-5 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-                    <button
-                      type="button"
-                      onClick={myCourses.reload}
-                      className="min-h-11 rounded-full bg-white/10 px-5 text-sm font-black ring-1 ring-white/20 transition hover:bg-white/15 active:scale-95"
-                    >
-                      <RefreshCw className="mr-1.5 inline h-4 w-4" /> Try again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => window.location.reload()}
-                      className="min-h-11 rounded-full px-5 text-xs font-bold text-white/50 underline-offset-2 hover:text-white/70 hover:underline"
-                    >
-                      Reload page
-                    </button>
-                  </div>
-                </div>
-              </div>
+            ) : myCourses.state === "error" &&
+              myCourses.courses.length === 0 ? (
+              <section role="alert" className="dc-study-empty">
+                <h2>Your library couldn't load</h2>
+                <p className="dc-account-error">
+                  {myCourses.error || "Please retry."}
+                </p>
+                <button
+                  type="button"
+                  className="dc-account-text-action"
+                  onClick={myCourses.reload}
+                >
+                  Try again
+                </button>
+              </section>
             ) : (
               <>
-                {myCourses.courses.length > 3 ? (
-                  <div className="relative">
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search your courses…"
-                      aria-label="Search your courses"
-                      className="min-h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-semibold text-white outline-none placeholder:text-white/35 focus:border-violet-400/60"
-                      data-my-course-search
-                    />
-                  </div>
-                ) : null}
-
-                <section aria-labelledby="my-courses-heading">
-                  <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Built by you</p>
-                      <h2 id="my-courses-heading" className="mt-0.5 text-xl font-black">My courses</h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { window.location.hash = MY_COURSE_NEW_HASH; }}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-violet-600 px-4 text-[11px] font-black transition hover:bg-violet-500"
-                      data-my-course-create-inline
-                    >
-                      <Plus size={14} /> New course
-                    </button>
-                  </div>
-
-                  {/* A fluid shelf: `auto-fill` + a 15rem floor means the
-                      column count follows the actual viewport — one column on
-                      a phone, more on a tablet, as many as a desktop can
-                      carry — instead of jumping at fixed breakpoints. */}
-                  <div
-                    className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3"
-                    data-my-course-grid
-                  >
-                    {courses.map((course) => (
-                      <MyCourseCard key={course.id} course={course} onPlay={openCourse} onEdit={editCourse} onDelete={requestDelete} />
-                    ))}
-
-                    {/* The "+" tile is the same size as a card, so the grid
-                        never jumps when the first course is created. */}
-                    <button
-                      type="button"
-                      onClick={() => { window.location.hash = MY_COURSE_NEW_HASH; }}
-                      aria-label="Create a new module or folder"
-                      className="group flex aspect-[4/3] w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-white/20 bg-white/[0.025] p-4 text-center transition hover:border-violet-400/50 hover:bg-violet-500/[0.08] active:scale-[0.99] sm:aspect-auto sm:min-h-[15rem]"
-                      data-my-course-create
-                    >
-                      <span className="grid h-14 w-14 place-items-center rounded-full bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/30 transition group-hover:bg-violet-500/25">
-                        <Plus size={26} />
-                      </span>
-                      <span className="text-sm font-black">Create module / folder</span>
-                      <span className="max-w-[15rem] text-[11px] font-medium leading-5 text-white/45">
-                        Cover image, title, file type, name, resource aur Brain MCQ — sab kuch yahin se.
-                      </span>
-                    </button>
-                  </div>
-                </section>
-
-                {myCourses.courses.length === 0 ? (
-                  <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center" data-my-course-empty>
-                    <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-violet-500/15 text-violet-200">
-                      <ImagePlus size={24} />
-                    </span>
-                    <h3 className="mt-4 text-lg font-black">Build your first course</h3>
-                    <p className="mx-auto mt-1 max-w-md text-sm font-medium leading-6 text-white/50">
-                      Ek module ya folder banayein, usme resources (video, PDF, link) aur Brain MCQ add karein — aur phir
-                      Play dabakar apna khud ka Course Player kholein.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => { window.location.hash = MY_COURSE_NEW_HASH; }}
-                      className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-violet-600 px-6 text-sm font-black transition hover:bg-violet-500"
-                      data-my-course-create-empty
-                    >
-                      <Plus size={16} /> New course
-                    </button>
-                  </section>
-                ) : null}
-
-                {myCourses.courses.length > 0 ? (
-                  <p className="flex items-center justify-center gap-2 text-center text-[11px] font-semibold text-white/35">
-                    <Sparkles size={12} /> Har course apne aap save hota hai — Play karte hi Course Player khul jaata hai.
+                {myCourses.state === "error" ? (
+                  <p role="alert" className="dc-account-error">
+                    Last saved courses shown. {myCourses.error}
                   </p>
                 ) : null}
+                {myCourses.courses.length > 0 ? (
+                  <div className="dc-study-search">
+                    <Search aria-hidden="true" />
+                    <input
+                      type="search"
+                      data-my-course-search
+                      aria-label="Search your courses"
+                      placeholder="Search your courses"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                    {query ? (
+                      <button
+                        type="button"
+                        aria-label="Clear search"
+                        onClick={() => setQuery("")}
+                      >
+                        <X aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {myCourses.courses.length === 0 ? (
+                  <section data-my-course-empty className="dc-study-empty">
+                    <h2>No courses yet</h2>
+                    <p className="dc-account-note">
+                      Use New course to add modules, folders and resources.
+                    </p>
+                  </section>
+                ) : courses.length === 0 ? (
+                  <section className="dc-study-empty">
+                    <h2>No matches</h2>
+                    <p className="dc-account-note">
+                      Try a course title or description.
+                    </p>
+                  </section>
+                ) : (
+                  <div data-my-course-grid className="dc-study-list">
+                    {courses.map((course) => (
+                      <MyCourseCard
+                        minimal
+                        key={course.id}
+                        course={course}
+                        onPlay={openCourse}
+                        onEdit={editCourse}
+                        onDelete={requestDelete}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
         </main>
-
-        {/* The floating "+" — always one tap away, on every screen size. */}
-        <button
-          type="button"
-          onClick={() => { window.location.hash = MY_COURSE_NEW_HASH; }}
-          aria-label="Create a new module or folder"
-          title="New module / folder"
-          className="fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_12px_30px_-10px_rgba(124,92,255,0.9)] transition hover:brightness-110 active:scale-95 sm:bottom-28 sm:right-6 lg:bottom-8"
-          data-my-course-create-fab
-        >
-          <Plus size={26} />
-        </button>
-
-        <BottomNav active="study-library" onChange={navigateFromBottom} purchasesBadge={purchasedIds.size} />
-
-        {/* Card-level delete confirmation — the Profile card glass (tint 0.62 ·
-            rgb(173,216,255) · blur 0 + `.dc-rev-glass`), sized by the shared
-            responsive overlay: full-width sheet on a phone, centred dialog on
-            a tablet / desktop. */}
-        <ConfirmDialog
-          open={Boolean(pendingDelete)}
-          material="profile"
-          title="Delete this course?"
-          message={`“${pendingDelete?.title || "Untitled course"}” and everything inside it will be permanently deleted. This can't be undone.`}
-          confirmLabel={deleting ? "Deleting…" : "Delete"}
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => { if (!deleting) setPendingDelete(null); }}
+        <BottomNav
+          active="study-library"
+          onChange={navigateFromBottom}
+          purchasesBadge={purchasedIds.size}
         />
+        {/* A native confirmation stays open for failed writes and restores
+            focus safely even when an optimistic removal replaced the card. */}
+        <ContentDialog
+          open={Boolean(pendingDelete)}
+          onClose={() => {
+            if (!deletePendingRef.current) setPendingDelete(null);
+          }}
+          busy={deleting}
+          role="alertdialog"
+          title="Delete this course?"
+          description={`“${
+            pendingDelete?.title || "Untitled course"
+          }” and everything inside it will be permanently deleted. This can't be undone.`}
+          fallbackFocusRef={createButtonRef}
+          data-my-course-delete-confirm
+          footer={
+            <>
+              <button
+                type="button"
+                className="dc-content-secondary"
+                disabled={deleting}
+                onClick={() => setPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dc-content-primary dc-content-danger"
+                disabled={deleting}
+                aria-busy={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </>
+          }
+        >
+          <p className="dc-content-note">
+            The original courses you purchased are not affected. Only this
+            course in your Study Library is deleted.
+          </p>
+          {deleteError ? (
+            <p role="alert" className="dc-content-error">
+              {deleteError}
+            </p>
+          ) : null}
+        </ContentDialog>
       </div>
     </div>
   );
@@ -319,13 +352,14 @@ export default function StudyLibraryPage() {
 
 function LibrarySkeleton() {
   return (
-    <div className="space-y-4" role="status" aria-label="Loading My Study Library" data-my-course-skeleton>
-      <div className="h-32 animate-pulse rounded-3xl bg-white/[0.05]" />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="aspect-[4/3] animate-pulse rounded-3xl bg-white/[0.05]" />
-        ))}
-      </div>
+    <div
+      role="status"
+      aria-label="Loading My Study Library"
+      data-my-course-skeleton
+      className="dc-study-loading"
+    >
+      <p>Loading your courses…</p>
+      <div aria-hidden="true" />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { handleAccountPreferences, handlePublicProfile } from "./_lib/accountPreferences.js";
+import { normalizeUserPreferences } from "../utils/userPreferences.js";
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 import { handleEmbedProxy } from "./_lib/embedProxy.js";
@@ -123,6 +125,8 @@ const routeQuery = (req: VercelRequest) =>
    answered by that route (or by a precise error naming it), never by the
    leaderboard. */
 const SHARED_ROUTES = [
+  "account/preferences",
+  "public-profile",
   "personal-course",
   "my-courses",
   "personal-ai",
@@ -154,6 +158,8 @@ const sharedRouteAddressed = (req: VercelRequest & { url?: string }): SharedRout
 
 /** The friendly name used in dispatch-failure messages. */
 const ROUTE_LABEL: Record<SharedRoute, string> = {
+  "account/preferences": "Account settings",
+  "public-profile": "Public profile",
   "personal-course": "My Study Library",
   // The learner-authored course shelf (`users/{uid}/myCourses`). This is the
   // Admin-SDK path the client falls back to when Firestore rules refuse it, so
@@ -276,6 +282,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const path = incomingPath(reqWithUrl);
   // Which feature this request was addressed at, per vercel.json's rewrites.
   const route = sharedRouteAddressed(reqWithUrl);
+  if (route === "account/preferences") return handleAccountPreferences(req, res);
+  if (route === "public-profile") return handlePublicProfile(req, res);
   if (matchesApiRoute(reqWithUrl, "manifest")) {
     return handleManifest(req, res);
   }
@@ -439,6 +447,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
   }
+  res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   // A GET reaching this line for a shared route means the request never carried
   // a dispatchable action — typically a POST turned into a GET by an upstream
@@ -464,7 +473,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     type LeaderboardDoc = { id: string; data: () => Record<string, unknown> };
     const recent = await db.collection("users").limit(200).get();
-    const allDocs: LeaderboardDoc[] = recent.docs;
+    const allDocs: LeaderboardDoc[] = recent.docs.filter((doc) => normalizeUserPreferences(doc.data()?.preferences).profileVisible);
     const subscriberDocs = allDocs.filter((doc: LeaderboardDoc) => isSubscriber((doc.data() || {}) as Record<string, unknown>));
 
     const [subscribers, users] = await Promise.all([
@@ -489,10 +498,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const cached = await adminDb().collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC).get();
       const data = cached.data() || {};
       if (cached.exists && Array.isArray(data.subscribers)) {
+        const rows = [...data.subscribers, ...(Array.isArray(data.users) ? data.users : [])];
+        const uids = [...new Set(rows.map((row) => String(row?.uid || "")).filter((uid) => uid && !uid.includes("/")))];
+        const visible = new Set<string>();
+        await Promise.all(uids.map(async (uid) => {
+          const user = await adminDb().collection("users").doc(uid).get();
+          if (user.exists && normalizeUserPreferences(user.data()?.preferences).profileVisible) visible.add(uid);
+        }));
         return res.status(200).json({
           ok: true,
-          subscribers: data.subscribers,
-          users: Array.isArray(data.users) ? data.users : [],
+          subscribers: data.subscribers.filter((row: { uid?: string }) => visible.has(String(row.uid || ""))),
+          users: Array.isArray(data.users) ? data.users.filter((row: { uid?: string }) => visible.has(String(row.uid || ""))) : [],
           cached: true,
         });
       }

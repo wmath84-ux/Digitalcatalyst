@@ -26,6 +26,7 @@ export interface FirestoreProductDoc {
   inStock?: boolean;
   saleStart?: string | number | { toMillis?: () => number; _seconds?: number } | null;
   saleEnd?: string | number | { toMillis?: () => number; _seconds?: number } | null;
+  canonicalModules?: CanonicalCourseModule[];
   courseContent?: CanonicalCourseModule[];
   paidUpdates?: CanonicalPaidUpdate[];
   adminProduct?: {
@@ -39,6 +40,13 @@ export interface FirestorePurchaseDoc {
   productDocumentId?: string;
   updateId?: string;
   entitlementId?: string;
+  kind?: string;
+  purchaseKind?: string;
+  moduleId?: string | null;
+  resourceId?: string | null;
+  status?: string;
+  source?: string;
+  expiresAt?: number;
 }
 
 export interface QuoteLineInput {

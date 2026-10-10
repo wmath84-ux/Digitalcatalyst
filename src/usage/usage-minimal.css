@@ -1,35 +1,27 @@
-/* Mirrors ProfileLayout's max-w-4xl page, 16px quiet frames and simple rows.
-   No display counters are invented here: all allowance hooks stay authoritative. */
-[data-usage-limits-layout] { max-width: 896px; padding-block: 8px 24px; text-shadow: none; }
-[data-usage-limits-page] h1 { font-size: 24px !important; font-weight: 700; line-height: 1.3; }
-[data-usage-limits-page] h2 { font-size: 18px !important; font-weight: 600; line-height: 1.4; }
-[data-usage-limits-page] h3 { font-size: 15px !important; font-weight: 600; line-height: 1.45; }
-[data-usage-limits-page] [data-usage-limits-grid] { gap: 24px; align-items: start !important; }
-/* Only the outer telemetry surfaces, not their nested glass action buttons. */
-[data-usage-limits-page] [data-ai-quota-card],
-[data-usage-limits-page] [data-myday-allowance-card] > div,
-[data-usage-limits-page] .dc-profile-card {
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 16px !important;
-  background: rgba(255,255,255,.02);
-  box-shadow: none;
-  text-shadow: none;
-}
-[data-usage-limits-page] [data-ai-quota-card] > div[aria-hidden],
-[data-usage-limits-page] [data-myday-allowance-card] > div > div[aria-hidden],
-[data-usage-limits-page] .dc-profile-card > div[aria-hidden] { display: none; }
-[data-usage-limits-page] [data-ai-quota-card] > div:last-child,
-[data-usage-limits-page] [data-myday-allowance-card] > div > div:last-child,
-[data-usage-limits-page] .dc-profile-card > div:last-child { padding: 24px; height: auto; }
-[data-usage-limits-page] .dc-profile-subpanel { background: none; border: 0; border-radius: 0; padding-inline: 0; }
-[data-usage-limits-page] .dc-profile-card-meta { font-size: 12px; font-weight: 400; line-height: 1.6; color: rgba(255,255,255,.65); }
-[data-usage-limits-page] .dc-profile-card-accent { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 500; color: rgba(255,255,255,.7); }
-.dc-usage-guidance { border-top: 1px solid rgba(255,255,255,.1); padding-top: 24px; }
-.dc-usage-guidance p { margin-top: 8px; font-size: 12px; line-height: 1.7; color: rgba(255,255,255,.65); }
+/* Plain telemetry: server values and rules remain visible without nested cards. */
+.dc-usage-header .dc-account-header { margin-bottom: 0; }
+[data-usage-limits-layout] { max-width: 960px; padding-block: 0.5rem 1.5rem; text-shadow: none; }
+[data-usage-limits-page] h1 { font-size: clamp(1.5rem, 1.2rem + 1vw, 1.875rem); font-weight: 800; line-height: 1.3; }
+[data-usage-limits-page] h2 { font-size: 1.125rem; font-weight: 750; line-height: 1.5; }
+[data-usage-limits-page] h3 { font-size: 0.875rem; font-weight: 650; line-height: 1.5; }
+[data-usage-limits-page] [data-usage-limits-grid] { gap: 1.75rem; align-items: start !important; }
+.dc-usage-section { min-width: 0; padding-top: 1.25rem; border-top: 1px solid var(--account-border); }
+.dc-usage-section-header { display: flex; flex-wrap: wrap; min-width: 0; align-items: start; justify-content: space-between; gap: 0.5rem 1rem; }
+.dc-usage-state { margin-top: 0.75rem; color: #ced5e5; font-size: 0.8125rem; font-weight: 650; }
+.dc-usage-metric { min-width: 0; margin-block: 1rem; }
+.dc-usage-metric header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
+.dc-usage-metric header strong { color: #f8fafc; font-size: 1.125rem; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dc-usage-metric progress { display: block; width: 100%; height: 0.35rem; overflow: hidden; margin-top: 0.75rem; border: 0; border-radius: 999px; background: #252d3e; accent-color: #b2a4ff; }
+.dc-usage-metric progress::-webkit-progress-bar { background: #252d3e; border-radius: 999px; }
+.dc-usage-metric progress::-webkit-progress-value { background: #b2a4ff; border-radius: 999px; }
+.dc-usage-metric progress::-moz-progress-bar { background: #b2a4ff; border-radius: 999px; }
+.dc-usage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem; margin-top: 0.5rem; }
+.dc-usage-rules-list { display: grid; gap: 0.6rem; padding-block: 0.5rem; color: var(--account-muted); font-size: 0.8125rem; line-height: 1.7; }
+.dc-usage-pairing-code { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-block: 0.75rem; }
+.dc-usage-pairing-code code { min-width: 0; font-size: 1.5rem; font-weight: 750; letter-spacing: 0.15em; overflow-wrap: anywhere; }
+.dc-usage-pairing-code p { width: 100%; }
+.dc-usage-browser-row { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 0.5rem 1rem; padding-block: 0.75rem; border-bottom: 1px solid var(--account-border); }
+.dc-usage-browser-row > div { min-width: 0; flex: 1 1 12rem; }
+.dc-usage-browser-row strong { font-size: 0.875rem; font-weight: 650; overflow-wrap: anywhere; }
+[data-usage-limits-page] button:focus-visible, [data-usage-limits-page] summary:focus-visible { outline: 2px solid var(--account-accent); outline-offset: 3px; border-radius: 4px; }
 @media (min-width: 900px) { [data-usage-limits-grid] { grid-template-columns: repeat(2,minmax(0,1fr)) !important; } }
-@media (max-width: 479px) {
-  [data-usage-limits-page] [data-ai-quota-card] > div:last-child,
-  [data-usage-limits-page] [data-myday-allowance-card] > div > div:last-child,
-  [data-usage-limits-page] .dc-profile-card > div:last-child { padding: 16px; }
-}
-html[data-glass="on"] [data-usage-limits-page] .dc-profile-card { box-shadow: none; }

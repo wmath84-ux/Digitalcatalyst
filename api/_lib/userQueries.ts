@@ -58,14 +58,24 @@ const readBody = (req: VercelRequest): Record<string, unknown> => {
 const encodeHeader = (value: string) =>
   /^[\x20-\x7E]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
 
-async function sendMail(input: {
+export const mailConfigured = () => Boolean(
+  String(process.env.SMTP_HOST || "").trim() && String(process.env.SMTP_USER || "").trim()
+  && String(process.env.SMTP_PASS || "").trim() && String(process.env.SMTP_FROM || process.env.SMTP_USER || "").trim(),
+);
+
+export async function sendMail(input: {
   to: string;
   subject: string;
   text: string;
   html?: string;
   fromName?: string;
   replyTo?: string;
+  messageId?: string;
+  timeoutMs?: number;
 }): Promise<{ ok: boolean; reason?: string }> {
+  if (!/^[^\s<>@\r\n]+@[^\s<>@\r\n]+\.[^\s<>@\r\n]+$/.test(input.to) || input.to.length > 254) {
+    return { ok: false, reason: "The recipient address is invalid." };
+  }
   const host = String(process.env.SMTP_HOST || "").trim();
   const user = String(process.env.SMTP_USER || "").trim();
   const pass = String(process.env.SMTP_PASS || "").trim();
@@ -119,7 +129,7 @@ async function sendMail(input: {
           b64(input.text),
         ].join("\r\n");
 
-    const messageId = `<${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${host}>`;
+    const messageId = input.messageId || `<${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${host}>`;
     const body = [
       `From: ${fromHeader}`,
       `To: ${input.to}`,
@@ -147,33 +157,48 @@ async function sendMail(input: {
     ];
     let step = -1;
     let settled = false;
+    let deadline: ReturnType<typeof setTimeout>;
     const finish = (result: { ok: boolean; reason?: string }) => {
       if (settled) return;
       settled = true;
-      try { socket.end(); } catch { /* already closed */ }
+      clearTimeout(deadline);
+      try { result.ok ? socket.end() : socket.destroy(); } catch { /* already closed */ }
       resolve(result);
     };
 
+    deadline = setTimeout(() => finish({ ok: false, reason: "The mail server timed out." }), input.timeoutMs || 20000);
     socket.setEncoding("utf8");
-    socket.setTimeout(20000, () => finish({ ok: false, reason: "The mail server timed out." }));
+    socket.setTimeout(input.timeoutMs || 20000, () => finish({ ok: false, reason: "The mail server timed out." }));
+    socket.on("close", () => finish({ ok: false, reason: "The mail server closed before confirming delivery." }));
     socket.on("error", (error) => finish({ ok: false, reason: error.message }));
 
+    // SMTP replies may be split across TLS packets or contain multiline EHLO
+    // responses. Advance only on a complete final reply, never per data chunk.
+    let replyBuffer = "";
+    const expected = [[220], [250], [334], [334], [235], [250], [250, 251], [354], [250]];
     socket.on("data", (chunk: string) => {
-      const code = Number(String(chunk).slice(0, 3));
-      if (code >= 400) {
-        finish({ ok: false, reason: `Mail server said: ${String(chunk).trim()}` });
-        return;
+      if (settled) return;
+      replyBuffer += chunk;
+      if (replyBuffer.length > 65536) { finish({ ok: false, reason: "The mail server reply was invalid." }); return; }
+      let newline: number;
+      while (!settled && (newline = replyBuffer.indexOf("\n")) >= 0) {
+        const line = replyBuffer.slice(0, newline).replace(/\r$/, "");
+        replyBuffer = replyBuffer.slice(newline + 1);
+        const reply = line.match(/^(\d{3})([ -])/);
+        if (!reply || reply[2] === "-") continue;
+        const code = Number(reply[1]);
+        if (!expected[step + 1]?.includes(code)) {
+          finish({ ok: false, reason: `Mail server rejected delivery (${code}).` });
+          return;
+        }
+        step += 1;
+        if (steps[step] === "QUIT") {
+          socket.write("QUIT\r\n");
+          finish({ ok: true }); // 250 after DATA is the server's acceptance.
+          return;
+        }
+        socket.write(`${steps[step]}\r\n`);
       }
-      step += 1;
-      if (step >= steps.length) {
-        finish({ ok: true });
-        return;
-      }
-      if (steps[step] === "QUIT") {
-        finish({ ok: true });
-        return;
-      }
-      socket.write(`${steps[step]}\r\n`);
     });
   });
 }

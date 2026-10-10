@@ -49,9 +49,10 @@ test("all premium PDP commerce controls are wired to app handlers", () => {
   // (`withCoupon`) rather than the raw one, so the literal
   // `onCheckoutSelection(selection, ...)` no longer appears there.
   // Assert the wiring and the price argument instead of the variable name.
-  assert.match(pdp, /onCheckoutSelection\((?:withCoupon|selection), summary\.effectiveSubtotal\)/);
+  assert.match(pdp, /onCheckoutSelection\(withCoupon, payable\)/);
   // The paid-update path forwards its own price.
-  assert.match(pdp, /onCheckoutSelection\(selection, Number\(update\.cashPrice\) \|\| 0\)/);
+  assert.match(pdp, /paiseToRupees\(pricing\.quote\.cashPayable\)/);
+  assert.match(pdp, /handlePreview\(order\.selection, order\.summary\)/);
   assert.match(main, /onCheckoutSelection=\{navigatePdpSelectionToCheckout\}/);
   assert.match(main, /startCheckout\(\{/);
 });

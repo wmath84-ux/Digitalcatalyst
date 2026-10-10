@@ -1,3 +1,4 @@
+import { commerceContentTree } from "../../../utils/contentOwnership";
 // src/components/pdp/PdpPurchaseBuilder.tsx
 //
 // Part 3: customer-facing Product Detail Page purchase builder.
@@ -14,7 +15,7 @@
 // at viewport widths down to 320px (verified in
 // `tests/pdpPurchaseBuilderMobileWidths.test.mjs`).
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   BadgePercent,
   BrainCircuit,
@@ -46,6 +47,9 @@ import { PaymentButton } from "../ui/PaymentButton";
 import { SimplePanel } from "../ui/SimplePanel";
 import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
+import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./PdpSelectionSummary";
+import { pdpSelectionKey } from "../../pdp/quoteSelection";
+import { isFreeProduct } from "../../../utils/couponVisibility";
 import {
   buildCheckoutSelection,
   computeSummary,
@@ -60,6 +64,7 @@ import {
   getPurchasableModules,
   getPurchasableResources,
   getResourceEffectivePrice,
+  normalizeModuleSelectionIds,
   validateSelection,
   type PdpPurchaseMode,
 } from "../../../utils/pdpSelection";
@@ -68,8 +73,25 @@ import {
 // Props
 // ---------------------------------------------------------------------------
 
+export type PdpSelectionRequest = {
+  productId: string; revision: number; viewerId?: string | null;
+  mode: "selected_modules" | "selected_resources" | "paid_update";
+  ids: string[];
+};
+
 export interface PdpPurchaseBuilderProps {
   product: Product;
+  /** One price and one CTA, embedded in the product decision panel. */
+  compact?: boolean;
+  pricing?: PdpPricingView;
+  couponEntry?: ReactNode;
+  /** Native Paid-tab selection uses this SAME verified purchase controller. */
+  selectionRequest?: PdpSelectionRequest;
+  onSelectionChange?: (snapshot: PdpSelectionSnapshot) => void;
+  /** Keep optional coupon visibility in sync with the actual chosen content. */
+  onPayableChange?: (payable: number) => void;
+  /** The shared cart accepts full products, not individual-content selections. */
+  onModeChange?: (mode: PdpPurchaseMode) => void;
   /** Base product ownership. Comes from `CatalogContext.purchasedIds`. */
   isProductOwned: boolean;
   /** Paid-update ids already owned by the user for this product. */
@@ -153,6 +175,13 @@ const RESOURCE_TYPE_ICON = {
 
 export default function PdpPurchaseBuilder({
   product,
+  compact = false,
+  pricing,
+  couponEntry,
+  selectionRequest,
+  onSelectionChange,
+  onPayableChange,
+  onModeChange,
   isProductOwned,
   ownedUpdateIds,
   ownedModuleIds,
@@ -160,9 +189,11 @@ export default function PdpPurchaseBuilder({
   returnRoute,
   onPreview,
 }: PdpPurchaseBuilderProps) {
-  const modules = (product.canonicalModules || []) as CanonicalCourseModule[];
+  const modules = useMemo(() => commerceContentTree(product), [product]);
   const paidUpdates = (product.paidUpdates || []) as CanonicalPaidUpdate[];
   const presentation = getProductPresentation(product);
+  // The catalog treats an explicit ₹0 price as free even without its flag.
+  const pricingProduct = useMemo(() => isFreeProduct(product) ? { ...product, isFree: true } : product, [product]);
 
   const purchasableModules = useMemo(() => getPurchasableModules(modules), [modules]);
   const bundleModules = useMemo(() => getBundleModules(modules), [modules]);
@@ -195,10 +226,10 @@ export default function PdpPurchaseBuilder({
   // Resources / paid updates keep their explicit opt-in because they are not
   // part of the module dropdown; a tiny chip row appears only for products
   // that actually offer them.
-  const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => new Set());
-  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(() => new Set());
-  const [selectedUpdateId, setSelectedUpdateId] = useState<string | null>(null);
-  const [extraMode, setExtraMode] = useState<Extract<PdpPurchaseMode, "selected_resources" | "paid_update"> | null>(null);
+  const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => new Set(selectionRequest?.mode === "selected_modules" ? selectionRequest.ids : []));
+  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(() => new Set(selectionRequest?.mode === "selected_resources" ? selectionRequest.ids : []));
+  const [selectedUpdateId, setSelectedUpdateId] = useState<string | null>(selectionRequest?.mode === "paid_update" ? selectionRequest.ids[0] || null : null);
+  const [extraMode, setExtraMode] = useState<Extract<PdpPurchaseMode, "selected_resources" | "paid_update"> | null>(selectionRequest && selectionRequest.mode !== "selected_modules" ? selectionRequest.mode : null);
   const [previewNotice, setPreviewNotice] = useState<string | null>(null);
   const [moduleModalOpen, setModuleModalOpen] = useState(false);
   const fallbackModulePrice = useMemo(() => getModuleFallbackPrice(product, modules), [product, modules]);
@@ -216,8 +247,8 @@ export default function PdpPurchaseBuilder({
   // full course for everyone else.
   const baseMode: PdpPurchaseMode = selectedModuleIds.size > 0
     ? "selected_modules"
-    : isProductOwned && availableModes.includes("paid_update")
-      ? "paid_update"
+    : isProductOwned
+      ? "full_product"
       : availableModes.includes("full_product")
         ? "full_product"
         : availableModes[0] || "free_entitlement";
@@ -248,15 +279,16 @@ export default function PdpPurchaseBuilder({
         isProductOwned,
         ownedUpdateIds,
         ownedModuleIds,
+        ownedResourceIds,
       }),
-    [mode, selectedModuleIds, selectedResourceIds, selectedUpdateId, modules, isProductOwned, ownedUpdateIds, ownedModuleIds],
+    [mode, selectedModuleIds, selectedResourceIds, selectedUpdateId, modules, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds],
   );
 
   // Summary
   const summary = useMemo(
     () =>
       computeSummary({
-        product,
+        product: pricingProduct,
         mode,
         selectedIds:
           mode === "paid_update"
@@ -269,9 +301,40 @@ export default function PdpPurchaseBuilder({
         isProductOwned,
         ownedUpdateIds,
         ownedModuleIds,
+        ownedResourceIds,
       }),
-    [product, mode, selectedModuleIds, selectedResourceIds, selectedUpdateId, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds],
+    [pricingProduct, mode, selectedModuleIds, selectedResourceIds, selectedUpdateId, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds],
   );
+
+  const checkoutSelection = useMemo(() => buildCheckoutSelection({
+    product, mode,
+    selectedIds: mode === "paid_update" ? new Set(selectedUpdateId ? [selectedUpdateId] : []) : mode === "selected_modules" ? selectedModuleIds : selectedResourceIds,
+    paidUpdateId: selectedUpdateId, returnRoute: returnRoute || DEFAULT_RETURN_ROUTE,
+  }), [product.id, mode, selectedUpdateId, selectedModuleIds, selectedResourceIds, returnRoute]);
+  const snapshot = useMemo<PdpSelectionSnapshot>(() => {
+    const flat = flattenModules(modules);
+    const byId = new Map(flat.map((module) => [module.id, module]));
+    const rules: string[] = [];
+    if (mode === "selected_modules") for (const id of selectedModuleIds) {
+      const module = byId.get(id);
+      for (const requiredId of module?.requiredPreviousModuleIds || []) {
+        const required = byId.get(requiredId);
+        if (required) rules.push(`${required.title} is required for ${module?.title}.${getIsModuleOwned(required, ownershipState) ? " Already owned; no additional charge." : " Included in this selection."}`);
+      }
+    }
+    if (mode === "selected_modules" && [...selectedModuleIds].some((id) => byId.get(id)?.includeInBundle === false)) rules.push("Optional add-ons in this selection are not included with the full product.");
+    if (mode === "paid_update") rules.push("The base product is required for this paid update. Only the named update is being purchased.");
+    if (summary.lineItems.some((line) => line.alreadyOwned)) rules.push("Already-owned items are excluded from the amount payable.");
+    return { selection: checkoutSelection, summary, valid: validation.ok && summary.selectedCount > 0, rules: [...new Set(rules)] };
+  }, [checkoutSelection, summary, validation.ok, mode, modules, selectedModuleIds, ownershipState]);
+  const expectedPricingKey = pdpSelectionKey({ ...checkoutSelection, productIds: [product.documentId || product.id], couponCode: pricing?.couponIntent || null });
+  const currentPricing = pricing && pricing.selectionKey !== expectedPricingKey ? { ...pricing, quote: null, status: "loading" as const } : pricing;
+  useEffect(() => { onSelectionChange?.(snapshot); }, [onSelectionChange, snapshot]);
+
+  useEffect(() => {
+    onPayableChange?.(summary.effectiveSubtotal);
+    onModeChange?.(mode);
+  }, [onPayableChange, onModeChange, mode, summary.effectiveSubtotal]);
 
   // ---- Handlers ----
 
@@ -280,22 +343,21 @@ export default function PdpPurchaseBuilder({
   // modules — exactly what the old inline selector did per toggle. Without
   // this, picking one dependent module from the dropdown would fail
   // validation and leave the CTA silently disabled.
-  const normalizeModuleSelection = (ids: readonly string[]): Set<string> => {
-    const flat = flattenModules(modules);
-    const byId = new Map(flat.map((m) => [m.id, m]));
-    const purchasableIds = new Set(purchasableModules.map((m) => m.id));
-    const next = new Set<string>();
-    const addWithDeps = (id: string, seen: Set<string>) => {
-      if (next.has(id) || seen.has(id) || !purchasableIds.has(id)) return;
-      seen.add(id);
-      const module = byId.get(id);
-      if (!module || getIsModuleOwned(module, ownershipState)) return;
-      next.add(id);
-      for (const depId of module.requiredPreviousModuleIds || []) addWithDeps(depId, seen);
-    };
-    ids.forEach((id) => addWithDeps(String(id), new Set()));
-    return next;
-  };
+  const normalizeModuleSelection = (ids: readonly string[]) => normalizeModuleSelectionIds(ids, modules, ownershipState);
+
+  const lastSelectionRequest = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectionRequest || selectionRequest.productId !== product.id) return;
+    const key = `${selectionRequest.productId}:${selectionRequest.revision}`;
+    if (lastSelectionRequest.current === key) return;
+    lastSelectionRequest.current = key;
+    setSelectedModuleIds(selectionRequest.mode === "selected_modules" ? normalizeModuleSelection(selectionRequest.ids) : new Set());
+    setSelectedResourceIds(new Set(selectionRequest.mode === "selected_resources" ? selectionRequest.ids : []));
+    setSelectedUpdateId(selectionRequest.mode === "paid_update" ? selectionRequest.ids[0] || null : null);
+    setExtraMode(selectionRequest.mode !== "selected_modules" && selectionRequest.ids.length ? selectionRequest.mode : null);
+    setPreviewNotice(null);
+  }, [selectionRequest, product.id]);
+  const fromPaid = Boolean(selectionRequest?.ids.length);
 
   const toggleResource = (id: string) => {
     setSelectedResourceIds((current) => {
@@ -343,6 +405,7 @@ export default function PdpPurchaseBuilder({
     <>
       <ModuleSelectTrigger
         label="Purchase individually"
+        compact={compact}
         totalModules={purchasableModules.length}
         selectedCount={selectedModuleIds.size}
         selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
@@ -376,30 +439,31 @@ export default function PdpPurchaseBuilder({
   }
 
   return (
-    <div className="space-y-4" data-pdp-purchase-builder>
-      {modulePicker}
+    <div className="space-y-4" data-pdp-purchase-builder data-pdp-purchase-layout={compact ? "minimal" : "expanded"}>
+      {(!compact || (!fromPaid && purchasableModules.length > 0)) && modulePicker}
 
       {/* The Full course / Modules tabs were removed: the dropdown above is
           the module picker, and the CTA defaults to the full course. Only
           non-module extras (standalone resources, paid updates) still get an
           explicit opt-in chip row — and only when the product offers them. */}
-      {extraModes.length > 0 ? (
+      {!fromPaid && extraModes.length > 0 ? (
         <div data-pdp-extra-modes className="flex flex-wrap gap-2" role="group" aria-label="Extra purchase options">
           <ExtraModeChip
+            compact={compact}
             active={mode !== "selected_resources" && mode !== "paid_update"}
             onClick={() => setExtraMode(null)}
           >
-            {presentation.isCourse ? "Course · modules" : "Product modules"}
+            {compact ? "Full product" : presentation.isCourse ? "Course · modules" : "Product modules"}
           </ExtraModeChip>
           {extraModes.map((extra) => (
-            <ExtraModeChip key={extra} active={mode === extra} onClick={() => setExtraMode(extra)}>
+            <ExtraModeChip key={extra} compact={compact} active={mode === extra} onClick={() => setExtraMode(extra)}>
               {extra === "selected_resources" ? "Resources" : "Paid update"}
             </ExtraModeChip>
           ))}
         </div>
       ) : null}
 
-      {mode === "full_product" && (
+      {!compact && mode === "full_product" && (
         <FullCoursePanel
           modules={bundleModules}
           isProductOwned={isProductOwned}
@@ -408,8 +472,9 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      {mode === "selected_resources" && (
+      {!fromPaid && mode === "selected_resources" && (
         <ResourceSelector
+          compact={compact}
           resources={purchasableResources}
           modules={modules}
           selectedIds={selectedResourceIds}
@@ -418,8 +483,9 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      {mode === "paid_update" && (
+      {!fromPaid && mode === "paid_update" && (
         <PaidUpdateSelector
+          compact={compact}
           updates={availableUpdates}
           productLabel={presentation.typeLabel}
           selectedId={selectedUpdateId}
@@ -427,9 +493,13 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      <SummaryPanel summary={summary} />
+      {couponEntry}
+      {compact ? <PdpSelectionSummary snapshot={snapshot} pricing={currentPricing} showOriginal={mode !== "full_product" || (Number.isFinite(product.originalPrice) && product.originalPrice > 0)} /> : <SummaryPanel summary={summary} />}
+      {compact && !isProductOwned && mode === "selected_modules" && summary.selectedCount > 0 && purchasableModules.filter((module) => selectedModuleIds.has(module.id)).every((module) => module.includeInBundle !== false) && summary.fullCourse.effectivePrice < summary.effectiveSubtotal ? <p className="dc-pdp-selection-note">The full product costs {formatPriceValue(summary.fullCourse.effectivePrice)}. <button type="button" className="dc-pdp-text-action" onClick={() => { setSelectedModuleIds(new Set()); setSelectedResourceIds(new Set()); setExtraMode(null); }}>Choose full product</button></p> : null}
 
       <CtaBar
+        compact={compact}
+        pricing={currentPricing}
         mode={mode}
         summary={summary}
         isProductOwned={isProductOwned}
@@ -445,7 +515,8 @@ export default function PdpPurchaseBuilder({
 }
 
 /** Compact opt-in chip for the non-module extras (resources / paid updates). */
-function ExtraModeChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function ExtraModeChip({ compact, active, onClick, children }: { compact: boolean; active: boolean; onClick: () => void; children: ReactNode }) {
+  if (compact) return <button type="button" aria-pressed={active} onClick={onClick} className="dc-pdp-text-action">{children}</button>;
   return (
     <GlassButton
       variant="capsule"
@@ -528,16 +599,18 @@ function FullCoursePanel({
 }
 
 function ResourceSelector({
+  compact,
   resources,
   modules,
   selectedIds,
   ownershipState,
   onToggle,
 }: {
+  compact: boolean;
   resources: Array<CanonicalCourseResource & { parentTitle: string; parentModuleId: string }>;
   modules: CanonicalCourseModule[];
   selectedIds: Set<string>;
-  ownershipState: { isProductOwned: boolean; ownedUpdateIds: ReadonlySet<string> | readonly string[]; ownedModuleIds?: ReadonlySet<string> | readonly string[] };
+  ownershipState: { isProductOwned: boolean; ownedUpdateIds: ReadonlySet<string> | readonly string[]; ownedModuleIds?: ReadonlySet<string> | readonly string[]; ownedResourceIds?: ReadonlySet<string> | readonly string[] };
   onToggle: (id: string) => void;
 }) {
   if (resources.length === 0) {
@@ -550,7 +623,7 @@ function ResourceSelector({
   return (
     <div className="space-y-2">
       <p className="px-1 text-xs font-black uppercase tracking-wider text-white/55">
-        Individually purchasable resources
+        {compact ? "Select resources" : "Individually purchasable resources"}
       </p>
       {resources.map((r) => {
         const isSelected = selectedIds.has(r.id);
@@ -559,6 +632,13 @@ function ResourceSelector({
         const regular = r.cashPrice;
         const sale = r.salePrice;
         const TypeIcon = RESOURCE_TYPE_ICON[r.type] || Package;
+        if (compact) return (
+          <label key={r.id} data-pdp-resource data-resource-id={r.id} className="dc-pdp-option-row">
+            <input type="checkbox" checked={isOwned || isSelected} disabled={isOwned} onChange={() => onToggle(r.id)} aria-label={isOwned ? `${r.name} — already owned` : `Select ${r.name}`} />
+            <span className="dc-pdp-option-copy"><span>{r.name}</span><small>{[r.parentTitle, RESOURCE_TYPE_LABEL[r.type] || r.type].filter(Boolean).join(" · ")}</small></span>
+            <strong>{isOwned ? "Owned" : formatPriceValue(price)}</strong>
+          </label>
+        );
         return (
           <SimplePanel
             key={r.id}
@@ -616,11 +696,13 @@ function ResourceSelector({
 }
 
 function PaidUpdateSelector({
+  compact,
   updates,
   productLabel,
   selectedId,
   onSelect,
 }: {
+  compact: boolean;
   updates: CanonicalPaidUpdate[];
   productLabel: string;
   selectedId: string | null;
@@ -642,6 +724,13 @@ function PaidUpdateSelector({
           u.includedModuleIds.length > 0 ? `${u.includedModuleIds.length} module${u.includedModuleIds.length === 1 ? "" : "s"}` : null,
           u.includedResourceIds.length > 0 ? `${u.includedResourceIds.length} resource${u.includedResourceIds.length === 1 ? "" : "s"}` : null,
         ].filter((item): item is string => Boolean(item));
+        if (compact) return (
+          <label key={u.id} data-pdp-update data-update-id={u.id} className="dc-pdp-option-row">
+            <input type="checkbox" checked={isSelected} onChange={() => onSelect(isSelected ? null : u.id)} aria-label={`Select ${u.title}`} />
+            <span className="dc-pdp-option-copy"><span>{u.title}</span><small>{includedSummary.join(" · ")}</small></span>
+            <strong>{formatPriceValue(u.cashPrice)}</strong>
+          </label>
+        );
         return (
           <SimplePanel
             key={u.id}
@@ -765,6 +854,8 @@ function SummaryPanel({
 }
 
 function CtaBar({
+  compact,
+  pricing,
   mode,
   summary,
   isProductOwned,
@@ -775,6 +866,8 @@ function CtaBar({
   onPreview,
   onClearNotice,
 }: {
+  compact: boolean;
+  pricing?: PdpPricingView;
   mode: PdpPurchaseMode;
   summary: ReturnType<typeof computeSummary>;
   isProductOwned: boolean;
@@ -839,6 +932,18 @@ function CtaBar({
     disabled = true;
     if (!helper) helper = validation.reason || "Please adjust your selection.";
   }
+  if (compact) {
+    label = isProductOwned && mode === "full_product"
+      ? libraryAction
+      : mode === "full_product"
+        ? (pricing?.quote ? pricing.quote.cashPayable === 0 : summary.effectiveSubtotal === 0) ? "Get free access" : "Get access"
+        : "Continue to checkout";
+    // Selector headings already explain how to choose content. Reserve helper
+    // copy for actual validation errors instead of repeating the instruction.
+    if (validation.ok) helper = null;
+  }
+  if (pricing?.status === "loading" || pricing?.applying) { disabled = true; label = "Verifying price"; }
+  if (pricing?.status === "error") disabled = true;
   return (
     <div className="space-y-2" data-pdp-cta>
       {previewNotice && !validation.ok ? (
@@ -867,7 +972,8 @@ function CtaBar({
         size="md"
         onClick={onPreview}
         disabled={disabled}
-        icon={icon ? (() => {
+        className={compact ? "dc-pdp-primary" : undefined}
+        icon={compact ? null : icon ? (() => {
           const Icon = icon;
           return <Icon size={20} />;
         })() : undefined}

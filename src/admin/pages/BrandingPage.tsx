@@ -32,6 +32,7 @@
 // Cloudinary upload with folder="branding".
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PiHandWavingDuotone } from "react-icons/pi";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
@@ -691,8 +692,10 @@ export default function BrandingPage() {
                   style={{ backgroundImage: `linear-gradient(to bottom right, ${previewFrom}, ${previewTo})` }}
                   data-home-gradient-preview
                 >
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Good to see you 👋</p>
-                  <p className="mt-0.5 truncate text-sm font-bold tracking-tight">Hello, Learner</p>
+                  <p className="flex min-w-0 items-center gap-2 text-xl font-bold tracking-tight">
+                    <span className="truncate">Hello, <strong className="font-extrabold">Learner</strong></span>
+                    <PiHandWavingDuotone className="h-6 w-6 shrink-0 text-amber-200" aria-hidden="true" />
+                  </p>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="text-xs font-semibold text-slate-600">

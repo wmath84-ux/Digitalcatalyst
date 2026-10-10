@@ -37,6 +37,8 @@ type Entry = {
   listeners: Set<(docs: SharedDoc[], error: unknown) => void>;
   stop: (() => void) | null;
   teardown: ReturnType<typeof setTimeout> | null;
+  reconnect: (() => void) | null;
+  generation: number;
 };
 
 /** Keep a dropped listener alive briefly so remounts reuse it (see above). */
@@ -56,7 +58,7 @@ export function subscribeShared(
 ): () => void {
   let entry = registry.get(key);
   if (!entry) {
-    entry = { docs: null, error: null, listeners: new Set(), stop: null, teardown: null };
+    entry = { docs: null, error: null, listeners: new Set(), stop: null, teardown: null, reconnect: null, generation: 0 };
     registry.set(key, entry);
   }
   const current = entry;
@@ -69,16 +71,21 @@ export function subscribeShared(
   // Replay: a late subscriber gets the last snapshot without a round trip.
   if (current.docs || current.error) listener(current.docs || [], current.error);
 
-  if (!current.stop) {
+  const reconnect = () => {
+    const generation = ++current.generation;
+    try { current.stop?.(); } catch { /* reconnect even after a failed teardown */ }
+    current.stop = null;
     try {
       current.stop = onSnapshot(
         makeQuery(),
         (snapshot) => {
+          if (generation !== current.generation) return;
           current.docs = snapshot.docs.map((item) => ({ id: item.id, data: item.data() }));
           current.error = null;
           current.listeners.forEach((fn) => fn(current.docs as SharedDoc[], null));
         },
         (error) => {
+          if (generation !== current.generation) return;
           current.error = error;
           current.listeners.forEach((fn) => fn(current.docs || [], error));
         },
@@ -87,7 +94,9 @@ export function subscribeShared(
       current.error = error;
       current.listeners.forEach((fn) => fn([], error));
     }
-  }
+  };
+  current.reconnect = reconnect;
+  if (!current.stop) reconnect();
 
   return () => {
     current.listeners.delete(listener);
@@ -114,6 +123,8 @@ type DocEntry = {
   listeners: Set<(data: DocumentData | null, exists: boolean, error: unknown) => void>;
   stop: (() => void) | null;
   teardown: ReturnType<typeof setTimeout> | null;
+  reconnect: (() => void) | null;
+  generation: number;
 };
 
 const docRegistry = new Map<string, DocEntry>();
@@ -127,7 +138,7 @@ export function subscribeSharedDoc(
 ): () => void {
   let entry = docRegistry.get(key);
   if (!entry) {
-    entry = { data: null, exists: false, error: null, seen: false, listeners: new Set(), stop: null, teardown: null };
+    entry = { data: null, exists: false, error: null, seen: false, listeners: new Set(), stop: null, teardown: null, reconnect: null, generation: 0 };
     docRegistry.set(key, entry);
   }
   const current = entry;
@@ -138,11 +149,15 @@ export function subscribeSharedDoc(
   current.listeners.add(listener);
   if (current.seen || current.error) listener(current.data, current.exists, current.error);
 
-  if (!current.stop) {
+  const reconnect = () => {
+    const generation = ++current.generation;
+    try { current.stop?.(); } catch { /* reconnect even after a failed teardown */ }
+    current.stop = null;
     try {
       current.stop = onSnapshot(
         makeRef(),
         (snapshot) => {
+          if (generation !== current.generation) return;
           current.data = snapshot.data() ?? null;
           current.exists = snapshot.exists();
           current.error = null;
@@ -150,6 +165,7 @@ export function subscribeSharedDoc(
           current.listeners.forEach((fn) => fn(current.data, current.exists, null));
         },
         (error) => {
+          if (generation !== current.generation) return;
           current.error = error;
           current.listeners.forEach((fn) => fn(current.data, current.exists, error));
         },
@@ -158,7 +174,9 @@ export function subscribeSharedDoc(
       current.error = error;
       current.listeners.forEach((fn) => fn(null, false, error));
     }
-  }
+  };
+  current.reconnect = reconnect;
+  if (!current.stop) reconnect();
 
   return () => {
     current.listeners.delete(listener);
@@ -171,11 +189,16 @@ export function subscribeSharedDoc(
   };
 }
 
+/** Reconnect the existing registry entry without orphaning other consumers. */
+export function retrySharedDoc(key: string) { docRegistry.get(key)?.reconnect?.(); }
+export function retrySharedCollection(key: string) { registry.get(key)?.reconnect?.(); }
+
 /** Purge a cached doc entry immediately — used on logout so the next sign-in
  * never replays the previous user's stale snapshot from the 10 s grace window. */
 export function purgeSharedDoc(key: string) {
   const entry = docRegistry.get(key);
   if (entry) {
+    ++entry.generation;
     try { entry.stop?.(); } catch {}
     if (entry.teardown) clearTimeout(entry.teardown);
     docRegistry.delete(key);
@@ -185,6 +208,7 @@ export function purgeSharedDoc(key: string) {
 export function purgeSharedCollection(key: string) {
   const entry = registry.get(key);
   if (entry) {
+    ++entry.generation;
     try { entry.stop?.(); } catch {}
     if (entry.teardown) clearTimeout(entry.teardown);
     registry.delete(key);

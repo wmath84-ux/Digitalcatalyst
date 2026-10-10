@@ -37,12 +37,11 @@ const rules = read("firestore.rules");
 /* 1. Store page default view = the square glass grid                 */
 /* ------------------------------------------------------------------ */
 
-test("store view options order is Grid, Cards, Mixed", () => {
-  // The dropdown renders VIEW_OPTIONS in declaration order.
-  assert.match(storePage, /const VIEW_OPTIONS[\s\S]*?\{ mode: "grid"[\s\S]*?\{ mode: "list"[\s\S]*?\{ mode: "mixed"/);
+test("native Store view options remain Grid, List, Mixed", () => {
+  assert.match(storePage, /<option value="grid">Grid<\/option>[\s\S]*<option value="list">List<\/option>[\s\S]*<option value="mixed">Mixed<\/option>/);
 });
 
-test("store page defaults to the square glass grid", () => {
+test("store page defaults to the grid, while list and mixed remain available", () => {
   // 2026-09-10 owner brief: "product ka by default mobile, tablet aur desktop
   // ke liye grid square card ratio set karo." The listing opens as the grid of
   // exact-square glass cards; "Cards" (rectangular rows) and "Mixed" are still

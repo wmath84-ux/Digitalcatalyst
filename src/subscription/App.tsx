@@ -1,8 +1,6 @@
 import SubscriptionPage from "./components/SubscriptionPage";
-// The page's own responsive design system (phone / tablet / desktop + the
-// solid-vs-glass material rules). Imported here, after the app theme, so its
-// layout rules win over the legacy container-query block in src/index.css.
-import "./subscription.css";
+// The page loads its scoped minimalist stylesheet. Do not reintroduce the
+// legacy card/deck stylesheet after it.
 import type { TabKey } from "../components/BottomNav";
 
 export type SubscriptionAppProps = {

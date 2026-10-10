@@ -9,13 +9,22 @@ const formatPrice = (value: number | null) => {
 
 interface Props {
   label?: string;
+  compact?: boolean;
   totalModules: number;
   selectedCount: number;
   selectedTotal: number;
   onOpen: () => void;
 }
 
-export default function ModuleSelectTrigger({ label = "Purchase individually", totalModules, selectedCount, selectedTotal, onOpen }: Props) {
+export default function ModuleSelectTrigger({ label = "Purchase individually", compact = false, totalModules, selectedCount, selectedTotal, onOpen }: Props) {
+  if (compact) {
+    return (
+      <button type="button" data-pdp-modules-trigger className="dc-pdp-text-action dc-pdp-module-trigger" onClick={onOpen}>
+        <span data-pdp-module-trigger-title>{label}</span>
+        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+      </button>
+    );
+  }
   return (
     <div className="px-0 pt-0">
       <GlassSurface radius={16} className="text-white">

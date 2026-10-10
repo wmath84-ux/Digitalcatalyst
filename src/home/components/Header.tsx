@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Bell, Gauge, Heart, Moon, Search, Settings, Sun, Trophy, UserRound, X } from "lucide-react";
+import { PiHandWavingDuotone } from "react-icons/pi";
 import ExpandingTabs, { type ExpandingTabItem } from "../../components/ui/ExpandingTabs";
 import MobileHeaderMenu from "../../components/MobileHeaderMenu";
 import { GlassSurface } from "../../components/ui/glass";
@@ -79,6 +80,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
   const viewportBand = useViewportBand();
   const isPhoneLayout = viewportBand === "compact-mobile" || viewportBand === "large-mobile";
+  const firstName = userName.trim().split(/\s+/)[0] || "Learner";
   // Which header action wears the expanded pill. On Home none of the
   // shortcuts is "the current page", so the bar starts collapsed and the
   // tapped action expands on its way out (route pages remount the header).
@@ -252,11 +254,25 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             <BrandMark className="h-10 w-10 rounded-2xl ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
-            <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
-              {headerVariant === 'flow' ? 'Organize your day' : 'Good to see you 👋'}
-            </p>
-            <h1 data-home-greeting className="mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight">
-              {headerVariant === 'flow' ? 'Plan Today' : `Hello, ${userName}`}
+            {headerVariant === "flow" ? (
+              <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
+                Organize your day
+              </p>
+            ) : null}
+            <h1
+              data-home-greeting
+              className={headerVariant === "flow"
+                ? "mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight"
+                : "flex min-w-0 items-center gap-2 text-[clamp(1.25rem,5.6vw,1.75rem)] font-bold tracking-tight"}
+            >
+              {headerVariant === "flow" ? "Plan Today" : (
+                <>
+                  <span className="min-w-0 truncate whitespace-nowrap" title={`Hello, ${firstName}`}>
+                    Hello, <strong data-home-user-name className="font-extrabold">{firstName}</strong>
+                  </span>
+                  <PiHandWavingDuotone data-home-wave className="h-6 w-6 shrink-0 text-amber-200 min-[390px]:h-7 min-[390px]:w-7" aria-hidden="true" />
+                </>
+              )}
             </h1>
           </div>
         </div>

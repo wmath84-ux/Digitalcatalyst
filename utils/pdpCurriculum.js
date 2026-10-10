@@ -78,8 +78,8 @@ const isOwnedPaidModule = (module, ownedUpdateIds) => {
 
 const keepIncluded = (modules) =>
   arr(modules)
-    .filter((module) => isObject(module) && !module.paid)
-    .map((module) => ({ ...module, modules: keepIncluded(module.modules) }));
+    .filter((module) => isObject(module) && !module.paid && module.includeInBundle !== false)
+    .map((module) => ({ ...module, resources: arr(module.resources).filter((resource) => resource.includeInBundle !== false && !resource.paidUpdateId), modules: keepIncluded(module.modules) }));
 
 /**
  * Keep only unpaid paid-upgrade modules. Included parents are dropped and

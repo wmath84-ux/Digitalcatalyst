@@ -31,13 +31,13 @@ test("subscription quote preserves feature/product line kinds and IDs for unlock
   assert.match(entitlements, /selectedFeatureIds: uniqueFeatures/);
 });
 
-test("owned product PDP surfaces a prominent paid upgrade", () => {
-  assert.match(pdp, /Course upgrade available/);
-  assert.match(pdp, /A published content update is available for this product/);
-  assert.match(pdp, /label=\{`Upgrade for \$\{formatPrice\(firstAvailableUpdate\.cashPrice\)\}`\}/);
-  // When the base course is owned the module picker is hidden; the upgrade is
-  // bought directly from the prominent upgrade card.
-  assert.match(builder, /isProductOwned && availableModes\.includes\("paid_update"\)/);
+test("owned product PDP keeps library primary and remaining Paid discovery without an automatic repeated purchase CTA", () => {
+  assert.match(pdp, /data-pdp-library-primary/);
+  assert.match(pdp, /data-pdp-remaining-paid/);
+  assert.match(pdp, /setActiveTab\("Paid"\)/);
+  assert.match(pdp, /<PdpPaidContent/);
+  assert.match(pdp, /hasScopedSelection/);
+  assert.doesNotMatch(pdp, /data-pdp-upgrade-box/);
 });
 
 test("upgrade checkout lists exactly what is being added", () => {

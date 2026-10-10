@@ -1,3 +1,4 @@
+import { isBundleIncluded, isPaidContent, visibleContentModules } from "./contentOwnership.js";
 // utils/pdpSelection.js
 //
 // Pure helpers for the customer-facing Product Detail Page purchase builder.
@@ -94,7 +95,7 @@ export const getVisibleModules = (modules) => {
     if (m.visibility === "hidden") return false;
     if (m.active === false) return false;
     if (m.accessLevel === "hidden") return false;
-    if (m.accessLevel === "paid_update") return false;
+    if (isPaidContent(m)) return false;
     return true;
   });
 };
@@ -105,7 +106,7 @@ export const getVisibleModules = (modules) => {
  * subscription feature picker. Nested modules are flattened first.
  */
 export const getPurchasableModules = (modules) => {
-  return getVisibleModules(flattenModules(modules));
+  return getVisibleModules(visibleContentModules(modules));
 };
 
 /**
@@ -113,7 +114,7 @@ export const getPurchasableModules = (modules) => {
  * "Full Course includes" panel but cannot be selected individually.
  */
 export const getBundleModules = (modules) => {
-  return getVisibleModules(modules).filter((m) => m.includeInBundle !== false);
+  return getVisibleModules(modules).filter(isBundleIncluded);
 };
 
 /**
@@ -128,6 +129,7 @@ export const getModuleEffectivePrice = (module, fallbackPrice = null) => {
   if (!isObject(module)) return null;
   const cash = numOrNull(module.cashPrice);
   if (cash === null || cash < 0) {
+    if (module.cashPrice !== null && module.cashPrice !== undefined && module.cashPrice !== "") return null;
     const fallback = numOrNull(fallbackPrice);
     return fallback === null || fallback < 0 ? null : fallback;
   }
@@ -188,14 +190,34 @@ export const getIsModuleOwned = (module, { isProductOwned, ownedUpdateIds, owned
   if (!isObject(module)) return false;
   const moduleSet = ownedModuleIds instanceof Set ? ownedModuleIds : new Set(ownedModuleIds || []);
   if (moduleSet.has(module.id)) return true;
-  if (isProductOwned && module.includeInBundle !== false) return true;
-  if (module.accessLevel === "paid_update") {
+  if (isProductOwned && isBundleIncluded(module) && module.ancestorExcludedFromBundle !== true) return true;
+  if (isPaidContent(module)) {
     const updateSet = ownedUpdateIds instanceof Set ? ownedUpdateIds : new Set(ownedUpdateIds || []);
+    if (module.paidUpdateId && updateSet.has(module.paidUpdateId)) return true;
     if (module.entitlementId && updateSet.has(module.entitlementId)) return true;
     if (updateSet.has(module.id)) return true;
   }
   return false;
 };
+
+/** One synchronous dependency normalizer for the Paid checkboxes and the
+ * existing purchase builder. UI intent never flickers back to an old scope
+ * while the builder applies it, and acquired requirements stay uncharged. */
+export function normalizeModuleSelectionIds(ids, modules, ownership) {
+  const byId = new Map(flattenModules(modules).map((module) => [String(module.id), module]));
+  const purchasable = new Set(getPurchasableModules(modules).map((module) => String(module.id)));
+  const next = new Set();
+  const add = (id, seen) => {
+    if (next.has(id) || seen.has(id) || !purchasable.has(id)) return;
+    seen.add(id);
+    const module = byId.get(id);
+    if (!module || getIsModuleOwned(module, ownership)) return;
+    next.add(id);
+    for (const dependency of arr(module.requiredPreviousModuleIds)) add(String(dependency), seen);
+  };
+  for (const id of arr(ids)) add(String(id), new Set());
+  return next;
+}
 
 // ---------------------------------------------------------------------------
 // Resource selection
@@ -209,17 +231,16 @@ export const getIsModuleOwned = (module, { isProductOwned, ownedUpdateIds, owned
 export const getPurchasableResources = (modules) => {
   const out = [];
   const visit = (m) => {
-    if (!isObject(m)) return;
-    arr(m.resources).forEach((r) => {
+    if (!isObject(m) || m.visibility === "hidden" || m.active === false || m.accessLevel === "hidden") return;
+    arr(m.resources || m.files).forEach((r) => {
       if (!isObject(r)) return;
-      if (r.visibility === "hidden") return;
-      if (r.accessLevel === "hidden") return;
-      if (r.accessLevel === "paid_update") return;
+      if (r.visibility === "hidden" || r.active === false) return;
+      if (r.accessLevel === "hidden" || isPaidContent(r)) return;
       if (r.individuallyPurchasable !== true) return;
       out.push({
         ...r,
         parentTitle: str(m.title),
-        parentModuleId: str(m.parentModuleId || m.id),
+        parentModuleId: str(m.id),
       });
     });
     arr(m.modules).forEach(visit);
@@ -245,13 +266,21 @@ export const getResourceEffectivePrice = (resource) => {
 
 /**
  * Resources are "owned" when:
+ *   - the resource itself was purchased, OR
  *   - the parent module is owned, OR
  *   - the base product is owned and the resource is part of the bundle
  *     (i.e. the parent module is `includeInBundle`).
  */
-export const getIsResourceOwned = (resource, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const getIsResourceOwned = (resource, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   if (!isObject(resource)) return false;
-  const byId = new Map(arr(modules).filter(isObject).map((m) => [m.id, m]));
+  const owned = ownedResourceIds instanceof Set ? ownedResourceIds : new Set(ownedResourceIds || []);
+  if (owned.has(resource.id) || (resource.entitlementId && owned.has(resource.entitlementId))) return true;
+  if (isPaidContent(resource)) {
+    const updates = ownedUpdateIds instanceof Set ? ownedUpdateIds : new Set(ownedUpdateIds || []);
+    return updates.has(resource.paidUpdateId || resource.entitlementId || resource.id);
+  }
+  if (resource.includeInBundle === false) return false;
+  const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
   const module = byId.get(resource.parentModuleId);
   if (!module) return false;
   return getIsModuleOwned(module, { isProductOwned, ownedUpdateIds, ownedModuleIds });
@@ -292,7 +321,7 @@ export const getAvailablePaidUpdates = (paidUpdates, ownedUpdateIds) => {
  *       * dependencies must be a subset of the selection or already-owned
  *         modules.
  */
-export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   const idList = (selectedIds instanceof Set ? Array.from(selectedIds) : arr(selectedIds)).map(String);
   if (mode === "full_product") {
     return { ok: true, purchaseKind: "full_product", ids: [] };
@@ -339,7 +368,7 @@ export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, 
       }
       const r = byId.get(id);
       if (!r) continue;
-      if (getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds })) continue;
+      if (getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds })) continue;
       out.push(id);
     }
     return { ok: true, purchaseKind: "selected_resources", ids: out };
@@ -385,12 +414,18 @@ export const computeFullCoursePrice = ({ product, modules }) => {
   if (isObject(product)) {
     const regularRaw = numOrNull(product.originalPrice);
     const saleRaw = numOrNull(product.salePrice) ?? numOrNull(product.price);
+    if (product.isFree === true) {
+      return { regularPrice: Math.max(0, regularRaw || saleRaw || 0), salePrice: 0, effectivePrice: 0 };
+    }
     if (regularRaw !== null && regularRaw > 0) {
       return {
         regularPrice: regularRaw,
         salePrice: saleRaw === null ? null : saleRaw,
         effectivePrice: saleRaw === null ? regularRaw : Math.min(saleRaw, regularRaw),
       };
+    }
+    if (saleRaw !== null && saleRaw > 0) {
+      return { regularPrice: saleRaw, salePrice: null, effectivePrice: saleRaw };
     }
   }
   let regular = 0;
@@ -491,7 +526,7 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
  * Build the canonical `CheckoutLineItem[]` for a given (mode, selectedIds)
  * state. Used by the summary panel.
  */
-export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
+export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
   const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
   const productId = str(product?.id);
   const productTitle = str(product?.title);
@@ -593,7 +628,7 @@ export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdate
         salePrice: sale,
         effectivePrice: effective,
         quantity: 1,
-        alreadyOwned: getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds }),
+        alreadyOwned: getIsResourceOwned(r, modules, { isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }),
         entitlementId: str(r.entitlementId, id),
       };
     }).filter(Boolean);
@@ -604,8 +639,8 @@ export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdate
 /**
  * Compute the dynamic summary block for the summary panel.
  */
-export const computeSummary = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
-  const lines = buildLineItems({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds });
+export const computeSummary = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds }) => {
+  const lines = buildLineItems({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds, ownedResourceIds });
   const totals = computeLineTotals(lines);
   const full = computeFullCoursePrice({ product, modules });
   const titles = lines.filter((l) => !l.alreadyOwned).map((l) => l.title);

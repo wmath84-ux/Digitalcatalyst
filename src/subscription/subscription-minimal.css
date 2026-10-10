@@ -1,30 +1,524 @@
-/* Membership and checkout decisions are the only prominent surfaces.
-   Ordinary content uses the same single-line frame as ProfileLayout. */
-[data-subscription-page] {
-  --sub-shadow: none;
-  --sub-border: rgba(255,255,255,.1);
-  --sub-radius: 16px;
-  --sub-radius-lg: 16px;
+/* Subscription-local design: plain decisions and one itemised summary.
+   Shared app chrome and the accessible, bounded sheet primitives are unchanged. */
+[data-subscription-page],
+.dc-subscription-picker {
+  --sub-border: rgba(226, 232, 240, 0.14);
+  --sub-muted: #b3bed0;
+  --sub-accent: #c1baff;
+  min-width: 0;
+  color: #f2f5fb;
   text-shadow: none;
 }
-[data-subscription-page] [data-subscription-hero] { background: none; border: 0; box-shadow: none; padding-block: 20px; }
-[data-subscription-page] .dc-simple-panel { border-radius: 16px; }
-[data-subscription-page] .dc-membership-section { background: transparent; border: 0; border-top: 1px solid rgba(255,255,255,.1); border-radius: 0; }
-[data-subscription-page] [data-important-membership] { border-radius: 16px; border: 1px solid rgba(255,255,255,.1); box-shadow: none; text-shadow: none; }
-[data-subscription-page] [data-important-membership] > div[aria-hidden]:nth-of-type(3),
-[data-subscription-page] [data-important-membership] > div[aria-hidden]:nth-of-type(4) { opacity: .2; }
-[data-subscription-page] [data-member-products] li,
-[data-subscription-page] [data-subscription-owned-features] li,
-[data-subscription-page] [data-subscription-owned-products] li { background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,.08); border-radius: 0; }
-[data-subscription-page] [data-member-features] li { border-bottom: 1px solid rgba(255,255,255,.08); }
-[data-subscription-page] [data-subscription-step] .dc-glass-card { background: rgba(255,255,255,.02) !important; }
-[data-subscription-page] [data-subscription-live-card] { background: rgba(255,255,255,.02); border-color: rgba(255,255,255,.1); box-shadow: none; }
-/* Legacy pricing information is secondary, not another frosted focal point. */
-[data-subscription-page] [data-pricing-glass-card] { background: none !important; border: 0 !important; border-top: 1px solid rgba(255,255,255,.1) !important; border-radius: 0 !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; padding: 20px 0 !important; }
-[data-subscription-page] [data-pricing-glass-card] > div:first-child { background: none !important; border: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-[data-subscription-page] h2 { font-size: 20px !important; font-weight: 600; line-height: 1.4; }
-[data-subscription-page] h3 { font-size: 15px !important; font-weight: 600; line-height: 1.45; }
-[data-subscription-page] [data-subscription-step] { background: rgba(255,255,255,.02); box-shadow: none; }
-[data-subscription-page] [data-subscription-step] > .dc-sub-step-head { background: none; }
-[data-subscription-page] [data-subscription-step] .dc-glass-card { border: 0 !important; background: none !important; }
-[data-subscription-page] [data-subscription-price-summary] .dc-glass-card { border: 1px solid rgba(255,255,255,.1) !important; background: rgba(255,255,255,.02) !important; }
+[data-subscription-page] {
+  background: #0a0e18;
+}
+.dc-subscription-shell {
+  container-type: inline-size;
+  container-name: dc-subscription;
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+}
+[data-subscription-hero] {
+  padding-block: 0.5rem 1.5rem;
+}
+[data-subscription-hero] h1 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.3;
+}
+[data-subscription-layout][data-subscription-workspace] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+[data-subscription-main],
+[data-subscription-rail] {
+  min-width: 0;
+}
+.dc-subscription-section {
+  min-width: 0;
+  padding-block: 1.25rem;
+  border-top: 1px solid var(--sub-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.dc-subscription-section h2,
+.dc-subscription-state h2 {
+  margin-bottom: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 750;
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+}
+.dc-subscription-note {
+  margin-top: 0.5rem;
+  color: var(--sub-muted);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-note strong {
+  color: #e2e8f5;
+  font-weight: 650;
+}
+.dc-subscription-plan-list {
+  display: grid;
+  gap: 0;
+  border: 0;
+  min-width: 0;
+}
+.dc-subscription-plan-row {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 0.875rem;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--sub-border);
+  cursor: pointer;
+}
+.dc-subscription-plan-row > span:nth-child(2),
+.dc-subscription-pick-row > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.dc-subscription-plan-row strong,
+.dc-subscription-pick-row strong {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-plan-row small,
+.dc-subscription-pick-row small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--sub-muted);
+  font-size: 0.75rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-plan-row[data-selected="true"] strong:first-child {
+  color: #ddd8ff;
+}
+.dc-subscription-plan-price,
+.dc-subscription-pick-price {
+  max-width: 38%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dc-subscription-plan-price small {
+  text-align: right;
+}
+[data-subscription-page] input[type="radio"],
+.dc-subscription-picker input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.25rem;
+  accent-color: #b8aaff;
+  cursor: pointer;
+}
+.dc-subscription-duration {
+  margin-top: 1rem;
+  border: 0;
+}
+.dc-subscription-duration legend {
+  color: #e7edf9;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.dc-subscription-duration > div {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.25rem;
+}
+.dc-subscription-duration label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.dc-subscription-duration input[type="radio"] {
+  margin: 0;
+}
+.dc-subscription-duration label:has(input:disabled) {
+  color: var(--sub-muted);
+  cursor: not-allowed;
+}
+.dc-subscription-disclosure {
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--sub-border);
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+.dc-subscription-disclosure summary {
+  min-height: 2.75rem;
+  padding-block: 0.75rem;
+  color: #d4cefa;
+  cursor: pointer;
+  line-height: 1.65;
+}
+.dc-subscription-compare-scroll {
+  max-width: 100%;
+  overflow: auto;
+  margin-bottom: 0.75rem;
+}
+.dc-subscription-compare-scroll table {
+  min-width: 100%;
+  width: max-content;
+  max-width: none;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+.dc-subscription-compare-scroll caption {
+  max-width: 100%;
+  padding-block: 0.75rem;
+  color: var(--sub-muted);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.dc-subscription-compare-scroll th,
+.dc-subscription-compare-scroll td {
+  min-width: 9rem;
+  max-width: 14rem;
+  padding: 0.875rem 0.75rem;
+  border-bottom: 1px solid var(--sub-border);
+  line-height: 1.55;
+}
+.dc-subscription-compare-scroll th {
+  font-weight: 650;
+}
+.dc-subscription-compare-scroll th:first-child {
+  min-width: 8rem;
+}
+.dc-subscription-compare-scroll th small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--sub-muted);
+}
+.dc-subscription-addon-actions {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+.dc-subscription-text-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--sub-accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.55;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-text-action:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dc-subscription-text-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dc-subscription-addon-actions button {
+  justify-content: space-between;
+  padding-block: 0.625rem;
+}
+.dc-subscription-addon-actions button > span {
+  color: var(--sub-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.dc-subscription-code {
+  margin-top: 1rem;
+}
+.dc-subscription-code label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #dce3f1;
+}
+.dc-subscription-code form {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 1rem;
+}
+.dc-subscription-code input,
+.dc-subscription-picker input[type="search"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--sub-border);
+  border-radius: 8px;
+  background: #101625;
+  color: #f0f4fc;
+  font-size: 1rem;
+  box-shadow: none;
+}
+.dc-subscription-code input::placeholder,
+.dc-subscription-picker input::placeholder {
+  color: #8f9caf;
+}
+.dc-subscription-code-applied {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.875rem;
+  padding-block: 0.5rem;
+}
+.dc-subscription-code-applied > div {
+  min-width: 0;
+  flex: 1;
+}
+.dc-subscription-code-applied strong {
+  color: #b0dbc9;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-error {
+  margin-block: 0.75rem;
+  color: #f1b9b7;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-items > div,
+.dc-subscription-totals > div {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+.dc-subscription-items > div {
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--sub-border);
+}
+.dc-subscription-items dt {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-items dt small,
+.dc-subscription-totals dt small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--sub-muted);
+  font-size: 0.75rem;
+  line-height: 1.65;
+}
+.dc-subscription-items dd {
+  max-width: 45%;
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-totals {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.dc-subscription-totals dt {
+  min-width: 0;
+  flex: 1;
+  color: var(--sub-muted);
+  font-size: 0.8125rem;
+}
+.dc-subscription-totals dd {
+  max-width: 45%;
+  font-size: 0.875rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-payable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sub-border);
+}
+.dc-subscription-payable > span {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.dc-subscription-payable > strong {
+  max-width: 100%;
+  font-size: 1.875rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dc-subscription-checkout-action {
+  margin-block: 0.25rem 0.875rem;
+}
+.dc-subscription-primary {
+  display: inline-flex;
+  width: 100%;
+  min-height: 3rem;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #101828;
+  font-size: 0.9375rem;
+  font-weight: 750;
+  line-height: 1.55;
+}
+.dc-subscription-primary:hover {
+  background: #eee9ff;
+}
+.dc-subscription-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.dc-subscription-terms {
+  margin-top: 0.75rem;
+  color: var(--sub-muted);
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+.dc-subscription-terms a {
+  color: var(--sub-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dc-subscription-rules {
+  margin-bottom: 1rem;
+}
+.dc-subscription-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-block: 3rem;
+  font-size: 0.875rem;
+}
+.dc-subscription-picker {
+  gap: 1rem;
+  background: #101625;
+  border: 1px solid var(--sub-border);
+  text-align: left;
+}
+.dc-subscription-picker header {
+  display: flex;
+  min-width: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.dc-subscription-picker header > div {
+  min-width: 0;
+}
+.dc-subscription-picker header h2 {
+  font-size: 1.25rem;
+  font-weight: 750;
+  line-height: 1.4;
+}
+.dc-subscription-picker header p {
+  margin-top: 0.25rem;
+  color: var(--sub-muted);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+.dc-subscription-picker-list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+.dc-subscription-pick-row {
+  display: flex;
+  align-items: start;
+  min-width: 0;
+  gap: 0.75rem;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--sub-border);
+  cursor: pointer;
+}
+.dc-subscription-pick-row:has(input:disabled) {
+  cursor: default;
+}
+.dc-subscription-select-all {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: 0.8125rem;
+}
+.dc-subscription-select-all input[type="checkbox"] {
+  margin: 0;
+}
+[data-subscription-page] button:focus-visible,
+[data-subscription-page] input:focus-visible,
+[data-subscription-page] summary:focus-visible,
+[data-subscription-page] a:focus-visible,
+.dc-subscription-picker button:focus-visible,
+.dc-subscription-picker input:focus-visible,
+.dc-subscription-picker summary:focus-visible,
+.dc-subscription-picker a:focus-visible {
+  outline: 2px solid var(--sub-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+@container dc-subscription (min-width:860px) {
+  [data-subscription-layout][data-subscription-workspace] {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 3rem;
+    align-items: start;
+  }
+  [data-subscription-rail] {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+@media (max-width: 359px) {
+  .dc-subscription-plan-row {
+    gap: 0.625rem;
+  }
+  .dc-subscription-plan-price {
+    max-width: 36%;
+  }
+  .dc-subscription-code form {
+    gap: 0.75rem;
+  }
+}
+
+.dc-subscription-items dd del,
+.dc-subscription-pick-price del {
+  display: block;
+  color: var(--sub-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.dc-desktop-shell [data-subscription-page] [data-subscription-subscribe-bar] {
+  padding: 0;
+}

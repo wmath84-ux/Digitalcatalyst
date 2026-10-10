@@ -102,11 +102,14 @@ const subscriptionPage = readSource("src/subscription/components/SubscriptionPag
 test("PdpApp gates the coupon input behind shouldShowCouponInput", () => {
   assert.match(pdpApp, /shouldShowCouponInput/);
   assert.match(pdpApp, /isFreeProduct\(product\)/);
-  assert.match(pdpApp, /canShowCouponInput\s*&&\s*\(/);
+  assert.match(pdpApp, /canShowCouponInput\s*\?\s*\(/);
 });
 
 test("PdpApp drops an applied coupon when the product becomes free", () => {
-  assert.match(pdpApp, /!canShowCouponInput\s*&&\s*appliedCoupon/);
+  const hook = readSource("src/pdp/usePdpQuote.ts");
+  assert.match(hook, /!chargeable && coupon/);
+  assert.match(hook, /setCoupon\(null\)/);
+  assert.match(pdpApp, /summary\.effectiveSubtotal > 0 \? pricing\.appliedCode : null/);
 });
 
 test("CheckoutReviewStep hides the coupon card when nothing is payable", () => {

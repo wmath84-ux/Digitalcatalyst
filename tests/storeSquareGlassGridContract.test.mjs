@@ -49,8 +49,12 @@ const main = read("src/main.tsx");
 
 /* ── helpers: read the pinned tokens back out of the CSS ──────────────────── */
 
-const px = (css, name) => Number(new RegExp(`${name}:\\s*([\\d.]+)px`).exec(css)?.[1]);
-const alpha = (css, name) => Number(new RegExp(`${name}:\\s*rgba\\(173, 216, 255, ([\\d.]+)\\)`).exec(css)?.[1]);
+const px = (css, name) =>
+  Number(new RegExp(`${name}:\\s*([\\d.]+)px`).exec(css)?.[1]);
+const alpha = (css, name) =>
+  Number(
+    new RegExp(`${name}:\\s*rgba\\(173, 216, 255, ([\\d.]+)\\)`).exec(css)?.[1]
+  );
 
 const BLUR_CEILING = px(glassCss, "--dc-glass-blur-ceiling");
 
@@ -65,8 +69,14 @@ test("the owner's density vocabulary is pinned once, in CSS", () => {
   assert.match(glassCss, /--dc-glass-blue: 173, 216, 255;/);
   // The stylesheet that paints them loads AFTER glass.css, so it can out-rank
   // the navy plate glass.css puts on `.dc-glass-card`.
-  const order = [main.indexOf('import "./glass.css";'), main.indexOf('import "./store-glass.css";')];
-  assert.ok(order[0] >= 0 && order[1] > order[0], "store-glass.css must be imported after glass.css");
+  const order = [
+    main.indexOf('import "./glass.css";'),
+    main.indexOf('import "./store-glass.css";'),
+  ];
+  assert.ok(
+    order[0] >= 0 && order[1] > order[0],
+    "store-glass.css must be imported after glass.css"
+  );
 });
 
 test("the store glass is blur 42–50% and light blue at 22–30%", () => {
@@ -74,31 +84,49 @@ test("the store glass is blur 42–50% and light blue at 22–30%", () => {
   const tint = alpha(glassCss, "--dc-store-glass-tint");
   assert.ok(blur > 0, "--dc-store-glass-blur must be pinned in px");
   const density = blur / BLUR_CEILING;
-  assert.ok(density >= 0.42 && density <= 0.5, `store blur density is ${(density * 100).toFixed(0)}%, brief says 42–50%`);
-  assert.ok(tint >= 0.22 && tint <= 0.3, `store colour density is ${(tint * 100).toFixed(0)}%, brief says 22–30%`);
+  assert.ok(
+    density >= 0.42 && density <= 0.5,
+    `store blur density is ${(density * 100).toFixed(0)}%, brief says 42–50%`
+  );
+  assert.ok(
+    tint >= 0.22 && tint <= 0.3,
+    `store colour density is ${(tint * 100).toFixed(0)}%, brief says 22–30%`
+  );
 });
 
 test("the store glass actually paints those numbers on the pack's layers", () => {
   // The pack GlassSurface tree is 1 frost · 2 tint · 3 sheen · 4 rim; the frost
   // and the tint are the two the brief is about, and both are !important
   // because the engine writes them inline.
-  const frost = /:where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(1\) \{([^}]*)\}/.exec(storeCss)?.[1];
+  const frost =
+    /:where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(1\) \{([^}]*)\}/.exec(
+      storeCss
+    )?.[1];
   assert.ok(frost, "expected the frost-layer rule");
   // Both spellings, prefixed first: Lightning CSS collapses the pair to the
   // LAST one written, so the unprefixed form (the only one Firefox reads) must
   // be the survivor.
   assert.match(
     frost,
-    /-webkit-backdrop-filter: blur\(var\(--dc-store-glass-blur\)\) saturate\(1\.3\) !important;\s*\n\s*backdrop-filter: blur\(var\(--dc-store-glass-blur\)\) saturate\(1\.3\) !important;/,
+    /-webkit-backdrop-filter: blur\(var\(--dc-store-glass-blur\)\) saturate\(1\.3\) !important;\s*\n\s*backdrop-filter: blur\(var\(--dc-store-glass-blur\)\) saturate\(1\.3\) !important;/
   );
 
-  const tint = /:where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(2\) \{([^}]*)\}/.exec(storeCss)?.[1];
+  const tint =
+    /:where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(2\) \{([^}]*)\}/.exec(
+      storeCss
+    )?.[1];
   assert.ok(tint, "expected the tint-layer rule");
   assert.match(tint, /background: var\(--dc-store-glass-tint\) !important/);
 
   // `?glass=off` still rolls the store back to an opaque plate.
-  assert.match(storeCss, /html\[data-glass="off"\] :where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(1\)/);
-  assert.match(storeCss, /html\[data-glass="off"\] :where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(2\)/);
+  assert.match(
+    storeCss,
+    /html\[data-glass="off"\] :where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(1\)/
+  );
+  assert.match(
+    storeCss,
+    /html\[data-glass="off"\] :where\(\.dc-store-glass\) > div\[aria-hidden\]:nth-of-type\(2\)/
+  );
 });
 
 /* ------------------------------------------------------------------ */
@@ -154,23 +182,17 @@ test("the hero card's type scale is a headline, not a label", () => {
 /* 2. "Top rated" is a heading; the card has a heading too             */
 /* ------------------------------------------------------------------ */
 
-test("“Top rated” is heading-sized", () => {
-  // It is an <h2> now, not a 10px eyebrow, and it still carries the scene ink
-  // scrim because it is the one store heading that sits on the raw scene.
-  assert.match(storePage, /<h2 className="dc-scene-ink dc-store-section-title px-3 sm:px-4">Top rated<\/h2>/);
-  assert.doesNotMatch(storePage, /dc-section-label px-4">Top rated/);
-
-  const title = /\.dc-store-section-title \{([^}]*)\}/.exec(storeCss)?.[1];
-  assert.ok(title, "expected the section-title rule");
-  assert.match(title, /font-size: clamp\(1\.5rem, 6vw, 2\.375rem\)/);
-  assert.match(title, /font-weight: 800/);
-  assert.match(title, /text-transform: none/);
-  // The desktop shell zeroes the heading's own gutter.
-  assert.match(indexCss, /\.dc-desktop-shell \[data-store-top-rated\] :where\(\.dc-section-label, \.dc-store-section-title\) \{/);
+test("Top Rated remains a genuine sort, not a duplicate showcase heading", () => {
+  assert.doesNotMatch(storePage, /data-store-top-rated|>Top rated</);
+  assert.match(storePage, /"Top Rated"/);
+  assert.match(storePage, /b\.rating - a\.rating/);
 });
 
 test("every product card carries a heading that is its biggest type", () => {
-  assert.match(card, /<h3 className="dc-store-card-title line-clamp-2">\{product\.title\}<\/h3>/);
+  assert.match(
+    card,
+    /<h3 className="dc-store-card-title line-clamp-2">\{product\.title\}<\/h3>/
+  );
   const title = /\.dc-store-card-title \{([^}]*)\}/.exec(storeCss)?.[1];
   assert.ok(title, "expected the card-title rule");
   assert.match(title, /font-size: clamp\(0\.8rem, 3\.5vw, 1\.1875rem\)/);
@@ -192,57 +214,55 @@ test("every product card carries a heading that is its biggest type", () => {
 /* ------------------------------------------------------------------ */
 
 test("every product card uses Home's 4:3 artwork ratio", () => {
-  // Same 4:3 media box Home trending cards use — the card itself is not a
-  // square; height is art + copy so the length/width stack tracks Home.
-  assert.match(homeCard, /aspect-\[4\/3\]/);
-  assert.match(card, /dc-store-glass dc-scene-ink group relative flex w-full min-h-0 flex-col overflow-hidden/);
-  assert.doesNotMatch(card, /aspect-square/);
-  assert.match(card, /className="relative aspect-\[4\/3\] w-full overflow-hidden"/);
-  // The <img> is absolutely positioned so index.css's unlayered
-  // `img { height: auto }` (640–1366px) cannot stretch it out of the crop.
-  assert.match(card, /className="absolute inset-0 h-full w-full object-cover/);
-  // The loading placeholders are the same 4:3 stack in the same grid.
-  assert.match(storePage, /dc-store-glass flex w-full min-h-0 flex-col overflow-hidden/);
-  assert.match(storePage, /className="relative aspect-\[4\/3\] w-full overflow-hidden"/);
+  const css = read("src/components/store-marketplace.css");
+  assert.match(css, /\.dc-marketplace-cover \{[\s\S]*?aspect-ratio: 4\/3/);
+  assert.match(css, /\.dc-marketplace-cover img \{[\s\S]*?position: absolute/);
+  assert.match(css, /height: 100% !important/);
+  assert.match(css, /object-fit: cover/);
   assert.doesNotMatch(storePage, /aspect-square/);
 });
 
 test("the card's flex column reaches its children, so the CTA sits at the bottom", () => {
-  // Regression (2026-09-10, owner: "add to my cart button upar center me ho
-  // gaya hai"): GlassSurface puts a content wrapper between the card root and
-  // the card's real children, and that wrapper ships as `display: block`. A
-  // flex column on the ROOT therefore never reached the artwork / copy — so
-  // `flex-1` and `mt-auto` did nothing and the CTA floated up under the title.
-  // The wrapper is promoted to the flex column from the root's class list,
-  // which keeps `contentClassName="p-0"` (edge-to-edge artwork) intact.
-  for (const source of [card, storePage]) {
-    assert.match(source, /\[&>div:last-child\]:flex \[&>div:last-child\]:min-h-0 \[&>div:last-child\]:flex-col/);
-  }
-  assert.match(card, /contentClassName="p-0"/, "the artwork stays edge-to-edge");
-  // Same copy padding Home uses under the 4:3 art.
-  assert.match(card, /className="relative z-20 flex flex-1 flex-col gap-1 p-3"/);
-  assert.match(homeCard, /flex flex-1 flex-col gap-1 p-3/);
-  // Comments are stripped first: the CTA must not float on auto margins.
-  const bareCard = card.replace(/\/\*[\s\S]*?\*\//g, "");
-  assert.doesNotMatch(bareCard, /mt-auto/, "nothing floats on auto margins in a block box any more");
-  // Between JSX children a bare slash-star comment is literal TEXT — it painted
-  // the comment onto the card. The copy block's comment must stay braced.
-  assert.match(card, /\{\/\* `flex-1` \+ `p-3`: same copy stack/);
-  assert.doesNotMatch(card, /\n\s*\/\* `flex-1`/);
+  const css = read("src/components/store-marketplace.css");
+  assert.match(
+    css,
+    /\.dc-marketplace-card \{[\s\S]*?display: flex;[\s\S]*?flex-direction: column/
+  );
+  assert.match(
+    css,
+    /\.dc-marketplace-open \{[\s\S]*?flex: 1;[\s\S]*?justify-content: start/
+  );
+  assert.match(css, /\.dc-marketplace-card-footer \{/);
+  assert.doesNotMatch(storePage, /<GlassCard/);
 });
 
 test("the price is on the card at every breakpoint, not only from sm:", () => {
   // The phone card used to hide the whole price row (`hidden … sm:flex`), which
   // is what read as "text dikh nahi raha" on mobile. It is now always visible;
   // only the save pill (the bulkiest chip) waits for `sm:`.
-  assert.match(card, /<div className="flex flex-wrap items-baseline gap-x-1\.5">/);
-  assert.match(card, /<span className="text-\[13px\] dc-hero-price sm:text-lg">₹\{product\.price\}<\/span>/);
-  assert.match(card, /<span className="text-\[10px\] dc-anchor-price sm:text-\[12px\]">₹\{product\.originalPrice\}<\/span>/);
+  assert.match(
+    card,
+    /<div className="flex flex-wrap items-baseline gap-x-1\.5">/
+  );
+  assert.match(
+    card,
+    /<span className="text-\[13px\] dc-hero-price sm:text-lg">₹\{product\.price\}<\/span>/
+  );
+  assert.match(
+    card,
+    /<span className="text-\[10px\] dc-anchor-price sm:text-\[12px\]">₹\{product\.originalPrice\}<\/span>/
+  );
   // The pill is hidden via a WRAPPER: `.dc-save-pill` sets `display:
   // inline-flex` in unlayered CSS, which beats a `hidden` utility on itself.
-  assert.match(card, /<span className="hidden sm:inline-flex">\s*\n\s*<span className="dc-save-pill">/);
+  assert.match(
+    card,
+    /<span className="hidden sm:inline-flex">\s*\n\s*<span className="dc-save-pill">/
+  );
   // The byline stays the one `sm:`-only line — a 145px card cannot carry it.
-  assert.match(card, /<p className="dc-store-card-meta hidden truncate sm:block">by \{product\.instructor\}<\/p>/);
+  assert.match(
+    card,
+    /<p className="dc-store-card-meta hidden truncate sm:block">by \{product\.instructor\}<\/p>/
+  );
 });
 
 /* ------------------------------------------------------------------ */
@@ -259,44 +279,63 @@ test("the store grid is two-up on phones and auto-fills like Home on tablet", ()
 
   // Tablets: the same 180px auto-fill Home uses, restated later so an older
   // 2-up override cannot pin the store to a different column count.
-  const tabletBlock = /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
+  const tabletBlock =
+    /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(
+      indexCss
+    )?.[1];
   assert.ok(tabletBlock, "expected the 640–959 [data-store-grid] rule");
-  assert.match(tabletBlock, /grid-template-columns: repeat\(auto-fill, minmax\(180px, 1fr\)\) !important/);
+  assert.match(
+    tabletBlock,
+    /grid-template-columns: repeat\(auto-fill, minmax\(180px, 1fr\)\) !important/
+  );
   assert.match(tabletBlock, /gap: 12px !important/);
 
   // Store cards are not transform-scaled inside their track on tablets.
-  const scale = /\[data-home-grid\] > \*,\n\s*\[data-pdp-grid\] > \* \{\s*\n\s*transform: scale\(var\(--tablet-scale\)\)/.exec(indexCss);
-  assert.ok(scale, "expected the tablet card-scale rule without [data-store-grid]");
+  const scale =
+    /\[data-home-grid\] > \*,\n\s*\[data-pdp-grid\] > \* \{\s*\n\s*transform: scale\(var\(--tablet-scale\)\)/.exec(
+      indexCss
+    );
+  assert.ok(
+    scale,
+    "expected the tablet card-scale rule without [data-store-grid]"
+  );
 });
 
 test("the store grid auto-fills the same 220px track Home uses on desktop", () => {
-  const desktop = /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
+  const desktop =
+    /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(
+      indexCss
+    )?.[1];
   assert.ok(desktop, "expected the desktop [data-store-grid] rule");
-  assert.match(desktop, /grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important/);
+  assert.match(
+    desktop,
+    /grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important/
+  );
   assert.match(desktop, /gap: 16px !important/);
 
   // Home's desktop grid uses the same 220px floor.
-  assert.match(indexCss, /\[data-home-grid\],\s*\n\s*\[data-store-grid\],\s*\n\s*\[data-pdp-grid\],\s*\n\s*\[data-search-grid\] \{\s*\n\s*grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important;/);
+  assert.match(
+    indexCss,
+    /\[data-home-grid\],\s*\n\s*\[data-store-grid\],\s*\n\s*\[data-pdp-grid\],\s*\n\s*\[data-search-grid\] \{\s*\n\s*grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important;/
+  );
 });
 
-test("the store grid JSX matches Home's column/gap rhythm", () => {
-  const homeApp = read("src/home/App.tsx");
-  assert.match(homeApp, /grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4/);
-  const gridHooks = storePage.match(/data-store-grid[^\n]*className="[^"]+"/g) || [];
-  assert.ok(gridHooks.length >= 2, `expected skeleton + live store grids, found ${gridHooks.length}`);
-  for (const hook of gridHooks) {
-    assert.match(hook, /grid-cols-2 gap-3/, `${hook} keeps Home's 2-up + gap-3`);
-    assert.match(hook, /sm:grid-cols-3/, `${hook} steps to 3-up at sm like Home`);
-    assert.match(hook, /md:gap-4/, `${hook} uses Home's md:gap-4`);
-  }
-  assert.match(storePage, /data-store-list className="[^"]*px-3/);
+test("native grids adapt to the actual content width rather than overflowing beside the rail", () => {
+  const css = read("src/components/store-marketplace.css");
+  assert.match(storePage, /data-store-grid-loading/);
+  assert.match(storePage, /data-store-grid/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /@container dc-marketplace \(max-width: 339px\)/);
+  assert.match(css, /repeat\(auto-fill, minmax\(230px, 1fr\)\)/);
+  assert.match(css, /\.dc-marketplace-list \{/);
 });
 
 test("the store opens on the Home-ratio grid, and the skeleton matches it", () => {
   assert.match(storePage, /useState<ViewMode>\("grid"\)/);
   assert.match(storePage, /data-store-grid-loading/);
-  // The three layouts are all still one tap away in the dropdown.
-  assert.match(storePage, /const VIEW_OPTIONS[\s\S]*?\{ mode: "grid"[\s\S]*?\{ mode: "list"[\s\S]*?\{ mode: "mixed"/);
+  assert.match(storePage, /<option value="grid">Grid<\/option>/);
+  assert.match(storePage, /<option value="list">List<\/option>/);
+  assert.match(storePage, /<option value="mixed">Mixed<\/option>/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -307,18 +346,33 @@ test("the footer nav is light blue at 15–20% with a 40% blur", () => {
   const blur = px(glassCss, "--dc-footer-nav-blur");
   const tint = alpha(glassCss, "--dc-footer-nav-tint");
   const density = blur / BLUR_CEILING;
-  assert.ok(Math.abs(density - 0.4) < 0.001, `footer blur density is ${(density * 100).toFixed(0)}%, brief says 40%`);
-  assert.ok(tint >= 0.15 && tint <= 0.2, `footer colour density is ${(tint * 100).toFixed(0)}%, brief says 15–20%`);
+  assert.ok(
+    Math.abs(density - 0.4) < 0.001,
+    `footer blur density is ${(density * 100).toFixed(0)}%, brief says 40%`
+  );
+  assert.ok(
+    tint >= 0.15 && tint <= 0.2,
+    `footer colour density is ${(tint * 100).toFixed(0)}%, brief says 15–20%`
+  );
 
   // The dock paints the tint on its panel and the frost on its own material
   // layer — never both, or the two would stack past the brief.
-  const panel = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{([^}]*)\}/.exec(glassCss)?.[1];
-  assert.match(panel, /background-color: var\(--dc-footer-nav-tint\) !important/);
-  const lens = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(glassCss)?.[1];
+  const panel =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{([^}]*)\}/.exec(
+      glassCss
+    )?.[1];
+  assert.match(
+    panel,
+    /background-color: var\(--dc-footer-nav-tint\) !important/
+  );
+  const lens =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(
+      glassCss
+    )?.[1];
   assert.match(lens, /background: transparent !important/);
   assert.match(
     lens,
-    /-webkit-backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important;\s*\n\s*backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important;/,
+    /-webkit-backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important;\s*\n\s*backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important;/
   );
 });
 

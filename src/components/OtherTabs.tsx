@@ -1,184 +1,66 @@
 import { useMemo, useState } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
-import { useOwnedProducts } from "../hooks/useCourseAccess";
-import { BagIcon, SearchIcon } from "./icons";
-import { GlassCard } from "./ui/GlassCard";
-import { GlassSurface } from "./ui/glass";
-import { EmptyState } from "./ui/EmptyState";
-import { WatchActionButton } from "./ui/WatchActionButton";
-import "./collection-cards.css";
+import { useCourseAccess, useOwnedProducts } from "../hooks/useCourseAccess";
+import { ChevronRight, Search, X } from "lucide-react";
+import { getProductClassLabel, getProductPresentation } from "../pdp/productPresentation";
+import "../profile/profile-minimal.css";
+import "./purchases-minimal.css";
 
-function accessLabel(product: Product): string {
-  return product.category === "Notes" || product.category === "PDF" || product.category === "E-book"
-    ? "Open Now"
-    : "Watch Now";
-}
-
-/** A compact library tile: cover, title and the existing access action. */
-function PurchasedProductCard({
-  item,
-  onOpenCourse,
-}: {
-  item: Product;
-  onOpenCourse: (course: { id: string; title: string }) => void;
-}) {
-  const label = accessLabel(item);
-  const openCourse = () => onOpenCourse({ id: item.id, title: item.title });
+function PurchasedProductRow({ item, permanent, onOpenCourse }: { item: Product; permanent: boolean; onOpenCourse: (course: { id: string; title: string }) => void }) {
+  const { resolution, loading, hasActiveSubscription, subscription } = useCourseAccess({ product: item });
+  const [imageFailed, setImageFailed] = useState(false);
+  const identity = getProductPresentation(item);
+  const full = permanent || resolution.hasFullProductAccess;
+  const canOpen = full || resolution.accessibleModuleIds.size > 0 || resolution.accessibleResourceIds.size > 0;
+  const moduleCount = resolution.ownedModuleIds.size;
+  const resourceCount = resolution.ownedResourceIds.size;
+  const planAccess = !permanent && full && hasActiveSubscription;
+  const scope = planAccess ? "Plan access" : full ? "Full access" : [moduleCount ? `${moduleCount} module${moduleCount === 1 ? "" : "s"}` : "", resourceCount ? `${resourceCount} resource${resourceCount === 1 ? "" : "s"}` : "", !moduleCount && !resourceCount && resolution.ownedUpdateIds.size ? "Purchased update" : ""].filter(Boolean).join(" · ");
+  const expiry = planAccess && subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const metadata = [identity.typeLabel, getProductClassLabel(item), identity.subjectLabel].filter((part) => part && part.toLowerCase() !== "lifetime access").join(" · ");
+  const open = () => {
+    if (canOpen) onOpenCourse({ id: item.id, title: item.title });
+    else window.location.hash = `#/product/${encodeURIComponent(item.id)}`;
+  };
   return (
-    <GlassCard
-      contentClassName="p-0"
-      radius={22}
-      className="dc-collection-card group"
-      data-purchase-entry={item.id}
-    >
-      <div className="dc-collection-media">
-        <button type="button" className="dc-collection-media-link" onClick={openCourse} aria-label={`${label} — ${item.title}`}>
-          <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
-        </button>
-      </div>
-      <div className="dc-collection-body">
-        <button type="button" onClick={openCourse} className="dc-collection-link">
-          <h3 className="dc-collection-title" title={item.title}>{item.title}</h3>
-        </button>
-        <WatchActionButton
-          label={label}
-          ariaLabel={`${label} — ${item.title}`}
-          className="dc-collection-watch"
-          data-purchase-access={item.id}
-          onClick={openCourse}
-        />
-      </div>
-    </GlassCard>
+    <li data-purchase-entry={item.id} className="dc-purchases-row">
+      <button type="button" data-purchase-access={item.id} data-access-scope={planAccess ? "plan" : full ? "full" : "partial"} aria-label={`${canOpen ? "Open" : "View access for"} ${identity.title}`} onClick={open} disabled={loading && !permanent}>
+        {item.image && !imageFailed ? <img src={item.image} alt="" loading="lazy" decoding="async" onError={() => setImageFailed(true)} /> : <span className="dc-purchases-image-fallback" aria-hidden="true">{identity.typeLabel}</span>}
+        <span className="dc-purchases-copy">
+          <strong className="dc-purchases-title" title={identity.title}>{identity.title}</strong>
+          <small>{metadata}</small>
+          <span className="dc-purchases-scope">{loading && !permanent ? "Checking access…" : scope || "Access details"}{expiry ? ` · Ends ${expiry}` : ""}</span>
+          {!full && !loading ? <small>{canOpen ? "Only your purchased content is unlocked." : "Base access is required. View product details."}</small> : null}
+        </span>
+        <ChevronRight aria-hidden="true" className="dc-purchases-open-icon" />
+      </button>
+    </li>
   );
 }
 
-export function PurchasesTab({
-  purchased,
-  onOpenCourse,
-}: {
-  purchased: Set<string>;
-  onOpenCourse: (course: { id: string; title: string }) => void;
-}) {
-  const { products } = useCatalog();
-  const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
+export function PurchasesTab({ purchased, onOpenCourse }: { purchased: Set<string>; onOpenCourse: (course: { id: string; title: string }) => void }) {
+  const { products, loading: catalogLoading, error } = useCatalog();
+  const { ownedProductIds: canonicalOwnedIds, accessibleProductIds, permanentProductIds, signedIn, loading: accessLoading, error: accessError } = useOwnedProducts();
   const ownedSet = useMemo(() => {
-    const s = new Set<string>(signedIn ? canonicalOwnedIds : []);
-    for (const id of purchased) s.add(id);
-    return s;
-  }, [canonicalOwnedIds, purchased, signedIn]);
-  const allItems: Product[] = useMemo(
-    () => products.filter((product) => ownedSet.has(product.id) || Boolean(product.documentId && ownedSet.has(product.documentId))),
-    [products, ownedSet],
-  );
-
+    const ids = new Set<string>(signedIn ? accessibleProductIds || canonicalOwnedIds : []);
+    for (const id of purchased) ids.add(id);
+    return ids;
+  }, [accessibleProductIds, canonicalOwnedIds, purchased, signedIn]);
+  const permanentSet = useMemo(() => new Set([...purchased, ...(permanentProductIds || [])]), [permanentProductIds, purchased]);
+  const allItems = useMemo(() => products.filter((product) => ownedSet.has(product.id) || Boolean(product.documentId && ownedSet.has(product.documentId))), [products, ownedSet]);
   const [query, setQuery] = useState("");
-
   const items = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter((product) => {
-      const haystack = [
-        product.title,
-        product.instructor,
-        product.category,
-        product.subject,
-        product.classLevel,
-        product.description,
-        ...(product.tags || []),
-        ...(product.searchKeywords || []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+    const term = query.trim().toLocaleLowerCase();
+    return !term ? allItems : allItems.filter((product) => [product.title, product.instructor, product.category, product.subject, product.classLevel, product.description, ...(product.tags || []), ...(product.searchKeywords || [])].filter(Boolean).join(" ").toLocaleLowerCase().includes(term));
   }, [allItems, query]);
-
-  if (allItems.length === 0) {
-    return (
-      <div className="px-4 pb-8 pt-6">
-        <EmptyState
-          icon={<BagIcon className="h-7 w-7 text-indigo-300" />}
-          title="No purchases yet"
-          body="Resources you buy or claim for free from the Store will appear here for lifetime access."
-        />
-        <button
-          type="button"
-          onClick={() => { window.location.hash = "#/store"; }}
-          className="mx-auto mt-4 block rounded-full bg-white/10 px-5 py-2 text-xs font-black text-white backdrop-blur hover:bg-white/15"
-        >
-          Browse Store
-        </button>
-      </div>
-    );
-  }
-
+  const loading = Boolean(catalogLoading || (accessLoading && !allItems.length));
   return (
-    <div className="px-3 pb-8 pt-6 sm:px-4">
-      {/* Header — lifetime access + count badge */}
-      <GlassCard contentClassName="p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[15px] font-extrabold tracking-tight text-white">Your purchases</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/20 px-1.5 text-[10px] font-black text-emerald-200 ring-1 ring-emerald-400/30">
-                {allItems.length}
-              </span>
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-white/55">
-              Lifetime access · Tap <span className="font-semibold text-white/80">Watch Now</span> to continue in the Course Player.
-            </p>
-          </div>
-          <span className="hidden shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70 sm:inline-flex">
-            Library
-          </span>
-        </div>
-      </GlassCard>
-
-      {/* Search — same glass as HOME social card (store lens):
-          tint 0.62 over light blue rgb(173,216,255) @ 26%, blur 46% → 18.4px,
-          quiet sheen + white rim (src/store-glass.css). */}
-      <GlassSurface
-        tint={0.62}
-        tintColor="173,216,255"
-        blur={0}
-        radius={18}
-        className="dc-store-glass dc-scene-ink relative mt-4"
-        contentClassName="flex items-center gap-2 px-3 py-2.5"
-      >
-        <SearchIcon className="h-4 w-4 shrink-0 text-white/70" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search purchases…"
-          className="w-full min-w-0 bg-transparent text-sm font-medium text-white placeholder:text-white/60 focus:outline-none"
-          data-purchases-search
-        />
-        {query ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => setQuery("")}
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
-          >
-            <span aria-hidden className="text-[14px] leading-none">×</span>
-          </button>
-        ) : null}
-      </GlassSurface>
-
-      {items.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-10 text-center backdrop-blur">
-          <p className="text-sm font-bold text-white/80">No matches</p>
-          <p className="mt-1 text-xs text-white/45">Try a different search — e.g. course title or instructor.</p>
-        </div>
-      ) : (
-        <div data-collection-grid data-purchases-grid className="mt-4">
-          {items.map((item) => (
-            <PurchasedProductCard key={item.id} item={item} onOpenCourse={onOpenCourse} />
-          ))}
-        </div>
-      )}
-    </div>
+    <section data-purchases-page className="dc-purchases-layout">
+      <header className="dc-account-header"><div><h1>My Purchases</h1>{!loading ? <p className="dc-account-note">{allItems.length} {allItems.length === 1 ? "item" : "items"} · access details shown below</p> : null}</div></header>
+      {accessError && allItems.length > 0 ? <p role="alert" className="dc-account-error">{accessError} Last verified purchases are shown.</p> : null}
+      {allItems.length > 0 ? <div className="dc-purchases-search"><Search aria-hidden="true" /><input type="search" data-purchases-search aria-label="Search purchases" placeholder="Search purchases" value={query} onChange={(event) => setQuery(event.target.value)} />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X aria-hidden="true" /></button> : null}</div> : null}
+      {loading ? <div role="status" className="dc-purchases-empty"><p>Loading your purchases…</p><div className="dc-purchases-loading" aria-hidden="true" /></div> : (error || accessError) && !allItems.length ? <div role="alert" className="dc-purchases-empty"><p>Purchases could not be loaded.</p><p className="dc-account-note">{String(error || accessError)}</p><button type="button" onClick={() => window.location.reload()} className="dc-account-text-action">Retry</button></div> : allItems.length === 0 ? <div className="dc-purchases-empty"><h2>No purchases yet</h2><p className="dc-account-note">Bought and free-claimed content appears here.</p><button type="button" onClick={() => { window.location.hash = "#/store"; }} className="dc-account-primary">Browse Store</button></div> : items.length === 0 ? <div className="dc-purchases-empty"><h2>No matches</h2><p className="dc-account-note">Try a title, subject or instructor.</p></div> : <ul data-purchases-grid className="dc-purchases-list">{items.map((item) => <PurchasedProductRow key={item.id} item={item} permanent={permanentSet.has(item.id) || Boolean(item.documentId && permanentSet.has(item.documentId))} onOpenCourse={onOpenCourse} />)}</ul>}
+    </section>
   );
 }

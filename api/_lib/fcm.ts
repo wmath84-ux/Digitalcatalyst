@@ -1,3 +1,4 @@
+import { userNotificationPolicy, createNotificationPreferenceReader } from "./notificationPreferences.js";
 // api/_lib/fcm.ts
 //
 // Firebase Cloud Messaging (FCM) dispatcher used by the Eduvora
@@ -44,6 +45,8 @@ import { getNotificationBrandChrome } from "./branding.js";
 export type FcmPayload = {
   title: string;
   body: string;
+  marketing?: boolean;
+  type?: string;
   tag?: string;
   url?: string;
   icon?: string;
@@ -183,6 +186,7 @@ async function sendToTokenDoc(item: FcmTokenDoc, data: Record<string, string>): 
  *  number of devices that were actually delivered to. */
 export async function fcmPushToUser(db: Firestore, uid: string, payload: FcmPayload): Promise<number> {
   if (!fcmConfigured()) return 0;
+  if (!(await userNotificationPolicy(db, uid, payload)).push) return 0;
   const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
   if (snap.empty) return 0;
   const brand = await getNotificationBrandChrome();
@@ -203,7 +207,7 @@ export async function fcmPushToUser(db: Firestore, uid: string, payload: FcmPayl
   for (const item of snap.docs as unknown as QueryDocumentSnapshot[]) {
     sent += await sendToTokenDoc(
       { ref: item.ref as unknown as FcmTokenDoc["ref"], data: () => item.data() },
-      data,
+      { ...data, uid },
     );
   }
   return sent;
@@ -229,13 +233,18 @@ export async function fcmPushToAllDevices(db: Firestore, payload: FcmPayload): P
     targetType: payload.targetType || "",
   };
   let sent = 0;
+  let devices = 0;
+  const readPolicy = createNotificationPreferenceReader(db);
   for (const item of snap.docs as unknown as QueryDocumentSnapshot[]) {
+    const uid = String(item.data()?.uid || item.ref.parent.parent?.id || "");
+    if (!uid || !(await readPolicy(uid, payload)).push) continue;
+    devices += 1;
     sent += await sendToTokenDoc(
       { ref: item.ref as unknown as FcmTokenDoc["ref"], data: () => item.data() },
-      data,
+      { ...data, uid },
     );
   }
-  return { sent, devices: snap.size };
+  return { sent, devices };
 }
 
 // ------------------------------------------------------------------ token registration
@@ -258,7 +267,7 @@ const hashToken = (token: string) =>
  * re-registering is a no-op, a rotated token writes a new doc.
  *
  * Returns:
- *   • 200 with `{ ok: true, registered: docId }` on success
+ *   • 200 with `{ ok: true, registered: docId, uid: decoded.uid }` on success
  *   • 400 if the token is missing or too long
  *   • 401 if the Authorization header is missing / invalid (handled
  *     by `requireFirebaseUser` — same shape as every other endpoint)
@@ -304,7 +313,7 @@ export async function handleFcmRegister(
         },
         { merge: true },
       );
-    return res.status(200).json({ ok: true, registered: docId });
+    return res.status(200).json({ ok: true, registered: docId, uid: decoded.uid });
   } catch (error) {
     // Distinguish auth failures (handled by requireFirebaseUser) from
     // everything else. The shape matches errorResponse so the client

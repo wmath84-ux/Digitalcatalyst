@@ -23,6 +23,7 @@ export interface OwnershipState {
   isProductOwned: boolean;
   ownedUpdateIds: ReadonlySet<string> | readonly string[];
   ownedModuleIds?: ReadonlySet<string> | readonly string[];
+  ownedResourceIds?: ReadonlySet<string> | readonly string[];
 }
 
 export interface SelectionResultOk {
@@ -100,6 +101,7 @@ export declare const validateSelection: (input: {
   isProductOwned: boolean;
   ownedUpdateIds: ReadonlySet<string> | readonly string[];
   ownedModuleIds?: ReadonlySet<string> | readonly string[];
+  ownedResourceIds?: ReadonlySet<string> | readonly string[];
 }) => SelectionResult;
 
 export declare const computeLineTotals: (
@@ -133,6 +135,7 @@ export declare const buildLineItems: (input: {
   isProductOwned: boolean;
   ownedUpdateIds: ReadonlySet<string> | readonly string[];
   ownedModuleIds?: ReadonlySet<string> | readonly string[];
+  ownedResourceIds?: ReadonlySet<string> | readonly string[];
 }) => CheckoutLineItem[];
 
 export declare const computeSummary: (input: {
@@ -144,6 +147,7 @@ export declare const computeSummary: (input: {
   isProductOwned: boolean;
   ownedUpdateIds: ReadonlySet<string> | readonly string[];
   ownedModuleIds?: ReadonlySet<string> | readonly string[];
+  ownedResourceIds?: ReadonlySet<string> | readonly string[];
 }) => SummaryResult;
 
 export declare const __testHelpers: {
@@ -153,3 +157,5 @@ export declare const __testHelpers: {
   arr: (v: unknown) => unknown[];
   isObject: (v: unknown) => boolean;
 };
+
+export function normalizeModuleSelectionIds(ids: readonly string[], modules: readonly CanonicalCourseModule[], ownership: OwnershipState): Set<string>;

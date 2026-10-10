@@ -61,7 +61,10 @@ const formatWhen = (value: number) => {
   }
 };
 
-export default function WebClipperCard() {
+export default function WebClipperCard({ minimal = false }: { minimal?: boolean } = {}) {
+  const [now, setNow] = useState(() => Date.now());
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
   const [code, setCode] = useState<PairingCode | null>(null);
   const [tokens, setTokens] = useState<ClipperToken[]>([]);
   const [busy, setBusy] = useState<"idle" | "code" | "load" | "revoke">("idle");
@@ -73,6 +76,7 @@ export default function WebClipperCard() {
     try {
       const payload = await request("joplin.clipper.status");
       setTokens(Array.isArray(payload.tokens) ? (payload.tokens as ClipperToken[]) : []);
+      setLoaded(true);
       setError("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read the connected browsers.");
@@ -133,6 +137,16 @@ export default function WebClipperCard() {
     );
   }, [code]);
 
+  if (minimal) return (
+    <section data-web-clipper-card className="dc-usage-clipper" aria-live="polite">
+      <p className="dc-account-note">Save web pages as My Day notes. Pairing codes are single-use; browser access can be revoked.</p>
+      <div className="dc-usage-actions"><button type="button" onClick={() => void generateCode()} disabled={busy !== "idle"} className="dc-account-text-action">{busy === "code" ? "Generating…" : code && code.expiresAt > now ? "New pairing code" : "Pair a browser"}</button><button type="button" onClick={() => void refresh()} disabled={busy !== "idle"} className="dc-account-text-action">Refresh connections</button></div>
+      {code ? <div data-web-clipper-code className="dc-usage-pairing-code"><code>{code.code}</code><button type="button" aria-label="Copy pairing code" onClick={copy} disabled={code.expiresAt <= now} className="dc-account-text-action">Copy</button><p className="dc-account-note">{code.expiresAt <= now ? "Expired. Generate a new pairing code." : `Single use · Expires ${formatWhen(code.expiresAt)}`}</p></div> : null}
+      {error ? <p role="alert" className="dc-account-error">{loaded ? "Last verified connections shown. " : ""}{error}</p> : null}
+      {notice ? <p role="status" className="dc-account-note">{notice}</p> : null}
+      {!loaded && !error ? <p role="status" className="dc-account-note">Loading browser connections…</p> : loaded ? <div data-web-clipper-tokens>{tokens.length ? <ul>{tokens.map((token) => <li key={token.tokenId} className="dc-usage-browser-row"><div><strong>{token.label || "Browser extension"}</strong><p className="dc-account-note">{token.status === "active" && token.expiresAt <= now ? "Expired" : token.status} · Last used {formatWhen(token.lastUsedAt)} · Expires {formatWhen(token.expiresAt)}</p></div><button type="button" onClick={() => void revoke(token.tokenId)} disabled={busy !== "idle"} aria-label={`Disconnect ${token.label || "this browser"}`} className="dc-account-text-action">Disconnect</button></li>)}</ul> : <p className="dc-account-note">No connected browsers.</p>}{tokens.some((token) => token.status === "active" && token.expiresAt > now) ? <button type="button" onClick={() => void revokeAll()} disabled={busy !== "idle"} className="dc-account-text-action">Disconnect all browsers</button> : null}</div> : null}
+    </section>
+  );
   return (
     <ProfileCard contentClassName="p-4 sm:p-5">
       <div data-web-clipper-card className="flex flex-col gap-4">

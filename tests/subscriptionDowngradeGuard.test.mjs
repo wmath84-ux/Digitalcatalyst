@@ -206,7 +206,7 @@ test("the shared subscription page hides lower plans and retains checkout guards
   assert.match(page, /Active and free accounts both land on this same plan-selection page/);
   assert.match(page, /const pickerPlans = useMemo/);
   assert.match(page, /order >= ownedPlanOrder/);
-  assert.match(page, /<PlanOverview[\s\S]*?plans=\{pickerPlans\}/);
+  assert.match(page, /<MinimalPlanPicker[\s\S]*?plans=\{pickerPlans\}/);
   assert.match(page, /setSelectedPlanId\(ownedVisible \? ownedPlanId : pickerPlans\[0\]\.id\)/);
   assert.doesNotMatch(page, /manageMode|const upgradePlans/);
   // The merged verdict still feeds the subscribe bar + the refuse-to-checkout stop.
@@ -215,7 +215,10 @@ test("the shared subscription page hides lower plans and retains checkout guards
 
 test("a yearly member cannot slip into the monthly cycle of their own plan", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
-  assert.match(page, /ownedCycle === "yearly"[\s\S]*?cycle === "monthly"[\s\S]*?setCycle\("yearly"\)/);
+  assert.match(
+    page,
+    /ownedCycle === "yearly"[\s\S]*?cycle === "monthly"[\s\S]*?setCycle\("yearly"\)/
+  );
 
   const overview = read("src/subscription/components/PlanOverview.tsx");
   assert.match(overview, /data-subscription-cycle-downgrade=/);
@@ -225,8 +228,10 @@ test("a yearly member cannot slip into the monthly cycle of their own plan", () 
 
 test("the subscribe bar explains a blocked downgrade instead of taking payment", () => {
   const bar = read("src/subscription/components/SubscribeBar.tsx");
-  assert.match(bar, /data-subscription-downgrade-note/);
-  assert.match(bar, /cta\.tone === "blocked"/);
+  assert.match(bar, /resolveSubscribeCta/);
+  assert.match(bar, /cta\.disabled/);
+  assert.match(bar, /ownershipState\?\.blocked && ownershipState\.reason/);
+  assert.match(bar, /data-subscription-owned-note/);
 });
 
 test("the removed 'Manage plan' header is gone and its help icon moved to the main header", () => {
@@ -250,9 +255,11 @@ test("the removed 'Manage plan' header is gone and its help icon moved to the ma
 test("the 'already have an active membership' banner copy is removed", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   assert.equal(
-    page.includes("Choose any active plan, feature, or product below. Plan changes activate after verified payment."),
+    page.includes(
+      "Choose any active plan, feature, or product below. Plan changes activate after verified payment."
+    ),
     false,
-    "the old manage-mode banner sentence must be gone",
+    "the old manage-mode banner sentence must be gone"
   );
 });
 

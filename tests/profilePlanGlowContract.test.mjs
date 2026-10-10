@@ -29,7 +29,7 @@ test("profile hero maps each subscription tier to its plan label", () => {
 
 test("profile hero keeps the plan status data attribute", () => {
   assert.match(profilePage, /data-profile-plan-status=\{active \? "active" : "expired"\}/);
-  assert.match(profilePage, /data-profile-membership-status=\{membership\.active \? "active" : "expired"\}/);
+  assert.match(profilePage, /data-profile-membership-status=\{active \? "active" : "expired"\}/);
 });
 
 test("profile page is clean: no legacy orbs or animated gradients", () => {
@@ -47,10 +47,12 @@ test("profile page is clean: no legacy orbs or animated gradients", () => {
   assert.doesNotMatch(styles, /conic-gradient\(/);
 });
 
-test("profile actions and cards are the pack components, not the old brand gradient (Phase A / A3)", () => {
-  assert.doesNotMatch(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
-  assert.match(profilePage, /<ProfileCard data-profile-hero/);
-  assert.match(profilePage, /<GlassButton variant="capsule"/);
+test("profile uses plain sections and native controls without nested cards", () => {
+  assert.doesNotMatch(profileLayout, /<ProfileCard|<GlassSurface|<GlassCard/);
+  assert.match(profileLayout, /<section data-profile-hero/);
+  assert.match(profileLayout, /<section data-profile-membership-card/);
+  assert.match(profileLayout, /data-member-renew/);
+  assert.match(profileLayout, /data-renewal-reminder-toggle/);
 });
 
 test("profile page paints no background of its own (Phase A)", () => {

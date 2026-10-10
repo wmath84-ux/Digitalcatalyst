@@ -126,7 +126,10 @@ test("a plan switch is never an add-on and never blocked", () => {
 test("server quote loader drops the already-paid plan and owned lines for add-ons", () => {
   const loader = read("api/_lib/subscriptions.ts");
   assert.match(loader, /evaluateSubscriptionSelection\(\{\s*record: options\.existingSubscription/);
-  assert.match(loader, /const isAddOnPurchase = Boolean\(ownershipVerdict && ownershipVerdict\.addOnPurchase\)/);
+  assert.match(
+    loader,
+    /const isAddOnPurchase = Boolean\(ownershipVerdict && ownershipVerdict\.addOnPurchase\)/
+  );
   // The plan line (already paid) and already-owned feature/product lines are
   // filtered out so only the NEW items are charged.
   assert.match(loader, /if \(item\.kind === "subscription"\) return false; \/\/ plan already paid/);
@@ -140,14 +143,23 @@ test("server quote loader drops the already-paid plan and owned lines for add-on
 
 test("server duplicate guard lets add-on selections through", () => {
   const guard = read("api/_lib/subscriptions.ts");
-  assert.match(guard, /featureIds: Array\.isArray\(selection\.featureIds\) \? selection\.featureIds\.map\(String\) : \[\],/);
-  assert.match(guard, /productIds: Array\.isArray\(selection\.productIds\) \? selection\.productIds\.map\(String\) : \[\],/);
+  assert.match(
+    guard,
+    /featureIds: Array\.isArray\(selection\.featureIds\) \? selection\.featureIds\.map\(String\) : \[\],/
+  );
+  assert.match(
+    guard,
+    /productIds: Array\.isArray\(selection\.productIds\) \? selection\.productIds\.map\(String\) : \[\],/
+  );
 });
 
 test("add-on grants merge access and never move the expiry", () => {
   const writer = read("api/_lib/subscriptions.ts");
   assert.match(writer, /if \(previous\.exists && args\.addOn && !isPlanChange\)/);
-  assert.match(writer, /const access = mergeSubscriptionAccess\(previousData, args\.plan, args\.selectedFeatureIds\)/);
+  assert.match(
+    writer,
+    /const access = mergeSubscriptionAccess\(previousData, args\.plan, args\.selectedFeatureIds\)/
+  );
   assert.match(writer, /upgradedAt: nowTs/);
   // No time math for add-ons: expiresAt comes straight from the stored record.
   assert.match(writer, /expiresAt: Timestamp\.fromMillis\(expiresAtMs\),\s*renewalReminderOptOut/);
@@ -156,12 +168,18 @@ test("add-on grants merge access and never move the expiry", () => {
 test("the quote engine surfaces subscriptionAddOn", () => {
   const engine = read("utils/serverQuotes.js");
   assert.match(engine, /subscriptionAddOn = false,\s*\} = input/);
-  assert.match(engine, /subscriptionAddOn: kind === "subscription" \|\| kind === "subscription_features"\s*\? Boolean\(subscriptionAddOn\)\s*: false,/);
+  assert.match(
+    engine,
+    /subscriptionAddOn: kind === "subscription" \|\| kind === "subscription_features"\s*\? Boolean\(subscriptionAddOn\)\s*: false,/
+  );
 });
 
 test("the quote endpoint loads the current membership and passes the add-on flag through", () => {
   const endpoint = read("api/_lib/quotes.ts");
-  assert.match(endpoint, /const currentSubscription = await loadCurrentSubscription\(firebaseUser\.uid\)/);
+  assert.match(
+    endpoint,
+    /const currentSubscription = await loadCurrentSubscription\(firebaseUser\.uid\)/
+  );
   assert.match(endpoint, /existingSubscription: currentSubscription/);
   assert.match(endpoint, /subscriptionAddOn = subContext\.addOnPurchase === true/);
   assert.match(endpoint, /subscriptionAddOn,\s*\}\);/);
@@ -172,7 +190,10 @@ test("create-order and verify-payment carry the add-on flag for replays", () => 
   const verify = read("api/razorpay/verify-payment.ts");
   assert.match(createOrder, /subscriptionAddOn: quote\.subscriptionAddOn === true/);
   assert.match(verify, /subscriptionAddOn: intent\.subscriptionAddOn === true/);
-  assert.match(verify, /quote\.subscriptionAddOn\s*\?\s*`⬆️ \$\{planLabel \|\| "Your membership"\} upgraded`/);
+  assert.match(
+    verify,
+    /quote\.subscriptionAddOn\s*\?\s*`⬆️ \$\{planLabel \|\| "Your membership"\} upgraded`/
+  );
 });
 
 test("the entitlement writer passes the add-on flag into the subscription write", () => {
@@ -187,24 +208,27 @@ test("the entitlement writer passes the add-on flag into the subscription write"
 test("subscription page evaluates add-ons with the selected features and products", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   assert.match(page, /featureIds: selectedFeatureIds,\s*productIds: selectedCourseIds,/);
-  assert.match(page, /const isAddOnUpgrade = Boolean\(ownershipState\.addOnPurchase && !ownershipState\.blocked\)/);
+  assert.match(
+    page,
+    /const isAddOnUpgrade = Boolean\(ownershipState\.addOnPurchase && !ownershipState\.blocked\)/
+  );
   assert.match(page, /chargeableFeatureIds/);
   assert.match(page, /data-subscription-addon-upgrade-note/);
-  assert.match(page, /no plan price is charged again/);
+  assert.match(page, /plan price is not charged again/);
 });
 
 test("the always-visible plan picker exposes add-on pickers to active members", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
-  assert.match(page, /data-subscription-layout data-subscription-workspace/);
-  assert.match(page, /<CourseSelectTrigger/);
-  assert.match(page, /<FeatureSelectTrigger/);
+  assert.match(page, /data-subscription-layout\s+data-subscription-workspace/);
+  assert.match(page, /data-subscription-course-trigger/);
+  assert.match(page, /data-subscription-feature-trigger/);
   assert.doesNotMatch(page, /<OwnedPlanCard|setAddOnIntent/);
 });
 
 test("the price summary marks the plan row as included for add-on upgrades", () => {
   const summary = read("src/subscription/components/PriceSummary.tsx");
   assert.match(summary, /planAlreadyIncluded/);
-  assert.match(summary, /Included in your membership/);
+  assert.match(summary, /Already paid/);
 });
 
 // ---------------------------------------------------------------------------

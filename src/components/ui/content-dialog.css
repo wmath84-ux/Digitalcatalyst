@@ -1,0 +1,157 @@
+.dc-content-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(0 0 0 / 0.68);
+}
+.dc-content-dialog {
+  --dialog-muted: #b1bbcb;
+  --dialog-border: rgb(226 232 240 / 0.14);
+  position: fixed;
+  z-index: 101;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2rem);
+  max-width: 720px;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(
+    100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--dialog-border);
+  border-radius: 16px;
+  background: #101520;
+  color: #f8fafc;
+  text-shadow: none;
+  box-shadow: none;
+}
+.dc-content-dialog-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--dialog-border);
+  min-width: 0;
+}
+.dc-content-dialog-header > div {
+  min-width: 0;
+}
+.dc-content-dialog-header h2 {
+  font-size: 1.25rem;
+  font-weight: 750;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.dc-content-dialog-header p {
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--dialog-muted);
+  overflow-wrap: anywhere;
+}
+.dc-content-dialog-close {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  color: #c4bbff;
+}
+.dc-content-dialog-body {
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem 1.5rem;
+  scrollbar-width: thin;
+}
+.dc-content-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--dialog-border);
+}
+.dc-content-dialog
+  :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  background: #171d2a;
+  border: 1px solid var(--dialog-border);
+  border-radius: 8px;
+  color: #f8fafc;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.dc-content-dialog input[type="checkbox"],
+.dc-content-dialog input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #c2b8ff;
+}
+.dc-content-dialog :is(button, input, textarea, select):focus-visible {
+  outline: 2px solid #c2b8ff;
+  outline-offset: 3px;
+}
+.dc-content-dialog button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.dc-content-primary,
+.dc-content-secondary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.dc-content-primary {
+  background: #f8fafc;
+  color: #111827;
+}
+.dc-content-secondary {
+  color: #c4bbff;
+}
+.dc-content-danger {
+  background: #ffd5d2;
+  color: #681b1b;
+}
+.dc-content-note {
+  color: var(--dialog-muted);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .dc-content-dialog {
+    width: calc(100% - 1.5rem);
+  }
+  .dc-content-dialog-header,
+  .dc-content-dialog-body {
+    padding: 1rem;
+  }
+  .dc-content-dialog-footer {
+    padding: 0.875rem 1rem;
+  }
+}
+
+.dc-content-error {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #ffd0cb;
+}

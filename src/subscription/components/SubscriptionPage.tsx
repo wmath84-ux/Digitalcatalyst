@@ -14,44 +14,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
-import { CalendarClock, CreditCard, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import Header from "../../components/Header";
 import BottomNav, { type TabKey } from "../../components/BottomNav";
-import StackedCards from "./StackedCards";
-import PlanOverview from "./PlanOverview";
 import PromoCodeInput, { type PromoResult } from "./PromoCodeInput";
-import CourseSelectTrigger from "./CourseSelectTrigger";
 import CourseSelectModal from "./CourseSelectModal";
-import FeatureSelectTrigger from "./FeatureSelectTrigger";
 import FeatureSelectModal from "./FeatureSelectModal";
-import PriceSummary from "./PriceSummary";
-import PricingGlassCard from "./PricingGlassCard";
-import { GlassButton } from "../../components/ui/glass-button";
+import PriceSummary, { formatSubscriptionMoney } from "./PriceSummary";
+import MinimalPlanPicker from "./MinimalPlanPicker";
+import { includedSubscriptionModules, subscriptionUnlockName } from "../utils/unlockPresentation";
 import SubscribeBar from "./SubscribeBar";
 import HelpModal from "./HelpModal";
-import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { useSubscriptionGateLogic } from "../../hooks/useSubscriptionGateLogic";
 import { apiFetch } from "../../utils/apiBase";
-import { isPlanVisibleForAudience, resolveEffectiveSubscriberPrice } from "../../utils/subscriptionPricing";
+import {
+  isPlanVisibleForAudience,
+  resolveEffectiveSubscriberPrice,
+} from "../../utils/subscriptionPricing";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
-  groupFeaturesByPriceTier,
   resolveFeaturePrice,
   resolveFeaturesForPlan,
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
-import {
-  featuresForPlanCycle,
-  planVisibleCycles,
-} from "../../../utils/subscriptionVisibility";
-import FeaturePricingTiers from "./FeaturePricingTiers";
+import { featuresForPlanCycle, planVisibleCycles } from "../../../utils/subscriptionVisibility";
 import PlanComparisonTable from "./PlanComparisonTable";
-import LiveSelectionCard from "./LiveSelectionCard";
-import GlassModal from "../../components/ui/glass-modal";
 import "../subscription-minimal.css";
 import {
   evaluatePlanChange,
@@ -81,10 +72,8 @@ type SubscriptionRecordLike = {
   renewalReminderOptOut?: boolean;
 };
 
-const productHasId = (
-  product: { id: string; documentId?: string },
-  ids: ReadonlySet<string>,
-) => ids.has(String(product.id)) || Boolean(product.documentId && ids.has(String(product.documentId)));
+const productHasId = (product: { id: string; documentId?: string }, ids: ReadonlySet<string>) =>
+  ids.has(String(product.id)) || Boolean(product.documentId && ids.has(String(product.documentId)));
 
 type SubscriptionPageProps = {
   cartCount: number;
@@ -133,25 +122,48 @@ export default function SubscriptionPage({
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
   const [isFeatureModalOpen, setFeatureModalOpen] = useState(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
-  // Final confirmation, rendered in the AI Canvas Glass Modal. The modal body
-  // is the SAME LiveSelectionCard the page shows, so review and page can never
-  // disagree about what is being bought.
-  const [isConfirmOpen, setConfirmOpen] = useState(false);
-
   // Coupon (server-validated through the Part 5 CheckoutContext).
   // The input is held locally; the Part 7 `applyCoupon` action in
   // the context takes the verified value. We deliberately do NOT
   // compute the discount client-side.
-  const [, setCouponInput] = useState<string>("");
   const [couponStatus, setCouponStatus] = useState<"idle" | "applying" | "error">("idle");
   const [couponErrorMessage, setCouponErrorMessage] = useState<string | null>(null);
   const [appliedCoupon, setAppliedCoupon] = useState<{
     code: string;
     discountPaise: number;
     label: string;
+    selectionKey: string;
   } | null>(null);
-  const [appliedReferral, setAppliedReferral] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
+  const [appliedReferral, setAppliedReferral] = useState<{
+    code: string;
+    discountPaise: number;
+    label: string;
+    selectionKey: string;
+  } | null>(null);
   const [referralError, setReferralError] = useState<string | null>(null);
+  // A verified code belongs to one buyer and one exact selection. Never show
+  // an old discount, or revive a slow response, after either has changed.
+  const discountSelectionKey = JSON.stringify([
+    user?.id || "",
+    selectedPlanId,
+    cycle,
+    [...selectedFeatureIds].sort(),
+    [...selectedCourseIds].sort(),
+  ]);
+  const discountScopeRef = useRef(discountSelectionKey);
+  discountScopeRef.current = discountSelectionKey;
+  const discountRequestRef = useRef(0);
+  const activeCoupon = appliedCoupon?.selectionKey === discountSelectionKey ? appliedCoupon : null;
+  const activeReferral =
+    appliedReferral?.selectionKey === discountSelectionKey ? appliedReferral : null;
+  useEffect(() => {
+    discountRequestRef.current += 1;
+    setAppliedCoupon(null);
+    setAppliedReferral(null);
+    setCouponStatus("idle");
+    setCouponErrorMessage(null);
+    setReferralError(null);
+  }, [discountSelectionKey]);
 
   // Submit / busy state. The "loading" state drives the bottom
   // bar; the actual activation is performed by the Part 5
@@ -179,7 +191,7 @@ export default function SubscriptionPage({
           setCatalog(FALLBACK_SUBSCRIPTION_CATALOG);
           setUsingFallback(true);
           setSelectedPlanId(
-            (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null,
+            (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null
           );
         }
       } catch (error) {
@@ -193,7 +205,7 @@ export default function SubscriptionPage({
         setCatalog(FALLBACK_SUBSCRIPTION_CATALOG);
         setUsingFallback(true);
         setSelectedPlanId(
-          (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null,
+          (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null
         );
       } finally {
         if (!cancelled) setCatalogLoading(false);
@@ -207,10 +219,19 @@ export default function SubscriptionPage({
   // Live subscription record. It drives plan ownership and checkout guards;
   // the membership summary and reminder controls now live in Profile.
   useEffect(() => {
-    if (!user) { setActiveSubscription(null); return undefined; }
-    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
-      setActiveSubscription(snapshot.exists() ? (snapshot.data() as SubscriptionRecordLike) : null);
-    }, () => setActiveSubscription(null));
+    if (!user) {
+      setActiveSubscription(null);
+      return undefined;
+    }
+    return onSnapshot(
+      doc(db, "users", user.id, "subscription", "current"),
+      (snapshot) => {
+        setActiveSubscription(
+          snapshot.exists() ? (snapshot.data() as SubscriptionRecordLike) : null
+        );
+      },
+      () => setActiveSubscription(null)
+    );
   }, [user]);
 
   // Self-heal purchases made before product ids became first-class quote
@@ -218,17 +239,29 @@ export default function SubscriptionPage({
   // merges any missing product ids without extending the membership period.
   useEffect(() => {
     const orderId = String(activeSubscription?.orderId || "").trim();
-    if (!user || activeSubscription?.status !== "active" || !orderId || repairedOrderIdsRef.current.has(orderId)) return;
+    if (
+      !user ||
+      activeSubscription?.status !== "active" ||
+      !orderId ||
+      repairedOrderIdsRef.current.has(orderId)
+    )
+      return;
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || firebaseUser.uid !== user.id) return;
     repairedOrderIdsRef.current.add(orderId);
-    void firebaseUser.getIdToken().then((token: string) => apiFetch("/api/razorpay/verify-payment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ orderId }),
-    })).then((response: Response) => {
-      if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
-    }).catch(() => repairedOrderIdsRef.current.delete(orderId));
+    void firebaseUser
+      .getIdToken()
+      .then((token: string) =>
+        apiFetch("/api/razorpay/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ orderId }),
+        })
+      )
+      .then((response: Response) => {
+        if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
+      })
+      .catch(() => repairedOrderIdsRef.current.delete(orderId));
   }, [activeSubscription, user]);
 
   // Renewal / change-plan checkout restores the user's current plan, cycle,
@@ -240,15 +273,22 @@ export default function SubscriptionPage({
     void getDoc(doc(db, "users", user.id, "subscription", "current")).then((snapshot) => {
       const data = snapshot.data() || {};
       if (!snapshot.exists()) return;
-      if (catalog.plans.some((plan) => plan.id === String(data.planId || ""))) setSelectedPlanId(String(data.planId));
+      if (catalog.plans.some((plan) => plan.id === String(data.planId || "")))
+        setSelectedPlanId(String(data.planId));
       if (data.cycle === "monthly" || data.cycle === "yearly") setCycle(data.cycle);
       const activeFeatureIds = new Set(catalog.features.map((feature) => feature.id));
-      setSelectedFeatureIds((Array.isArray(data.features) ? data.features.map(String) : []).filter((id) => activeFeatureIds.has(id)));
-      const storedProductIds = new Set(Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []);
+      setSelectedFeatureIds(
+        (Array.isArray(data.features) ? data.features.map(String) : []).filter((id) =>
+          activeFeatureIds.has(id)
+        )
+      );
+      const storedProductIds = new Set(
+        Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []
+      );
       setSelectedCourseIds(
         availableProducts
           .filter((product) => productHasId(product, storedProductIds))
-          .map((product) => String(product.documentId || product.id)),
+          .map((product) => String(product.documentId || product.id))
       );
     });
   }, [availableProducts, catalog, user]);
@@ -266,13 +306,13 @@ export default function SubscriptionPage({
       setSelectedFeatureIds((current) =>
         current.length === 0
           ? defaultFeatureIds.filter((id) => rawFeatures.some((feature) => feature.id === id))
-          : current,
+          : current
       );
     }
   }, [rawFeatures]);
   const plan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
-    [plans, selectedPlanId],
+    [plans, selectedPlanId]
   );
   // Membership state — declared here (not further down) because the per-cycle
   // visibility rules below need to know whether this buyer is already a member:
@@ -301,9 +341,24 @@ export default function SubscriptionPage({
   // The plan's admin-configured cycle price is part of the payable total.
   // Checkout resolves the same field server-side, so this display cannot be
   // used to tamper with the amount.
-  const selectedPlanPricePaise = plan
-    ? (cycle === "yearly" ? plan.yearlyPricePaise : plan.monthlyPricePaise)
+  const publicPlanPricePaise = plan
+    ? cycle === "yearly"
+      ? plan.yearlyPricePaise
+      : plan.monthlyPricePaise
     : 0;
+  const selectedPlanPricePaise =
+    plan && isActiveMember && publicPlanPricePaise > 0
+      ? Math.round(
+          resolveEffectiveSubscriberPrice(
+            plan.id,
+            cycle,
+            publicPlanPricePaise / 100,
+            true,
+            plan.subscriberPricingOverride ?? null,
+            gateSettings.subscriberPricing
+          ) * 100
+        )
+      : publicPlanPricePaise;
 
   // ── Per-cycle visibility (admin → catalog → page) ─────────────────────────
   // The admin decides, per feature, which cycles a NON-subscriber may be
@@ -315,16 +370,16 @@ export default function SubscriptionPage({
   // here, using the same function.
   const cycleVisibilityOptions = useMemo(
     () => ({ isSubscriber: isActiveMember, gateRows: gateSettings.features }),
-    [gateSettings.features, isActiveMember],
+    [gateSettings.features, isActiveMember]
   );
   /** Features offered on the selected plan + cycle (this is what the page lists). */
   const offeredFeatures = useMemo(
     () => featuresForPlanCycle(rawFeatures, selectedPlanId, cycle, cycleVisibilityOptions),
-    [cycleVisibilityOptions, rawFeatures, selectedPlanId, cycle],
+    [cycleVisibilityOptions, rawFeatures, selectedPlanId, cycle]
   );
   const offeredFeatureIdSet = useMemo(
     () => new Set(offeredFeatures.map((feature) => String(feature.id))),
-    [offeredFeatures],
+    [offeredFeatures]
   );
 
   // A selection can only ever contain what is being offered: switching to a
@@ -345,18 +400,7 @@ export default function SubscriptionPage({
   // helper, so display and charge can never drift apart.
   const features = useMemo(
     () => resolveFeaturesForPlan<SubscriptionFeatureDoc>(offeredFeatures, selectedPlanId, cycle),
-    [offeredFeatures, selectedPlanId, cycle],
-  );
-
-  const selectedFeatureRecords = useMemo(
-    () => features.filter((f) => selectedFeatureIds.includes(f.id)),
-    [features, selectedFeatureIds],
-  );
-
-  // Ascending price tiers for the "what you get at each price" strip.
-  const featureTiers = useMemo(
-    () => groupFeaturesByPriceTier(offeredFeatures, selectedPlanId, cycle),
-    [offeredFeatures, selectedPlanId, cycle],
+    [offeredFeatures, selectedPlanId, cycle]
   );
 
   // Plan-included features (free with the plan) — we surface them
@@ -372,7 +416,7 @@ export default function SubscriptionPage({
   }, [plan, features]);
   const includedFeatureRecords = useMemo(
     () => features.filter((f) => includedFeatureIds.has(f.id)),
-    [features, includedFeatureIds],
+    [features, includedFeatureIds]
   );
 
   // ---------------------------------------------------------------------------
@@ -386,8 +430,8 @@ export default function SubscriptionPage({
     activeSubscription?.cycle === "yearly"
       ? "yearly"
       : activeSubscription?.cycle === "monthly"
-        ? "monthly"
-        : null;
+      ? "monthly"
+      : null;
   // Plans rank by their catalog `sortOrder` (Basic 1 < Premium 2 < Pro 3 …).
   // A null rank means "cannot rank" — the no-downgrade rule then refuses to
   // guess and never blocks.
@@ -397,7 +441,7 @@ export default function SubscriptionPage({
       const order = Number(found?.sortOrder);
       return found && Number.isFinite(order) ? order : null;
     },
-    [plans],
+    [plans]
   );
   const ownedPlanOrder = planOrderOf(ownedPlanId);
 
@@ -414,7 +458,7 @@ export default function SubscriptionPage({
         ownedPlanOrder,
         selectedPlanOrder: planOrderOf(selectedPlanId),
       }),
-    [activeSubscription, selectedPlanId, cycle, ownedPlanOrder, planOrderOf],
+    [activeSubscription, selectedPlanId, cycle, ownedPlanOrder, planOrderOf]
   );
 
   const ownershipState = useMemo(() => {
@@ -433,7 +477,14 @@ export default function SubscriptionPage({
       code: planChangeState.code,
       reason: planChangeState.reason,
     };
-  }, [activeSubscription, selectedPlanId, cycle, selectedFeatureIds, selectedCourseIds, planChangeState]);
+  }, [
+    activeSubscription,
+    selectedPlanId,
+    cycle,
+    selectedFeatureIds,
+    selectedCourseIds,
+    planChangeState,
+  ]);
   const isSelectionOwned = ownershipState.owned;
   // An add-on upgrade: the member keeps their current plan + cycle but adds at
   // least one feature / product they don't have yet. Only the NEW items are
@@ -452,15 +503,15 @@ export default function SubscriptionPage({
   const membershipOwnedFeatureIds = useMemo(() => {
     if (!ownershipState.active) return [];
     const owned = new Set<string>(
-      Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : [],
+      Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []
     );
     const recordPlanId = String(activeSubscription?.planId || "").trim();
     const recordCycle: BillingCycle | null =
       activeSubscription?.cycle === "yearly"
         ? "yearly"
         : activeSubscription?.cycle === "monthly"
-          ? "monthly"
-          : null;
+        ? "monthly"
+        : null;
     if (recordPlanId && recordCycle) {
       for (const feature of rawFeatures) {
         const resolved = resolveFeaturePrice(feature as never, recordPlanId, recordCycle);
@@ -471,24 +522,25 @@ export default function SubscriptionPage({
   }, [ownershipState.active, activeSubscription, rawFeatures]);
   const membershipOwnedFeatureIdSet = useMemo(
     () => new Set(membershipOwnedFeatureIds),
-    [membershipOwnedFeatureIds],
+    [membershipOwnedFeatureIds]
   );
   const membershipOwnedProductIds = useMemo(() => {
     if (!ownershipState.active) return [];
-    return Array.from(new Set(
-      Array.isArray(activeSubscription?.includedProductIds)
-        ? activeSubscription.includedProductIds.map(String)
-        : [],
-    ));
+    return Array.from(
+      new Set(
+        Array.isArray(activeSubscription?.includedProductIds)
+          ? activeSubscription.includedProductIds.map(String)
+          : []
+      )
+    );
   }, [ownershipState.active, activeSubscription]);
   const membershipOwnedProductIdSet = useMemo(
     () => new Set(membershipOwnedProductIds),
-    [membershipOwnedProductIds],
+    [membershipOwnedProductIds]
   );
 
-  // Server is the only authority on price math. We display the
-  // plan's cycle price + feature prices + coupon discount (from
-  // the verified quote) — never derive the total client-side.
+  // Catalog-based estimate only. Code reductions are preflight-validated;
+  // checkout computes and verifies the final price server-side.
   //
   // Already-owned carry-over: whenever the buyer has an active membership,
   // ONLY the items not already unlocked are payable. The plan line stays
@@ -499,15 +551,31 @@ export default function SubscriptionPage({
     () =>
       ownershipState.active
         ? selectedFeatureIds.filter((id) => !membershipOwnedFeatureIdSet.has(id))
-        : (isAddOnUpgrade ? ownershipState.newFeatureIds : selectedFeatureIds),
-    [ownershipState.active, isAddOnUpgrade, ownershipState.newFeatureIds, selectedFeatureIds, membershipOwnedFeatureIdSet],
+        : isAddOnUpgrade
+        ? ownershipState.newFeatureIds
+        : selectedFeatureIds,
+    [
+      ownershipState.active,
+      isAddOnUpgrade,
+      ownershipState.newFeatureIds,
+      selectedFeatureIds,
+      membershipOwnedFeatureIdSet,
+    ]
   );
   const chargeableCourseIds = useMemo(
     () =>
       ownershipState.active
         ? selectedCourseIds.filter((id) => !membershipOwnedProductIdSet.has(id))
-        : (isAddOnUpgrade ? ownershipState.newProductIds : selectedCourseIds),
-    [ownershipState.active, isAddOnUpgrade, ownershipState.newProductIds, selectedCourseIds, membershipOwnedProductIdSet],
+        : isAddOnUpgrade
+        ? ownershipState.newProductIds
+        : selectedCourseIds,
+    [
+      ownershipState.active,
+      isAddOnUpgrade,
+      ownershipState.newProductIds,
+      selectedCourseIds,
+      membershipOwnedProductIdSet,
+    ]
   );
   // Items the buyer already owns but still selected — shown in the summary as
   // "Already purchased · ₹0" so it is impossible to miss that nothing is
@@ -516,23 +584,20 @@ export default function SubscriptionPage({
     () =>
       features.filter(
         (feature) =>
-          selectedFeatureIds.includes(feature.id) &&
-          membershipOwnedFeatureIdSet.has(feature.id),
+          selectedFeatureIds.includes(feature.id) && membershipOwnedFeatureIdSet.has(feature.id)
       ),
-    [features, selectedFeatureIds, membershipOwnedFeatureIdSet],
+    [features, selectedFeatureIds, membershipOwnedFeatureIdSet]
   );
   const carriedOverProductRecords = useMemo(() => {
     if (!ownershipState.active) return [];
-    const carried = new Set(
-      selectedCourseIds.filter((id) => membershipOwnedProductIdSet.has(id)),
-    );
+    const carried = new Set(selectedCourseIds.filter((id) => membershipOwnedProductIdSet.has(id)));
     return availableProducts.filter((product) => productHasId(product, carried));
   }, [ownershipState.active, selectedCourseIds, membershipOwnedProductIdSet, availableProducts]);
   const hasOwnedCarryOver =
     carriedOverFeatureRecords.length > 0 || carriedOverProductRecords.length > 0;
   const featuresTotalPaise = useMemo(
     () => sumSelectedFeaturePaise(offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle),
-    [offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle],
+    [offeredFeatures, chargeableFeatureIds, selectedPlanId, cycle]
   );
   const chargeableProductRecords = useMemo(() => {
     const chargeable = new Set(chargeableCourseIds);
@@ -546,23 +611,27 @@ export default function SubscriptionPage({
     () =>
       features.filter(
         (feature) =>
-          chargeableFeatureIds.includes(feature.id) && !includedFeatureIds.has(feature.id),
+          chargeableFeatureIds.includes(feature.id) && !includedFeatureIds.has(feature.id)
       ),
-    [features, chargeableFeatureIds, includedFeatureIds],
+    [features, chargeableFeatureIds, includedFeatureIds]
   );
 
   // Resolve subscriptionProducts (new per-plan / duration priced add-ons) into selectable records
   // These can be used to override prices of catalog products when selected via subscription.
   const resolvedSubscriptionProducts = useMemo(() => {
     return rawSubscriptionProducts.map((sp) => {
-      const resolved = resolveFeaturePrice({
-        id: sp.productId || sp.id,
-        included: sp.included,
-        pricePaise: sp.pricePaise || 0,
-        monthlyPricePaise: sp.monthlyPricePaise,
-        yearlyPricePaise: sp.yearlyPricePaise,
-        planPricing: sp.planPricing || {},
-      }, selectedPlanId, cycle);
+      const resolved = resolveFeaturePrice(
+        {
+          id: sp.productId || sp.id,
+          included: sp.included,
+          pricePaise: sp.pricePaise || 0,
+          monthlyPricePaise: sp.monthlyPricePaise,
+          yearlyPricePaise: sp.yearlyPricePaise,
+          planPricing: sp.planPricing || {},
+        },
+        selectedPlanId,
+        cycle
+      );
       return {
         ...sp,
         resolvedPrice: resolved.pricePaise / 100,
@@ -571,76 +640,51 @@ export default function SubscriptionPage({
       };
     });
   }, [rawSubscriptionProducts, selectedPlanId, cycle]);
-  const subscriptionDisplayProducts = useMemo(() => availableProducts.map((product) => {
-    const pricing = resolvedSubscriptionProducts.find((entry) =>
-      String(entry.productId || entry.id) === String(product.id) ||
-      String(entry.productId || entry.id) === String(product.documentId || ""),
-    );
-    return pricing
-      ? { ...product, price: Math.max(0, Number(pricing.resolvedPrice || 0)) }
-      : product;
-  }), [availableProducts, resolvedSubscriptionProducts]);
-  const productsTotalPaise = useMemo(() => chargeableProductRecords.reduce((sum, product) => {
-    const pricing = resolvedSubscriptionProducts.find((entry) =>
-      String(entry.productId || entry.id) === String(product.id) ||
-      String(entry.productId || entry.id) === String(product.documentId || ""),
-    );
-    return sum + (pricing
-      ? Math.max(0, Math.round(Number(pricing.resolvedPrice || 0) * 100))
-      : Math.max(0, Math.round(product.price * 100)));
-  }, 0), [chargeableProductRecords, resolvedSubscriptionProducts]);
+  const subscriptionDisplayProducts = useMemo(
+    () =>
+      availableProducts.map((product) => {
+        const pricing = resolvedSubscriptionProducts.find(
+          (entry) =>
+            String(entry.productId || entry.id) === String(product.id) ||
+            String(entry.productId || entry.id) === String(product.documentId || "")
+        );
+        return pricing
+          ? {
+              ...product,
+              price: Math.max(0, Number(pricing.resolvedPrice || 0)),
+              originalPrice: Math.max(0, Number(pricing.resolvedPrice || 0)),
+            }
+          : product;
+      }),
+    [availableProducts, resolvedSubscriptionProducts]
+  );
+  const productsTotalPaise = useMemo(
+    () =>
+      chargeableProductRecords.reduce((sum, product) => {
+        const pricing = resolvedSubscriptionProducts.find(
+          (entry) =>
+            String(entry.productId || entry.id) === String(product.id) ||
+            String(entry.productId || entry.id) === String(product.documentId || "")
+        );
+        return (
+          sum +
+          (pricing
+            ? Math.max(0, Math.round(Number(pricing.resolvedPrice || 0) * 100))
+            : Math.max(0, Math.round(product.price * 100)))
+        );
+      }, 0),
+    [chargeableProductRecords, resolvedSubscriptionProducts]
+  );
   // The plan's cycle price is NOT charged again for an add-on upgrade —
   // the plan was already paid when the membership started.
   const planPricePaise = isAddOnUpgrade ? 0 : selectedPlanPricePaise;
   const subtotalPaise = planPricePaise + featuresTotalPaise + productsTotalPaise;
-  const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
+  const couponDiscountPaise = activeReferral?.discountPaise || activeCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
   // payable paise (admin-set), default 0. Add-on upgrades only charge the
   // new items, so the plan's floor must not inflate them.
   const minPayablePaise = isAddOnUpgrade ? 0 : plan?.minPayablePaise || 0;
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
-  const totalRupees = (totalPaise / 100).toFixed(2);
-
-  // ---------------------------------------------------------------------------
-  // The single source of truth the live card + confirmation modal both render.
-  // Every field is derived from the same values the payable total is built
-  // from, so changing the plan, the billing duration or any add-on updates the
-  // card in the same render — there is no second copy of this state to drift.
-  // ---------------------------------------------------------------------------
-  const liveSelection = useMemo(
-    () => ({
-      planName: plan?.name ?? null,
-      planBadge: plan?.badge ?? null,
-      cycle,
-      planPricePaise,
-      planAlreadyOwned: isAddOnUpgrade,
-      featureNames: chargeableFeatureRecords.map((feature) => feature.name),
-      includedFeatureNames: includedFeatureRecords.map((feature) => feature.name),
-      featuresTotalPaise,
-      courseNames: chargeableProductRecords.map((product) => String(product.title || "")),
-      coursesTotalPaise: productsTotalPaise,
-      discountPaise: couponDiscountPaise,
-      discountLabel: appliedReferral ? "Referral discount" : appliedCoupon ? "Coupon discount" : null,
-      subtotalPaise,
-      totalPaise,
-    }),
-    [
-      plan,
-      cycle,
-      planPricePaise,
-      isAddOnUpgrade,
-      chargeableFeatureRecords,
-      includedFeatureRecords,
-      featuresTotalPaise,
-      chargeableProductRecords,
-      productsTotalPaise,
-      couponDiscountPaise,
-      appliedReferral,
-      appliedCoupon,
-      subtotalPaise,
-      totalPaise,
-    ],
-  );
 
   // "Zero means free": when the admin priced the plan (and every selected
   // add-on) at ₹0 and no minimum-payable floor applies, this selection is a
@@ -672,7 +716,7 @@ export default function SubscriptionPage({
     const audienceVisible = plans.filter((candidate) =>
       isPlanVisibleForAudience(candidate.id, isActiveMember, gateSettings.planVisibility, {
         ownedPlanId: isActiveMember ? ownedPlanId : null,
-      }),
+      })
     );
     if (!isActiveMember || ownedPlanOrder === null) return audienceVisible;
     return audienceVisible.filter((candidate) => {
@@ -688,7 +732,8 @@ export default function SubscriptionPage({
   useEffect(() => {
     if (pickerPlans.length === 0) return;
     if (selectedPlanId && pickerPlans.some((candidate) => candidate.id === selectedPlanId)) return;
-    const ownedVisible = ownedPlanId && pickerPlans.some((candidate) => candidate.id === ownedPlanId);
+    const ownedVisible =
+      ownedPlanId && pickerPlans.some((candidate) => candidate.id === ownedPlanId);
     setSelectedPlanId(ownedVisible ? ownedPlanId : pickerPlans[0].id);
   }, [pickerPlans, selectedPlanId, ownedPlanId]);
 
@@ -708,8 +753,9 @@ export default function SubscriptionPage({
   }, [isActiveMember, ownedCycle, selectedPlanId, ownedPlanId, cycle]);
 
   const memberFeatureIds = useMemo(
-    () => (Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []),
-    [activeSubscription],
+    () =>
+      Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : [],
+    [activeSubscription]
   );
   // Features the buyer already owns as far as the subscription page is
   // concerned: the ids stored on their active membership PLUS every feature
@@ -731,32 +777,8 @@ export default function SubscriptionPage({
   // can ever be re-selected, so they are never charged a second time.
   const subscriptionProductOwnedIds = useMemo(
     () => new Set<string>([...purchasedIds, ...membershipOwnedProductIds]),
-    [purchasedIds, membershipOwnedProductIds],
+    [purchasedIds, membershipOwnedProductIds]
   );
-
-  // Phase-2: subscriber-only override price for the currently selected
-  // plan + cycle. Resolved via the admin's `settings/subscriptionGate`
-  // document — non-subscribers always see the public price.
-  const subscriberPriceRupees = useMemo(() => {
-    if (!isActiveMember) return null;
-    const activePlan = plans.find((p) => p.id === selectedPlanId);
-    if (!activePlan) return null;
-    const baseRupees = cycle === "yearly"
-      ? (activePlan.yearlyPricePaise / 100)
-      : (activePlan.monthlyPricePaise / 100);
-    if (!Number.isFinite(baseRupees) || baseRupees <= 0) return null;
-    // Both admin surfaces resolve through one rule: the plan sheet's own
-    // override wins, the gate matrix is the fallback (see the shared helper).
-    const resolved = resolveEffectiveSubscriberPrice(
-      activePlan.id,
-      cycle,
-      baseRupees,
-      true,
-      activePlan.subscriberPricingOverride ?? null,
-      gateSettings.subscriberPricing,
-    );
-    return Math.round(resolved);
-  }, [isActiveMember, plans, selectedPlanId, cycle, gateSettings.subscriberPricing]);
 
   // Never leave a stale coupon / referral attached to a selection the buyer
   // cannot purchase. Add-on upgrades ARE purchasable, so their coupon state
@@ -781,7 +803,8 @@ export default function SubscriptionPage({
       if (!code) return { valid: false, message: "Enter a coupon code." };
       setCouponStatus("applying");
       setCouponErrorMessage(null);
-      setCouponInput(code);
+      const selectionKey = discountSelectionKey;
+      const request = ++discountRequestRef.current;
       try {
         // Coupon validation goes through the server. The
         // server-side applyCoupon is owned by the Part 5
@@ -799,17 +822,22 @@ export default function SubscriptionPage({
           selectedModuleIds: [],
           couponCode: code,
         });
+        if (discountScopeRef.current !== selectionKey || discountRequestRef.current !== request)
+          return { valid: false, message: "Selection changed. Apply the code again." };
         setCouponStatus("idle");
         setAppliedReferral(null);
         setReferralError(null);
         playSfxSuccess();
         setAppliedCoupon({
           code,
+          selectionKey,
           discountPaise,
           label: discountPaise > 0 ? "Verified savings" : "Coupon applied (no additional savings).",
         });
         return { valid: true, message: "Coupon applied." };
       } catch (error) {
+        if (discountScopeRef.current !== selectionKey || discountRequestRef.current !== request)
+          return { valid: false, message: "Selection changed. Apply the code again." };
         const message =
           error instanceof Error ? error.message : "This coupon could not be applied.";
         setCouponStatus("error");
@@ -818,11 +846,11 @@ export default function SubscriptionPage({
         return { valid: false, message };
       }
     },
-    [plan, cycle, selectedFeatureIds, selectedCourseIds],
+    [plan, cycle, selectedFeatureIds, selectedCourseIds, discountSelectionKey]
   );
 
   const handleRemoveCoupon = useCallback(() => {
-    setCouponInput("");
+    discountRequestRef.current += 1;
     setAppliedCoupon(null);
     setCouponErrorMessage(null);
     setCouponStatus("idle");
@@ -832,7 +860,6 @@ export default function SubscriptionPage({
   // the code so nothing stale is carried into checkout.
   useEffect(() => {
     if (!canShowCouponInput && appliedCoupon) {
-      setCouponInput("");
       setAppliedCoupon(null);
       setCouponErrorMessage(null);
       setCouponStatus("idle");
@@ -848,35 +875,59 @@ export default function SubscriptionPage({
     }
   }, [isFreeSelection, appliedReferral]);
 
-  const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
-    const code = rawCode.trim().toUpperCase();
-    if (!code) return { valid: false, message: "Enter a referral code." };
-    setReferralError(null);
-    try {
-      const firebaseUser = await import("../../../firebase").then((module) => module.auth.currentUser);
-      if (!firebaseUser) throw new Error("Please sign in to apply a referral code.");
-      const token = await firebaseUser.getIdToken(true);
-      const response = await apiFetch("/api/subscription-referral", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ referralCode: code }),
-      });
-      const data = await response.json().catch(() => ({})) as { ok?: boolean; code?: string; discountPaise?: number; error?: string };
-      if (!response.ok || !data.ok) throw new Error(data.error || "Referral code is invalid.");
-      const discountPaise = Math.max(0, Number(data.discountPaise || 0));
-      setAppliedCoupon(null);
-      playSfxSuccess();
-      setAppliedReferral({ code: data.code || code, discountPaise, label: `₹${Math.round(discountPaise / 100)} referral discount` });
-      return { valid: true, message: "Referral code applied." };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Referral code is invalid.";
-      setReferralError(message);
-      playSfxError();
-      return { valid: false, message };
-    }
-  }, []);
+  const handleApplyReferral = useCallback(
+    async (rawCode: string): Promise<PromoResult> => {
+      const code = rawCode.trim().toUpperCase();
+      if (!code) return { valid: false, message: "Enter a referral code." };
+      setReferralError(null);
+      const selectionKey = discountSelectionKey;
+      const request = ++discountRequestRef.current;
+      try {
+        const firebaseUser = await import("../../../firebase").then(
+          (module) => module.auth.currentUser
+        );
+        if (!firebaseUser) throw new Error("Please sign in to apply a referral code.");
+        const token = await firebaseUser.getIdToken(true);
+        const response = await apiFetch("/api/subscription-referral", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ referralCode: code }),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          ok?: boolean;
+          code?: string;
+          discountPaise?: number;
+          error?: string;
+        };
+        if (!response.ok || !data.ok) throw new Error(data.error || "Referral code is invalid.");
+        const discountPaise = Math.max(0, Number(data.discountPaise || 0));
+        if (discountScopeRef.current !== selectionKey || discountRequestRef.current !== request)
+          return { valid: false, message: "Selection changed. Apply the code again." };
+        setAppliedCoupon(null);
+        playSfxSuccess();
+        setAppliedReferral({
+          code: data.code || code,
+          discountPaise,
+          selectionKey,
+          label: `${formatSubscriptionMoney(
+            discountPaise
+          )} referral discount, subject to the minimum payable.`,
+        });
+        return { valid: true, message: "Referral code applied." };
+      } catch (error) {
+        if (discountScopeRef.current !== selectionKey || discountRequestRef.current !== request)
+          return { valid: false, message: "Selection changed. Apply the code again." };
+        const message = error instanceof Error ? error.message : "Referral code is invalid.";
+        setReferralError(message);
+        playSfxError();
+        return { valid: false, message };
+      }
+    },
+    [discountSelectionKey]
+  );
 
   const handleRemoveReferral = useCallback(() => {
+    discountRequestRef.current += 1;
     setAppliedReferral(null);
     setReferralError(null);
   }, []);
@@ -911,7 +962,7 @@ export default function SubscriptionPage({
           subscriptionPlanId: plan.id,
           billingCycle: cycle,
           featureIds: selectedFeatureIds,
-          couponCode: appliedReferral?.code || appliedCoupon?.code || null,
+          couponCode: activeReferral?.code || activeCoupon?.code || null,
           returnRoute: "#/subscription",
         },
         buyer: {
@@ -923,450 +974,329 @@ export default function SubscriptionPage({
       });
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : "Could not start subscription checkout.",
+        error instanceof Error ? error.message : "Could not start subscription checkout."
       );
       setIsSubmitting(false);
     }
-  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral, ownershipState]);
+  }, [
+    user,
+    plan,
+    cycle,
+    selectedFeatureIds,
+    selectedCourseIds,
+    activeCoupon,
+    activeReferral,
+    ownershipState,
+  ]);
 
   // ---------- Render ----------
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
-    <div className="min-h-screen overflow-x-hidden">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full flex-col overflow-x-hidden">
-        <Header
-          cartCount={cartCount}
-          notifCount={0}
-          onNavigateToSubscription={onNavigateToSubscription}
-          onNavigateToCart={onNavigateToCart}
-          onNavigateToNotifications={onNavigateToNotifications}
-          onHelpClick={() => setHelpOpen(true)}
-        />
-
-        <main ref={contentColumnRef} data-subscription-page className="flex-1 overflow-x-hidden overflow-y-auto">
-          <div data-subscription-shell className="flex min-h-full w-full flex-col">
-            {catalogLoading ? (
-              <div data-subscription-loading className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/55">
-                <LoaderCircle className="h-6 w-6 animate-spin text-violet-300" />
-                <p className="font-semibold">Loading subscription plans…</p>
-              </div>
-            ) : catalogError && !catalog ? (
-              <div data-subscription-catalog-error className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/85">
-                <p className="font-black text-rose-200">We couldn't load the subscription catalog.</p>
-                <p className="text-xs text-white/55">{catalogError}</p>
-                <GlassButton
-                  variant="capsule"
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="[&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
-                >
-                  Retry
-                </GlassButton>
-              </div>
-            ) : (
-              <>
-      {/* This is the plan-selection page for every account. Active membership
-          details and controls live in Profile, while ownership and upgrade
-          safeguards remain enforced in this purchase flow. */}
-      <section data-subscription-hero aria-labelledby="subscription-hero-title">
-        <span className="dc-sub-eyebrow">
-          <Sparkles className="h-3 w-3" aria-hidden="true" /> Eduvora plans
-        </span>
-        <h1 id="subscription-hero-title">
-          {plan ? `${plan.name} — choose your duration` : "Choose the plan that fits how you study"}
-        </h1>
-        <p className="dc-sub-lede">
-          One plan, plus only the courses and features you actually want. Every price is re-checked on the server before any payment, and we remind you before the cycle ends.
-        </p>
-        <div className="dc-sub-trust">
-          <span><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Server-verified pricing</span>
-          <span><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Reminder before the cycle ends</span>
-          <span><CreditCard className="h-3.5 w-3.5" aria-hidden="true" /> One payment per cycle</span>
-        </div>
-      </section>
-
-      <div className="flex-1 pb-4">
-        {/* Fallback catalog banner removed — default plans are always shown
-            with accurate pricing, so the warning added noise without value. */}
-        {/* The plan picker remains visible for every account. Ownership is
-            still checked by the quote/CTA guards, while Profile owns renewal
-            details and member-management actions. */}
-        <div data-subscription-layout data-subscription-workspace>
-          <div data-subscription-main className="min-w-0">
-            {/* The swipeable plan deck is the ONE deliberately glassy surface
-                of the buy flow (it is a stack of cards by design); the steps
-                below it are solid plates, which is the mix this page runs on. */}
-            <div className="dc-sub-deck-wrap">
-              <StackedCards cards={SHOWCASE_CARDS} />
-            </div>
-
-            {/* ── STEP 1 — plan + billing duration ─────────────────────────────
-                Everything downstream (feature prices, course prices, the live
-                card, the total) is resolved from these two values, so they are
-                the first and most prominent decision on the page. */}
-            {usingFallback ? (
-              <p
-                data-subscription-fallback-note
-                className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-2.5 text-[11px] font-semibold text-amber-100"
-              >
-                Showing the built-in plan list — the live catalog could not be reached. Prices are re-checked by the server before any payment.
-              </p>
-            ) : null}
-
-            <Step
-              index={1}
-              title="Choose your plan and duration"
-              hint="Compare what each plan includes, then pick monthly or yearly. Prices below update instantly."
-              done={Boolean(plan)}
-            >
-            {/* Plan + cycle card. Members only see their own plan + HIGHER plans
-                (pickerPlans) — lower plans are hidden, not merely disabled, so a
-                downgrade can never even be selected. */}
-            <PlanOverview
-              plans={pickerPlans}
-              features={features}
-              selectedPlanId={selectedPlanId}
-              onChangePlan={setSelectedPlanId}
-              cycle={cycle}
-              onChangeCycle={(c) => {
-                if (supportedCycles.includes(c)) setCycle(c);
-              }}
-              selectedFeatureRecords={selectedFeatureRecords}
-              includedFeatureRecords={includedFeatureRecords}
-              totalPaise={totalPaise}
-              ownedPlanId={isActiveMember ? ownedPlanId || null : null}
-              ownedCycle={isActiveMember ? ownedCycle : null}
-              isSubscriber={isActiveMember}
-              subscriberPriceRupees={subscriberPriceRupees}
-              gatePlanRows={gateSettings.planVisibility}
-            />
-
-            {/* The comparison table — the single answer to "what is actually
-                different between these plans?". Columns are the selection target,
-                rows are the features, cells state the real outcome (Included /
-                exact add-on price / not offered) for the active cycle. */}
-            <PlanComparisonTable
-              plans={pickerPlans}
-              features={offeredFeatures}
-              cycle={cycle}
-              selectedPlanId={selectedPlanId}
-              ownedPlanId={isActiveMember ? ownedPlanId || null : null}
-              onSelectPlan={setSelectedPlanId}
-            />
-            </Step>
-
-            {/* ── STEP 2 — optional add-ons ───────────────────────────────────
-                Clearly framed as optional so the buyer knows the plan alone is a
-                complete purchase; every price here is already resolved for the
-                plan + cycle chosen in step 1. */}
-            <Step
-              index={2}
-              title="Add courses and features"
-              hint="Optional. Anything included with your plan is marked and never charged twice."
-              done={selectedCourseIds.length > 0 || selectedFeatureIds.length > 0}
-            >
-            {/* Course (product) selector trigger */}
-            <CourseSelectTrigger
-              selectedIds={selectedCourseIds}
-              onOpen={() => setCourseModalOpen(true)}
-              products={availableProducts}
-            />
-
-            {/* Feature selector trigger */}
-            <FeatureSelectTrigger
-              features={features}
-              selectedIds={selectedFeatureIds}
-              onOpen={() => setFeatureModalOpen(true)}
-              purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
-            />
-
-            {/* Price-tier strip — features grouped by their resolved price
-                for the active plan + cycle. */}
-            <FeaturePricingTiers
-              tiers={featureTiers}
-              cycle={cycle}
-              selectedIds={selectedFeatureIds}
-              purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
-              onToggleTier={(ids, allSelected) => {
-                setSelectedFeatureIds((current) => {
-                  const next = new Set(current);
-                  if (allSelected) ids.forEach((id) => next.delete(id));
-                  else ids.forEach((id) => next.add(id));
-                  return Array.from(next);
-                });
-              }}
-            />
-
-            </Step>
-
-            {/* ── STEP 3 — discounts ──────────────────────────────────────────── */}
-            <Step
-              index={3}
-              title="Apply a code"
-              hint="Optional. Coupons and referral codes are verified by the server before payment."
-              done={Boolean(appliedCoupon || appliedReferral)}
-            >
-            {/* Coupon section — server-validated via the Part 7 engine.
-                The coupon field is hidden when nothing is payable. */}
-            <div className="space-y-3 px-5">
-              {canShowCouponInput ? (
-                <PromoCodeInput
-                  kind="coupon"
-                  label="Have a coupon? Enter the code below."
-                  placeholder="Enter coupon code"
-                  appliedCode={appliedCoupon?.code ?? null}
-                  appliedMessage={appliedCoupon?.label ?? null}
-                  errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-                  onApply={handleApplyCoupon}
-                  onRemove={handleRemoveCoupon}
-                  disabled={isSubmitting}
-                />
-              ) : null}
-              {!isFreeSelection ? (
-                <PromoCodeInput
-                  kind="referral"
-                  label="Have a referral code? Get ₹250 off the final price."
-                  placeholder="Enter referral code"
-                  appliedCode={appliedReferral?.code ?? null}
-                  appliedMessage={appliedReferral?.label ?? null}
-                  errorMessage={referralError}
-                  onApply={handleApplyReferral}
-                  onRemove={handleRemoveReferral}
-                  disabled={isSubmitting}
-                />
-              ) : (
-                <div
-                  data-subscription-free-note
-                  className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-200"
-                >
-                  <span aria-hidden="true">🎉</span>
-                  <span>
-                    This subscription is <strong>free</strong> — no payment is
-                    needed. Tap the button below to activate it instantly.
-                  </span>
+      <div className="min-h-screen overflow-x-hidden">
+        <div
+          data-app-frame
+          className="relative mx-auto flex min-h-screen w-full flex-col overflow-x-hidden"
+        >
+          <Header
+            cartCount={cartCount}
+            notifCount={0}
+            onNavigateToSubscription={onNavigateToSubscription}
+            onNavigateToCart={onNavigateToCart}
+            onNavigateToNotifications={onNavigateToNotifications}
+            onHelpClick={() => setHelpOpen(true)}
+          />
+          <main ref={contentColumnRef} data-subscription-page className="flex-1 overflow-y-auto">
+            <div data-subscription-shell className="dc-subscription-shell">
+              <header data-subscription-hero>
+                <h1>Subscription</h1>
+                <p className="dc-subscription-note">
+                  Choose a plan, duration and optional add-ons.
+                </p>
+              </header>
+              {catalogLoading ? (
+                <div data-subscription-loading role="status" className="dc-subscription-state">
+                  <LoaderCircle aria-hidden="true" className="h-5 w-5 animate-spin" />
+                  <p>Loading subscription plans…</p>
                 </div>
+              ) : catalogError && !catalog ? (
+                <div data-subscription-catalog-error role="alert" className="dc-subscription-state">
+                  <h2>Subscription plans couldn't load</h2>
+                  <p className="dc-subscription-error">{catalogError}</p>
+                  <button
+                    type="button"
+                    className="dc-subscription-text-action"
+                    onClick={() => window.location.reload()}
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {usingFallback ? (
+                    <p
+                      data-subscription-fallback-note
+                      role="status"
+                      className="dc-subscription-note"
+                    >
+                      The live catalog is unavailable. The built-in plans below are estimates;
+                      checkout checks current availability and prices before payment.
+                    </p>
+                  ) : null}
+                  <div data-subscription-layout data-subscription-workspace>
+                    <div data-subscription-main>
+                      {pickerPlans.length ? (
+                        <MinimalPlanPicker
+                          plans={pickerPlans}
+                          selectedPlanId={selectedPlanId}
+                          onChangePlan={setSelectedPlanId}
+                          cycle={cycle}
+                          onChangeCycle={(next) => {
+                            if (supportedCycles.includes(next)) setCycle(next);
+                          }}
+                          supportedCycles={supportedCycles}
+                          subscriber={isActiveMember}
+                          ownedPlanId={isActiveMember ? ownedPlanId : null}
+                          ownedCycle={ownedCycle}
+                          subscriberPricing={gateSettings.subscriberPricing}
+                          planVisibility={{
+                            isSubscriber: isActiveMember,
+                            gateRows: gateSettings.planVisibility,
+                          }}
+                        />
+                      ) : (
+                        <p className="dc-subscription-note">
+                          No plans are currently available for this account.
+                        </p>
+                      )}
+                      <PlanComparisonTable
+                        plans={pickerPlans}
+                        features={rawFeatures}
+                        cycle={cycle}
+                        selectedPlanId={selectedPlanId}
+                        planVisibility={{
+                          isSubscriber: isActiveMember,
+                          gateRows: gateSettings.planVisibility,
+                        }}
+                        featureVisibility={cycleVisibilityOptions}
+                        subscriberPricing={gateSettings.subscriberPricing}
+                      />
+                      <section className="dc-subscription-section" data-subscription-addons>
+                        <h2>Optional add-ons</h2>
+                        <p className="dc-subscription-note">
+                          Included and already-purchased items are not charged again.
+                        </p>
+                        <div className="dc-subscription-addon-actions">
+                          <button
+                            type="button"
+                            data-subscription-course-trigger
+                            className="dc-subscription-text-action"
+                            onClick={() => setCourseModalOpen(true)}
+                          >
+                            Choose courses<span>{selectedCourseIds.length} selected</span>
+                          </button>
+                          <button
+                            type="button"
+                            data-subscription-feature-trigger
+                            className="dc-subscription-text-action"
+                            onClick={() => setFeatureModalOpen(true)}
+                          >
+                            Choose features<span>{selectedFeatureIds.length} selected</span>
+                          </button>
+                        </div>
+                      </section>
+                      {canShowCouponInput || !isFreeSelection ? (
+                        <section className="dc-subscription-section" data-subscription-discounts>
+                          <h2>Discount code</h2>
+                          <p className="dc-subscription-note">
+                            Optional. Use one coupon or referral code. Reapply it if you change your
+                            selection.
+                          </p>
+                          {canShowCouponInput ? (
+                            <PromoCodeInput
+                              minimal
+                              key={`${discountSelectionKey}:coupon`}
+                              kind="coupon"
+                              label="Coupon code"
+                              placeholder="Enter coupon code"
+                              appliedCode={activeCoupon?.code ?? null}
+                              appliedMessage={activeCoupon?.label ?? null}
+                              errorMessage={couponStatus === "error" ? couponErrorMessage : null}
+                              onApply={handleApplyCoupon}
+                              onRemove={handleRemoveCoupon}
+                              disabled={isSubmitting}
+                            />
+                          ) : null}
+                          {!isFreeSelection ? (
+                            <PromoCodeInput
+                              minimal
+                              key={`${discountSelectionKey}:referral`}
+                              kind="referral"
+                              label="Referral code"
+                              placeholder="Enter referral code"
+                              appliedCode={activeReferral?.code ?? null}
+                              appliedMessage={activeReferral?.label ?? null}
+                              errorMessage={referralError}
+                              onApply={handleApplyReferral}
+                              onRemove={handleRemoveReferral}
+                              disabled={isSubmitting}
+                            />
+                          ) : null}
+                        </section>
+                      ) : null}
+                      <div className="dc-subscription-rules">
+                        {isAddOnUpgrade ? (
+                          <p data-subscription-addon-upgrade-note className="dc-subscription-note">
+                            <strong>Add-on upgrade:</strong> only the{" "}
+                            {ownershipState.newFeatureIds.length +
+                              ownershipState.newProductIds.length}{" "}
+                            new item(s) are charged. Your plan, cycle and expiry stay unchanged; the
+                            plan price is not charged again.
+                          </p>
+                        ) : null}
+                        {!isAddOnUpgrade && hasOwnedCarryOver ? (
+                          <p data-subscription-carryover-note className="dc-subscription-note">
+                            <strong>Already purchased — carried over:</strong> the named items in
+                            the summary cost ₹0. You only pay for the new plan and new items.
+                          </p>
+                        ) : null}
+                        {!isAddOnUpgrade && isSelectionOwned ? (
+                          <p className="dc-subscription-note">
+                            This is your current plan and duration. Add new courses or features to
+                            upgrade, or choose a higher plan. Renewal of this package opens in the
+                            last 7 days before expiry.
+                          </p>
+                        ) : null}
+                        {isFreeSelection ? (
+                          <p data-subscription-free-note className="dc-subscription-note">
+                            Nothing to pay. Checkout verifies ₹0 before activating access; no
+                            payment gateway is required.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <aside data-subscription-rail>
+                      <PriceSummary
+                        plan={plan}
+                        cycle={cycle}
+                        basePricePaise={planPricePaise}
+                        planAlreadyIncluded={isAddOnUpgrade}
+                        featuresTotalPaise={featuresTotalPaise}
+                        productsTotalPaise={productsTotalPaise}
+                        features={chargeableFeatureRecords.map((feature) => ({
+                          id: feature.id,
+                          name: feature.name,
+                          pricePaise: resolveFeaturePrice(
+                            feature as never,
+                            selectedPlanId || "",
+                            cycle
+                          ).pricePaise,
+                        }))}
+                        includedFeatureTitles={includedFeatureRecords.map(
+                          (feature) => feature.name
+                        )}
+                        includedProductTitles={Array.from(
+                          new Set([
+                            ...(plan?.includedProductIds || []),
+                            ...(catalog?.productUnlocks || [])
+                              .filter((unlock) => unlock.active && unlock.planId === selectedPlanId)
+                              .map((unlock) => unlock.productId),
+                          ])
+                        ).map((id) => subscriptionUnlockName(availableProducts, id))}
+                        includedModules={includedSubscriptionModules(
+                          catalog,
+                          plan,
+                          availableProducts
+                        )}
+                        alreadyOwnedFeatureTitles={carriedOverFeatureRecords.map(
+                          (feature) => feature.name
+                        )}
+                        alreadyOwnedProductTitles={carriedOverProductRecords.map((product) =>
+                          String(product.title || "")
+                        )}
+                        products={chargeableProductRecords.map((product) => ({
+                          id: String(product.documentId || product.id),
+                          title: String(product.title || ""),
+                          pricePaise: Math.max(
+                            0,
+                            Math.round(
+                              (subscriptionDisplayProducts.find(
+                                (candidate) => candidate.id === product.id
+                              )?.price ?? product.price) * 100
+                            )
+                          ),
+                          originalPricePaise: Math.max(
+                            0,
+                            Math.round(
+                              (subscriptionDisplayProducts.find(
+                                (candidate) => candidate.id === product.id
+                              )?.originalPrice ??
+                                product.originalPrice ??
+                                0) * 100
+                            )
+                          ),
+                        }))}
+                        couponDiscountPaise={couponDiscountPaise}
+                        couponCode={activeReferral?.code ?? activeCoupon?.code ?? null}
+                        discountLabel={activeReferral ? "Referral discount" : "Coupon discount"}
+                        minPayablePaise={minPayablePaise}
+                        totalPaise={totalPaise}
+                      />
+                      <SubscribeBar
+                        totalPaise={totalPaise}
+                        loading={isSubmitting}
+                        disabled={!plan || isSubmitting || supportedCycles.length === 0}
+                        onSubscribe={() => void handleSubscribe()}
+                        ownershipState={ownershipState}
+                      />
+                      <p className="dc-subscription-note">
+                        {isAddOnUpgrade
+                          ? "New add-ons expire with your current membership."
+                          : `Access lasts for the selected ${
+                              cycle === "monthly" ? "monthly" : "yearly"
+                            } period.`}{" "}
+                        Renewals are manual and require your confirmation.
+                      </p>
+                      <p className="dc-subscription-terms">
+                        By continuing, you agree to the{" "}
+                        <a href="/terms-of-service.html">Terms of Service</a> and{" "}
+                        <a href="/privacy-policy.html">Privacy Policy</a>.
+                      </p>
+                      {submitError ? (
+                        <p
+                          role="alert"
+                          data-subscription-submit-error
+                          className="dc-subscription-error"
+                        >
+                          {submitError}
+                        </p>
+                      ) : null}
+                    </aside>
+                  </div>
+                  <CourseSelectModal
+                    open={isCourseModalOpen}
+                    selected={selectedCourseIds}
+                    onClose={() => setCourseModalOpen(false)}
+                    onChangeSelected={setSelectedCourseIds}
+                    products={subscriptionDisplayProducts}
+                    purchasedIds={subscriptionProductOwnedIds}
+                  />
+                  <FeatureSelectModal
+                    open={isFeatureModalOpen}
+                    features={features}
+                    selected={selectedFeatureIds}
+                    onClose={() => setFeatureModalOpen(false)}
+                    onChangeSelected={setSelectedFeatureIds}
+                    includedIds={Array.from(includedFeatureIds)}
+                    purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
+                  />
+                  <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+                </>
               )}
             </div>
-
-            </Step>
-          </div>
-
-          <aside data-subscription-rail className="min-w-0">
-            {/* ── STEP 4 — review ─────────────────────────────────────────────
-                The live card restates plan + duration + every selection and the
-                money in one surface. It is the same component the confirmation
-                modal renders, driven by the same props, so the two can never
-                disagree. On desktop this becomes a sticky rail that stays beside
-                the pointer while the buyer edits the configuration. */}
-            <Step
-              index={4}
-              title="Review what you're buying"
-              hint="This card updates the moment you change the plan, the duration or any add-on."
-              done={Boolean(plan)}
-            >
-            <div className="px-5">
-              <LiveSelectionCard {...liveSelection} />
-            </div>
-
-            {/* Full itemised breakdown stays available underneath for buyers who
-                want every line rather than the summary. */}
-            <div className="pt-3">
-            <PriceSummary
-              plan={plan}
-              cycle={cycle}
-              basePricePaise={planPricePaise}
-              planAlreadyIncluded={isAddOnUpgrade}
-              featuresTotalPaise={featuresTotalPaise}
-              featuresCount={chargeableFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
-              includedFeatureCount={includedFeatureIds.size}
-              productsCount={chargeableProductRecords.length}
-              productsTotalPaise={productsTotalPaise}
-              featureTitles={chargeableFeatureRecords.map((feature) => feature.name)}
-              includedFeatureTitles={includedFeatureRecords.map((feature) => feature.name)}
-              alreadyOwnedFeatureTitles={carriedOverFeatureRecords.map((feature) => feature.name)}
-              alreadyOwnedProductTitles={carriedOverProductRecords.map((product) => String(product.title || ""))}
-              products={chargeableProductRecords.map((product) => ({
-                id: String(product.documentId || product.id),
-                title: String(product.title || ""),
-              }))}
-              couponDiscountPaise={couponDiscountPaise}
-              couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
-              discountLabel={appliedReferral ? "Referral discount" : "Coupon discount"}
-              minPayablePaise={minPayablePaise}
-              totalPaise={totalPaise}
-            />
-            </div>
-            {/* P1-2: alag card below Summary — exactly mobile_pricing_page.html colors — keep existing summary.
-                Now driven by the live selection: plan name, cycle, prices and
-                features update the instant the buyer changes anything. */}
-            <div className="px-5 pt-3">
-              <PricingGlassCard
-                planName={plan?.name ?? null}
-                planBadge={plan?.badge ?? null}
-                planDescription={plan?.description ?? null}
-                monthlyPricePaise={plan?.monthlyPricePaise ?? 0}
-                yearlyPricePaise={plan?.yearlyPricePaise ?? 0}
-                cycle={cycle}
-                features={offeredFeatures.map((f) => ({
-                  name: f.name,
-                  included: includedFeatureIds.has(f.id),
-                }))}
-              />
-            </div>
-            </Step>
-
-            <p className="px-5 pt-5 text-center text-[11px] leading-relaxed dc-ink-3">
-              By subscribing you agree to the{" "}
-              <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-                Terms of Service
-              </a>{" "}
-              and{" "}
-              <a href="/privacy-policy.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-                Privacy Policy
-              </a>
-              . Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
-            </p>
-          </aside>
+          </main>
+          <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />
         </div>
-
-        {/* Selection and carry-over notes stay with the plan picker. */}
-        {isActiveMember ? (
-          <div className="mt-6 flex flex-col gap-2.5 pb-2">
-            <div className="flex flex-col gap-2.5">
-              {isAddOnUpgrade ? (
-                <div
-                  data-subscription-addon-upgrade-note
-                  className="flex items-start gap-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-emerald-200 md:text-xs md:leading-6"
-                >
-                  <span aria-hidden="true" className="mt-0.5">⬆️</span>
-                  <span>
-                    <strong>Add-on upgrade:</strong> you&apos;ll only be charged for
-                    the <strong>{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length} new item{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length === 1 ? "" : "s"}</strong> you
-                    added. Your current plan, cycle and expiry date stay exactly
-                    as they are — no plan price is charged again.
-                  </span>
-                </div>
-              ) : null}
-              {!isAddOnUpgrade && hasOwnedCarryOver ? (
-                <div
-                  data-subscription-carryover-note
-                  className="flex items-start gap-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-emerald-200 md:text-xs md:leading-6"
-                >
-                  <span aria-hidden="true" className="mt-0.5">✅</span>
-                  <span>
-                    <strong>Already purchased — carried over:</strong>{" "}
-                    {carriedOverFeatureRecords.length} feature
-                    {carriedOverFeatureRecords.length === 1 ? "" : "s"}
-                    {carriedOverProductRecords.length > 0
-                      ? ` and ${carriedOverProductRecords.length} course${carriedOverProductRecords.length === 1 ? "" : "s"}`
-                      : ""}{" "}
-                    you already paid for are included with the new plan. They
-                    are <strong>not charged again</strong> — you only pay for
-                    the new plan and any new items.
-                  </span>
-                </div>
-              ) : null}
-              {!isAddOnUpgrade && isSelectionOwned ? (
-                <div className="flex items-start gap-2.5 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3.5 py-3 text-[11px] leading-relaxed text-violet-200 md:text-xs md:leading-6">
-                  <span aria-hidden="true" className="mt-0.5">💡</span>
-                  <span>
-                    This is your current plan + cycle. Add a new feature or
-                    course below to upgrade it, or pick another plan. Renewal of
-                    this exact package opens in the last 7 days before expiry.
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        {submitError ? (
-          <p
-            role="alert"
-            data-subscription-submit-error
-            className="mt-3 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-center text-xs font-semibold text-rose-200"
-          >
-            {submitError}
-          </p>
-        ) : null}
       </div>
-
-      {/* Sticky bottom bar */}
-      <SubscribeBar
-        totalPaise={totalPaise}
-        subtotalPaise={subtotalPaise}
-        couponDiscountPaise={couponDiscountPaise}
-        loading={isSubmitting}
-        disabled={!plan || isSubmitting}
-        onSubscribe={() => setConfirmOpen(true)}
-        totalRupees={totalRupees}
-        ownershipState={ownershipState}
-      />
-
-      {/* Modals — only mounted when server-driven data is available. */}
-      <CourseSelectModal
-        open={isCourseModalOpen}
-        selected={selectedCourseIds}
-        onClose={() => setCourseModalOpen(false)}
-        onChangeSelected={setSelectedCourseIds}
-        products={subscriptionDisplayProducts}
-        purchasedIds={subscriptionProductOwnedIds}
-      />
-
-      <FeatureSelectModal
-        open={isFeatureModalOpen}
-        features={features}
-        selected={selectedFeatureIds}
-        onClose={() => setFeatureModalOpen(false)}
-        onChangeSelected={setSelectedFeatureIds}
-        includedIds={Array.from(includedFeatureIds)}
-        purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
-      />
-
-      {/* AI Canvas Glass Modal — the final confirmation. Its body is the same
-          LiveSelectionCard the page renders, so the modal always reflects the
-          current plan, duration and selection at the moment it opens. */}
-      <GlassModal
-        open={isConfirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        data-testid="subscription-confirm-modal"
-        accent="#8B7CF6"
-        widthClassName="w-[380px] max-w-[calc(100vw-2rem)]"
-        title={plan ? `Confirm ${plan.name}` : "Confirm your subscription"}
-        description={
-          isFreeSelection
-            ? "Nothing to pay — this selection activates instantly."
-            : `You're paying ${totalPaise <= 0 ? "nothing" : `₹${Math.round(totalPaise / 100).toLocaleString("en-IN")}`} for the ${cycle === "yearly" ? "yearly" : "monthly"} cycle.`
-        }
-        features={[
-          isFreeSelection ? "No payment required" : "One payment for this cycle — no silent auto-charges",
-          "Reminder before the cycle ends, never after",
-          "Cancel anytime from Profile — access stays till the last day",
-        ]}
-        primaryLabel={isSubmitting ? "Processing…" : isFreeSelection ? "Activate now" : "Confirm and pay"}
-        primaryDisabled={isSubmitting || !plan}
-        /* The final money action in the buy flow wears the same payment CTA as
-           every other pay surface (Uiverse pretty-grasshopper-57); `onPrimary`
-           still closes the modal and calls the page's own `handleSubscribe`. */
-        primaryVariant="payment"
-        primaryLoading={isSubmitting}
-        onPrimary={() => {
-          setConfirmOpen(false);
-          void handleSubscribe();
-        }}
-        secondaryLabel="Keep editing"
-      >
-        <LiveSelectionCard {...liveSelection} compact />
-      </GlassModal>
-
-      <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
-      </>
-      )}
-          </div>
-        </main>
-
-        <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />
-      </div>
-    </div>
     </OverlayBoundsProvider>
   );
 }
@@ -1397,46 +1327,13 @@ async function preflightSubscriptionCoupon(selection: {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(selection),
   });
-  const data = (await response.json().catch(() => ({}))) as { ok?: boolean; discountPaise?: number; error?: string };
+  const data = (await response.json().catch(() => ({}))) as {
+    ok?: boolean;
+    discountPaise?: number;
+    error?: string;
+  };
   if (!response.ok || !data.ok) {
     throw new Error(data.error || "This coupon could not be applied.");
   }
   return Number(data.discountPaise || 0);
-}
-
-// ---------------------------------------------------------------------------
-// Section shell. The page previously ran as one undifferentiated column of
-// cards, banners and pickers, so a buyer had no idea how many decisions were
-// left or which one they were on. Every purchase step is now a numbered
-// section with a title and a one-line purpose, which is the cheapest possible
-// form of progress feedback (goal-gradient effect) and makes the page
-// scannable instead of scattered.
-// ---------------------------------------------------------------------------
-function Step({
-  index,
-  title,
-  hint,
-  done = false,
-  children,
-}: {
-  index: number;
-  title: string;
-  hint?: string;
-  done?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section data-subscription-step={index}>
-      <header className="dc-sub-step-head">
-        <span className={`dc-sub-step-num ${done ? "is-done" : ""}`} aria-hidden="true">
-          {done ? "\u2713" : index}
-        </span>
-        <div className="min-w-0">
-          <h2 className="dc-sub-step-title">{title}</h2>
-          {hint ? <p className="dc-sub-step-hint">{hint}</p> : null}
-        </div>
-      </header>
-      <div className="dc-sub-step-body">{children}</div>
-    </section>
-  );
 }

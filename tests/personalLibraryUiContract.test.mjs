@@ -43,29 +43,19 @@ test("My Study Library is one lazy authenticated route reachable from desktop an
   assert.match(profileApp, /window\.location\.hash = "#\/study-library"/);
 });
 
-test("central workspace is a course shelf: product-card grid + a '+' that opens the builder", () => {
+test("Study Library uses one readable course row per course and one create action", () => {
   assert.match(study, /My Study Library/);
-  // Every course the learner built is a card drawn with the store's own
-  // product-card material, carrying cover, title, Play, Edit and Delete
-  // (owner brief 2026-09-29: a self-created course deletes from its card).
   assert.match(study, /data-my-course-grid/);
-  assert.match(study, /<MyCourseCard key=\{course\.id\} course=\{course\} onPlay=\{openCourse\} onEdit=\{editCourse\} onDelete=\{requestDelete\} \/>/);
-  assert.match(myCard, /dc-scene-plate/);
-  assert.match(myCard, /aspect-\[4\/3\]/);
-  assert.match(myCard, /data-my-course-play/);
-  assert.match(myCard, /data-my-course-edit/);
-  // The "+" is a tile in the grid AND a floating button, both opening the
-  // builder route (new module / folder, image, title, type, name, resource).
-  assert.match(study, /data-my-course-create/);
-  assert.match(study, /data-my-course-create-fab/);
-  assert.match(study, /data-my-course-create-empty/);
-  assert.match(study, /MY_COURSE_NEW_HASH = "#\/my-course\/new"/);
+  assert.match(study, /<MyCourseCard\s+minimal/);
+  for (const action of ["play", "edit", "delete"])
+    assert.match(myCard, new RegExp(`data-my-course-${action}`));
+  assert.equal((study.match(/data-my-course-create\b/g) || []).length, 1);
+  assert.doesNotMatch(
+    study,
+    /data-my-course-create-fab|data-my-course-create-empty|Saved for Later/
+  );
   assert.match(study, /myCoursePlayHash\(course\.id\)/);
   assert.match(study, /myCourseEditHash\(course\.id\)/);
-  // The old link-organiser surface is gone for good.
-  assert.doesNotMatch(study, /Saved for Later/);
-  assert.doesNotMatch(study, /data-library-plan-usage/);
-  assert.doesNotMatch(study, /usageAtPerModuleLimit/);
 });
 
 test("the builder gives modules and resources full CRUD, confirmations and non-drag reorder", () => {
@@ -187,7 +177,10 @@ test("a learner's own courses are never plan-gated — no entitlement, no usage 
   assert.doesNotMatch(myClient, /personalCourse|entitlement/i);
   // The old saved-link API keeps its own gating untouched (it still serves
   // the Course Player's "My Modules" surface inside OFFICIAL courses).
-  const listBody = api.slice(api.indexOf("async function listLibrary"), api.indexOf("async function createModule"));
+  const listBody = api.slice(
+    api.indexOf("async function listLibrary"),
+    api.indexOf("async function createModule")
+  );
   assert.match(listBody, /readEntitlement/);
   assert.doesNotMatch(listBody, /assertCreationEntitled/);
   assert.match(api, /assertCreationEntitled/);
@@ -202,7 +195,10 @@ test("official data is resolved server-side and copied only into owner-scoped pe
   assert.match(api, /sanitizePersonalResourceInput/);
   assert.match(api, /kind: "official"/);
   assert.match(api, /tx\.create\(targetRef/);
-  assert.doesNotMatch(api, /tx\.(?:set|update|delete)\([^\n]*(?:siteProducts|products|courseContent)/);
+  assert.doesNotMatch(
+    api,
+    /tx\.(?:set|update|delete)\([^\n]*(?:siteProducts|products|courseContent)/
+  );
   assert.doesNotMatch(api, /updateDoc|setDoc|deleteDoc/);
 });
 
@@ -248,7 +244,10 @@ test("a learner-authored course opens the SAME Course Player, on its own namespa
   assert.match(myPlayer, /mine=\{\{ courseId: course\.id \}\}/);
   assert.match(player, /mine\?: \{ courseId: string \} \| null/);
   assert.match(player, /MINE_HIDDEN_TABS: DockTab\[\] = \["paid"\]/);
-  assert.match(player, /storageProductId = isMine && mine \? `mine-\$\{mine\.courseId\}` : String\(product\.id\)/);
+  assert.match(
+    player,
+    /storageProductId = isMine && mine \? `mine-\$\{mine\.courseId\}` : String\(product\.id\)/
+  );
   assert.match(player, /hiddenTabs=\{hiddenTabs\}/);
   assert.match(player, /useCourseAccess\(\{ product, skip: isMine \}\)/);
   // Settings stay, the three official-resource rows do not.

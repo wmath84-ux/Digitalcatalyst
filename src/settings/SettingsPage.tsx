@@ -1,230 +1,209 @@
-// src/settings/SettingsPage.tsx
-//
-// The dedicated Settings / Preferences page (`#/settings`).
-//
-// The desktop rail's "Settings" entry used to deep-link into the Profile page
-// and the learner had to open a modal to reach the switches. This page is the
-// real destination: the same five preference toggles the Profile modal shows,
-// on their own screen, with the same Firestore field (`users/{uid}.preferences`)
-// and the same web-push registration behind the Push switch.
-//
-// Nothing here is re-implemented:
-//   • `PreferenceRow` (the toggle row) and `BaseModal` come from
-//     `src/profile/ProfileLayout.tsx`.
-//   • `Preferences` + `DEFAULT_PREFERENCES` come from `src/profile/App.tsx`.
-//   • the two save handlers mirror `src/profile/App.tsx` exactly, so the
-//     Profile and this page can never disagree about what "saved" means.
-//
-// Layout is the ordinary phone-shaped app frame (`[data-app-frame]` with a
-// direct `<main>`), which is the shape the tablet scroll model already binds
-// to the viewport — so this page scrolls on a tablet with no extra CSS.
-
-import { useEffect, useState } from "react";
-import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, Bell, Lock, ShieldCheck, Sparkles, UserRound } from "lucide-react";
-import { db } from "../../firebase";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Loader2 } from "lucide-react";
+import { auth } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
-import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
-import { BaseModal, PreferenceRow } from "../profile/ProfileLayout";
-import { GlassCard } from "../components/ui/GlassCard";
-import { GlassButton } from "../components/ui/glass-button";
-import { DEFAULT_PREFERENCES, type Preferences } from "../profile/App";
+import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
+import { getNativePushPermission, isAndroidNative, registerForPush } from "../utils/capacitorBridge";
+import { type PreferenceKey } from "../../utils/userPreferences";
+import { useUserPreferences } from "./useUserPreferences";
+import "./settings.css";
+
+const LABELS: Record<PreferenceKey, string> = {
+  push: "Push notifications", email: "Email updates", promotions: "Promotions",
+  profileVisible: "Public profile", shareActivity: "Share learning activity",
+};
+
+type DeviceState = "checking" | "unsupported" | "blocked" | "not-connected" | "allowed" | "connected" | "error";
+
+export function SettingSwitch({ setting, checked, disabled, saving, description, note, onChange }: {
+  setting: PreferenceKey; checked: boolean; disabled: boolean; saving: boolean;
+  description: string; note?: string; onChange: (value: boolean) => void;
+}) {
+  const id = `setting-${setting}`;
+  return (
+    <div className="settings-row" data-setting={setting} data-saving={saving || undefined}>
+      <div className="settings-row-copy">
+        <label id={`${id}-label`} htmlFor={id}>{LABELS[setting]}</label>
+        <p id={`${id}-description`}>{description}</p>
+        {note ? <span className="settings-row-note">{note}</span> : null}
+      </div>
+      <div className="settings-switch-wrap">
+        <label className="settings-switch" htmlFor={id}>
+          <input id={id} name={setting} type="checkbox" role="switch" checked={checked}
+            disabled={disabled} aria-labelledby={`${id}-label`} aria-describedby={`${id}-description`}
+            aria-busy={saving || undefined} onChange={(event) => onChange(event.currentTarget.checked)} />
+          <span aria-hidden="true"><span /></span>
+        </label>
+        <span className="settings-switch-state" aria-hidden="true">{saving ? "Saving" : checked ? "On" : "Off"}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
   const { purchasedIds } = useCatalog();
-  // There is no appearance section any more: the app is dark only, so the
-  // "Dark mode" switch that used to head this page is gone with it.
-  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [pushHelpOpen, setPushHelpOpen] = useState(false);
+  const settings = useUserPreferences(user?.id);
+  const [deviceState, setDeviceState] = useState<DeviceState>("checking");
+  const [deviceBusy, setDeviceBusy] = useState(false);
+  const [deviceMessage, setDeviceMessage] = useState("");
+  const native = isAndroidNative();
+  const currentAccount = useRef(user?.id);
+  currentAccount.current = user?.id;
+  const deviceOperation = useRef(0);
 
-  // Same listener the Profile uses: the switches always show what is stored on
-  // the user document, so the two screens stay in sync while both are mounted.
+  const inspectDevice = async (isCurrent = () => true) => {
+    try {
+      let next: DeviceState;
+      if (native) {
+        const permission = await getNativePushPermission();
+        next = permission === "granted" ? "allowed" : permission === "denied" ? "blocked" : "not-connected";
+      } else next = !isWebPushSupported() ? "unsupported" : Notification.permission === "denied" ? "blocked"
+        : Notification.permission !== "granted" ? "not-connected" : "allowed";
+      // Permission alone does not confirm cloud registration. Inspecting it
+      // needs no push subscription creation, service-worker wait or prompt.
+      if (isCurrent()) setDeviceState((current) => next === "allowed" && current === "connected" ? current : next);
+    } catch {
+      if (isCurrent()) setDeviceState("error");
+    }
+  };
+
   useEffect(() => {
-    if (!user) return undefined;
-    const unsubscribe = onSnapshot(
-      doc(db, "users", user.id),
-      (snapshot) => {
-        const data = snapshot.data() || {};
-        setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences || {}) });
-      },
-      (error) => console.warn("Settings sync failed", error),
-    );
-    return unsubscribe;
-  }, [user]);
+    let active = true;
+    setDeviceState("checking");
+    setDeviceMessage("");
+    setDeviceBusy(false);
+    ++deviceOperation.current;
+    const check = () => { if (active) void inspectDevice(() => active); };
+    check();
+    window.addEventListener("focus", check);
+    return () => { active = false; ++deviceOperation.current; window.removeEventListener("focus", check); };
+    // Permission is device-local, not an account preference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, native]);
 
-  const handleFooterChange = (tab: TabKey) => {
-    if (tab === "home") window.location.hash = "#/home";
-    else if (tab === "myday") window.location.hash = "#/my-day";
-    else if (tab === "store") window.location.hash = "#/store";
-    else if (tab === "purchases") window.location.hash = "#/store/purchases";
-    else if (tab === "profile") window.location.hash = "#/profile";
-    else if (tab === "revision") window.location.hash = "#/revision";
-  };
-
-  if (!user) {
-    return (
-      <div data-settings-page className="min-h-screen text-white">
-        <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col">
-          <main data-settings-content className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-12 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">
-              <ShieldCheck size={24} />
-            </span>
-            <h1 className="text-2xl font-black tracking-tight text-white">Sign in to change settings</h1>
-            <p className="max-w-xs text-sm font-medium text-white/55">
-              Notifications and privacy switches are saved to your account, so they need a signed-in learner.
-            </p>
-            <GlassButton variant="capsule" onClick={() => { window.location.hash = "#/auth?mode=login"; }}>
-              Sign in
-            </GlassButton>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
-  const savePreferences = async (next: Preferences) => {
-    setPreferences(next);
-    setSaving(true);
+  const connectDevice = async () => {
+    if (!user || deviceBusy) return;
+    const uid = user.id;
+    const operation = ++deviceOperation.current;
+    const isCurrent = () => operation === deviceOperation.current && currentAccount.current === uid && auth.currentUser?.uid === uid;
+    setDeviceBusy(true);
+    setDeviceMessage("");
     try {
-      await setDoc(doc(db, "users", user.id), { preferences: next, updatedAt: serverTimestamp() }, { merge: true });
-      setMessage("");
-    } catch (error) {
-      console.error("Preference save failed", error);
-      setMessage("Preferences could not be saved.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // The Push switch must actually register/remove this device, otherwise the
-  // preference is cosmetic and system notifications never arrive.
-  const handlePushToggle = async (checked: boolean) => {
-    setSaving(true);
-    try {
-      if (checked) {
-        const enabled = await ensureSavedWebPushSubscription(user.id);
-        const permission = typeof window !== "undefined" ? window.Notification.permission : "denied";
-        if (!enabled || permission !== "granted") {
-          setMessage("Notifications are blocked in your browser. Enable them in the browser's site settings, then try again.");
-          setPushHelpOpen(true);
-          setPreferences((current) => ({ ...current, push: false }));
-          await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: false }, updatedAt: serverTimestamp() }, { merge: true });
-          return;
+      // Ask browser permission directly inside this gesture, BEFORE awaiting
+      // account persistence (Safari/iOS otherwise rejects the prompt).
+      if (!native) {
+        if (!isWebPushSupported()) throw new Error("This browser does not support push. Use supported Chrome, Edge, or the installed app; the account switch still works.");
+        if (Notification.permission === "denied") throw new Error("Allow notifications in this site's browser settings, then return here and retry. Eduvora cannot change a blocked browser permission.");
+        if (Notification.permission === "default" && await Notification.requestPermission() !== "granted") {
+          throw new Error("Permission was not granted. Your account setting has not been changed; you can try again.");
         }
-      } else {
-        await removeWebPushSubscription(user.id);
       }
-      await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: checked }, updatedAt: serverTimestamp() }, { merge: true });
-      setPreferences((current) => ({ ...current, push: checked }));
-      setMessage("");
+      if (!isCurrent()) return;
+      if (!settings.preferences.push && !await settings.setPreference("push", true)) return;
+      if (!isCurrent()) return;
+      const deliveryConfigured = native ? settings.capabilities?.fcmConfigured : settings.capabilities?.webPushConfigured;
+      if (deliveryConfigured === false) throw new Error("Push delivery is not configured on the server. Your account preference is saved; device setup can be retried later.");
+      if (native) {
+        const result = await registerForPush(async () => auth.currentUser?.uid === uid ? auth.currentUser.getIdToken() : null, { uid });
+        if (!result.ok) throw new Error(result.reason === "permission-denied"
+          ? "Allow notifications for Eduvora in your phone's app settings, then retry. Your account preference remains saved."
+          : "This device could not be registered. Check your connection and try again.");
+      } else if (!await ensureSavedWebPushSubscription(user.id)) {
+        throw new Error("Device registration was not confirmed. Check your connection and try again; your account setting remains saved.");
+      }
+      if (!isCurrent()) return;
+      setDeviceState("connected");
+      setDeviceMessage("This device is connected. Notifications follow your account settings.");
     } catch (error) {
-      console.error("Push preference change failed", error);
-      setMessage("Could not update push notifications.");
-    } finally {
-      setSaving(false);
-    }
+      if (!isCurrent()) return;
+      setDeviceMessage(error instanceof Error ? error.message : "Could not connect this device. Please retry.");
+      await inspectDevice(isCurrent);
+    } finally { if (isCurrent()) setDeviceBusy(false); }
   };
+
+  const navigateFooter = (tab: TabKey) => {
+    const routes: Record<TabKey, string> = { home: "#/home", myday: "#/my-day", store: "#/store", purchases: "#/store/purchases", profile: "#/profile", revision: "#/revision", flowpath: "#/flowpath", "study-library": "#/study-library" };
+    window.location.hash = routes[tab];
+  };
+
+  if (!user) return (
+    <div data-settings-page className="settings-page">
+      <div data-app-frame className="settings-frame">
+        <main data-settings-content className="settings-signed-out">
+          <p className="settings-eyebrow">Your account</p>
+          <h1>Settings</h1><p>Sign in to manage notifications and privacy.</p>
+          <button className="settings-primary" onClick={() => { window.location.hash = "#/auth?mode=login&return=%23%2Fsettings"; }}>Sign in <ChevronRight size={16} /></button>
+        </main>
+      </div>
+    </div>
+  );
+
+  const renderSwitch = (key: PreferenceKey, description: string, note?: string) => (
+    <SettingSwitch key={key} setting={key} checked={settings.preferences[key]} description={description} note={note}
+      disabled={!settings.ready || settings.savingKeys.includes(key)} saving={settings.savingKeys.includes(key)}
+      onChange={(value) => { void settings.setPreference(key, value); }} />
+  );
+  const accountPushOff = !settings.preferences.push;
+  const deviceLabel: Record<DeviceState, string> = { checking: "Checking permission", unsupported: "Not supported here", blocked: "Permission blocked", "not-connected": "Not connected", allowed: "Permission allowed", connected: "Connected", error: "Could not check permission" };
+  const deviceDescription = accountPushOff
+    ? "Push is off for your account. Turn it on whenever you're ready; device permission is separate."
+    : deviceState === "blocked"
+      ? native ? "Allow notifications in your phone's Eduvora app settings, then retry." : "Allow notifications in this site's browser settings, then retry."
+      : deviceState === "unsupported"
+        ? "Your account preference is saved. This browser can't receive push; other connected devices still can."
+        : "Connect this browser or phone to receive push alerts. We only ask for permission when you choose to connect.";
 
   return (
-    <div data-settings-page className="min-h-screen text-white">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
-        <Header
-          cartCount={cartIds.size}
-          notifCount={0}
-          title="Settings"
-          subtitle="Notifications & privacy"
+    <div data-settings-page className="settings-page">
+      <div data-app-frame className="settings-frame">
+        <Header title="Settings" subtitle="Your preferences" cartCount={cartIds.size} notifCount={0}
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
-          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-        />
-
-        <main data-settings-content className="flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-6 md:px-6 lg:px-6 xl:px-8">
-          <div data-settings-layout className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <header className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <GlassButton
-                  variant="capsule"
-                  onClick={() => { window.location.hash = "#/profile"; }}
-                  className="mb-2 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black"
-                >
-                  <span className="inline-flex items-center gap-1.5 text-white/85"><ArrowLeft size={13} /> Back to Profile</span>
-                </GlassButton>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your space</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-white">Settings</h1>
-                <p className="mt-0.5 text-xs font-medium text-white/55">
-                  Saved securely to your account — changes apply on every device.
-                </p>
-              </div>
-              {saving ? <span className="text-[11px] font-black text-violet-300">Saving…</span> : null}
+          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }} />
+        <main data-settings-content className="settings-main">
+          <div data-settings-layout className="settings-layout">
+            <nav className="settings-breadcrumb" aria-label="Breadcrumb"><a href="#/home">Home</a><span>/</span><a href="#/profile">Profile</a><span>/</span><span aria-current="page">Settings</span></nav>
+            <header className="settings-heading">
+              <div><a className="settings-back" href="#/profile"><ArrowLeft size={15} /> Profile</a><p className="settings-eyebrow">Your account</p><h1>Settings</h1><p>Choose how we reach you and what others can see.</p></div>
+              <span className="settings-save-state" role="status" aria-live="polite">
+                {settings.savingKeys.length ? <><Loader2 className="settings-spinner" size={14} /> Saving changes</>
+                  : settings.loading ? "Loading settings…"
+                  : settings.lastSavedKey ? <><Check size={14} /> {LABELS[settings.lastSavedKey]} saved</>
+                  : settings.ready && !settings.error ? <><Check size={14} /> Saved to your account</> : null}
+              </span>
             </header>
-
-            {message ? (
-              <div role="status" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 px-4 py-3 text-sm font-semibold text-rose-200">
-                {message}
+            {settings.error ? <div className="settings-alert" role="alert"><p>{settings.error}</p><button type="button" disabled={settings.savingKeys.length > 0} onClick={() => { void settings.retry(); }}>{settings.failed ? "Retry change" : "Retry connection"}</button></div> : null}
+            <section className="settings-section" aria-labelledby="settings-notifications">
+              <div className="settings-section-heading"><h2 id="settings-notifications">Notifications</h2><p>Account preferences apply to every device. Your in-app learning and purchase alerts remain available.</p></div>
+              {renderSwitch("push", "Receive system alerts on your connected browsers and phones. Turning this off doesn't delete your reminders.")}
+              {renderSwitch("email", "Course updates and subscription reminders, sent to your verified account email.", settings.capabilities
+                ? settings.capabilities.emailConfigured ? `Delivery address: ${user.email}` : "Email delivery isn't configured on the server yet. Your preference is saved and will be honoured when delivery is available."
+                : "Email delivery status hasn't been confirmed. Retry the connection to check it.")}
+              {renderSwitch("promotions", "Optional offers and new-product announcements in your inbox and enabled notification channels.", "Off means no promotional alerts. Updates to your purchased courses aren't promotions.")}
+              <div className="settings-device" data-device-state={deviceState}>
+                <div><p className="settings-device-label">This device <span>{deviceLabel[deviceState]}</span></p><p>{deviceDescription}</p></div>
+                <button type="button" className="settings-secondary" disabled={deviceBusy || !settings.ready || settings.savingKeys.includes("push")}
+                  onClick={() => { void connectDevice(); }}>{deviceBusy ? <><Loader2 className="settings-spinner" size={14} /> Connecting…</> : deviceState === "blocked" || deviceState === "error" ? "Retry setup" : accountPushOff ? "Turn on & connect" : deviceState === "connected" ? "Reconnect device" : "Connect device"}</button>
+                {deviceMessage ? <p className="settings-device-message" role="status">{deviceMessage}</p> : null}
               </div>
-            ) : null}
-
-            <GlassCard>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Preferences</p>
-              <h2 className="mt-1 text-lg font-black text-white">Notifications & privacy</h2>
-              <div className="mt-4 space-y-2">
-                <PreferenceRow
-                  icon={<Bell />}
-                  label="Push notifications"
-                  checked={preferences.push}
-                  onChange={(checked) => void handlePushToggle(checked)}
-                />
-                <PreferenceRow
-                  icon={<Sparkles />}
-                  label="Email updates"
-                  checked={preferences.email}
-                  onChange={(checked) => void savePreferences({ ...preferences, email: checked })}
-                />
-                <PreferenceRow
-                  icon={<Bell />}
-                  label="Promotions"
-                  checked={preferences.promotions}
-                  onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })}
-                />
-                <PreferenceRow
-                  icon={<UserRound />}
-                  label="Public profile"
-                  checked={preferences.profileVisible}
-                  onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })}
-                />
-                <PreferenceRow
-                  icon={<Lock />}
-                  label="Share learning activity"
-                  checked={preferences.shareActivity}
-                  onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })}
-                />
-              </div>
-            </GlassCard>
+            </section>
+            <section className="settings-section" aria-labelledby="settings-privacy">
+              <div className="settings-section-heading"><h2 id="settings-privacy">Privacy</h2><p>Your notes, purchases, email and phone number are never part of your public profile.</p></div>
+              {renderSwitch("profileVisible", "Show your name and profile photo on your public learner profile and community leaderboard.", !settings.preferences.profileVisible ? "Hidden profiles are removed from the public leaderboard. Your learning activity is hidden too." : undefined)}
+              {renderSwitch("shareActivity", "Show only the number of courses started and completed learning items on your public profile. Course names and private content stay hidden.", !settings.preferences.profileVisible ? "This choice is saved, but nothing is shared while your public profile is off." : "Off by default. Sharing starts only when you explicitly turn this on.")}
+              <a className="settings-public-link" href={`#/learner/${encodeURIComponent(user.id)}`}>View your public profile <ArrowUpRight size={15} /></a>
+            </section>
+            <p className="settings-footnote">Changes save automatically. You can turn any setting back on. Browser or phone permission can only be changed on that device.</p>
           </div>
         </main>
-
-        <BottomNav active="profile" onChange={handleFooterChange} purchasesBadge={purchasedIds.size} />
+        <BottomNav active="profile" onChange={navigateFooter} purchasesBadge={purchasedIds.size} />
       </div>
-
-      {pushHelpOpen ? (
-        <BaseModal title="Notifications are blocked" onClose={() => setPushHelpOpen(false)}>
-          <p className="text-sm font-medium text-white/75">
-            Your browser is blocking notifications for this site, so the switch was turned back off.
-            Open the site settings (the lock icon in the address bar), allow notifications, then try again.
-          </p>
-          <GlassButton variant="capsule" onClick={() => setPushHelpOpen(false)} className="mt-5 w-full [&>span>div]:w-full">
-            Got it
-          </GlassButton>
-        </BaseModal>
-      ) : null}
     </div>
   );
 }
