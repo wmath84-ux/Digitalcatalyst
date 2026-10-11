@@ -41,8 +41,8 @@ export function GlassPrefToggle({
 
   // Dark material only — the light branch the `light` prop used to select is
   // gone with the app-wide light theme.
-  const offTrack = "rgba(255,255,255,0.08)";
-  const offBorder = "rgba(255,255,255,0.1)";
+  const offTrack = "var(--gp-track)";
+  const offBorder = "var(--gp-track-line)";
 
   const trackBg = useTransform(progress, [0, 1], [offTrack, `${color}44`]);
   const trackBorder = useTransform(progress, [0, 1], [offBorder, `${color}55`]);

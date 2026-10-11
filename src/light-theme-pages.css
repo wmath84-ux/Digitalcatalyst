@@ -1,0 +1,1646 @@
+/*
+ * Light theme — per-page remaps (src/light-theme-pages.css).
+ *
+ * Companion to src/light-theme.css: same design reference (the Revision app's
+ * white mode — soft #f7f9fb canvas, white cards, M3 container wells, #191c1e
+ * ink, #004ac6 brand), same rules (no invert filters, solid plates keep white
+ * ink, every selector scoped to html[data-theme="light"]).
+ *
+ * One section per learner page — admin is deliberately absent (pinned dark).
+ * Each section is written from a full colour audit of that page's stylesheet
+ * and TSX classes, so every colour / background / button / component role is
+ * accounted for: dark glass wells become light wells, night-sky white ink
+ * becomes the ink ramp, pastel night accents become their AA dark counterparts,
+ * and saturated brand plates stay saturated with white ink (rule 3) re-hued to
+ * the Revision primaries.
+ */
+
+/* ── 0. Shared remaps used by several pages ───────────────────────────────── */
+
+/* A dark translucent "night glass" well → the light frosted well. */
+html[data-theme="light"] {
+  --dc-light-well: rgba(255, 255, 255, 0.72);
+  --dc-light-well-strong: rgba(255, 255, 255, 0.9);
+  --dc-light-well-line: rgba(25, 28, 30, 0.09);
+  --dc-light-well-line-strong: rgba(25, 28, 30, 0.14);
+}
+
+/* White glow halos (rings, inner rims) are dark-mode depth cues; on light
+   plates they smear. Neutralise the generic case; page sections re-add the
+   soft shadow each component needs. */
+html[data-theme="light"] .myday-scope :is(.myday-cta, .myday-fab, .myday-sched-fab):focus-visible,
+html[data-theme="light"] .myday-scope .myday-qa:focus-visible {
+  outline-color: rgba(0, 74, 198, 0.55);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11. MY DAY — overview (myday-overview.css) + reminders (myday-reminders.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Scope tokens: brand violet becomes the Revision blue; the ink ramp flips. */
+html[data-theme="light"] .myday-scope {
+  --myday-violet: #2563eb;
+  --myday-violet-deep: #004ac6;
+  --myday-indigo: #2563eb;
+  --myday-blue: #0369a1;
+  --myday-ink: #191c1e;
+  --myday-ink-soft: #334155;
+  --myday-ink-mute: #5b6679;
+  --myday-ring: rgba(0, 74, 198, 0.32);
+}
+
+/* The night star field becomes a quiet dawn wash over the paper canvas. */
+html[data-theme="light"] .myday-sky {
+  background-image:
+    radial-gradient(110% 55% at 50% 112%, rgba(37, 99, 235, 0.1), transparent 62%),
+    radial-gradient(90% 36% at 50% -8%, rgba(0, 98, 67, 0.07), transparent 60%),
+    linear-gradient(180deg, #fdfefe 0%, #f2f4f6 60%, #eceef0 100%);
+}
+html[data-theme="light"] .myday-sky::after {
+  background: linear-gradient(to bottom, rgba(25, 28, 30, 0.03), transparent 26%, transparent 72%, rgba(25, 28, 30, 0.05));
+}
+
+/* Hero scrims: white/ink washes instead of night gradients. */
+html[data-theme="light"] .myday-hero-scrim {
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.28) 55%, transparent 82%),
+    linear-gradient(to top, rgba(242, 244, 246, 0.7), transparent 45%);
+}
+
+/* ── pills, wells and panels (dark night glass → light frosted wells) ─────── */
+html[data-theme="light"] :is(
+  .myday-date-pill, .myday-stat-pill, .myday-sync-pill, .myday-empty, .myday-cal,
+  .myday-cal--panel, .myday-tasks-progress, .myday-tip-card, .myday-sched-clock,
+  .myday-sched-daycard, .myday-sched-datestrip, .myday-sched-stat, .myday-sched-mix,
+  .myday-sched-railstats > div
+) {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--dc-light-well-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), var(--dc-shadow-sm);
+}
+html[data-theme="light"] :is(.myday-date-pill, .myday-stat-pill, .myday-sync-pill) {
+  border-color: var(--dc-light-well-line-strong);
+}
+html[data-theme="light"] .myday-tip-card:hover {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--dc-light-well-line-strong);
+}
+html[data-theme="light"] .myday-tl-dot {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--dc-light-well-line-strong);
+}
+html[data-theme="light"] .myday-streak {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.72));
+  border-color: rgba(133, 83, 0, 0.18);
+}
+html[data-theme="light"] .myday-quote-card {
+  background: linear-gradient(150deg, rgba(219, 234, 254, 0.85), rgba(191, 219, 254, 0.72));
+  border-color: rgba(0, 74, 198, 0.22);
+}
+html[data-theme="light"] .myday-quote-card::after {
+  background: radial-gradient(100% 80% at 90% -10%, rgba(255, 255, 255, 0.55), transparent 55%);
+}
+html[data-theme="light"] .myday-banner {
+  background: linear-gradient(135deg, #004ac6, #2563eb 55%, #0369a1);
+}
+html[data-theme="light"] :is(.myday-tasks-hero, .myday-sched-hero, .myday-sched-form-hero) {
+  background:
+    radial-gradient(120% 140% at 92% -10%, rgba(0, 74, 198, 0.12), transparent 58%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(242, 244, 246, 0.82));
+  border-color: var(--dc-light-well-line);
+}
+
+/* ── ink ramp (night white ink → Revision ink) ────────────────────────────── */
+html[data-theme="light"] :is(
+  .myday-qa, .myday-cta, .myday-fab, .myday-sched-fab, .myday-tile-icon,
+  .myday-cal-day--today, .myday-snav-item:hover, .myday-snav-item--active,
+  .myday-snav-dot, .myday-cal-btn:hover, .myday-cal-day:hover, .myday-cal-today:hover,
+  .myday-clear-btn:hover, .myday-sched-daynav:hover, .myday-sched-clock-time,
+  .myday-sched-railstats dd, .myday-sched-stat dd, .myday-sched-daykind,
+  .myday-tl-start, .myday-tl-title, .myday-sched-form-hero-icon, .myday-sched-form-hero-title,
+  .myday-reset-filters:hover, .myday-tasks-add, .myday-sched-add
+) {
+  /* Saturated plates and selected states keep white ink (rule 3). */
+  color: #ffffff;
+}
+html[data-theme="light"] :is(
+  .myday-date-pill, .myday-stat-pill, .myday-cal-title, .myday-cal-day--today,
+  .myday-sched-form-hero-title, .myday-sched-clock-time, .myday-sched-railstats dd,
+  .myday-sched-stat dd, .myday-sched-daykind, .myday-tl-start, .myday-tl-title,
+  .myday-cal-day, .myday-cal-today, .myday-sched-daynav
+):where(:not(.myday-qa, .myday-cta, .myday-fab, .myday-sched-fab, .myday-tasks-add, .myday-sched-add)) {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .myday-date-pill { color: var(--dc-ink); }
+html[data-theme="light"] .myday-stat-pill { color: var(--dc-ink); }
+html[data-theme="light"] .myday-cal-title { color: var(--dc-ink); }
+html[data-theme="light"] .myday-cal-day { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-cal-today { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-cal-today:hover,
+html[data-theme="light"] button.myday-cal-day:not(.myday-cal-day--selected):hover {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .myday-cal-btn { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-cal-btn:hover { color: var(--dc-brand-ink); }
+html[data-theme="light"] .myday-cal-wd { color: var(--dc-ink-faint); }
+html[data-theme="light"] .myday-cal-year { color: var(--dc-ink-faint); }
+html[data-theme="light"] .myday-cal-day--edge { color: var(--dc-ink-disabled); }
+html[data-theme="light"] .myday-cal-day--selected { border-color: rgba(0, 74, 198, 0.55); }
+html[data-theme="light"] .myday-cal-day--today {
+  background: #004ac6;
+  box-shadow: 0 4px 12px -6px rgba(0, 74, 198, 0.55);
+  color: #ffffff;
+}
+html[data-theme="light"] .myday-hero-quote { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-see-all { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-see-all:hover { color: var(--dc-brand-ink); }
+html[data-theme="light"] .myday-stat-pill--streak { color: #c2410c; }
+html[data-theme="light"] .myday-streak-flame { color: #c2410c; }
+html[data-theme="light"] .myday-streak-mini { color: #c2410c; }
+html[data-theme="light"] .myday-form-label { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-form-label > span { color: #ba1a1a; }
+html[data-theme="light"] .myday-empty-icon { color: #6d28d9; }
+html[data-theme="light"] .myday-empty--blue .myday-empty-icon { color: #1d4ed8; }
+html[data-theme="light"] .myday-banner-book { color: #dbeafe; }
+html[data-theme="light"] .myday-strip-quote { color: #4c1d95; }
+html[data-theme="light"] .myday-tip-icon--sky { color: #0369a1; }
+html[data-theme="light"] .myday-tip-icon--violet { color: #6d28d9; }
+html[data-theme="light"] .myday-tip-icon--rose { color: #be123c; }
+html[data-theme="light"] .myday-tip-icon--amber { color: #b45309; }
+html[data-theme="light"] .myday-tip-icon--violet { background: rgba(109, 40, 217, 0.12); }
+html[data-theme="light"] .myday-tip-icon--amber { border-color: rgba(133, 83, 0, 0.3); }
+
+/* Side nav */
+html[data-theme="light"] .myday-snav-item { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-snav-item:hover { color: var(--dc-ink); }
+html[data-theme="light"] .myday-snav-item--active {
+  background: #004ac6;
+  box-shadow: 0 6px 16px -8px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] .myday-snav-item--active .myday-snav-icon { border-color: rgba(255, 255, 255, 0.35); }
+html[data-theme="light"] .myday-snav-dot {
+  color: var(--dc-ink);
+  border-color: var(--dc-light-well-line-strong);
+}
+
+/* Quick-action buttons stay saturated with white ink (rule 3), re-hued. */
+html[data-theme="light"] .myday-qa::after { background: rgba(2, 6, 16, 0.12); }
+html[data-theme="light"] .myday-qa--task { background: linear-gradient(135deg, #2563eb, #004ac6); }
+html[data-theme="light"] .myday-qa--note { background: linear-gradient(135deg, #0369a1, #075985); }
+html[data-theme="light"] .myday-qa--schedule { background: linear-gradient(135deg, #007d57, #006243); }
+html[data-theme="light"] .myday-qa--revision { background: linear-gradient(135deg, #e11d48, #be123c); }
+html[data-theme="light"] :is(.myday-qa--task, .myday-qa--note, .myday-qa--schedule, .myday-qa--revision) {
+  box-shadow: 0 10px 22px -12px rgba(25, 28, 30, 0.45);
+}
+html[data-theme="light"] .myday-qa-sub { color: rgba(255, 255, 255, 0.85); }
+html[data-theme="light"] .myday-qa-arrow { color: rgba(255, 255, 255, 0.9); }
+
+/* CTAs and FABs: Revision primaries, white ink. */
+html[data-theme="light"] .myday-cta { background: #004ac6; box-shadow: 0 8px 18px -10px rgba(0, 74, 198, 0.6); }
+html[data-theme="light"] .myday-cta--blue { background: #2563eb; box-shadow: 0 8px 18px -10px rgba(37, 99, 235, 0.6); }
+html[data-theme="light"] .myday-cta--rose { background: #ba1a1a; box-shadow: 0 8px 18px -10px rgba(186, 26, 26, 0.55); }
+html[data-theme="light"] :is(.myday-cta:hover, .myday-cta--blue:hover, .myday-cta--rose:hover) {
+  filter: brightness(0.94);
+}
+html[data-theme="light"] :is(.myday-fab, .myday-sched-fab) {
+  background: linear-gradient(135deg, #2563eb, #004ac6);
+  box-shadow: 0 12px 26px -12px rgba(0, 74, 198, 0.6);
+}
+html[data-theme="light"] .myday-tasks-add { background: linear-gradient(135deg, #2563eb, #004ac6); }
+html[data-theme="light"] .myday-sched-add { background: #004ac6; }
+html[data-theme="light"] .myday-sched-form-hero-icon { background: #004ac6; box-shadow: 0 8px 18px -10px rgba(0, 74, 198, 0.6); }
+
+/* Tile icon plates: saturated, white glyph (rule 3), re-hued amber/rose. */
+html[data-theme="light"] .myday-tile-icon--violet { background: linear-gradient(135deg, #2563eb, #004ac6); }
+html[data-theme="light"] .myday-tile-icon--sky { background: #0369a1; }
+html[data-theme="light"] .myday-tile-icon--amber { background: #b45309; }
+html[data-theme="light"] .myday-tile-icon--rose { background: #be123c; }
+
+/* Task tiles: dark translucent tints → M3 soft containers with ink text. */
+html[data-theme="light"] .myday-task-tile { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-task-tile--violet { background: rgba(0, 74, 198, 0.1); color: #003ea8; }
+html[data-theme="light"] .myday-task-tile--sky { background: rgba(3, 105, 161, 0.1); color: #0369a1; }
+html[data-theme="light"] .myday-task-tile--rose { background: rgba(186, 26, 26, 0.08); color: #ba1a1a; }
+html[data-theme="light"] .myday-task-tile--amber { background: rgba(133, 83, 0, 0.1); border-color: rgba(133, 83, 0, 0.25); color: #855300; }
+html[data-theme="light"] .myday-task-tile--emerald { background: rgba(0, 98, 67, 0.1); border-color: rgba(0, 98, 67, 0.25); color: #006243; }
+html[data-theme="light"] .myday-task-time { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-pri--high { color: #ba1a1a; }
+html[data-theme="light"] .myday-pri--med { color: #855300; }
+html[data-theme="light"] .myday-pri--low { color: #006243; }
+html[data-theme="light"] .myday-status--pending { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-status--progress { color: #0369a1; }
+html[data-theme="light"] .myday-status--done { color: #006243; }
+html[data-theme="light"] .myday-tasks-empty-icon { color: #6d28d9; background: rgba(109, 40, 217, 0.12); }
+html[data-theme="light"] .myday-reset-filters { color: #4c1d95; }
+html[data-theme="light"] .myday-reset-filters:hover { background: rgba(0, 74, 198, 0.12); color: var(--dc-brand-ink); }
+html[data-theme="light"] .myday-clear-btn { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-clear-btn:hover { color: var(--dc-ink); }
+
+/* Schedule rail + timeline copy */
+html[data-theme="light"] .myday-sched-hero-note { color: #0369a1; }
+html[data-theme="light"] .myday-sched-clock-time { color: var(--dc-ink); }
+html[data-theme="light"] .myday-sched-clock-label { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-railstats dt { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-railstats dd { color: var(--dc-ink); }
+html[data-theme="light"] .myday-sched-daycard-time { color: #0369a1; }
+html[data-theme="light"] .myday-sched-daycard-count { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-sched-daynav { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-sched-daykind { color: var(--dc-ink); }
+html[data-theme="light"] .myday-sched-daydate { color: #0369a1; }
+html[data-theme="light"] .myday-sched-dayhint { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-stat dt { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-stat dd { color: var(--dc-ink); }
+html[data-theme="light"] .myday-sched-mixlabel { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-sched-mixcount { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-maintitle { color: var(--dc-ink-2); }
+html[data-theme="light"] .myday-sched-mainsub { color: #0369a1; }
+html[data-theme="light"] .myday-sched-footquote { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-empty-icon { color: #0369a1; }
+html[data-theme="light"] .myday-sched-duration { color: #0369a1; }
+html[data-theme="light"] .myday-sched-duration--warn { color: #ba1a1a; }
+html[data-theme="light"] .myday-sched-form-hero-sub { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-sched-field-hint { color: var(--dc-ink-faint); }
+html[data-theme="light"] .myday-tl-start { color: var(--dc-ink); }
+html[data-theme="light"] .myday-tl-end { color: var(--dc-ink-faint); }
+html[data-theme="light"] .myday-tl-dur { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-tl-title { color: var(--dc-ink); }
+html[data-theme="light"] .myday-tl-detail { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-tl-chip { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-tl-chip--time { color: var(--dc-ink); }
+html[data-theme="light"] .myday-tl-badge--live { color: #3730a3; background: rgba(37, 99, 235, 0.12); }
+html[data-theme="light"] .myday-tl-badge--live > i { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
+html[data-theme="light"] .myday-tl-badge--next { color: #0369a1; }
+html[data-theme="light"] .myday-tl-badge--done { color: var(--dc-ink-3); }
+html[data-theme="light"] .myday-tl-nowrow-time { color: #0369a1; }
+
+/* Timeline selection ring: dark night ring → soft ink ring. */
+html[data-theme="light"] .myday-scope :is([data-tl-selected], .myday-tl-row)[style*="box-shadow"] {
+  box-shadow: 0 0 0 3px rgba(25, 28, 30, 0.12);
+}
+
+/* ── My Day — reminders + tasks panels (myday-reminders.css) ──────────────── */
+html[data-theme="light"] .myrem-head-icon {
+  background: linear-gradient(135deg, #2563eb, #004ac6);
+  box-shadow: 0 8px 18px -10px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] :is(.myrem-title, .myday-tasks-title) { color: var(--dc-ink); }
+html[data-theme="light"] :is(.myrem-sub, .myday-tasks-sub) { color: var(--dc-ink-3); }
+html[data-theme="light"] .myrem-add {
+  background: linear-gradient(135deg, #2563eb, #004ac6);
+  box-shadow: 0 8px 18px -10px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] :is(.myrem-searchbox, .myrem-iconbtn, .myrem-chip, .myrem-dsearch-btn,
+  .myrem-dsearch-field, .myrem-sortbtn, .myrem-hsearch, .myrem-cal-filter) {
+  background: rgba(25, 28, 30, 0.05);
+  border-color: var(--dc-light-well-line);
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] :is(.myrem-iconbtn, .myrem-dsearch-btn, .myrem-sortbtn, .myrem-cal-filter, .myrem-hsearch kbd):hover {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .myrem-hsearch kbd { color: var(--dc-ink-faint); }
+html[data-theme="light"] .myrem-iconbtn[data-on="true"] {
+  background: rgba(0, 74, 198, 0.12);
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .myrem-chip[data-active="true"] {
+  background: #2563eb;
+  box-shadow: 0 6px 14px -8px rgba(37, 99, 235, 0.55);
+}
+html[data-theme="light"] .myrem-sortmenu,
+html[data-theme="light"] .myrem-menu {
+  background: #ffffff;
+  border-color: var(--dc-line);
+  box-shadow: var(--dc-shadow-lg);
+}
+html[data-theme="light"] .myrem-sortmenu button,
+html[data-theme="light"] .myrem-menu button { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-sortmenu button[data-on="true"] { color: var(--dc-brand-ink); }
+html[data-theme="light"] .myrem-menu button[data-danger="true"] { color: #ba1a1a; }
+html[data-theme="light"] .myrem-group-title { color: var(--dc-ink); }
+html[data-theme="light"] .myrem-check { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-check[data-on="true"] { background: #004ac6; }
+html[data-theme="light"] .myrem-tile[data-cat="study"] { background: #1d4ed8; }
+html[data-theme="light"] .myrem-tile[data-cat="test"] { background: #be123c; }
+html[data-theme="light"] .myrem-tile[data-cat="personal"] { background: #b45309; }
+html[data-theme="light"] .myrem-tile[data-cat="class"] { background: #0369a1; }
+html[data-theme="light"] .myrem-quick-tile[data-cat="study"] { background: #1d4ed8; }
+html[data-theme="light"] .myrem-quick-tile[data-cat="test"] { background: #be123c; }
+html[data-theme="light"] .myrem-quick-tile[data-cat="class"] { background: #0369a1; }
+html[data-theme="light"] .myrem-quick-tile[data-cat="personal"] { background: #b45309; }
+html[data-theme="light"] :is(.myrem-tile, .myrem-quick-tile, .myrem-card-title, .myrem-stat-num, .myrem-empty-title, .myrem-banner-title, .myrem-banner-book, .myrem-banner-cta, .myrem-empty-cta, .myrem-quick-tile) {
+  color: #ffffff;
+}
+html[data-theme="light"] .myrem-kebab-btn { color: var(--dc-ink-3); }
+html[data-theme="light"] .myrem-kebab-btn:hover { color: var(--dc-ink); }
+html[data-theme="light"] .myrem-card {
+  background: #ffffff;
+  border-color: var(--dc-line);
+  box-shadow: var(--dc-shadow-md);
+}
+html[data-theme="light"] .myrem-cal-label { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-cal-nav:hover { color: var(--dc-brand-ink); }
+html[data-theme="light"] .myrem-cal-filter[data-on="true"] {
+  background: rgba(0, 74, 198, 0.12);
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .myrem-cal-day { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-cal-day[data-edge="true"] { color: var(--dc-ink-disabled); }
+html[data-theme="light"] .myrem-cal-day[data-today="true"] { color: var(--dc-brand-ink); }
+html[data-theme="light"] .myrem-cal-day[data-selected="true"] {
+  background: #004ac6;
+  color: #ffffff;
+}
+html[data-theme="light"] .myrem-empty {
+  background: rgba(25, 28, 30, 0.04);
+  border-color: var(--dc-light-well-line);
+}
+html[data-theme="light"] .myrem-empty-icon {
+  color: #6d28d9;
+  background: rgba(109, 40, 217, 0.12);
+}
+html[data-theme="light"] .myrem-empty-cta {
+  background: linear-gradient(135deg, #2563eb, #004ac6);
+  box-shadow: 0 8px 18px -10px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] .myrem-banner-inner {
+  background: linear-gradient(135deg, #004ac6, #2563eb 60%, #0369a1);
+}
+html[data-theme="light"] .myrem-banner-sub { color: rgba(255, 255, 255, 0.88); }
+html[data-theme="light"] .myrem-banner-cta { border-color: rgba(255, 255, 255, 0.45); }
+html[data-theme="light"] .myrem-quick-btn { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-catpick-item { color: var(--dc-ink-2); }
+html[data-theme="light"] .myrem-catpick-item[data-on="true"] {
+  background: rgba(0, 74, 198, 0.12);
+  color: var(--dc-brand-ink);
+}
+
+
+/* ── 0c. Alpha-white utility ink on LIGHT surfaces (plate-safe) ──────────────
+   text-white/NN re-tints through --color-white (light-theme.css rule 2), but at
+   30–60% alpha the ink drops under AA on white cards. On light surfaces it
+   becomes solid ink at the matching weight; inside saturated plates (rule 3 —
+   white ink on deep fills) the alpha-white is already correct, so the plate
+   list is excluded. */
+html[data-theme="light"] :where([class*="text-white/"]):not(
+  .bg-amber-500 *, .bg-amber-600 *, .bg-black *, .bg-blue-500 *, .bg-blue-600 *,
+  .bg-cyan-600 *, .bg-emerald-500 *, .bg-emerald-600 *, .bg-fuchsia-600 *,
+  .bg-indigo-500 *, .bg-indigo-600 *, .bg-orange-500 *, .bg-pink-500 *,
+  .bg-purple-500 *, .bg-red-500 *, .bg-red-600 *, .bg-rose-500 *, .bg-rose-600 *,
+  .bg-sky-500 *, .bg-teal-500 *, .bg-violet-500 *, .bg-violet-600 *,
+  .from-amber-500 *, .from-cyan-500 *, .from-emerald-500 *, .from-indigo-500 *,
+  .from-indigo-600 *, .from-orange-500 *, .from-rose-500 *, .from-violet-500 *,
+  .from-violet-600 *, .to-blue-500 *, .to-blue-600 *, .to-cyan-500 *, .to-cyan-600 *,
+  .to-fuchsia-500 *, .to-fuchsia-600 *, .to-pink-500 *, .to-red-500 *, .via-violet-600 *,
+  .liquid-metal-button *, .dc-account-primary *, .dc-subscription-primary *,
+  .dc-collection-watch *, .uzp-pay *, .dc-dl-btn *, .myday-qa *, .myday-cta *,
+  .myday-fab *, .myday-sched-fab *, .myday-tasks-add *, .myday-sched-add *,
+  .myday-banner *, .myday-tile-icon--violet *, .myday-tile-icon--sky *,
+  .myday-tile-icon--amber *, .myday-tile-icon--rose *, .myday-snav-item--active *,
+  .myday-cal-day--today *, .myday-sched-form-hero-icon *, .myrem-tile *,
+  .myrem-quick-tile *, .myrem-banner-inner *, .myrem-head-icon *, .myrem-add *,
+  .myrem-empty-cta *, .myrem-check[data-on="true"] *, .myrem-cal-day[data-selected="true"] *,
+  .rev-card[data-rev-score-card] *, .study-library-empty__cta *, .settings-switch *
+) {
+  color: #434655;
+}
+html[data-theme="light"] :where([class*="text-white/8"], [class*="text-white/9"]):not(
+  .bg-amber-500 *, .bg-amber-600 *, .bg-black *, .bg-blue-500 *, .bg-blue-600 *,
+  .bg-cyan-600 *, .bg-emerald-500 *, .bg-emerald-600 *, .bg-fuchsia-600 *,
+  .bg-indigo-500 *, .bg-indigo-600 *, .bg-orange-500 *, .bg-pink-500 *,
+  .bg-purple-500 *, .bg-red-500 *, .bg-red-600 *, .bg-rose-500 *, .bg-rose-600 *,
+  .bg-sky-500 *, .bg-teal-500 *, .bg-violet-500 *, .bg-violet-600 *,
+  .from-amber-500 *, .from-cyan-500 *, .from-emerald-500 *, .from-indigo-500 *,
+  .from-indigo-600 *, .from-orange-500 *, .from-rose-500 *, .from-violet-500 *,
+  .from-violet-600 *, .to-blue-500 *, .to-blue-600 *, .to-cyan-500 *, .to-cyan-600 *,
+  .to-fuchsia-500 *, .to-fuchsia-600 *, .to-pink-500 *, .to-red-500 *, .via-violet-600 *,
+  .liquid-metal-button *, .dc-account-primary *, .dc-subscription-primary *,
+  .dc-collection-watch *, .uzp-pay *, .dc-dl-btn *, .myday-qa *, .myday-cta *,
+  .myday-fab *, .myday-sched-fab *, .myday-tasks-add *, .myday-sched-add *,
+  .myday-banner *, .myday-tile-icon--violet *, .myday-tile-icon--sky *,
+  .myday-tile-icon--amber *, .myday-tile-icon--rose *, .myday-snav-item--active *,
+  .myday-cal-day--today *, .myday-sched-form-hero-icon *, .myrem-tile *,
+  .myrem-quick-tile *, .myrem-banner-inner *, .myrem-head-icon *, .myrem-add *,
+  .myrem-empty-cta *, .myrem-check[data-on="true"] *, .myrem-cal-day[data-selected="true"] *,
+  .rev-card[data-rev-score-card] *, .study-library-empty__cta *, .settings-switch *
+) {
+  color: #334155;
+}
+
+/* ── 0b. Pastel night accents → AA dark counterparts (global) ────────────────
+   Tailwind's light pastel text classes (text-amber-200, text-emerald-300 …) are
+   night-sky accents: fine on dark plates, ~2:1 on the light canvas. In light
+   mode each takes its dark counterpart. These are `:where()` so any saturated
+   plate that legitimately keeps pastel ink can out-rank them. */
+html[data-theme="light"] :where(.text-amber-100, .text-amber-200) { color: #92400e; }
+html[data-theme="light"] :where(.text-amber-300) { color: #b45309; }
+html[data-theme="light"] :where(.text-orange-200, .text-orange-300) { color: #c2410c; }
+html[data-theme="light"] :where(.text-yellow-200, .text-yellow-300) { color: #a16207; }
+html[data-theme="light"] :where(.text-rose-200, .text-rose-300) { color: #be123c; }
+html[data-theme="light"] :where(.text-red-200, .text-red-300) { color: #b91c1c; }
+html[data-theme="light"] :where(.text-pink-200, .text-pink-300) { color: #be123c; }
+html[data-theme="light"] :where(.text-emerald-200, .text-emerald-300) { color: #047857; }
+html[data-theme="light"] :where(.text-green-200, .text-green-300) { color: #15803d; }
+html[data-theme="light"] :where(.text-teal-200, .text-teal-300) { color: #0f766e; }
+html[data-theme="light"] :where(.text-sky-200, .text-sky-300) { color: #0369a1; }
+html[data-theme="light"] :where(.text-cyan-200, .text-cyan-300) { color: #0e7490; }
+html[data-theme="light"] :where(.text-blue-200, .text-blue-300) { color: #1d4ed8; }
+html[data-theme="light"] :where(.text-indigo-200, .text-indigo-300) { color: #3730a3; }
+html[data-theme="light"] :where(.text-violet-200, .text-violet-300) { color: #6d28d9; }
+html[data-theme="light"] :where(.text-purple-200, .text-purple-300) { color: #7e22ce; }
+html[data-theme="light"] :where(.text-fuchsia-200, .text-fuchsia-300) { color: #a21caf; }
+html[data-theme="light"] :where(.text-slate-100) { color: #334155; }
+html[data-theme="light"] :where(.text-gray-100) { color: #334155; }
+html[data-theme="light"] :where(.text-zinc-100, .text-neutral-100) { color: #334155; }
+html[data-theme="light"] :where(.text-slate-300, .text-slate-200) { color: #475569; }
+html[data-theme="light"] :where(.text-gray-300, .text-gray-200) { color: #4b5563; }
+html[data-theme="light"] :where(.text-zinc-300, .text-zinc-200) { color: #52525b; }
+html[data-theme="light"] :where(.text-neutral-300, .text-neutral-200) { color: #525252; }
+
+
+/* Plate restore: inside saturated plates the pastel night accents are correct
+   (light ink on deep fills), so they keep their Tailwind values. The selector
+   list mirrors the solid-plate list in light-theme.css §4 plus this file's own
+   saturated plates. */
+html[data-theme="light"] :is(
+  .bg-amber-500, .bg-amber-600, .bg-black, .bg-blue-500, .bg-blue-600, .bg-cyan-600,
+  .bg-emerald-500, .bg-emerald-600, .bg-fuchsia-600, .bg-indigo-500, .bg-indigo-600,
+  .bg-orange-500, .bg-pink-500, .bg-purple-500, .bg-red-500, .bg-red-600, .bg-rose-500,
+  .bg-rose-600, .bg-sky-500, .bg-teal-500, .bg-violet-500, .bg-violet-600,
+  .from-amber-500, .from-cyan-500, .from-emerald-500, .from-indigo-500, .from-indigo-600,
+  .from-orange-500, .from-rose-500, .from-violet-500, .from-violet-600, .to-blue-500,
+  .to-blue-600, .to-cyan-500, .to-cyan-600, .to-fuchsia-500, .to-fuchsia-600,
+  .to-pink-500, .to-red-500, .via-violet-600,
+  .myday-qa--task, .myday-qa--note, .myday-qa--schedule, .myday-qa--revision,
+  .myday-cta, .myday-cta--blue, .myday-cta--rose, .myday-fab, .myday-sched-fab,
+  .myday-tasks-add, .myday-sched-add, .myday-banner, .myday-tile-icon--violet,
+  .myday-tile-icon--sky, .myday-tile-icon--amber, .myday-tile-icon--rose,
+  .myday-snav-item--active, .myday-cal-day--today, .myday-sched-form-hero-icon,
+  .myrem-tile, .myrem-quick-tile, .myrem-banner-inner, .myrem-head-icon, .myrem-add,
+  .myrem-check[data-on="true"], .myrem-cal-day[data-selected="true"], .myrem-empty-cta,
+  .dc-subscription-primary
+) :where(
+  .text-amber-100, .text-amber-200, .text-amber-300, .text-orange-200, .text-orange-300,
+  .text-yellow-200, .text-yellow-300, .text-rose-200, .text-rose-300, .text-red-200,
+  .text-red-300, .text-pink-200, .text-pink-300, .text-emerald-200, .text-emerald-300,
+  .text-green-200, .text-green-300, .text-teal-200, .text-teal-300, .text-sky-200,
+  .text-sky-300, .text-cyan-200, .text-cyan-300, .text-blue-200, .text-blue-300,
+  .text-indigo-200, .text-indigo-300, .text-violet-200, .text-violet-300,
+  .text-purple-200, .text-purple-300, .text-fuchsia-200, .text-fuchsia-300
+) {
+  /* one uniform light ink on deep fills — keeps AA on every plate */
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   12. SUBSCRIPTION (subscription-minimal.css + SubscriptionPage / pickers)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-subscription-page],
+html[data-theme="light"] .dc-subscription-picker {
+  --sub-border: #e0e3e5;
+  --sub-muted: #5b6679;
+  --sub-accent: #004ac6;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-subscription-page] {
+  background: transparent;
+}
+html[data-theme="light"] .dc-subscription-note strong { color: var(--dc-ink); }
+html[data-theme="light"] .dc-subscription-plan-row[data-selected="true"] strong:first-child { color: var(--dc-brand-ink); }
+html[data-theme="light"] [data-subscription-page] input[type="radio"],
+html[data-theme="light"] .dc-subscription-picker input[type="checkbox"] { accent-color: #004ac6; }
+html[data-theme="light"] .dc-subscription-duration legend { color: var(--dc-ink); }
+html[data-theme="light"] .dc-subscription-disclosure summary { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-subscription-code label { color: var(--dc-ink-2); }
+html[data-theme="light"] :is(.dc-subscription-code input, .dc-subscription-picker input[type="search"]) {
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] :is(.dc-subscription-code input, .dc-subscription-picker input[type="search"])::placeholder {
+  color: var(--dc-ink-faint);
+}
+html[data-theme="light"] .dc-subscription-code-applied strong { color: var(--dc-success-ink); }
+html[data-theme="light"] .dc-subscription-error { color: var(--dc-urgent-ink); }
+html[data-theme="light"] .dc-subscription-picker {
+  background: var(--dc-bg-elevated);
+  border-color: var(--dc-line);
+  box-shadow: var(--dc-shadow-lg);
+}
+html[data-theme="light"] .dc-subscription-primary {
+  background: #004ac6;
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-subscription-primary:hover { background: #003ea8; }
+html[data-theme="light"] .dc-subscription-terms a { color: var(--dc-brand-ink); }
+
+/* Live selection card + compare surfaces (subscription.css companions) */
+html[data-theme="light"] [data-subscription-page] .dc-compare-scroll {
+  background: rgba(255, 255, 255, 0.72);
+}
+html[data-theme="light"] [data-subscription-page] .dc-compare-rowhead {
+  background: var(--dc-bg-muted);
+}
+html[data-theme="light"] [data-subscription-page] [data-subscription-step] .dc-glass-card,
+html[data-theme="light"] [data-subscription-page] [data-subscription-live-card] {
+  background: var(--dc-bg-secondary);
+  border-color: var(--dc-line);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-subscription-hero] .dc-sub-trust svg { color: var(--dc-accent-ink); }
+html[data-theme="light"] [data-subscription-step] .dc-sub-step-num { color: var(--dc-accent-ink); }
+html[data-theme="light"] [data-subscription-step] .dc-sub-step-num.is-done { color: var(--dc-success-ink); }
+html[data-theme="light"] [data-subscription-page] :where(.text-amber-200) { color: #92400e; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   13. STORE (store-glass.css hero + product cards, store-marketplace.css page)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The store lens keeps its light-blue identity tint; the ink flips. */
+html[data-theme="light"][data-glass="on"] :where(.dc-store-glass) {
+  color: var(--dc-ink);
+  box-shadow:
+    0 18px 40px -26px rgba(25, 28, 30, 0.35),
+    0 4px 14px -8px rgba(25, 28, 30, 0.18);
+}
+@media (hover: hover) {
+  html[data-theme="light"][data-glass="on"] :where(.dc-store-glass):hover {
+    box-shadow:
+      0 26px 56px -28px rgba(25, 28, 30, 0.4),
+      0 6px 18px -8px rgba(25, 28, 30, 0.2);
+  }
+}
+html[data-theme="light"] :is(
+  .dc-store-hero-title, .dc-store-hero-count, .dc-store-section-title, .dc-store-card-title
+) {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-store-hero-eyebrow,
+html[data-theme="light"] .dc-store-card-kicker {
+  color: #0369a1;
+}
+html[data-theme="light"] .dc-store-card-scrim {
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.42) 55%,
+    transparent 100%
+  );
+}
+/* Brand ramp over the lens: the dark-mode pastel run becomes the ink run. */
+html[data-theme="light"][data-glass="on"] :where(.dc-store-glass) :where(.bg-clip-text.text-transparent) {
+  background-image: linear-gradient(to right, #003ea8 0%, #5b21b6 50%, #a21caf 100%) !important;
+}
+/* ?glass=off / no-backdrop fallbacks: navy plates → paper plates. */
+html[data-theme="light"][data-glass="off"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2) {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(242, 244, 246, 0.92) 55%,
+    rgba(236, 238, 240, 0.94) 100%
+  ) !important;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-theme="light"][data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2) {
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(242, 244, 246, 0.92) 55%,
+      rgba(236, 238, 240, 0.94) 100%
+    ) !important;
+  }
+}
+
+/* ── store marketplace page ─────────────────────────────────────────────── */
+html[data-theme="light"] [data-store-marketplace] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-marketplace-heading > p { color: var(--dc-accent-ink); }
+html[data-theme="light"] .dc-marketplace-heading > span { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-search {
+  background: var(--dc-bg-muted);
+  border-color: var(--dc-line-strong);
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] .dc-marketplace-search input { color: var(--dc-ink); }
+html[data-theme="light"] .dc-marketplace-chips button { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-marketplace-chips button[aria-pressed="true"] {
+  background: #004ac6;
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-marketplace-toolbar { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-arrange select {
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-marketplace-card {
+  background: var(--dc-bg-secondary);
+  border-color: var(--dc-line);
+}
+html[data-theme="light"] .dc-marketplace-cover { background: var(--dc-bg-muted-2); }
+html[data-theme="light"] .dc-marketplace-cover-fallback { color: var(--dc-accent-ink); }
+html[data-theme="light"] .dc-marketplace-kind { color: var(--dc-accent-ink); }
+html[data-theme="light"] :is(.dc-marketplace-details, .dc-marketplace-instructor) { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-save {
+  background: var(--dc-bg-muted);
+  color: var(--dc-accent-ink);
+  border-color: var(--dc-line);
+}
+html[data-theme="light"] .dc-marketplace-rating { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-rating svg { color: #b45309; }
+html[data-theme="light"] .dc-marketplace-rating strong { color: var(--dc-ink); }
+html[data-theme="light"] .dc-marketplace-price del { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-price strong { color: var(--dc-ink); }
+html[data-theme="light"] .dc-marketplace-saving { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-purchase-state { color: var(--dc-success-ink); }
+html[data-theme="light"] .dc-marketplace-skeleton { background: var(--dc-bg-muted-2); }
+html[data-theme="light"] .dc-marketplace-state p { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-marketplace-text-action { color: var(--dc-brand-ink); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   14. HOME (home.css + home/components, incl. the social profile card)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] .dc-home-hero-cta {
+  background: #004ac6;
+  color: #ffffff;
+}
+html[data-theme="light"][data-glass="on"] [data-home-content] .dc-home-category-group > div:last-child > div[aria-hidden] {
+  background: rgba(0, 74, 198, 0.1);
+}
+html[data-theme="light"] .dc-home-progress-fill { background: #004ac6; }
+html[data-theme="light"] .dc-home-feedback-button { background: #004ac6; color: #ffffff; }
+html[data-theme="light"] .dc-home-feedback-button:hover { background: #003ea8; }
+
+/* Social profile card (wears the store lens; these are its content inks). */
+html[data-theme="light"] .dc-social-card { color: var(--dc-ink); }
+html[data-theme="light"] .dc-social-pic { border-color: rgba(25, 28, 30, 0.18); }
+html[data-theme="light"] .dc-social-name span { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-social-media::before { background: rgba(25, 28, 30, 0.08); }
+html[data-theme="light"] .dc-social-icon:focus-visible { outline-color: var(--dc-brand); }
+html[data-theme="light"] .dc-social-tooltip {
+  background: #191c1e;
+  color: #f7f9fb;
+}
+html[data-theme="light"] .dc-social-icon .dc-social-tooltip::after { border-top-color: #191c1e; }
+
+/* Alpha-suffixed pastel utilities (text-indigo-200/80 …) don't match the bare
+   class selectors above; catch them by attribute and route them to brand ink. */
+html[data-theme="light"] :where([class*="text-indigo-200"], [class*="text-indigo-300"]) { color: var(--dc-brand-ink); }
+html[data-theme="light"] :where([class*="text-violet-200"], [class*="text-violet-300"]) { color: #6d28d9; }
+html[data-theme="light"] :where([class*="text-amber-200"]) { color: #92400e; }
+html[data-theme="light"] :where([class*="text-emerald-200"], [class*="text-emerald-300"]) { color: #047857; }
+html[data-theme="light"] :where([class*="text-rose-200"], [class*="text-rose-300"]) { color: #be123c; }
+html[data-theme="light"] :where([class*="text-sky-200"], [class*="text-sky-300"]) { color: #0369a1; }
+html[data-theme="light"] :where([class*="text-blue-200"], [class*="text-blue-300"]) { color: #1d4ed8; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   15. CART + FAVORITES (collection-cards.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] :is(.dc-collection-card.dc-glass-card, .dc-collection-card.dc-scene-plate) {
+  background: var(--dc-bg-secondary);
+  border-color: var(--dc-line);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-collection-card .dc-collection-media { background: var(--dc-bg-muted-2); }
+html[data-theme="light"] .dc-collection-card .dc-collection-title { color: var(--dc-ink); }
+html[data-theme="light"] .dc-collection-category { color: var(--dc-accent-ink); }
+html[data-theme="light"] :is(.dc-collection-meta, .dc-collection-prices) { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-collection-price { color: var(--dc-ink); }
+html[data-theme="light"] .dc-collection-discount { color: var(--dc-success-ink); }
+html[data-theme="light"] .dc-collection-card .dc-collection-watch {
+  background: #004ac6;
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-collection-card .dc-collection-watch:hover { background: #003ea8; }
+html[data-theme="light"] .dc-collection-card .dc-collection-watch[data-uzw-press="true"] { background: #002d76; }
+html[data-theme="light"] .dc-cart-remove { color: #ba1a1a; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   16. CHECKOUT (checkout-minimal.css + PaymentGateway)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-checkout-app] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-checkout-step-indicator li[aria-current="step"] { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-checkout-step-indicator li[data-step-state="complete"] { color: var(--dc-success-ink); }
+html[data-theme="light"] :is([data-checkout-app] h2, .dc-payment-page h2) { color: var(--dc-ink); }
+html[data-theme="light"] .dc-checkout-note { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-checkout-buyer-name { color: var(--dc-ink); }
+html[data-theme="light"] [data-checkout-buyer] [data-firebase-verified="true"] { color: var(--dc-success-ink); }
+html[data-theme="light"] .dc-checkout-detail-list { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-checkout-total strong { color: var(--dc-ink); }
+html[data-theme="light"] :is([data-checkout-price-section] dd, .dc-checkout-facts dd) { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-checkout-text-action { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-checkout-reference { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-checkout-error { color: var(--dc-urgent-ink); }
+html[data-theme="light"] .dc-checkout-recovery { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-payment-page { color: var(--dc-ink); }
+html[data-theme="light"] .dc-checkout-code-form input {
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-checkout-code-form input::placeholder { color: var(--dc-ink-faint); }
+html[data-theme="light"] .dc-checkout-code-applied strong { color: var(--dc-success-ink); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   17. LEADERBOARD (leaderboard-minimal.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-leaderboard-minimal] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-leaderboard-brand { color: var(--dc-accent-ink); }
+html[data-theme="light"] :is(.dc-leaderboard-heading > div > p:last-child, .dc-leaderboard-note) { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-stats dt { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-views button { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-leaderboard-views button[aria-pressed="true"] {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .dc-leaderboard-position { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-person p { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-referral span { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-code-status { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-leaderboard-code-status.is-available { color: var(--dc-success-ink); }
+html[data-theme="light"] .dc-leaderboard-action { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-leaderboard-error { color: var(--dc-urgent-ink); }
+html[data-theme="light"] .dc-leaderboard-subscriber[data-referral-used="true"] .dc-leaderboard-referral code { color: var(--dc-ink-3); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   18. SETTINGS + PUBLIC PROFILE (settings.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-settings-page] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .settings-row-copy > label { color: var(--dc-ink); }
+html[data-theme="light"] .settings-row-note { color: var(--dc-ink-3); }
+html[data-theme="light"] .settings-switch > span {
+  border-color: var(--dc-line-strong);
+  background: var(--dc-bg-muted-3);
+}
+html[data-theme="light"] .settings-switch input:focus-visible + span { outline-color: var(--dc-brand); }
+html[data-theme="light"] .settings-device .settings-device-label { color: var(--dc-ink); }
+html[data-theme="light"] .settings-device > .settings-device-message { color: var(--dc-accent-ink); }
+html[data-theme="light"] .settings-secondary { color: var(--dc-accent-ink); }
+html[data-theme="light"] .settings-alert { color: var(--dc-urgent-ink); }
+html[data-theme="light"] .settings-alert button { color: #9f1239; }
+html[data-theme="light"] .settings-footnote { color: var(--dc-ink-faint); }
+html[data-theme="light"] .public-profile-avatar { color: var(--dc-accent-ink); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   19. PROFILE / PURCHASES / USAGE leftovers (beyond light-theme.css §7)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] .dc-usage-state { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-usage-metric header strong { color: var(--dc-ink); }
+html[data-theme="light"] .dc-usage-metric progress {
+  background: var(--dc-bg-muted-3);
+  color: var(--dc-brand);
+}
+html[data-theme="light"] .dc-usage-metric progress::-webkit-progress-bar { background: var(--dc-bg-muted-3); }
+html[data-theme="light"] .dc-purchases-search {
+  background: var(--dc-bg-muted);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-purchases-search input { color: var(--dc-ink); }
+html[data-theme="light"] .dc-purchases-search input::placeholder { color: var(--dc-ink-faint); }
+html[data-theme="light"] :is([data-purchases-page] .dc-purchases-row img, .dc-purchases-image-fallback) {
+  background: var(--dc-bg-muted-2);
+}
+html[data-theme="light"] .dc-purchases-title { color: var(--dc-ink); }
+html[data-theme="light"] .dc-purchases-scope { color: var(--dc-ink-3); }
+html[data-theme="light"] .dc-purchases-row > button:hover .dc-purchases-title { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-purchases-empty { color: var(--dc-ink-2); }
+html[data-theme="light"] .dc-purchases-loading { background: var(--dc-bg-muted-2); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   20. STUDY LIBRARY (study-library-minimal.css + study-library-states.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-study-library-page] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-study-layout h2 { color: var(--dc-ink); }
+html[data-theme="light"] .dc-study-search {
+  background: var(--dc-bg-muted);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-study-search input { color: var(--dc-ink); }
+html[data-theme="light"] .dc-study-search input::placeholder { color: var(--dc-ink-faint); }
+html[data-theme="light"] :is([data-study-library-page] .dc-study-course-open img, .dc-study-cover-fallback) {
+  background: var(--dc-bg-muted-2);
+}
+html[data-theme="light"] .dc-study-course-copy strong { color: var(--dc-ink); }
+html[data-theme="light"] .dc-study-delete { color: #ba1a1a; }
+html[data-theme="light"] .dc-study-loading > div { background: var(--dc-bg-muted-2); }
+html[data-theme="light"] :is(.study-library-empty, .study-library-notice) { color: var(--dc-ink); }
+html[data-theme="light"] .study-library-empty__icon { color: #6d28d9; }
+html[data-theme="light"] .study-library-empty[data-resource-kind="note"] .study-library-empty__icon { color: #b45309; }
+html[data-theme="light"] .study-library-empty h2 { color: var(--dc-ink); }
+html[data-theme="light"] .study-library-empty p { color: var(--dc-ink-3); }
+html[data-theme="light"] .study-library-notice__icon {
+  background: rgba(25, 28, 30, 0.06);
+  color: #6d28d9;
+}
+html[data-theme="light"] .study-library-notice--error .study-library-notice__icon { color: #b45309; }
+html[data-theme="light"] .study-library-notice__message { color: var(--dc-ink-2); }
+html[data-theme="light"] .study-library-notice__retry {
+  background: rgba(25, 28, 30, 0.07);
+  color: var(--dc-ink);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   21. SHARED GLASS MATERIALS (empty-state-glass, revision-glass, profile-glass,
+       glass.css input + chrome disc) — used across Home / Store / Purchases /
+       Revision / Profile.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Empty-state + revision lenses keep their glacier tint; the ink flips. */
+html[data-theme="light"][data-glass="on"] :is(:where(.dc-empty-glass), :where(.dc-rev-glass)) {
+  color: var(--dc-ink);
+  box-shadow:
+    0 12px 30px -18px rgba(25, 28, 30, 0.3),
+    0 3px 10px -6px rgba(25, 28, 30, 0.16);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-empty-glass) :where(.dc-empty-title) { color: var(--dc-ink); }
+html[data-theme="light"][data-glass="on"] :where(.dc-empty-glass) :where(.dc-empty-body) { color: var(--dc-ink-muted); }
+/* ?glass=off / no-backdrop fallbacks: navy plate → paper plate. */
+html[data-theme="light"][data-glass="off"] :where(.dc-empty-glass) > div[aria-hidden]:nth-of-type(2),
+html[data-theme="light"][data-glass="off"] :where(.dc-rev-glass) > div[aria-hidden]:nth-of-type(2) {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(242, 244, 246, 0.92) 55%,
+    rgba(236, 238, 240, 0.94) 100%
+  ) !important;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-theme="light"][data-glass="on"] :is(
+    :where(.dc-empty-glass) > div[aria-hidden]:nth-of-type(2),
+    :where(.dc-rev-glass) > div[aria-hidden]:nth-of-type(2)
+  ) {
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(242, 244, 246, 0.92) 55%,
+      rgba(236, 238, 240, 0.94) 100%
+    ) !important;
+  }
+}
+
+/* Profile / Usage bento tiles: white-alpha washes become ink-alpha. */
+html[data-theme="light"] .dc-profile-title { color: var(--dc-ink); }
+html[data-theme="light"] .dc-profile-card-accent { color: var(--dc-accent-ink); }
+html[data-theme="light"] .dc-profile-card-value { color: var(--dc-ink); }
+html[data-theme="light"] .dc-profile-bar {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted-2);
+}
+html[data-theme="light"] .dc-profile-bar > span { background: #004ac6; }
+html[data-theme="light"] .dc-profile-subpanel,
+html[data-theme="light"] .dc-profile-tile {
+  border-color: var(--dc-line);
+  background: rgba(25, 28, 30, 0.03);
+}
+html[data-theme="light"] .dc-profile-tile:hover {
+  border-color: rgba(0, 74, 198, 0.28);
+  background: rgba(25, 28, 30, 0.055);
+}
+
+/* Shared glass search input (DesktopShell + command palette). */
+html[data-theme="light"][data-glass="on"] .dc-glass-input input { color: var(--dc-ink); }
+html[data-theme="light"][data-glass="on"] .dc-glass-input input::placeholder { color: var(--dc-ink-faint); }
+html[data-theme="light"][data-glass="on"] .dc-glass-input span.shrink-0 { color: var(--dc-ink-3); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   22. SHARED DIALOGS + OVERLAYS (content-dialog, quick sketch note, menus)
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] .dc-content-dialog-backdrop {
+  background: var(--dc-backdrop-scrim);
+}
+html[data-theme="light"] .dc-content-dialog {
+  background: var(--dc-bg-elevated);
+  border-color: var(--dc-line);
+  color: var(--dc-ink);
+  box-shadow: var(--dc-shadow-lg);
+}
+html[data-theme="light"] .dc-content-dialog-close { color: var(--dc-accent-ink); }
+html[data-theme="light"] .dc-content-dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-content-secondary { color: var(--dc-accent-ink); }
+html[data-theme="light"] .dc-content-error { color: var(--dc-urgent-ink); }
+html[data-theme="light"] .dc-qsk-scoped-note {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--dc-ink-2);
+  border-color: var(--dc-line);
+}
+html[data-theme="light"] .branched-menu__action--danger:hover { color: #ba1a1a; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   23. FLOWPATH — the --fp-* palette (index.css :root) re-pointed for light.
+       The dark block itself is contract-pinned in index.css (flowpathRouting
+       contract); this is the app-wide light override of the same tokens.
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] {
+  --fp-bg-0: #f7f9fb;
+  --fp-bg-1: #f2f4f6;
+  --fp-surface: rgba(25, 28, 30, 0.05);
+  --fp-surface-hover: rgba(25, 28, 30, 0.1);
+  --fp-surface-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.55));
+  --fp-panel: linear-gradient(155deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.5));
+  --fp-text: #191c1e;
+  --fp-muted: rgba(25, 28, 30, 0.62);
+  --fp-border: rgba(25, 28, 30, 0.12);
+  --fp-border-hover: rgba(25, 28, 30, 0.22);
+  --fp-grid-line: rgba(25, 28, 30, 0.05);
+  --fp-card-shadow: 0 20px 60px -30px rgba(0, 0, 0, 0.35);
+  --fp-strong-shadow: 0 30px 80px -36px rgba(0, 0, 0, 0.4);
+  --fp-overlay: rgba(25, 28, 30, 0.45);
+
+  --fp-text-85: color-mix(in srgb, #191c1e 85%, transparent);
+  --fp-text-70: color-mix(in srgb, #191c1e 70%, transparent);
+  --fp-text-55: color-mix(in srgb, #191c1e 62%, transparent);
+  --fp-text-50: color-mix(in srgb, #191c1e 58%, transparent);
+  --fp-text-45: color-mix(in srgb, #191c1e 55%, transparent);
+  --fp-text-40: color-mix(in srgb, #191c1e 52%, transparent);
+  --fp-text-30: color-mix(in srgb, #191c1e 45%, transparent);
+  --fp-text-20: color-mix(in srgb, #191c1e 38%, transparent);
+  --fp-text-15: color-mix(in srgb, #191c1e 30%, transparent);
+  --fp-text-10: color-mix(in srgb, #191c1e 16%, transparent);
+  --fp-text-6: color-mix(in srgb, #191c1e 9%, transparent);
+  --fp-text-5: color-mix(in srgb, #191c1e 7%, transparent);
+  --fp-text-3: color-mix(in srgb, #191c1e 5%, transparent);
+
+  --fp-rose-text: #be123c;
+  --fp-amber-text: #b45309;
+  --fp-emerald-text: #047857;
+  --fp-violet-text: #6d28d9;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   24. SHARED CHROME (index.css) — desktop rail, glass hook family, sticky bars
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The .dc-glass* hook family (My Day, cart, search, revision toolbars …). */
+html[data-theme="light"] :is(
+  .dc-glass, .dc-glass-soft, .dc-glass-chip, .dc-glass-input,
+  .dc-glass-toolbar, .dc-modal-glass, .dc-glass-dark
+) {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(25, 28, 30, 0.1);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(25, 28, 30, 0.05),
+    var(--dc-shadow-sm);
+  color: var(--dc-ink);
+}
+
+/* Desktop left rail */
+html[data-theme="light"] .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item]:hover:not([data-active="true"]) {
+  background: rgba(25, 28, 30, 0.06);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] {
+  background-color: #004ac6;
+  color: #ffffff;
+  box-shadow:
+    0 6px 16px -8px rgba(0, 74, 198, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+html[data-theme="light"] .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] > span:first-child {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-desktop-shell [data-desktop-topbar] {
+  border-bottom-color: rgba(25, 28, 30, 0.1);
+}
+html[data-theme="light"] .dc-desktop-shell [data-desktop-topbar-button]:hover { color: var(--dc-ink); }
+html[data-theme="light"] .dc-desktop-shell [data-desktop-rail-item="myday"][data-active="true"] {
+  background: #004ac6;
+}
+html[data-theme="light"] .dc-desktop-shell [data-pdp-thumbs] button:hover {
+  border-color: rgba(25, 28, 30, 0.35);
+}
+html[data-theme="light"] .dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
+  background-color: rgba(247, 249, 251, 0.88);
+}
+
+/* PDP sticky tab bar (mobile shell) + compare table row heads */
+html[data-theme="light"] [data-pdp-tabbar][data-stuck="true"] {
+  background-color: rgba(247, 249, 251, 0.88);
+}
+html[data-theme="light"] .dc-compare-table .dc-compare-rowhead {
+  background: var(--dc-bg-muted);
+}
+
+/* Misc shared roles */
+html[data-theme="light"] .dc-premium-close:focus-visible { outline-color: var(--dc-brand); }
+html[data-theme="light"] .course-rich-surface a { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-footer-pill { border-color: #34343a; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   25. MY COURSE EDITOR (course-editor-minimal.css) + STUDY PACK
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-editor-minimal] {
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :is(.dc-editor-counts, .dc-editor-note, .dc-editor-save-state) { color: var(--dc-ink-3); }
+html[data-theme="light"] [data-editor-minimal] :is(
+  input:not([type="file"]):not([type="checkbox"]):not([type="radio"]), select, textarea
+) {
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+  border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] [data-editor-minimal] :is(label > span:first-child, .dc-editor-section > p) {
+  color: var(--dc-ink-3);
+}
+html[data-theme="light"] [data-editor-minimal] :is([data-my-course-editor-back], [data-my-module-add-child]) {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .dc-editor-actions {
+  background: var(--dc-bg-secondary);
+  border-color: var(--dc-line);
+}
+html[data-theme="light"] [data-editor-minimal] [data-my-course-delete] { color: #ba1a1a; }
+html[data-theme="light"] .dc-editor-error { color: var(--dc-urgent-ink); }
+
+/* Study pack page shells that hard-code dark plates */
+html[data-theme="light"] [data-study-pack-page] :where([class*="bg-slate-950"], [class*="bg-slate-900"]) {
+  background-color: rgba(255, 255, 255, 0.94);
+  background-image: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   26. COURSE PLAYER SURFACES that predate its light palette
+       (keyed to the player's own data-course-theme, like courseTheme.css)
+   ══════════════════════════════════════════════════════════════════════════ */
+.course-player-shell[data-course-theme="light"] .course-resource-library {
+  color: #191c1e;
+}
+.course-player-shell[data-course-theme="light"] .library-header__title { color: rgba(25, 28, 30, 0.9); }
+.course-player-shell[data-course-theme="light"] .library-header__count { color: rgba(25, 28, 30, 0.55); }
+.course-player-shell[data-course-theme="light"] .library-search__icon { color: rgba(25, 28, 30, 0.5); }
+.course-player-shell[data-course-theme="light"] .library-search__input::placeholder { color: rgba(25, 28, 30, 0.45); }
+.course-player-shell[data-course-theme="light"] .library-search__count { color: rgba(25, 28, 30, 0.5); }
+.course-player-shell[data-course-theme="light"] .library-search__clear { color: rgba(25, 28, 30, 0.6); }
+.course-player-shell[data-course-theme="light"] .course-library__lock { color: #b45309; }
+.course-player-shell[data-course-theme="light"] .course-library__preview { color: #0369a1; }
+.course-player-shell[data-course-theme="light"] .course-library__done { color: #047857; }
+.course-player-shell[data-course-theme="light"] .library-no-results { color: rgba(25, 28, 30, 0.6); }
+
+/* ── My Day — final light-wash sweep (decorative layers + tracks) ─────────── */
+html[data-theme="light"] .myday-hero-stars { display: none; }
+html[data-theme="light"] .myday-progress-track {
+  border-color: var(--dc-light-well-line);
+  background: rgba(25, 28, 30, 0.08);
+}
+html[data-theme="light"] .myday-mini-row:hover {
+  background: rgba(25, 28, 30, 0.05);
+  border-color: var(--dc-light-well-line-strong);
+}
+html[data-theme="light"] .myday-snowman-bubble {
+  border-color: rgba(0, 74, 198, 0.2);
+}
+html[data-theme="light"] .myday-sched-mixbar { background: rgba(25, 28, 30, 0.08); }
+html[data-theme="light"] .myday-tl-rail::before {
+  background: linear-gradient(180deg, transparent, rgba(0, 74, 198, 0.22), transparent);
+}
+html[data-theme="light"] .myrem-chip-n {
+  background: rgba(25, 28, 30, 0.08);
+  color: var(--dc-ink-3);
+}
+html[data-theme="light"] .myrem-skel::after {
+  background: linear-gradient(90deg, transparent, rgba(25, 28, 30, 0.07), transparent);
+}
+
+/* ── shared chrome — final sweep ─────────────────────────────────────────── */
+/* The dark boot canvas on html/body/#root: body + #root keep the dark literal
+   from index.css, so overscroll and transparent shells would flash navy. */
+html[data-theme="light"] body,
+html[data-theme="light"] #root {
+  background-color: var(--dc-bg-primary);
+}
+
+/* Global skeleton shimmer (index.css .dc-skeleton) */
+html[data-theme="light"] .dc-skeleton {
+  background-color: rgba(25, 28, 30, 0.07);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(25, 28, 30, 0.07) 50%,
+    transparent 100%
+  );
+}
+
+/* FlowPath shimmer hairline */
+html[data-theme="light"] .fp-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(25, 28, 30, 0.1), transparent);
+}
+
+/* Mobile header glow hairline: ink line instead of a white one */
+html[data-theme="light"] .mobile-header-glow {
+  border-bottom-color: rgba(25, 28, 30, 0.12);
+}
+html[data-theme="light"] .mobile-header-glow::after {
+  background: rgba(25, 28, 30, 0.04);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   27. QUERY CARD palette tokens (src/components/QueryCard.tsx inline styles)
+       Dark block first (the default), then the light remap.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --qc-face: #101a2c;
+  --qc-inset: #0a1120;
+  --qc-hairline: #263149;
+  --qc-ink: #eaf0fa;
+  --qc-ink-secondary: #93a1be;
+  --qc-ink-tertiary: #7c8aa8;
+  --qc-accent: #38bdf8;
+  --qc-reply-ink: #5eead4;
+  --qc-reply-body: #d5deee;
+  --qc-reply-bar: #10b981;
+}
+html[data-theme="light"] {
+  --qc-face: #ffffff;
+  --qc-inset: #f2f4f6;
+  --qc-hairline: #e0e3e5;
+  --qc-ink: #191c1e;
+  --qc-ink-secondary: #434655;
+  --qc-ink-tertiary: #5b6679;
+  --qc-accent: #0369a1;
+  --qc-reply-ink: #047857;
+  --qc-reply-body: #334155;
+  --qc-reply-bar: #006243;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   28. NOTIFICATIONS + QUERIES + SEARCH surfaces
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --n-card-bg: rgba(255, 255, 255, 0.06);
+  --n-card-line: rgba(255, 255, 255, 0.08);
+  --n-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --n-chip-bg: rgba(255, 255, 255, 0.06);
+  --n-chip-bg-hover: rgba(255, 255, 255, 0.15);
+}
+html[data-theme="light"] {
+  --n-card-bg: rgba(255, 255, 255, 0.86);
+  --n-card-line: rgba(25, 28, 30, 0.09);
+  --n-card-shadow: 0 4px 16px rgba(25, 28, 30, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --n-chip-bg: rgba(25, 28, 30, 0.06);
+  --n-chip-bg-hover: rgba(25, 28, 30, 0.12);
+}
+/* The per-alert accent glyphs are night-bright; darken like the dock glyphs. */
+html[data-theme="light"] [data-notification-icon] svg {
+  filter: brightness(0.72) saturate(1.25);
+}
+
+/* Queries page shells that carry arbitrary dark hex utilities */
+html[data-theme="light"] :where([class*="border-[#263149]"], [class*="border-[#3B4A6B]"]) {
+  border-color: var(--dc-line) !important;
+}
+html[data-theme="light"] :where([class*="bg-[#101A2C]"], [class*="bg-[#0A1120]"]) {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+html[data-theme="light"] :where([class*="ring-offset-[#101A2C]"]) {
+  --tw-ring-offset-color: var(--dc-bg-primary);
+}
+html[data-theme="light"] :where([class*="text-[#FDA4AF]"]) { color: var(--dc-urgent-ink) !important; }
+html[data-theme="light"] :where([class*="ring-[#7DD3FC]"]) { --tw-ring-color: var(--dc-brand) !important; }
+html[data-theme="light"] [data-queries-page] .dc-app-shell { color: var(--dc-ink); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   29. GLASS-PACK COMPONENT MATERIALS (PricingGlassCard, glass-modal, glass-
+       pref-toggle, ShimmerProgress, glass-toast) — inline washes now read
+       these tokens so both themes share one component code path.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Pricing glass card (subscription) */
+  --pgc-glass: rgba(255, 255, 255, 0.1);
+  --pgc-glass-line: rgba(255, 255, 255, 0.3);
+  --pgc-card-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  --pgc-chip: rgba(255, 255, 255, 0.2);
+  --pgc-chip-line: rgba(255, 255, 255, 0.4);
+  --pgc-divider: rgba(255, 255, 255, 0.25);
+  --pgc-row: rgba(255, 255, 255, 0.15);
+  --pgc-row-line: rgba(255, 255, 255, 0.2);
+  --pgc-ink-strong: rgba(255, 255, 255, 0.9);
+  --pgc-ink-faint: rgba(255, 255, 255, 0.4);
+  /* Glass modal */
+  --gm-panel: rgba(255, 255, 255, 0.08);
+  --gm-panel-line: rgba(255, 255, 255, 0.12);
+  --gm-panel-rim: rgba(255, 255, 255, 0.05);
+  --gm-panel-sheen: rgba(255, 255, 255, 0.1);
+  --gm-btn-hover: rgba(255, 255, 255, 0.1);
+  --gm-shine: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  /* Preference toggle + shimmer progress */
+  --gp-track: rgba(255, 255, 255, 0.08);
+  --gp-track-line: rgba(255, 255, 255, 0.1);
+  --gp-off-ink: rgba(255, 255, 255, 0.25);
+  --gp-shimmer: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.35), transparent);
+  --gp-shimmer-v: linear-gradient(to top, transparent, rgba(255, 255, 255, 0.35), transparent);
+  /* Toast */
+  --gt-shell: rgba(255, 255, 255, 0.06);
+  --gt-shell-on-light: rgba(18, 18, 24, 0.78);
+  --gt-shell-line: rgba(255, 255, 255, 0.1);
+  --gt-shell-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --gt-btn: rgba(255, 255, 255, 0.08);
+  --gt-btn-line: rgba(255, 255, 255, 0.12);
+  --gt-btn-hover: rgba(255, 255, 255, 0.14);
+}
+html[data-theme="light"] {
+  --pgc-glass: rgba(255, 255, 255, 0.72);
+  --pgc-glass-line: rgba(25, 28, 30, 0.12);
+  --pgc-card-shadow: 0 4px 24px -1px rgba(25, 28, 30, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --pgc-chip: rgba(25, 28, 30, 0.06);
+  --pgc-chip-line: rgba(25, 28, 30, 0.12);
+  --pgc-divider: rgba(25, 28, 30, 0.16);
+  --pgc-row: rgba(25, 28, 30, 0.04);
+  --pgc-row-line: rgba(25, 28, 30, 0.1);
+  --pgc-ink-strong: #191c1e;
+  --pgc-ink-faint: #5b6679;
+  --gm-panel: rgba(255, 255, 255, 0.92);
+  --gm-panel-line: rgba(25, 28, 30, 0.1);
+  --gm-panel-rim: rgba(25, 28, 30, 0.05);
+  --gm-panel-sheen: rgba(25, 28, 30, 0.05);
+  --gm-btn-hover: rgba(25, 28, 30, 0.08);
+  --gm-shine: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  --gp-track: rgba(25, 28, 30, 0.1);
+  --gp-track-line: rgba(25, 28, 30, 0.14);
+  --gp-off-ink: rgba(25, 28, 30, 0.35);
+  --gp-shimmer: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.85), transparent);
+  --gp-shimmer-v: linear-gradient(to top, transparent, rgba(255, 255, 255, 0.85), transparent);
+  --gt-shell: rgba(255, 255, 255, 0.92);
+  --gt-shell-on-light: rgba(25, 28, 30, 0.88);
+  --gt-shell-line: rgba(25, 28, 30, 0.1);
+  --gt-shell-shadow: 0 8px 40px rgba(25, 28, 30, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --gt-btn: rgba(25, 28, 30, 0.06);
+  --gt-btn-line: rgba(25, 28, 30, 0.1);
+  --gt-btn-hover: rgba(25, 28, 30, 0.12);
+}
+
+/* Modal scrims stay scrims: the §4 dark-plate catch-all would otherwise turn
+   the backdrop into a white plate. */
+html[data-theme="light"] :where([class*="bg-[#1A1A19]"]) {
+  background-color: rgba(25, 28, 30, 0.5) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   30. SEARCH FIELDS — one look everywhere (user directive): the box is
+       SOLID WHITE, the typed text is BLACK, the placeholder is quiet grey,
+       and the edges are clean white (no sheen/rim two-tone). One clear
+       focus ring replaces the glass glow lift.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Solid white plate: the glass search surfaces (home + store capsules,
+   DesktopShell/command-palette glass input, search page) and the page-level
+   search wells. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input),
+html[data-theme="light"] [data-search-launcher]:has(> .dc-scene-plate),
+html[data-theme="light"] :is(.dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field, .dc-subscription-picker input[type="search"]) {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow:
+    0 0 0 1px rgba(25, 28, 30, 0.1),
+    0 10px 24px -18px rgba(25, 28, 30, 0.32);
+  border-color: rgba(25, 28, 30, 0.12);
+}
+
+/* Flatten the glass layers INSIDE a search surface: the white sheen + inner
+   white rim are what made the box read as two colours at the edges. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input) > div[aria-hidden],
+html[data-theme="light"] [data-search-launcher] > .dc-scene-plate div[aria-hidden] {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Black typed ink on the white field; placeholder stays a quiet grey. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher],
+  .dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field) :is(input, textarea) {
+  background-color: transparent !important;
+  color: #14171a !important;
+  -webkit-text-fill-color: #14171a;
+  caret-color: #14171a;
+}
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher],
+  .dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field) :is(input, textarea)::placeholder,
+html[data-theme="light"] .dc-subscription-picker input[type="search"]::placeholder {
+  color: #6b7280 !important;
+  -webkit-text-fill-color: #6b7280;
+  opacity: 1;
+}
+
+/* Icons and trailing chips inside the field share the quiet ink. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher]) :where(svg) {
+  color: #5b6679;
+}
+html[data-theme="light"] [data-search-launcher] :where(.text-white\/15, .text-white\/85) {
+  border-color: rgba(25, 28, 30, 0.16);
+  color: #434655;
+}
+
+/* One clear focus affordance instead of the glass glow lift. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher]):focus-within {
+  box-shadow:
+    0 0 0 2px rgba(0, 74, 198, 0.45),
+    0 0 0 1px rgba(25, 28, 30, 0.12),
+    0 10px 24px -18px rgba(25, 28, 30, 0.32);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   31. LANDING PAGE — clear ink on a quiet canvas (user: "text clear nahin
+       dikh rahe"). The WebGL aurora becomes a faint mist so the copy reads;
+   the footer becomes a light well with solid ink links.
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-dc-landing-waves] {
+  opacity: 0.13;
+  filter: saturate(0.9) brightness(1.12);
+}
+
+/* Hero + section copy: solid, readable ink (a touch bolder than the night
+   wash it replaces). */
+html[data-theme="light"] [data-dc-landing-waves] ~ * :is(h1, h2, h3) {
+  color: #14171a;
+}
+html[data-theme="light"] :is(.text-white\/40, .text-white\/55) {
+  color: #334155;
+}
+
+/* Footer: the navy strip becomes the light well; its light-slate link ink
+   (text-slate-100) is remapped in §0b, the cyan accents in §0b too. */
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) {
+  background-color: #eef1f4 !important;
+  background-image: none !important;
+  border-top-color: rgba(25, 28, 30, 0.12) !important;
+  box-shadow: none !important;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) :where(.text-white, p, li) {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) a,
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) button {
+  color: var(--dc-brand-ink);
+}
+
+/* The landing glass card + pill read as clean white glass with ink copy. */
+html[data-theme="light"] [data-dc-landing-waves] ~ * :where(.text-white\/15, .border-white\/15, .border-white\/10, .border-white\/20) {
+  border-color: rgba(25, 28, 30, 0.14);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   32. PRODUCT DETAIL PAGE — emphasis pass (user: "aur highlight bnao, clear
+       chijen samajh mein aani chahie"). The decision area becomes a real
+       card, the gallery selection and tabs get stronger signals.
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-pdp-root] .dc-pdp-purchase {
+  background: #ffffff;
+  border: 1px solid rgba(25, 28, 30, 0.14);
+  border-radius: 14px;
+  padding: 1.15rem 1.15rem 1.25rem;
+  box-shadow: var(--dc-shadow-md);
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-current-price {
+  color: #14171a;
+  font-size: 2.125rem;
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-tabs button[aria-pressed="true"] {
+  border-bottom-width: 3px;
+  color: var(--dc-brand-ink);
+  font-weight: 800;
+}
+html[data-theme="light"] [data-pdp-root] [data-pdp-thumbs] button[aria-pressed="true"] {
+  border-color: var(--dc-brand);
+}
+html[data-theme="light"] [data-pdp-root] [data-pdp-thumbs] button {
+  border-color: rgba(25, 28, 30, 0.18);
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-highlight-list li {
+  padding-left: 0.15rem;
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-module-index {
+  color: var(--dc-brand-ink);
+  font-weight: 750;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   33. OVERLAYS + CONTROLS — last dark leftovers (user QA) and the branded
+       control language (blue gradient primary, white/outline secondary,
+       rounded-xl) shared by PDP, subscription, profile and dialogs.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 33.1 dialog tokens: the module-picker / content-dialog subtext and
+   rules read --dialog-muted + --dialog-border (dark values at :root). ── */
+html[data-theme="light"] {
+  --dialog-muted: #5b6679;
+  --dialog-border: rgba(25, 28, 30, 0.12);
+}
+
+/* ── 33.2 .dc-field: auth inputs + country-code box + profile/settings
+   fields kept the dark glass wash (rgba(60,62,68,.168)) and white ink. ── */
+html[data-theme="light"][data-glass="on"] :where(.dc-field) {
+  color: var(--dc-ink);
+  border-color: rgba(25, 28, 30, 0.14);
+  background-color: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(25, 28, 30, 0.05);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-field)::placeholder {
+  color: #6b7280;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-field):focus,
+html[data-theme="light"][data-glass="on"] :where(.dc-field):focus-within {
+  background-color: #ffffff;
+  border-color: var(--dc-brand);
+  box-shadow: 0 0 0 3px rgba(0, 74, 198, 0.16);
+}
+
+/* ── 33.3 auth segmented switcher: the track is bg-black/40 (dark) — a
+   light track with the brand pill (bg-indigo-600 keeps white ink). ── */
+html[data-theme="light"] :where([role="tablist"][class*="bg-black/"]) {
+  background-color: #e7ecf3 !important;
+  border-color: rgba(25, 28, 30, 0.1) !important;
+}
+
+/* ── 33.4 ExpandingTabs (desktop header quick actions + home actions): the
+   active pill's bg-white/90 re-tints to ink through --color-white — it must
+   be the brand pill with white ink instead. ── */
+html[data-theme="light"] [data-expanding-tabs] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(25, 28, 30, 0.1) !important;
+  box-shadow: 0 8px 20px -14px rgba(25, 28, 30, 0.35) !important;
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab] {
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab]:hover {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab][data-active="true"] {
+  background: linear-gradient(135deg, #004ac6, #2563eb) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 8px 18px -8px rgba(0, 74, 198, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ── 33.5 glass-select trigger + its portaled option list (sort dropdown
+   etc.): glass.css re-inks both with literal white. ── */
+html[data-theme="light"][data-glass="on"] .dc-glass-select {
+  background: #ffffff !important;
+  border-color: rgba(25, 28, 30, 0.14) !important;
+  color: var(--dc-ink) !important;
+  box-shadow: 0 1px 2px rgba(25, 28, 30, 0.05);
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select:hover {
+  border-color: rgba(25, 28, 30, 0.28) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select svg {
+  color: var(--dc-ink-3) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"] {
+  color: #334155 !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"]:hover,
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"]:focus {
+  background: rgba(0, 74, 198, 0.1) !important;
+  color: var(--dc-brand-ink) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"][aria-selected="true"] {
+  color: var(--dc-brand-ink) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"] svg {
+  color: var(--dc-brand) !important;
+}
+
+/* ── 33.6 command palette (search overlay): white panel, ink copy, the
+   active row wears the brand wash. ── */
+html[data-theme="light"] [data-glass-command-panel] {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-glass-command-panel] [data-active="true"],
+html[data-theme="light"] [data-glass-command-panel] :where([data-command-item])[data-active="true"] {
+  background: rgba(0, 74, 198, 0.12) !important;
+  color: var(--dc-brand-ink) !important;
+}
+
+/* ── 33.7 segment slide + leftover literal whites (hover ink, panel icons,
+   choice/tile borders, swatch ring). ── */
+html[data-theme="light"] .dc-segment [data-toggle]:hover {
+  color: var(--dc-ink);
+}
+html[data-theme="light"][data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+  background: linear-gradient(135deg, #004ac6, #2563eb) !important;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-choice):not([aria-checked="true"]) {
+  border-color: rgba(25, 28, 30, 0.18);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-tile):not([data-selected]) {
+  border-color: rgba(25, 28, 30, 0.14);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
+  --tw-ring-color: var(--dc-brand);
+  --tw-ring-offset-color: #ffffff;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-panel) svg {
+  color: var(--dc-ink-3);
+}
+
+/* ── 33.8 the branded button language (light): primary = blue gradient,
+   rounded-xl, soft brand shadow; secondary = white fill, brand outline.
+   Applies to dialogs (PDP module picker), PDP CTAs, profile + subscription
+   primaries. ── */
+html[data-theme="light"] :is(
+  .dc-content-primary,
+  .dc-pdp-primary, .dc-pdp-library-cta, .dc-pdp-review-submit,
+  .dc-account-primary, .dc-subscription-primary
+) {
+  background: linear-gradient(135deg, #004ac6 0%, #2563eb 60%, #2f6fed 100%) !important;
+  background-image: linear-gradient(135deg, #004ac6 0%, #2563eb 60%, #2f6fed 100%) !important;
+  color: #ffffff !important;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px -10px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] :is(
+  .dc-content-primary,
+  .dc-pdp-primary, .dc-pdp-library-cta, .dc-pdp-review-submit,
+  .dc-account-primary, .dc-subscription-primary
+):hover {
+  filter: brightness(1.07);
+  background-color: transparent;
+}
+html[data-theme="light"] :is(.dc-account-primary, .dc-subscription-primary, .dc-content-primary) .uzp-pay__text,
+html[data-theme="light"] :is(.dc-account-primary, .dc-subscription-primary, .dc-content-primary) span {
+  color: #ffffff !important;
+}
+html[data-theme="light"] :is(.dc-content-secondary, .dc-pdp-secondary-actions .dc-pdp-text-action) {
+  background: #ffffff;
+  border: 1.5px solid rgba(0, 74, 198, 0.35);
+  border-radius: 12px;
+  color: var(--dc-brand-ink);
+  font-weight: 750;
+  box-shadow: 0 4px 12px -8px rgba(0, 74, 198, 0.35);
+}
+html[data-theme="light"] :is(.dc-content-secondary, .dc-pdp-secondary-actions .dc-pdp-text-action):hover {
+  background: linear-gradient(135deg, #004ac6, #2563eb);
+  border-color: transparent;
+  color: #ffffff;
+  text-decoration: none;
+}
+html[data-theme="light"] .dc-pdp-secondary-actions .dc-pdp-text-action[aria-pressed="true"] {
+  background: linear-gradient(135deg, #004ac6, #2563eb);
+  border-color: transparent;
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-pdp-secondary-actions .dc-pdp-text-action:disabled {
+  background: #f2f4f6;
+  border-color: rgba(25, 28, 30, 0.14);
+  color: var(--dc-ink-faint);
+  box-shadow: none;
+}
+
+/* Dock tooltip (GlassDock): glass.css paints it rgba(6,11,26,.9) via
+   :where([data-glass-dock-item]) > div:first-child !important — mirror that
+   selector with the light prefix so the white chip + ink copy win. */
+html[data-theme="light"][data-glass="on"] :where([data-glass-dock-item]) > div:first-child,
+html[data-theme="light"] [data-glass-dock-tip] {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  color: var(--dc-ink) !important;
+  border-color: rgba(25, 28, 30, 0.12) !important;
+  box-shadow: 0 8px 20px -10px rgba(25, 28, 30, 0.35) !important;
+}
+
+/* The PDP price card + dialog shells: a slightly larger, friendlier radius. */
+html[data-theme="light"] [data-pdp-root] .dc-pdp-purchase {
+  border-radius: 16px;
+  border-color: rgba(0, 74, 198, 0.16);
+}
+html[data-theme="light"] .dc-content-dialog {
+  border-radius: 18px;
+}
+
+/* Subscription/My Day brand plates re-hue to the same blue mix. */
+html[data-theme="light"] .bg-indigo-600 {
+  background-color: #004ac6;
+}
+html[data-theme="light"] .bg-indigo-600:hover {
+  background-color: #003ea8;
+}

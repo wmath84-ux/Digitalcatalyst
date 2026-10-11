@@ -28,20 +28,20 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@200;400;600&display=swap" rel="stylesheet" />
     <!-- Colour theme, applied before the first paint so there is no flash of the
          wrong theme. Mirrors src/lib/theme.ts (storage key, `light` default and the
-         admin / course-player routes that stay dark). Keep the two in sync. -->
+         admin routes that stay dark). Keep the two in sync. -->
     <script>
       (function () {
         try {
           var stored = window.localStorage.getItem("dc.theme");
           var mode = stored === "dark" || stored === "light" ? stored : "light";
           var hash = window.location.hash || "";
-          if (hash.indexOf("#/admin") === 0 || hash.indexOf("#/course/") === 0 || hash.indexOf("#/my-course/") === 0) mode = "dark";
+          if (hash.indexOf("#/admin") === 0) mode = "dark";
           var root = document.documentElement;
           root.dataset.theme = mode;
           root.classList.add(mode);
           root.style.colorScheme = mode;
           var meta = document.querySelector('meta[name="theme-color"]:not([media])');
-          if (meta) meta.setAttribute("content", mode === "light" ? "#f8fafc" : "#0a0c12");
+          if (meta) meta.setAttribute("content", mode === "light" ? "#f7f9fb" : "#0a0c12");
         } catch (e) {
           document.documentElement.dataset.theme = "light";
           document.documentElement.classList.add("light");
@@ -51,7 +51,7 @@
     <style>
       /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
       html { background-color: #0a0c12; }
-      html[data-theme="light"] { background-color: #f8fafc; }
+      html[data-theme="light"] { background-color: #f7f9fb; }
       /* ── The app opening animation (see src/utils/openingSplash.ts) ─────────
          Two layers, always both present in the DOM:
            · .app-boot-fallback — a CSS-only brand card. Paints with no JS at

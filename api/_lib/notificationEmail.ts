@@ -9,6 +9,14 @@ export type EmailNotification = NotificationPolicyPayload & {
   title: string; body: string; url?: string; eventId?: string;
 };
 const COLLECTION = "notificationEmailOutbox";
+type OutboxRow = {
+  uid: string;
+  payload: EmailNotification;
+  status: string;
+  attempts?: number;
+  nextAttemptAt?: number;
+  leaseUntil?: number;
+};
 const EMAIL_CATEGORIES = new Set(["course", "unlock", "subscription", "store", "promotion", "announcement", "community"]);
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
 
@@ -52,9 +60,9 @@ export async function deliverNotificationEmails(db: Firestore, options: {
   // Two parallel workers, five-second SMTP timeout: ≤10s for four emails.
   for (let start = 0; start < candidates.length; start += 2) {
     await Promise.all(candidates.slice(start, start + 2).map(async (candidate) => {
-      const claimed = await db.runTransaction(async (transaction) => {
+      const claimed = await db.runTransaction(async (transaction): Promise<(OutboxRow & { attempts: number }) | null> => {
         const snapshot = await transaction.get(candidate.ref);
-        const row = snapshot.data();
+        const row = snapshot.data() as OutboxRow | undefined;
         if (!row || !["pending", "sending"].includes(row.status)
           || Number(row.nextAttemptAt || 0) > now || (row.status === "sending" && Number(row.leaseUntil || 0) > now)) return null;
         const attempts = Number(row.attempts || 0) + 1;

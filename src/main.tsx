@@ -48,6 +48,10 @@ import "./course/courseGradientWaves.css";
 // — no global invert filters. Imported last so it out-ranks the dark-first
 // layers above; lazily loaded route CSS is handled by the scoped specificity.
 import "./light-theme.css";
+// Per-page light remaps (My Day, Subscription, Store, … — every learner page,
+// admin absent). Same scoping rules; after light-theme.css so its plate
+// restores win the ties against the global pastel remaps.
+import "./light-theme-pages.css";
 // Apply the stored colour theme (light by default) before anything renders.
 initThemeMode();
 

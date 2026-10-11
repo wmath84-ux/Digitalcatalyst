@@ -174,7 +174,7 @@ export default function GlassModal({
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className={`relative isolate ${widthClassName} overflow-hidden rounded-3xl outline-none`}
             style={{
-              background: "rgba(255,255,255,0.08)",
+              background: "var(--gm-panel)",
               border: "1px solid rgba(255,255,255,0.12)",
               boxShadow:
                 "0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.1)",
@@ -193,7 +193,7 @@ export default function GlassModal({
               className="pointer-events-none absolute left-8 right-8 top-0 h-[1px]"
               style={{
                 background:
-                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                  "var(--gm-shine)",
               }}
             />
 
@@ -207,7 +207,7 @@ export default function GlassModal({
               transition={{ duration: 0.2, ease: EASE }}
               className="absolute right-4 top-4 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full"
               style={{
-                background: "rgba(255,255,255,0.08)",
+                background: "var(--gm-panel)",
                 border: "1px solid rgba(255,255,255,0.08)",
               }}
             >
@@ -332,7 +332,7 @@ export default function GlassModal({
                     <motion.button
                       type="button"
                       onClick={onSecondary ?? onClose}
-                      whileHover={{ scale: 1.04, background: "rgba(255,255,255,0.1)" }}
+                      whileHover={{ scale: 1.04, background: "var(--gm-btn-hover)" }}
                       whileTap={{ scale: 0.96 }}
                       transition={{ duration: 0.25, ease: EASE }}
                       className="w-full cursor-pointer rounded-full py-3 text-sm font-medium text-white/50"

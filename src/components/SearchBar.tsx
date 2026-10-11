@@ -140,9 +140,7 @@ export default function SearchBar({
                 <GlassButton type="button" aria-label="Clear search" onClick={(e) => { e.stopPropagation(); onChange(""); }} className="shrink-0 [&_.size-12]:size-7">
                   <XIcon className="h-4 w-4" />
                 </GlassButton>
-              ) : (
-                <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">Tap to search</span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

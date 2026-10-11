@@ -188,10 +188,12 @@ test("the store search keeps its public API and its tap-to-search contract", () 
     "readOnly",
     "onFocus={openSearchPage}",
     "#/search?q=",
-    "Tap to search",
   ]) {
     assert.ok(searchBar.includes(anchor), `SearchBar must keep ${anchor} — other screens/tests rely on it`);
   }
+  // The "Tap to search" chip is gone by design (light-mode copy pass): the
+  // placeholder is the ONE clear instruction — no duplicated call-to-search.
+  assert.doesNotMatch(searchBar, /Tap to search/, "the duplicated tap hint must stay out");
   assert.match(searchBar, /<GlassSurface\b/, "the ad-hoc white pill is replaced by the pack lens");
   assert.doesNotMatch(searchBar, /className="[^"]*bg-white\/60/, "no leftover ad-hoc frost on the capsule itself");
   // Wave 3 note: this used to assert the native <select> stayed. It no longer

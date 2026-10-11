@@ -435,7 +435,7 @@ export default function SearchPage({
                 <p className="dc-empty-body">
                   {queryIsLive
                     ? "Try a shorter keyword, check the spelling, or clear the active filter — the catalog searches titles, subjects, instructors and tags."
-                    : "Search across every course, PDF and e-book by title, subject or instructor. Results update live as you type."}
+                    : "Search across every course, PDF and e-book in the catalogue."}
                 </p>
                 {queryIsLive ? (
                   <GlassButton

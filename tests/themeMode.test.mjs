@@ -74,9 +74,17 @@ test("writes and round-trips the preference", () => {
   assert.equal(readStoredThemeMode(storage), "dark");
 });
 
-test("admin and course-player routes stay dark regardless of preference", () => {
-  for (const hash of ["#/admin", "#/admin-login", "#/course/abc", "#/my-course/xyz"]) {
+test("admin routes stay dark regardless of preference", () => {
+  for (const hash of ["#/admin", "#/admin-login"]) {
     assert.equal(resolveDocumentTheme("light", hash), "dark", hash);
+    assert.equal(resolveDocumentTheme("dark", hash), "dark", hash);
+  }
+});
+
+test("learner routes — including the course player — follow the preference", () => {
+  for (const hash of ["#/course/abc", "#/my-course/xyz", "#/my-day", "#/subscription"]) {
+    assert.equal(resolveDocumentTheme("light", hash), "light", hash);
+    assert.equal(resolveDocumentTheme("dark", hash), "dark", hash);
   }
 });
 
@@ -94,7 +102,7 @@ test("applyDocumentTheme sets data-theme, classes, colour-scheme and theme-color
   assert.ok(doc._classes.has("light"));
   assert.ok(!doc._classes.has("dark"));
   assert.equal(doc.documentElement.style.colorScheme, "light");
-  assert.equal(doc._meta.attributes.content, "#f8fafc");
+  assert.equal(doc._meta.attributes.content, "#f7f9fb");
 
   applyDocumentTheme("dark", doc);
   assert.equal(doc.documentElement.dataset.theme, "dark");

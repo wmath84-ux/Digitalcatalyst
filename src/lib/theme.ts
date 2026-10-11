@@ -7,9 +7,10 @@
 //   • Applied to <html> as `data-theme`, a `light` / `dark` class (the vendored
 //     glass components and Tailwind's `dark:` variant read these), and
 //     `color-scheme`, so native form controls and scrollbars match.
-//   • Routes that were always dark keep their dark look regardless of the
-//     stored preference (admin console and the course player, which has its
-//     own light/dark palette). See `resolveDocumentTheme`.
+//   • The admin console keeps its dark look regardless of the stored
+//     preference; every learner-facing route (including the course player,
+//     whose own palette toggle lives in its settings) follows the preference.
+//     See `resolveDocumentTheme`.
 //
 // The inline pre-paint script in index.html mirrors `resolveDocumentTheme` and
 // the storage key, so the correct theme is on <html> before the first paint
@@ -21,7 +22,7 @@ export const THEME_STORAGE_KEY = "dc.theme";
 export const DEFAULT_THEME_MODE: ThemeMode = "light";
 
 /** Routes that always render with the dark palette (see resolveDocumentTheme). */
-const FORCED_DARK_HASH_PREFIXES = ["#/admin", "#/course/", "#/my-course/"] as const;
+const FORCED_DARK_HASH_PREFIXES = ["#/admin"] as const;
 
 export function normalizeThemeMode(value: unknown): ThemeMode | null {
   return value === "light" || value === "dark" ? value : null;
@@ -52,8 +53,9 @@ export function writeStoredThemeMode(mode: ThemeMode, storage: Storage | null = 
 }
 
 /**
- * The theme a route should actually render with. Admin and course-player routes
- * are pinned dark so their existing, dark-only chrome is unchanged.
+ * The theme a route should actually render with. Admin routes are pinned dark
+ * so the console's dark-only chrome is unchanged; every learner page follows
+ * the stored preference.
  */
 export function resolveDocumentTheme(mode: ThemeMode, hash: string): ThemeMode {
   if (FORCED_DARK_HASH_PREFIXES.some((prefix) => hash.startsWith(prefix))) return "dark";
@@ -68,7 +70,7 @@ export function applyDocumentTheme(theme: ThemeMode, doc: Document = document): 
   root.style.colorScheme = theme;
   doc.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute(
     "content",
-    theme === "light" ? "#f8fafc" : "#0a0c12",
+    theme === "light" ? "#f7f9fb" : "#0a0c12",
   );
 }
 

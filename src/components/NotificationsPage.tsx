@@ -298,9 +298,9 @@ function NotificationCard({
         notification.read ? "" : "ring-1 ring-indigo-400/40"
       }`}
       style={{
-        background: "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+        background: "var(--n-card-bg)",
+        border: "1px solid var(--n-card-line)",
+        boxShadow: "var(--n-card-shadow)",
       }}
     >
       {/* Separate blur layer so the frosted backdrop never re-rasterises
@@ -338,8 +338,8 @@ function NotificationCard({
             onDismiss(notification);
           }}
           className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full"
-          style={{ background: "rgba(255,255,255,0.06)" }}
-          whileHover={{ scale: 1.2, backgroundColor: "rgba(255,255,255,0.15)" }}
+          style={{ background: "var(--n-chip-bg)" }}
+          whileHover={{ scale: 1.2, backgroundColor: "var(--n-chip-bg-hover)" }}
           whileTap={{ scale: 0.85 }}
         >
           <X size={11} className="text-white/30" aria-hidden />

@@ -15,6 +15,8 @@ import type { CouponDoc } from "./coupons";
 
 export interface FirestoreProductDoc {
   id: string;
+  /** The Firestore document id when the record was keyed by document path. */
+  documentId?: string;
   title?: string;
   price?: string | number;
   salePrice?: string | number | null;
