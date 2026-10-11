@@ -1437,3 +1437,210 @@ html[data-theme="light"] [data-pdp-root] .dc-pdp-module-index {
   color: var(--dc-brand-ink);
   font-weight: 750;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   33. OVERLAYS + CONTROLS — last dark leftovers (user QA) and the branded
+       control language (blue gradient primary, white/outline secondary,
+       rounded-xl) shared by PDP, subscription, profile and dialogs.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 33.1 dialog tokens: the module-picker / content-dialog subtext and
+   rules read --dialog-muted + --dialog-border (dark values at :root). ── */
+html[data-theme="light"] {
+  --dialog-muted: #5b6679;
+  --dialog-border: rgba(25, 28, 30, 0.12);
+}
+
+/* ── 33.2 .dc-field: auth inputs + country-code box + profile/settings
+   fields kept the dark glass wash (rgba(60,62,68,.168)) and white ink. ── */
+html[data-theme="light"][data-glass="on"] :where(.dc-field) {
+  color: var(--dc-ink);
+  border-color: rgba(25, 28, 30, 0.14);
+  background-color: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(25, 28, 30, 0.05);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-field)::placeholder {
+  color: #6b7280;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-field):focus,
+html[data-theme="light"][data-glass="on"] :where(.dc-field):focus-within {
+  background-color: #ffffff;
+  border-color: var(--dc-brand);
+  box-shadow: 0 0 0 3px rgba(0, 74, 198, 0.16);
+}
+
+/* ── 33.3 auth segmented switcher: the track is bg-black/40 (dark) — a
+   light track with the brand pill (bg-indigo-600 keeps white ink). ── */
+html[data-theme="light"] :where([role="tablist"][class*="bg-black/"]) {
+  background-color: #e7ecf3 !important;
+  border-color: rgba(25, 28, 30, 0.1) !important;
+}
+
+/* ── 33.4 ExpandingTabs (desktop header quick actions + home actions): the
+   active pill's bg-white/90 re-tints to ink through --color-white — it must
+   be the brand pill with white ink instead. ── */
+html[data-theme="light"] [data-expanding-tabs] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(25, 28, 30, 0.1) !important;
+  box-shadow: 0 8px 20px -14px rgba(25, 28, 30, 0.35) !important;
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab] {
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab]:hover {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-expanding-tabs] [data-expanding-tab][data-active="true"] {
+  background: linear-gradient(135deg, #004ac6, #2563eb) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 8px 18px -8px rgba(0, 74, 198, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ── 33.5 glass-select trigger + its portaled option list (sort dropdown
+   etc.): glass.css re-inks both with literal white. ── */
+html[data-theme="light"][data-glass="on"] .dc-glass-select {
+  background: #ffffff !important;
+  border-color: rgba(25, 28, 30, 0.14) !important;
+  color: var(--dc-ink) !important;
+  box-shadow: 0 1px 2px rgba(25, 28, 30, 0.05);
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select:hover {
+  border-color: rgba(25, 28, 30, 0.28) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select svg {
+  color: var(--dc-ink-3) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"] {
+  color: #334155 !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"]:hover,
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"]:focus {
+  background: rgba(0, 74, 198, 0.1) !important;
+  color: var(--dc-brand-ink) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"][aria-selected="true"] {
+  color: var(--dc-brand-ink) !important;
+}
+html[data-theme="light"][data-glass="on"] .dc-glass-select-pop [role="option"] svg {
+  color: var(--dc-brand) !important;
+}
+
+/* ── 33.6 command palette (search overlay): white panel, ink copy, the
+   active row wears the brand wash. ── */
+html[data-theme="light"] [data-glass-command-panel] {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-glass-command-panel] [data-active="true"],
+html[data-theme="light"] [data-glass-command-panel] :where([data-command-item])[data-active="true"] {
+  background: rgba(0, 74, 198, 0.12) !important;
+  color: var(--dc-brand-ink) !important;
+}
+
+/* ── 33.7 segment slide + leftover literal whites (hover ink, panel icons,
+   choice/tile borders, swatch ring). ── */
+html[data-theme="light"] .dc-segment [data-toggle]:hover {
+  color: var(--dc-ink);
+}
+html[data-theme="light"][data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+  background: linear-gradient(135deg, #004ac6, #2563eb) !important;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-choice):not([aria-checked="true"]) {
+  border-color: rgba(25, 28, 30, 0.18);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-tile):not([data-selected]) {
+  border-color: rgba(25, 28, 30, 0.14);
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
+  --tw-ring-color: var(--dc-brand);
+  --tw-ring-offset-color: #ffffff;
+}
+html[data-theme="light"][data-glass="on"] :where(.dc-panel) svg {
+  color: var(--dc-ink-3);
+}
+
+/* ── 33.8 the branded button language (light): primary = blue gradient,
+   rounded-xl, soft brand shadow; secondary = white fill, brand outline.
+   Applies to dialogs (PDP module picker), PDP CTAs, profile + subscription
+   primaries. ── */
+html[data-theme="light"] :is(
+  .dc-content-primary,
+  .dc-pdp-primary, .dc-pdp-library-cta, .dc-pdp-review-submit,
+  .dc-account-primary, .dc-subscription-primary
+) {
+  background: linear-gradient(135deg, #004ac6 0%, #2563eb 60%, #2f6fed 100%) !important;
+  background-image: linear-gradient(135deg, #004ac6 0%, #2563eb 60%, #2f6fed 100%) !important;
+  color: #ffffff !important;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px -10px rgba(0, 74, 198, 0.55);
+}
+html[data-theme="light"] :is(
+  .dc-content-primary,
+  .dc-pdp-primary, .dc-pdp-library-cta, .dc-pdp-review-submit,
+  .dc-account-primary, .dc-subscription-primary
+):hover {
+  filter: brightness(1.07);
+  background-color: transparent;
+}
+html[data-theme="light"] :is(.dc-account-primary, .dc-subscription-primary, .dc-content-primary) .uzp-pay__text,
+html[data-theme="light"] :is(.dc-account-primary, .dc-subscription-primary, .dc-content-primary) span {
+  color: #ffffff !important;
+}
+html[data-theme="light"] :is(.dc-content-secondary, .dc-pdp-secondary-actions .dc-pdp-text-action) {
+  background: #ffffff;
+  border: 1.5px solid rgba(0, 74, 198, 0.35);
+  border-radius: 12px;
+  color: var(--dc-brand-ink);
+  font-weight: 750;
+  box-shadow: 0 4px 12px -8px rgba(0, 74, 198, 0.35);
+}
+html[data-theme="light"] :is(.dc-content-secondary, .dc-pdp-secondary-actions .dc-pdp-text-action):hover {
+  background: linear-gradient(135deg, #004ac6, #2563eb);
+  border-color: transparent;
+  color: #ffffff;
+  text-decoration: none;
+}
+html[data-theme="light"] .dc-pdp-secondary-actions .dc-pdp-text-action[aria-pressed="true"] {
+  background: linear-gradient(135deg, #004ac6, #2563eb);
+  border-color: transparent;
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-pdp-secondary-actions .dc-pdp-text-action:disabled {
+  background: #f2f4f6;
+  border-color: rgba(25, 28, 30, 0.14);
+  color: var(--dc-ink-faint);
+  box-shadow: none;
+}
+
+/* Dock tooltip (GlassDock): glass.css paints it rgba(6,11,26,.9) via
+   :where([data-glass-dock-item]) > div:first-child !important — mirror that
+   selector with the light prefix so the white chip + ink copy win. */
+html[data-theme="light"][data-glass="on"] :where([data-glass-dock-item]) > div:first-child,
+html[data-theme="light"] [data-glass-dock-tip] {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  color: var(--dc-ink) !important;
+  border-color: rgba(25, 28, 30, 0.12) !important;
+  box-shadow: 0 8px 20px -10px rgba(25, 28, 30, 0.35) !important;
+}
+
+/* The PDP price card + dialog shells: a slightly larger, friendlier radius. */
+html[data-theme="light"] [data-pdp-root] .dc-pdp-purchase {
+  border-radius: 16px;
+  border-color: rgba(0, 74, 198, 0.16);
+}
+html[data-theme="light"] .dc-content-dialog {
+  border-radius: 18px;
+}
+
+/* Subscription/My Day brand plates re-hue to the same blue mix. */
+html[data-theme="light"] .bg-indigo-600 {
+  background-color: #004ac6;
+}
+html[data-theme="light"] .bg-indigo-600:hover {
+  background-color: #003ea8;
+}

@@ -348,6 +348,7 @@ function DockItem({
           plate's growth is a transform instead of a taller layout box. */}
       {!wide && (
         <motion.div
+          data-glass-dock-tip
           className={`pointer-events-none absolute -top-10 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
             active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}

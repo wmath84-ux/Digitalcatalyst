@@ -126,6 +126,7 @@ export function GlassCommand({
         <GlassSurface
           tint={0.6}
           radius={20}
+          data-glass-command-panel
           className="relative z-10 w-full max-w-lg animate-in fade-in-0 zoom-in-95 duration-200"
           contentClassName="flex flex-col"
         >
