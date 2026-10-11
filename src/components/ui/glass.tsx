@@ -18,6 +18,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { getEffectiveThemeMode, subscribeThemeMode } from "../../lib/theme";
 import { cn } from "@/lib/utils";
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -37,20 +38,19 @@ import { cn } from "@/lib/utils";
 // ── environment ────────────────────────────────────────────────────────────
 
 /* ── scheme ─────────────────────────────────────────────────────────────────
- * The app is DARK ONLY. Upstream shipped a reader that resolved the material
- * from `html.dark` / `html.light` / `data-theme` / the OS preference; every
- * one of those inputs is gone now (see src/lib/glassScheme.ts), so the reader
- * is a constant and the subscription that watched those attributes has nothing
- * left to watch. `useGlassDark` keeps its name and its signature — the pack's
- * components call it in ~20 places — and simply always resolves dark.
+ * The material follows the app theme (src/lib/theme.ts): light by default, dark
+ * when the learner picks it on the Profile page or on a route that is pinned
+ * dark (admin, course player). `useGlassDark` keeps its name and signature — the
+ * pack's components call it in ~20 places — and re-renders them when the theme
+ * changes, so every glass surface swaps material without a reload.
  * ──────────────────────────────────────────────────────────────────────── */
 
-function subscribeScheme(): () => void {
-  return () => undefined;
+function subscribeScheme(onChange: () => void): () => void {
+  return subscribeThemeMode(onChange);
 }
 
 function readDark(): boolean {
-  return true;
+  return getEffectiveThemeMode() === "dark";
 }
 
 export function useGlassDark(): boolean {

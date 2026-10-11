@@ -1,3 +1,9 @@
+:root {
+  /* Ink channel for glass copy. Dark: white. Light theme (light-theme.css): ink.
+     Used as `rgb(var(--dc-glass-ink-rgb) / A)` so each alpha is preserved. */
+  --dc-glass-ink-rgb: 255 255 255;
+}
+
 /*
  * Liquid Glass design layer (website-glass rollout — Wave 0).
  *
@@ -468,19 +474,19 @@ html[data-glass="on"] :where(.dc-scene-plate) {
   --dc-ink-1: rgba(255, 255, 255, 0.97);
   --dc-ink-2: rgba(255, 255, 255, 0.82);
   --dc-ink-3: rgba(255, 255, 255, 0.64);
-  color: rgba(255, 255, 255, 0.97);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.97);
 }
 
 /* Muted copy inside a card had a floor of ~55% white, which is under 4.5:1
  * even on the new plate. Lift the two utilities the cards actually use. */
 html[data-glass="on"] :where(.dc-glass-card) :where(.text-white\/50, .text-white\/55, .text-white\/60),
 html[data-glass="on"] :where(.dc-scene-plate) :where(.text-white\/50, .text-white\/55, .text-white\/60) {
-  color: rgba(255, 255, 255, 0.76);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.76);
 }
 
 html[data-glass="on"] :where(.dc-glass-card) :where(.text-white\/70, .text-white\/75, .text-white\/80),
 html[data-glass="on"] :where(.dc-scene-plate) :where(.text-white\/70, .text-white\/75, .text-white\/80) {
-  color: rgba(255, 255, 255, 0.88);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.88);
 }
 
 /* Home's tiles, bars and chips carry four copy steps the cards never used — a
@@ -488,11 +494,11 @@ html[data-glass="on"] :where(.dc-scene-plate) :where(.text-white\/70, .text-whit
    tile title. Same ladder, extended; the two card rules above stay
    byte-for-byte, so the material the owner approved does not shift. */
 html[data-glass="on"] :where(.dc-scene-plate) :where(.text-white\/35, .text-white\/40, .text-white\/45) {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.7);
 }
 
 html[data-glass="on"] :where(.dc-scene-plate) :where(.text-white\/85) {
-  color: rgba(255, 255, 255, 0.93);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.93);
 }
 
 /* Media cards (`contentClassName="p-0"`) put artwork edge-to-edge and lay copy
@@ -520,7 +526,7 @@ html[data-glass="on"] :where(.dc-scene-ink) {
 }
 
 html[data-glass="on"] :where(.dc-scene-ink):where(.text-white\/50, .text-white\/55, .text-white\/60) {
-  color: rgba(255, 255, 255, 0.86);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.86);
 }
 
 /* The carousel's dot row is the one control on Home that paints straight onto
@@ -546,7 +552,7 @@ html[data-glass="on"] :where(.dc-scene-field) > div[aria-hidden]:nth-of-type(4) 
 }
 
 html[data-glass="on"] :where(.dc-scene-field) input::placeholder {
-  color: rgba(255, 255, 255, 0.66);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.66);
 }
 
 /* My Day's Quick Notes composer is a WELL (a plated GlassSurface around a bare
@@ -554,11 +560,11 @@ html[data-glass="on"] :where(.dc-scene-field) input::placeholder {
    its own rule because the contract above pins the `input::placeholder`
    selector exactly. */
 html[data-glass="on"] :where(.dc-scene-field) textarea::placeholder {
-  color: rgba(255, 255, 255, 0.66);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.66);
 }
 
 html[data-glass="on"] :where(.dc-scene-field) :where(.text-white\/35) {
-  color: rgba(255, 255, 255, 0.66);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.66);
 }
 
 /* One sensitivity, not two: a plated surface never keeps a live blur stage.
@@ -628,7 +634,7 @@ html[data-glass="on"]:not([data-glass-tier="flat"]) :where(.z-\[1000\]) [role="s
 
 /* The description's `/50` ink step, lifted to the plate's muted floor. */
 html[data-glass="on"] :where(.z-\[1000\]) [role="status"] :where(.text-white\/50) {
-  color: rgba(255, 255, 255, 0.76);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.76);
 }
 
 /* `glass-toggle-group` used as a LIGHT segmented control (the store filter row
@@ -955,15 +961,15 @@ html[data-glass="on"] [data-course-dock] .dc-footer-pill {
    exactly the plate's ladder (/35–/45 → 0.7, /50–/60 → 0.76) so the store and
    Home read the same. */
 html[data-glass="on"] :where([data-search-launcher]) input::placeholder {
-  color: rgba(255, 255, 255, 0.66);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.66);
 }
 
 html[data-glass="on"] :where([data-search-launcher]) :where(.text-white\/35, .text-white\/40, .text-white\/45) {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.7);
 }
 
 html[data-glass="on"] :where([data-search-launcher]) :where(.text-white\/50, .text-white\/55, .text-white\/60) {
-  color: rgba(255, 255, 255, 0.76);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.76);
 }
 
 /* The plate's ink floor is a `color` on the surface ROOT, so it would also
@@ -1002,7 +1008,7 @@ html[data-glass="on"] :where(.dc-scene-ink) :where(.bg-clip-text.text-transparen
    sits on the scene with no surface under it. The cards keep their own painted
    scrim, so only this line is lifted. */
 html[data-glass="on"] :where([data-store-coverflow]) :where(.dc-scene-ink) {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgb(var(--dc-glass-ink-rgb) / 0.8);
 }
 
 /* ── (a) THE FOOTER DOCK ───────────────────────────────────────────────────

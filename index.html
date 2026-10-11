@@ -7,7 +7,7 @@
          Evaluated immediately by browser on cold start before JavaScript executes. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#f8fafc" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -26,9 +26,32 @@
          page social profile card (weights 200 / 600 are the card's bio and
          name lines); it sits at the head of that card's font stack. -->
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@200;400;600&display=swap" rel="stylesheet" />
+    <!-- Colour theme, applied before the first paint so there is no flash of the
+         wrong theme. Mirrors src/lib/theme.ts (storage key, `light` default and the
+         admin / course-player routes that stay dark). Keep the two in sync. -->
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem("dc.theme");
+          var mode = stored === "dark" || stored === "light" ? stored : "light";
+          var hash = window.location.hash || "";
+          if (hash.indexOf("#/admin") === 0 || hash.indexOf("#/course/") === 0 || hash.indexOf("#/my-course/") === 0) mode = "dark";
+          var root = document.documentElement;
+          root.dataset.theme = mode;
+          root.classList.add(mode);
+          root.style.colorScheme = mode;
+          var meta = document.querySelector('meta[name="theme-color"]:not([media])');
+          if (meta) meta.setAttribute("content", mode === "light" ? "#f8fafc" : "#0a0c12");
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+          document.documentElement.classList.add("light");
+        }
+      })();
+    </script>
     <style>
       /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
       html { background-color: #0a0c12; }
+      html[data-theme="light"] { background-color: #f8fafc; }
       /* ── The app opening animation (see src/utils/openingSplash.ts) ─────────
          Two layers, always both present in the DOM:
            · .app-boot-fallback — a CSS-only brand card. Paints with no JS at

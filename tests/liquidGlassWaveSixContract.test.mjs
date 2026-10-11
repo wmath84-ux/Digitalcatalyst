@@ -23,11 +23,10 @@ const code = (src) =>
 const exists = (p) => fs.existsSync(new URL(`../${p}`, import.meta.url));
 
 test("dark ink follows the route's own theme signal, not a forced class", () => {
-  // The app is dark only now, so no route publishes a theme attribute of its
-  // own — the pack's useGlassDark() resolves dark unconditionally and the
-  // FlowPath theme hook that used to write `data-theme` is deleted.
+  // The FlowPath theme hook is deleted; the app-wide theme (src/lib/theme.ts)
+  // is the only writer of `data-theme`, and useGlassDark() follows it.
   assert.ok(!exists("src/flowpath/hooks/useTheme.ts"), "the FlowPath theme hook is gone");
-  assert.match(read("src/components/ui/glass.tsx"), /function readDark\(\): boolean \{\s*return true;/);
+  assert.match(read("src/components/ui/glass.tsx"), /function readDark\(\): boolean \{\s*return getEffectiveThemeMode\(\) === "dark";/);
 
   for (const f of [
     "src/components/flowpath/CurveSettingsModal.tsx",

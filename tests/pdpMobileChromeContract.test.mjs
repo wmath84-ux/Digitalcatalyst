@@ -36,8 +36,8 @@ test("the product page removes decorative badges and duplicate thumb purchase co
 test("desktop breadcrumbs survive and plain product copy has a readable backing", () => {
   const minimalCss = read("src/pdp-minimal.css");
   assert.match(pdp, /<nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden[^"]*sm:flex"/);
-  assert.match(minimalCss, /\[data-pdp-root\] \{[\s\S]*?background: rgba\(10, 14, 24, 0\.96\)/);
-  assert.match(minimalCss, /\.dc-pdp-description \{[^}]*color: #d0d7e3/);
+  assert.match(minimalCss, /\[data-pdp-root\] \{[\s\S]*?background: (?:var\(--pdp-b-rgba-10-14-24-0-96, )?rgba\(10, 14, 24, 0\.96\)/);
+  assert.match(minimalCss, /\.dc-pdp-description \{[^}]*color: var\(--pdp-t-d0d7e3, #d0d7e3\)/);
   assert.match(css, /:where\(\.dc-scene-plate\) \{\s*\n\s*--dc-ink-1: rgba\(255, 255, 255, 0\.97\);/);
 });
 

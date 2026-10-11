@@ -1,5 +1,6 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
 import { GlassButton } from "../components/ui/glass-button";
+import { ThemeModeToggle } from "../components/ui/ThemeModeToggle";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { PaymentButton } from "../components/ui/PaymentButton";
 import { buildRenewalView } from "../../utils/renewalPresentation";
@@ -208,6 +209,16 @@ export default function ProfileLayout({ name, email, photoURL, bio, initials, me
             {membership.planDescription ? <details className="dc-account-disclosure"><summary>Plan details</summary><p className="dc-account-note">{membership.planDescription}</p></details> : null}
           </>
         ) : <div data-profile-upgrade-card><p className="dc-account-note">No paid membership. Purchased content remains in My Purchases.</p><button type="button" onClick={onOpenPlans} className="dc-account-primary">View plans</button></div>}
+      </section>
+
+      <section data-profile-appearance aria-labelledby="profile-appearance-title" className="dc-account-section">
+        <header className="dc-account-section-header">
+          <div>
+            <h2 id="profile-appearance-title">Appearance</h2>
+            <p className="dc-account-note">Light is the default. Your choice is saved on this device and applies across the app.</p>
+          </div>
+          <ThemeModeToggle />
+        </header>
       </section>
 
       <section aria-label="Account tools" className="dc-account-section">

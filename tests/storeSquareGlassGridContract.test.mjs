@@ -175,7 +175,7 @@ test("the hero card's type scale is a headline, not a label", () => {
   // The body copy steps up with it and stays near-white on the lens.
   const body = /\.dc-store-hero-body \{([^}]*)\}/.exec(storeCss)?.[1];
   assert.match(body, /font-size: clamp\(0\.875rem, 3\.6vw, 1\.0625rem\)/);
-  assert.match(body, /color: rgba\(255, 255, 255, 0\.94\)/);
+  assert.match(body, /color: rgb\(var\(--dc-glass-ink-rgb\) \/ 0\.94\)/);
 });
 
 /* ------------------------------------------------------------------ */

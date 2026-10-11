@@ -1,3 +1,77 @@
+/* ── Home colour tokens ──────────────────────────────────────────────────────
+   Semantic tokens for the Home page chrome (hero, cards, chips, rules, copy).
+   `:root` holds the dark defaults — the values this sheet used before the theme
+   system — and `html[data-theme="light"]` swaps in the light palette. Light
+   inks are picked for WCAG AA (≥ 4.5:1 on white and on the light card wash).
+   Brand plates (hero CTA, active category pill, feedback button) and artwork
+   keep their own colours on purpose.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --dc-home-hero-ink: #fff;
+  --dc-home-hero-bg: rgba(20, 24, 44, 0.52);
+  --dc-home-hero-scrim: linear-gradient(90deg, rgba(8, 12, 27, 0.4), rgba(8, 12, 27, 0.06) 72%);
+  --dc-home-accent-line: rgba(160, 146, 255, 0.25);
+  --dc-home-accent-fill: rgba(111, 91, 220, 0.13);
+  --dc-home-accent-ink-strong: #e8e4ff;
+  --dc-home-accent-ink: #c8bdff;
+  --dc-home-ink-strong: rgba(255, 255, 255, 0.97);
+  --dc-home-ink: rgba(240, 242, 252, 0.9);
+  --dc-home-ink-soft: rgba(233, 236, 248, 0.76);
+  --dc-home-ink-faint: rgba(230, 235, 247, 0.6);
+  --dc-home-ink-disabled: rgba(255, 255, 255, 0.22);
+  --dc-home-line-soft: rgba(255, 255, 255, 0.14);
+  --dc-home-tint: rgba(255, 255, 255, 0.06);
+  --dc-home-tint-strong: rgba(255, 255, 255, 0.1);
+  --dc-home-chip: rgba(8, 12, 27, 0.8);
+  --dc-home-chip-soft: rgba(7, 12, 28, 0.37);
+  --dc-home-chip-hover: rgba(22, 25, 46, 0.94);
+  --dc-home-dot: rgba(255, 255, 255, 0.42);
+  --dc-home-dot-active: #b6a8ff;
+  --dc-home-focus: rgba(176, 166, 255, 0.95);
+  --dc-home-title-shadow-color: rgba(4, 8, 18, 0.42);
+  --dc-home-pink-ink: #ff8fb1;
+  --dc-home-star-ink: #ffd47f;
+  --dc-home-success-ink: #8dd8b4;
+  --dc-home-danger-line: rgba(251, 113, 133, 0.24);
+  --dc-home-danger-fill: rgba(190, 24, 93, 0.1);
+  --dc-home-danger-ink: #fecdd3;
+  --dc-home-card-shadow: 0 12px 30px -22px rgba(2, 6, 16, 0.82), 0 2px 8px -5px rgba(2, 6, 16, 0.48);
+  --dc-home-card-shadow-hover: 0 16px 34px -22px rgba(2, 6, 16, 0.88), 0 3px 10px -6px rgba(2, 6, 16, 0.55);
+}
+
+html[data-theme="light"] {
+  --dc-home-hero-ink: #0f172a;
+  --dc-home-hero-bg: rgba(255, 255, 255, 0.94);
+  --dc-home-hero-scrim: linear-gradient(90deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.1) 72%);
+  --dc-home-accent-line: rgba(124, 58, 237, 0.24);
+  --dc-home-accent-fill: rgba(124, 58, 237, 0.08);
+  --dc-home-accent-ink-strong: #5b21b6;
+  --dc-home-accent-ink: #6d28d9;
+  --dc-home-ink-strong: #0f172a;
+  --dc-home-ink: #1e293b;
+  --dc-home-ink-soft: #475569;
+  --dc-home-ink-faint: #5b6679;
+  --dc-home-ink-disabled: #94a3b8;
+  --dc-home-line-soft: rgba(15, 23, 42, 0.1);
+  --dc-home-tint: rgba(15, 23, 42, 0.035);
+  --dc-home-tint-strong: rgba(15, 23, 42, 0.06);
+  --dc-home-chip: rgba(255, 255, 255, 0.94);
+  --dc-home-chip-soft: rgba(255, 255, 255, 0.72);
+  --dc-home-chip-hover: #ffffff;
+  --dc-home-dot: rgba(15, 23, 42, 0.24);
+  --dc-home-dot-active: #7c3aed;
+  --dc-home-focus: #4f46e5;
+  --dc-home-title-shadow-color: transparent;
+  --dc-home-pink-ink: #be185d;
+  --dc-home-star-ink: #b45309;
+  --dc-home-success-ink: #047857;
+  --dc-home-danger-line: rgba(190, 24, 93, 0.28);
+  --dc-home-danger-fill: rgba(190, 24, 93, 0.07);
+  --dc-home-danger-ink: #9f1239;
+  --dc-home-card-shadow: 0 12px 28px -20px rgba(15, 23, 42, 0.14), 0 2px 6px -4px rgba(15, 23, 42, 0.08);
+  --dc-home-card-shadow-hover: 0 16px 30px -20px rgba(15, 23, 42, 0.16), 0 4px 10px -6px rgba(15, 23, 42, 0.1);
+}
+
 /* Home-only dashboard layout and component polish. Keep every selector inside
    [data-home-content] so the approved Header, footer dock and other routes stay
    untouched. */
@@ -58,9 +132,9 @@
   min-height: clamp(220px, 22vw, 304px);
   overflow: hidden;
   padding: clamp(22px, 3.2vw, 40px);
-  color: #fff;
+  color: var(--dc-home-hero-ink);
   isolation: isolate;
-  background-color: rgba(20, 24, 44, 0.52);
+  background-color: var(--dc-home-hero-bg);
 }
 
 .dc-home-hero-slide::after {
@@ -68,7 +142,7 @@
   z-index: 0;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, rgba(8, 12, 27, 0.4), rgba(8, 12, 27, 0.06) 72%);
+  background: var(--dc-home-hero-scrim);
   pointer-events: none;
 }
 
@@ -87,10 +161,10 @@
   min-height: 25px;
   align-items: center;
   padding: 0 10px;
-  border: 1px solid rgba(199, 188, 255, 0.3);
+  border: 1px solid var(--dc-home-accent-line);
   border-radius: 999px;
-  background: rgba(32, 28, 65, 0.42);
-  color: rgba(232, 228, 255, 0.94);
+  background: var(--dc-home-accent-fill);
+  color: var(--dc-home-accent-ink-strong);
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.12em;
@@ -101,7 +175,7 @@
 [data-home-content] [data-home-hero] .dc-home-hero-title {
   max-width: 19ch;
   margin: 12px 0 0;
-  color: #fff;
+  color: var(--dc-home-hero-ink);
   font-size: clamp(25px, 3.2vw, 40px) !important;
   font-weight: 760;
   letter-spacing: -0.035em;
@@ -115,7 +189,7 @@
   max-width: 48ch;
   margin: 10px 0 0;
   overflow: hidden;
-  color: rgba(241, 243, 255, 0.82);
+  color: var(--dc-home-ink-soft);
   font-size: clamp(13px, 1.15vw, 15px);
   font-weight: 450;
   line-height: 1.45;
@@ -135,10 +209,10 @@
   min-height: 25px;
   align-items: center;
   padding: 0 9px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 999px;
-  background: rgba(7, 12, 28, 0.38);
-  color: rgba(245, 246, 255, 0.86);
+  background: var(--dc-home-chip-soft);
+  color: var(--dc-home-ink);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
@@ -191,14 +265,14 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--dc-home-dot);
   cursor: pointer;
   transition: width 180ms ease, background-color 180ms ease;
 }
 
 .dc-home-hero-dot.is-active {
   width: 22px;
-  background: #b6a8ff;
+  background: var(--dc-home-dot-active);
 }
 
 .dc-home-hero-skeleton {
@@ -297,12 +371,12 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
 .dc-home-section-heading h2 {
   min-width: 0;
   margin: 0;
-  color: rgba(255, 255, 255, 0.97);
+  color: var(--dc-home-ink-strong);
   font-size: clamp(20px, 1.8vw, 24px);
   font-weight: 720;
   letter-spacing: -0.025em;
   line-height: 1.2;
-  text-shadow: 0 1px 5px rgba(4, 8, 18, 0.42);
+  text-shadow: 0 1px 5px var(--dc-home-title-shadow-color);
 }
 
 .dc-home-section-trailing {
@@ -321,7 +395,7 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
   padding: 0 2px 0 10px;
   border: 0;
   background: transparent;
-  color: rgba(220, 218, 255, 0.88);
+  color: var(--dc-home-accent-ink);
   font-size: 13px;
   font-weight: 650;
   line-height: 1;
@@ -330,7 +404,7 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
 }
 
 .dc-home-section-action:hover {
-  color: #fff;
+  color: var(--dc-home-ink-strong);
 }
 
 .dc-home-section-action:focus-visible,
@@ -339,7 +413,7 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
 .dc-home-product-favorite:focus-visible,
 .dc-home-continue-action:focus-visible,
 .dc-home-hero-dot:focus-visible {
-  outline: 2px solid rgba(176, 166, 255, 0.95);
+  outline: 2px solid var(--dc-home-focus);
   outline-offset: 3px;
 }
 
@@ -349,10 +423,10 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
   align-items: center;
   gap: 5px;
   padding: 0 10px;
-  border: 1px solid rgba(160, 146, 255, 0.23);
+  border: 1px solid var(--dc-home-accent-line);
   border-radius: 999px;
-  background: rgba(111, 91, 220, 0.13);
-  color: #d7d0ff;
+  background: var(--dc-home-accent-fill);
+  color: var(--dc-home-accent-ink);
   font-size: 13px;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -381,13 +455,13 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
 
 html[data-glass="on"] [data-home-content] .dc-home-card,
 html[data-glass="on"] [data-home-content] .dc-home-product-card {
-  box-shadow: 0 12px 30px -22px rgba(2, 6, 16, 0.82), 0 2px 8px -5px rgba(2, 6, 16, 0.48) !important;
+  box-shadow: var(--dc-home-card-shadow) !important;
 }
 
 @media (hover: hover) {
   html[data-glass="on"] [data-home-content] .dc-home-card:hover,
   html[data-glass="on"] [data-home-content] .dc-home-product-card:hover {
-    box-shadow: 0 16px 34px -22px rgba(2, 6, 16, 0.88), 0 3px 10px -6px rgba(2, 6, 16, 0.55) !important;
+    box-shadow: var(--dc-home-card-shadow-hover) !important;
   }
 }
 
@@ -412,9 +486,9 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--dc-home-tint);
 }
 
 .dc-home-continue-image img {
@@ -445,7 +519,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--dc-home-ink-strong);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.32;
@@ -457,7 +531,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 .dc-home-continue-percent {
   flex: 0 0 auto;
   padding-top: 1px;
-  color: #c8bdff;
+  color: var(--dc-home-accent-ink);
   font-size: 12px;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -466,7 +540,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 .dc-home-continue-details {
   display: -webkit-box;
   overflow: hidden;
-  color: rgba(230, 235, 247, 0.7);
+  color: var(--dc-home-ink-soft);
   font-size: 12px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
@@ -478,7 +552,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-width: 0;
   align-items: flex-start;
   gap: 6px;
-  color: rgba(233, 230, 255, 0.84);
+  color: var(--dc-home-ink);
   font-size: 12px;
   line-height: 1.38;
 }
@@ -486,7 +560,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 .dc-home-continue-lesson > svg {
   flex: 0 0 auto;
   margin-top: 1px;
-  color: #aea2ff;
+  color: var(--dc-home-accent-ink);
 }
 
 .dc-home-continue-lesson > span {
@@ -499,7 +573,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-continue-lesson-label {
   margin-right: 5px;
-  color: rgba(230, 235, 247, 0.58);
+  color: var(--dc-home-ink-faint);
   font-size: 11px;
 }
 
@@ -516,9 +590,9 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-width: 40px;
   height: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--dc-home-tint-strong);
 }
 
 .dc-home-progress-fill {
@@ -531,7 +605,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-continue-progress-label {
   flex: 0 0 auto;
-  color: rgba(231, 231, 246, 0.67);
+  color: var(--dc-home-ink-soft);
   font-size: 10.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -545,13 +619,13 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   gap: 6px;
   align-self: flex-end;
   padding: 0 1px;
-  color: #c9c0ff;
+  color: var(--dc-home-accent-ink);
   font-size: 12px;
   font-weight: 750;
 }
 
 .dc-home-continue-action:hover .dc-home-continue-cta {
-  color: #fff;
+  color: var(--dc-home-ink-strong);
 }
 
 .dc-home-continue-skeleton {
@@ -623,7 +697,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   width: 100%;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--dc-home-tint);
 }
 
 .dc-home-product-image {
@@ -648,10 +722,10 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-height: 24px;
   align-items: center;
   padding: 0 9px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 999px;
-  background: rgba(8, 12, 27, 0.82);
-  color: rgba(255, 255, 255, 0.94);
+  background: var(--dc-home-chip);
+  color: var(--dc-home-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -669,10 +743,10 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   height: 38px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 999px;
-  background: rgba(8, 12, 27, 0.78);
-  color: rgba(255, 255, 255, 0.88);
+  background: var(--dc-home-chip);
+  color: var(--dc-home-ink);
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
   backdrop-filter: blur(8px);
@@ -680,12 +754,12 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 }
 
 .dc-home-product-favorite:hover {
-  background: rgba(22, 25, 46, 0.94);
+  background: var(--dc-home-chip-hover);
   transform: translateY(-1px);
 }
 
 .dc-home-product-favorite.is-favorite {
-  color: #ff8fb1;
+  color: var(--dc-home-pink-ink);
 }
 
 .dc-home-product-copy {
@@ -704,7 +778,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-height: 2.55em;
   margin: 0;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--dc-home-ink-strong);
   font-size: clamp(14px, 1.1vw, 16px);
   font-weight: 680;
   letter-spacing: -0.01em;
@@ -720,7 +794,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   min-height: 1.3em;
   margin: 0;
   overflow: hidden;
-  color: rgba(229, 234, 246, 0.78);
+  color: var(--dc-home-ink-soft);
   font-size: 12px;
   line-height: 1.4;
   -webkit-box-orient: vertical;
@@ -745,7 +819,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  color: #ffd47f;
+  color: var(--dc-home-star-ink);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -753,7 +827,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 }
 
 .dc-home-product-rating-count {
-  color: rgba(231, 233, 244, 0.76);
+  color: var(--dc-home-ink-soft);
   font-size: 11px;
   font-weight: 500;
 }
@@ -768,7 +842,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   align-items: baseline;
   column-gap: 6px;
   row-gap: 2px;
-  color: rgba(255, 255, 255, 0.98);
+  color: var(--dc-home-ink-strong);
   font-size: 18px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -789,7 +863,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 }
 
 .dc-home-product-price del {
-  color: rgba(223, 228, 240, 0.82);
+  color: var(--dc-home-ink-soft);
   font-size: 13px;
   font-weight: 600;
   text-decoration-line: line-through;
@@ -864,7 +938,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   gap: 5px;
   min-width: 0;
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--dc-home-ink-strong);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.3;
@@ -878,7 +952,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-verified-icon {
   flex: 0 0 auto;
-  color: #8dd8b4;
+  color: var(--dc-home-success-ink);
 }
 
 .dc-home-review-byline {
@@ -886,28 +960,28 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   flex-wrap: wrap;
   gap: 5px;
   margin: 3px 0 0;
-  color: rgba(229, 234, 246, 0.64);
+  color: var(--dc-home-ink-faint);
   font-size: 11px;
   line-height: 1.3;
 }
 
 .dc-home-review-stars {
   margin: 14px 0 0;
-  color: #ffd47f;
+  color: var(--dc-home-star-ink);
   font-size: 13px;
   letter-spacing: 0.08em;
   line-height: 1;
 }
 
 .dc-home-review-empty-stars {
-  color: rgba(255, 255, 255, 0.22);
+  color: var(--dc-home-ink-disabled);
 }
 
 .dc-home-review-comment {
   display: -webkit-box;
   margin: 10px 0 0;
   overflow: hidden;
-  color: rgba(246, 247, 251, 0.84);
+  color: var(--dc-home-ink);
   font-size: 13px;
   line-height: 1.5;
   -webkit-box-orient: vertical;
@@ -919,7 +993,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   margin: auto 0 0;
   padding-top: 12px;
   overflow: hidden;
-  color: #c8bdff;
+  color: var(--dc-home-accent-ink);
   font-size: 11px;
   font-weight: 650;
   line-height: 1.35;
@@ -951,10 +1025,10 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   align-items: center;
   gap: 8px;
   padding: 0 13px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(238, 237, 255, 0.9);
+  background: var(--dc-home-tint);
+  color: var(--dc-home-ink);
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
@@ -962,18 +1036,18 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 }
 
 .dc-home-feedback-back:hover {
-  border-color: rgba(185, 174, 255, 0.32);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--dc-home-accent-line);
+  background: var(--dc-home-tint-strong);
 }
 
 .dc-home-feedback-back:focus-visible {
-  outline: 2px solid rgba(176, 166, 255, 0.95);
+  outline: 2px solid var(--dc-home-focus);
   outline-offset: 3px;
 }
 
 .dc-home-feedback-page-eyebrow {
   margin: 0 0 6px;
-  color: #bdb3ff;
+  color: var(--dc-home-accent-ink);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.14em;
@@ -983,7 +1057,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-feedback-page-heading h1 {
   margin: 0;
-  color: rgba(255, 255, 255, 0.98);
+  color: var(--dc-home-ink-strong);
   font-size: clamp(25px, 3vw, 34px);
   font-weight: 760;
   letter-spacing: -0.035em;
@@ -994,7 +1068,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 .dc-home-feedback-page-description {
   max-width: 58ch;
   margin: 8px 0 0;
-  color: rgba(228, 232, 246, 0.74);
+  color: var(--dc-home-ink-soft);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -1030,10 +1104,10 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   flex: 0 0 42px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(172, 159, 255, 0.2);
+  border: 1px solid var(--dc-home-accent-line);
   border-radius: 14px;
-  background: rgba(107, 91, 219, 0.14);
-  color: #c9c0ff;
+  background: var(--dc-home-accent-fill);
+  color: var(--dc-home-accent-ink);
 }
 
 .dc-home-feedback-copy {
@@ -1043,7 +1117,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-feedback-copy h2 {
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--dc-home-ink-strong);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -1052,7 +1126,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-feedback-copy p {
   margin: 4px 0 0;
-  color: rgba(229, 234, 246, 0.68);
+  color: var(--dc-home-ink-faint);
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -1065,7 +1139,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   justify-content: center;
   gap: 8px;
   padding: 0 15px;
-  border: 1px solid rgba(184, 175, 255, 0.24);
+  border: 1px solid var(--dc-home-accent-line);
   border-radius: 999px;
   background: #514cc6;
   color: #fff;
@@ -1083,17 +1157,17 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 
 .dc-home-catalog-error {
   padding: 18px 20px;
-  border: 1px solid rgba(251, 113, 133, 0.24);
+  border: 1px solid var(--dc-home-danger-line);
   border-radius: 18px;
-  background: rgba(190, 24, 93, 0.1);
-  color: #fecdd3;
+  background: var(--dc-home-danger-fill);
+  color: var(--dc-home-danger-ink);
   font-size: 13px;
   line-height: 1.5;
 }
 
 .dc-home-results-count {
   margin: -7px 0 0;
-  color: rgba(230, 235, 247, 0.65);
+  color: var(--dc-home-ink-faint);
   font-size: 12px;
 }
 
@@ -1105,21 +1179,21 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   justify-content: center;
   gap: 9px;
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--dc-home-line-soft);
   border-radius: 20px;
-  background: rgba(7, 12, 27, 0.35);
+  background: var(--dc-home-chip-soft);
   text-align: center;
 }
 
 .dc-home-search-empty p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.91);
+  color: var(--dc-home-ink);
   font-size: 14px;
   font-weight: 650;
 }
 
 .dc-home-search-empty span {
-  color: rgba(231, 235, 247, 0.65);
+  color: var(--dc-home-ink-faint);
   font-size: 12px;
 }
 

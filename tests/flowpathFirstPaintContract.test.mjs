@@ -25,16 +25,16 @@ const emptyState = fs.readFileSync("src/components/flowpath/EmptyState.tsx", "ut
 const activityCard = fs.readFileSync("src/components/flowpath/ActivityCard.tsx", "utf8");
 const plusNode = fs.readFileSync("src/components/flowpath/PlusNode.tsx", "utf8");
 
-test("FlowPath publishes no theme — the app is dark only", () => {
-  // The pre-paint `data-theme` write is gone with the light theme: there is
-  // one scheme, so nothing can flash the wrong one on the first frame.
-  assert.ok(!fs.existsSync("src/flowpath/hooks/useTheme.ts"), "the theme hook is deleted");
+test("FlowPath publishes no theme of its own — the app-wide theme owns <html>", () => {
+  // The pre-paint `data-theme` write lives in one place now: src/lib/theme.ts,
+  // mirrored by the inline script in index.html. FlowPath never writes it.
+  assert.ok(!fs.existsSync("src/flowpath/hooks/useTheme.ts"), "the FlowPath theme hook is deleted");
   assert.doesNotMatch(flowPathView, /useTheme/);
   assert.doesNotMatch(flowPathView, /data-theme/);
-  // …and the app-level scheme writer pins dark, never light.
   const scheme = fs.readFileSync("src/lib/glassScheme.ts", "utf8");
-  assert.match(scheme, /classList\.add\("dark"\)/);
-  assert.doesNotMatch(scheme, /classList\.toggle\("light"/);
+  assert.match(scheme, /syncDocumentTheme\(\)/);
+  const theme = fs.readFileSync("src/lib/theme.ts", "utf8");
+  assert.match(theme, /classList\.toggle\("light"/);
 });
 
 test("no FlowPath surface mounts invisible (no opacity-0 entrance dead time)", () => {
