@@ -349,11 +349,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             >
               <X size={13} strokeWidth={2.6} />
             </GlassButton>
-          ) : (
-            <span className="absolute right-3 top-1/2 hidden -translate-y-1/2 shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
-              Tap to search
-            </span>
-          )}
+          ) : null}
         </div>
 
         {query.trim().length > 0 && (

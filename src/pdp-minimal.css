@@ -123,9 +123,11 @@
 [data-pdp-root] [data-pdp-buy] { gap: 1rem; }
 [data-pdp-root] .dc-pdp-identity { display: grid; gap: 0.55rem; }
 [data-pdp-root] .dc-pdp-type-label {
-  color: var(--pdp-muted);
+  color: var(--pdp-accent);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 [data-pdp-root] .dc-pdp-title {
@@ -140,7 +142,8 @@
 
 [data-pdp-root] .dc-pdp-byline {
   color: var(--pdp-muted);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
+  font-weight: 650;
   line-height: 1.5;
 }
 
@@ -172,7 +175,8 @@
 }
 
 [data-pdp-root] [data-pdp-meta-item] { min-width: 0; max-width: 100%; }
-[data-pdp-root] [data-pdp-meta-item] dt { color: var(--pdp-muted); font-size: 0.75rem; }
+[data-pdp-root] [data-pdp-meta-item] dt { color: var(--pdp-muted); font-size: 0.75rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+[data-pdp-root] [data-pdp-meta-item] dd { font-size: 0.9375rem; font-weight: 700; }
 [data-pdp-root] [data-pdp-meta-item] dd {
   margin: 0.2rem 0 0;
   color: var(--pdp-t-e4e9f2, #e4e9f2);
@@ -266,6 +270,34 @@
   text-align: left;
 }
 [data-pdp-root] .dc-pdp-text-action:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* The action row (Add to cart / Save / Share) wears real pill buttons so the
+   controls read as buttons, not as links. */
+[data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action {
+  min-height: 2.75rem;
+  padding: 0.55rem 1.25rem;
+  border: 1.5px solid var(--pdp-accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pdp-accent);
+  font-size: 0.875rem;
+  font-weight: 750;
+  justify-content: center;
+}
+[data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action:hover {
+  background: color-mix(in srgb, var(--pdp-accent) 14%, transparent);
+  text-decoration: none;
+}
+[data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action:disabled {
+  border-color: var(--pdp-border);
+  background: transparent;
+  color: var(--pdp-muted);
+}
+[data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action[aria-pressed="true"] {
+  background: var(--pdp-accent);
+  border-color: var(--pdp-accent);
+  color: #ffffff;
+}
 [data-pdp-root] .dc-pdp-text-action:disabled { color: var(--pdp-muted); cursor: default; text-decoration: none; }
 [data-pdp-root] .dc-pdp-text-action[aria-pressed="true"] { color: var(--pdp-t-e0dcff, #e0dcff); }
 [data-pdp-root] .dc-pdp-secondary-actions { position: relative; display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; }
@@ -326,7 +358,16 @@
 [data-pdp-root] .dc-pdp-description { color: var(--pdp-t-d0d7e3, #d0d7e3); font-size: 0.9375rem; line-height: 1.75; white-space: pre-line; overflow-wrap: anywhere; }
 [data-pdp-root] .dc-pdp-description[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 [data-pdp-root] .dc-pdp-more-highlights summary { min-height: 2.75rem; padding-block: 0.8rem; color: var(--pdp-accent); cursor: pointer; font-size: 0.8125rem; font-weight: 600; }
-[data-pdp-root] .dc-pdp-section-heading { color: var(--pdp-t-f8fafc, #f8fafc); font-size: 1rem; font-weight: 750; line-height: 1.5; }
+[data-pdp-root] .dc-pdp-section-heading {
+  color: var(--pdp-t-f8fafc, #f8fafc);
+  font-size: 1.0625rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--pdp-accent);
+  display: inline-block;
+}
 [data-pdp-root] .dc-pdp-included-list { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.5rem; color: var(--pdp-t-c4cede, #c4cede); font-size: 0.875rem; }
 [data-pdp-root] .dc-pdp-highlight-list { display: grid; gap: 0.5rem; margin-top: 0.5rem; color: var(--pdp-t-c4cede, #c4cede); font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
 
@@ -334,7 +375,7 @@
 [data-pdp-root] .dc-pdp-module-heading { display: flex; width: 100%; min-height: 3.25rem; align-items: center; gap: 0.75rem; padding-block: 0.875rem; text-align: left; }
 [data-pdp-root] .dc-pdp-module-index { color: var(--pdp-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 [data-pdp-root] .dc-pdp-module-copy { display: grid; min-width: 0; flex: 1; gap: 0.2rem; }
-[data-pdp-root] .dc-pdp-module-name { font-size: 0.875rem; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+[data-pdp-root] .dc-pdp-module-name { font-size: 0.9375rem; font-weight: 750; line-height: 1.5; overflow-wrap: anywhere; }
 [data-pdp-root] .dc-pdp-module-count { color: var(--pdp-muted); font-size: 0.75rem; }
 [data-pdp-root] .dc-pdp-paid-note { color: var(--pdp-t-f2cb7c, #f2cb7c); font-size: 0.75rem; line-height: 1.5; }
 [data-pdp-root] [data-paid="true"] > .dc-pdp-module-heading { color: var(--pdp-t-f9dfa8, #f9dfa8); }

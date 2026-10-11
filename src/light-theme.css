@@ -304,11 +304,12 @@ html[data-theme="light"] .dc-home-hero-art {
           mask-image: linear-gradient(to right, transparent 0%, #000 38%);
 }
 
-/* Search field inside the header: a light fill and ink border, not a
-   transparent well on a white plate. The input stays transparent. */
+/* Search field inside the header: SOLID WHITE fill (never a navy wash — that
+   was the "two colours in one box" bug) with black ink. Full sweep in
+   light-theme-pages.css §30. */
 html[data-theme="light"] .dc-scene-field:has(input) {
-  background-color: rgba(15, 23, 42, 0.045);
-  border-color: var(--dc-line-strong);
+  background-color: #ffffff;
+  background-image: none;
 }
 html[data-theme="light"] .dc-scene-field input,
 html[data-theme="light"] .dc-scene-field input.bg-transparent {

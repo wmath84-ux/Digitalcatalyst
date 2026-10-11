@@ -449,6 +449,9 @@ html[data-theme="light"] :where(.text-indigo-200, .text-indigo-300) { color: #37
 html[data-theme="light"] :where(.text-violet-200, .text-violet-300) { color: #6d28d9; }
 html[data-theme="light"] :where(.text-purple-200, .text-purple-300) { color: #7e22ce; }
 html[data-theme="light"] :where(.text-fuchsia-200, .text-fuchsia-300) { color: #a21caf; }
+html[data-theme="light"] :where(.text-slate-100) { color: #334155; }
+html[data-theme="light"] :where(.text-gray-100) { color: #334155; }
+html[data-theme="light"] :where(.text-zinc-100, .text-neutral-100) { color: #334155; }
 html[data-theme="light"] :where(.text-slate-300, .text-slate-200) { color: #475569; }
 html[data-theme="light"] :where(.text-gray-300, .text-gray-200) { color: #4b5563; }
 html[data-theme="light"] :where(.text-zinc-300, .text-zinc-200) { color: #52525b; }
@@ -1289,4 +1292,148 @@ html[data-theme="light"] {
    the backdrop into a white plate. */
 html[data-theme="light"] :where([class*="bg-[#1A1A19]"]) {
   background-color: rgba(25, 28, 30, 0.5) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   30. SEARCH FIELDS — one look everywhere (user directive): the box is
+       SOLID WHITE, the typed text is BLACK, the placeholder is quiet grey,
+       and the edges are clean white (no sheen/rim two-tone). One clear
+       focus ring replaces the glass glow lift.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Solid white plate: the glass search surfaces (home + store capsules,
+   DesktopShell/command-palette glass input, search page) and the page-level
+   search wells. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input),
+html[data-theme="light"] [data-search-launcher]:has(> .dc-scene-plate),
+html[data-theme="light"] :is(.dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field, .dc-subscription-picker input[type="search"]) {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow:
+    0 0 0 1px rgba(25, 28, 30, 0.1),
+    0 10px 24px -18px rgba(25, 28, 30, 0.32);
+  border-color: rgba(25, 28, 30, 0.12);
+}
+
+/* Flatten the glass layers INSIDE a search surface: the white sheen + inner
+   white rim are what made the box read as two colours at the edges. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input) > div[aria-hidden],
+html[data-theme="light"] [data-search-launcher] > .dc-scene-plate div[aria-hidden] {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Black typed ink on the white field; placeholder stays a quiet grey. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher],
+  .dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field) :is(input, textarea) {
+  background-color: transparent !important;
+  color: #14171a !important;
+  -webkit-text-fill-color: #14171a;
+  caret-color: #14171a;
+}
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher],
+  .dc-study-search, .dc-purchases-search, .dc-marketplace-search,
+  .myrem-hsearch, .myrem-dsearch-field) :is(input, textarea)::placeholder,
+html[data-theme="light"] .dc-subscription-picker input[type="search"]::placeholder {
+  color: #6b7280 !important;
+  -webkit-text-fill-color: #6b7280;
+  opacity: 1;
+}
+
+/* Icons and trailing chips inside the field share the quiet ink. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher]) :where(svg) {
+  color: #5b6679;
+}
+html[data-theme="light"] [data-search-launcher] :where(.text-white\/15, .text-white\/85) {
+  border-color: rgba(25, 28, 30, 0.16);
+  color: #434655;
+}
+
+/* One clear focus affordance instead of the glass glow lift. */
+html[data-theme="light"] :is(.dc-scene-field, .dc-glass-input, [data-search-launcher]):focus-within {
+  box-shadow:
+    0 0 0 2px rgba(0, 74, 198, 0.45),
+    0 0 0 1px rgba(25, 28, 30, 0.12),
+    0 10px 24px -18px rgba(25, 28, 30, 0.32);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   31. LANDING PAGE — clear ink on a quiet canvas (user: "text clear nahin
+       dikh rahe"). The WebGL aurora becomes a faint mist so the copy reads;
+   the footer becomes a light well with solid ink links.
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-dc-landing-waves] {
+  opacity: 0.13;
+  filter: saturate(0.9) brightness(1.12);
+}
+
+/* Hero + section copy: solid, readable ink (a touch bolder than the night
+   wash it replaces). */
+html[data-theme="light"] [data-dc-landing-waves] ~ * :is(h1, h2, h3) {
+  color: #14171a;
+}
+html[data-theme="light"] :is(.text-white\/40, .text-white\/55) {
+  color: #334155;
+}
+
+/* Footer: the navy strip becomes the light well; its light-slate link ink
+   (text-slate-100) is remapped in §0b, the cyan accents in §0b too. */
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) {
+  background-color: #eef1f4 !important;
+  background-image: none !important;
+  border-top-color: rgba(25, 28, 30, 0.12) !important;
+  box-shadow: none !important;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) :where(.text-white, p, li) {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) a,
+html[data-theme="light"] :where([class*="bg-[#0a1426]"]) button {
+  color: var(--dc-brand-ink);
+}
+
+/* The landing glass card + pill read as clean white glass with ink copy. */
+html[data-theme="light"] [data-dc-landing-waves] ~ * :where(.text-white\/15, .border-white\/15, .border-white\/10, .border-white\/20) {
+  border-color: rgba(25, 28, 30, 0.14);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   32. PRODUCT DETAIL PAGE — emphasis pass (user: "aur highlight bnao, clear
+       chijen samajh mein aani chahie"). The decision area becomes a real
+       card, the gallery selection and tabs get stronger signals.
+   ══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] [data-pdp-root] .dc-pdp-purchase {
+  background: #ffffff;
+  border: 1px solid rgba(25, 28, 30, 0.14);
+  border-radius: 14px;
+  padding: 1.15rem 1.15rem 1.25rem;
+  box-shadow: var(--dc-shadow-md);
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-current-price {
+  color: #14171a;
+  font-size: 2.125rem;
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-tabs button[aria-pressed="true"] {
+  border-bottom-width: 3px;
+  color: var(--dc-brand-ink);
+  font-weight: 800;
+}
+html[data-theme="light"] [data-pdp-root] [data-pdp-thumbs] button[aria-pressed="true"] {
+  border-color: var(--dc-brand);
+}
+html[data-theme="light"] [data-pdp-root] [data-pdp-thumbs] button {
+  border-color: rgba(25, 28, 30, 0.18);
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-highlight-list li {
+  padding-left: 0.15rem;
+}
+html[data-theme="light"] [data-pdp-root] .dc-pdp-module-index {
+  color: var(--dc-brand-ink);
+  font-weight: 750;
 }
