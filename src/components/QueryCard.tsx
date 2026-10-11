@@ -43,13 +43,15 @@ import FatZebraButton from "./ui/FatZebraButton";
  * INSET is darker again, which is what makes the reply/composer blocks read as
  * *inside* the card rather than as a second card.
  */
-const FACE = "#101A2C";
-const INSET = "#0A1120";
-const HAIRLINE = "#263149";
-const INK = "#EAF0FA";
-const INK_SECONDARY = "#93A1BE";
-const INK_TERTIARY = "#7C8AA8";
-const ACCENT = "#38BDF8";
+// Palette lives in CSS custom properties (see src/light-theme-pages.css §27) so
+// the card follows the app-wide light/dark theme with no per-render branching.
+const FACE = "var(--qc-face)";
+const INSET = "var(--qc-inset)";
+const HAIRLINE = "var(--qc-hairline)";
+const INK = "var(--qc-ink)";
+const INK_SECONDARY = "var(--qc-ink-secondary)";
+const INK_TERTIARY = "var(--qc-ink-tertiary)";
+const ACCENT = "var(--qc-accent)";
 
 /** The hairline gradient: muted at rest, lit up on hover / keyboard focus. */
 const RING_REST = "linear-gradient(135deg,#5B4BC4 0%,#2E7FC0 46%,#1A2440 100%)";
@@ -277,12 +279,12 @@ export default function QueryCard({
                 style={{
                   backgroundColor: INSET,
                   border: `1px solid ${HAIRLINE}`,
-                  borderLeft: `2px solid #10B981`,
+                  borderLeft: "2px solid var(--qc-reply-bar)",
                 }}
               >
                 <p
                   className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide"
-                  style={{ color: "#5EEAD4" }}
+                  style={{ color: "var(--qc-reply-ink)" }}
                 >
                   <Mail size={12} aria-hidden="true" />
                   <span>Your reply</span>
@@ -298,7 +300,7 @@ export default function QueryCard({
                 </p>
                 <p
                   className="mt-2 whitespace-pre-wrap break-words text-[14px] font-medium leading-[1.6]"
-                  style={{ color: "#D5DEEE" }}
+                  style={{ color: "var(--qc-reply-body)" }}
                 >
                   {query.reply}
                 </p>

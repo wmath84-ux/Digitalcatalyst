@@ -76,14 +76,14 @@ export default function PricingGlassCard({
     <div
       className="relative mt-4"
       style={{
-        background: "rgba(255, 255, 255, 0.1)",
+        background: "var(--pgc-glass)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         borderRadius: 28,
-        border: "1px solid rgba(255, 255, 255, 0.3)",
+        border: "1px solid var(--pgc-glass-line)",
         padding: "28px 24px",
         boxShadow:
-          "0 4px 24px -1px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255,255,255,0.4)",
+          "var(--pgc-card-shadow)",
       }}
       data-pricing-glass-card
       data-plan={displayName}
@@ -92,10 +92,10 @@ export default function PricingGlassCard({
       {/* Badge — plan badge or default "15% off" for yearly */}
       <div
         style={{
-          background: "rgba(255, 255, 255, 0.2)",
+          background: "var(--pgc-chip)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255, 255, 255, 0.4)",
+          border: "1px solid var(--pgc-chip-line)",
           borderTop: "none",
           borderRight: "none",
           borderBottomLeftRadius: 20,
@@ -109,7 +109,7 @@ export default function PricingGlassCard({
           gap: 6,
           fontSize: 13,
           fontWeight: 500,
-          color: "white",
+          color: "var(--pgc-ink-strong)",
           zIndex: 10,
         }}
       >
@@ -163,7 +163,7 @@ export default function PricingGlassCard({
 
         <div
           style={{
-            borderTop: "1.5px dashed rgba(255, 255, 255, 0.25)",
+            borderTop: "1.5px dashed var(--pgc-divider)",
             margin: "24px 0",
             width: "100%",
           }}
@@ -175,8 +175,8 @@ export default function PricingGlassCard({
               <li key={label} className="flex items-start gap-4">
                 <div
                   style={{
-                    backgroundColor: "rgba(255, 255, 255, 0.15)",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    backgroundColor: "var(--pgc-row)",
+                    border: "1px solid var(--pgc-row-line)",
                     borderRadius: "50%",
                     width: 22,
                     height: 22,
@@ -188,7 +188,7 @@ export default function PricingGlassCard({
                   }}
                 >
                   <Check
-                    style={{ color: "rgba(255, 255, 255, 0.9)" }}
+                    style={{ color: "var(--pgc-ink-strong)" }}
                     size={10}
                     strokeWidth={3}
                   />
@@ -201,8 +201,8 @@ export default function PricingGlassCard({
               <li key={label} className="flex items-start gap-4 pt-0">
                 <div
                   style={{
-                    backgroundColor: "rgba(255, 255, 255, 0.15)",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    backgroundColor: "var(--pgc-row)",
+                    border: "1px solid var(--pgc-row-line)",
                     borderRadius: "50%",
                     width: 22,
                     height: 22,
@@ -214,7 +214,7 @@ export default function PricingGlassCard({
                   }}
                 >
                   <X
-                    style={{ color: "rgba(255, 255, 255, 0.4)" }}
+                    style={{ color: "var(--pgc-ink-faint)" }}
                     size={10}
                     strokeWidth={3}
                   />
@@ -231,11 +231,11 @@ export default function PricingGlassCard({
           type="button"
           style={{
             width: "100%",
-            background: "rgba(255, 255, 255, 0.2)",
+            background: "var(--pgc-chip)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(255, 255, 255, 0.4)",
-            color: "white",
+            border: "1px solid var(--pgc-chip-line)",
+            color: "var(--pgc-ink-strong)",
             padding: "16px 0",
             borderRadius: 20,
             fontSize: 18,

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { FlowPathView } from "./components/flowpath/FlowPathView";
 import Header from "./home/components/Header";
 import { useAuth } from "./context/AuthContext";
+import { useThemeMode } from "./hooks/useThemeMode";
 
 interface FlowPathAppProps {
   onNavigateToHome: () => void;
@@ -32,7 +33,10 @@ export default function FlowPathApp({
   const { user } = useAuth();
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // FlowPath follows the app-wide theme (the Profile toggle owns it) — the
+  // header sun/moon flips the same global preference every other page reads.
+  const [themeMode, setThemeMode] = useThemeMode();
+  const isDarkMode = themeMode === "dark";
   // The header settings gear → the SAME CurveSettingsModal the dock's gear
   // opens. FlowPathView fills this handle with its own opener (the curve
   // state and modal are owned there), so there is no duplicate settings page.
@@ -63,7 +67,7 @@ export default function FlowPathApp({
           onOpenNotifications={onOpenNotifications}
           onOpenSettings={() => openCurveRef.current?.()}
           headerVariant="flow"
-          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+          onToggleTheme={() => setThemeMode(isDarkMode ? "light" : "dark")}
           isDarkMode={isDarkMode}
         />
       </div>

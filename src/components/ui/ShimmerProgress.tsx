@@ -25,7 +25,7 @@ export default function ShimmerProgress({
   paused = false,
   orientation = "horizontal",
   thickness = 6,
-  trackColor = "rgba(255,255,255,0.14)",
+  trackColor = "var(--gp-track)",
   fillColor = FILL_ACTIVE,
   pausedColor = FILL_PAUSED,
   className = "",
@@ -84,8 +84,8 @@ export default function ShimmerProgress({
           className="absolute inset-0"
           style={{
             background: vertical
-              ? "linear-gradient(to top, transparent, rgba(255,255,255,0.35), transparent)"
-              : "linear-gradient(to right, transparent, rgba(255,255,255,0.35), transparent)",
+              ? "var(--gp-shimmer-v)"
+              : "var(--gp-shimmer)",
           }}
           animate={
             paused

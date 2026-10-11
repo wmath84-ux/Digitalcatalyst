@@ -185,9 +185,9 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
       }}
       className="pointer-events-auto relative w-full overflow-hidden rounded-2xl"
       style={{
-        background: onLightSurface ? "rgba(18,18,24,0.78)" : "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)",
+        background: onLightSurface ? "var(--gt-shell-on-light)" : "var(--gt-shell)",
+        border: "1px solid var(--gt-shell-line)",
+        boxShadow: "var(--gt-shell-shadow)",
       }}
       role="status"
     >
@@ -232,10 +232,10 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
           <motion.span
             className="flex h-5 w-5 items-center justify-center rounded-full"
             style={{
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "var(--gt-btn)",
+              border: "1px solid var(--gt-btn-line)",
             }}
-            whileHover={{ background: "rgba(255,255,255,0.14)" }}
+            whileHover={{ background: "var(--gt-btn-hover)" }}
           >
             <X size={10} className="text-white/60" aria-hidden />
           </motion.span>
