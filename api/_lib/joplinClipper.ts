@@ -69,7 +69,6 @@ const readBody = (req: VercelRequest): Row => {
 const fail = (statusCode: number, code: string, message: string) =>
   Object.assign(new Error(message), { statusCode, code });
 
-const dayKey = (now: number) => new Date(now).toISOString().slice(0, 10);
 
 /** Read the extension's token from either header shape. */
 function bearerToken(req: VercelRequest): string {
@@ -360,7 +359,7 @@ export async function handleClipperClip(req: VercelRequest, res: VercelResponse)
         id: noteId,
         type_: 1,
         title: clip.title,
-        body: trimClipBody(body),
+        body: trimClipBody(clipBody(clip)),
         source_url: clip.url,
         markup_language: 2,
         parent_id: notebookId,
@@ -371,7 +370,7 @@ export async function handleClipperClip(req: VercelRequest, res: VercelResponse)
     });
 
     if (outcome.replayed) {
-      await appendClipToNote(uid, noteId, trimClipBody(body), now);
+      await appendClipToNote(uid, noteId, trimClipBody(clipBody(clip)), now);
     }
 
     await tokenRef.set({ lastUsedAt: now }, { merge: true });
@@ -392,7 +391,6 @@ export async function handleClipperRotate(req: VercelRequest, res: VercelRespons
   try {
     const token = bearerToken(req);
     if (!token) throw fail(401, "CLIPPER_TOKEN_REQUIRED", "Pair the extension again.");
-    const db = adminDb();
     const found = await findToken(token);
     const record = found?.data ?? null;
     if (!tokenHasScope(record, "clip:write")) {
@@ -413,7 +411,6 @@ export async function handleClipperRotate(req: VercelRequest, res: VercelRespons
 
 /** Appending to an existing note is a server-side merge: no allowance, no rev race. */
 async function appendClipToNote(uid: string, noteId: string, section: string, now: number): Promise<void> {
-  const db = adminDb();
   const ref = userRef(uid).collection(joplinCollections.items).doc(noteId);
   const snapshot = await ref.get();
   if (!snapshot.exists) return;
