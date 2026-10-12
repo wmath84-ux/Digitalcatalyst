@@ -39,7 +39,13 @@ export default function SubscribeBar({
         disabled={Boolean(loading || disabled || cta.disabled)}
         aria-busy={loading}
       >
-        {loading ? "Opening checkout…" : cta.disabled ? cta.label : "Continue to checkout"}
+        {loading
+          ? "Opening checkout…"
+          : cta.disabled
+          ? cta.label
+          : totalPaise <= 0
+          ? "Continue to free access"
+          : "Continue to checkout"}
       </button>
       {ownershipState?.blocked && ownershipState.reason ? (
         <p data-subscription-owned-note className="dc-subscription-note">
