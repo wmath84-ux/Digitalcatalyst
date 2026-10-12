@@ -109,3 +109,19 @@ test("the dock's files stay byte-comparable and the pinned hooks survive", () =>
   // The material is still CSS behind the gate, never painted from index.css.
   assert.doesNotMatch(indexCss, /dc-scene-plate/);
 });
+
+
+test("mobile Paid content is denser and preserves a reliable scroll gap above the dock", () => {
+  const paidCss = read("src/pdp-minimal.css");
+  assert.match(paidCss, /@media \(max-width: 959px\)[\s\S]*?max\(var\(--dc-footer-nav-h, 0px\), 112px\)/);
+  assert.match(paidCss, /\[data-pdp-root\] \[data-pdp-paid-group="available"\] \.dc-pdp-paid-list > li\s*\{[^}]*padding: 0\.8rem 0/);
+  assert.match(paidCss, /\[data-pdp-root\] \.dc-pdp-owned-list\s*\{[^}]*margin-top: 0\.55rem/);
+});
+
+test("the mobile PDP Share menu stays in flow and light-mode hover keeps white text on blue", () => {
+  const paidCss = read("src/pdp-minimal.css");
+  const lightPages = read("src/light-theme-pages.css");
+  assert.match(paidCss, /@media \(max-width: 639px\)[\s\S]*?\[data-product-share\]\[data-open="true"\]\s*\{[^}]*position: relative !important/);
+  assert.match(paidCss, /margin-top: 0\.45rem/);
+  assert.match(lightPages, /\.dc-pdp-secondary-actions \.dc-pdp-text-action:hover,[\s\S]*?color: #ffffff !important/);
+});

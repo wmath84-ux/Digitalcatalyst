@@ -222,3 +222,109 @@
 @media (min-width: 1200px) {
   [data-cart-items] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
 }
+
+
+/* Favorites: show one full-width, horizontal course row on phone-sized
+   screens. A two-column grid with only one saved product leaves half the
+   screen empty and forces its title/actions into an unnecessarily tall card. */
+@media (max-width: 639px) {
+  [data-favorites-row][data-footer-nav-space] {
+    width: 100%;
+    min-width: 0;
+    padding-bottom: calc(
+      max(var(--dc-footer-nav-h, 0px), 112px) + env(safe-area-inset-bottom, 0px) + 1rem
+    ) !important;
+    scroll-padding-bottom: calc(
+      max(var(--dc-footer-nav-h, 0px), 112px) + env(safe-area-inset-bottom, 0px) + 1rem
+    );
+  }
+
+  [data-favorites-row] [data-collection-grid] {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  [data-favorites-row] [data-favorite-card] > div:last-child {
+    display: grid;
+    grid-template-columns: minmax(112px, 34%) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-media {
+    align-self: center;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    border-radius: 11px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-body {
+    min-width: 0;
+    gap: 6px;
+    padding: 0;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-category {
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-title {
+    font-size: 14px !important;
+    line-height: 1.35;
+    -webkit-line-clamp: 3;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-meta {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-prices {
+    gap: 3px 6px;
+    font-size: 11px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-price {
+    font-size: 15px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-actions > button {
+    min-width: 0;
+    min-height: 38px;
+    border-radius: 10px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-actions .liquid-metal-button > span > div > div:last-child {
+    padding-inline: 5px;
+  }
+}
+
+@media (max-width: 359px) {
+  [data-favorites-row] [data-favorite-card] > div:last-child {
+    grid-template-columns: minmax(94px, 31%) minmax(0, 1fr);
+    gap: 9px;
+    padding: 10px;
+  }
+
+  [data-favorites-row] [data-favorite-card] .dc-collection-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Disabled "In Cart" is an owned-state label, not an unavailable action. Keep
+   it legible instead of applying the generic disabled-control fade. */
+html[data-theme="light"] [data-favorites-row] [data-favorite-card] .dc-collection-actions .liquid-metal-button:disabled {
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}

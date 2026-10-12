@@ -30,3 +30,16 @@ test("light mode uses readable tertiary ink for the last Cart copy and muted tot
   assert.match(cart, /data-cart-price-note/);
   assert.match(light, /html\[data-theme="light"\][\s\S]*?\[data-cart-price-note\][\s\S]*?color:\s*var\(--dc-ink-3\) !important/);
 });
+
+
+test("phone Favorites uses the full width, compact row layout and safe dock clearance", () => {
+  const favorites = read("src/cartWishlist/pages/FavoritesPage.tsx");
+  const favoriteCard = read("src/cartWishlist/components/FavoriteCard.tsx");
+  const collection = read("src/components/collection-cards.css");
+  assert.match(favorites, /data-favorites-row data-footer-nav-space/);
+  assert.match(collection, /@media \(max-width: 639px\)[\s\S]*?\[data-favorites-row\] \[data-collection-grid\]\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(collection, /max\(var\(--dc-footer-nav-h, 0px\), 112px\)/);
+  assert.match(collection, /\[data-favorites-row\] \[data-favorite-card\] > div:last-child\s*\{[^}]*grid-template-columns: minmax\(112px, 34%\) minmax\(0, 1fr\)/);
+  assert.doesNotMatch(favoriteCard, /GlassButton|EmojiBurstLayer|className="absolute right-2 top-2/);
+  assert.match(favoriteCard, /className="dc-collection-actions"/);
+});

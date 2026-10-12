@@ -2260,3 +2260,16 @@ html[data-theme="light"] [data-pdp-tabbar][data-stuck="true"] {
   background-color: rgba(255, 255, 255, 0.9);
   box-shadow: 0 8px 16px -14px rgba(15, 23, 42, 0.26);
 }
+
+
+/* Android touch can leave :hover active after a tap. Keep the Share label
+   white whenever its button receives the blue hover/focus surface. The more
+   specific PDP ink rule above must not repaint that label dark blue. */
+html[data-theme="light"] [data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action:hover,
+html[data-theme="light"] [data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action:focus-visible,
+html[data-theme="light"] [data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-action:active {
+  background: linear-gradient(135deg, #004ac6, #2563eb) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -8px rgba(0, 74, 198, 0.55);
+}

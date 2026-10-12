@@ -1,10 +1,8 @@
-import { Heart, ShoppingCart, Star } from "lucide-react";
-import { EmojiBurstLayer, useEmojiBurst } from "../../components/ui/EmojiBurst";
+import { ShoppingCart, Star } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
-import { GlassButton } from "@/components/ui/glass-button";
 import "../../components/collection-cards.css";
 
 interface FavoriteCardProps {
@@ -22,7 +20,6 @@ export default function FavoriteCard({
   onAddToCart,
   onOpen,
 }: FavoriteCardProps) {
-  const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
   const discount = product.originalPrice > product.price
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
@@ -48,14 +45,6 @@ export default function FavoriteCard({
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         </button>
-        <EmojiBurstLayer particles={likeParticles} />
-        <GlassButton
-          onClick={() => { likeBurst(); onRemove(product.id); }}
-          className="absolute right-2 top-2 [&_.size-12]:size-11"
-          aria-label="Remove from favorites"
-        >
-          <Heart size={16} className="fill-rose-500 text-rose-500" />
-        </GlassButton>
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[11px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {product.hours} • {product.lessons} lessons
         </span>
