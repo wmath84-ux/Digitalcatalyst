@@ -754,12 +754,12 @@
   }
 }
 
-html[data-recall-theme="dark"] [data-recall-root] [data-revision-streak] {
+[data-recall-root][data-recall-theme="dark"] [data-revision-streak] {
   background: linear-gradient(145deg, var(--rc-surface-container-high), var(--rc-surface-container));
   border-color: var(--rc-outline-variant);
 }
 
-html[data-recall-theme="dark"] [data-recall-root] [data-revision-streak] > div:first-child {
+[data-recall-root][data-recall-theme="dark"] [data-revision-streak] > div:first-child {
   background: rgba(255, 255, 255, 0.08);
 }
 
