@@ -79,3 +79,11 @@ test('authentication shell compiles and keeps its system-back cleanup', () => {
   assert.equal(result.diagnostics.filter(d => d.category === ts.DiagnosticCategory.Error).length, 0);
   assert.match(source, /return \(\) => window.removeEventListener\("popstate", handleSystemBack\)/);
 });
+
+
+test('mobile auth form starts below Back instead of vertical-centering into excessive blank space', () => {
+  const css = read('src/components/auth/auth-reference.css');
+  assert.match(css, /@media \(max-width: 639px\)[\s\S]*?justify-content: flex-start/);
+  assert.match(css, /padding-top: calc\(env\(safe-area-inset-top\) \+ 68px\)/);
+  assert.match(css, /@media \(max-height: 640px\)/);
+});
