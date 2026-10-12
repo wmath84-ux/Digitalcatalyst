@@ -21,10 +21,11 @@
 // as such rather than over-claimed.
 //
 // ── What the learner sees ───────────────────────────────────────────────────
-// My Day's chrome is Joplin's (§41/§42): no glass cards, no Digitalcatalyst
-// toolbar on top, no recolouring. The host contributes exactly one thing — a
-// neutral loading surface, and an honest diagnostic if the deployment has no
-// compiled workspace (§110, §125).
+// My Day's chrome stays workspace-owned (§41/§42): its responsive layout and
+// theme live inside `public/my-day-workspace`, not in a host-side overlay. The
+// host contributes no extra toolbar or page surface — only a neutral loading
+// screen and an honest diagnostic if the deployment has no workspace bundle
+// (§110, §125).
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";

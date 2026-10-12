@@ -103,22 +103,17 @@ async function openWorkspace(width = 1280, height = 900) {
   await page.waitForSelector(".note-card[data-note-id]");
   await page.locator(".note-card[data-note-id]").first().click();
   await page.waitForSelector("#editor-body-input");
-  await page.waitForFunction(() => window.DCMyDayNoteFormatting && document.querySelector(".editor-preview"));
+  await page.waitForFunction(() => window.DCMyDayNoteFormatting && document.querySelector("#editor-body-input") && !document.querySelector(".editor-preview"));
   return { page, context, errors };
 }
 
-browserTest("the actual workspace renders Markdown, KaTeX, tables, task state and literal fences safely", async () => {
+browserTest("the workspace stays editor-only while retaining the canonical Markdown source", async () => {
   const { page, context, errors } = await openWorkspace();
-  const preview = page.locator(".editor-preview");
-  assert.equal(await preview.locator("h1").textContent(), "Stress note");
-  assert.equal(await preview.locator("strong").count(), 1);
-  assert.equal(await preview.locator("em").count(), 1);
-  assert.equal(await preview.locator(".katex").count() >= 6, true, "Unicode inline expressions and display math all use KaTeX");
-  assert.equal(await preview.locator(".myday-table-scroll > table").count(), 1);
-  assert.equal(await preview.locator('li[data-checked="true"]').count(), 1);
-  assert.equal(await preview.locator('li[data-checked="false"]').count(), 1);
-  assert.match(await preview.locator("pre code").textContent(), /const source = \"\$x\^2\$\"/);
-  assert.equal(await page.locator("script, iframe, [onclick], [onerror]").count(), 0);
+  const textarea = page.locator("#editor-body-input");
+  assert.equal(await textarea.inputValue(), noteBody);
+  assert.equal(await page.locator(".editor-preview").count(), 0, "no rendered copy sits beside or below the editor");
+  assert.equal(await page.locator("#btn-toggle-preview, #btn-toggle-split, [data-preview-mode]").count(), 0, "the workspace has no preview or split-view controls");
+  assert.equal(await page.locator(".editor-textarea-container").count(), 1);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -153,13 +148,14 @@ browserTest("Markdown save/reload/re-edit stays canonical; rich HTML paste and t
   await page.locator(".note-card[data-note-id]").first().click();
   await page.waitForSelector("#editor-body-input");
   assert.equal(await page.locator("#editor-body-input").inputValue(), pasted, "reload does not migrate Markdown into HTML");
-  assert.equal(await page.locator(".editor-preview h2").textContent(), "Pasted");
+  assert.equal(await page.locator(".editor-preview").count(), 0, "the note opens without reintroducing a rendered preview");
+  assert.equal(await page.locator("#btn-toggle-preview, #btn-toggle-split").count(), 0);
   assert.deepEqual(errors, []);
   await context.close();
 });
 
 for (const width of [320, 390, 768, 1024, 1440]) {
-  browserTest(`${width}px: editor, formatting toolbar, math and preview remain within the viewport`, async () => {
+  browserTest(`${width}px: editor-only layout, mobile navigation, and formatting controls stay within the viewport`, async () => {
     const { page, context, errors } = await openWorkspace(width, width < 768 ? 820 : 900);
     const metrics = await page.evaluate(() => {
       const rect = (selector) => {
@@ -173,17 +169,23 @@ for (const width of [320, 390, 768, 1024, 1440]) {
         toolbar: rect(".editor-toolbar"),
         tools: rect(".editor-format-tools"),
         textarea: rect("#editor-body-input"),
-        preview: rect(".editor-preview"),
-        table: rect(".myday-table-scroll"),
+        editor: rect(".editor-textarea-container"),
+        editorHeader: rect('.mobile-topbar[data-bar="editor"]'),
+        previewCount: document.querySelectorAll(".editor-preview, #btn-toggle-preview, #btn-toggle-split").length,
+        backButtonCount: document.querySelectorAll("#btn-editor-back, .editor-back").length,
       };
     });
     assert.ok(metrics.doc <= metrics.viewport + 1, `document overflow: ${JSON.stringify(metrics)}`);
     assert.ok(metrics.toolbar.left >= 0 && metrics.toolbar.right <= metrics.viewport + 1, `toolbar outside viewport: ${JSON.stringify(metrics)}`);
     assert.ok(metrics.tools.left >= 0 && metrics.tools.right <= metrics.viewport + 1, `format controls outside viewport: ${JSON.stringify(metrics)}`);
     assert.ok(metrics.textarea.left >= 0 && metrics.textarea.right <= metrics.viewport + 1, `editor outside viewport: ${JSON.stringify(metrics)}`);
-    assert.ok(metrics.preview.left >= 0 && metrics.preview.right <= metrics.viewport + 1, `preview outside viewport: ${JSON.stringify(metrics)}`);
-    assert.ok(metrics.table.left >= 0 && metrics.table.right <= metrics.viewport + 1, `table wrapper outside viewport: ${JSON.stringify(metrics)}`);
-    if (width < 768) assert.ok(metrics.tools.scrollWidth > metrics.tools.clientWidth, "the phone toolbar deliberately scrolls inside its own row instead of expanding the page");
+    assert.ok(metrics.editor.left >= 0 && metrics.editor.right <= metrics.viewport + 1, `editor surface outside viewport: ${JSON.stringify(metrics)}`);
+    assert.equal(metrics.previewCount, 0, "live preview and split mode stay removed at every viewport size");
+    assert.equal(metrics.backButtonCount, 0, "the editor toolbar has no Back button");
+    if (width < 768) {
+      assert.ok(metrics.tools.scrollWidth > metrics.tools.clientWidth, "format controls scroll inside their own row instead of expanding the page");
+      assert.ok(metrics.editorHeader.height > 0, "the phone editor retains a navigation header");
+    }
     assert.deepEqual(errors, []);
     await context.close();
   });

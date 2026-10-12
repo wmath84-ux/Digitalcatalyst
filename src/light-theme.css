@@ -229,6 +229,10 @@ html[data-theme="light"] [data-usage-limits-page] {
   --account-border: #e0e3e5;
   --account-muted: #434655;
   --account-accent: #004ac6;
+  --account-edge: rgba(0, 74, 198, 0.24);
+  --account-edge-strong: rgba(0, 74, 198, 0.58);
+  --account-surface: rgba(255, 255, 255, 0.78);
+  --account-hover: rgba(0, 74, 198, 0.055);
   color: var(--dc-ink);
   background: transparent;
 }

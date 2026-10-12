@@ -4,7 +4,7 @@
 .dc-subscription-picker {
   --sub-border: rgba(226, 232, 240, 0.14);
   --sub-muted: #b3bed0;
-  --sub-accent: #c1baff;
+  --sub-accent: #60a5fa;
   min-width: 0;
   color: #f2f5fb;
   text-shadow: none;
@@ -521,4 +521,272 @@
 
 .dc-desktop-shell [data-subscription-page] [data-subscription-subscribe-bar] {
   padding: 0;
+}
+
+/* PDP-inspired subscription finish: make the plan choice and verified price
+   easy to scan, with the same quiet blue framing as Store and Checkout. */
+[data-subscription-page] {
+  --sub-accent: #60a5fa;
+  --sub-edge: rgba(96, 165, 250, 0.3);
+  --sub-edge-strong: rgba(96, 165, 250, 0.68);
+  --sub-surface: rgba(17, 23, 36, 0.86);
+  --sub-surface-soft: rgba(10, 15, 25, 0.66);
+  --sub-surface-raised: rgba(21, 29, 44, 0.94);
+}
+
+[data-subscription-page] [data-subscription-hero] {
+  position: relative;
+  overflow: hidden;
+  margin-block: 0.5rem 1.25rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--sub-edge);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.1), var(--sub-surface) 60%);
+  box-shadow: 0 16px 36px -30px rgba(2, 6, 16, 0.9);
+}
+
+[data-subscription-page] [data-subscription-hero]::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #60a5fa, #a78bfa);
+  content: "";
+}
+
+[data-subscription-page] [data-subscription-hero] h1::after {
+  display: block;
+  width: 3rem;
+  height: 3px;
+  margin-top: 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  content: "";
+}
+
+[data-subscription-page] [data-subscription-hero] .dc-subscription-note {
+  max-width: 58ch;
+}
+
+[data-subscription-fallback-note] {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+[data-subscription-page] .dc-subscription-section {
+  position: relative;
+  margin-block: 0.85rem 0;
+  padding: 1rem clamp(0.8rem, 2.4vw, 1.15rem);
+  border: 1px solid var(--sub-edge);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--sub-surface-raised), var(--sub-surface));
+  box-shadow: 0 14px 30px -28px rgba(2, 6, 16, 0.88);
+}
+
+[data-subscription-page] .dc-subscription-section h2 {
+  margin-bottom: 0.6rem;
+  color: #f8fbff;
+  letter-spacing: -0.02em;
+}
+
+/* Feature tiers already contain their own selectable plates; keep their
+   wrapper open so those cards do not become cards inside a card. */
+[data-subscription-page] [data-subscription-price-tiers] {
+  margin-block: 0.85rem 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-subscription-page] .dc-subscription-plan-list {
+  gap: 0.55rem;
+}
+
+[data-subscription-page] .dc-subscription-plan-row {
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: var(--sub-surface-soft);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+[data-subscription-page] .dc-subscription-plan-row[data-selected="true"] {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.08);
+}
+
+[data-subscription-page] .dc-subscription-plan-row:focus-within {
+  outline: 2px solid var(--sub-edge-strong);
+  outline-offset: 2px;
+}
+
+[data-subscription-page] .dc-subscription-plan-row strong:first-child {
+  color: #f3f8ff;
+}
+
+[data-subscription-page] .dc-subscription-plan-row[data-selected="true"] strong:first-child {
+  color: #dbeafe;
+}
+
+[data-subscription-page] .dc-subscription-plan-price strong {
+  color: #eaf4ff;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-subscription-page] input[type="radio"],
+.dc-subscription-picker input[type="checkbox"] {
+  accent-color: #60a5fa;
+}
+
+[data-subscription-page] .dc-subscription-duration {
+  padding: 0.75rem;
+  border: 1px solid var(--sub-edge);
+  border-radius: 12px;
+  background: var(--sub-surface-soft);
+}
+
+[data-subscription-page] .dc-subscription-duration > div {
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+[data-subscription-page] .dc-subscription-duration label {
+  flex: 1;
+  padding-inline: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+[data-subscription-page] .dc-subscription-duration label:has(input:checked) {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.12);
+  color: #eaf4ff;
+}
+
+[data-subscription-page] .dc-subscription-addon-actions button {
+  min-height: 3.25rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: var(--sub-surface-soft);
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+[data-subscription-page] .dc-subscription-addon-actions button:hover {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.1);
+}
+
+[data-subscription-page] .dc-subscription-disclosure {
+  margin-block: 0.9rem 0;
+  padding: 0.25rem 0.8rem;
+  border: 1px solid var(--sub-edge);
+  border-radius: 12px;
+  background: var(--sub-surface);
+}
+
+[data-subscription-page] .dc-subscription-disclosure summary {
+  color: #dbeafe;
+  font-weight: 650;
+}
+
+[data-subscription-page] .dc-subscription-disclosure[open] {
+  border-color: var(--sub-edge-strong);
+}
+
+[data-subscription-page] .dc-subscription-compare-scroll {
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 12px;
+  background: rgba(10, 15, 25, 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+[data-subscription-page] .dc-subscription-compare-scroll th,
+[data-subscription-page] .dc-subscription-compare-scroll td {
+  border-bottom-color: rgba(148, 163, 184, 0.14);
+}
+
+[data-subscription-page] .dc-subscription-compare-scroll thead th {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+[data-subscription-page] [data-subscription-price-summary] {
+  border-color: var(--sub-edge-strong);
+  background: linear-gradient(150deg, rgba(37, 99, 235, 0.12), var(--sub-surface) 55%);
+  box-shadow: 0 18px 38px -30px rgba(37, 99, 235, 0.28), 0 12px 28px -26px rgba(2, 6, 16, 0.8);
+}
+
+[data-subscription-page] [data-subscription-price-summary] h2 {
+  color: #f8fbff;
+}
+
+[data-subscription-page] .dc-subscription-payable {
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--sub-edge);
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.09);
+}
+
+[data-subscription-page] .dc-subscription-payable > strong {
+  color: #eaf4ff;
+}
+
+[data-subscription-page] [data-subscription-subscribe-bar] {
+  padding: 0.85rem;
+  border: 1px solid var(--sub-edge);
+  border-radius: 14px;
+  background: var(--sub-surface);
+}
+
+[data-subscription-page] .dc-subscription-primary {
+  border: 1px solid rgba(219, 234, 254, 0.9);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #0b1b36;
+  box-shadow: 0 10px 26px -18px rgba(96, 165, 250, 0.9);
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+[data-subscription-page] .dc-subscription-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  box-shadow: 0 14px 28px -18px rgba(96, 165, 250, 0.78);
+}
+
+[data-subscription-page] .dc-subscription-state {
+  padding: 1.5rem;
+  border: 1px dashed var(--sub-edge);
+  border-radius: 14px;
+  background: var(--sub-surface);
+}
+
+[data-subscription-page] [data-subscription-addon-upgrade-note],
+[data-subscription-page] [data-subscription-carryover-note],
+[data-subscription-page] [data-subscription-free-note] {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--sub-edge);
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.07);
+}
+
+@media (max-width: 420px) {
+  [data-subscription-page] .dc-subscription-section { padding: 0.85rem; }
+  [data-subscription-page] .dc-subscription-plan-row { gap: 0.65rem; }
+  [data-subscription-page] .dc-subscription-plan-price { max-width: 40%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-subscription-page] .dc-subscription-plan-row,
+  [data-subscription-page] .dc-subscription-addon-actions button,
+  [data-subscription-page] .dc-subscription-primary { transition-duration: 1ms; }
+  [data-subscription-page] .dc-subscription-primary:hover:not(:disabled) { transform: none; }
+  [data-subscription-page] .animate-spin { animation: none; }
 }

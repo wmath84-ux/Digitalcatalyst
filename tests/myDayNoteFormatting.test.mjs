@@ -1,7 +1,7 @@
-// My Day's live editor stores Markdown and renders it only at the preview edge.
-// These tests bundle the same module the shipped iframe loads, then exercise
-// rich paste, plain Markdown paste, save-format toolbar actions, the shared
-// sanitizer/KaTeX path and responsive preview wrappers in a real DOM.
+// My Day's live editor stores Markdown and does not mount an in-editor preview.
+// These tests bundle the same formatting utility the shipped iframe loads, then
+// exercise rich paste, plain Markdown paste, save-format toolbar actions, the
+// sanitizer/KaTeX renderer and copy/re-paste compatibility in a real DOM.
 
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
@@ -133,7 +133,7 @@ test("plain text paste preserves Markdown and line breaks without an HTML save-f
   assert.deepEqual(Array.from(previewDocument.querySelectorAll(".myday-checklist-control")).map((input) => [input.checked, input.disabled]), [[true, true], [false, true]]);
 });
 
-test("KaTeX render, responsive tables and malicious Markdown/HTML are safe at preview time", () => {
+test("the standalone renderer handles KaTeX, responsive tables and malicious Markdown/HTML safely", () => {
   const stress = [
     "## Inline and display math",
     "Unicode: A = πr²; x²; √(a+b); 3 × 10⁸; ∞.",

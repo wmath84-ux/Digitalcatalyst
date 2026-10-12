@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Bell,
+  Check,
+  ChevronRight,
+  Loader2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
+} from "lucide-react";
 import { auth } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
@@ -38,7 +48,7 @@ export function SettingSwitch({ setting, checked, disabled, saving, description,
             aria-busy={saving || undefined} onChange={(event) => onChange(event.currentTarget.checked)} />
           <span aria-hidden="true"><span /></span>
         </label>
-        <span className="settings-switch-state" aria-hidden="true">{saving ? "Saving" : checked ? "On" : "Off"}</span>
+        <span className="settings-switch-state" data-switch-state={saving ? "saving" : checked ? "on" : "off"} aria-hidden="true">{saving ? "Saving" : checked ? "On" : "Off"}</span>
       </div>
     </div>
   );
@@ -170,7 +180,16 @@ export default function SettingsPage() {
           <div data-settings-layout className="settings-layout">
             <nav className="settings-breadcrumb" aria-label="Breadcrumb"><a href="#/home">Home</a><span>/</span><a href="#/profile">Profile</a><span>/</span><span aria-current="page">Settings</span></nav>
             <header className="settings-heading">
-              <div><a className="settings-back" href="#/profile"><ArrowLeft size={15} /> Profile</a><p className="settings-eyebrow">Your account</p><h1>Settings</h1><p>Choose how we reach you and what others can see.</p></div>
+              <div className="settings-heading-copy">
+                <a className="settings-back" href="#/profile"><ArrowLeft size={15} /> Profile</a>
+                <p className="settings-eyebrow">Your account</p>
+                <h1>Settings</h1>
+                <p>Choose how we reach you and what others can see.</p>
+              </div>
+              <div className="settings-heading-art" aria-hidden="true">
+                <span className="settings-heading-icon"><SlidersHorizontal size={22} /></span>
+                <span className="settings-heading-art-copy"><small>ACCOUNT</small><strong>Control center</strong></span>
+              </div>
               <span className="settings-save-state" role="status" aria-live="polite">
                 {settings.savingKeys.length ? <><Loader2 className="settings-spinner" size={14} /> Saving changes</>
                   : settings.loading ? "Loading settings…"
@@ -180,13 +199,20 @@ export default function SettingsPage() {
             </header>
             {settings.error ? <div className="settings-alert" role="alert"><p>{settings.error}</p><button type="button" disabled={settings.savingKeys.length > 0} onClick={() => { void settings.retry(); }}>{settings.failed ? "Retry change" : "Retry connection"}</button></div> : null}
             <section className="settings-section" aria-labelledby="settings-notifications">
-              <div className="settings-section-heading"><h2 id="settings-notifications">Notifications</h2><p>Account preferences apply to every device. Your in-app learning and purchase alerts remain available.</p></div>
+              <div className="settings-section-heading">
+                <span className="settings-section-icon" aria-hidden="true"><Bell size={19} /></span>
+                <div className="settings-section-heading-copy">
+                  <div className="settings-section-title-row"><h2 id="settings-notifications">Notifications</h2><span className="settings-section-count">3 preferences</span></div>
+                  <p>Account preferences apply to every device. Your in-app learning and purchase alerts remain available.</p>
+                </div>
+              </div>
               {renderSwitch("push", "Receive system alerts on your connected browsers and phones. Turning this off doesn't delete your reminders.")}
               {renderSwitch("email", "Course updates and subscription reminders, sent to your verified account email.", settings.capabilities
                 ? settings.capabilities.emailConfigured ? `Delivery address: ${user.email}` : "Email delivery isn't configured on the server yet. Your preference is saved and will be honoured when delivery is available."
                 : "Email delivery status hasn't been confirmed. Retry the connection to check it.")}
               {renderSwitch("promotions", "Optional offers and new-product announcements in your inbox and enabled notification channels.", "Off means no promotional alerts. Updates to your purchased courses aren't promotions.")}
               <div className="settings-device" data-device-state={deviceState}>
+                <span className="settings-device-icon" aria-hidden="true"><Smartphone size={18} /></span>
                 <div><p className="settings-device-label">This device <span>{deviceLabel[deviceState]}</span></p><p>{deviceDescription}</p></div>
                 <button type="button" className="settings-secondary" disabled={deviceBusy || !settings.ready || settings.savingKeys.includes("push")}
                   onClick={() => { void connectDevice(); }}>{deviceBusy ? <><Loader2 className="settings-spinner" size={14} /> Connecting…</> : deviceState === "blocked" || deviceState === "error" ? "Retry setup" : accountPushOff ? "Turn on & connect" : deviceState === "connected" ? "Reconnect device" : "Connect device"}</button>
@@ -194,7 +220,13 @@ export default function SettingsPage() {
               </div>
             </section>
             <section className="settings-section" aria-labelledby="settings-privacy">
-              <div className="settings-section-heading"><h2 id="settings-privacy">Privacy</h2><p>Your notes, purchases, email and phone number are never part of your public profile.</p></div>
+              <div className="settings-section-heading">
+                <span className="settings-section-icon settings-section-icon--privacy" aria-hidden="true"><ShieldCheck size={19} /></span>
+                <div className="settings-section-heading-copy">
+                  <div className="settings-section-title-row"><h2 id="settings-privacy">Privacy</h2><span className="settings-section-count">2 controls</span></div>
+                  <p>Your notes, purchases, email and phone number are never part of your public profile.</p>
+                </div>
+              </div>
               {renderSwitch("profileVisible", "Show your name and profile photo on your public learner profile and community leaderboard.", !settings.preferences.profileVisible ? "Hidden profiles are removed from the public leaderboard. Your learning activity is hidden too." : undefined)}
               {renderSwitch("shareActivity", "Show only the number of courses started and completed learning items on your public profile. Course names and private content stay hidden.", !settings.preferences.profileVisible ? "This choice is saved, but nothing is shared while your public profile is off." : "Off by default. Sharing starts only when you explicitly turn this on.")}
               <a className="settings-public-link" href={`#/learner/${encodeURIComponent(user.id)}`}>View your public profile <ArrowUpRight size={15} /></a>
