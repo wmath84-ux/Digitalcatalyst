@@ -571,3 +571,201 @@
   scrollbar-width: thin;
   scrollbar-color: var(--rc-outline-variant) transparent;
 }
+
+
+/* ── Revision mobile viewport + floating dock clearance ────────────────────
+   The Uiverse footer is absolutely positioned. The app shell must therefore
+   own a bounded viewport on phones/tablet portrait; otherwise a tall flex
+   child makes the shell taller than the viewport and takes the dock with it.
+   The main content is the sole scroll owner on this layout.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-recall-root] [data-revision-bounded-shell="true"] {
+  position: relative;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[data-recall-root] [data-revision-bounded-shell="true"] [data-revision-scroll] {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Dashboard content: tighten the space after secondary tabs and keep its
+   visual rhythm balanced on short phone screens. */
+[data-recall-root] [data-revision-dashboard] {
+  padding-top: clamp(0.5rem, 2vh, 1rem);
+  padding-bottom: 0.5rem;
+}
+
+[data-recall-root] [data-revision-dashboard] > section {
+  gap: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: clamp(1.25rem, 4vw, 2rem);
+}
+
+[data-recall-root] [data-revision-start-session] {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background-image: linear-gradient(110deg, #0755d6, #3177ec);
+  box-shadow: 0 12px 26px -16px rgba(0, 74, 198, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  letter-spacing: -0.01em;
+}
+
+[data-recall-root] [data-revision-daily-goal] {
+  min-height: 0;
+  gap: 1rem;
+  border: 1px solid var(--rc-outline-variant);
+  border-radius: 24px;
+  background: var(--rc-surface);
+  box-shadow: 0 10px 28px -24px rgba(15, 23, 42, 0.28), 0 2px 6px -5px rgba(15, 23, 42, 0.14);
+}
+
+[data-recall-root] [data-revision-daily-goal] > div:first-child > div:first-child {
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+[data-recall-root] [data-revision-daily-goal] [role="progressbar"] {
+  height: 10px;
+  margin-top: 1.1rem;
+  margin-bottom: 0.8rem;
+  background: var(--rc-surface-container-high);
+  outline: 1px solid rgba(100, 116, 139, 0.08);
+  outline-offset: -1px;
+}
+
+[data-recall-root] [data-revision-daily-goal] [role="progressbar"] > div {
+  background-image: linear-gradient(90deg, #0755d6, #65a0ff);
+}
+
+[data-recall-root] [data-revision-daily-goal] [role="progressbar"] > div.bg-review-easy {
+  background-image: linear-gradient(90deg, #059669, #34d399);
+}
+
+[data-recall-root] [data-revision-streak] {
+  min-height: 176px;
+  padding: 1.1rem;
+  gap: 0.1rem;
+  border: 1px solid rgba(37, 99, 235, 0.13);
+  border-radius: 24px;
+  background: linear-gradient(145deg, var(--rc-primary-soft), var(--rc-surface-container-low));
+  box-shadow: 0 12px 28px -26px rgba(37, 99, 235, 0.32);
+}
+
+[data-recall-root] [data-revision-streak] > div:first-child {
+  margin-bottom: 0.7rem;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+[data-recall-root] [data-revision-streak] h3 {
+  color: var(--rc-primary);
+  font-size: clamp(1.35rem, 4.7vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.18;
+}
+
+[data-recall-root] [data-revision-streak] p {
+  margin-top: 0.25rem;
+  color: var(--rc-on-primary-fixed-variant);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+[data-recall-root] [data-revision-deck-card] {
+  overflow: hidden;
+  border: 1px solid var(--rc-outline-variant);
+  border-radius: 24px;
+  background: var(--rc-surface);
+  box-shadow: 0 12px 28px -26px rgba(15, 23, 42, 0.32), 0 2px 6px -5px rgba(15, 23, 42, 0.13);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+[data-recall-root] [data-revision-deck-card] > div:first-child > span {
+  border: 1px solid rgba(100, 116, 139, 0.16);
+  background: var(--rc-surface-container-low);
+  color: var(--rc-on-surface-variant);
+  font-weight: 750;
+}
+
+[data-recall-root] [data-revision-deck-card] h3 {
+  color: var(--rc-text-primary);
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+[data-recall-root] [data-revision-deck-card] > div:nth-of-type(2) {
+  gap: 0.7rem;
+}
+
+[data-recall-root] [data-revision-deck-card] > div:nth-of-type(2) > div:first-child {
+  height: 7px;
+  background: var(--rc-surface-container-high);
+}
+
+[data-recall-root] [data-revision-deck-card] > div:nth-of-type(2) > span {
+  min-width: 2.25rem;
+  color: var(--rc-on-surface-variant);
+  font-weight: 700;
+}
+
+[data-recall-root] [data-revision-deck-card] > div:last-child {
+  gap: 1.25rem;
+}
+
+[data-recall-root] [data-revision-deck-card] > div:last-child > div > span:first-child {
+  color: var(--rc-on-surface-variant);
+}
+
+[data-recall-root] [data-revision-deck-card] + button {
+  background-image: linear-gradient(135deg, #0755d6, #3177ec);
+}
+
+@media (max-width: 480px) {
+  [data-recall-root] [data-revision-dashboard] > section {
+    gap: 1rem;
+  }
+
+  [data-recall-root] [data-revision-daily-goal] {
+    padding: 1.2rem;
+    border-radius: 21px;
+  }
+
+  [data-recall-root] [data-revision-daily-goal] [role="progressbar"] {
+    height: 9px;
+    margin-top: 0.9rem;
+  }
+
+  [data-recall-root] [data-revision-streak] {
+    min-height: 156px;
+    padding: 1rem;
+    border-radius: 21px;
+  }
+
+  [data-recall-root] [data-revision-deck-card] {
+    padding: 1rem;
+    border-radius: 21px;
+  }
+}
+
+html[data-recall-theme="dark"] [data-recall-root] [data-revision-streak] {
+  background: linear-gradient(145deg, var(--rc-surface-container-high), var(--rc-surface-container));
+  border-color: var(--rc-outline-variant);
+}
+
+html[data-recall-theme="dark"] [data-recall-root] [data-revision-streak] > div:first-child {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-recall-root] [data-revision-start-session],
+  [data-recall-root] [data-revision-deck-card] {
+    transition-duration: 1ms !important;
+  }
+}
