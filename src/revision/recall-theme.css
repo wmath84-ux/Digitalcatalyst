@@ -591,8 +591,8 @@
   flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem + env(safe-area-inset-bottom, 0px)) !important;
-  scroll-padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem) !important;
+  scroll-padding-bottom: calc(var(--dc-footer-nav-h, 96px) + 1.5rem);
 }
 
 /* Dashboard content: tighten the space after secondary tabs and keep its
@@ -686,7 +686,7 @@
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-[data-recall-root] [data-revision-deck-card] > div:first-child > span {
+[data-recall-root] [data-revision-deck-card] > span {
   border: 1px solid rgba(100, 116, 139, 0.16);
   background: var(--rc-surface-container-low);
   color: var(--rc-on-surface-variant);
