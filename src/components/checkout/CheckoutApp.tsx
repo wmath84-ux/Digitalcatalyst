@@ -33,7 +33,10 @@ import { useBranding } from "../../context/BrandingContext";
 import CheckoutReviewStep from "./CheckoutReviewStep";
 import CheckoutSuccessStep from "./CheckoutSuccessStep";
 
-const STEPS = [{ label: "Review" }, { label: "Payment" }, { label: "Done" }];
+const PAID_STEPS = [{ label: "Review" }, { label: "Payment" }, { label: "Done" }];
+// A free order has no transaction, so its second rail stop is the automatic
+// access grant rather than a payment the buyer would never make.
+const FREE_STEPS = [{ label: "Review" }, { label: "Access" }];
 
 type StepId = 1 | 2 | 3;
 
@@ -145,6 +148,13 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const finalPrice = quote?.cashPayable || 0;
   const quoteId = quote?.quoteId || "";
 
+  // A free order (a free product, or a selection a coupon/referral reduced to
+  // ₹0 with no floor) never opens a transaction: the review CTA claims the
+  // access, the second step runs the server grant, and the rail says so.
+  const isFreeOrder = Boolean(quote) && finalPrice <= 0 && (quote?.minimumPayable || 0) <= 0;
+  const steps = isFreeOrder ? FREE_STEPS : PAID_STEPS;
+  const railStep = isFreeOrder ? (step >= 2 ? 2 : 1) : step;
+
   return (
     <div className="min-h-screen sm:py-6" data-checkout-app>
       <div
@@ -176,12 +186,22 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
             >
               <ArrowLeft size={16} />
             </CheckoutAction>
-            <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
-            <span className="dc-checkout-step-count">{step} of 3</span>
+            <h1 className="text-base font-extrabold tracking-tight text-white">
+              {isFreeOrder ? "Free access" : "Checkout"}
+            </h1>
+            <span className="dc-checkout-step-count">
+              {railStep} of {steps.length}
+            </span>
           </div>
-          {/* Plain, read-only progress through the three checkout steps. */}
-          <div className="px-4 pb-2" data-checkout-stepbar data-step={step}>
-            <StepIndicator minimal currentStep={step} steps={STEPS} />
+          {/* Plain, read-only progress through the checklist: Review → Payment
+              → Done normally, Review → Access when the order is free. */}
+          <div
+            className="px-4 pb-2"
+            data-checkout-stepbar
+            data-step={step}
+            data-steps={steps.length}
+          >
+            <StepIndicator minimal currentStep={railStep} steps={steps} />
           </div>
         </div>
 
@@ -200,6 +220,10 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
                 quoteId={quoteId}
                 finalPrice={finalPrice}
                 productName={productName}
+                /* A free order claims its access through this step's own
+                   button: the same server calls, no Razorpay sheet, no
+                   transaction, and no payment framing anywhere on the copy. */
+                freeAccess={isFreeOrder}
                 onPaymentSuccess={handlePaymentSuccess}
                 onGoBack={handleBackToReview}
               />
