@@ -27,6 +27,7 @@ import { PaymentButton } from "./components/ui/PaymentButton";
 import PdpPaidContent from "./components/pdp/PdpPaidContent";
 import { buildPdpPaidContent, type PaidContentRow } from "../utils/pdpPaidContent";
 import PdpPurchaseBuilder, { type PdpSelectionRequest } from "./components/pdp/PdpPurchaseBuilder";
+import WriteReviewDialog from "./components/pdp/WriteReviewDialog";
 import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./components/pdp/PdpSelectionSummary";
 import { pdpSelectionKey, usePdpQuote } from "./pdp/usePdpQuote";
 import { paiseToRupees } from "./utils/money";
@@ -1154,15 +1155,20 @@ function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, 
           <span>{ratingSummary.count.toLocaleString("en-IN")} rating{ratingSummary.count === 1 ? "" : "s"}</span>
         </div>
       ) : null}
+      {/* "Write a review" opens the reference feedback card (Uiverse
+          "dry-bulldog-95") as a real modal — rendered inside this section so
+          the list, its status line and the composer stay one region. */}
       {composerOpen && canReview && (
-        <div id="pdp-review-composer" className="dc-pdp-review-composer">
-          <p className="dc-pdp-selection-note">Your rating</p>
-          <div className="mt-2 flex gap-1" role="group" aria-label="Choose a rating">
-            {[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" onClick={() => onRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} aria-pressed={value === rating} className="dc-pdp-rating-choice"><Star aria-hidden="true" className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></button>)}
-          </div>
-          <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} aria-label="Your product review" placeholder="Your experience" className="dc-pdp-review-input" />
-          <button type="button" disabled={submitting} onClick={onSubmit} className="dc-pdp-review-submit">{submitting ? "Submitting…" : "Submit review"}</button>
-        </div>
+        <WriteReviewDialog
+          productTitle={identity.title}
+          rating={rating}
+          comment={comment}
+          submitting={submitting}
+          onRating={onRating}
+          onComment={onComment}
+          onSubmit={onSubmit}
+          onClose={onToggleComposer}
+        />
       )}
       {notice ? <p role="status" aria-live="polite" className="dc-pdp-selection-note">{notice}</p> : null}
       {reviews.length > 0 ? (

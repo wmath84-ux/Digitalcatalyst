@@ -1,0 +1,930 @@
+/*
+ * src/components/checkout/checkout-uiverse.css
+ *
+ * The checkout page's cart + summary treatment, adapted from zanina-yassine's
+ * MIT-licensed Uiverse "warm-bulldog-97" form
+ * (https://uiverse.io/zanina-yassine/warm-bulldog-97).
+ *
+ * The reference is a 400px light card that stacks three blocks:
+ *   1. a "Your cart" card — product rows (60px thumb · title/meta · qty · price)
+ *   2. a coupon row stamped inside the same card
+ *   3. a "Checkout" card — a 3fr/1fr details grid over a tinted footer that
+ *      pairs the big price with a blue-gradient CTA
+ *
+ * Every value below is the reference's own geometry (radii 19/7/9, the 40px
+ * title bar, the #efeff3 divider + footer, the 22px/900 price with sup, the
+ * 60px→150px blue gradient button, the 0.3s cubic-bezier(0.15,0.83,0.66,1)
+ * transitions). Two deliberate departures, both product requirements:
+ *   · prices are rupees (₹ + integer + optional paise), never dollars; and
+ *   · the burger's quantity stepper becomes a read-only unit chip, because a
+ *     course/module/resource line is a licence — the server owns its quantity
+ *     and the buyer never edits it here.
+ *
+ * Nothing outside `.cu-*` is touched, so the shared header/footer, the
+ * Razorpay gateway and the dark base stylesheet are unaffected.
+ */
+
+/* ── Container ───────────────────────────────────────────────────────────── */
+
+[data-checkout-app] .cu-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ── Card + title bar (reference `.card` / `.title`) ─────────────────────── */
+
+/* The cart card and the summary card are the two checkout sections that wear
+   the reference's card material. `html[data-theme="light"]` keeps the same
+   (or higher) specificity than the shared light-theme page rules, so the
+   reference geometry always wins for these two blocks. */
+html[data-theme="light"] [data-checkout-app] [data-checkout-line-items],
+html[data-theme="light"] [data-checkout-app] [data-checkout-price-section],
+html[data-theme="light"] [data-checkout-app] [data-checkout-coupon-section],
+[data-checkout-app] [data-checkout-line-items],
+[data-checkout-app] [data-checkout-price-section],
+[data-checkout-app] [data-checkout-coupon-section] {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #eef0f4;
+  border-radius: 19px 19px 9px 9px;
+  background: #ffffff;
+  box-shadow:
+    0 12px 26px rgb(15 23 42 / 6%),
+    0 47px 47px rgb(15 23 42 / 4%);
+  color: #2b2b2f;
+}
+
+html[data-theme="light"] [data-checkout-app] [data-checkout-price-section],
+[data-checkout-app] [data-checkout-price-section] {
+  border-radius: 9px 9px 19px 19px;
+}
+
+/* Visually hidden card heading. Pinned to the app's 18px heading floor so the
+   card is announced by name without borrowing the reference's 11px label. */
+html[data-theme="light"] [data-checkout-app] h2.cu-sr-heading,
+[data-checkout-app] h2.cu-sr-heading {
+  font-size: 1.125rem;
+  font-weight: 750;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+[data-checkout-app] .cu-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid #efeff3;
+  color: #63656b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-checkout-app] .cu-title > span {
+  color: #8a8d94;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+/* ── Item rows (reference `.products .product`) ──────────────────────────── */
+
+[data-checkout-app] .cu-items {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  margin: 0;
+}
+
+[data-checkout-app] .cu-item {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 12px;
+  transition: background-color 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+}
+
+[data-checkout-app] .cu-item + .cu-item {
+  border-top: 1px solid #f4f5f8;
+}
+
+[data-checkout-app] .cu-item:hover {
+  background: #fafbfe;
+}
+
+[data-checkout-app] .cu-item[data-owned="true"] {
+  opacity: 0.72;
+}
+
+[data-checkout-app] .cu-thumb {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #eceff5;
+  border-radius: 12px;
+  background: #f5f7fb;
+  color: #9aa4b6;
+}
+
+[data-checkout-app] .cu-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-checkout-app] .cu-thumb svg {
+  width: 20px;
+  height: 20px;
+}
+
+[data-checkout-app] .cu-copy {
+  min-width: 0;
+}
+
+[data-checkout-app] .cu-copy > h3 {
+  margin: 0;
+  color: #47484b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-copy > p {
+  margin: 3px 0 0;
+  color: #7a7c81;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Quantity chip — the reference's stepper, made honest: a licence line has a
+   server-owned quantity, so it reads, it does not edit. */
+[data-checkout-app] .cu-units {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 0 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #47484b;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  filter: drop-shadow(0 1px 0 #efefef);
+}
+
+[data-checkout-app] .cu-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+[data-checkout-app] .cu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #707175;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+[data-checkout-app] .cu-badge--owned {
+  border-color: #bbe3cf;
+  background: #effaf3;
+  color: #10693f;
+}
+
+[data-checkout-app] .cu-badge--free {
+  border-color: #cfe0ff;
+  background: #eff4ff;
+  color: #115dfc;
+}
+
+[data-checkout-app] .cu-item-price {
+  display: flex;
+  max-width: 45%;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: auto;
+  text-align: right;
+}
+
+[data-checkout-app] .cu-item-price > strong {
+  color: #47484b;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-item-price > del {
+  color: #9aa0ab;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Module / resource rows with a price tag (individual purchases) ─────── */
+
+[data-checkout-app] .cu-modules {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+}
+
+[data-checkout-app] .cu-module {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 6px;
+  border-radius: 10px;
+}
+
+[data-checkout-app] .cu-module + .cu-module {
+  border-top: 1px solid #f4f5f8;
+}
+
+[data-checkout-app] .cu-module-number {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f1f5fb;
+  color: #5f6b7d;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-checkout-app] .cu-module-copy {
+  min-width: 0;
+}
+
+[data-checkout-app] .cu-module-copy > strong {
+  display: block;
+  color: #47484b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-module-copy > span {
+  display: block;
+  margin-top: 2px;
+  color: #7a7c81;
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The reference's price tag: a tinted pill with the amount. */
+[data-checkout-app] .cu-price-tag {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid #dbe6fb;
+  border-radius: 999px;
+  background: #f5f8ff;
+  color: #115dfc;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-checkout-app] .cu-price-tag[data-tone="owned"] {
+  border-color: #cfe8d9;
+  background: #f1faf4;
+  color: #10693f;
+}
+
+[data-checkout-app] .cu-price-tag[data-tone="muted"] {
+  border-color: #e5e5e5;
+  background: #f7f8fa;
+  color: #707175;
+}
+
+/* ── "New content included" (paid updates) ─────────────────────────────── */
+
+[data-checkout-app] .cu-includes {
+  margin: 0 10px 10px;
+  padding: 10px;
+  border: 1px dashed #cddcf8;
+  border-radius: 12px;
+  background: #f7faff;
+}
+
+[data-checkout-app] .cu-includes-title {
+  margin: 0;
+  color: #115dfc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-checkout-app] .cu-includes-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-checkout-app] .cu-includes-list > li {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 6px;
+  color: #47484b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-includes-list svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #115dfc;
+}
+
+[data-checkout-app] .cu-includes .cu-note {
+  padding: 0;
+  margin-top: 8px;
+}
+
+/* ── Coupons (reference `.coupons`) ─────────────────────────────────────── */
+
+[data-checkout-app] .cu-coupons {
+  border-top: 1px solid #efeff3;
+}
+
+[data-checkout-app] .cu-coupon-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+}
+
+[data-checkout-app] .cu-coupon-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 5px;
+  outline: none;
+  background: #ffffff;
+  color: #2b2b2f;
+  font-size: 13px;
+  font-weight: 600;
+  filter: drop-shadow(0 1px 0 #efefef);
+  transition: all 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+}
+
+[data-checkout-app] .cu-coupon-form input::placeholder {
+  color: #9aa0ab;
+  font-weight: 600;
+}
+
+[data-checkout-app] .cu-coupon-form input:focus {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: 0 0 0 2px #242424;
+}
+
+/* Reference `.coupons form button` + `.checkout-btn` (blue gradient). The
+   `html[data-theme="light"]` twin of each selector outranks the shared light
+   page rules that re-ink text actions, so the gradient keeps white ink. */
+[data-checkout-app] .cu-apply,
+[data-checkout-app] .cu-pay,
+html[data-theme="light"] [data-checkout-app] .cu-apply,
+html[data-theme="light"] [data-checkout-app] .cu-pay {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #4480ff 0%, #115dfc 50%, #0550ed 100%);
+  box-shadow: 0 0.5px 0.5px #efefef, 0 1px 0.5px rgb(239 239 239 / 50%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+}
+
+[data-checkout-app] .cu-apply:hover:not(:disabled),
+[data-checkout-app] .cu-pay:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+[data-checkout-app] .cu-apply:disabled,
+[data-checkout-app] .cu-pay:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+[data-checkout-app] .cu-coupon-applied {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+}
+
+[data-checkout-app] .cu-coupon-applied > div {
+  min-width: 0;
+}
+
+[data-checkout-app] .cu-coupon-applied strong {
+  color: #10693f;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-coupon-applied p {
+  margin: 3px 0 0;
+  color: #7a7c81;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-coupon-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ba1a1a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-coupon-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8a8d94;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Summary details grid (reference `.checkout .details`) ─────────────── */
+
+[data-checkout-app] .cu-details {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 5px;
+  padding: 10px;
+  margin: 0;
+}
+
+[data-checkout-app] .cu-details dt {
+  margin: auto auto auto 0;
+  color: #707175;
+  font-size: 11px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-details dd {
+  margin: auto 0 auto auto;
+  color: #47484b;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-details dd[data-tone="save"] {
+  color: #10693f;
+}
+
+[data-checkout-app] .cu-details dd[data-tone="muted"] {
+  color: #707175;
+}
+
+/* ── Footer: big rupee price + the commitment button ───────────────────── */
+
+[data-checkout-app] .cu-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 10px 20px;
+  background-color: #efeff3;
+}
+
+[data-checkout-app] .cu-total-label {
+  display: block;
+  color: #707175;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-checkout-app] .cu-price {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  color: #2b2b2f;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-price > sup {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+[data-checkout-app] .cu-price > sub {
+  width: fit-content;
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  color: #5f5d6b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-checkout-app] .cu-price > .cu-price-free {
+  color: #10693f;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: normal;
+}
+
+[data-checkout-app] .cu-detail-note {
+  margin-left: 4px;
+  color: #9aa0ab;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+[data-checkout-app] .cu-price-note {
+  margin: 4px 0 0;
+  color: #7a7c81;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+[data-checkout-app] .cu-pay {
+  width: 150px;
+  max-width: 100%;
+  min-height: 36px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+[data-checkout-app] .cu-pay.uzp-pay {
+  --uzp-clr: #115dfc;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #4480ff 0%, #115dfc 50%, #0550ed 100%);
+  box-shadow: 0 0.5px 0.5px #efefef, 0 1px 0.5px rgb(239 239 239 / 50%);
+  color: #ffffff;
+}
+
+[data-checkout-app] .cu-pay.uzp-pay:hover:not(:disabled) {
+  background: linear-gradient(180deg, #5590ff 0%, #1f6bff 50%, #1160f5 100%);
+}
+
+[data-checkout-app] .cu-pay .uzp-pay__content {
+  justify-content: center;
+  min-height: 36px;
+}
+
+[data-checkout-app] .cu-pay .uzp-pay__text {
+  max-width: 100%;
+  padding: 0.65rem 1rem;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+[data-checkout-app] .cu-pay .uzp-pay__icon:empty,
+[data-checkout-app] .cu-pay .uzp-pay__decor {
+  display: none;
+}
+
+[data-checkout-app] .cu-pay .uzp-pay__spinner {
+  color: #ffffff;
+}
+
+/* Server verification + expiry stamp under the footer. */
+[data-checkout-app] .cu-stamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px 10px;
+  color: #707175;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+[data-checkout-app] .cu-stamp svg {
+  flex: 0 0 auto;
+  color: #115dfc;
+}
+
+/* ── Two-stop rail (free orders: Review → Access) ────────────────────────
+   The three-stop rail is the layout the paid flow and the shared CSS assume;
+   a free order's rail simply re-cuts the same track into two. */
+
+[data-checkout-app] [data-checkout-stepbar][data-steps="2"] .dc-checkout-step-indicator ol,
+html[data-theme="light"] [data-checkout-app] [data-checkout-stepbar][data-steps="2"] .dc-checkout-step-indicator ol {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ── Success animation card ──────────────────────────────────────────────
+   Adapted from Yaya12085's MIT-licensed Uiverse "nasty-firefox-13": the plate
+   pulses 1 → 1.09 in 0.6s linear alternate-reverse, the title is #066e29, the
+   message #595b5f, the primary action solid #1aa06d, the secondary outlined. */
+
+[data-checkout-app] .cu-success,
+[data-payment-gateway] .cu-success {
+  position: relative;
+  width: 100%;
+  max-width: 290px;
+  margin-inline: auto;
+  overflow: hidden;
+  padding: 1.25rem 1rem 1rem;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 10%),
+    0 10px 10px -5px rgb(0 0 0 / 4%);
+  text-align: left;
+}
+
+/* The reference's own corner dismiss (`.dismiss { right:10px; top:10px;
+   border: 2px solid #D1D5DB; border-radius: 7px; transition: .3s ease }`,
+   red on hover). Here it skips the animation and shows the receipt, so a
+   buyer who already knows what happened is never held for the 2.6s beat. */
+[data-checkout-app] .cu-success-dismiss,
+[data-payment-gateway] .cu-success-dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #d1d5db;
+  border-radius: 7px;
+  background-color: #ffffff;
+  color: #111827;
+  transition: 0.3s ease;
+}
+
+[data-checkout-app] .cu-success-dismiss:hover,
+[data-payment-gateway] .cu-success-dismiss:hover,
+[data-checkout-app] .cu-success-dismiss:focus-visible,
+[data-payment-gateway] .cu-success-dismiss:focus-visible {
+  border-color: #ee0d0d;
+  background-color: #ee0d0d;
+  color: #ffffff;
+}
+
+[data-checkout-app] .cu-success-plate,
+[data-payment-gateway] .cu-success-plate {
+  display: flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-inline: auto;
+  border-radius: 9999px;
+  background-color: #e2feee;
+  color: #0afa2a;
+  animation: cuSuccessPulse 0.6s linear alternate-reverse infinite;
+  transition: 0.6s ease;
+}
+
+[data-checkout-app] .cu-success-plate svg,
+[data-payment-gateway] .cu-success-plate svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+[data-checkout-app] .cu-success-content,
+[data-payment-gateway] .cu-success-content {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+[data-checkout-app] .cu-success-title,
+[data-payment-gateway] .cu-success-title {
+  margin: 0;
+  color: #066e29;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+[data-checkout-app] .cu-success-message,
+[data-payment-gateway] .cu-success-message {
+  margin: 0.5rem 0 0;
+  color: #595b5f;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-success-footnote,
+[data-payment-gateway] .cu-success-footnote {
+  margin: 0.6rem 0 0;
+  color: #067647;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+[data-checkout-app] .cu-success-actions,
+[data-payment-gateway] .cu-success-actions {
+  margin: 0.75rem 1rem 0;
+}
+
+[data-checkout-app] .cu-success-primary,
+[data-payment-gateway] .cu-success-primary {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.375rem;
+  background-color: #1aa06d;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5rem;
+  transition: background-color 0.2s ease;
+}
+
+[data-checkout-app] .cu-success-primary:hover,
+[data-payment-gateway] .cu-success-primary:hover {
+  background-color: #15855a;
+}
+
+[data-checkout-app] .cu-success-secondary,
+[data-payment-gateway] .cu-success-secondary {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
+  color: #242525;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+[data-checkout-app] .cu-success-secondary:hover,
+[data-payment-gateway] .cu-success-secondary:hover {
+  border-color: #9ca3af;
+  background-color: #f9fafb;
+}
+
+@keyframes cuSuccessPulse {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.09);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-checkout-app] .cu-success-plate,
+  [data-payment-gateway] .cu-success-plate {
+    animation: none;
+  }
+}
+
+/* ── Notes / recovery states reuse the plain checkout ink ──────────────── */
+
+[data-checkout-app] .cu-note {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: #7a7c81;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* ── Narrow phones ─────────────────────────────────────────────────────── */
+
+/* Narrow phones: keep the label column wide enough to read the coupon row
+   without the amount being squeezed into a sliver. */
+@media (max-width: 420px) {
+  [data-checkout-app] .cu-details {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 359px) {
+  [data-checkout-app] .cu-item {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+  [data-checkout-app] .cu-thumb {
+    width: 48px;
+    height: 48px;
+  }
+  [data-checkout-app] .cu-item-price {
+    grid-column: 1 / -1;
+    max-width: 100%;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  [data-checkout-app] .cu-coupon-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-checkout-app] .cu-footer {
+    padding-inline: 12px;
+  }
+  [data-checkout-app] .cu-pay,
+  [data-checkout-app] .cu-pay.uzp-pay {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-checkout-app] .cu-item,
+  [data-checkout-app] .cu-apply,
+  [data-checkout-app] .cu-pay,
+  [data-checkout-app] .cu-coupon-form input {
+    transition-duration: 1ms;
+  }
+}

@@ -55,6 +55,15 @@ interface PaymentGatewayProps {
    */
   finalPrice: number;
   productName: string;
+  /**
+   * A ₹0 order: no transaction happens. The free branch below runs
+   * straight through the same server create-order → verify-payment
+   * pair, the Razorpay modal is never loaded and no amount is ever
+   * charged. Only the framing changes — "Access" instead of
+   * "Payment", "Nothing to pay" instead of an amount, and a claim
+   * button instead of a pay button.
+   */
+  freeAccess?: boolean;
   onPaymentSuccess: (payment: VerifiedPayment) => void;
   onGoBack: () => void;
 }
@@ -167,6 +176,7 @@ export default function PaymentGateway({
   quoteId,
   finalPrice,
   productName,
+  freeAccess = false,
   onPaymentSuccess,
   onGoBack,
 }: PaymentGatewayProps) {
@@ -376,8 +386,17 @@ export default function PaymentGateway({
   const busy =
     paymentState === "creating" || paymentState === "awaiting" || paymentState === "verifying";
 
+  // Kept as its own literal so the free-order label reads the same
+  // everywhere it is used.
+  const payLabel = finalPrice === 0 ? "Confirm free access" : "Pay securely";
+
   return (
-    <div data-payment-gateway data-payment-state={paymentState} className="dc-payment-page">
+    <div
+      data-payment-gateway
+      data-payment-state={paymentState}
+      data-free-access={freeAccess ? "true" : "false"}
+      className="dc-payment-page"
+    >
       <header>
         <span className="dc-payment-brand-mark"><ShieldCheck size={24} aria-hidden="true" /></span>
         <div>
@@ -388,10 +407,14 @@ export default function PaymentGateway({
       </header>
       <section className="dc-checkout-section" data-payment-summary>
         <div className="dc-checkout-total">
-          <span>{finalPrice === 0 ? "Amount payable" : "Amount to pay"}</span>
+          <span>{freeAccess ? "Nothing to pay" : finalPrice === 0 ? "Amount payable" : "Amount to pay"}</span>
           <strong>{displayAmount}</strong>
         </div>
-        <p className="dc-checkout-note">The server-verified amount is confirmed before payment.</p>
+        <p className="dc-checkout-note">
+          {freeAccess
+            ? "Nothing is charged for this order — the server grants access directly."
+            : "The server-verified amount is confirmed before payment."}
+        </p>
       </section>
       {paymentState === "success" ? (
         <StatusCard title="Payment verified" detail="Access is being added to your account…" />
@@ -400,13 +423,19 @@ export default function PaymentGateway({
         <StatusCard
           title={
             paymentState === "verifying"
-              ? "Verifying payment"
+              ? freeAccess
+                ? "Adding this free item to your library"
+                : "Verifying payment"
               : paymentState === "awaiting"
               ? "Complete payment in Razorpay"
+              : freeAccess
+              ? "Unlocking free access"
               : "Creating secure order"
           }
           detail={
-            paymentState === "verifying"
+            freeAccess
+              ? "No money moves here. Access is granted the moment the server confirms the claim."
+              : paymentState === "verifying"
               ? "Keep this page open until verification finishes."
               : "Access unlocks only after server verification."
           }
@@ -427,7 +456,13 @@ export default function PaymentGateway({
           disabled={busy}
           onClick={startPayment}
           data-payment-gateway-pay=""
-          label={busy ? "Please wait…" : finalPrice === 0 ? "Confirm free access" : "Pay securely"}
+          label={
+            busy
+              ? "Please wait…"
+              : freeAccess && paymentState === "error"
+              ? "Try free access again"
+              : payLabel
+          }
         />
       ) : null}
       {!busy && paymentState !== "success" ? (
@@ -436,7 +471,9 @@ export default function PaymentGateway({
         </button>
       ) : null}
       <p className="dc-checkout-note">
-        {finalPrice === 0
+        {freeAccess
+          ? "Free order — there is no transaction to complete or cancel. Access is granted by the server."
+          : finalPrice === 0
           ? "No card or payment is required for this order."
           : "UPI, cards, net banking and supported wallets through Razorpay. Card details are not stored here."}
       </p>

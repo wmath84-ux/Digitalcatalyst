@@ -1,20 +1,36 @@
 // src/components/checkout/CheckoutReviewStep.tsx
 //
-// Plain, quote-driven review: buyer identity, individually named items, real
-// price / coupon reductions, payable and minimum rules, selection details,
-// membership scope / expiry, and safe refresh / failure recovery. Financial
-// amounts and access claims come from the verified server quote.
+// Quote-driven review presented as the reference cart/checkout card set
+// (Uiverse "warm-bulldog-97", see ./checkout-uiverse.css): a "Your cart" card
+// of product rows (cover thumbnail · title · meta · quantity chip · price),
+// the server-validated coupon row stamped into that same card, then a
+// "Checkout" card whose details grid sits over a tinted footer that pairs the
+// big rupee total with the single commitment button.
+//
+// The buyer card, the selection details, the membership scope and the safe
+// refresh / failure recovery stay exactly as they were: financial amounts and
+// access claims still come only from the verified server quote.
 
 import { useEffect, useId, useMemo, useState } from "react";
 import CheckoutSection, { CheckoutAction, formatCheckoutMoney } from "./CheckoutSection";
 import { PaymentButton } from "../ui/PaymentButton";
-import { AlertCircle, ArrowLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  LoaderCircle,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { apiFetch } from "../../utils/apiBase";
 import type { CheckoutLineItem, ServerPriceQuote } from "../../types/commerce";
-import CheckoutLineItemCard from "./CheckoutLineItemCard";
+import { CheckoutCartRow, CheckoutModuleList } from "./CheckoutCartList";
+import RupeePrice from "./RupeePrice";
+import "./checkout-uiverse.css";
 import {
   subscriptionProductFor,
   subscriptionUnlockName,
@@ -157,6 +173,11 @@ export default function CheckoutReviewStep({
   const moduleLines = lineItemsForDisplay.filter((line) => line.kind === "selected_modules");
   const resourceLines = lineItemsForDisplay.filter((line) => line.kind === "selected_resources");
   const updateLines = lineItemsForDisplay.filter((line) => line.kind === "paid_update");
+  // The cart-card module list is the record of what this order contains, so it
+  // keeps an already-owned line in place — tagged "Already owned · ₹0" — rather
+  // than letting it vanish from the list the buyer is checking.
+  const linesOfKind = (kind: CheckoutLineItem["kind"]) =>
+    lineItems.filter((line) => line.kind === kind);
   const subscriptionPlanLines = lineItemsForDisplay.filter((line) => line.kind === "subscription");
   const subscriptionAddonLines = lineItemsForDisplay.filter(
     (line) => line.kind === "subscription_features"
@@ -205,68 +226,149 @@ export default function CheckoutReviewStep({
           both repeated the same names on the review page. */}
       {isSubscriptionPurchase ? null : (
         <CheckoutSection data-checkout-line-items>
-          <header className="mb-2 flex items-center justify-between">
-            <h2 className="dc-section-label">
-              Items ({lineItemsForDisplay.length + ownedLineItems.length})
-            </h2>
-            {lineItemsForDisplay.length > 0 ? (
-              <p className="text-[11px] text-white/55">
-                {lineItemsForDisplay.length} new · {ownedLineItems.length} already owned
-              </p>
-            ) : null}
-          </header>
-          <div className="space-y-2">
-            {lineItemsForDisplay.length === 0 && ownedLineItems.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
-                No items to charge for. This quote is fully covered by your existing library.
-              </p>
-            ) : null}
-            {lineItemsForDisplay.map((line) => (
-              <CheckoutLineItemCard minimal key={line.id} line={line} />
-            ))}
-            {ownedLineItems.map((line) => (
-              <CheckoutLineItemCard minimal key={line.id} line={line} />
-            ))}
-          </div>
+          {/* The reference's title bar is an 11px uppercase label, which cannot
+              also be the card's heading (the app's heading floor is 18px), so
+              the card carries a visually hidden heading of the same words. */}
+          <h2 className="sr-only cu-sr-heading">
+            Your cart · {lineItemsForDisplay.length + ownedLineItems.length}{" "}
+            {(lineItemsForDisplay.length + ownedLineItems.length) === 1 ? "item" : "items"}
+          </h2>
+          <p className="cu-title" data-checkout-cart-title aria-hidden="true">
+            Your cart
+            <span>
+              {lineItemsForDisplay.length + ownedLineItems.length}{" "}
+              {(lineItemsForDisplay.length + ownedLineItems.length) === 1 ? "item" : "items"}
+              {ownedLineItems.length > 0 ? ` · ${ownedLineItems.length} already owned` : ""}
+            </span>
+          </p>
+
+          {/* Products (a course, a cart bundle, a free grant) lead with the
+              catalog cover and the product title; a scoped purchase (individual
+              modules / resources / a paid update) is a module list, so each
+              module gets its own price tag instead of a cart row. */}
+          {productLines.length > 0 && kind !== "cart_bundle" ? (
+            <div className="cu-items" data-checkout-product-rows>
+              {productLines.map((line) => (
+                <CheckoutCartRow key={line.id} line={line} products={catalogProducts} />
+              ))}
+            </div>
+          ) : null}
+
+          {kind === "cart_bundle" ? (
+            <div className="cu-items" data-checkout-product-rows>
+              {lineItemsForDisplay.map((line) => (
+                <CheckoutCartRow key={line.id} line={line} products={catalogProducts} />
+              ))}
+              {ownedLineItems.map((line) => (
+                <CheckoutCartRow key={line.id} line={line} products={catalogProducts} />
+              ))}
+            </div>
+          ) : null}
+
+          {kind === "selected_modules" ? (
+            <CheckoutModuleList kind="selected_modules" lines={linesOfKind("selected_modules")} />
+          ) : null}
+
+          {kind === "selected_resources" ? (
+            <CheckoutModuleList
+              kind="selected_resources"
+              lines={linesOfKind("selected_resources")}
+            />
+          ) : null}
+
+          {kind === "paid_update" ? (
+            <>
+              <CheckoutModuleList kind="paid_update" lines={linesOfKind("paid_update")} />
+              {/* An update is priced as one package, so its included modules are
+                  named without a second price tag beside them. */}
+              {updateLines.flatMap((line) => line.detailItems || []).length > 0 ? (
+                <div className="cu-includes" data-checkout-update-includes>
+                  <p className="cu-includes-title">New content included</p>
+                  <ul className="cu-includes-list">
+                    {updateLines
+                      .flatMap((line) => line.detailItems || [])
+                      .map((item) => (
+                        <li key={item}>
+                          <Check size={13} aria-hidden="true" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                  </ul>
+                  <p className="cu-note">
+                    Your existing course stays owned; this checkout adds only the content listed
+                    above.
+                  </p>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {lineItemsForDisplay.length === 0 && ownedLineItems.length === 0 ? (
+            <p className="cu-note" data-checkout-empty-items>
+              No items to charge for. This quote is fully covered by your existing library.
+            </p>
+          ) : null}
+
+          {/* Part 7 — the coupon row is stamped into the cart card, exactly
+              where the reference puts "Apply coupons". Hidden entirely for
+              free / ₹0-payable orders, so a free claim shows no code field. */}
+          {showCouponCard ? (
+            <CouponCard
+              appliedCode={quote.couponCode || null}
+              appliedType={quote.couponType || null}
+              appliedValue={typeof quote.couponValue === "number" ? quote.couponValue : null}
+              appliedDiscount={couponDiscount}
+              status={checkout.couponStatus}
+              errorMessage={checkout.couponErrorMessage}
+              input={checkout.couponInput}
+              onChange={checkout.setCouponInput}
+              onApply={(code) => checkout.applyCoupon(code)}
+              onRemove={() => checkout.removeCoupon()}
+              disabled={showLoading}
+            />
+          ) : null}
         </CheckoutSection>
       )}
 
-      {/* Part 7 — Coupon input card (server-validated, with verified savings).
-          Hidden entirely for free / ₹0-payable orders. */}
-      {showCouponCard ? (
-        <CouponCard
-          appliedCode={quote.couponCode || null}
-          appliedType={quote.couponType || null}
-          appliedValue={typeof quote.couponValue === "number" ? quote.couponValue : null}
-          appliedDiscount={couponDiscount}
-          status={checkout.couponStatus}
-          errorMessage={checkout.couponErrorMessage}
-          input={checkout.couponInput}
-          onChange={checkout.setCouponInput}
-          onApply={(code) => checkout.applyCoupon(code)}
-          onRemove={() => checkout.removeCoupon()}
-          disabled={showLoading}
-        />
+      {isSubscriptionPurchase && showCouponCard ? (
+        <CheckoutSection data-checkout-coupon-section>
+          <CouponCard
+            appliedCode={quote.couponCode || null}
+            appliedType={quote.couponType || null}
+            appliedValue={typeof quote.couponValue === "number" ? quote.couponValue : null}
+            appliedDiscount={couponDiscount}
+            status={checkout.couponStatus}
+            errorMessage={checkout.couponErrorMessage}
+            input={checkout.couponInput}
+            onChange={checkout.setCouponInput}
+            onApply={(code) => checkout.applyCoupon(code)}
+            onRemove={() => checkout.removeCoupon()}
+            disabled={showLoading}
+          />
+        </CheckoutSection>
       ) : null}
 
-      {/* Price section */}
+      {/* Checkout card — the reference's 3fr/1fr details grid over a tinted
+          footer that carries the big rupee price beside the commitment CTA. */}
       <CheckoutSection data-checkout-price-section>
-        <header className="mb-2 flex items-center justify-between">
-          <h2 className="dc-section-label">Price breakdown</h2>
-          <p className="text-[10px] dc-ink-3">GST inclusive</p>
-        </header>
-        <dl className="space-y-1.5 text-sm">
+        <h2 className="sr-only cu-sr-heading">Checkout summary</h2>
+        <p className="cu-title" aria-hidden="true">
+          Checkout
+          <span>GST inclusive</span>
+        </p>
+        <dl className="cu-details" data-checkout-price-details>
           {/* Anchoring: the pre-discount subtotal is the quiet reference the
               final total is judged against. */}
-          <PriceRow label="Regular subtotal" value={regularSubtotal} />
+          <PriceRow label="Your cart subtotal" value={regularSubtotal} />
           {saleDiscount > 0 ? (
-            <PriceRow label="Sale discount" value={-saleDiscount} negative />
+            <PriceRow label="Product discount" value={-saleDiscount} negative />
           ) : null}
           {couponDiscount > 0 ? (
             <PriceRow
               label={`${quote.couponIsReferral ? "Referral discount" : "Coupon discount"}${
                 quote.couponCode ? ` (${quote.couponCode})` : ""
               }`}
+              note="Discount through applied coupons"
               value={-couponDiscount}
               negative
             />
@@ -274,16 +376,38 @@ export default function CheckoutReviewStep({
           {minimumPayable > 0 ? (
             <PriceRow label="Minimum payable" value={minimumPayable} muted />
           ) : null}
+          <PriceRow
+            label="Final total"
+            value={finalTotal}
+            testId="data-checkout-final-total"
+          />
         </dl>
-        <div className="dc-checkout-total">
-          <span>Final total</span>
-          <strong data-checkout-final-total>{formatRupee(finalTotal)}</strong>
+        <div className="cu-footer" data-checkout-footer>
+          <span className="min-w-0">
+            <span className="cu-total-label">Amount due</span>
+            <RupeePrice paise={finalTotal} />
+            {regularSubtotal - finalTotal > 0 ? (
+              <span className="cu-price-note">
+                You save {formatRupee(regularSubtotal - finalTotal)} on this order.
+              </span>
+            ) : null}
+          </span>
+          <PaymentButton
+            size="md"
+            loading={showLoading}
+            disabled={paymentBlocked}
+            icon={null}
+            className="cu-pay"
+            onClick={onProceed}
+            data-checkout-proceed=""
+            label={finalTotal === 0 ? "Get free access" : "Checkout"}
+          />
         </div>
-        {regularSubtotal - finalTotal > 0 ? (
-          <p className="dc-checkout-note">You save {formatRupee(regularSubtotal - finalTotal)}.</p>
-        ) : null}
-        <p className="dc-checkout-note">
-          The payable is verified server-side. Any change requires a fresh quote.
+        <p className="cu-stamp" data-checkout-verified-stamp>
+          <ShieldCheck size={13} aria-hidden="true" />
+          {finalTotal === 0
+            ? "Free item · no payment or transaction is needed."
+            : "Verified server-side before payment · no card details are stored here."}
         </p>
       </CheckoutSection>
 
@@ -429,29 +553,10 @@ export default function CheckoutReviewStep({
         </div>
       ) : null}
 
-      {/* Navigation */}
+      {/* Secondary actions. The commitment button itself sits in the Checkout
+          card's footer (the reference's checkout--footer), not here, so the
+          money action is read as one block: total → button. */}
       <div className="space-y-2 pb-2" data-checkout-actions>
-        {/* The checkout CTA is the app's one payment button (Uiverse
-            pretty-grasshopper-57 port) — same handler, same quote, same
-            disabled-until-the-quote-settles rule. The label stays
-            contextual: a ₹0 order still says "Get free access". */}
-        <PaymentButton
-          block
-          size="lg"
-          loading={showLoading}
-          disabled={paymentBlocked}
-          icon={null}
-          className="dc-checkout-primary"
-          onClick={onProceed}
-          data-checkout-proceed=""
-          label={finalTotal === 0 ? "Continue to free access" : "Continue to payment"}
-        />
-        {/* Transparency bias, placed at the exact point of commitment. */}
-        <p className="dc-checkout-note">
-          {finalTotal === 0
-            ? "No card needed. Access unlocks after the server confirms this order."
-            : "Razorpay secure checkout · nothing is charged until you confirm."}
-        </p>
         {!showError && !quoteExpired ? (
           <div>
             <CheckoutAction
@@ -857,34 +962,40 @@ function BuyerCard({
   );
 }
 
+/**
+ * One detail row of the reference's `3fr 1fr` grid — the odd `span` (quiet
+ * label) on the left, the even one (the amount) flushed right. Savings keep
+ * their own green tone; every amount is the server's number.
+ */
 function PriceRow({
   label,
   value,
   negative,
   muted,
   note,
+  testId,
 }: {
   label: string;
   value: number;
   negative?: boolean;
   muted?: boolean;
   note?: string;
+  /** Contract hooks may also be written literally: `data-foo`. */
+  testId?: string;
 }) {
   const display = negative ? `− ${formatRupee(Math.abs(value))}` : formatRupee(value);
+  const tone = negative ? "save" : muted ? "muted" : "amount";
+  const hook = testId ? { [testId]: "" } : {};
   return (
-    <div className="flex items-baseline justify-between">
-      <dt className={muted ? "text-xs text-white/55" : "text-sm text-white/55"}>
+    <>
+      <dt>
         {label}
-        {note ? <span className="ml-1 text-[10px] text-white/55">{note}</span> : null}
+        {note ? <span className="cu-detail-note">{note}</span> : null}
       </dt>
-      <dd
-        className={`font-bold ${
-          negative ? "text-emerald-300" : muted ? "text-white/55" : "text-white/85"
-        }`}
-      >
+      <dd data-tone={tone} {...hook}>
         {display}
       </dd>
-    </div>
+    </>
   );
 }
 
@@ -1042,14 +1153,19 @@ function CouponCard({
   const inputId = useId();
   const isApplied = Boolean(appliedCode);
   const applying = status === "applying";
+  // The reference's "Apply coupons" strip lives at the foot of the cart card, so
+  // this block is a plain row inside it — no nested card, no second heading.
   return (
-    <CheckoutSection data-checkout-coupon data-applied={isApplied ? "true" : "false"}>
-      <h2>Coupon</h2>
+    <div
+      className="cu-coupons"
+      data-checkout-coupon
+      data-applied={isApplied ? "true" : "false"}
+    >
       {isApplied ? (
-        <div className="dc-checkout-code-applied">
+        <div className="cu-coupon-applied">
           <div>
             <strong data-checkout-coupon-applied>{appliedCode}</strong>
-            <p className="dc-checkout-note">
+            <p>
               {appliedType === "percent" && appliedValue !== null
                 ? `${appliedValue}% code · `
                 : appliedType === "flat" && appliedValue !== null
@@ -1059,6 +1175,7 @@ function CouponCard({
             </p>
           </div>
           <CheckoutAction
+            className="dc-checkout-text-action cu-coupon-remove"
             onClick={() => void onRemove()}
             disabled={disabled || applying}
             data-checkout-coupon-remove
@@ -1068,7 +1185,7 @@ function CouponCard({
         </div>
       ) : (
         <form
-          className="dc-checkout-code-form"
+          className="cu-coupon-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (input.trim() && !applying && !disabled) void onApply(input.trim());
@@ -1077,47 +1194,45 @@ function CouponCard({
           <label htmlFor={inputId} className="sr-only">
             Coupon code
           </label>
-          <div>
-            <input
-              id={inputId}
-              type="text"
-              autoCapitalize="characters"
-              autoComplete="off"
-              spellCheck={false}
-              value={input}
-              onChange={(event) => onChange(event.target.value)}
-              placeholder="Enter coupon code"
-              disabled={applying || disabled}
-              data-checkout-coupon-input
-              aria-invalid={status === "error"}
-              aria-describedby={errorMessage && status === "error" ? `${inputId}-error` : undefined}
-            />
-            <CheckoutAction
-              type="submit"
-              disabled={applying || disabled || !input.trim()}
-              data-checkout-coupon-apply
-            >
-              {applying ? "Applying…" : "Apply"}
-            </CheckoutAction>
-          </div>
+          <input
+            id={inputId}
+            type="text"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            value={input}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Apply coupons"
+            disabled={applying || disabled}
+            data-checkout-coupon-input
+            aria-invalid={status === "error"}
+            aria-describedby={errorMessage && status === "error" ? `${inputId}-error` : undefined}
+          />
+          <CheckoutAction
+            type="submit"
+            className="cu-apply"
+            disabled={applying || disabled || !input.trim()}
+            data-checkout-coupon-apply
+          >
+            {applying ? "Applying…" : "Apply"}
+          </CheckoutAction>
           {errorMessage && status === "error" ? (
             <p
               id={`${inputId}-error`}
               data-checkout-coupon-error
               role="alert"
-              className="dc-checkout-error"
+              className="cu-coupon-error"
             >
               {errorMessage}
             </p>
           ) : (
-            <p className="dc-checkout-note">
-              Checkout verifies the code for these items. Any reduction appears in the price
-              breakdown.
+            <p className="cu-coupon-help">
+              Checkout verifies the code for these items. Any reduction appears in the summary.
             </p>
           )}
         </form>
       )}
-    </CheckoutSection>
+    </div>
   );
 }
 
