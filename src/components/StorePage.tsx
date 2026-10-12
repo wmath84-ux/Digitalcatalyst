@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useMemo, useState, useEffect, useLayoutEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { Check, ChevronDown, Search } from "lucide-react";
@@ -50,6 +51,13 @@ function StoreOptionPopover({
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    placement: "above" | "below";
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -57,12 +65,60 @@ function StoreOptionPopover({
   const selected = options.find((option) => option.value === value) ?? options[0];
   const isSort = kind === "sort";
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return undefined;
+    }
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const gutter = 12;
+      const width = Math.max(0, Math.min(isSort ? 240 : 190, viewportWidth - gutter * 2));
+      const naturalHeight = isSort ? options.length * 42 + 16 : 70;
+      const estimatedHeight = Math.min(naturalHeight, Math.max(70, Math.min(viewportHeight * 0.58, 352)));
+      const spaceAbove = Math.max(0, rect.top - gutter - 8);
+      const spaceBelow = Math.max(0, viewportHeight - rect.bottom - gutter - 8);
+      const placement: "above" | "below" =
+        spaceAbove >= estimatedHeight || spaceAbove >= spaceBelow ? "above" : "below";
+      const availableSpace = placement === "above" ? spaceAbove : spaceBelow;
+      const maxHeight = isSort
+        ? Math.max(70, Math.min(viewportHeight * 0.58, availableSpace, 352))
+        : 70;
+      const height = Math.min(naturalHeight, maxHeight);
+      const left = Math.max(gutter, Math.min(rect.right - width, viewportWidth - width - gutter));
+      const top = placement === "above"
+        ? Math.max(gutter, rect.top - height - 8)
+        : Math.max(gutter, Math.min(rect.bottom + 8, viewportHeight - height - gutter));
+
+      setMenuPosition({ top, left, width, maxHeight, placement });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
+    };
+  }, [open, isSort, options.length]);
+
   useEffect(() => {
     if (!open) return undefined;
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -109,41 +165,58 @@ function StoreOptionPopover({
         <span className="truncate">{selected.label}</span>
         <ChevronDown size={15} aria-hidden="true" />
       </button>
-      <div
-        ref={menuRef}
-        id={`${id}-options`}
-        role="listbox"
-        aria-label={isSort ? "Sort options" : "Product layouts"}
-        aria-labelledby={`${id}-trigger`}
-        aria-hidden={!open}
-        data-open={open ? "true" : "false"}
-        data-store-sort-options={isSort ? "" : undefined}
-        data-store-view-popover={!isSort ? "" : undefined}
-        className={`dc-compact-glass-window ${isSort ? "dc-compact-glass-window--menu dc-marketplace-sort-window" : "dc-marketplace-view-window"}`}
-        onKeyDown={moveOptionFocus}
-      >
-        {options.map((option) => {
-          const isSelected = option.value === value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={isSelected}
-              data-selected={isSelected ? "true" : "false"}
-              className={`dc-marketplace-popup-option ${!isSort ? "dc-marketplace-popup-option--view" : ""}`}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-                triggerRef.current?.focus({ preventScroll: true });
-              }}
-            >
-              <span>{option.label}</span>
-              {isSelected ? <Check size={15} aria-hidden="true" /> : null}
-            </button>
-          );
-        })}
-      </div>
+      {open && menuPosition ? createPortal(
+        <div
+          ref={menuRef}
+          id={`${id}-options`}
+          role="listbox"
+          aria-label={isSort ? "Sort options" : "Product layouts"}
+          aria-labelledby={`${id}-trigger`}
+          aria-hidden={!open}
+          data-open="true"
+          data-placement={menuPosition.placement}
+          data-store-popover-portal=""
+          data-store-sort-options={isSort ? "" : undefined}
+          data-store-view-popover={!isSort ? "" : undefined}
+          className={`dc-compact-glass-window ${isSort ? "dc-compact-glass-window--menu dc-marketplace-sort-window" : "dc-marketplace-view-window"}`}
+          style={{
+            position: "fixed",
+            top: menuPosition.top,
+            left: menuPosition.left,
+            right: "auto",
+            bottom: "auto",
+            width: menuPosition.width,
+            minWidth: menuPosition.width,
+            maxWidth: "calc(100vw - 24px)",
+            maxHeight: menuPosition.maxHeight,
+            transformOrigin: menuPosition.placement === "above" ? "bottom right" : "top right",
+          }}
+          onKeyDown={moveOptionFocus}
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                data-selected={isSelected ? "true" : "false"}
+                className={`dc-marketplace-popup-option ${!isSort ? "dc-marketplace-popup-option--view" : ""}`}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                  triggerRef.current?.focus({ preventScroll: true });
+                }}
+              >
+                <span>{option.label}</span>
+                {isSelected ? <Check size={15} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      ) : null}
     </div>
   );
 }
