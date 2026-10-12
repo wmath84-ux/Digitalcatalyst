@@ -189,3 +189,422 @@
     padding-left: 4.75rem;
   }
 }
+
+
+/* ── Study Library typography pass · make course information scan naturally ─ */
+[data-study-library-page] {
+  --study-ink: #172033;
+  --study-muted: #647084;
+  --study-edge: rgba(100, 116, 139, 0.18);
+  --study-brand: #004ac6;
+}
+
+.dc-study-layout {
+  padding-top: clamp(1rem, 2.5vw, 1.5rem);
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.dc-study-layout > .dc-account-text-action {
+  min-height: 2.5rem;
+  gap: 0.45rem;
+  padding-inline: 0.2rem;
+  border-radius: 9px;
+  color: var(--study-brand);
+  font-size: 0.875rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.dc-study-layout .dc-account-header {
+  align-items: center;
+  gap: 1rem;
+  margin-block: 0.65rem 1.25rem;
+}
+
+.dc-study-layout .dc-account-header > div {
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.dc-study-layout .dc-account-header h1 {
+  color: var(--study-ink);
+  font-size: clamp(1.85rem, 5.6vw, 2.3rem);
+  font-weight: 830;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.dc-study-layout .dc-study-intro {
+  max-width: 32rem;
+  margin-top: 0.55rem;
+  color: var(--study-muted);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.dc-study-layout [data-my-course-create] {
+  flex: 0 0 auto;
+  min-height: 3.15rem;
+  padding-inline: 1.25rem;
+  border-radius: 14px;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.dc-study-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.dc-study-summary-item {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgba(100, 116, 139, 0.15);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.075);
+  color: #526176;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.dc-study-summary-item strong {
+  color: #172033;
+  font-size: 0.82rem;
+  font-weight: 820;
+  font-variant-numeric: tabular-nums;
+}
+
+.dc-study-search {
+  min-height: 3.35rem;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+  padding-inline: 1rem;
+  border-radius: 15px;
+  border-color: rgba(100, 116, 139, 0.22);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.32);
+}
+
+.dc-study-search svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #64748b;
+}
+
+.dc-study-search input {
+  min-height: 3.35rem;
+  color: #172033;
+  font-size: 0.96rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.dc-study-search input::placeholder {
+  color: #7a8597;
+  opacity: 1;
+}
+
+.dc-study-course-row {
+  padding-block: 1.15rem;
+  border-bottom-color: rgba(100, 116, 139, 0.17);
+}
+
+.dc-study-course-open {
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+[data-study-library-page] .dc-study-course-open img,
+[data-study-library-page] .dc-study-cover-fallback {
+  width: 5.5rem;
+  height: 4.45rem;
+  border: 1px solid rgba(100, 116, 139, 0.12);
+  border-radius: 12px;
+  background: #f1f4f8;
+}
+
+.dc-study-course-open > svg {
+  margin-top: 0.25rem;
+  color: #7b8798;
+}
+
+.dc-study-course-copy {
+  gap: 0.4rem;
+  padding-top: 0.05rem;
+}
+
+.dc-study-course-copy strong {
+  color: #172033;
+  font-size: 1rem;
+  font-weight: 790;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.dc-study-course-copy .dc-study-course-stats {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 1.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(37, 99, 235, 0.13);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.045);
+  color: #526176;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.dc-study-course-stats svg {
+  flex: 0 0 auto;
+  color: #315ea8;
+}
+
+.dc-study-meta-divider {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 3px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.dc-study-course-copy .dc-study-course-description {
+  display: -webkit-box;
+  max-width: 62ch;
+  margin-top: 0.05rem;
+  overflow: hidden;
+  color: #5d6a7e;
+  font-size: 0.825rem;
+  font-weight: 450;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-wrap: pretty;
+}
+
+.dc-study-course-actions {
+  align-items: center;
+  gap: 0.55rem;
+  padding-left: 6.4rem;
+  margin-top: 0.3rem;
+}
+
+.dc-study-course-actions .dc-account-text-action,
+.dc-study-course-actions .dc-study-delete {
+  display: inline-flex;
+  min-width: 4rem;
+  min-height: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.045);
+  color: #004ac6;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.dc-study-course-actions .dc-study-delete {
+  border-color: rgba(190, 24, 93, 0.15);
+  background: rgba(190, 24, 93, 0.04);
+  color: #b4234d;
+}
+
+.dc-study-course-actions :is(.dc-account-text-action, .dc-study-delete):active {
+  transform: scale(0.98);
+}
+
+.dc-study-empty h2 {
+  color: #172033;
+  font-size: 1.25rem;
+  font-weight: 820;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.dc-study-empty .dc-account-note {
+  max-width: 45ch;
+  color: #647084;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.dc-study-loading {
+  color: #647084;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .dc-study-layout {
+    padding-inline: 1rem;
+  }
+
+  .dc-study-layout .dc-account-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .dc-study-layout .dc-account-header > div {
+    flex-basis: 100%;
+  }
+
+  .dc-study-layout [data-my-course-create] {
+    min-height: 2.9rem;
+  }
+
+  .dc-study-summary {
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+  }
+
+  .dc-study-summary-item {
+    padding-inline: 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .dc-study-course-open {
+    gap: 0.75rem;
+  }
+
+  [data-study-library-page] .dc-study-course-open img,
+  [data-study-library-page] .dc-study-cover-fallback {
+    width: 5rem;
+    height: 4.25rem;
+  }
+
+  .dc-study-course-copy strong {
+    font-size: 0.96rem;
+  }
+
+  .dc-study-course-copy .dc-study-course-description {
+    font-size: 0.8rem;
+  }
+
+  .dc-study-course-actions {
+    padding-left: 5.75rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .dc-study-summary-item {
+    min-height: 1.85rem;
+    gap: 0.25rem;
+    padding-inline: 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .dc-study-summary-item strong {
+    font-size: 0.76rem;
+  }
+
+  .dc-study-course-open {
+    gap: 0.65rem;
+  }
+
+  [data-study-library-page] .dc-study-course-open img,
+  [data-study-library-page] .dc-study-cover-fallback {
+    width: 4.25rem;
+    height: 3.65rem;
+  }
+
+  .dc-study-course-copy .dc-study-course-stats {
+    gap: 0.25rem;
+    padding-inline: 0.4rem;
+    font-size: 0.67rem;
+  }
+
+  .dc-study-course-actions {
+    padding-left: 4.9rem;
+  }
+}
+
+html[data-theme="dark"] [data-study-library-page] {
+  --study-ink: #f2f5fb;
+  --study-muted: #aab7ca;
+  --study-edge: rgba(148, 163, 184, 0.18);
+  --study-brand: #c1baff;
+}
+
+html[data-theme="dark"] .dc-study-layout .dc-account-header h1,
+html[data-theme="dark"] .dc-study-course-copy strong,
+html[data-theme="dark"] .dc-study-empty h2 {
+  color: #f2f5fb;
+}
+
+html[data-theme="dark"] .dc-study-summary-item {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+  color: #b4c0d2;
+}
+
+html[data-theme="dark"] .dc-study-summary-item strong {
+  color: #f2f5fb;
+}
+
+html[data-theme="dark"] .dc-study-search {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(17, 23, 36, 0.92);
+}
+
+html[data-theme="dark"] .dc-study-search input {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .dc-study-course-copy .dc-study-course-stats {
+  border-color: rgba(96, 165, 250, 0.2);
+  background: rgba(37, 99, 235, 0.11);
+  color: #c0cce0;
+}
+
+html[data-theme="dark"] .dc-study-course-stats svg {
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .dc-study-course-copy .dc-study-course-description {
+  color: #aab7ca;
+}
+
+html[data-theme="dark"] .dc-study-course-actions .dc-account-text-action {
+  border-color: rgba(96, 165, 250, 0.24);
+  background: rgba(37, 99, 235, 0.12);
+  color: #bfdbfe;
+}
+
+html[data-theme="dark"] .dc-study-course-actions .dc-study-delete {
+  border-color: rgba(251, 113, 133, 0.24);
+  background: rgba(190, 24, 93, 0.1);
+  color: #fda4af;
+}
+
+html[data-theme="dark"] .dc-study-empty .dc-account-note {
+  color: #aab7ca;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-study-course-actions :is(.dc-account-text-action, .dc-study-delete) {
+    transition-duration: 1ms !important;
+  }
+}
