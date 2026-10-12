@@ -88,3 +88,45 @@
 @media (prefers-reduced-motion: reduce) {
   .dc-auth-page .dc-auth-input-form, .dc-auth-page .dc-auth-social { transition: none; }
 }
+
+
+/* Phone-first auth framing: keep Back in its own top lane and start the form
+   directly beneath it instead of vertically centring a tall form in a sea of
+   blank space. On shorter screens the page remains scrollable. */
+@media (max-width: 639px) {
+  .dc-auth-page {
+    justify-content: flex-start;
+    padding-top: calc(env(safe-area-inset-top) + 68px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
+  }
+
+  .dc-auth-page .dc-auth-form {
+    gap: 11px;
+    padding: 24px 22px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: 0 16px 36px -28px rgba(15, 23, 42, 0.22);
+  }
+
+  .dc-auth-page .dc-auth-input-form {
+    min-height: 50px;
+  }
+
+  .dc-auth-page .dc-auth-submit {
+    margin-top: 14px;
+  }
+}
+
+@media (max-height: 640px) {
+  .dc-auth-page {
+    padding-top: calc(env(safe-area-inset-top) + 58px);
+  }
+
+  .dc-auth-page .dc-auth-form {
+    gap: 8px;
+    padding-block: 18px;
+  }
+
+  .dc-auth-page .dc-auth-submit {
+    margin: 10px 0 6px;
+  }
+}
