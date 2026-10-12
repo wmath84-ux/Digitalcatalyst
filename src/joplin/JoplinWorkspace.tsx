@@ -268,7 +268,7 @@ export default function JoplinWorkspace(props: JoplinWorkspaceProps) {
       // No `bg-white` here on purpose: the iframe paints Joplin's own canvas, and
       // a host-side page plate is exactly the Digitalcatalyst treatment the
       // workspace must not put under Joplin's UI.
-      className="relative h-[100dvh] w-full overflow-hidden supports-[height:100dvh]:h-[100dvh]"
+      className="relative min-h-0 flex-1 w-full overflow-hidden"
       data-myday-workspace="joplin"
       data-joplin-source-commit={runtime.manifest.sourceCommit}
     >
@@ -348,7 +348,7 @@ const MYDAY_ANALYTICS_EVENTS = new Set([
 
 function WorkspaceLoading({ label }: { label: string }) {
   return (
-    <div className="grid h-[100dvh] w-full place-items-center bg-neutral-100 dark:bg-neutral-900" data-myday-workspace-loading>
+    <div className="grid min-h-0 flex-1 w-full place-items-center bg-neutral-100 dark:bg-neutral-900" data-myday-workspace-loading>
       <div className="flex flex-col items-center gap-2">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" aria-hidden="true" />
         <p className="text-sm text-neutral-600 dark:text-neutral-300">{label}</p>
@@ -378,7 +378,7 @@ function WorkspaceRuntimeDiagnostic({
   onGoHome: () => void;
 }) {
   return (
-    <div className="grid min-h-[100dvh] w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900" data-myday-workspace-missing>
+    <div className="grid min-h-0 flex-1 w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900" data-myday-workspace-missing>
       <div className="w-full max-w-xl rounded-lg border border-neutral-200 bg-white p-5 text-left shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
         <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">My Day workspace runtime not built</h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
@@ -456,7 +456,7 @@ export class JoplinWorkspaceBoundary extends Component<BoundaryProps, { error: E
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="grid min-h-[100dvh] w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900">
+      <div className="grid min-h-0 flex-1 w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900">
         <div className="max-w-md rounded-lg border border-neutral-200 p-5 text-center dark:border-neutral-700">
           <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Your workspace did not open</h1>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
