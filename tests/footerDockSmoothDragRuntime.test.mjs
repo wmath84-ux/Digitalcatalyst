@@ -282,6 +282,7 @@ test("the footer height holds while a gesture is live, then publishes once", asy
 
   const nav = window.document.createElement("nav");
   nav.setAttribute("data-site-footer-nav", "");
+  nav.innerHTML = '<div data-glass-dock=""></div>';
   window.document.body.appendChild(nav);
   let navHeight = 68;
   nav.getBoundingClientRect = () => ({

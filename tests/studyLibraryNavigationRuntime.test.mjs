@@ -8,8 +8,11 @@ const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve("vite/package.json"))("esbuild");
 const dir = path.resolve("node_modules/.tmp-library-navigation");
 fs.mkdirSync(dir, {recursive:true});
-await build({entryPoints:["src/components/BottomNav.tsx"], outfile:path.join(dir,"nav.mjs"), bundle:true, format:"esm", platform:"browser", external:["react","react/jsx-runtime"], logLevel:"silent"});
+await build({entryPoints:["src/components/BottomNav.tsx"], outfile:path.join(dir,"nav.mjs"), bundle:true, format:"esm", platform:"browser", packages:"external", logLevel:"silent"});
 const dom = new JSDOM('<div id="root"></div>', {url:"https://example.test",pretendToBeVisual:true});
+// This runtime contract covers the preserved classic dock; the new Uiverse
+// footer is the default when no saved preference exists.
+dom.window.localStorage.setItem("dc-footer-navigation-style", "glass-dock");
 for (const key of ["window","document","HTMLElement","Element","Node","Event","CustomEvent","getComputedStyle","requestAnimationFrame","cancelAnimationFrame"]) globalThis[key] = dom.window[key];
 Object.defineProperty(globalThis,"navigator",{value:dom.window.navigator,configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;

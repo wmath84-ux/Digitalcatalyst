@@ -1,12 +1,12 @@
 // src/utils/footerNavSpace.ts
 //
-// Publishes the REAL height of the floating footer navigation (the glass
-// dock pill plus its safe-area inset) as `--dc-footer-nav-h` on <html>.
+// Publishes the REAL height of the selected floating footer (Uiverse pill or
+// classic glass dock, including its safe-area inset) as `--dc-footer-nav-h`.
 //
-// Why: pages used to guess the clearance with hand-written padding hacks
-// (`pb-2`, `padding-bottom: 4.5rem`, `bottom-[56px]` …). Those guesses were
-// smaller than the dock — which magnifies to 1.55× and lifts 12 px — so the
-// dock ended up ON TOP of page content and swallowed taps.
+// Why: pages used to guess clearance with hand-written padding hacks
+// (`pb-2`, `padding-bottom: 4.5rem`, `bottom-[56px]` …). Those guesses could
+// undershoot the classic dock's 1.55× magnification and 12px lift, letting it
+// overlap page content and swallow taps.
 //
 // Instead of padding hacks, every scroller now grows its own content area by
 // exactly this measured amount (see the `[data-footer-nav-space]` rules in
@@ -55,12 +55,13 @@ function measure(): number {
     return nav.getBoundingClientRect().height > 0;
   });
   if (navs.length === 0) return 0;
-  // The pill can lift/magnify; use the nav wrapper (padding + pill) height,
-  // which already contains the safe-area inset, and add the 12 px lift so a
-  // magnified icon never crosses into content either.
-  return Math.round(
-    Math.max(...navs.map((nav) => nav.getBoundingClientRect().height)) + 12,
-  );
+  // The classic GlassDock can lift/magnify; the Uiverse four-tab pill only
+  // nudges by 1px on hover. Use the nav wrapper (padding + pill) height, which
+  // already contains the safe-area inset, and add the 12px lift only when an
+  // actual GlassDock is present so the newer pill doesn't leave dead space.
+  const navHeight = Math.max(...navs.map((nav) => nav.getBoundingClientRect().height));
+  const hasMagnifyingDock = navs.some((nav) => nav.querySelector("[data-glass-dock]") !== null);
+  return Math.round(navHeight + (hasMagnifyingDock ? 12 : 0));
 }
 
 /** True while a finger/pointer is driving the dock's magnification wave. */

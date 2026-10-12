@@ -12,10 +12,9 @@
 //
 // The reference's geometry, palette and pulse are kept verbatim. What changes
 // is the copy and the actions: this is a payment/access confirmation, so the
-// primary action opens the receipt and the secondary returns to the source.
-// The receipt card itself is revealed by CheckoutSuccessStep right after this
-// card lands, so a buyer sees the animation and then the record — in order,
-// never at once.
+// primary action opens the receipt/access record and the secondary returns to
+// the source. CheckoutSuccessStep reveals that record only after this card has
+// completely exited, so the two beats never overlap.
 
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ReceiptText, X } from "lucide-react";
@@ -30,8 +29,9 @@ export interface CheckoutSuccessAnimationProps {
   onPrimary: () => void;
   secondaryLabel: string;
   onSecondary: () => void;
-  /** The reference's corner × — here it skips straight to the receipt. */
+  /** The reference's corner × — here it skips straight to the receipt/access record. */
   onDismiss: () => void;
+  dismissLabel?: string;
   /** "free" swaps the glyph for the no-payment variant of the same card. */
   variant?: "paid" | "free";
 }
@@ -45,6 +45,7 @@ export default function CheckoutSuccessAnimation({
   secondaryLabel,
   onSecondary,
   onDismiss,
+  dismissLabel = "Dismiss and view receipt",
   variant = "paid",
 }: CheckoutSuccessAnimationProps) {
   const reduceMotion = useReducedMotion();
@@ -63,7 +64,7 @@ export default function CheckoutSuccessAnimation({
         type="button"
         className="cu-success-dismiss"
         onClick={onDismiss}
-        aria-label="Dismiss and view receipt"
+        aria-label={dismissLabel}
         data-checkout-success-dismiss=""
       >
         <X size={16} aria-hidden="true" />

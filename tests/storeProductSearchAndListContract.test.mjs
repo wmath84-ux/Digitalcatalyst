@@ -38,5 +38,7 @@ test("Store list rows reuse My Purchases geometry without removing Store actions
   assert.match(storeCss, /\.dc-marketplace-card\.is-list \.dc-marketplace-cover img\s*\{\s*object-fit: contain/);
   assert.match(purchasesCss, /\.dc-purchases-row > button\s*\{[\s\S]*?min-height: 6\.5rem/);
   assert.match(purchasesCss, /width: 5rem; height: 4rem/);
-  assert.match(store, /viewMode === "mixed" && index % 3 === 0[\s\S]*?card\(product, true\)/);
+  assert.match(store, /viewMode === "mixed" && index % 3 !== 0[\s\S]*?card\(product, true\)/);
+  assert.match(store, /return card\(product, false, true\)/);
+  assert.match(card, /data-store-card-variant=\{list \? "list" : large \? "large" : "grid"\}/);
 });

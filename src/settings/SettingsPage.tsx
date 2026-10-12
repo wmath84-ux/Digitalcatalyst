@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  PanelsTopLeft,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
@@ -20,6 +21,7 @@ import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/
 import { getNativePushPermission, isAndroidNative, registerForPush } from "../utils/capacitorBridge";
 import { type PreferenceKey } from "../../utils/userPreferences";
 import { useUserPreferences } from "./useUserPreferences";
+import { setFooterNavigationStyle, useFooterNavigationStyle } from "../utils/footerNavigationStyle";
 import "./settings.css";
 
 const LABELS: Record<PreferenceKey, string> = {
@@ -59,6 +61,7 @@ export default function SettingsPage() {
   const { cartIds } = useCommerce();
   const { purchasedIds } = useCatalog();
   const settings = useUserPreferences(user?.id);
+  const footerNavigationStyle = useFooterNavigationStyle();
   const [deviceState, setDeviceState] = useState<DeviceState>("checking");
   const [deviceBusy, setDeviceBusy] = useState(false);
   const [deviceMessage, setDeviceMessage] = useState("");
@@ -230,6 +233,45 @@ export default function SettingsPage() {
               {renderSwitch("profileVisible", "Show your name and profile photo on your public learner profile and community leaderboard.", !settings.preferences.profileVisible ? "Hidden profiles are removed from the public leaderboard. Your learning activity is hidden too." : undefined)}
               {renderSwitch("shareActivity", "Show only the number of courses started and completed learning items on your public profile. Course names and private content stay hidden.", !settings.preferences.profileVisible ? "This choice is saved, but nothing is shared while your public profile is off." : "Off by default. Sharing starts only when you explicitly turn this on.")}
               <a className="settings-public-link" href={`#/learner/${encodeURIComponent(user.id)}`}>View your public profile <ArrowUpRight size={15} /></a>
+            </section>
+            <section className="settings-section" aria-labelledby="settings-navigation" data-footer-navigation-preference>
+              <div className="settings-section-heading">
+                <span className="settings-section-icon" aria-hidden="true"><PanelsTopLeft size={19} /></span>
+                <div className="settings-section-heading-copy">
+                  <div className="settings-section-title-row"><h2 id="settings-navigation">Footer navigation</h2><span className="settings-section-count">2 styles</span></div>
+                  <p>Choose the four-button glass bar or keep the classic magnifying dock on phones and portrait tablets. Desktop keeps its existing rail and peek dock.</p>
+                </div>
+              </div>
+              <div className="settings-navigation-options" role="radiogroup" aria-label="Footer navigation style">
+                <button
+                  type="button"
+                  className="settings-navigation-choice"
+                  role="radio"
+                  aria-checked={footerNavigationStyle === "uiverse"}
+                  data-selected={footerNavigationStyle === "uiverse" ? "true" : undefined}
+                  onClick={() => setFooterNavigationStyle("uiverse")}
+                >
+                  <span className="settings-navigation-preview settings-navigation-preview--uiverse" aria-hidden="true">
+                    <span><i /><i /><i /><i /></span>
+                  </span>
+                  <span className="settings-navigation-choice-copy"><strong>Four-button glass</strong><small>Home · Store · My Purchases · Profile</small></span>
+                  {footerNavigationStyle === "uiverse" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                </button>
+                <button
+                  type="button"
+                  className="settings-navigation-choice"
+                  role="radio"
+                  aria-checked={footerNavigationStyle === "glass-dock"}
+                  data-selected={footerNavigationStyle === "glass-dock" ? "true" : undefined}
+                  onClick={() => setFooterNavigationStyle("glass-dock")}
+                >
+                  <span className="settings-navigation-preview settings-navigation-preview--dock" aria-hidden="true">
+                    <span><i /><i /><i /><i /><i /><i /><i /></span>
+                  </span>
+                  <span className="settings-navigation-choice-copy"><strong>Classic glass dock</strong><small>Seven-item dock with magnification and peek mode</small></span>
+                  {footerNavigationStyle === "glass-dock" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                </button>
+              </div>
             </section>
             <p className="settings-footnote">Changes save automatically. You can turn any setting back on. Browser or phone permission can only be changed on that device.</p>
           </div>

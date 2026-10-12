@@ -307,7 +307,8 @@ test("footerNavSpace watches footers, not every style write in the app", () => {
   assert.match(footerSpace, /attributeFilter: \["data-dc-dock-gesture"\]/);
   // The published variable, and the pages that consume it, are unchanged.
   assert.match(footerSpace, /setProperty\("--dc-footer-nav-h", `\$\{next\}px`\)/);
-  assert.match(footerSpace, /Math\.max\(\.\.\.navs\.map\(\(nav\) => nav\.getBoundingClientRect\(\)\.height\)\) \+ 12/);
+  assert.match(footerSpace, /const hasMagnifyingDock = navs\.some\(\(nav\) => nav\.querySelector\("\[data-glass-dock\]"\) !== null\)/);
+  assert.match(footerSpace, /navHeight \+ \(hasMagnifyingDock \? 12 : 0\)/);
 });
 
 test("every footer still renders the ONE shared capsule (so the fix reaches all of them)", () => {

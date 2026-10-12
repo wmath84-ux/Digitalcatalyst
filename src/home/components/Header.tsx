@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Gauge, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
+import { Gauge, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
 import { PiHandWavingDuotone } from "react-icons/pi";
 import ExpandingTabs, { type ExpandingTabItem } from "../../components/ui/ExpandingTabs";
 import MobileHeaderMenu from "../../components/MobileHeaderMenu";
+import HeaderNotificationsButton from "../../components/HeaderNotificationsButton";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassInput } from "../../components/ui/glass-input";
@@ -33,8 +34,9 @@ interface HeaderProps {
    */
   onOpenSettings?: () => void;
   /**
-   * Header variant — when 'flow', only profile, notifications and gear icons
-   * are rendered to prevent greeting shrinkage from too many icons. Default 'default' shows all actions.
+   * Header variant — when 'flow', only the gear remains in the compact action
+   * row; the standalone Notifications button stays beside it and Profile is in
+   * the phone quick-actions drawer / footer. Default 'default' shows page actions.
    */
   headerVariant?: 'default' | 'flow';
   /**
@@ -171,15 +173,6 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
     { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
     {
-      id: "notifications",
-      label: "Alerts",
-      ariaLabel: "Notifications",
-      icon: <Bell size={17} strokeWidth={2.4} />,
-      badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
-      badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
-      badgeTone: "rose",
-    },
-    {
       id: "favorites",
       label: "Favorites",
       ariaLabel: "Favorites",
@@ -192,12 +185,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       : []),
   ];
   const homeActionItems = headerVariant === "flow"
-    ? allHomeActionItems.filter((item) => item.id === "profile" || item.id === "notifications" || item.id === "settings")
-    : allHomeActionItems;
-  // Usage Limits belongs in the phone drawer and the persistent rail only.
-  // Keep the tablet inline action cluster exactly as it was.
+    ? allHomeActionItems.filter((item) => item.id === "settings")
+    : allHomeActionItems.filter((item) => item.id !== "profile");
+  // Profile stays reachable in the phone quick-actions drawer while the old
+  // header-avatar slot becomes the always-visible glass Notifications button.
+  // Usage Limits belongs in the phone drawer and persistent rail only.
   const phoneMenuItems = [
     ...homeActionItems,
+    ...allHomeActionItems.filter((item) => item.id === "profile"),
     { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={17} strokeWidth={2.4} /> },
   ];
 
@@ -222,10 +217,10 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       data-site-header
       data-home-header
       /* `dc-scene-plate--bar` gives the bar the SAME material the review cards
-         wear (glass.css · THE CONTRAST PLATE): a dark, translucent plate, a
-         bright top hairline and a downward shadow, so the greeting and the
-         search pill stay legible over the Winter scene's snow and lake instead
-         of floating on a 10% tint. The `--bar` variant paints the header
+         wear (glass.css · THE CONTRAST PLATE): a dark, translucent plate with
+         an inset top hairline, so the greeting and search pill stay legible on
+         the Winter scene instead of floating on a 10% tint, without an exterior
+         shadow/glow below the header. The `--bar` variant paints the header
          element itself, because this bar's animated padding band + bottom
          radius live outside the GlassSurface it wraps. The surface keeps the
          pinned docs sensitivity below (tint 0.25 · blur 0) untouched. */
@@ -277,6 +272,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
+          <HeaderNotificationsButton
+            count={unreadNotificationCount}
+            size={isPhoneLayout ? 40 : 36}
+            onClick={() => {
+              if (onOpenNotifications) onOpenNotifications();
+              else window.location.hash = "#/notifications";
+            }}
+          />
           {isPhoneLayout ? (
             <MobileHeaderMenu
               items={phoneMenuItems}

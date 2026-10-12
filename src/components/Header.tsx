@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Gauge, HelpCircle } from "lucide-react";
-import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
+import { BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
+import HeaderNotificationsButton from "./HeaderNotificationsButton";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
@@ -142,22 +143,6 @@ export default function Header({
           badgeTone: "rose" as const,
         },
     {
-      id: "notifications",
-      label: "Alerts",
-      ariaLabel: "Notifications",
-      icon: <BellIcon className="h-5 w-5" />,
-      badge:
-        displayedNotificationCount > 0
-          ? displayedNotificationCount > 99
-            ? "99+"
-            : String(displayedNotificationCount)
-          : undefined,
-      badgeAriaLabel:
-        displayedNotificationCount > 0
-          ? `${displayedNotificationCount} unread notifications`
-          : undefined,
-    },
-    {
       id: "subscription",
       label: "Plans",
       ariaLabel: "Subscription",
@@ -229,8 +214,8 @@ export default function Header({
          the winter scene's bright snow band, so the white app name, subtitle and
          action icons had nothing to sit on. The bar variant paints the plate on
          the strip itself (the strip is not a GlassSurface), kills its blur, and
-         adds the hairline rim + soft drop the Home header wears. `bg-white/75`
-         and `backdrop-blur-xl` stay in the class list — they are the published
+         keeps only the inset hairline; a late chrome rule removes the exterior
+         shadow and glow. `bg-white/75` and `backdrop-blur-xl` stay in the class list — they are the published
          material that `?glass=off` restores, and the gate means this rule only
          ever applies while glass is on. */
       className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
@@ -266,7 +251,12 @@ export default function Header({
           </div>
         )}
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2" data-header-action-cluster>
+          <HeaderNotificationsButton
+            count={displayedNotificationCount}
+            size={isPhoneLayout ? 40 : 36}
+            onClick={onNavigateToNotifications}
+          />
           {isPhoneLayout ? (
             <MobileHeaderMenu
               items={mobileMenuItems}

@@ -493,10 +493,16 @@ check(
     await pay(page);
     await verify(page);
     assert.equal(await page.locator("[data-checkout-stepbar]").getAttribute("data-step"), "3");
-    assert.match(
-      await page.locator("[data-checkout-success-receipt]").textContent(),
-      /order-fixture.*pay-fixture.*Verified/
+    const receipt = page.locator("[data-checkout-success-receipt]");
+    assert.equal(await page.locator("[data-checkout-success-step]").getAttribute("data-success-phase"), "animation");
+    assert.equal(await receipt.isVisible(), false);
+    await page.locator("[data-checkout-success-receipt-btn]").click();
+    await page.waitForFunction(
+      () => document.querySelector("[data-checkout-success-step]")?.getAttribute("data-success-phase") === "receipt"
     );
+    assert.equal(await receipt.isVisible(), true);
+    assert.equal(await page.locator("[data-checkout-success-animation]").count(), 0);
+    assert.match(await receipt.textContent(), /order-fixture.*pay-fixture.*Verified/);
     assert.equal(await page.locator("[data-checkout-success-cash-paid]").textContent(), "₹229.9");
     assert.equal(
       await page
@@ -535,11 +541,20 @@ check(
       await payment(page);
       await page.locator("[data-payment-gateway-pay]").click();
       await page.locator("[data-checkout-success-step]").waitFor();
-      assert.equal(await page.locator("[data-checkout-success-cash-paid]").textContent(), "₹0");
-      assert.match(
-        await page.locator("[data-checkout-success-receipt]").textContent(),
-        /No payment required.*Free access/
+      assert.equal(await page.locator("[data-checkout-success-step]").getAttribute("data-success-phase"), "animation");
+      assert.equal(await page.locator("[data-checkout-success-animation]").getAttribute("data-variant"), "free");
+      const accessRecord = page.locator("[data-checkout-success-receipt]");
+      assert.equal(await accessRecord.isVisible(), false);
+      await page.locator("[data-checkout-success-receipt-btn]").click();
+      await page.waitForFunction(
+        () => document.querySelector("[data-checkout-success-step]")?.getAttribute("data-success-phase") === "receipt"
       );
+      assert.equal(await accessRecord.isVisible(), true);
+      assert.equal(await page.locator("[data-checkout-success-animation]").count(), 0);
+      assert.match(await accessRecord.textContent(), /No payment required.*Free access/);
+      assert.match(await accessRecord.textContent(), /Access record.*Access reference/);
+      assert.doesNotMatch(await accessRecord.textContent(), /Order ID/);
+      assert.equal(await page.locator("[data-checkout-success-cash-paid]").textContent(), "₹0");
       assert.ok(await page.evaluate(() => !window.fixtureRazorpay));
       assert.equal(
         await page.evaluate(

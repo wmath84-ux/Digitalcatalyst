@@ -141,17 +141,19 @@ test("the summary footer pairs the big total with the single commitment CTA", ()
 
 // ── Success: animation first, then the receipt ──────────────────────────────
 
-test("the success screen plays the animation and then the receipt, in order", () => {
-  assert.match(success, /const \[showReceipt, setShowReceipt\] = useState\(false\)/);
-  assert.match(success, /data-success-phase=\{showReceipt \? "receipt" : "animation"\}/);
+test("the success animation fully exits before the receipt is revealed", () => {
+  assert.match(success, /type SuccessPhase = "animation" \| "transition" \| "receipt"/);
+  assert.match(success, /const \[phase, setPhase\] = useState<SuccessPhase>\("animation"\)/);
+  assert.match(success, /data-success-phase=\{phase\}/);
   assert.match(success, /<CheckoutSuccessAnimation/);
-  assert.match(success, /primaryLabel="View receipt"/);
-  assert.match(success, /onPrimary=\{\(\) => setShowReceipt\(true\)\}/);
-  // The receipt is built with the verified order but is not painted until the
-  // second beat — `display: none` until then — so the two never share the
-  // screen while the record is already complete in the DOM.
-  assert.match(success, /style=\{\{ display: showReceipt \? undefined : "none" \}\}/);
-  assert.match(success, /animate=\{showReceipt \? \{ opacity: 1, y: 0 \} : \{ opacity: 0, y: 12 \}\}/);
+  assert.match(success, /primaryLabel=\{isFreeOrder \? "View access record" : "View receipt"\}/);
+  assert.match(success, /onPrimary=\{\(\) => setPhase\("transition"\)\}/);
+  assert.match(success, /onExitComplete=\{\(\) => \{/);
+  assert.match(success, /current === "transition" \? "receipt" : current/);
+  // The receipt stays in the DOM for stable hooks but remains display:none
+  // throughout the animation and its exit; only the completed exit reveals it.
+  assert.match(success, /style=\{\{ display: phase === "receipt" \? undefined : "none" \}\}/);
+  assert.match(success, /animate=\{phase === "receipt" \? \{ opacity: 1, y: 0 \} : \{ opacity: 0, y: 12 \}\}/);
   assert.match(success, /data-checkout-success-receipt/);
   assert.equal((success.match(/data-checkout-success-receipt\b/g) || []).length, 1, "one receipt hook");
   // The reference animation itself: the pulsing 3rem plate over the 2rem glyph.
@@ -165,15 +167,17 @@ test("the success screen plays the animation and then the receipt, in order", ()
 test("the success card keeps the reference's corner dismiss", () => {
   // `nasty-firefox-13` ships a × in the corner: 30px plate, 2px border, red hover.
   assert.match(animation, /data-checkout-success-dismiss=""/);
-  assert.match(animation, /aria-label="Dismiss and view receipt"/);
+  assert.match(animation, /dismissLabel = "Dismiss and view receipt"/);
+  assert.match(animation, /aria-label=\{dismissLabel\}/);
+  assert.match(success, /dismissLabel=\{isFreeOrder \? "Dismiss and view access record" : "Dismiss and view receipt"\}/);
   assert.match(animation, /onClick=\{onDismiss\}/);
   assert.match(css, /\.cu-success-dismiss[\s\S]*?border:\s*2px solid #d1d5db[\s\S]*?border-radius:\s*7px/);
   assert.match(css, /\.cu-success-dismiss:hover[\s\S]*?background-color:\s*#ee0d0d/);
   // The card is the positioning context the × hangs off.
   assert.match(css, /\.cu-success,[\s\S]*?position:\s*relative/);
   // And it never cancels a verified purchase — it jumps to the receipt.
-  assert.match(success, /onDismiss=\{\(\) => setShowReceipt\(true\)\}/);
-  assert.match(success, /onPrimary=\{\(\) => setShowReceipt\(true\)\}/);
+  assert.match(success, /onDismiss=\{\(\) => setPhase\("transition"\)\}/);
+  assert.match(success, /onPrimary=\{\(\) => setPhase\("transition"\)\}/);
   assert.doesNotMatch(success, /onDismiss=\{[^}]*onGoBackToSource/);
 });
 
@@ -197,6 +201,10 @@ test("a ₹0 order is an Access step, never a transaction", () => {
   assert.match(gateway, /: payLabel\b/);
   assert.match(review, /Free item · no payment or transaction is needed\./);
   assert.match(review, /label=\{finalTotal === 0 \? "Get free access" : "Checkout"\}/);
+  assert.match(success, /No payment or payment transaction is needed — your access is now part of your library\./);
+  assert.match(success, /\{isFreeOrder \? "Access record" : "Receipt"\}/);
+  assert.match(success, /isFreeOrder \? "Access reference" : "Order ID"/);
+  assert.match(success, /Your free access is active in My Purchases\./);
 });
 
 // ── The PDP review dialog ───────────────────────────────────────────────────
@@ -210,22 +218,32 @@ test("Write a review opens the reference feedback card as a modal", () => {
   assert.match(reviewDialog, /grid grid-cols-6 gap-2 rounded-xl border border-slate-200 bg-white p-2 text-sm/);
   assert.match(reviewDialog, /col-span-6 h-28 resize-none rounded-lg border border-slate-200 bg-slate-100/);
   assert.match(reviewDialog, /focus:border-slate-600/);
-  assert.match(reviewDialog, /col-span-1 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-100/);
+  assert.match(reviewDialog, /col-span-1 flex items-center justify-center rounded-lg border p-2/);
+  assert.match(reviewDialog, /data-pdp-review-rating=\{value\}/);
+  assert.match(reviewDialog, /Very unhappy/);
+  assert.match(reviewDialog, /viewBox="0 0 24 24"/);
   assert.match(reviewDialog, /M7\.39999 6\.32003L15\.89 3\.49003/);
-  assert.match(reviewDialog, /className="col-span-6 flex items-center justify-center gap-2 rounded-lg/);
+  assert.match(reviewDialog, /className="col-span-2 flex items-center justify-center rounded-lg border/);
+  assert.match(reviewDialog, /aria-label=\{submitting \? "Submitting review" : "Submit review"\}/);
+  assert.match(reviewDialog, /<h1[\s\S]*?Send feedback/);
   // It is a real modal: labelled dialog, Escape, scroll lock, visible close.
   assert.match(reviewDialog, /role="dialog"/);
   assert.match(reviewDialog, /aria-modal="true"/);
   assert.match(reviewDialog, /aria-labelledby=\{headingId\}/);
   assert.match(reviewDialog, /event\.key === "Escape"/);
+  assert.match(reviewDialog, /event\.key !== "Tab"/);
+  assert.match(reviewDialog, /previousFocus\?\.isConnected/);
   assert.match(reviewDialog, /lockBodyScroll\(\)/);
   assert.match(reviewDialog, /aria-label="Close review form"/);
 });
 
 test("the review dialog keeps the accessible names the review journey is driven by", () => {
-  assert.match(reviewDialog, /aria-label=\{`\$\{value\} star\$\{value === 1 \? "" : "s"\}`\}/);
+  assert.match(reviewDialog, /aria-label=\{`\$\{value\} star\$\{value === 1 \? "" : "s"\} — \$\{label\}`\}/);
   assert.match(reviewDialog, /aria-label="Your product review"/);
-  assert.match(reviewDialog, /\{submitting \? "Submitting…" : "Submit review"\}/);
+  assert.match(pdp, /notice=\{notice\}/);
+  assert.match(reviewDialog, /role="status" aria-live="polite"/);
+  assert.match(reviewDialog, /aria-label=\{submitting \? "Submitting review" : "Submit review"\}/);
+  assert.match(reviewDialog, /title=\{label\}/);
   // Rendered inside the reviews section, so the status line stays in one region.
   assert.match(pdp, /<section data-pdp-reviews[\s\S]*?\{composerOpen && canReview && \(/);
   assert.doesNotMatch(reviewDialog, /createPortal/);

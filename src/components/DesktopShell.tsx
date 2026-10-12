@@ -7,8 +7,8 @@
 // bottom-nav pill. On a tablet we drop the phone frame and let
 // content use a 720 px column. On a desktop we go further — the
 // phone framing disappears, a PERSISTENT LEFT SIDEBAR takes over
-// from the bottom nav, and a global TOP BAR provides search,
-// notifications and a quick profile switcher.
+// from the bottom nav, and the global TOP BAR keeps search / page actions
+// beside a dedicated glass Notifications button. Profile stays in the rail.
 //
 // This shell is the single place that owns the desktop chrome. Every
 // app page (Home, Store, MyDay, Profile, Revision, …) renders inside
@@ -34,7 +34,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useScreenSize from "@/hooks/useScreenSize";
 import {
-  Bell,
   CalendarDays,
   ChevronDown,
   Crown,
@@ -64,6 +63,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
+import HeaderNotificationsButton from "./HeaderNotificationsButton";
 import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
@@ -770,31 +770,20 @@ export default function DesktopShell({
                 ariaLabel="Quick actions"
                 itemSize={36}
                 activeId={
-                  window.location.hash.startsWith("#/notifications")
-                    ? "notifications"
-                    : window.location.hash.startsWith("#/favorites")
-                      ? "favorites"
-                      : window.location.hash.startsWith("#/cart")
-                        ? "cart"
-                        : window.location.hash.startsWith("#/subscription")
-                          ? "subscription"
-                          : null
+                  window.location.hash.startsWith("#/favorites")
+                    ? "favorites"
+                    : window.location.hash.startsWith("#/cart")
+                      ? "cart"
+                      : window.location.hash.startsWith("#/subscription")
+                        ? "subscription"
+                        : null
                 }
                 onSelect={(id) => {
-                  if (id === "notifications") handleNavigate("#/notifications");
-                  else if (id === "favorites") handleNavigate("#/favorites");
+                  if (id === "favorites") handleNavigate("#/favorites");
                   else if (id === "cart") handleNavigate("#/cart");
                   else if (id === "subscription") handleNavigate("#/subscription");
                 }}
                 items={[
-                  {
-                    id: "notifications",
-                    label: "Alerts",
-                    ariaLabel: "Notifications",
-                    icon: <Bell size={16} />,
-                    badge: notifications > 0 ? (notifications > 99 ? "99+" : String(notifications)) : undefined,
-                    badgeTone: "rose",
-                  },
                   {
                     id: "favorites",
                     label: "Favorites",
@@ -819,19 +808,11 @@ export default function DesktopShell({
                   },
                 ]}
               />
-              <button
-                type="button"
-                onClick={() => handleNavigate(user ? "#/profile" : "#/auth?mode=login")}
-                aria-label={user ? `Profile — ${user.name}` : "Sign in"}
-                title={user ? user.name : "Sign in"}
-                className="ml-1 grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white ring-1 ring-white/25 transition hover:brightness-110 active:scale-95"
-              >
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" width={36} height={36} className="h-full w-full object-cover" />
-                ) : (
-                  <span aria-hidden="true">{initials}</span>
-                )}
-              </button>
+              <HeaderNotificationsButton
+                count={notifications}
+                size={36}
+                onClick={() => handleNavigate("#/notifications")}
+              />
             </div>
           </div>
 

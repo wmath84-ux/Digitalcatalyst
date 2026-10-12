@@ -619,7 +619,12 @@ function PremiumProductContent({
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
       return;
     }
-    setReviewComposerOpen((open) => !open);
+    if (reviewComposerOpen) {
+      setReviewComposerOpen(false);
+    } else {
+      setReviewNotice("");
+      setReviewComposerOpen(true);
+    }
   };
   const openReviewsPage = () => {
     window.location.hash = `#/product/${encodeURIComponent(product.id)}?reviews=1`;
@@ -1164,6 +1169,7 @@ function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, 
           rating={rating}
           comment={comment}
           submitting={submitting}
+          notice={notice}
           onRating={onRating}
           onComment={onComment}
           onSubmit={onSubmit}

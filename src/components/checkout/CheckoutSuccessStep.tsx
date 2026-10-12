@@ -1,13 +1,13 @@
 // Read-only receipt. Payment verification and entitlement activation remain
 // server-controlled in PaymentGateway; this screen only presents that result.
 //
-// The screen plays in two beats, in order:
+// The screen plays in two strictly separate beats:
 //   1. the success animation card (CheckoutSuccessAnimation — Uiverse
 //      "nasty-firefox-13") confirming the transaction/access, then
 //   2. the itemised receipt below it.
-// Both are always the SAME verified quote: the animation adds a moment, never
-// a second source of truth. "View receipt" (or the ~2.6s hold) moves a buyer
-// straight from the animation to the record.
+// The receipt remains hidden until the animation's exit has completed, so the
+// two never crossfade over each other. Both are the SAME verified quote; free
+// claims use the access variant and never invent a payment transaction.
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -32,8 +32,10 @@ export interface CheckoutSuccessStepProps {
   onBackToSource?: () => void;
 }
 
-/** How long the animation card holds before the receipt takes over. */
+/** How long the animation card holds before its exit begins. */
 const CELEBRATION_HOLD_MS = 2600;
+const REDUCED_MOTION_HOLD_MS = 1400;
+type SuccessPhase = "animation" | "transition" | "receipt";
 
 export default function CheckoutSuccessStep({
   orderId,
@@ -50,18 +52,19 @@ export default function CheckoutSuccessStep({
   const checkout = useCheckout();
   const { products } = useCatalog();
   const reduceMotion = useReducedMotion();
-  const [showReceipt, setShowReceipt] = useState(false);
+  const [phase, setPhase] = useState<SuccessPhase>("animation");
 
-  // Beat 2 — the receipt follows the animation on its own, so the order the
-  // buyer sees is always animation → record.
+  // Beat 2 starts only after the animated card has had time to land. Entering
+  // "transition" removes the card; AnimatePresence reveals the receipt only
+  // from onExitComplete, so no frame ever paints both cards together.
   useEffect(() => {
-    if (showReceipt) return undefined;
+    if (!checkout.quote || phase !== "animation") return undefined;
     const timer = window.setTimeout(
-      () => setShowReceipt(true),
-      reduceMotion ? 0 : CELEBRATION_HOLD_MS
+      () => setPhase("transition"),
+      reduceMotion ? REDUCED_MOTION_HOLD_MS : CELEBRATION_HOLD_MS
     );
     return () => window.clearTimeout(timer);
-  }, [reduceMotion, showReceipt]);
+  }, [checkout.quote, phase, reduceMotion]);
 
   const quote = checkout.quote;
   if (!quote)
@@ -92,7 +95,7 @@ export default function CheckoutSuccessStep({
     ? "Membership activated"
     : "Payment successful";
   const message = isFreeOrder
-    ? "No payment and no transaction — this free item is now part of your library."
+    ? "No payment or payment transaction is needed — your access is now part of your library."
     : isSubscription
     ? "Your payment is verified and your membership is live."
     : "Your payment is verified and the content has been added to your account.";
@@ -100,11 +103,15 @@ export default function CheckoutSuccessStep({
   return (
     <div
       data-checkout-success-step
-      data-success-phase={showReceipt ? "receipt" : "animation"}
+      data-success-phase={phase}
       className="dc-checkout-success"
     >
-      <AnimatePresence>
-        {!showReceipt ? (
+      <AnimatePresence
+        onExitComplete={() => {
+          setPhase((current) => current === "transition" ? "receipt" : current);
+        }}
+      >
+        {phase === "animation" ? (
           <motion.div
             key="celebrate"
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -120,9 +127,10 @@ export default function CheckoutSuccessStep({
                   ? "₹0 · free access"
                   : `Paid ${formatCheckoutMoney(finalTotal)} · ${paymentMethod || "Razorpay"}`
               }
-              primaryLabel="View receipt"
-              onPrimary={() => setShowReceipt(true)}
-              onDismiss={() => setShowReceipt(true)}
+              primaryLabel={isFreeOrder ? "View access record" : "View receipt"}
+              onPrimary={() => setPhase("transition")}
+              onDismiss={() => setPhase("transition")}
+              dismissLabel={isFreeOrder ? "Dismiss and view access record" : "Dismiss and view receipt"}
               secondaryLabel="Back to source"
               onSecondary={() => onBackToSource?.()}
             />
@@ -130,15 +138,14 @@ export default function CheckoutSuccessStep({
         ) : null}
       </AnimatePresence>
 
-      {/* The record is built the moment the transaction is verified, but it is
-          not painted until the second beat: `display: none` until then, so the
-          screen still shows the animation first and the receipt second — one
-          after the other, never both at once. */}
+      {/* Keep receipt content and data hooks mounted, but hide it from both
+          sight and the accessibility tree until AnimatePresence confirms the
+          success card has completely exited. */}
       <motion.div
         initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
-        animate={showReceipt ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+        animate={phase === "receipt" ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
         transition={{ duration: reduceMotion ? 0.15 : 0.4, ease: [0.16, 1, 0.3, 1] }}
-        style={{ display: showReceipt ? undefined : "none" }}
+        style={{ display: phase === "receipt" ? undefined : "none" }}
         className="flex flex-col gap-3"
       >
         <header className="dc-checkout-success-head">
@@ -146,6 +153,8 @@ export default function CheckoutSuccessStep({
           <p className="dc-checkout-note">
             {isSubscription
               ? "Membership access has been updated."
+              : isFreeOrder
+              ? "Your free access is active in My Purchases."
               : "Your purchased content is available in My Purchases."}
           </p>
         </header>
@@ -155,9 +164,12 @@ export default function CheckoutSuccessStep({
           </div>
         ) : null}
         <CheckoutSection data-checkout-success-receipt>
-          <h2>Receipt</h2>
+          <h2>{isFreeOrder ? "Access record" : "Receipt"}</h2>
           <dl className="dc-checkout-facts">
-            <ReceiptRow label="Order ID" value={orderId || quote.quoteId} />
+            <ReceiptRow
+              label={isFreeOrder ? "Access reference" : "Order ID"}
+              value={isFreeOrder ? quote.quoteId : orderId || quote.quoteId}
+            />
             <ReceiptRow
               label="Payment ID"
               value={paymentId || (finalTotal === 0 ? "No payment required" : "Not available")}

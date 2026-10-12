@@ -1,10 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import { profilePhotoSrc } from "../utils/profilePhoto";
+import { Menu, X } from "lucide-react";
 import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
+import "./header-navigation.css";
 
 export type MobileHeaderMenuItem = {
   id: string;
@@ -31,8 +30,8 @@ const ACTION_COLORS: Record<string, string> = {
 
 /**
  * The phone-only counterpart to the tablet Glass Sidebar. The normal
- * header keeps just its profile-avatar menu trigger; contextual header actions
- * are listed inside this glass drawer. The desktop/tablet cluster is unchanged.
+ * header keeps a dedicated Notifications glass button beside this separate
+ * quick-actions trigger; contextual header actions stay in this glass drawer.
  */
 export default function MobileHeaderMenu({
   items,
@@ -50,22 +49,9 @@ export default function MobileHeaderMenu({
   className?: string;
   ariaLabel?: string;
 }) {
-  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [photoFailed, setPhotoFailed] = useState(false);
   const drawerId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const photoSrc = profilePhotoSrc(user?.photoURL);
-  const initials = user?.name
-    ?.trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U";
-
-  useEffect(() => setPhotoFailed(false), [photoSrc]);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -216,26 +202,12 @@ export default function MobileHeaderMenu({
         title={open ? "Close quick actions" : "Open quick actions"}
         aria-expanded={open}
         aria-controls={drawerId}
-        className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] transition hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${className}`}
+        className={`dc-header-glass-button dc-mobile-header-menu-button ${className}`.trim()}
         data-mobile-header-menu-button
+        data-header-glass-button="quick-actions"
+        data-button-size="40"
       >
-        <span data-mobile-header-avatar-surface>
-        {photoSrc && !photoFailed ? (
-          <img
-            src={photoSrc}
-            alt=""
-            width={40}
-            height={40}
-            className="h-full w-full rounded-full object-cover"
-            referrerPolicy="no-referrer"
-            draggable={false}
-            onError={() => setPhotoFailed(true)}
-            data-mobile-header-avatar
-          />
-        ) : (
-          <span aria-hidden="true" data-mobile-header-avatar-fallback>{initials}</span>
-        )}
-        </span>
+        <Menu aria-hidden="true" size={20} strokeWidth={2.1} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>
