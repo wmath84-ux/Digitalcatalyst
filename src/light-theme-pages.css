@@ -1146,13 +1146,26 @@ html[data-theme="light"] .dc-purchases-loading { background: var(--dc-bg-muted-2
    20. STUDY LIBRARY (study-library-minimal.css + study-library-states.css)
    ══════════════════════════════════════════════════════════════════════════ */
 html[data-theme="light"] [data-study-library-page] {
+  --account-border: var(--dc-line);
+  --account-muted: var(--dc-ink-3);
+  --account-accent: var(--dc-brand-ink);
+  --account-edge: rgba(0, 74, 198, 0.24);
+  --account-edge-strong: rgba(0, 74, 198, 0.58);
   background: transparent;
   color: var(--dc-ink);
 }
+html[data-theme="light"] [data-study-library-page] .dc-account-header h1 { color: var(--dc-ink); }
+html[data-theme="light"] [data-study-library-page] .dc-account-note { color: var(--dc-ink-3); }
+html[data-theme="light"] [data-study-library-page] .dc-account-error { color: var(--dc-urgent-ink); }
 html[data-theme="light"] .dc-study-layout h2 { color: var(--dc-ink); }
 html[data-theme="light"] .dc-study-search {
   background: var(--dc-bg-muted);
-  border-color: var(--dc-line-strong);
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+html[data-theme="light"] .dc-study-search:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 html[data-theme="light"] .dc-study-search input { color: var(--dc-ink); }
 html[data-theme="light"] .dc-study-search input::placeholder { color: var(--dc-ink-faint); }

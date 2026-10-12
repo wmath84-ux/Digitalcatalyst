@@ -62,4 +62,7 @@ test("light theme keeps the new outlines legible on paper surfaces", () => {
   assert.match(lightStyles, /html\[data-theme="light"\] \.dc-marketplace-control/);
   assert.match(lightStyles, /html\[data-theme="light"\] \.dc-checkout-section/);
   assert.match(lightStyles, /html\[data-theme="light"\] \[data-subscription-page\] \.dc-subscription-plan-row/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \[data-study-library-page\]\s*\{[\s\S]*?--account-muted:\s*var\(--dc-ink-3\)/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \[data-study-library-page\] \.dc-account-header h1 \{ color: var\(--dc-ink\); \}/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \[data-study-library-page\] \.dc-account-error \{ color: var\(--dc-urgent-ink\); \}/);
 });
