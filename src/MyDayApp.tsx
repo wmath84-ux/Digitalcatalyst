@@ -184,7 +184,7 @@ export default function MyDayApp() {
 
   if (myDay.loading && !myDay.unlimited && !myDay.paid) {
     return (
-      <div className="myday-workspace-root relative flex min-h-[100dvh] w-full flex-col">
+      <div className="myday-workspace-root relative flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden">
         {/* Header visible during loading for seamless experience */}
         <div className="sticky top-0 z-50 md:hidden" data-myday-mobile-header>
           <Header
@@ -203,7 +203,7 @@ export default function MyDayApp() {
             }}
           />
         </div>
-        <WorkspaceNotice title="Opening My Day…" body="Checking your access and preparing your workspace." />
+        <WorkspaceNotice title="Opening My Day…" body="Checking your access and preparing your workspace." fillContainer />
         {/* Footer navigation visible during loading for seamless experience */}
         <BottomNav
           active="myday"
@@ -228,7 +228,7 @@ export default function MyDayApp() {
     <div // The route paints NO page plate of its own: the shared backdrop behind the
     // app is the surface while the bundle loads, and the workspace brings
     // Joplin's own canvas once it mounts (no Digitalcatalyst glass on top of it).
-    className="myday-workspace-root relative flex min-h-[100dvh] w-full flex-col">
+    className={`myday-workspace-root relative flex ${blocked ? "min-h-[100dvh]" : "h-[100dvh] min-h-0 overflow-hidden"} w-full flex-col`}>
       {/* §2 — the global app header on a phone. The workspace frame brings its
           own header on a wide screen, so this one is phone-only and the desktop
           layout is untouched. It is the SAME shared Header every other route
@@ -274,7 +274,7 @@ export default function MyDayApp() {
               window.location.hash = "#/home";
             }}
           >
-            <Suspense fallback={<WorkspaceNotice title="Opening your workspace…" body="Starting notebooks, notes and to-dos." />}>
+            <Suspense fallback={<WorkspaceNotice title="Opening your workspace…" body="Starting notebooks, notes and to-dos." fillContainer />}>
               <JoplinWorkspace
                 uid={user.id}
                 email={user.email ?? null}
@@ -331,14 +331,16 @@ function WorkspaceNotice({
   body,
   actionLabel,
   onAction,
+  fillContainer = false,
 }: {
   title: string;
   body: string;
   actionLabel?: string;
   onAction?: () => void;
+  fillContainer?: boolean;
 }) {
   return (
-    <div className="grid min-h-[100dvh] w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900" data-myday-notice>
+    <div className={`grid ${fillContainer ? "min-h-0 flex-1" : "min-h-[100dvh]"} w-full place-items-center bg-neutral-100 px-4 dark:bg-neutral-900`} data-myday-notice>
       <div className="max-w-md text-center">
         <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title}</h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">{body}</p>
