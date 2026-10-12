@@ -80,9 +80,10 @@ function Sidebar({
   return (
     <aside
       aria-label="Chats"
+      data-lumen-sidebar={mode}
       className={cn(
         "flex h-full flex-col border-r border-[--border] bg-[--side]",
-        mode === "drawer" ? "anim-drawer w-[min(272px,88%)] shadow-[var(--sh-pop)]" : "w-[252px] xl:w-[264px]"
+        mode === "drawer" ? "anim-drawer w-full shadow-[var(--sh-pop)]" : "w-[252px] xl:w-[264px]"
       )}
     >
       {/* Brand */}

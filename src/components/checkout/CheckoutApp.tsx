@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { CheckoutAction } from "./CheckoutSection";
 import "./checkout-minimal.css";
+import "./checkout-brand.css";
 import StepIndicator from "../StepIndicator";
 import PaymentGateway, { type VerifiedPayment } from "../PaymentGateway";
 import Header from "../Header";

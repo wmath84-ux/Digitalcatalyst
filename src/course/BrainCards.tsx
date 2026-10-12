@@ -27,27 +27,27 @@
 import { motion } from "framer-motion";
 import type { ComponentProps, CSSProperties, HTMLAttributes, ReactNode } from "react";
 
-/** The reference deck's own palette — the exact values its source uses. */
+/** Website colours; card geometry and motion remain unchanged. */
 export const BRAIN = {
   /** The card face (reference: `backgroundColor: '#D3DDEE'`). */
-  card: "#D3DDEE",
+  card: "var(--dc-brand-soft, #dbeafe)",
   /** The card ink (reference title colour). */
-  ink: "#111111",
+  ink: "var(--dc-ink, #191c1e)",
   /** Secondary ink on the card — the reference's own colour, softened. */
   inkSoft: "rgba(17, 17, 17, 0.68)",
   inkFaint: "rgba(17, 17, 17, 0.46)",
   /** The pill (reference: `backgroundColor: '#141312'`, `color: '#F5F1E8'`). */
-  pill: "#141312",
-  pillHover: "#2C2825",
-  pillPress: "#000000",
-  pillInk: "#F5F1E8",
+  pill: "var(--dc-brand, #004ac6)",
+  pillHover: "#003ea8",
+  pillPress: "#003487",
+  pillInk: "#ffffff",
   /** The light face the reference uses as its pill's TEXT — here, a plate. */
-  plate: "#F5F1E8",
+  plate: "var(--dc-bg-primary, #ffffff)",
   /** The reference's light page / dark page. */
-  page: "#E8E8DF",
-  pageInk: "#666662",
+  page: "var(--dc-bg-muted, #f8fafc)",
+  pageInk: "var(--dc-ink-3, #475569)",
   /** The reference's hint line, dark mode. */
-  hint: "#9E9E98",
+  hint: "var(--dc-ink-3, #475569)",
   line: "rgba(17, 17, 17, 0.14)",
   /** The reference's two shadows, verbatim. */
   shadowTop: "0 30px 60px rgba(0,0,0,0.30), 0 10px 20px rgba(0,0,0,0.20)",

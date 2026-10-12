@@ -113,6 +113,7 @@ export default function PerfectFreehandSketch({
   resourceId,
   resourceName,
   debounceMs,
+  readOnly = false,
 }: {
   /** The signed-in learner — scopes the board and the remembered style. */
   uid?: string | null;
@@ -124,6 +125,8 @@ export default function PerfectFreehandSketch({
   resourceName?: string | null;
   /** Milliseconds of quiet before a drawing reaches the cloud (tests shrink it). */
   debounceMs?: number;
+  /** Course player view mode: keep the canvas visible, disable editing. */
+  readOnly?: boolean;
 }) {
   const sketch = usePerfectFreehandSketch({ uid, productId, moduleId, resourceId, resourceName, debounceMs });
 
@@ -324,6 +327,7 @@ export default function PerfectFreehandSketch({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
+      if (readOnly) return;
       if (event.button !== 0 && event.pointerType === "mouse") return;
       // Only the first finger: a second one must never join the same stroke.
       if (event.isPrimary === false) return;
@@ -344,12 +348,12 @@ export default function PerfectFreehandSketch({
       const existing = new Set(strokesRef.current.map((stroke) => stroke.id));
       setLiveStroke({ id: quickSketchStrokeId(existing), points: [point] });
     },
-    [currentSnapshot, eraseAt, flash, pointFromEvent, tool],
+    [currentSnapshot, eraseAt, flash, pointFromEvent, tool, readOnly],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
-      if (event.isPrimary === false) return;
+      if (readOnly || event.isPrimary === false) return;
       const point = pointFromEvent(event);
       if (tool === "erase") {
         if (erasingRef.current) eraseAt(point);
@@ -357,7 +361,7 @@ export default function PerfectFreehandSketch({
       }
       setLiveStroke((current) => (current ? { ...current, points: [...current.points, point] } : current));
     },
-    [eraseAt, pointFromEvent, tool],
+    [eraseAt, pointFromEvent, tool, readOnly],
   );
 
   const handlePointerUp = useCallback(() => {
@@ -398,7 +402,7 @@ export default function PerfectFreehandSketch({
       return !active || active === document.body || root.contains(active);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isActive()) return;
+      if (readOnly || !isActive()) return;
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       const mod = event.metaKey || event.ctrlKey;
@@ -421,7 +425,7 @@ export default function PerfectFreehandSketch({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clearCanvas, copyOptions, copySvg, redo, undo]);
+  }, [clearCanvas, copyOptions, copySvg, redo, undo, readOnly]);
 
   useEffect(
     () => () => {
@@ -471,7 +475,7 @@ export default function PerfectFreehandSketch({
   const statusState = sketch.status === "error" ? "error" : sketch.status;
 
   return (
-    <div ref={rootRef} className="dc-qsk" data-quick-sketch="" data-quick-sketch-tool={tool}>
+    <div ref={rootRef} className="dc-qsk" data-quick-sketch="" data-read-only={readOnly ? "true" : "false"} data-quick-sketch-tool={tool}>
       {sketch.loading ? (
         <div className="dc-qsk-loading" data-quick-sketch-loading="">
           <span aria-label="Loading your sketch" />
@@ -529,6 +533,7 @@ export default function PerfectFreehandSketch({
           type="button"
           className="dc-qsk-icon-button"
           data-quick-sketch-menu=""
+          disabled={readOnly}
           aria-expanded={panelOpen}
           aria-label={panelOpen ? "Hide the sketch options" : "Show the sketch options"}
           title={panelOpen ? "Hide options" : "Show options"}
@@ -569,7 +574,7 @@ export default function PerfectFreehandSketch({
             type="button"
             className="dc-qsk-chip-button"
             data-quick-sketch-new-canvas=""
-            disabled={!sketch.canCreateBoard}
+            disabled={readOnly || !sketch.canCreateBoard}
             onClick={() => {
               const key = sketch.createBoard();
               if (!key) flash("Canvas limit reached for this module");
@@ -602,6 +607,7 @@ export default function PerfectFreehandSketch({
                       type="button"
                       className="dc-qsk-canvas-trash"
                       data-quick-sketch-delete-canvas={board.sketchKey}
+                      disabled={readOnly}
                       title={`Delete ${board.title}`}
                       onClick={() => {
                         setCanvasMenuOpen(false);
@@ -620,7 +626,7 @@ export default function PerfectFreehandSketch({
 
       <QuickSketchPanel
         style={style}
-        open={panelOpen}
+        open={panelOpen && !readOnly}
         onPreview={previewStyle}
         onBegin={beginStyleGesture}
         onCommit={commitStyleGesture}
@@ -633,7 +639,7 @@ export default function PerfectFreehandSketch({
       />
 
       {/* Bottom-left: the tools — the editor's "Draw" (and its eraser). */}
-      <div className="dc-qsk-corner dc-qsk-corner--bottom-left">
+      {!readOnly ? <div className="dc-qsk-corner dc-qsk-corner--bottom-left">
         <button
           type="button"
           className="dc-qsk-text-button"
@@ -654,10 +660,10 @@ export default function PerfectFreehandSketch({
         >
           Erase
         </button>
-      </div>
+      </div> : null}
 
       {/* Bottom-right: Undo · Redo · Clear — the editor's own three. */}
-      <div className="dc-qsk-corner dc-qsk-corner--bottom-right">
+      {!readOnly ? <div className="dc-qsk-corner dc-qsk-corner--bottom-right">
         <button
           type="button"
           className="dc-qsk-text-button"
@@ -688,7 +694,7 @@ export default function PerfectFreehandSketch({
         >
           Clear
         </button>
-      </div>
+      </div> : null}
 
       {!sketch.scoped && !sketch.loading ? (
         <div className="dc-qsk-scoped-note" data-quick-sketch-unscoped="">

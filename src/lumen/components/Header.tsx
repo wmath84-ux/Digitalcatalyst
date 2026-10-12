@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, LoaderCircle, Moon, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff, Sun } from "lucide-react";
+import { Cloud, CloudOff, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff, Sun } from "lucide-react";
 import { tierLte } from "../lib/tier";
 import type { AIModel, Chat, Tier } from "../lib/types";
 import { cn } from "../utils/cn";
@@ -69,8 +69,6 @@ function Header({
   syncState = "idle",
   syncError = null,
   onRetrySync,
-  theme = "light",
-  onToggleTheme,
 }: {
   models: AIModel[];
   selectedSource: string;
@@ -193,25 +191,6 @@ function Header({
             onRetry={syncError ? onRetrySync : syncState === "error" ? onRetrySync : undefined}
           />
         )}
-
-        {/* Light/Dark theme toggle — immediately to the left of the model dropdown */}
-        {onToggleTheme ? (
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            aria-pressed={theme === "dark"}
-            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            title={theme === "dark" ? "Light theme" : "Dark theme"}
-            data-lumen-theme-toggle={theme}
-            className={cn(
-              "icon-btn focus-ring flex-none",
-              sm && "is-sm",
-              tier === "xxs" && "is-xs",
-            )}
-          >
-            {theme === "dark" ? <Sun size={sm ? 15 : 16} aria-hidden="true" /> : <Moon size={sm ? 15 : 16} aria-hidden="true" />}
-          </button>
-        ) : null}
 
         <ModelSelector models={models} disabled={modelDisabled} modelId={selectedSource} tier={tier} onSelect={onSelectModel} />
 

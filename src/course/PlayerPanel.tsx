@@ -27,7 +27,6 @@
 //      left to hide.
 
 import { BookmarkPlus, ExternalLink, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
-import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
@@ -173,23 +172,6 @@ export interface PlayerPanelProps {
   canFullscreen: boolean;
   courseFullscreen: boolean;
   onHideStatusBarChange: (next: boolean) => void;
-  /**
-   * Footer navigation mode. `legacyFooterDock` = ON (the DEFAULT) keeps the
-   * always-visible dock inside the study pane; OFF switches to the newer
-   * bottom-centre peek dock (line → tap/hover opens → swipe to select).
-   * The choice is remembered per device.
-   */
-  legacyFooterDock: boolean;
-  onLegacyFooterDockChange: (next: boolean) => void;
-  /** Genuine light/dark Course Player appearance (shared theme tokens). */
-  playerTheme?: "dark" | "light";
-  onPlayerThemeChange?: (next: "dark" | "light") => void;
-  /** Sketch "Clean / Optimised Look" — default OFF, persisted per user. */
-  sketchCleanLook?: boolean;
-  onSketchCleanLookChange?: (next: boolean) => void;
-  /** Module listing style — classic (simple list) vs modern (magnifying icons). */
-  moduleListingStyle?: "classic" | "modern";
-  onModuleListingStyleChange?: (next: "classic" | "modern") => void;
   /** P1: Gate personal access — the file the learner is currently viewing */
   gateFile?: { id?: string | null; url?: string | null; name?: string | null } | null;
   productId?: string | null;
@@ -228,14 +210,6 @@ export default function PlayerPanel({
   canFullscreen,
   courseFullscreen,
   onHideStatusBarChange,
-  legacyFooterDock,
-  onLegacyFooterDockChange,
-  playerTheme = "light",
-  onPlayerThemeChange,
-  sketchCleanLook = false,
-  onSketchCleanLookChange,
-  moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
-  onModuleListingStyleChange,
   gateFile = null,
   productId = null,
   moduleId = null,
@@ -429,22 +403,6 @@ export default function PlayerPanel({
         {settingsRow("Snowfall", snowMode, (next) => onSnowModeChange(next), "snow")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}
-        {/* ON (default) = the always-visible dock inside the study pane.
-            OFF = the newer bottom-centre peek dock (line → tap opens → swipe
-            to select). Remembered per device. */}
-        {settingsRow("Always-visible footer dock", legacyFooterDock, (next) => onLegacyFooterDockChange(next), "footerDock")}
-        {/* Genuine light/dark palette (Part 1 §6) — a real token switch, never
-            a CSS colour inversion. */}
-        {onPlayerThemeChange ? settingsRow("Light appearance", playerTheme === "light", (next) => onPlayerThemeChange(next ? "light" : "dark"), "lightTheme") : null}
-        {/* Sketch "Clean / Optimised Look" (Part 1 §25) — OFF by default and
-            remembered per user. Re-arranges the Sketch workspace only. */}
-        {onSketchCleanLookChange ? settingsRow("Sketch Clean / Optimised Look", sketchCleanLook, (next) => onSketchCleanLookChange(next), "sketchClean") : null}
-        {/* "Modern module listing" — ON (DEFAULT when nothing is saved) =
-            magnifying dock-style module icons + the landing page's animated
-            Gradient Waves behind the player's content area. OFF = classic
-            list + the legacy player backdrop. Applies instantly, remembered
-            per user; an explicitly saved OFF is never overridden. */}
-        {onModuleListingStyleChange ? settingsRow("Modern module listing", moduleListingStyle === "modern", (next) => onModuleListingStyleChange(next ? "modern" : "classic"), "moduleStyle") : null}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
         </p>

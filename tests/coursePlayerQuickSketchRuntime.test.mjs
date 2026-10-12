@@ -676,3 +676,29 @@ test("a second canvas is its own drawing, and the first one is still there", asy
   const rows = all("[data-quick-sketch-canvas-menu] .dc-qsk-canvas-row");
   assert.equal(rows.length, 2, "the chip lists both canvases");
 });
+
+test("view mode hides editing controls, blocks drawing/deletion, and preserves saved strokes", async () => {
+  freshWorld();
+  await settle();
+  await drawLine(line());
+  await settle(DEBOUNCE + 120);
+  assert.equal(strokeCount(), 1);
+  mounted.unmount();
+  mountHost({ readOnly: true });
+  await settle();
+  assert.equal(strokeCount(), 1);
+  assert.equal(el('data-quick-sketch-undo'), null);
+  assert.equal(el('data-quick-sketch-clear'), null);
+  assert.equal(el('[data-quick-sketch-tool-button="erase"]'), null);
+  assert.equal(el('data-quick-sketch-menu').disabled, true);
+  assert.equal(el('data-quick-sketch-new-canvas').disabled, true);
+  await drawLine(line());
+  act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Backspace', bubbles: true })));
+  await settle();
+  assert.equal(strokeCount(), 1, 'viewing never adds or deletes strokes');
+  mounted.unmount();
+  mountHost({ readOnly: false });
+  await settle();
+  assert.ok(el('data-quick-sketch-undo'));
+  assert.equal(strokeCount(), 1, 'returning to edit mode keeps the drawing');
+});

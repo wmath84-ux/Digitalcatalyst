@@ -25,6 +25,7 @@
 // column, no nested cards. It scrolls inside itself because the Brain page
 // lives in the Split Deck's study pane, which can be any height.
 
+import "./study-light-surfaces.css";
 import { useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
@@ -238,7 +239,7 @@ export default function SelfPracticeSetComposer({
       aria-modal="true"
       aria-label="Create your own practice set"
     >
-      <div className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+      <div data-brain-composer-surface className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
         <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4">
           <h3 className="flex items-center gap-2 text-sm font-bold text-white">
             <Sparkles size={15} className="text-emerald-300" aria-hidden="true" /> Create your own practice set

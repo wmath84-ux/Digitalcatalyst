@@ -10,15 +10,15 @@
 
 .course-player-shell[data-course-theme="light"] {
   --dc-course-theme-page: #f6f7fb;
-  --dc-course-theme-surface: #ffffff;
+  --dc-course-theme-surface: var(--dc-bg-primary, #ffffff);
   --dc-course-theme-raised: #f8fafc;
   --dc-course-theme-soft: #f1f5f9;
   --dc-course-theme-border: rgba(15, 23, 42, 0.14);
-  --dc-course-theme-ink: #0f172a;
-  --dc-course-theme-ink-soft: #334155;
-  --dc-course-theme-ink-muted: #475569;
+  --dc-course-theme-ink: var(--dc-ink, #191c1e);
+  --dc-course-theme-ink-soft: var(--dc-ink-2, #414754);
+  --dc-course-theme-ink-muted: var(--dc-ink-3, #475569);
   --dc-course-theme-placeholder: #64748b;
-  --course-text: #0b1220;
+  --course-text: var(--dc-ink, #191c1e);
   --course-muted: rgba(11, 18, 32, 0.7);
   --course-border: rgba(15, 23, 42, 0.14);
   background-color: #f6f7fb;

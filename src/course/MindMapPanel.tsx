@@ -139,7 +139,6 @@ import {
   LayoutTemplate,
   Layers,
   Maximize,
-  Moon,
   Network,
   Palette,
   Plus,
@@ -147,7 +146,6 @@ import {
   Square,
   Rows3,
   Sparkles,
-  Sun,
   Trash2,
   TriangleAlert,
   Type,
@@ -2349,17 +2347,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
               Compact sun/moon control: flips the map between its genuine
               dark and light palettes and remembers the choice per user.
               It replaces the removed double-tap-delete arm switch (§7). */}
-          <button
-            type="button"
-            onClick={mindThemeCtl.toggleTheme}
-            aria-pressed={mindTheme === "light"}
-            className={`mm-tool ${mindTheme === "light" ? "mm-tool-violet" : ""}`}
-            aria-label={mindTheme === "light" ? "Switch mind map to dark theme" : "Switch mind map to light theme"}
-            title={mindTheme === "light" ? "Dark theme" : "Light (daylight) theme"}
-            data-course-mindmap-theme-toggle={mindTheme}
-          >
-            {mindTheme === "light" ? <Moon /> : <Sun />}
-          </button>
+
 
         </div>
       </div>

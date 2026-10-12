@@ -1,0 +1,107 @@
+/* Feature-owned solid surfaces: do not inherit the legacy dark player plate.
+   Kept scoped to library UI, never to authored note/editor content. */
+html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"][data-course-notes-mode="list"],
+html[data-theme="light"] [data-course-notes-panel][data-notes-theme="light"] [data-course-notes-list] {
+  background: #fff !important;
+  color: var(--dc-ink, #0f172a) !important;
+  color-scheme: light;
+  --course-text: var(--dc-ink, #0f172a);
+  --course-muted: var(--dc-ink-3, #475569);
+  --dc-flat-board: #fff;
+  --dc-flat-ink: var(--dc-ink, #0f172a);
+  --dc-flat-ink-sub: var(--dc-ink-3, #475569);
+  --dc-flat-cyan: var(--dc-brand, #4338ca);
+}
+html[data-theme="light"] [data-course-notes-list] .branched-menu {
+  --bm-ink: var(--dc-ink, #0f172a);
+  --bm-muted: var(--dc-ink-3, #475569);
+  --bm-accent: var(--dc-brand, #4338ca);
+  --bm-line: #cbd5e1;
+}
+html[data-theme="light"] [data-course-note-collections] {
+  color: var(--dc-ink, #0f172a);
+  padding: 12px 0;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+html[data-theme="light"] [data-course-note-collections] [role="tablist"] { background: #f1f5f9; border-color: #e2e8f0; }
+html[data-theme="light"] [data-course-note-collection] { color: var(--dc-ink-3, #475569); min-height: 40px; }
+html[data-theme="light"] [data-course-note-collection][aria-selected="true"] { background: #fff; color: var(--dc-brand-ink, #3730a3); }
+html[data-theme="light"] [data-course-notes-add] { background: var(--dc-brand, #4f46e5) !important; color: #fff !important; box-shadow: 0 6px 18px #4f46e530; }
+html[data-theme="light"] [data-course-notes-add] svg { color: #fff !important; }
+
+/* A calm, solid practice library with the indigo accents used across My Day.
+   No extra navigation or sidebar; the question deck's behaviour stays intact. */
+html[data-theme="light"] [data-course-brain-panel] { color: var(--dc-ink, #0f172a); background: #f8fafc; color-scheme: light; }
+html[data-theme="light"] [data-brain-screen="library"] { container-type: inline-size; }
+.brain-library-eyebrow { color: var(--dc-brand, #4f46e5); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.brain-library-title { margin: 2px 0 0; color: var(--dc-ink, #0f172a); font-size: 24px; font-weight: 800; letter-spacing: -.04em; }
+[data-brain-collection] { flex-wrap: wrap; row-gap: 12px; }
+[data-brain-library-intro] { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; margin: 4px 0 16px; padding: 18px; border: 1px solid #e0e7ff; border-radius: 18px; background: linear-gradient(120deg, #eef2ff, #faf5ff 65%, #f0fdfa); }
+[data-brain-library-intro] h3 { color: #1e1b4b; font-size: 17px; font-weight: 750; letter-spacing: -.025em; }
+[data-brain-library-intro] p { max-width: 42ch; margin-top: 5px; color: var(--dc-ink-3, #475569); font-size: 12px; line-height: 1.6; }
+.brain-library-summary { display: flex; gap: 8px; }
+.brain-library-summary span { padding: 7px 10px; border: 1px solid #e0e7ff; border-radius: 10px; background: #fff; color: var(--dc-ink-3, #475569); font-size: 11px; white-space: nowrap; }
+.brain-library-summary strong { color: #312e81; font-size: 16px; margin-right: 3px; }
+.brain-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; padding-bottom: 12px; }
+html[data-theme="light"] [data-brain-set],
+html[data-theme="light"] [data-brain-empty] { background: #fff !important; border: 1px solid #e2e8f0; border-radius: 18px !important; box-shadow: 0 3px 14px -8px #33415525 !important; }
+html[data-theme="light"] [data-brain-set] { display: flex; flex-direction: column; transition: border-color 160ms ease, box-shadow 160ms ease; }
+html[data-theme="light"] [data-brain-set] > div:last-child { margin-top: auto !important; padding-top: 16px; }
+html[data-theme="light"] [data-brain-set]:hover { border-color: #a5b4fc; box-shadow: 0 6px 20px -8px #4f46e520 !important; }
+html[data-theme="light"] [data-brain-set] button { min-height: 40px; }
+html[data-theme="light"] [data-brain-screen] button:focus-visible { outline: 2px solid var(--dc-brand, #4f46e5); outline-offset: 3px; }
+
+/* The creation overlay used to be a dark island in the light player, mixing
+   white text remaps with a navy card. Own its complete light palette here. */
+html[data-theme="light"] .course-player-shell [data-brain-self-composer],
+html[data-theme="light"] [data-brain-self-composer] { color-scheme: light; }
+html[data-theme="light"] [data-brain-composer-surface] { background: #fff !important; color: var(--dc-ink, #0f172a); border-color: #e2e8f0; }
+html[data-theme="light"] [data-brain-composer-surface] :is(h3, p, span, label, li, pre, button) { color: #334155 !important; }
+html[data-theme="light"] [data-brain-composer-surface] h3 { color: var(--dc-ink, #0f172a) !important; }
+html[data-theme="light"] [data-brain-composer-surface] :is(input, textarea, select, option) { background: #fff !important; color: var(--dc-ink, #0f172a) !important; border-color: #cbd5e1 !important; color-scheme: light; }
+html[data-theme="light"] [data-brain-composer-surface] :is(input, textarea)::placeholder { color: #64748b; opacity: 1; }
+html[data-theme="light"] [data-brain-composer-surface] :is(input, textarea, select):focus { border-color: #6366f1 !important; outline: 2px solid #e0e7ff; }
+html[data-theme="light"] [data-brain-composer-surface] [role="tablist"] { background: #f1f5f9; border-color: #e2e8f0; }
+html[data-theme="light"] [data-brain-composer-surface] [aria-selected="true"] { background: #e0e7ff; color: #312e81 !important; }
+html[data-theme="light"] [data-brain-composer-surface] :is([data-brain-self-create], [data-brain-self-parse], [data-brain-self-copy]) { background: var(--dc-brand, #4338ca) !important; color: #fff !important; }
+html[data-theme="light"] [data-brain-composer-surface] :is([data-brain-self-create], [data-brain-self-parse], [data-brain-self-copy]) * { color: #fff !important; }
+html[data-theme="light"] [data-brain-composer-surface] :is([data-brain-self-error], [data-brain-self-parse-errors]) { background: #fff1f2; color: #9f1239 !important; }
+html[data-theme="light"] [data-brain-composer-surface] [data-brain-self-preview] { background: #ecfdf5; color: #065f46 !important; }
+html[data-theme="light"] [data-brain-composer-surface] button:focus-visible { outline: 2px solid var(--dc-brand, #4f46e5); outline-offset: 2px; }
+html[data-theme="light"] [data-brain-submit-dialog] { background: #fff !important; color: var(--dc-ink, #0f172a) !important; border: 1px solid #e2e8f0; box-shadow: 0 20px 60px #0f172a30 !important; }
+html[data-theme="light"] [data-brain-submit-dialog] :is(h3, p) { color: #334155 !important; }
+@media (prefers-reduced-motion: reduce) { html[data-theme="light"] [data-brain-set] { transition: none; } }
+
+/* Empty/loading/error states must be as readable as populated note lists. */
+html[data-theme="light"] [data-course-notes-list] .study-library-empty { background: #f8fafc; border-color: #cbd5e1; }
+html[data-theme="light"] [data-course-notes-list] :is(.study-library-empty h2, .study-library-notice__title) { color: var(--dc-ink, #0f172a); }
+html[data-theme="light"] [data-course-notes-list] :is(.study-library-empty p, .study-library-notice__message) { color: var(--dc-ink-3, #475569); }
+html[data-theme="light"] [data-course-notes-list] :is(.study-library-empty__icon, .study-library-notice__icon) { background: #eef2ff; color: var(--dc-brand, #4338ca); border-color: #c7d2fe; }
+html[data-theme="light"] [data-course-notes-list] .study-library-notice { color: var(--dc-ink, #0f172a); background: #f8fafc; border-color: #cbd5e1; }
+html[data-theme="light"] [data-course-notes-list] .study-library-notice--error { background: #fffbeb; border-color: #fde68a; }
+html[data-theme="light"] [data-course-notes-list] .study-library-notice__retry { color: var(--dc-brand-ink, #3730a3); background: #eef2ff; border-color: #c7d2fe; }
+html[data-theme="light"] [data-brain-composer-surface] [data-brain-self-mark][aria-pressed="true"] { color: #065f46 !important; background: #d1fae5; box-shadow: inset 0 0 0 1px #047857; }
+html[data-theme="light"] [data-brain-composer-surface] :is([data-brain-self-parse-errors], [data-brain-self-error]) * { color: #9f1239 !important; }
+
+/* Practice chrome stays outside the draggable stack. */
+[data-course-brain-panel] .brain-practice-header {
+  display: flex; flex: 0 0 auto; align-items: center; gap: 12px;
+  padding: 12px 16px; background: #fff; border-bottom: 1px solid #e2e8f0;
+}
+[data-course-brain-panel] .brain-practice-back {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 44px; height: 44px; border: 1px solid #dbe4ef;
+  border-radius: 14px; background: #f8fafc; color: var(--dc-ink, #0f172a); cursor: pointer;
+}
+[data-course-brain-panel] .brain-practice-back:hover { background: #eff6ff; border-color: #93c5fd; }
+[data-course-brain-panel] .brain-practice-back:focus-visible { outline: 2px solid var(--dc-brand, #004ac6); outline-offset: 3px; }
+[data-course-brain-panel] .brain-practice-heading { min-width: 0; flex: 1; }
+[data-course-brain-panel] .brain-practice-eyebrow { color: var(--dc-brand, #004ac6); font-size: 11px; font-weight: 750; }
+[data-course-brain-panel] .brain-practice-heading h3 {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--dc-ink, #0f172a); font-size: 15px; font-weight: 750; line-height: 1.5;
+}
+[data-course-brain-panel] .brain-practice-heading [data-brain-deck-hint] {
+  margin-top: 2px; color: var(--dc-ink-3, #475569); font-size: 12px; line-height: 1.5;
+}

@@ -501,6 +501,7 @@ class SqliteRecallRepository implements RecallRepository {
     }
 
     async saveTheme(theme: Theme, current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+    theme = "light";
       const snapshot = { ...current, settings: { ...current.settings, theme } };
       if (isTauriRuntime()) {
         const { invoke } = await import("../shims/tauri");
@@ -672,6 +673,7 @@ class LocalStorageRecallRepository implements RecallRepository {
   }
 
   async saveTheme(theme: Theme, current: RecallStateSnapshot): Promise<RecallStateSnapshot> {
+    theme = "light";
     const snapshot = { ...current, settings: { ...current.settings, theme } };
     await this.saveSnapshot(snapshot);
     return snapshot;
@@ -782,7 +784,7 @@ function migrateSettings(settings: Partial<RecallStateSnapshot["settings"]> & { 
   const defaultOnboardingComplete = hasExistingData ? true : false;
 
   return {
-    theme: (settings.theme === "dark" || settings.theme === "light") ? settings.theme : "light",
+    theme: "light",
     accentColor: (settings.accentColor === "zinc" || settings.accentColor === "blue" || settings.accentColor === "green" || settings.accentColor === "rose" || settings.accentColor === "amber" || settings.accentColor === "violet") ? settings.accentColor : "zinc",
     dyslexiaFont: typeof settings.dyslexiaFont === "boolean" ? settings.dyslexiaFont : false,
     seededAt: settings.seededAt,

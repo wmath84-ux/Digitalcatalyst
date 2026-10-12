@@ -1,31 +1,12 @@
-// App colour theme: "light" or "dark".
-//
-// Single source of truth for the learner-facing colour scheme.
-//
-//   • Default: LIGHT. Used when nothing valid is stored yet.
-//   • Persistence: localStorage under THEME_STORAGE_KEY ("dc.theme").
-//   • Applied to <html> as `data-theme`, a `light` / `dark` class (the vendored
-//     glass components and Tailwind's `dark:` variant read these), and
-//     `color-scheme`, so native form controls and scrollbars match.
-//   • The admin console keeps its dark look regardless of the stored
-//     preference; every learner-facing route (including the course player,
-//     whose own palette toggle lives in its settings) follows the preference.
-//     See `resolveDocumentTheme`.
-//
-// The inline pre-paint script in index.html mirrors `resolveDocumentTheme` and
-// the storage key, so the correct theme is on <html> before the first paint
-// (no flash of the wrong theme). Keep the two in sync.
-
+// Light-only application theme. Legacy dark preferences and callers are normalized.
 export type ThemeMode = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "dc.theme";
 export const DEFAULT_THEME_MODE: ThemeMode = "light";
 
-/** Routes that always render with the dark palette (see resolveDocumentTheme). */
-const FORCED_DARK_HASH_PREFIXES = ["#/admin"] as const;
 
 export function normalizeThemeMode(value: unknown): ThemeMode | null {
-  return value === "light" || value === "dark" ? value : null;
+  return value === "light" || value === "dark" ? "light" : null;
 }
 
 function safeStorage(): Storage | null {
@@ -44,33 +25,28 @@ export function readStoredThemeMode(storage: Storage | null = safeStorage()): Th
   }
 }
 
-export function writeStoredThemeMode(mode: ThemeMode, storage: Storage | null = safeStorage()): void {
+export function writeStoredThemeMode(_mode: ThemeMode, storage: Storage | null = safeStorage()): void {
   try {
-    storage?.setItem(THEME_STORAGE_KEY, mode);
+    storage?.setItem(THEME_STORAGE_KEY, "light");
   } catch {
     /* private mode / quota — the choice still applies for this session */
   }
 }
 
-/**
- * The theme a route should actually render with. Admin routes are pinned dark
- * so the console's dark-only chrome is unchanged; every learner page follows
- * the stored preference.
- */
-export function resolveDocumentTheme(mode: ThemeMode, hash: string): ThemeMode {
-  if (FORCED_DARK_HASH_PREFIXES.some((prefix) => hash.startsWith(prefix))) return "dark";
-  return mode;
+/** All routes use light appearance, including restored legacy preferences. */
+export function resolveDocumentTheme(_mode: ThemeMode, _hash: string): ThemeMode {
+  return "light";
 }
 
-export function applyDocumentTheme(theme: ThemeMode, doc: Document = document): void {
+export function applyDocumentTheme(_theme: ThemeMode, doc: Document = document): void {
   const root = doc.documentElement;
-  root.dataset.theme = theme;
-  root.classList.toggle("light", theme === "light");
-  root.classList.toggle("dark", theme === "dark");
-  root.style.colorScheme = theme;
+  root.dataset.theme = "light";
+  root.classList.toggle("light", true);
+  root.classList.toggle("dark", false);
+  root.style.colorScheme = "light";
   doc.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute(
     "content",
-    theme === "light" ? "#f7f9fb" : "#0a0c12",
+    "#f7f9fb",
   );
 }
 
@@ -108,8 +84,7 @@ export function syncDocumentTheme(hash: string = currentHash()): void {
 }
 
 export function setThemeMode(mode: ThemeMode): void {
-  if (mode === storedMode) return;
-  storedMode = mode;
+  storedMode = "light";
   writeStoredThemeMode(mode);
   syncDocumentTheme();
 }
@@ -129,6 +104,7 @@ export function initThemeMode(): void {
   if (initialised || typeof window === "undefined") return;
   initialised = true;
   storedMode = readStoredThemeMode();
+  writeStoredThemeMode("light");
   syncDocumentTheme();
   window.addEventListener("storage", (event) => {
     if (event.key !== THEME_STORAGE_KEY && event.key !== null) return;

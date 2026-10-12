@@ -1,0 +1,91 @@
+/* Colour-only integration with home/PDP tokens. No sizing, layout or motion.
+   Portals are explicitly included; authored content and status colours are not
+   blanket-remapped. The multicolour navigation strips keep their identity. */
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) {
+  --course-text: var(--dc-ink, #191c1e);
+  --course-muted: var(--dc-ink-3, #475569);
+  --course-border: var(--dc-line, #e2e8f0);
+  --course-card-blue: var(--dc-brand-soft, #dbeafe);
+  --course-card-indigo: #e0e7ff;
+  --course-card-sky: #e0f2fe;
+  --course-card-periwinkle: #ede9fe;
+  --dc-flat-ink: var(--dc-ink, #191c1e);
+  --dc-flat-ink-sub: var(--dc-ink-3, #475569);
+  --dc-flat-board: #ffffff;
+  --dc-flat-cyan: var(--dc-brand, #004ac6);
+  color: var(--dc-ink, #191c1e);
+}
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="text-violet-200"], [class~="text-violet-300"], [class~="text-violet-600"], [class~="text-indigo-300"], [class~="text-indigo-600"], [class~="text-cyan-300"], [class~="text-sky-300"], [class~="text-blue-600"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { color: var(--dc-brand-ink, #004ac6) !important; }
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="bg-violet-600"], [class~="bg-indigo-600"], [class~="bg-blue-600"], [class~="bg-sky-600"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { background-color: var(--dc-brand, #004ac6) !important; color: #ffffff !important; }
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="bg-violet-50"], [class~="bg-indigo-50"], [class~="bg-blue-50"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { background-color: var(--dc-brand-soft, #dbeafe) !important; }
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="text-slate-900"], [class~="text-gray-900"], [class~="text-zinc-900"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { color: var(--dc-ink, #191c1e) !important; }
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="text-slate-500"], [class~="text-slate-600"], [class~="text-gray-500"], [class~="text-gray-600"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { color: var(--dc-ink-3, #475569) !important; }
+html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is(button, input, textarea, select, summary, [role="menuitem"]):focus-visible:not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { outline-color: var(--dc-brand, #004ac6); }
+
+/* Feature-owned UI tokens, not content colours. */
+html[data-theme="light"] .course-player-shell .branched-menu {
+  --bm-ink: var(--dc-ink, #191c1e);
+  --bm-muted: var(--dc-ink-3, #475569);
+  --bm-accent: var(--dc-brand, #004ac6);
+  --bm-line: var(--dc-line, #e2e8f0);
+}
+html[data-theme="light"] .course-player-shell .lumen-root {
+  --bg: var(--dc-bg-primary, #ffffff);
+  --bg-2: var(--dc-bg-muted, #f8fafc);
+  --ink: var(--dc-ink, #191c1e);
+  --ink-2: var(--dc-ink-2, #414754);
+  --ink-3: var(--dc-ink-3, #475569);
+  --accent: var(--dc-brand, #004ac6);
+  --accent-hover: #003ea8;
+  --accent-press: #003487;
+  --accent-ink: var(--dc-brand-ink, #004ac6);
+  --accent-soft: var(--dc-brand-soft, #dbeafe);
+  --accent-soft-2: #bfdbfe;
+  --user-bubble: #eff6ff;
+  --user-bubble-border: #dbeafe;
+}
+html[data-theme="light"] .course-player-shell [data-master-self-control] [aria-selected="true"],
+html[data-theme="light"] .course-player-shell [data-course-note-collection][aria-selected="true"] {
+  background: var(--dc-brand, #004ac6) !important;
+  color: #ffffff !important;
+}
+html[data-theme="light"] .course-player-shell [data-course-progress-label],
+html[data-theme="light"] .course-player-shell [data-course-settings-trigger] {
+  color: var(--dc-brand-ink, #004ac6) !important;
+}
+html[data-theme="light"] .course-player-shell [data-course-progress-fill] {
+  background: var(--dc-brand, #004ac6) !important;
+}
+html[data-theme="light"] .course-player-shell [data-course-sheet-row][data-selected="true"] {
+  background-color: var(--dc-brand-soft, #dbeafe);
+}
+/* Creation overlays are app UI (not the authored experiment/map itself). */
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) > div {
+  background: #ffffff !important; color: var(--dc-ink, #191c1e) !important;
+  border-color: var(--dc-line, #e2e8f0) !important;
+}
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) :is(h2, h3, label, details, button, [class~="text-white"]) {
+  color: var(--dc-ink, #191c1e) !important;
+}
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) :is([class~="text-slate-400"], [class~="text-slate-300"]) {
+  color: var(--dc-ink-3, #475569) !important;
+}
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) :is(input, textarea, select) {
+  background: var(--dc-bg-muted, #f8fafc) !important;
+  color: var(--dc-ink, #191c1e) !important;
+  border-color: var(--dc-line, #e2e8f0) !important;
+}
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) :is([class~="bg-cyan-400"], [class~="bg-emerald-500"]) {
+  background: var(--dc-brand, #004ac6) !important; color: #ffffff !important;
+}
+html[data-theme="light"] .course-player-shell :is([data-experiment-self-composer], [data-self-mindmap-composer]) [role="alert"] {
+  color: var(--dc-urgent-ink, #b42318) !important; background: #fff1f2;
+}
+html[data-theme="light"] .course-player-shell [data-self-mindmap-composer] [class~="text-emerald-200"] {
+  color: var(--dc-success-ink, #166534) !important;
+}
+html[data-theme="light"] .course-player-shell [data-course-mindmap] {
+  --mm-text: var(--dc-ink, #191c1e);
+  --mm-muted: var(--dc-ink-3, #475569);
+  --mm-border: var(--dc-line, #e2e8f0);
+}

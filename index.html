@@ -27,17 +27,14 @@
          name lines); it sits at the head of that card's font stack. -->
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@200;400;600&display=swap" rel="stylesheet" />
     <!-- Colour theme, applied before the first paint so there is no flash of the
-         wrong theme. Mirrors src/lib/theme.ts (storage key, `light` default and the
-         admin routes that stay dark). Keep the two in sync. -->
+         wrong theme. Mirrors src/lib/theme.ts (light-only policy). Keep the two in sync. -->
     <script>
       (function () {
         try {
-          var stored = window.localStorage.getItem("dc.theme");
-          var mode = stored === "dark" || stored === "light" ? stored : "light";
-          var hash = window.location.hash || "";
-          if (hash.indexOf("#/admin") === 0) mode = "dark";
+          var mode = "light";
           var root = document.documentElement;
           root.dataset.theme = mode;
+          root.classList.remove("dark");
           root.classList.add(mode);
           root.style.colorScheme = mode;
           var meta = document.querySelector('meta[name="theme-color"]:not([media])');

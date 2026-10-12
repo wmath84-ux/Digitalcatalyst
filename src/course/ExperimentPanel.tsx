@@ -5,7 +5,7 @@
 // filter selects, and the ONE create affordance.
 //
 //   · MASTER — the course's own 2D experiments (the admin's `interactive`
-//     resources), opened in the normal viewer stack. A locked module's
+//     resources), opened in the lower study pane. A locked module's
 //     experiment carries its lock instead of opening.
 //   · SELF   — the learner's OWN experiments, read from “My experiments” on
 //     the Study Library shelf through the player's live library listener
@@ -35,7 +35,7 @@ export interface PlayerExperiment {
   title: string;
   /** The module it belongs to, shown as the row's second line. */
   moduleTitle: string;
-  /** Ready for the player's viewer stack (`selectFile` / `selectPersonalFile`). */
+  /** Resource payload for the lower study pane. */
   file: CourseFile;
   /** A paid/unauthorised module's experiment — listed, not openable. */
   locked?: boolean;
@@ -48,7 +48,7 @@ export interface ExperimentPanelProps {
   selfExperiments: PlayerExperiment[];
   /** The course's own experiments, in curriculum order. */
   masterExperiments: PlayerExperiment[];
-  /** Open an experiment in the viewer stack (the player owns which path). */
+  /** Open an experiment in the lower study pane (the player checks access). */
   onOpen: (experiment: PlayerExperiment, source: "master" | "self") => void;
   /**
    * Saves an experiment the learner built in the composer (the “+” in SELF

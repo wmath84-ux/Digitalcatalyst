@@ -35,7 +35,7 @@ export default function FlowPathApp({
   const [searchQuery, setSearchQuery] = useState("");
   // FlowPath follows the app-wide theme (the Profile toggle owns it) — the
   // header sun/moon flips the same global preference every other page reads.
-  const [themeMode, setThemeMode] = useThemeMode();
+  const [themeMode] = useThemeMode();
   const isDarkMode = themeMode === "dark";
   // The header settings gear → the SAME CurveSettingsModal the dock's gear
   // opens. FlowPathView fills this handle with its own opener (the curve
@@ -67,7 +67,6 @@ export default function FlowPathApp({
           onOpenNotifications={onOpenNotifications}
           onOpenSettings={() => openCurveRef.current?.()}
           headerVariant="flow"
-          onToggleTheme={() => setThemeMode(isDarkMode ? "light" : "dark")}
           isDarkMode={isDarkMode}
         />
       </div>

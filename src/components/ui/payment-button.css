@@ -32,7 +32,7 @@
 .uzp-pay {
   /* Keep the resting button pure white; the accent only appears when the
      learner interacts (or while a payment is in progress). */
-  --uzp-clr: #4f46e5;
+  --uzp-clr: var(--dc-purchase-accent, #4f46e5);
 
   text-decoration: none;
   line-height: 1;

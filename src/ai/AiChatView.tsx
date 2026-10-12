@@ -9,9 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookmarkPlus, ChevronDown, Copy, HelpCircle, Info, Lightbulb, MessageCircleQuestion,
   RotateCcw, Send, Sparkles, TriangleAlert,
-  Moon,
-  Sun,
-} from "lucide-react";
+  } from "lucide-react";
 import { toast } from "../components/ui/glass-toast";
 import { cn } from "../utils/cn";
 import {
@@ -406,17 +404,7 @@ export default function AiChatView({
                 aria-label="Ask the AI about this module"
                 className="max-h-[140px] min-h-11 flex-1 resize-none bg-transparent px-2.5 py-2.5 text-[13px] font-semibold leading-5 text-white outline-none placeholder:text-white/30 disabled:opacity-50"
               />
-              <button
-                type="button"
-                onClick={aiThemeCtl.toggleTheme}
-                aria-pressed={aiThemeCtl.theme === "light"}
-                aria-label={aiThemeCtl.theme === "light" ? "Switch AI to dark theme" : "Switch AI to light theme"}
-                title={aiThemeCtl.theme === "light" ? "Dark theme" : "Light theme"}
-                data-course-ai-theme-toggle={aiThemeCtl.theme}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300 transition hover:bg-white/[0.09] hover:text-white"
-              >
-                {aiThemeCtl.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-              </button>
+
               <button
                 type="button"
                 onClick={() => void send(draft)}

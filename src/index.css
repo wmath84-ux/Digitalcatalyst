@@ -8,6 +8,39 @@
 @import "tw-animate-css";
 /* P3-16: lens budget — scrolling grids (Store, Home ProductCard) stay frost-only, no per-card GlassLens; claimLens/releaseLens remain available-but-unused (pinned by test) */
 
+:root {
+  /* Shared purchase CTA / header avatar accent. */
+  --dc-purchase-accent: #4f46e5;
+}
+
+/* The ring stays inside the existing 40px header tap target. A neutral gap
+   separates it from photos and initials, in both themes. */
+[data-mobile-header-menu-button] {
+  border: 2px solid var(--dc-purchase-accent, #4f46e5);
+  padding: 2px;
+  background: #111827;
+  box-shadow: none;
+}
+html[data-theme="light"] [data-mobile-header-menu-button] {
+  background: #fff;
+}
+[data-mobile-header-avatar-surface] {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6, var(--dc-purchase-accent, #4f46e5));
+  color: #fff;
+}
+[data-mobile-header-menu-button]:focus-visible {
+  outline: 2px solid var(--dc-purchase-accent, #4f46e5);
+  outline-offset: 3px;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -3789,7 +3822,7 @@ body.is-desktop nav:has([data-site-footer]) {
   html[data-orientation-locked="portrait"]:not([data-course-player-active="true"]) {
     overflow: hidden;
   }
-  
+
   /* Ensure overlay is always on top in landscape. Belt-and-braces: also gated
      on `data-phone-device` (from isPhoneDevice() in appOrientation.ts), so a
      tablet window can never be shown the "rotate your phone" overlay even if
@@ -7319,7 +7352,7 @@ html[data-course-player-active="true"] {
    The "classic" (old) module listing style — a simple, traditional list
    without magnifying icons or dock-style motion effects. This is the DEFAULT.
    The "modern" style uses the full dock-style magnification wave.
-   
+
    The classic style:
    · Disables the icon magnification effect (pointerY tracking)
    · Uses simpler, more traditional button styling
@@ -7361,4 +7394,10 @@ html[data-course-player-active="true"] {
 /* The icon plate border-radius is slightly smaller in classic mode */
 .classic-module-list [data-course-sheet-row] > span:first-child > span {
   border-radius: 10px !important;
+}
+
+/* Only the Sketch editor's bottom controls are conditional. Keep the course
+   navigation and header/Edit action reachable while inspecting the canvas. */
+[data-course-sketch-panel][data-sketch-editing="false"] [data-course-sketch-host] .App-bottom-bar {
+  display: none !important;
 }

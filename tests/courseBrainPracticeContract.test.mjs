@@ -420,7 +420,8 @@ test("a practice card has no buttons: answers answer, a swipe skips", () => {
   // A question swiped without an answer stays unanswered: only a tapped option
   // is ever written to `selections` (an unanswered one counts as skipped).
   assert.match(brainPanel, /const answerQuestion = useCallback\(\(questionIndex: number, optionIndex: number\) => \{\s*\n\s*setSelections\(\(previous\) => \(\{ \.\.\.previous, \[questionIndex\]: optionIndex \}\)\);/);
-  assert.match(brainDeck, /data-brain-deck-hint=""/);
+  assert.match(brainPanel, /<header className="brain-practice-header">[\s\S]*data-brain-deck-hint=""[\s\S]*<\/header>/);
+  assert.doesNotMatch(brainDeck, /data-brain-deck-hint/);
 });
 
 test("the question count is a small round box in the card's top-right corner", () => {
@@ -456,12 +457,10 @@ test("the Brain practice flow is solid — the glass design is gone from it", ()
   // …and what paints it instead is the reference's own palette, verbatim:
   // the #D3DDEE card, the #111111 ink, the #141312 / #F5F1E8 pill, the two
   // shadows and the 22 px radius.
-  assert.match(brainCards, /card: "#D3DDEE"/);
-  assert.match(brainCards, /ink: "#111111"/);
-  assert.match(brainCards, /pill: "#141312"/);
-  assert.match(brainCards, /pillHover: "#2C2825"/);
-  assert.match(brainCards, /pillPress: "#000000"/);
-  assert.match(brainCards, /pillInk: "#F5F1E8"/);
+  assert.match(brainCards, /card: "var\(--dc-brand-soft, #dbeafe\)"/);
+  assert.match(brainCards, /ink: "var\(--dc-ink, #191c1e\)"/);
+  assert.match(brainCards, /pill: "var\(--dc-brand, #004ac6\)"/);
+  assert.match(brainCards, /pillInk: "#ffffff"/);
   assert.match(brainCards, /shadowTop: "0 30px 60px rgba\(0,0,0,0\.30\), 0 10px 20px rgba\(0,0,0,0\.20\)"/);
   assert.match(brainCards, /shadowRest: "0 14px 30px rgba\(0,0,0,0\.18\)"/);
   assert.match(brainCards, /radius: 22/);
@@ -513,7 +512,7 @@ test("the deck scales with its own box, and the panel keeps the S() language", (
   assert.match(brainDeck, /new ResizeObserver\(\(\) => setSize\(\{ width: node\.clientWidth, height: node\.clientHeight \}\)\)/);
   // …and derives every card metric from the reference card's own width, so the
   // reference design is the design at 1× and stays proportional at any size.
-  assert.match(brainDeck, /const unitScale = width \/ BRAIN_DECK_REFERENCE_WIDTH;/);
+  assert.match(brainDeck, /const unitScale = brainCardTextScale\(width, height\);/);
   assert.match(brainDeck, /fontSize: unit\(21\),/);
   assert.match(brainDeck, /minHeight: unit\(46\),/);
   // A card whose content is taller than the pane shares the deck's one fit and
@@ -614,13 +613,9 @@ test("the demo course ships a real Brain practice set", () => {
   assert.match(demo, /\{ type: "brain", module: "Brain — Practice Sets", price: "₹129", coins: 129 \}/);
 });
 
-test("Always-visible footer dock defaults ON, still remembered per device", () => {
-  assert.match(playerApp, /return localStorage\.getItem\(legacyFooterDockStorageKey\) !== "0";/);
-  assert.match(playerApp, /catch \{\s*\n\s*return true;\s*\n\s*\}/);
-  assert.match(playerApp, /DEFAULT IS ON/);
-  assert.match(playerPanel, /`legacyFooterDock` = ON \(the DEFAULT\)/);
-  // The peek dock is now the opt-out, never the default.
-  assert.match(playerApp, /peekDock=\{!legacyFooterDock\}/);
+test("coloured course navigation remains available without the removed dock setting", () => {
+  assert.match(playerApp, /<CoursePeekDock tab=\{dockTab\}/);
+  assert.doesNotMatch(playerApp, /legacyFooterDockStorageKey/);
 });
 
 // ---------------------------------------------------------------------------
