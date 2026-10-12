@@ -889,3 +889,19 @@ html[data-theme="dark"] [data-account-profile] .dc-account-footer {
     transform: none;
   }
 }
+
+
+/* Dark-mode finishing pass for roles that use the paper palette in light mode. */
+html[data-theme="dark"] [data-account-profile] [data-profile-appearance] h2 {
+  color: #f3f6fb;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-logout {
+  border-color: rgba(251, 113, 133, 0.22);
+  background: rgba(190, 24, 93, 0.12);
+  color: #fda4af;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-legal > * {
+  color: #aab7ca;
+}
