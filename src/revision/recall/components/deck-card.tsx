@@ -54,6 +54,7 @@ export function DeckCard({ deck, onOpen }: DeckCardProps): JSX.Element {
           cardSurface("p-5 text-left w-full h-full"),
           "hover:shadow-md cursor-pointer group",
         )}
+        data-revision-deck-card
         aria-label={t("deck.openDeck", { name: deck.name })}
       >
       <div className="flex justify-between items-start mb-4">
@@ -129,7 +130,7 @@ export function DeckCard({ deck, onOpen }: DeckCardProps): JSX.Element {
           onClick={(e) => { e.stopPropagation(); startReview(deck.id); }}
           aria-label={t("deck.startReview")}
           title={t("deck.startReview")}
-          className="absolute bottom-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg hover:shadow-xl hover:bg-primary-hover active:scale-95 transition-all"
+          className="absolute bottom-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary-container text-on-primary shadow-lg hover:brightness-105 hover:shadow-xl active:scale-95 transition-all"
         >
           <RotateCw className="h-4 w-4" />
         </button>
