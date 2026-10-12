@@ -50,9 +50,7 @@ import {
   Search,
   Trash2,
   X,
-  Moon,
-  Sun,
-} from "lucide-react";
+  } from "lucide-react";
 import type { AccessibleReadResource } from "../../utils/readResources.js";
 import {
   groupReadUploads,
@@ -624,17 +622,7 @@ export default function ReadLibraryPanel({
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300" aria-label={`${libraryMode === "course" ? entries.length : readUploads.uploads.length} resources`}>
               {libraryMode === "course" ? entries.length : readUploads.uploads.length}
             </span>
-            <button
-              type="button"
-              onClick={readThemeCtl.toggleTheme}
-              aria-pressed={readThemeCtl.theme === "light"}
-              aria-label={readThemeCtl.theme === "light" ? "Switch Read to dark theme" : "Switch Read to light theme"}
-              title={readThemeCtl.theme === "light" ? "Dark theme" : "Light theme"}
-              data-course-read-theme-toggle={readThemeCtl.theme}
-              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-slate-300 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-            >
-              {readThemeCtl.theme === "light" ? <Moon size={15} aria-hidden="true" /> : <Sun size={15} aria-hidden="true" />}
-            </button>
+
             {/* The library grows here: a learner's own PDF, in one tap. */}
             <button
               type="button"

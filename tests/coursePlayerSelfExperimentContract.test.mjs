@@ -299,12 +299,13 @@ test("the player feeds the panel the SELF list, the course list and the writer",
     /selfExperimentsFromCourses\(myLibrary\.courses, storageProductId\)\.map\(\(experiment\) => \(\{/,
   );
   assert.match(player, /file: selfExperimentCourseFile\(experiment\),/);
-  assert.match(player, /experimentPanel=\{\s*<ExperimentPanel/);
+  assert.match(player, /experimentPanel=\{studyExperiment \? \(/);
+  assert.match(player, /<ExperimentPanel/);
   assert.match(player, /onCreateSelfExperiment=\{createSelfExperiment\}/);
   assert.match(player, /selfExperimentSeed=\{\{/);
   assert.match(player, /const masterExperimentItems = useMemo<PlayerExperiment\[\]>\(/);
-  // MASTER opens the official lesson; SELF stays out of course progress.
-  assert.match(player, /if \(source === "self"\) selectPersonalFile\(experiment\.file\);/);
+  // Both open in the study pane; SELF stays out of official course progress.
+  assert.match(player, /openStudyExperiment\(experiment\.file, source === "self"\)/);
   assert.match(overlay, /experimentPanel\?: ReactNode;/);
   assert.match(overlay, /\) : tab === "experiment" \? \(/);
   assert.match(overlay, /experimentPanel \?\? \(/);

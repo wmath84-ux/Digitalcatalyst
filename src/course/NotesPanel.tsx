@@ -33,7 +33,8 @@
 // map restarts on its library.
 
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, FileText, Moon, NotebookPen, Plus, Sun, X } from "lucide-react";
+import "./study-light-surfaces.css";
+import { Check, FileText, NotebookPen, Plus, X } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
@@ -85,7 +86,7 @@ interface NotesPanelProps {
    * indicator only distinguishes Unsaved from Saved.
    */
   syncState?: {
-    status: "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+    status: "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
     synced: boolean;
     errorMessage?: string | null;
   };
@@ -179,7 +180,8 @@ function NoteStatus({
     tone = "warn";
   } else if (editing) {
     tone = "ok";
-    if (sync?.status === "error") { label = "Saved on this device"; tone = "muted"; }
+    if (sync?.status === "error") { label = "Save needs attention"; tone = "warn"; }
+    else if (sync?.status === "pending") { label = "Saved on device · backup pending"; tone = "muted"; }
     else if (sync && (sync.status === "saving" || !sync.synced)) { label = "Saving…"; tone = "muted"; }
     else if (sync) label = "Synced";
     else label = "Saved";
@@ -605,19 +607,7 @@ export default function NotesPanel({
             <div className="flex shrink-0 items-center gap-1">
               {/* Compact Light/Dark control inside the editor header (Part 2).
                   Reuses the shared persisted theme state — no second system. */}
-              <button
-                type="button"
-                onClick={noteThemeCtl.toggleTheme}
-                aria-pressed={darkNote}
-                aria-label={darkNote ? "Switch note editor to light theme" : "Switch note editor to dark theme"}
-                title={darkNote ? "Light editor" : "Dark editor"}
-                data-course-note-theme-toggle={noteThemeCtl.theme}
-                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${
-                  darkNote ? "text-slate-300 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
-                }`}
-              >
-                {darkNote ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
+
               {/* §14 — one action slot: a saved note that is merely being
                   VIEWED shows "Edit"; while EDITING that exact slot becomes
                   "Save" (plus Cancel). Compose always shows Cancel + Save. */}

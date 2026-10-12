@@ -18,7 +18,7 @@
 // does not show extra close buttons of our own.
 
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { PaymentButton } from "./ui/PaymentButton";
 import { auth } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
@@ -29,6 +29,7 @@ import {
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 import { formatCheckoutMoney } from "./checkout/CheckoutSection";
 import "./checkout/checkout-minimal.css";
+import "./checkout/checkout-brand.css";
 import { useBranding } from "../context/BrandingContext";
 
 export type VerifiedPayment = {
@@ -326,7 +327,7 @@ export default function PaymentGateway({
         description: order.productName || productName,
         order_id: order.orderId,
         prefill: order.customer,
-        theme: { color: "#4f46e5" },
+        theme: { color: "#004ac6" },
         modal: {
           // Full-screen checkout: one tap on × / backdrop / Esc / system Back
           // closes it immediately. No extra confirm dialog, no extra buttons.
@@ -378,10 +379,14 @@ export default function PaymentGateway({
   return (
     <div data-payment-gateway data-payment-state={paymentState} className="dc-payment-page">
       <header>
+        <span className="dc-payment-brand-mark"><ShieldCheck size={24} aria-hidden="true" /></span>
+        <div>
+        <p className="dc-payment-eyebrow">CHECKOUT</p>
         <h2>{finalPrice === 0 ? "Confirm free access" : "Payment"}</h2>
         <p className="dc-checkout-note">{productName}</p>
+        </div>
       </header>
-      <section className="dc-checkout-section">
+      <section className="dc-checkout-section" data-payment-summary>
         <div className="dc-checkout-total">
           <span>{finalPrice === 0 ? "Amount payable" : "Amount to pay"}</span>
           <strong>{displayAmount}</strong>

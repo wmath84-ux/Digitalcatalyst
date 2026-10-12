@@ -12,7 +12,7 @@
 // ── Two layers, exactly like `useCourseMindMap` ───────────────────────────
 //   1. Firestore is the source of truth: one document per note at
 //      `users/{uid}/notes/{noteId}` (`src/course/cloudNotes.ts`), read through
-//      a LIVE listener so a note saved on the phone appears on the laptop
+//      a one-shot cloud read, so remote edits appear on reopen or refresh
 //      without a refresh. Ownership is re-derived from the path by
 //      firestore.rules, so one learner can never read or write another's notes.
 //   2. localStorage mirrors every change (the pre-existing
@@ -31,7 +31,7 @@ import {
   cloudNotesUid,
   deleteCloudNotes,
   describeNotesError,
-  subscribeCloudNotes,
+  fetchCloudNotes,
   uploadCloudNotes,
 } from "./cloudNotes";
 import {
@@ -53,7 +53,7 @@ import {
 import { richTextToPlain } from "../utils/richText";
 import type { CoursePlayerNote } from "../types/course";
 
-export type NotesSaveStatus = "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+export type NotesSaveStatus = "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
 
 export interface UseCourseNotesInput {
   uid?: string | null;
@@ -88,7 +88,7 @@ export interface UseCourseNotesResult {
 }
 
 /** Short enough to feel instant, long enough to coalesce a burst of edits. */
-const DEFAULT_DEBOUNCE_MS = 600;
+const DEFAULT_DEBOUNCE_MS = 30000;
 const MAX_SYNC_ATTEMPTS = 8;
 
 /** Newest first — the order the notes grid has always shown. */
@@ -133,6 +133,7 @@ interface NotesSession {
   flushWanted: boolean;
   disposed: boolean;
   listenerFailed: boolean;
+  deviceSaved: boolean;
 }
 
 interface NotesView {
@@ -148,7 +149,7 @@ const noteTime = (note: CoursePlayerNote) => note.updatedAt || note.createdAt ||
 const nextNoteTime = (note: CoursePlayerNote) => Math.max(Date.now(), noteTime(note) + 1);
 const initialView = (session: NotesSession): NotesView => ({
   session, notes: session.notes, status: session.scoped ? "loading" : "idle",
-  errorMessage: null, lastSavedAt: null, loading: session.scoped,
+  errorMessage: null, lastSavedAt: null, loading: session.scoped && session.notes.length === 0,
 });
 
 export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNotesResult {
@@ -161,7 +162,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     notes: scoped ? byRecency(loadLocalNotes(uidText, productText)) : [],
     dirty: new Set(), deleted: new Set(scoped ? loadDeletedNoteIds(uidText, productText) : []),
     writing: new Set(), timer: null, retry: null, attempts: 0, inFlight: false,
-    flushWanted: false, disposed: false, listenerFailed: false,
+    flushWanted: false, disposed: false, listenerFailed: false, deviceSaved: true,
   }), [uidText, productText, scoped]);
   const scopeRef = useRef(session);
   scopeRef.current = session;
@@ -200,15 +201,16 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     if (!scope.scoped) return;
     const sorted = byRecency(next).slice(0, MAX_NOTES_PER_COURSE);
     scope.notes = sorted;
-    persistLocalNotes(scope.uid, scope.productId, sorted);
+    const deviceSaved = persistLocalNotes(scope.uid, scope.productId, sorted);
+    scope.deviceSaved = deviceSaved;
     for (const id of dirtyIds) if (id && !scope.deleted.has(id)) scope.dirty.add(id);
     scope.attempts = 0;
     if (scope.retry) { clearTimeout(scope.retry); scope.retry = null; }
-    publish(scope, { notes: sorted, status: dirtyIds.length ? "saving" : "ready", errorMessage: null });
+    publish(scope, { notes: sorted, status: !deviceSaved ? "error" : dirtyIds.length ? "pending" : "ready", errorMessage: deviceSaved ? null : "Device storage is full or unavailable. Keep this page open until cloud backup succeeds." });
     if (dirtyIds.length) {
       // A child editor can commit during passive teardown AFTER this hook's
       // cleanup. Save that captured outgoing bucket, never the new board.
-      if (scope.disposed) flushRef.current(scope);
+      if (scope.disposed || !deviceSaved) flushRef.current(scope);
       else scheduleFlush(scope);
     }
   }, [session, publish, scheduleFlush]);
@@ -260,7 +262,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
         for (const note of uploads) {
           if (!scope.deleted.has(note.id) && scope.notes.some((row) => row.id === note.id)) scope.dirty.add(note.id);
         }
-        publish(scope, { status: "error", errorMessage: describeNotesError(error) });
+        publish(scope, { status: "error", errorMessage: scope.deviceSaved ? describeNotesError(error) : "Device storage and cloud backup failed. Keep this page open, copy your note, and retry saving." });
         if (scope.attempts < MAX_SYNC_ATTEMPTS) {
           scope.attempts += 1;
           scheduleRetry(scope, Math.min(20000, 700 * 2 ** Math.min(scope.attempts, 5)), () => flushRef.current(scope));
@@ -279,14 +281,14 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
   }, [publish, scheduleRetry, scheduleFlush]);
   flushRef.current = flushNow;
 
-  // Load local-first, then merge the live copy. The queue survives listener
+  // Load local-first, then merge one cloud read (no live server echoes). The queue survives listener
   // retries; only a new course/account creates a new independent session.
   useEffect(() => {
     if (!session.scoped) { setState(initialView(session)); return undefined; }
     let cancelled = false;
     session.listenerFailed = false;
-    publish(session, { notes: session.notes, loading: true, status: "loading", errorMessage: null });
-    const unsubscribe = subscribeCloudNotes(uidText, productText, (cloud) => {
+    publish(session, { notes: session.notes, loading: session.notes.length === 0, status: session.notes.length ? "ready" : "loading", errorMessage: null });
+    void fetchCloudNotes(uidText, productText).then((cloud) => {
       if (cancelled || scopeRef.current !== session) return;
       const localById = new Map(loadLocalNotes(uidText, productText).map((note) => [note.id, note]));
       for (const note of session.notes) {
@@ -323,7 +325,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
         });
       }
     });
-    return () => { cancelled = true; unsubscribe(); };
+    return () => { cancelled = true; };
   }, [session, uidText, productText, reloadToken, publish, scheduleFlush, scheduleRetry]);
 
   const add = useCallback((html: string, extra?: Partial<CoursePlayerNote>) => {

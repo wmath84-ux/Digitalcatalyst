@@ -56,7 +56,7 @@ import { useHandleLibrary } from "@excalidraw/excalidraw";
 // group — GitHub / Follow Us / Discord — per Part 1 §24).
 import { MainMenu, Sidebar } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { BookMarked, Check, ChevronDown, Layers, Moon, Pencil, Plus, RotateCcw, Sun, Trash2 } from "lucide-react";
+import { BookMarked, Check, ChevronDown, Layers, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
 import type { CoursePlayerTheme } from "./playerPreferences";
 import type { SketchScene } from "../../utils/sketchScene";
@@ -456,11 +456,11 @@ function SketchColourCluster({
     <div className="flex items-center gap-1.5" data-course-sketch-colour-cluster>
       <button
         type="button"
-        aria-label="Dark canvas (theme default)"
+        aria-label="Default white canvas"
         aria-pressed={canvasColour === null}
         onClick={() => onPick(null, true)}
         data-course-sketch-swatch="theme"
-        className={`h-4 w-4 rounded-full border border-white/25 bg-[#141416] transition-shadow ${
+        className={`h-4 w-4 rounded-full border border-slate-300 bg-white transition-shadow ${
           canvasColour === null ? "ring-2 ring-white/70 ring-offset-1 ring-offset-[#0c0c12]" : "hover:ring-1 hover:ring-white/40"
         }`}
       />
@@ -537,23 +537,6 @@ function SketchLibraryPill({ library }: { library: ReturnType<typeof useSketchLi
               : "Library"}
       </span>
     </span>
-  );
-}
-
-/** A compact daylight / light-dark control for the board (Part 1 §26C). */
-function SketchDaylightToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={isDark ? "Switch board to light theme" : "Switch board to dark theme"}
-      aria-pressed={!isDark}
-      title={isDark ? "Light board" : "Dark board"}
-      data-course-sketch-daylight={isDark ? "dark" : "light"}
-      className="flex h-6 w-6 items-center justify-center rounded-md border border-white/15 text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-300"
-    >
-      {isDark ? <Sun aria-hidden size={13} /> : <Moon aria-hidden size={13} />}
-    </button>
   );
 }
 
@@ -707,6 +690,11 @@ export default function SketchPanel({
    * shared chrome readable from both branches.
    */
   const quickMode = mode === "quick-sketch";
+  // Viewing a sketch should not expose editing chrome or accept stray marks.
+  // Keep this session-only: opening a different canvas starts in view mode.
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [sceneKey, mode]);
+
 
   /**
    * Where libraries.excalidraw.com sends the browser back to. A STABLE value
@@ -787,24 +775,13 @@ export default function SketchPanel({
         appState: (
           color
             ? { theme: "light", viewBackgroundColor: color }
-            : { theme: "dark", viewBackgroundColor: "#ffffff" }
+            : { theme: "light", viewBackgroundColor: "#ffffff" }
         ) as never,
       });
     }
     if (commit) {
       onCanvasColorChange(color);
     }
-  };
-
-  /**
-   * Daylight / light-dark control (Part 1 §26C): flips the Excalidraw board
-   * between its dark and light theme WITHOUT touching the learner's chosen
-   * canvas colour any more than necessary. Dark = the theme default (null);
-   * light = a white/light board. Persisted like any other canvas colour.
-   */
-  const isDarkBoard = canvasColour === null;
-  const toggleDaylight = () => {
-    applyCanvasColour(isDarkBoard ? "#ffffff" : null, true);
   };
 
   /**
@@ -832,9 +809,7 @@ export default function SketchPanel({
     return {
       elements: scene.elements as never,
       appState: {
-        // The player is a dark surface, so the board opens dark unless the
-        // learner flipped Excalidraw's own theme toggle (which is persisted).
-        theme: "dark",
+        // Preserve drawing colours and viewport, but never restore dark UI.
         viewBackgroundColor: "#ffffff",
         // A remembered canvas colour (the board's own, else the learner's
         // device preference) opens on a LIGHT board — the dark theme would
@@ -842,6 +817,7 @@ export default function SketchPanel({
         // always wins over the defaults.
         ...(canvasColor ? { theme: "light", viewBackgroundColor: canvasColor } : {}),
         ...saved,
+        theme: "light",
       } as never,
       files: scene.files as never,
       scrollToContent: !hasViewport,
@@ -873,10 +849,20 @@ export default function SketchPanel({
     </button>
   );
 
+  const editToggle = (
+    <button type="button" data-course-sketch-edit-toggle
+      aria-pressed={editing}
+      onClick={() => setEditing(value => !value)}
+      className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+      {editing ? "Done" : "Edit sketch"}
+    </button>
+  );
+
   return (
     <div
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden"
       data-course-sketch-panel
+      data-sketch-editing={editing ? "true" : "false"}
       data-course-theme={playerTheme}
       data-sketch-scope={scoped ? "module" : "none"}
       data-sketch-clean={cleanLook ? "true" : "false"}
@@ -896,6 +882,7 @@ export default function SketchPanel({
           className="flex shrink-0 items-center justify-end border-b border-white/10 px-3 py-1"
           data-course-sketch-quick-bar
         >
+          {editToggle}
           {modeToggle}
         </div>
       ) : (
@@ -920,6 +907,7 @@ export default function SketchPanel({
           />
         ) : null}
       >
+        {editToggle}
         {modeToggle}
         {quickMode ? null : (
           <>
@@ -929,6 +917,12 @@ export default function SketchPanel({
         )}
       </SketchStatus>
       )}
+
+      {/* A saved clean layout must still expose a way out of view mode,
+          even if Excalidraw hides its custom sidebar while viewing. */}
+      {cleanLook && !quickMode ? (
+        <div className="absolute left-3 top-14 z-50" data-course-sketch-edit-access>{editToggle}</div>
+      ) : null}
 
       {/* The canvas host: a positioned, flex-sized box. The editor is its
           absolutely-filled child, so its width and height always resolve from
@@ -946,6 +940,7 @@ export default function SketchPanel({
              canvases, its own save line — see the component). Switching back
              to the full editor loses nothing: both halves persist separately. */
           <PerfectFreehandSketch
+            readOnly={!editing}
             uid={uid}
             productId={productId}
             moduleId={moduleId}
@@ -957,6 +952,8 @@ export default function SketchPanel({
             <Excalidraw
               key={sceneKey}
               initialData={initialData}
+              theme="light"
+              viewModeEnabled={!editing}
               onChange={handleChange}
               name={[boardName, boards.length > 1 ? activeBoardTitle : ""].filter(Boolean).join(" — ") || "Sketch"}
               // "Browse libraries" opens libraries.excalidraw.com; it returns
@@ -989,7 +986,6 @@ export default function SketchPanel({
                 <MainMenu.DefaultItems.Help />
                 <MainMenu.DefaultItems.ClearCanvas />
                 <MainMenu.Separator />
-                <MainMenu.DefaultItems.ToggleTheme allowSystemTheme={false} />
                 <MainMenu.DefaultItems.ChangeCanvasBackground />
               </MainMenu>
               {cleanLook ? (
@@ -1012,7 +1008,7 @@ export default function SketchPanel({
                         onDeleteActive={() => setConfirmDeleteOpen(true)}
                       />
                     ) : null}
-                    <SketchDaylightToggle isDark={canvasColour === null} onToggle={toggleDaylight} />
+
                     {modeToggle}
                     {quickMode ? null : (
                       <>

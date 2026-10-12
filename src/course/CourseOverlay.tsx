@@ -267,7 +267,7 @@ interface CourseOverlayProps {
   onLinkNote: (id: string, links: string[]) => void;
   /** The notes hook's live state — drives editor sync state and library errors. */
   notesSync?: {
-    status: "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+    status: "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
     synced: boolean;
     errorMessage?: string | null;
   };

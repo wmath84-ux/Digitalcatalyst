@@ -267,7 +267,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
     if (!isExperiment) return "";
     if (!hasInlineExperiment) return embed.url;
     try {
-      return URL.createObjectURL(new Blob([buildExperimentDocument(experimentHtml, { theme: "dark" })], { type: "text/html" }));
+      return URL.createObjectURL(new Blob([buildExperimentDocument(experimentHtml, { theme: "light" })], { type: "text/html" }));
     } catch {
       return embed.url;
     }

@@ -37,8 +37,9 @@ export const loadLocalNotes = (uid: string, productId: string): CoursePlayerNote
 export const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNote[]) => {
   try {
     localStorage.setItem(notesStorageKey(uid, productId), JSON.stringify(notes));
+    return true;
   } catch {
-    /* storage full / private mode — ignore */
+    return false;
   }
 };
 

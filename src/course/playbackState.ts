@@ -86,8 +86,8 @@ export const persistPlaybackStore = (uid: string, productId: string, store: Cour
 /**
  * Paused/hidden media can keep polling the same position. Do not sort and
  * stringify the entire resume store (or synchronously write localStorage)
- * for an identical patch. Changed positions still persist immediately;
- * there is no debounce, delayed save or loss of the last seek/scroll.
+ * for an identical patch. The player coalesces changed positions for 1.5 s
+ * and flushes its captured course store on hide/exit.
  */
 export const playbackPatchChanged = (entry: CoursePlaybackEntry | undefined, patch: CoursePlaybackPatch): boolean => {
   if (!entry) return true;

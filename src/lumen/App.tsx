@@ -104,10 +104,8 @@ function LumenChatInner({
   const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
 
-  // Light/Dark theme — reuses the Course Player's shared, per-user theme layer.
-  // The AI page opens in Dark by default. The stored choice (set by the header
-  // toggle, per learner) always wins; this fallback only applies when none is saved.
-  const lumenThemeCtl = useCourseTheme("ai", learnerUid, "dark");
+  // AI follows the shared light-only appearance policy.
+  const lumenThemeCtl = useCourseTheme("ai", learnerUid, "light");
   // Cloud-backed chat history. Before this hook the whole conversation list
   // lived in React state and vanished the moment the player unmounted — the
   // reported "course player ke andar jo AI chats hote hain vah save nahin ho
@@ -712,7 +710,6 @@ function LumenChatInner({
             syncError={chatSyncError}
             onRetrySync={() => { flushChats(); reloadChats(); }}
             theme={lumenThemeCtl.theme}
-            onToggleTheme={lumenThemeCtl.toggleTheme}
           />
 
           {/* A failed cloud save must never be a silent state: say what
@@ -768,7 +765,7 @@ function LumenChatInner({
                 onClick={() => setDrawerOpen(false)}
                 aria-hidden="true"
               />
-              <div className="absolute inset-y-0 left-0">
+              <div className="absolute inset-y-0 left-0 w-[min(272px,88%)]" data-lumen-sidebar-drawer>
                 <Sidebar
                   mode="drawer"
                   chats={chats}

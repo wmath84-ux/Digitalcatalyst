@@ -1,11 +1,10 @@
-import { Download, Home, LayoutGrid, Library, Moon, Search, Settings, Sun, Tag, Timer, TrendingUp, Zap } from "lucide-react";
+import { Download, Home, LayoutGrid, Library, Search, Settings, Tag, Timer, TrendingUp, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "../shims/i18n";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
 import { useRecallStore } from "../stores/recall-store";
-import type { Theme } from "../types";
 
 interface Command {
   id: string;
@@ -31,8 +30,6 @@ export function CommandPalette(): JSX.Element {
   const showImportHub = useRecallStore((s) => s.showImportHub);
   const showFocusTimer = useRecallStore((s) => s.showFocusTimer);
   const startReview = useRecallStore((s) => s.startReview);
-  const setTheme = useRecallStore((s) => s.setTheme);
-  const settings = useRecallStore((s) => s.settings);
   const activeStudy = useRecallStore((s) => s.activeStudy);
   const { t } = useTranslation();
 
@@ -53,19 +50,13 @@ export function CommandPalette(): JSX.Element {
       action: () => startReview(),
     },
     {
-      id: "theme",
-      label: settings.theme === "dark" ? t("commandPalette.commands.themeLight") : t("commandPalette.commands.themeDark"),
-      icon: settings.theme === "dark" ? Sun : Moon,
-      action: () => void setTheme(settings.theme === "dark" ? "light" as Theme : "dark" as Theme),
-    },
-    {
       id: "search",
       label: t("commandPalette.commands.search"),
       icon: Search,
       shortcut: "Ctrl+K",
       action: () => { showBrowser(); },
     },
-  ], [showDashboard, showBrowser, showTags, showStats, showSettings, startReview, setTheme, settings.theme, t]);
+  ], [showDashboard, showBrowser, showTags, showStats, showSettings, startReview, t]);
 
   // Filter commands based on query
   const filtered = useMemo(() => {

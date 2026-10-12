@@ -55,20 +55,19 @@ const prefKey = (kind: string, feature: string, uid?: string | null) =>
 // ── Theme ───────────────────────────────────────────────────────────────
 
 export const loadCourseTheme = (
-  feature: ThemedFeature,
-  uid?: string | null,
-  fallback: CoursePlayerTheme = "light",
+  _feature: ThemedFeature,
+  _uid?: string | null,
+  _fallback: CoursePlayerTheme = "light",
 ): CoursePlayerTheme => {
-  const stored = safeGet(prefKey("courseTheme", feature, uid));
-  return stored === "light" || stored === "dark" ? stored : fallback;
+  return "light";
 };
 
 export const persistCourseTheme = (
   feature: ThemedFeature,
-  theme: CoursePlayerTheme,
+  _theme: CoursePlayerTheme,
   uid?: string | null,
 ) => {
-  safeSet(prefKey("courseTheme", feature, uid), theme);
+  safeSet(prefKey("courseTheme", feature, uid), "light");
 };
 
 /** Live, persisted light/dark choice for one Course Player feature. */
@@ -88,13 +87,13 @@ export function useCourseTheme(
 
   const set = useCallback(
     (next: CoursePlayerTheme) => {
-      setTheme(next);
+      setTheme("light");
       persistCourseTheme(feature, next, uid);
     },
     [feature, uid],
   );
   const toggle = useCallback(() => {
-    set(theme === "dark" ? "light" : "dark");
+    set("light");
   }, [set, theme]);
 
   return { theme, setTheme: set, toggleTheme: toggle };

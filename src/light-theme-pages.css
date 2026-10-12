@@ -753,7 +753,7 @@ html[data-theme="light"] .dc-marketplace-save {
   border-color: var(--dc-line);
 }
 html[data-theme="light"] .dc-marketplace-rating { color: var(--dc-ink-3); }
-html[data-theme="light"] .dc-marketplace-rating svg { color: #b45309; }
+html[data-theme="light"] .dc-marketplace-rating svg { color: #facc15; fill: #facc15; stroke: #ca8a04; }
 html[data-theme="light"] .dc-marketplace-rating strong { color: var(--dc-ink); }
 html[data-theme="light"] .dc-marketplace-price del { color: var(--dc-ink-3); }
 html[data-theme="light"] .dc-marketplace-price strong { color: var(--dc-ink); }
@@ -1618,8 +1618,8 @@ html[data-theme="light"] {
   --gp-off-ink: rgba(25, 28, 30, 0.35);
   --gp-shimmer: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.85), transparent);
   --gp-shimmer-v: linear-gradient(to top, transparent, rgba(255, 255, 255, 0.85), transparent);
-  --gt-shell: rgba(255, 255, 255, 0.92);
-  --gt-shell-on-light: rgba(25, 28, 30, 0.88);
+  --gt-shell: #fff;
+  --gt-shell-on-light: #fff;
   --gt-shell-line: rgba(25, 28, 30, 0.1);
   --gt-shell-shadow: 0 8px 40px rgba(25, 28, 30, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --gt-btn: rgba(25, 28, 30, 0.06);
@@ -1982,4 +1982,28 @@ html[data-theme="light"] .bg-indigo-600 {
 }
 html[data-theme="light"] .bg-indigo-600:hover {
   background-color: #003ea8;
+}
+
+/* Shared toast surfaces: global/administration glass toasts and Recall notices.
+   Use explicit hooks, not role=status (also used by loaders and inline notices).
+   The extra attribute specificity beats the glass-on navy plate; opaque white
+   keeps the same contrast over every page and updates live with the theme. */
+html[data-theme="light"] [data-dc-toast] {
+  background: #fff !important;
+  color: #000 !important;
+  border-color: #d1d5db !important;
+  box-shadow: 0 8px 32px rgba(25, 28, 30, 0.14) !important;
+}
+
+html[data-theme="light"] [data-dc-toast] [data-dc-toast-copy],
+html[data-theme="light"] [data-dc-toast] [data-dc-toast-copy] *,
+html[data-theme="light"] [data-dc-toast] [data-dc-toast-dismiss],
+html[data-theme="light"] [data-dc-toast] [data-dc-toast-dismiss] * {
+  color: #000 !important;
+  opacity: 1;
+}
+
+html[data-theme="light"] [data-dc-toast] button:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }

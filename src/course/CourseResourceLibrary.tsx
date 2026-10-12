@@ -9,10 +9,10 @@
 // MASTER / SELF tag; locked content stays visible but cannot be opened.
 //
 // The library is purely navigational: opening a row delegates to the existing
-// viewer / editor handlers the Course Player already owns. The title search is
-// the only filter — the old type chips (All / Notes / Mind Maps / …) are gone.
+// viewer / editor handlers the Course Player already owns. All modules remain
+// visible; this page no longer carries a search box or filtering state.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import {
   BookOpen,
   Brain,
@@ -29,13 +29,11 @@ import {
   Network,
   NotebookPen,
   PlayCircle,
-  Search,
-  X,
 } from "lucide-react";
 import type { CourseFile, CourseModule, MasterCourseNote } from "../types/course";
 import { isExperimentFileType, NOTE_RESOURCE_FILE_TYPE, READ_RESOURCE_FILE_TYPE } from "../types/course";
 import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
-import { allSectionValues, ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
+import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
 import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
 import "./courseResourceLibrary.css";
 import { isVisibleFile } from "./fileVisibility";
@@ -61,9 +59,6 @@ export interface CourseResourceLibraryProps {
   onOpenMindMapResource: (file: CourseFile, modulePath: string[]) => void;
   /** The learner's own "My Modules" entry, shown as the last branch of the library. */
   personalEntry?: { subtitle: string; locked?: boolean; onOpen: () => void } | null;
-  /** Current search query (controlled by the parent when it provides both props). */
-  searchQuery?: string;
-  onSearchQueryChange?: (query: string) => void;
   /** Library state. Defaults to "ready". */
   status?: "ready" | "loading" | "error";
   errorMessage?: string | null;
@@ -333,51 +328,6 @@ function resourceToItem(resource: LibraryResource): BranchedMenuItem {
   };
 }
 
-// ── Search ──────────────────────────────────────────────────────────────
-
-function LibrarySearchBar({
-  query,
-  onChange,
-  resultCount,
-}: {
-  query: string;
-  onChange: (value: string) => void;
-  resultCount: number;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div className="library-search" data-library-search>
-      <Search size={15} className="library-search__icon" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        type="search"
-        value={query}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Search modules, notes, mind maps…"
-        className="library-search__input"
-        aria-label="Search course resources"
-        data-library-search-input
-      />
-      {query ? (
-        <>
-          <span className="library-search__count" aria-live="polite">{resultCount} {resultCount === 1 ? "result" : "results"}</span>
-          <button
-            type="button"
-            onClick={() => { onChange(""); inputRef.current?.focus(); }}
-            className="library-search__clear"
-            aria-label="Clear search"
-            data-library-search-clear
-          >
-            <X size={14} />
-          </button>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-// ── Main component ──────────────────────────────────────────────────────
-
 export default function CourseResourceLibrary({
   modules,
   courseTitle,
@@ -392,16 +342,11 @@ export default function CourseResourceLibrary({
   onOpenMasterNote,
   onOpenMindMapResource,
   personalEntry,
-  searchQuery: externalSearchQuery,
-  onSearchQueryChange,
   status = "ready",
   errorMessage,
   onRetry,
 }: CourseResourceLibraryProps) {
   void accessibleResourceIds;
-  const [internalQuery, setInternalQuery] = useState("");
-  const searchQuery = externalSearchQuery ?? internalQuery;
-  const setSearchQuery = onSearchQueryChange ?? setInternalQuery;
   const built = useMemo(
     () => buildLibraryEntries(modules, {
       completedFileIds,
@@ -421,19 +366,7 @@ export default function CourseResourceLibrary({
   }, [built.entries]);
 
   const totalResources = built.entries.length;
-  const query = searchQuery.trim().toLowerCase();
-
-  // Filter by the title search only (the type chips are removed).
-  const visibleEntries = useMemo(() => {
-    if (!query) return built.entries;
-    return built.entries.filter(({ path, resource }) => [
-      resource.title,
-      resource.subtitle,
-      resource.source ?? "",
-      ...path.map((segment) => segment.label),
-      ...resource.metadata,
-    ].join(" ").toLowerCase().includes(query));
-  }, [built.entries, query]);
+  const visibleEntries = built.entries;
 
   // Per-module progress over every resource beneath it (unlocked resources only).
   const progressByKey = useMemo(() => {
@@ -452,7 +385,7 @@ export default function CourseResourceLibrary({
 
   const tree = useMemo<BranchedMenuItem[]>(() => {
     const entries: BranchEntry[] = visibleEntries.map(({ path, resource }) => ({ path, item: resourceToItem(resource) }));
-    const ensurePaths = query ? [] : built.modulePaths;
+    const ensurePaths = built.modulePaths;
     const branches = buildBranchTree(entries, {
       ensurePaths,
       sectionMeta: ({ key, count }) => {
@@ -494,19 +427,12 @@ export default function CourseResourceLibrary({
       });
     }
     return branches;
-  }, [visibleEntries, query, built.modulePaths, built.moduleMeta, progressByKey, personalEntry]);
+  }, [visibleEntries, built.modulePaths, built.moduleMeta, progressByKey, personalEntry]);
 
-  // Expansion (shared hook): the top level opens by default and the learner's
-  // choices are kept. Searching opens every matching module; a selected
-  // resource reveals the chain that holds it.
-  const { openValues, toggle: toggleSection, reveal, setAll } = useBranchedOpen(tree);
+  // Keep expansion choices and reveal the selected resource's ancestors.
+  const { openValues, toggle: toggleSection, reveal } = useBranchedOpen(tree);
   useEffect(() => {
-    if (!query) return;
-    setAll(allSectionValues(tree));
-  }, [query, tree, setAll]);
-
-  useEffect(() => {
-    if (!selectedFileId || query) return;
+    if (!selectedFileId) return;
     reveal(ancestorSectionValues(tree, `file:${selectedFileId}`));
     // Only re-run when the learner switches the selected file.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -545,9 +471,6 @@ export default function CourseResourceLibrary({
             <span className="library-header__count">{totalResources} {totalResources === 1 ? "resource" : "resources"}</span>
           ) : null}
         </div>
-        {status === "ready" && hasAnything ? (
-          <LibrarySearchBar query={searchQuery} onChange={setSearchQuery} resultCount={visibleEntries.length} />
-        ) : null}
       </div>
 
       <div className="library-body" data-library-body>
@@ -571,14 +494,6 @@ export default function CourseResourceLibrary({
               ? `The resource library for "${courseTitle}" will appear here once the course creator publishes modules and lessons.`
               : "The resource library will appear here once the course creator publishes modules and lessons."}
           />
-        ) : tree.length === 0 ? (
-          <div className="library-no-results" data-library-no-results>
-            <Search size={20} aria-hidden="true" />
-            <p>No resources match &ldquo;{searchQuery}&rdquo;</p>
-            <button type="button" onClick={() => setSearchQuery("")} className="library-no-results__reset" data-library-reset-search>
-              Clear search
-            </button>
-          </div>
         ) : (
           <BranchedMenu
             items={tree}

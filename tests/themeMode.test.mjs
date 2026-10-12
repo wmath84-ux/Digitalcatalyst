@@ -48,9 +48,9 @@ test("light is the default theme", () => {
   assert.equal(THEME_STORAGE_KEY, "dc.theme");
 });
 
-test("normalizeThemeMode accepts only light and dark", () => {
+test("normalizeThemeMode migrates legacy dark to light", () => {
   assert.equal(normalizeThemeMode("light"), "light");
-  assert.equal(normalizeThemeMode("dark"), "dark");
+  assert.equal(normalizeThemeMode("dark"), "light");
   assert.equal(normalizeThemeMode("system"), null);
   assert.equal(normalizeThemeMode(""), null);
   assert.equal(normalizeThemeMode(null), null);
@@ -62,36 +62,36 @@ test("falls back to light when nothing or junk is stored", () => {
   assert.equal(readStoredThemeMode(null), "light");
 });
 
-test("reads a stored preference", () => {
-  assert.equal(readStoredThemeMode(fakeStorage({ "dc.theme": "dark" })), "dark");
+test("legacy dark preferences resolve to light", () => {
+  assert.equal(readStoredThemeMode(fakeStorage({ "dc.theme": "dark" })), "light");
   assert.equal(readStoredThemeMode(fakeStorage({ "dc.theme": "light" })), "light");
 });
 
-test("writes and round-trips the preference", () => {
+test("writes normalize even legacy dark callers to light", () => {
   const storage = fakeStorage();
   writeStoredThemeMode("dark", storage);
-  assert.equal(storage._data.get("dc.theme"), "dark");
-  assert.equal(readStoredThemeMode(storage), "dark");
+  assert.equal(storage._data.get("dc.theme"), "light");
+  assert.equal(readStoredThemeMode(storage), "light");
 });
 
-test("admin routes stay dark regardless of preference", () => {
+test("admin routes also use light appearance", () => {
   for (const hash of ["#/admin", "#/admin-login"]) {
-    assert.equal(resolveDocumentTheme("light", hash), "dark", hash);
-    assert.equal(resolveDocumentTheme("dark", hash), "dark", hash);
+    assert.equal(resolveDocumentTheme("light", hash), "light", hash);
+    assert.equal(resolveDocumentTheme("dark", hash), "light", hash);
   }
 });
 
-test("learner routes — including the course player — follow the preference", () => {
+test("learner routes — including the course player — always use light appearance", () => {
   for (const hash of ["#/course/abc", "#/my-course/xyz", "#/my-day", "#/subscription"]) {
     assert.equal(resolveDocumentTheme("light", hash), "light", hash);
-    assert.equal(resolveDocumentTheme("dark", hash), "dark", hash);
+    assert.equal(resolveDocumentTheme("dark", hash), "light", hash);
   }
 });
 
-test("ordinary routes follow the stored preference", () => {
+test("ordinary routes always use light appearance", () => {
   for (const hash of ["#/home", "#/profile", "#/store", ""]) {
     assert.equal(resolveDocumentTheme("light", hash), "light", hash);
-    assert.equal(resolveDocumentTheme("dark", hash), "dark", hash);
+    assert.equal(resolveDocumentTheme("dark", hash), "light", hash);
   }
 });
 
@@ -105,9 +105,9 @@ test("applyDocumentTheme sets data-theme, classes, colour-scheme and theme-color
   assert.equal(doc._meta.attributes.content, "#f7f9fb");
 
   applyDocumentTheme("dark", doc);
-  assert.equal(doc.documentElement.dataset.theme, "dark");
-  assert.ok(doc._classes.has("dark"));
-  assert.ok(!doc._classes.has("light"));
-  assert.equal(doc.documentElement.style.colorScheme, "dark");
-  assert.equal(doc._meta.attributes.content, "#0a0c12");
+  assert.equal(doc.documentElement.dataset.theme, "light");
+  assert.ok(!doc._classes.has("dark"));
+  assert.ok(doc._classes.has("light"));
+  assert.equal(doc.documentElement.style.colorScheme, "light");
+  assert.equal(doc._meta.attributes.content, "#f7f9fb");
 });

@@ -218,6 +218,7 @@ export default function MobileHeaderMenu({
         className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] transition hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${className}`}
         data-mobile-header-menu-button
       >
+        <span data-mobile-header-avatar-surface>
         {photoSrc && !photoFailed ? (
           <img
             src={photoSrc}
@@ -233,6 +234,7 @@ export default function MobileHeaderMenu({
         ) : (
           <span aria-hidden="true" data-mobile-header-avatar-fallback>{initials}</span>
         )}
+        </span>
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>

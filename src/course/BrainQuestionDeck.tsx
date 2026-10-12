@@ -68,12 +68,11 @@ import {
   type PanInfo,
 } from "framer-motion";
 import { BRAIN, BrainCounter } from "./BrainCards";
+import { brainCardTint, brainCardTextScale } from "./brainCardAppearance";
 import {
   BRAIN_DECK_GUTTER,
   BRAIN_DECK_HINT_HEIGHT,
   BRAIN_DECK_MAX_HEIGHT,
-  BRAIN_DECK_MIN_CONTENT_HEIGHT,
-  BRAIN_DECK_REFERENCE_WIDTH,
   BRAIN_DECK_STACK_PEEK,
   brainDeckSize,
 } from "./panelFit";
@@ -109,7 +108,7 @@ const ANSWER_FLICK = { x: -1, y: 0 };
  * Below this a card would be a wall of 9 px type, so the card's content becomes
  * scrollable instead and keeps its natural size (see `scrolls` in the deck).
  */
-const CONTENT_FLOOR = 0.62;
+const CONTENT_FLOOR = 0.85;
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -243,6 +242,7 @@ function CardFace({ question, ordinal, total, picked, interactive, scale, fit, s
           // At least the card's own box, so a short question still reads as a
           // card rather than a strip…
           minHeight: "100%",
+          height: scrolls ? "100%" : undefined,
           padding: `${unit(18)} ${unit(16)} ${unit(16)}`,
           // …and the question + answers block centred in whatever height the
           // deck solved. A GRID, not a flex column: a flex item is shrunk to fit
@@ -529,7 +529,7 @@ function FlickCard({
     [item.index, onReportHeight],
   );
 
-  const unitScale = width / BRAIN_DECK_REFERENCE_WIDTH;
+  const unitScale = brainCardTextScale(width, height);
   const selected = picked ?? selection ?? null;
   /**
    * Per card, not per deck: the deck shares ONE scale (so a card never resizes
@@ -543,6 +543,7 @@ function FlickCard({
     <motion.div
       data-brain-card={item.index}
       data-brain-card-slot={slot}
+      data-brain-card-tone={item.index % 4}
       data-brain-card-top={isTop ? "" : undefined}
       aria-hidden={!isTop}
       style={{
@@ -571,7 +572,7 @@ function FlickCard({
         className="relative h-full w-full overflow-hidden"
         style={{
           borderRadius: BRAIN.radius,
-          background: BRAIN.card,
+          background: brainCardTint(item.index),
           // The reference: a heavier drop shadow on the top card.
           boxShadow: isTop ? BRAIN.shadowTop : BRAIN.shadowRest,
           height,
@@ -628,8 +629,8 @@ export default function BrainQuestionDeck({
 
   /** The tallest content the deck has measured — what the card has to hold. */
   const tallest = useMemo(
-    () => Object.values(heights).reduce((max, value) => (value > max ? value : max), 0),
-    [heights],
+    () => items.slice(0, VISIBLE).reduce((max, item) => Math.max(max, heights[item.index] ?? 0), 0),
+    [heights, items],
   );
   /** The most height the pane can give a card before it would run off the box. */
   const heightCap = Math.min(
@@ -641,7 +642,7 @@ export default function BrainQuestionDeck({
    * anything has been measured it is the box the pane solved), the measured
    * content is what it grows to, and the pane's own height is the ceiling.
    */
-  const contentFloor = Math.max(BRAIN_DECK_MIN_CONTENT_HEIGHT, box.height);
+  const contentFloor = box.height;
   /**
    * ONE fit for the whole deck: a question that does not fit the pane is scaled
    * down (never past the legibility floor) and every card shares that scale, so
@@ -666,8 +667,7 @@ export default function BrainQuestionDeck({
         className="relative"
         data-brain-deck-stage=""
         // The cards behind peek BELOW the top card (the reference's SLOT_Y), so
-        // the stage reserves that strip: the hint line never ends up under a
-        // card, whatever height the pane solved.
+        // the stage reserves that strip so the stack fits inside the pane.
         style={{ width: box.width, height: cardHeight + BRAIN_DECK_STACK_PEEK }}
       >
         <AnimatePresence>
@@ -699,20 +699,7 @@ export default function BrainQuestionDeck({
           })}
         </AnimatePresence>
       </div>
-      <p
-        data-brain-deck-hint=""
-        style={{
-          marginTop: 12,
-          marginBottom: 0,
-          fontSize: "calc(12px * var(--brain-scale, 1))",
-          fontWeight: 600,
-          letterSpacing: "0.01em",
-          color: BRAIN.hint,
-          textAlign: "center",
-        }}
-      >
-        Tap an answer to submit · flick the card away to skip
-      </p>
+
     </div>
   );
 }

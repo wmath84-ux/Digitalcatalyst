@@ -126,51 +126,38 @@ export function brainFitScale(width: number, height: number): number {
 export const BRAIN_DECK_REFERENCE_WIDTH = 300;
 /** `SLOT_Y[3]` of the reference deck — how far the deepest card peeks out. */
 export const BRAIN_DECK_STACK_PEEK = 36;
-/** The hint line under the deck ("tap an answer … flick the card away"). */
-export const BRAIN_DECK_HINT_HEIGHT = 26;
+/** Instructions live in the header now; no space reserved below the deck. */
+export const BRAIN_DECK_HINT_HEIGHT = 0;
 /** The deck's breathing room inside the pane (its own padding + the shadow). */
 export const BRAIN_DECK_GUTTER = 28;
 /** Below this the card stops being readable; the pane scrolls instead. */
 export const BRAIN_DECK_MIN_WIDTH = 200;
-/** A big pane may enlarge the card — but it stays a card, never a poster. */
-export const BRAIN_DECK_MAX_WIDTH = 360;
+/** Let the deck use larger panes without making lines excessively wide. */
+export const BRAIN_DECK_MAX_WIDTH = 960;
 /** …and never taller than this before its content is scaled to fit. */
-export const BRAIN_DECK_MAX_HEIGHT = 560;
+export const BRAIN_DECK_MAX_HEIGHT = 960;
 /** The reference silhouette: the card is this much taller than it is wide. */
 export const BRAIN_DECK_EXTRA_HEIGHT = 56;
 /** The absolute floor under a card's height (a pane shorter than a card). */
 export const BRAIN_DECK_MIN_CONTENT_HEIGHT = 180;
 
 /**
- * The card box for the pane the deck has been given.
- *
- * There is deliberately no third dimension: the reference card is a square
- * plus a 56 px strip, and a practice card that has to hold a long question and
- * six options grows downwards at runtime (the card measures its own content;
- * see src/course/BrainQuestionDeck.tsx). What this function decides is the box
- * the deck is DRAWN in — 72% of the pane's width like the reference's `72vw`,
- * never wider than the reference cap, never taller than the pane can hold
- * (with the stack's peek and the hint line reserved), and never so small that
- * an option stops being a touch target. It is a pure function of the box, and
- * an unmeasured box returns the reference card exactly.
+ * Fill the available study pane, leaving only a shadow gutter and stack peek.
+ * Width and height are independent so a wide, short split is still useful.
+ * Text scaling is capped separately in FlickCard; long content scrolls.
  */
 export function brainDeckSize(width: number, height: number): { width: number; height: number } {
   const reference = { width: BRAIN_DECK_REFERENCE_WIDTH, height: BRAIN_DECK_REFERENCE_WIDTH + BRAIN_DECK_EXTRA_HEIGHT };
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return reference;
-  const availableWidth = Math.max(BRAIN_DECK_MIN_WIDTH, width - BRAIN_DECK_GUTTER);
+  const availableWidth = Math.max(1, width - Math.min(BRAIN_DECK_GUTTER, width * 0.08));
   const availableHeight = Math.max(
-    BRAIN_DECK_EXTRA_HEIGHT + 100,
+    1,
     height - BRAIN_DECK_GUTTER - BRAIN_DECK_HINT_HEIGHT - BRAIN_DECK_STACK_PEEK,
   );
   const maxWidth = Math.min(BRAIN_DECK_MAX_WIDTH, availableWidth);
   const maxHeight = Math.min(BRAIN_DECK_MAX_HEIGHT, availableHeight);
-  // WIDTH comes from the pane's width (the reference's own 72%), and a pane too
-  // short to afford the reference silhouette takes it out of the HEIGHT instead
-  // — a wide-but-short pane gets a short card, never a postage stamp. (The
-  // question and its answers re-fit inside whatever box this returns; see
-  // src/course/BrainQuestionDeck.tsx.)
-  const cardWidth = Math.max(BRAIN_DECK_MIN_WIDTH, Math.min(width * 0.72, maxWidth));
-  const cardHeight = Math.max(1, Math.min(cardWidth + BRAIN_DECK_EXTRA_HEIGHT, maxHeight));
+  const cardWidth = maxWidth;
+  const cardHeight = maxHeight;
   return { width: Math.round(cardWidth), height: Math.round(cardHeight) };
 }
 

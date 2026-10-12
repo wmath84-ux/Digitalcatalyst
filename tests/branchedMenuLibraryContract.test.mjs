@@ -57,9 +57,9 @@ test("the replaced listing implementations are gone and nothing imports them", (
   }
 });
 
-test("the Modules page has no filter chips, but keeps its title search", () => {
+test("the Modules page has no filter chips or search box", () => {
   assert.doesNotMatch(library, /FILTERS|LibraryFilterChips|data-library-filter/);
-  assert.match(library, /LibrarySearchBar|searchQuery/);
+  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|data-library-search/);
 });
 
 test("the Modules library shows the real module tree and the My Modules root entry", () => {

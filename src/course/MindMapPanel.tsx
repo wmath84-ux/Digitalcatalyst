@@ -139,7 +139,6 @@ import {
   LayoutTemplate,
   Layers,
   Maximize,
-  Moon,
   Network,
   Palette,
   Plus,
@@ -147,7 +146,6 @@ import {
   Square,
   Rows3,
   Sparkles,
-  Sun,
   Trash2,
   TriangleAlert,
   Type,
@@ -913,7 +911,8 @@ const SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
   idle: { label: "Sign in karke save hoga", tone: "text-white/60" },
   loading: { label: "Loading…", tone: "text-white/60" },
   ready: { label: "Ready", tone: "text-white/60" },
-  saving: { label: "Saving…", tone: "text-amber-300" },
+  pending: { label: "Device copy · cloud backup pending", tone: "text-slate-500" },
+  saving: { label: "Backing up…", tone: "text-amber-300" },
   saved: { label: "Cloud par saved", tone: "text-emerald-300" },
   error: { label: "Save retry ho raha hai", tone: "text-rose-300" },
 };
@@ -2349,17 +2348,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
               Compact sun/moon control: flips the map between its genuine
               dark and light palettes and remembers the choice per user.
               It replaces the removed double-tap-delete arm switch (§7). */}
-          <button
-            type="button"
-            onClick={mindThemeCtl.toggleTheme}
-            aria-pressed={mindTheme === "light"}
-            className={`mm-tool ${mindTheme === "light" ? "mm-tool-violet" : ""}`}
-            aria-label={mindTheme === "light" ? "Switch mind map to dark theme" : "Switch mind map to light theme"}
-            title={mindTheme === "light" ? "Dark theme" : "Light (daylight) theme"}
-            data-course-mindmap-theme-toggle={mindTheme}
-          >
-            {mindTheme === "light" ? <Moon /> : <Sun />}
-          </button>
+
 
         </div>
       </div>

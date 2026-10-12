@@ -104,7 +104,8 @@ import {
   useTransform,
   type MotionValue,
 } from 'framer-motion'
-import GlassMaterial, {
+import './neutral-footer-glass.css'
+import {
   DOCK_PANEL_BG,
   DOCK_PANEL_BLUR,
   DOCK_PANEL_BORDER,
@@ -319,6 +320,9 @@ function DockItem({
   const pressTarget = useMotionValue(1)
   const press = useSpring(pressTarget, { stiffness: 420, damping: 26 })
   const scale = useTransform([waveScale, press], ([m, p]: number[]) => m * p)
+  // Same pointer-distance spring drives the new sheen during touch drag.
+  // Keep it on a separate layer: never overwrite the existing scale/lift.
+  const sheenPosition = useTransform(waveScale, [1, MAG_SCALE], ['0% 50%', '50% 15%'])
 
   const setButtonRef = (node: HTMLButtonElement | null) => {
     if (typeof buttonRef === 'function') buttonRef(node)
@@ -432,6 +436,7 @@ function DockItem({
         }
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
+        <motion.span aria-hidden="true" data-dock-glass-sheen style={{ backgroundPosition: sheenPosition }} />
         {wide ? (
           <span className="whitespace-nowrap px-4 text-[13px] font-extrabold tracking-wide text-white">
             {label}
@@ -812,7 +817,7 @@ export default function GlassDock({
         }
         resetPointer()
       }}
-      className={`relative isolate mx-auto flex w-max max-w-full shrink-0 items-end rounded-3xl ${
+      className={`dc-neutral-footer relative isolate mx-auto flex w-max max-w-full shrink-0 items-end rounded-3xl ${
         compact ? 'gap-1.5 px-3 pb-2.5 pt-2.5' : 'gap-2 px-4 pb-3 pt-3'
       }`}
       style={{
@@ -833,13 +838,11 @@ export default function GlassDock({
         boxShadow: DOCK_PANEL_SHADOW,
       }}
       data-glass-dock=""
+      data-neutral-glass=""
       data-site-footer={siteFooter ? '' : undefined}
     >
-      {/* The WebsiteGlass lens itself — the pinned docs sensitivity
-          (radius 24 · strength 0.5 · blur 4 · tint 0.25): rim refraction on
-          Chromium, the frosted panel material everywhere else. Static layer —
-          the magnification wave never re-blurs it. */}
-      <GlassMaterial />
+      {/* Neutral reference glass: the capsule and each tile share one material.
+          No refraction/filter layer over the glyphs. */}
       {leading}
       {items.map((item, i) => (
         <DockItem

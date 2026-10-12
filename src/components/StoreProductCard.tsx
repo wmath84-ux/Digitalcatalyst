@@ -64,6 +64,7 @@ export default function StoreProductCard({
         onClick={() => onView(product)}
       >
         <div className="dc-marketplace-cover">
+          {hasOriginal ? <span className="dc-marketplace-discount">{Math.round((1 - finalPrice / product.originalPrice) * 100)}% off</span> : free ? <span className="dc-marketplace-discount">Free access</span> : null}
           {product.image && failedImage !== product.image ? (
             <img
               src={product.image}
@@ -105,7 +106,7 @@ export default function StoreProductCard({
       <div className="dc-marketplace-card-footer">
         {hasRating ? (
           <p className="dc-marketplace-rating">
-            <Star size={14} aria-hidden="true" />
+            <Star size={14} fill="#facc15" stroke="#ca8a04" aria-hidden="true" />
             <strong>{product.rating.toFixed(1)}</strong>
             <span>({product.reviews.toLocaleString("en-IN")})</span>
           </p>

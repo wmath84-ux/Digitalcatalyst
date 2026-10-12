@@ -215,7 +215,7 @@ export default function ProfileLayout({ name, email, photoURL, bio, initials, me
         <header className="dc-account-section-header">
           <div>
             <h2 id="profile-appearance-title">Appearance</h2>
-            <p className="dc-account-note">Light is the default. Your choice is saved on this device and applies across the app.</p>
+            <p className="dc-account-note">Light appearance is used throughout the app.</p>
           </div>
           <ThemeModeToggle />
         </header>
@@ -297,9 +297,9 @@ export function EditModal({
     } catch { setError("Profile could not be updated. Please retry."); }
     finally { setSaving(false); }
   };
-  
+
   const INPUT = "w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30";
-  
+
   return (
     <BaseModal title="Edit Profile" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">

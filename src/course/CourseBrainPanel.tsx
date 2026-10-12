@@ -69,7 +69,8 @@
 // belong to their module, not to the revision Test Bank.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Brain, Plus, RotateCcw } from "lucide-react";
+import "./study-light-surfaces.css";
+import { ArrowLeft, Brain, Plus, RotateCcw } from "lucide-react";
 import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
 import { BRAIN, BrainBadge, BrainPill, BrainProgress, BrainSurface } from "./BrainCards";
@@ -480,7 +481,8 @@ export default function CourseBrainPanel({
             SELF   = the learner's own sets, made here or in the Study Library. */}
         <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wide" style={{ color: BRAIN.inkSoft }}>Practice sets</p>
+            <p className="brain-library-eyebrow">YOUR PRACTICE SPACE</p>
+            <h2 className="brain-library-title">Brain</h2>
           </div>
           <div className="flex items-center" style={{ gap: S(8) }}>
             {/* The “+” exists ONLY while SELF is the open filter (owner brief,
@@ -543,6 +545,16 @@ export default function CourseBrainPanel({
           </div>
         ) : null}
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ marginTop: practiceModules.length > 0 ? S(10) : 0 }}>
+          <div data-brain-library-intro>
+            <div>
+              <h3>A little practice. A stronger recall.</h3>
+              <p>Pick a set, test what you know, and learn from each answer.</p>
+            </div>
+            <div className="brain-library-summary" aria-label="Available practice">
+              <span><strong>{(masterSelfCtl.mode === "self" ? selfSets : moduleSets).length}</strong> sets</span>
+              <span><strong>{(masterSelfCtl.mode === "self" ? selfSets : moduleSets).reduce((total, set) => total + set.questions.length, 0)}</strong> questions</span>
+            </div>
+          </div>
           {/* In SELF mode, show the learner's own practice sets (from the personal
               library) instead of the module-filtered MASTER sets. */}
           {masterSelfCtl.mode === "self" ? (
@@ -566,7 +578,7 @@ export default function CourseBrainPanel({
                 </div>
               </BrainSurface>
             ) : (
-              <div className="space-y-3">
+              <div className="brain-library-grid">
                 {selfSets.map((set) => {
                   const record = scores[set.id];
                   return (
@@ -638,7 +650,7 @@ export default function CourseBrainPanel({
               </div>
             </BrainSurface>
           ) : (
-            <div className="space-y-3">
+            <div className="brain-library-grid">
               {moduleSets.map((set) => {
                 const record = scores[set.id];
                 const done = completedFileIds?.has(set.id) ?? false;
@@ -725,6 +737,7 @@ export default function CourseBrainPanel({
                     key={`${item.id}-${index}`}
                     type="button"
                     data-brain-review-tile={index + 1}
+                    data-brain-answered={answered ? "true" : "false"}
                     onClick={() => openDeck(index)}
                     className="font-bold"
                     style={{
@@ -1055,27 +1068,23 @@ export default function CourseBrainPanel({
 
   return (
     <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="question" style={{ fontSize: S(16) }}>
-      <div className="flex shrink-0 items-center" style={{ padding: `${S(12)} ${S(16)} 0`, gap: S(8) }}>
+      <header className="brain-practice-header">
         <button
           type="button"
           onClick={backToLibrary}
           data-brain-back=""
-          className="shrink-0 rounded-full font-semibold"
-          style={{
-            fontSize: S(11),
-            padding: `${S(5)} ${S(10)}`,
-            border: "1px solid rgba(255,255,255,0.22)",
-            background: "transparent",
-            color: BRAIN.hint,
-            cursor: "pointer",
-          }}
+          className="brain-practice-back"
+          aria-label="Back to Brain"
+          title="Back to Brain"
         >
-          All sets
+          <ArrowLeft size={20} aria-hidden="true" />
         </button>
-        <p className="min-w-0 flex-1 truncate font-semibold" style={{ fontSize: S(11), color: BRAIN.hint }}>
-          {activeSet.title}
-        </p>
-      </div>
+        <div className="brain-practice-heading">
+          <p className="brain-practice-eyebrow">Brain · Practice</p>
+          <h3 title={activeSet.title}>{activeSet.title}</h3>
+          <p data-brain-deck-hint="">Tap an answer to submit · flick the card away to skip</p>
+        </div>
+      </header>
 
       {/* The deck owns the rest of the pane: no action bar, no Next, no Skip —
           the answers ARE the controls, and the swipe IS the skip. */}

@@ -1,0 +1,78 @@
+/* Website-aligned light checkout. Scope to checkout, never shared chrome or
+   the provider iframe. Financial facts and state controls remain unchanged. */
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) {
+  --checkout-border: #e2e8f0;
+  --checkout-muted: #475569;
+  --checkout-accent: #004ac6;
+  --checkout-edge: #dbe5f3;
+  --checkout-edge-strong: #93b6ec;
+  --checkout-surface: #ffffff;
+  --checkout-surface-raised: #ffffff;
+  color: #0f172a;
+  color-scheme: light;
+}
+html[data-theme="light"] [data-checkout-app] [data-checkout-content] {
+  gap: 20px;
+  padding-top: 8px;
+}
+html[data-theme="light"] [data-checkout-app] [data-checkout-toolbar] {
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+}
+html[data-theme="light"] [data-checkout-app] [data-checkout-toolbar] h1::after {
+  background: #004ac6;
+}
+html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator li > span:first-child {
+  display: grid; place-items: center; flex: 0 0 26px; height: 26px;
+  border-radius: 50%; background: #f1f5f9; color: #475569; font-weight: 750;
+}
+html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator li[aria-current="step"] > span:first-child {
+  background: #004ac6; color: #fff;
+}
+html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator li[data-step-state="complete"] > span:first-child {
+  background: #dcfce7; color: #166534;
+}
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) .dc-checkout-section {
+  border: 1px solid #e2e8f0; border-radius: 20px; background: #fff;
+  padding: clamp(16px, 3vw, 26px);
+  box-shadow: 0 6px 24px -14px rgb(15 23 42 / 16%);
+}
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) :is([data-checkout-price-section], [data-payment-summary]) {
+  background: linear-gradient(125deg, #eff6ff, #fff 75%);
+  border-color: #bcd1f2;
+}
+html[data-theme="light"] [data-payment-gateway] { gap: 18px; }
+html[data-theme="light"] [data-payment-gateway] > header {
+  display: flex; align-items: center; gap: 14px; padding-block: 8px 20px;
+}
+html[data-theme="light"] [data-payment-gateway] > header > div { min-width: 0; }
+html[data-theme="light"] [data-payment-gateway] h2 { font-size: 24px; letter-spacing: -0.035em; }
+html[data-theme="light"] [data-payment-gateway] .dc-payment-brand-mark {
+  display: grid; place-items: center; flex: 0 0 52px; height: 52px;
+  border-radius: 16px; background: #eff6ff; color: #004ac6; border: 1px solid #dbeafe;
+}
+html[data-theme="light"] [data-payment-gateway] .dc-payment-eyebrow {
+  color: #004ac6; font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
+}
+html[data-theme="light"] [data-payment-summary] .dc-checkout-total {
+  margin-top: 0; padding-top: 0; border-top: 0;
+}
+html[data-theme="light"] [data-payment-summary] .dc-checkout-total strong {
+  color: #0f172a; font-size: clamp(28px, 5vw, 40px);
+}
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) .dc-checkout-primary {
+  min-height: 52px; border: 1px solid #004ac6; border-radius: 14px;
+  background: #004ac6; color: #fff;
+  box-shadow: 0 8px 20px -10px rgb(0 74 198 / 45%);
+}
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) .dc-checkout-primary:hover:not(:disabled) {
+  background: #003ea8; border-color: #003ea8;
+}
+html[data-theme="light"] :is([data-checkout-app], [data-payment-gateway]) .dc-checkout-primary .uzp-pay__text { color: #fff; }
+html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visible {
+  outline: 2px solid #004ac6; outline-offset: 3px;
+}
+@media (max-width: 359px) {
+  html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator ol { gap: 4px; }
+  html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator li { gap: 4px; font-size: 11px; }
+}

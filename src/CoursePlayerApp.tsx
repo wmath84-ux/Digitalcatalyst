@@ -1,7 +1,8 @@
+import CourseLoadingDots from "./course/CourseLoadingDots";
+import "./course/courseBrandColors.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
-import { db } from "../firebase";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
 import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
@@ -21,6 +22,7 @@ import {
   selfExperimentCourseFile,
   selfExperimentsFromCourses,
 } from "./utils/selfExperiments";
+import ExperimentStage from "./course/ExperimentStage";
 import ExperimentPanel, { type PlayerExperiment } from "./course/ExperimentPanel";
 import { experimentHasSource } from "./utils/experimentSpec";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
@@ -353,40 +355,6 @@ const loadCourseSnow = (): boolean => {
   }
 };
 
-// ── Desktop site switch ─────────────────────────────────────────────────
-// This is the in-app equivalent of the browser's own "Desktop site" toggle.
-// It matters most for the case it was added for: a learner whose phone
-// browser has desktop-site turned ON gets a ~980px layout viewport, so an
-// embedded Google Doc renders its desktop page and the text becomes tiny.
-// Turning this OFF forces real device-width layout AND loads the host's
-// mobile rendering, which is what makes the text readable again.
-//
-// The choice is remembered across lessons and visits. A first-time visitor
-// on a phone that IS in desktop-site mode starts in the readable mobile
-// rendering, because that is the whole point of the control.
-// ── Footer dock mode ─────────────────────────────────────────────────────
-// ON = the always-visible dock inside the study pane (Player settings →
-// "Always-visible footer dock"). OFF = the bottom-centre PEEK dock: a thin
-// frosted line at the bottom centre of the player; tap/hover opens the footer
-// navigation and swiping left/right selects the tab under the finger on
-// release — the exact pattern the desktop shell already uses.
-//
-// DEFAULT IS ON: the owner asked for "Always-visible footer dock" to be the
-// out-of-the-box state, so a device that has never touched the toggle gets
-// the always-visible dock. The choice is still remembered per device, so a
-// learner who explicitly switches it off keeps the peek dock — only the
-// "never chose" value changed (missing key → ON, "0" → OFF, "1" → ON).
-const legacyFooterDockStorageKey = "dc.coursePlayerLegacyFooterDock";
-const loadLegacyFooterDock = (): boolean => {
-  try {
-    // Absent key = never chosen = ON (the new default). Only an explicit "0"
-    // from the player's own setting turns the always-visible dock off.
-    return localStorage.getItem(legacyFooterDockStorageKey) !== "0";
-  } catch {
-    return true;
-  }
-};
-
 const desktopViewStorageKey = "dc.coursePlayerDesktopView";
 const loadDesktopViewPreference = (): boolean => {
   try {
@@ -521,17 +489,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // "practice" module) is still a real deep-link target: open the set.
     return firstBrainFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
   }, [initialModuleId, modules, resolution.accessibleModuleIds]);
-  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
-  // ── Notes: Firestore-backed, device-mirrored ─────────────────────────────
+  const progressCtl = useLocalCourseProgress(user?.id ?? null, String(storageProductId));
+  const completedIds = useMemo(() => new Set(progressCtl.data.completedFileIds), [progressCtl.data.completedFileIds]);
+  // ── Notes: device-first, background-backed ─────────────────────────────
   // One document per note at `users/{uid}/notes/{noteId}`, scoped by the SAME
   // namespaced id everything else in this player uses — so a learner-authored
   // course can never share notes with an official one, and one learner can
   // never see another's. `useCourseNotes` keeps a live Firestore listener plus
   // the localStorage mirror (`notesStore`) as the offline copy, so notes save
-  // on Firebase and render on every device.
+  // locally first and are backed up to Firebase in quiet batches.
   const notesCtl = useCourseNotes({ uid: user?.id ?? null, productId: storageProductId });
   const notes = notesCtl.notes;
-  const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
+  const lastOpenedFileId = progressCtl.data.lastOpenedFileId;
+  useEffect(() => {
+    if (progressCtl.error) toast({ title: "Device storage needs attention", description: progressCtl.error, variant: "error" });
+  }, [progressCtl.error]);
   // Every file the user has opened this session stays mounted behind the
   // active one, so switching modules never tears a player down.
   const [visitedFiles, setVisitedFiles] = useState<CourseFile[]>([]);
@@ -540,6 +512,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const [playbackReady, setPlaybackReady] = useState(false);
   // Bottom dock state — which of the seven footer tabs the study pane shows.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
+  const [studyExperiment, setStudyExperiment] = useState<{ file: CourseFile; personal: boolean } | null>(null);
+  const experimentOpenedRef = useRef(false);
+  useEffect(() => {
+    setStudyExperiment(null);
+    experimentOpenedRef.current = false;
+  }, [storageProductId]);
+
   // A hidden tab can never be the open one (a learner-authored course drops
   // the Paid tab): if the tab list ever loses the active tab, the pane falls
   // back to Modules instead of rendering an empty surface.
@@ -627,17 +606,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
-  // Footer navigation mode: ON = the always-visible in-pane dock (default,
-  // Player settings → "Always-visible footer dock"), OFF = the bottom-centre
-  // peek dock.
-  const [legacyFooterDock, setLegacyFooterDock] = useState<boolean>(loadLegacyFooterDock);
-  // Part 1 §6 / §25 — the player's genuine light/dark appearance and the
-  // Sketch "Clean / Optimised Look" are BOTH remembered, per-user preferences
-  // from the shared course-player preference layer (never CSS inversion).
+  // Appearance is light-only; other learning preferences remain user-specific.
   const playerThemeCtl = useCourseTheme("player", user?.id ?? null);
   const sketchCleanLookCtl = usePersistedBooleanPreference("sketchCleanLook", user?.id ?? null, false);
-  // Player settings → "Modern module listing": ON (the default when nothing
-  // has been saved) = modern module list + the landing page's animated
+  // Retain the saved module-list presentation after removing its settings toggle.
+  // Modern (the default when nothing has been saved) uses the animated
   // Gradient Waves behind the content area; OFF = classic list + the legacy
   // player backdrop. A saved choice is only ever read here, never re-written.
   const moduleListingStyleCtl = useModuleListingStyle(user?.id ?? null, DEFAULT_MODULE_LISTING_STYLE);
@@ -833,10 +806,34 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * `lastOpenedFileId` — official progress stays an honest record of the
    * official curriculum only.
    */
+  // Experiments belong to the study pane, never the lecture viewer stack.
+  // Reuse the access-filtered master list so this cannot bypass locked modules.
+  const openStudyExperiment = useCallback((file: CourseFile, personal = false) => {
+    if (!isExperimentFileType(file.type)) return;
+    personal = personal || String(file.source || "") === "personal";
+    if (!personal && !masterExperimentItems.some(item => item.file.id === file.id && !item.locked)) return;
+    experimentOpenedRef.current = true;
+    userSelectedRef.current = true;
+    setStudyExperiment({ file, personal });
+    setDockTab("experiment");
+    splitDeckRef.current?.activateStudy();
+  }, [masterExperimentItems]);
+
+  useEffect(() => {
+    if (studyExperiment && !studyExperiment.personal
+      && !masterExperimentItems.some(item => item.file.id === studyExperiment.file.id && !item.locked)) {
+      setStudyExperiment(null);
+    }
+  }, [masterExperimentItems, studyExperiment]);
+
   const selectPersonalFile = useCallback((file: CourseFile) => {
+    if (isExperimentFileType(file.type)) {
+      openStudyExperiment(file, true);
+      return;
+    }
     userSelectedRef.current = true;
     setSelectedFile(file);
-  }, []);
+  }, [openStudyExperiment]);
 
   const openPersonalModules = () => {
     setPersonalModulesOpen(true);
@@ -1320,9 +1317,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   });
 
   // ── Part 17: Structural Readiness Gate ─────────────────────────────────
-  // Wait for ALL critical data before showing the player. This prevents
-  // broken UI, flickering, and race conditions between Product A → B or
-  // Module A → B transitions.
+  // Only access and local resume block the lesson. Optional study tools
+  // hydrate independently; switching modules must not unmount the player.
   const readinessStages = useMemo(() => ({
     access: !accessState.loading,
     notes: !notesCtl.loading,
@@ -1330,8 +1326,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     sketch: !sketch.loading,
     playback: playbackReady,
   }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
-  
-  const isReady = Object.values(readinessStages).every(Boolean);
+
+  const isReady = readinessStages.access && readinessStages.playback;
+  useEffect(() => {
+    // Deep links can resolve before SplitDeck mounts; reveal the study pane
+    // once it exists, even if this device previously collapsed it.
+    if (isReady && studyExperiment) splitDeckRef.current?.activateStudy();
+  }, [isReady, studyExperiment]);
+
 
   // Detect orientation for the split axis (portrait = lesson above study,
   // landscape = lesson left of study). Comparing the live viewport as well as
@@ -1425,36 +1427,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     }
   }, [desktopView]);
 
-  // Footer dock mode is a per-device preference, like the rest of the player's.
-  useEffect(() => {
-    try {
-      localStorage.setItem(legacyFooterDockStorageKey, legacyFooterDock ? "1" : "0");
-    } catch {
-      /* private mode / storage disabled — keep the in-memory preference */
-    }
-  }, [legacyFooterDock]);
-
   useEffect(() => () => resetDocumentViewportMode(), []);
 
   // Progress lives under the SAME namespaced id: a learner-authored course
   // gets its own progress document, so completing a lesson they wrote can
   // never move an official course's percentage (and vice versa).
-  const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", storageProductId) : null), [storageProductId, user]);
-
-  useEffect(() => {
-    if (!user || !progressRef) return undefined;
-    const unsubscribeProgress = onSnapshot(progressRef, (snapshot) => {
-      const data = snapshot.data() || {};
-      setCompletedIds(new Set(Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : []));
-      setLastOpenedFileId(typeof data.lastOpenedFileId === "string" ? data.lastOpenedFileId : null);
-    });
-    return () => { unsubscribeProgress(); };
-  }, [progressRef, user]);
-
-  // Notes no longer live only on this device: `useCourseNotes` (mounted above)
-  // reads `users/{uid}/notes` live, mirrors every change to localStorage and
-  // pushes anything device-only back up — so an old local note migrates to
-  // Firebase on the first open after this change.
+  // Progress and resume are restored from the device immediately. The scoped
+  // outbox batches cloud backup without a live listener or server echo render.
 
   // ── Panel session reset on exit ─────────────────────────────────────────
   // While the player is open, the Notes and Mind Map panels keep their place
@@ -1509,16 +1488,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * player switches away from a module — that is what makes "come back and
    * continue from the same second" work.
    */
+  const playbackSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportPlayback = useCallback((fileId: string, patch: CoursePlaybackPatch) => {
     if (!fileId || !playbackPatchChanged(playbackRef.current[fileId], patch)) return;
     mergePlaybackEntry(playbackRef.current, fileId, patch);
-    if (user?.id) persistPlaybackStore(user.id, storageProductId, playbackRef.current);
+    if (user?.id && !playbackSaveTimer.current) {
+      const store = playbackRef.current;
+      playbackSaveTimer.current = setTimeout(() => {
+        playbackSaveTimer.current = null;
+        persistPlaybackStore(user.id, storageProductId, store);
+      }, 1500);
+    }
   }, [storageProductId, user]);
 
   // Flush the snapshot when the tab is hidden / closed so nothing is lost.
   useEffect(() => {
     if (!user?.id) return undefined;
-    const flush = () => persistPlaybackStore(user.id, storageProductId, playbackRef.current);
+    const store = playbackRef.current;
+    const flush = () => {
+      if (playbackSaveTimer.current) clearTimeout(playbackSaveTimer.current);
+      playbackSaveTimer.current = null;
+      persistPlaybackStore(user.id, storageProductId, store);
+    };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flush);
     return () => {
@@ -1529,7 +1520,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }, [storageProductId, user]);
 
   useEffect(() => {
-    if (selectedFile || playableFiles.length === 0) return;
+    if (selectedFile || experimentOpenedRef.current || playableFiles.length === 0) return;
     // A deep-linked module (hero slide tap) wins over "first lesson". The
     // official `files` lookup is tried first (it is the pinned, URL-backed
     // list), then the learner's own experiment, which has no URL at all.
@@ -1548,8 +1539,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       if (brainSets.some((set) => set.id === first.id)) openBrainSet(first.id);
       return;
     }
+    if (first && isExperimentFileType(first.type)) {
+      openStudyExperiment(first, String(first.source || "") === "personal");
+      return;
+    }
     if (first) setSelectedFile(first);
-  }, [files, playableFiles, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules, brainSets, openBrainSet]);
+  }, [files, playableFiles, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules, brainSets, openBrainSet, openStudyExperiment]);
 
   // Resume the last opened file when the Firestore listener delivers the id.
   // A deep-link open is the learner's explicit "take me to THIS module" intent,
@@ -1563,7 +1558,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // saved before a refund / lock change never reopens content the learner can
   // no longer reach.
   useEffect(() => {
-    if (!lastOpenedFileId || deepLinkFileId || userSelectedRef.current) return;
+    if (!lastOpenedFileId || deepLinkFileId || userSelectedRef.current || experimentOpenedRef.current) return;
     // Official lessons first (the pinned `files` lookup), then the learner's own
     // experiment — `playableFiles` is the union of both.
     const match = files.find((file) => file.id === lastOpenedFileId) ?? playableFiles.find((file) => file.id === lastOpenedFileId);
@@ -1581,8 +1576,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     const filePaidLocked = match.accessLevel === "paidUpdate"
       && Boolean(match.paidUpdateId)
       && !resolution.ownedUpdateIds.has(String(accessId(match)));
-    if (moduleAccessible && !filePaidLocked) setSelectedFile(match);
-  }, [files, playableFiles, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules, brainSets, openBrainSet]);
+    if (moduleAccessible && !filePaidLocked) {
+      if (isExperimentFileType(match.type)) openStudyExperiment(match, String(match.source || "") === "personal");
+      else setSelectedFile(match);
+    }
+  }, [files, playableFiles, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules, brainSets, openBrainSet, openStudyExperiment]);
 
   /**
    * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
@@ -1591,27 +1589,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * stays an honest reflection of what has actually been finished.
    */
   const toggleComplete = async () => {
-    if (!user || !selectedFile || !progressRef) return;
+    if (!user || !selectedFile) return;
     // Personal (My Modules) content never joins official completion.
     if (String(selectedFile.source || "") === "personal") return;
     const completing = !completedIds.has(selectedFile.id);
-    // Optimistic flip — the Firestore listener confirms it a moment later.
-    setCompletedIds((current) => {
-      const next = new Set(current);
-      if (completing) next.add(selectedFile.id);
-      else next.delete(selectedFile.id);
-      return next;
-    });
+    progressCtl.store.complete(selectedFile.id, completing);
+    progressCtl.store.open(selectedFile.id);
     if (completing) playSfxComplete();
     else playSfxRemove();
-    await setDoc(progressRef, {
-      productId: storageProductId,
-      completedFileIds: completing ? arrayUnion(selectedFile.id) : arrayRemove(selectedFile.id),
-      lastOpenedFileId: selectedFile.id,
-      lastOpenedAt: serverTimestamp(),
-      accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
   };
 
   /**
@@ -1727,18 +1712,17 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * pass cannot duplicate the id.
    */
   const markFileComplete = useCallback(async (fileId: string) => {
-    if (!user || !progressRef) return;
-    setCompletedIds((current) => (current.has(fileId) ? current : new Set([...current, fileId])));
-    await setDoc(progressRef, {
-      productId: storageProductId,
-      completedFileIds: arrayUnion(fileId),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  }, [storageProductId, progressRef, user]);
+    if (!user) return;
+    progressCtl.store.complete(fileId, true);
+  }, [progressCtl.store, user]);
 
   const selectFile = (file: CourseFile) => {
     setMindMapModuleOverride(null);
     setMasterMapKey(null);
+    if (isExperimentFileType(file.type)) {
+      openStudyExperiment(file, String(file.source || "") === "personal");
+      return;
+    }
     // A Brain resource is not a document to open — it is the practice set on
     // the Brain tab, so selecting it takes the learner there instead of
     // handing an un-viewable type to the viewer stack.
@@ -1758,8 +1742,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // the active dock tab if they want the lesson full-size.
     // Personal content (My Modules) never touches course progress — no
     // lastOpenedFileId, no resume entry, no completion ids.
-    if (user && progressRef && String(file.source || "") !== "personal") {
-      void setDoc(progressRef, { productId: storageProductId, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
+    if (user && String(file.source || "") !== "personal") {
+      progressCtl.store.open(file.id);
     }
   };
 
@@ -1960,14 +1944,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         if (next) enterCoursePlayerFullscreen();
         else exitCoursePlayerFullscreen();
       }}
-      legacyFooterDock={legacyFooterDock}
-      onLegacyFooterDockChange={setLegacyFooterDock}
-      playerTheme={playerThemeCtl.theme}
-      onPlayerThemeChange={playerThemeCtl.setTheme}
-      sketchCleanLook={sketchCleanLookCtl.value}
-      onSketchCleanLookChange={sketchCleanLookCtl.setValue}
-      moduleListingStyle={moduleListingStyleCtl.style}
-      onModuleListingStyleChange={moduleListingStyleCtl.setStyle}
       /**
        * The learner's OWN course: "Add to My Module", "Save for later" and
        * "Gate personal access" are all about OFFICIAL course resources (copy
@@ -2112,7 +2088,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     <CourseResourceLibrary
       modules={modules}
       courseTitle={product.title}
-      selectedFileId={selectedFile?.id}
+      selectedFileId={studyExperiment?.file.id ?? selectedFile?.id}
       completedFileIds={completedIds}
       accessibleModuleIds={resolution.accessibleModuleIds}
       ownedUpdateIds={resolution.ownedUpdateIds}
@@ -2287,10 +2263,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // borrows resources OUT of an official course) has no meaning here.
       personalModulesEntry={isMine ? null : personalModulesEntry}
       onOpenPersonalModules={openPersonalModules}
-      // PEEK mode: the footer navigation lives at the bottom centre of the
-      // whole player (<CoursePeekDock /> below), so the study pane renders no
-      // footer of its own. The legacy preference keeps the in-pane dock.
-      peekDock={!legacyFooterDock}
+      // One compact strip navigation below the split; no duplicate in-pane dock.
+      peekDock
       // ── Brain tab: the course's practice sets, rendered with the revision
       // test-taking design. Owned here because it reads the course tree and
       // reports completions into the learner's progress.
@@ -2321,10 +2295,34 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // learner's own (SELF). The parent owns the panel because it reads BOTH
       // the course tree and the Study Library shelf — and owns the “+” save,
       // so a created experiment is already on the shelf before the sheet
-      // closes. MASTER opens through `selectFile` (official progress);
-      // SELF through `selectPersonalFile`, which deliberately leaves course
-      // progress alone.
-      experimentPanel={
+      // closes. Both open in this study pane; only an accessible MASTER
+      // experiment can report official completion. The upper lesson stays put.
+      experimentPanel={studyExperiment ? (
+        <div className="flex h-full min-h-0 flex-col bg-white text-slate-900" data-course-study-experiment>
+          <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-3 py-2">
+            <button type="button" onClick={() => setStudyExperiment(null)}
+              className="min-h-9 shrink-0 rounded-lg border border-slate-300 px-3 text-xs font-bold focus-visible:outline-2 focus-visible:outline-indigo-600">
+              Back to experiments
+            </button>
+            <h2 className="min-w-0 truncate text-sm font-bold">{studyExperiment.file.name}</h2>
+          </div>
+          <div className="min-h-0 flex-1">
+            <ExperimentStage key={`${studyExperiment.personal ? "self" : "master"}-${studyExperiment.file.id}`}
+              html={studyExperiment.file.interactiveHtml || ""}
+              url={studyExperiment.file.url || ""}
+              title={studyExperiment.file.name}
+              active={dockTab === "experiment"}
+              onComplete={() => {
+                // SELF work never changes official course completion.
+                if (!studyExperiment.personal && !completedIds.has(studyExperiment.file.id)
+                  && masterExperimentItems.some(item => item.file.id === studyExperiment.file.id && !item.locked)) {
+                  void markFileComplete(studyExperiment.file.id);
+                }
+              }}
+            />
+          </div>
+        </div>
+      ) : (
         <ExperimentPanel
           masterExperiments={masterExperimentItems}
           selfExperiments={selfExperimentItems}
@@ -2341,12 +2339,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               else handleOpenMasterMap(`master-${experiment.id}`);
               return;
             }
-            if (source === "self") selectPersonalFile(experiment.file);
-            else selectFile(experiment.file);
+            openStudyExperiment(experiment.file, source === "self");
           }}
           uid={user?.id ?? null}
         />
-      }
+      )}
       aiPanel={
         user?.id && aiOpened ? (
           <Suspense
@@ -2399,21 +2396,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     <CourseKeyboardProvider scopeRef={playerShellRef}>
     <>
     {/* ── Part 17: Readiness Gate ─────────────────────────────────────────
-        Show a staged loading UI until all critical data is ready. This
-        prevents broken UI, flickering, and race conditions. */}
+        Show the reference animation while access and local resume resolve.
+        Optional study tools still hydrate independently. */}
     {!isReady && (
       <div
         className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]"
         data-course-player-loading
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
         data-course-theme={playerThemeCtl.theme}
       >
         <div className="flex flex-col items-center gap-4 px-6">
-          {/* Animated loading indicator */}
-          <div className="relative h-16 w-16">
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-white/10 border-t-violet-500" />
-            <div className="absolute inset-2 animate-spin rounded-full border-4 border-white/10 border-t-sky-400" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-          </div>
-          
+          <CourseLoadingDots />
+
           {/* Stage indicators */}
           <div className="flex flex-col items-center gap-2 text-sm text-white/70">
             <div className="font-semibold text-white">Loading course...</div>
@@ -2440,7 +2436,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         </div>
       </div>
     )}
-    
+
     {/* ── Main Player UI (only render when ready) ──────────────────────── */}
     {isReady && (
     <div
@@ -2547,7 +2543,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           </span>
         </button>
       </div>
-      
+
       {/* Runway animation keyframes */}
       <style>{`
         @keyframes runwayShimmer {
@@ -2618,17 +2614,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           />
         </div>
       ) : null}
-      {/* ── Footer navigation: the bottom-centre PEEK dock ────────────────
-          OFF by default (the owner's preferred interaction): a thin frosted
-          line at the bottom centre — tap/hover opens the footer, swipe
-          left/right selects the tab under the finger. The "Always-visible
-          footer dock" Player setting turns it off and restores the dock
-          inside the study pane.
-          The dock itself carries the ONE keyboard rule (it hides completely
-          while the keyboard is open — src/course/CoursePeekDock.tsx), so the
-          footer can never ride above the keyboard, between the keyboard and
-          the writing surface. */}
-      {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} /> : null}
+      {/* Direct study strips disappear when the soft keyboard is open. */}
+      <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} />
       {snowMode ? <SnowOverlay /> : null}
     </div>
     )}

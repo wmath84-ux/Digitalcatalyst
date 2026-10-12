@@ -50,7 +50,7 @@ import {
   type MindMap,
 } from "../../utils/mindMapTree";
 
-export type MindMapSaveStatus = "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+export type MindMapSaveStatus = "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
 
 /** One row of the module's map list — enough to render a card, nothing more. */
 export interface MindMapSummary {
@@ -114,7 +114,7 @@ export interface UseCourseMindMapResult {
 
 /** Debounce window: short enough to feel instant, long enough to coalesce a
  * burst of `+` taps into one write instead of one write per keystroke. */
-const DEFAULT_DEBOUNCE_MS = 700;
+const DEFAULT_DEBOUNCE_MS = 30000;
 
 const localKey = (uid: string, productId: string, moduleId: string, mapKey: string) =>
   `dc.mindMap.v1.${uid}.${productId}.${moduleId}.${sanitizeMapKey(mapKey)}`;
@@ -147,8 +147,8 @@ const readLocalMindMap = (key: string): LocalMap | null => {
 };
 
 const writeLocalMindMap = (key: string, mind: MindMap, updatedAt: number) => {
-  try { localStorage.setItem(key, JSON.stringify({ ...mind, updatedAt })); }
-  catch { /* private mode / quota — the live queue still writes Firestore */ }
+  try { localStorage.setItem(key, JSON.stringify({ ...mind, updatedAt })); return true; }
+  catch { return false; }
 };
 
 const readLocalIndex = (key: string): MindMapSummary[] => {
@@ -382,12 +382,15 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     draft.revision += 1;
     draft.updatedAt = Math.max(Date.now(), draft.updatedAt + 1);
     draft.hasLocal = true;
-    draft.status = "saving";
+    draft.status = "pending";
     draft.errorMessage = null;
     draft.attempts = 0;
     if (draft.retry) { clearTimeout(draft.retry); draft.retry = null; }
     scope.uploads.add(draft.mapKey);
-    writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), mind, draft.updatedAt);
+    if (!writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), mind, draft.updatedAt)) {
+      draft.status = "error";
+      draft.errorMessage = "Device storage is full or unavailable. Keep this page open and use Save now for cloud backup.";
+    }
     persistOutbox(scope);
     touchSummary(scope, draft);
     notify(scope);
@@ -789,7 +792,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   const status = session.listError && (active.status === "ready" || active.status === "idle") ? "error" : active.status;
   return useMemo(() => ({
     mind: active.mind, setMind, status, errorMessage: active.errorMessage || session.listError,
-    lastSavedAt: active.lastSavedAt, flush, loading: session.scoped && !active.loaded,
+    lastSavedAt: active.lastSavedAt, flush, loading: session.scoped && !active.loaded && !active.hasLocal,
     hasStoredMap: active.hasStoredMap, maps, activeMapKey: session.activeMapKey,
     selectMap, createMap, renameMap, deleteMap, mapsLoading: session.mapsLoading,
     atMapLimit: maps.length >= MAX_MAPS_PER_MODULE,

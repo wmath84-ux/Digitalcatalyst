@@ -138,15 +138,13 @@ function resolveRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>(RECALL_ROOT_SELECTOR);
 }
 
-export function applyTheme(theme: Theme): void {
+export function applyTheme(_theme: Theme): void {
   const root = resolveRoot();
   if (!root) return;
 
-  // Upstream: dark + high-contrast both mean "the dark token set"; the
-  // high-contrast token set layers on top through data-recall-contrast.
-  root.setAttribute("data-recall-theme", theme === "light" ? "light" : "dark");
-  root.setAttribute("data-recall-contrast", theme === "high-contrast" ? "high" : "normal");
-  root.style.colorScheme = theme === "high-contrast" ? "dark" : theme === "light" ? "light" : "dark";
+  root.setAttribute("data-recall-theme", "light");
+  root.setAttribute("data-recall-contrast", "normal");
+  root.style.colorScheme = "light";
   syncPortalTheme(root);
 }
 

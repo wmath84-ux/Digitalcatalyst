@@ -1,9 +1,7 @@
-import { Moon, Sun, Eye, Volume2, Mic, Languages } from "lucide-react";
+import { Volume2, Mic, Languages } from "lucide-react";
 import { useTranslation } from "../../shims/i18n";
 import { SettingsCard } from "./settings-card";
 import { useRecallStore } from "../../stores/recall-store";
-import { toast } from "../../shims/toast";
-import type { Theme } from "../../types";
 
 const LANGUAGES: { code: string; label: string; nativeLabel: string }[] = [
   { code: "en", label: "English", nativeLabel: "English" },
@@ -13,19 +11,9 @@ const LANGUAGES: { code: string; label: string; nativeLabel: string }[] = [
 export function AppearanceSection(): JSX.Element {
   const { t, i18n } = useTranslation();
   const settings = useRecallStore((state) => state.settings);
-  const setTheme = useRecallStore((state) => state.setTheme);
   const setAccentColor = useRecallStore((state) => state.setAccentColor);
   const setDyslexiaFont = useRecallStore((state) => state.setDyslexiaFont);
   const updateSettings = useRecallStore((state) => state.updateSettings);
-
-  async function handleTheme(theme: Theme): Promise<void> {
-    try {
-      await setTheme(theme);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast.error(t("settings.themeChangeFailed", { message }));
-    }
-  }
 
   function handleLanguageChange(code: string): void {
     i18n.changeLanguage(code);
@@ -35,38 +23,7 @@ export function AppearanceSection(): JSX.Element {
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <SettingsCard title={t("settings.appearance")}>
-        <div className="flex gap-2">
-          <button
-            onClick={() => void handleTheme("dark")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
-              settings.theme === "dark"
-                ? "bg-surface-container text-text-primary recall-dark:bg-surface-container recall-dark:text-text-primary"
-                : "text-on-surface-variant hover:bg-background recall-dark:hover:bg-surface-container/50"
-            }`}
-          >
-            <Moon className="h-4 w-4" /> {t("settings.themeDark")}
-          </button>
-          <button
-            onClick={() => void handleTheme("light")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
-              settings.theme === "light"
-                ? "bg-surface-container text-text-primary recall-dark:bg-surface-container recall-dark:text-text-primary"
-                : "text-on-surface-variant hover:bg-background recall-dark:hover:bg-surface-container/50"
-            }`}
-          >
-            <Sun className="h-4 w-4" /> {t("settings.themeLight")}
-          </button>
-          <button
-            onClick={() => void handleTheme("high-contrast")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
-              settings.theme === "high-contrast"
-                ? "bg-surface-container text-text-primary recall-dark:bg-surface-container recall-dark:text-text-primary"
-                : "text-on-surface-variant hover:bg-background recall-dark:hover:bg-surface-container/50"
-            }`}
-          >
-            <Eye className="h-4 w-4" /> {t("settings.themeHighContrast")}
-          </button>
-        </div>
+        <p className="text-sm">Light appearance</p>
 
         <div className="mt-4 space-y-2">
           <label className="text-xs font-medium text-on-surface-variant recall-dark:text-on-surface-variant">{t("settings.accentColor")}</label>

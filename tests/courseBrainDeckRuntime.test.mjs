@@ -270,7 +270,8 @@ test("the top card carries the question, its answers and the n/N counter only", 
     [...stage.querySelectorAll("button")].every((button) => button.hasAttribute("data-brain-option")),
     "every button in the deck is an answer — nothing navigates",
   );
-  assert.ok(stage.textContent.includes("Tap an answer to submit"), "the hint says what to do");
+  assert.ok(window.document.querySelector(".brain-practice-header").textContent.includes("Tap an answer to submit"), "the header says what to do");
+  assert.equal(stage.querySelector("[data-brain-deck-hint]"), null);
 
   mounted.unmount();
 });
@@ -355,12 +356,13 @@ test("a flick in any direction skips the question and shows the next card", asyn
 test("a weak drag is not a swipe: the card springs back and the question stays", async () => {
   const mounted = await mountAndStart();
 
-  await act(async () => {
-    const card = cardOf("0");
-    card.dispatchEvent(pointer("pointerdown", 200, 200));
-    card.dispatchEvent(pointer("pointermove", 220, 210));
-    card.dispatchEvent(pointer("pointerup", 220, 210));
-  });
+  const card = cardOf("0");
+  await act(async () => card.dispatchEvent(pointer("pointerdown", 200, 200)));
+  // A slow drag needs elapsed time; synchronous events describe a fast flick.
+  await settle(150);
+  await act(async () => card.dispatchEvent(pointer("pointermove", 220, 210)));
+  await settle(150);
+  await act(async () => card.dispatchEvent(pointer("pointerup", 220, 210)));
   await settle(300);
 
   assert.equal(queue(), "0", "the question is still the learner's");
@@ -385,7 +387,7 @@ test("a question swiped without an answer is skipped, not answered", async () =>
   assert.equal(screen(), "review", "the practice still reaches its review step");
   const tiles = [...panel().querySelectorAll("[data-brain-review-tile]")];
   assert.equal(tiles.length, 3);
-  const answered = tiles.filter((tile) => tile.style.background.includes("20, 19, 18"));
+  const answered = tiles.filter((tile) => tile.getAttribute("data-brain-answered") === "true");
   assert.equal(answered.length, 1, "only the answered question is marked answered");
   // …and the submit confirmation counts the two skips before it submits.
   await tap(actionNamed(/Submit Practice/));
@@ -435,8 +437,8 @@ test("the deck solves its own box, whatever the divider leaves", async () => {
     for (const observer of observers) if (observer.targets.has(deck())) observer.callback([], observer);
   });
   await settle();
-  assert.equal(stage.style.width, "281px", "72% of the pane");
-  assert.equal(stage.style.height, "373px", "the reference silhouette + the stack's peek strip");
+  assert.equal(stage.style.width, "362px", "pane width minus shadow gutter");
+  assert.equal(stage.style.height, "612px", "available height plus the stack peek");
 
   // The divider dragged wide: the deck re-solves from the same signal, and the
   // card grows — but it stays a card.
@@ -445,10 +447,10 @@ test("the deck solves its own box, whatever the divider leaves", async () => {
     for (const observer of observers) if (observer.targets.has(deck())) observer.callback([], observer);
   });
   await settle();
-  assert.equal(stage.style.width, "360px", "the card grows, but stays a card");
+  assert.equal(stage.style.width, "872px", "the card uses the enlarged pane");
   // The reference silhouette is the floor and the ceiling is the pane's own
   // height, so the card is the silhouette here — with its content centred.
-  assert.equal(stage.style.height, "452px");
+  assert.equal(stage.style.height, "672px");
 
   mounted.unmount();
 });
@@ -465,4 +467,29 @@ after(() => {
   for (const handle of process._getActiveHandles?.() ?? []) {
     if (handle?.constructor?.name === "MessagePort") handle.unref?.();
   }
+});
+
+
+test("the practice header back icon returns to the Brain library", async () => {
+  const mounted = await mountAndStart();
+  const back = window.document.querySelector('button[aria-label="Back to Brain"]');
+  assert.ok(back);
+  assert.ok(back.querySelector("svg"));
+  assert.ok(back.closest(".brain-practice-header"));
+  await tap(back);
+  assert.equal(deck(), null);
+  assert.ok(actionNamed(/Start practice/), "the Brain library is available again");
+  mounted.unmount();
+});
+
+test("advancing the stack preserves each question's own colour", async () => {
+  const mounted = await mountAndStart();
+  const secondTone = cardOf("1").getAttribute("data-brain-card-tone");
+  assert.notEqual(cardOf("0").getAttribute("data-brain-card-tone"), secondTone);
+  assert.notEqual(cardOf("2").getAttribute("data-brain-card-tone"), secondTone);
+  await tap(cardOf("0").querySelector('[data-brain-option="0"]'));
+  await settle(900);
+  assert.equal(queue(), "1");
+  assert.equal(cardOf("1").getAttribute("data-brain-card-tone"), secondTone);
+  mounted.unmount();
 });

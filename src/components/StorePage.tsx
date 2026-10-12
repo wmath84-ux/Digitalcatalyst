@@ -1,8 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect, useId } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { Search } from "lucide-react";
 import StoreProductCard from "./StoreProductCard";
+import { buildStoreShelves } from "../utils/storeShelves";
 import ContentDialog from "./ui/ContentDialog";
 import { useBranding } from "../context/BrandingContext";
 import {
@@ -10,6 +11,7 @@ import {
   type AdvancedFilters,
 } from "./StoreAdvancedFilters";
 import "./store-marketplace.css";
+import "./store-filter-radio.css";
 import useDragScroll from "../hooks/useDragScroll";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
@@ -46,6 +48,7 @@ export default function StorePage({
   const chipDrag = useDragScroll<HTMLDivElement>();
   const [filterOpen, setFilterOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const filterGroupName = useId();
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -207,19 +210,21 @@ export default function StorePage({
           data-store-filter-bar
           ref={chipDrag.ref}
           onPointerDown={chipDrag.onPointerDown}
-          className="dc-marketplace-chips"
-          role="group"
+          className="dc-marketplace-chips dc-store-radio-filters"
+          role="radiogroup"
           aria-label="Catalog categories"
         >
           {chips.map((filter) => (
-            <button
-              type="button"
-              key={filter.id}
-              aria-pressed={activeFilter.id === filter.id}
-              onClick={() => setActiveFilterId(filter.id)}
-            >
-              {filter.label}
-            </button>
+            <label key={filter.id} className="dc-store-radio-option">
+              <input
+                type="radio"
+                name={filterGroupName}
+                value={filter.id}
+                checked={activeFilter.id === filter.id}
+                onChange={() => setActiveFilterId(filter.id)}
+              />
+              <span>{filter.label}</span>
+            </label>
           ))}
         </div>
         <div className="dc-marketplace-toolbar">
@@ -342,19 +347,30 @@ export default function StorePage({
               viewMode === "mixed" ? "is-mixed" : ""
             }`}
           >
-            {filtered.map((product, index) =>
-              viewMode === "mixed" && index % 3 === 0 ? (
-                <div
-                  key={product.id}
-                  className="dc-marketplace-feature"
-                  data-store-mixed-feature
-                >
-                  {card(product, true)}
-                </div>
-              ) : (
-                card(product)
-              )
-            )}
+            {buildStoreShelves(filtered).map(({ offset, gridProducts, railProducts }, group) => {
+              const renderGridCard = (product: Product, index: number) =>
+                viewMode === "mixed" && index % 3 === 0 ? (
+                  <div key={product.id} className="dc-marketplace-feature" data-store-mixed-feature>
+                    {card(product, true)}
+                  </div>
+                ) : card(product);
+              return (
+                <Fragment key={gridProducts[0].id}>
+                  {gridProducts.map((product, index) => renderGridCard(product, offset + index))}
+                  {railProducts.length > 0 ? (
+                    <section className="dc-marketplace-shelf" aria-label={`Explore more resources ${group + 1}`}>
+                      <header className="dc-marketplace-shelf-heading">
+                        <div><p>KEEP EXPLORING</p><h2>More to learn, your way</h2></div>
+                        <span>{railProducts.length > 1 ? "Swipe to explore →" : "Explore next →"}</span>
+                      </header>
+                      <div className="dc-marketplace-shelf-track" tabIndex={0} aria-label="Scrollable products">
+                        {railProducts.map((product, index) => renderGridCard(product, offset + 4 + index))}
+                      </div>
+                    </section>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </div>
         )}
       </div>

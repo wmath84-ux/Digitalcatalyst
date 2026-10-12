@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Gauge, Heart, Moon, Search, Settings, Sun, Trophy, UserRound, X } from "lucide-react";
+import { Bell, Gauge, Heart, Search, Settings, Trophy, UserRound, X } from "lucide-react";
 import { PiHandWavingDuotone } from "react-icons/pi";
 import ExpandingTabs, { type ExpandingTabItem } from "../../components/ui/ExpandingTabs";
 import MobileHeaderMenu from "../../components/MobileHeaderMenu";
@@ -74,7 +74,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings, headerVariant = 'default', onToggleTheme, isDarkMode = true },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenSettings, headerVariant = 'default' },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -277,17 +277,6 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
-          {onToggleTheme && (
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-              title={isDarkMode ? "Light mode" : "Dark mode"}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 active:scale-95 min-[390px]:h-10 min-[390px]:w-10"
-            >
-              {isDarkMode ? <Sun className="h-4 w-4 min-[390px]:h-5 min-[390px]:w-5" /> : <Moon className="h-4 w-4 min-[390px]:h-5 min-[390px]:w-5" />}
-            </button>
-          )}
           {isPhoneLayout ? (
             <MobileHeaderMenu
               items={phoneMenuItems}
