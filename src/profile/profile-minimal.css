@@ -4,6 +4,10 @@
   --account-border: rgba(226, 232, 240, 0.12);
   --account-muted: #b1bbcb;
   --account-accent: #c1baff;
+  --account-edge: rgba(96, 165, 250, 0.3);
+  --account-edge-strong: rgba(96, 165, 250, 0.72);
+  --account-surface: rgba(17, 23, 36, 0.72);
+  --account-hover: rgba(59, 130, 246, 0.08);
   color: #f8fafc;
   background: #0a0e18;
   text-shadow: none;
@@ -73,3 +77,135 @@
 .dc-account-preference-icon { display: none; }
 @media (min-width: 640px) { .dc-account-facts { grid-template-columns: repeat(3, minmax(0,1fr)); } .dc-account-actions .dc-account-primary { width: auto; min-width: 12rem; } }
 @media (max-width: 359px) { .dc-account-identity { gap: 0.875rem; } .dc-account-photo-action, .dc-account-photo-action img, .dc-account-avatar { width: 4rem; min-width: 4rem; } .dc-account-photo-action img, .dc-account-avatar { height: 4rem; } .dc-account-identity-copy h2 { font-size: 1.25rem; } }
+
+/* Account surfaces keep the PDP's composed, high-contrast language: one fine
+   cool-blue edge, restrained shading and no nested glass-card treatment. */
+[data-account-profile] .dc-account-header h1::after {
+  display: block;
+  width: 3.25rem;
+  height: 3px;
+  margin-top: 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.2);
+  content: "";
+}
+
+[data-account-profile] .dc-account-identity {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(0.875rem, 2.8vw, 1.25rem);
+  border: 1px solid var(--account-edge);
+  border-radius: 16px;
+  background: var(--account-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 32px -30px rgba(2, 6, 16, 0.9);
+}
+
+[data-account-profile] .dc-account-identity::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 16px 0 0 16px;
+  background: linear-gradient(180deg, #60a5fa, #8b7cf6);
+  content: "";
+}
+
+[data-account-profile] .dc-account-photo-action img,
+[data-account-profile] .dc-account-avatar {
+  border: 1px solid rgba(147, 197, 253, 0.38);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08), 0 8px 20px -14px rgba(2, 6, 16, 0.85);
+}
+
+[data-account-profile] .dc-account-identity-copy h2 {
+  color: #f8fbff;
+}
+
+[data-account-profile] .dc-account-stats {
+  overflow: hidden;
+  border: 1px solid var(--account-edge);
+  border-radius: 14px;
+  background: var(--account-surface);
+  box-shadow: 0 14px 28px -30px rgba(2, 6, 16, 0.9);
+}
+
+[data-account-profile] .dc-account-stats button {
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+[data-account-profile] .dc-account-stats button:hover {
+  background: var(--account-hover);
+}
+
+[data-account-profile] .dc-account-stats strong {
+  color: #eaf4ff;
+}
+
+[data-account-profile] .dc-account-section {
+  position: relative;
+  padding-top: 1.4rem;
+  border-top: 0;
+}
+
+[data-account-profile] .dc-account-section::before {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--account-edge-strong), var(--account-border) 30%, transparent 100%);
+  content: "";
+}
+
+[data-account-profile] .dc-account-section-header h2 {
+  letter-spacing: -0.015em;
+}
+
+[data-account-profile] .dc-account-status {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--account-edge);
+  border-radius: 999px;
+  background: var(--account-hover);
+}
+
+[data-account-profile] .dc-account-status.is-active {
+  border-color: rgba(74, 222, 128, 0.24);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+[data-account-profile] .dc-account-status.is-expired {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+[data-account-profile] .dc-account-link-list li {
+  border-bottom-color: var(--account-border);
+}
+
+[data-account-profile] .dc-account-link-list button {
+  border-radius: 10px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+[data-account-profile] .dc-account-link-list button:hover {
+  background: var(--account-hover);
+}
+
+[data-account-profile] .dc-account-disclosure {
+  padding-inline: 0.5rem;
+  border-top-color: var(--account-border);
+}
+
+[data-account-profile] .dc-account-disclosure[open] {
+  border-top-color: var(--account-edge-strong);
+}
+
+[data-account-profile] .dc-account-disclosure summary:hover {
+  color: #dbeafe;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-account-profile] .dc-account-stats button,
+  [data-account-profile] .dc-account-link-list button { transition-duration: 1ms; }
+}

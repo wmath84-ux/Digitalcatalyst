@@ -25,3 +25,136 @@
 .dc-usage-browser-row strong { font-size: 0.875rem; font-weight: 650; overflow-wrap: anywhere; }
 [data-usage-limits-page] button:focus-visible, [data-usage-limits-page] summary:focus-visible { outline: 2px solid var(--account-accent); outline-offset: 3px; border-radius: 4px; }
 @media (min-width: 900px) { [data-usage-limits-grid] { grid-template-columns: repeat(2,minmax(0,1fr)) !important; } }
+
+/* Usage Limits: each allowance is one outlined information surface, rather
+   than a stack of nested cards. Blue rules mirror the PDP's precise framing. */
+[data-usage-limits-page] .dc-account-header h1::after {
+  display: block;
+  width: 3.25rem;
+  height: 3px;
+  margin-top: 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.2);
+  content: "";
+}
+
+[data-usage-limits-page] .dc-usage-header > button {
+  border: 1px solid var(--account-border);
+  border-radius: 999px;
+  padding-inline: 0.75rem;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+[data-usage-limits-page] .dc-usage-header > button:hover {
+  border-color: var(--account-edge);
+  background: var(--account-hover);
+}
+
+[data-usage-limits-page] .dc-usage-section {
+  position: relative;
+  padding: 1.1rem;
+  border: 1px solid var(--account-border);
+  border-radius: 14px;
+  background: var(--account-surface);
+  box-shadow: 0 16px 34px -32px rgba(2, 6, 16, 0.9);
+}
+
+[data-usage-limits-page] .dc-usage-section::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, #60a5fa, rgba(96, 165, 250, 0.12) 72%, transparent);
+  content: "";
+}
+
+[data-usage-limits-page] .dc-usage-section-header {
+  align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--account-border);
+}
+
+[data-usage-limits-page] .dc-usage-section-header h2 {
+  color: #f8fbff;
+  font-size: 1.1rem;
+  letter-spacing: -0.015em;
+}
+
+[data-usage-limits-page] .dc-usage-state {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--account-edge);
+  border-radius: 999px;
+  background: var(--account-hover);
+  color: #cfe7ff;
+  font-size: 0.75rem;
+}
+
+[data-usage-limits-page] .dc-usage-metric {
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--account-edge);
+}
+
+[data-usage-limits-page] .dc-usage-metric header h3 {
+  color: #d9eafe;
+}
+
+[data-usage-limits-page] .dc-usage-metric header strong {
+  color: #eaf4ff;
+}
+
+[data-usage-limits-page] .dc-usage-metric progress {
+  border: 1px solid rgba(147, 197, 253, 0.18);
+  background: #172233;
+  accent-color: #60a5fa;
+}
+
+[data-usage-limits-page] .dc-usage-metric progress::-webkit-progress-bar {
+  background: #172233;
+}
+
+[data-usage-limits-page] .dc-usage-metric progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #3b82f6, #93c5fd);
+}
+
+[data-usage-limits-page] .dc-usage-metric progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #3b82f6, #93c5fd);
+}
+
+[data-usage-limits-page] .dc-account-disclosure {
+  margin-top: 0;
+  padding-inline: 0.9rem;
+  border: 1px solid var(--account-border);
+  border-radius: 12px;
+  background: var(--account-surface);
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+[data-usage-limits-page] .dc-account-disclosure[open] {
+  border-color: var(--account-edge-strong);
+}
+
+[data-usage-limits-page] .dc-account-disclosure summary {
+  color: #d9eafe;
+}
+
+[data-usage-limits-page] .dc-account-disclosure summary:hover {
+  color: #ffffff;
+}
+
+[data-usage-limits-page] .dc-usage-rules-list {
+  padding: 0.2rem 0 0.9rem 1.1rem;
+  list-style: disc;
+}
+
+@media (max-width: 420px) {
+  [data-usage-limits-page] .dc-usage-section { padding: 0.9rem; }
+  [data-usage-limits-page] .dc-usage-section-header { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-usage-limits-page] .dc-usage-header > button,
+  [data-usage-limits-page] .dc-account-disclosure { transition-duration: 1ms; }
+}

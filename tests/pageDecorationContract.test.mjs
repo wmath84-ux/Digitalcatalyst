@@ -1,0 +1,46 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const read = (path) => fs.readFileSync(path, "utf8");
+const homeHeader = read("src/home/components/Header.tsx");
+const homeStyles = read("src/home/home.css");
+const storeStyles = read("src/components/store-marketplace.css");
+const purchasesStyles = read("src/components/purchases-minimal.css");
+const profileStyles = read("src/profile/profile-minimal.css");
+const usageStyles = read("src/usage/usage-minimal.css");
+const lightStyles = read("src/light-theme-pages.css");
+
+test("Home header search has a visible blue edge with hover and keyboard focus feedback", () => {
+  assert.match(homeHeader, /data-home-search-slot/);
+  assert.match(homeStyles, /\[data-app-frame\] > \[data-home-header\] \[data-home-search-slot\] \.dc-scene-field/);
+  assert.match(homeStyles, /border:\s*1\.5px solid var\(--dc-home-search-edge\)/);
+  assert.match(homeStyles, /\[data-search-launcher\]:focus-within \.dc-scene-field/);
+  assert.match(homeStyles, /--dc-home-search-edge:\s*rgba\(125, 190, 255, 0\.95\)/);
+  assert.match(homeStyles, /--dc-home-search-edge:\s*rgba\(37, 99, 235, 0\.92\)/);
+});
+
+test("Store and My Purchases have responsive, interactive PDP-style framing", () => {
+  assert.match(storeStyles, /\.dc-marketplace-heading::after/);
+  assert.match(storeStyles, /\.dc-marketplace-search:focus-within/);
+  assert.match(storeStyles, /\.dc-marketplace-card:hover/);
+  assert.match(purchasesStyles, /\[data-purchases-page\] \.dc-account-header h1::after/);
+  assert.match(purchasesStyles, /\.dc-purchases-search:focus-within/);
+  assert.match(purchasesStyles, /\.dc-purchases-row:hover/);
+});
+
+test("Profile and Usage Limits stay scoped, readable and motion-aware", () => {
+  assert.match(profileStyles, /\[data-account-profile\] \.dc-account-identity::before/);
+  assert.match(profileStyles, /\[data-account-profile\] \.dc-account-section::before/);
+  assert.match(profileStyles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(usageStyles, /\[data-usage-limits-page\] \.dc-usage-section::before/);
+  assert.match(usageStyles, /progress::-webkit-progress-value/);
+  assert.match(usageStyles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(profileStyles, /<GlassCard|<GlassSurface/);
+});
+
+test("light theme keeps the new outlines legible on paper surfaces", () => {
+  assert.match(lightStyles, /html\[data-theme="light"\] \.dc-purchases-row/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \[data-usage-limits-page\] \.dc-usage-section/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \.dc-marketplace-control/);
+});

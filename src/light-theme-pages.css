@@ -658,6 +658,152 @@ html[data-theme="light"] .dc-marketplace-purchase-state { color: var(--dc-succes
 html[data-theme="light"] .dc-marketplace-skeleton { background: var(--dc-bg-muted-2); }
 html[data-theme="light"] .dc-marketplace-state p { color: var(--dc-ink-3); }
 html[data-theme="light"] .dc-marketplace-text-action { color: var(--dc-brand-ink); }
+html[data-theme="light"] .dc-marketplace-search {
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+html[data-theme="light"] .dc-marketplace-search:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+html[data-theme="light"] .dc-marketplace-control {
+  border-color: var(--dc-line-strong);
+  background: var(--dc-bg-muted);
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-marketplace-control:hover {
+  border-color: rgba(37, 99, 235, 0.42);
+}
+html[data-theme="light"] .dc-marketplace-chips button:not([aria-pressed="true"]) {
+  border-color: transparent;
+  background: rgba(15, 23, 42, 0.035);
+}
+html[data-theme="light"] .dc-marketplace-chips button:not([aria-pressed="true"]):hover {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.05);
+}
+html[data-theme="light"] .dc-marketplace-state {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(37, 99, 235, 0.035);
+}
+
+/* My Purchases keeps the cool-blue outline while its panels become paper. */
+html[data-theme="light"] .dc-purchases-search {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+html[data-theme="light"] .dc-purchases-search:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+html[data-theme="light"] .dc-purchases-search input {
+  border: 0;
+  background: transparent;
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-purchases-row {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-secondary);
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] .dc-purchases-row:hover {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #ffffff;
+}
+html[data-theme="light"] .dc-purchases-title,
+html[data-theme="light"] .dc-purchases-empty,
+html[data-theme="light"] .dc-purchases-empty h2 {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-purchases-scope,
+html[data-theme="light"] .dc-purchases-copy small {
+  color: var(--dc-ink-3);
+}
+html[data-theme="light"] .dc-purchases-row > button:hover .dc-purchases-title {
+  color: #003ea8;
+}
+html[data-theme="light"] [data-purchases-page] .dc-purchases-row img,
+html[data-theme="light"] .dc-purchases-image-fallback {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted-2);
+  color: var(--dc-accent-ink);
+}
+html[data-theme="light"] .dc-purchases-empty {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(37, 99, 235, 0.025);
+}
+html[data-theme="light"] .dc-purchases-loading {
+  border-color: rgba(37, 99, 235, 0.16);
+  background: linear-gradient(90deg, #e8edf5, #f4f7fc, #e8edf5);
+  background-size: 200% 100%;
+}
+html[data-theme="light"] [data-account-profile] .dc-account-stats strong {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-identity {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 12px 28px -24px rgba(15, 23, 42, 0.22);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-identity-copy h2 {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-section::before {
+  background: linear-gradient(90deg, rgba(0, 74, 198, 0.58), var(--account-border) 30%, transparent 100%);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-status {
+  background: rgba(0, 74, 198, 0.055);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-status.is-active {
+  background: rgba(0, 98, 67, 0.06);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-status.is-expired {
+  background: rgba(133, 83, 0, 0.06);
+}
+html[data-theme="light"] [data-account-profile] .dc-account-disclosure summary:hover {
+  color: #003ea8;
+}
+
+/* Usage cards are the page's only panels; all nested details stay open and legible. */
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-section {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-section::before {
+  background: linear-gradient(90deg, #2563eb, rgba(37, 99, 235, 0.1) 72%, transparent);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-section-header h2,
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-metric header h3,
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-metric header strong {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-state {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(37, 99, 235, 0.06);
+  color: #003ea8;
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-metric progress {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: #e5eaf2;
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-usage-metric progress::-webkit-progress-bar {
+  background: #e5eaf2;
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-account-disclosure {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.78);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-account-disclosure[open] {
+  border-color: rgba(37, 99, 235, 0.34);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-account-disclosure summary {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-usage-limits-page] .dc-account-disclosure summary:hover {
+  color: #003ea8;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    14. HOME (home.css + home/components, incl. the social profile card)
