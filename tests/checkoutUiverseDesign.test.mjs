@@ -103,9 +103,14 @@ test("an individual purchase lists every module with its own price tag", () => {
   for (const kind of ["selected_modules", "selected_resources", "paid_update"]) {
     assert.match(
       review,
-      new RegExp(`<CheckoutModuleList kind="${kind}" lines=\\{lineItemsForDisplay\\} />`)
+      new RegExp(`<CheckoutModuleList\\s+kind="${kind}"\\s+lines=\\{linesOfKind\\("${kind}"\\)\\}`)
     );
   }
+  // The list is the record of the order, so an already-owned module stays in it
+  // (tagged ₹0) instead of disappearing from the list the buyer is checking.
+  assert.match(review, /const linesOfKind = \(kind: CheckoutLineItem\["kind"\]\) =>/);
+  assert.match(review, /lineItems\.filter\(\(line\) => line\.kind === kind\)/);
+  assert.match(cartList, /"Already owned · ₹0"/);
   // A scoped purchase never renders the cart rows for the whole course.
   assert.match(review, /productLines\.length > 0 && kind !== "cart_bundle"/);
 });
@@ -142,9 +147,13 @@ test("the success screen plays the animation and then the receipt, in order", ()
   assert.match(success, /<CheckoutSuccessAnimation/);
   assert.match(success, /primaryLabel="View receipt"/);
   assert.match(success, /onPrimary=\{\(\) => setShowReceipt\(true\)\}/);
-  // The receipt only mounts on the second beat, so the two never share the screen.
-  assert.match(success, /\{showReceipt \? \(/);
+  // The receipt is built with the verified order but is not painted until the
+  // second beat — `display: none` until then — so the two never share the
+  // screen while the record is already complete in the DOM.
+  assert.match(success, /style=\{\{ display: showReceipt \? undefined : "none" \}\}/);
+  assert.match(success, /animate=\{showReceipt \? \{ opacity: 1, y: 0 \} : \{ opacity: 0, y: 12 \}\}/);
   assert.match(success, /data-checkout-success-receipt/);
+  assert.equal((success.match(/data-checkout-success-receipt\b/g) || []).length, 1, "one receipt hook");
   // The reference animation itself: the pulsing 3rem plate over the 2rem glyph.
   assert.match(animation, /cu-success-plate/);
   assert.match(css, /@keyframes cuSuccessPulse/);

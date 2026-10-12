@@ -173,6 +173,11 @@ export default function CheckoutReviewStep({
   const moduleLines = lineItemsForDisplay.filter((line) => line.kind === "selected_modules");
   const resourceLines = lineItemsForDisplay.filter((line) => line.kind === "selected_resources");
   const updateLines = lineItemsForDisplay.filter((line) => line.kind === "paid_update");
+  // The cart-card module list is the record of what this order contains, so it
+  // keeps an already-owned line in place — tagged "Already owned · ₹0" — rather
+  // than letting it vanish from the list the buyer is checking.
+  const linesOfKind = (kind: CheckoutLineItem["kind"]) =>
+    lineItems.filter((line) => line.kind === kind);
   const subscriptionPlanLines = lineItemsForDisplay.filter((line) => line.kind === "subscription");
   const subscriptionAddonLines = lineItemsForDisplay.filter(
     (line) => line.kind === "subscription_features"
@@ -261,16 +266,19 @@ export default function CheckoutReviewStep({
           ) : null}
 
           {kind === "selected_modules" ? (
-            <CheckoutModuleList kind="selected_modules" lines={lineItemsForDisplay} />
+            <CheckoutModuleList kind="selected_modules" lines={linesOfKind("selected_modules")} />
           ) : null}
 
           {kind === "selected_resources" ? (
-            <CheckoutModuleList kind="selected_resources" lines={lineItemsForDisplay} />
+            <CheckoutModuleList
+              kind="selected_resources"
+              lines={linesOfKind("selected_resources")}
+            />
           ) : null}
 
           {kind === "paid_update" ? (
             <>
-              <CheckoutModuleList kind="paid_update" lines={lineItemsForDisplay} />
+              <CheckoutModuleList kind="paid_update" lines={linesOfKind("paid_update")} />
               {/* An update is priced as one package, so its included modules are
                   named without a second price tag beside them. */}
               {updateLines.flatMap((line) => line.detailItems || []).length > 0 ? (
@@ -357,9 +365,10 @@ export default function CheckoutReviewStep({
           ) : null}
           {couponDiscount > 0 ? (
             <PriceRow
-              label={`Discount through applied coupons${
-                quote.couponIsReferral ? " (referral)" : ""
-              }${quote.couponCode ? ` · ${quote.couponCode}` : ""}`}
+              label={`${quote.couponIsReferral ? "Referral discount" : "Coupon discount"}${
+                quote.couponCode ? ` (${quote.couponCode})` : ""
+              }`}
+              note="Discount through applied coupons"
               value={-couponDiscount}
               negative
             />
