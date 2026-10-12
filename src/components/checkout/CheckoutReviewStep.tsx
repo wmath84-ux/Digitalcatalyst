@@ -834,46 +834,46 @@ export function SubscriptionUnlocksCard({
       ) : (
         <p className="dc-checkout-note">No features in this selection.</p>
       )}
-      <h3 className="mt-4" data-checkout-subscription-products-count={selectedProductRows.length}>
-        Products ({selectedProductRows.length}
-        {planUnlockRows.length ? ` + ${planUnlockRows.length} included` : ""})
-      </h3>
       {selectedProductRows.length || planUnlockRows.length ? (
-        <ul>
-          {selectedProductRows.map((row) => (
-            <li
-              key={row.id}
-              data-checkout-subscription-product={row.id}
-              className="dc-checkout-item"
-            >
-              <div className="dc-checkout-item-copy">
-                <h3>{row.name}</h3>
-                {row.alreadyOwned ? (
-                  <p className="dc-checkout-note">Already purchased · No charge</p>
-                ) : null}
-              </div>
-              <strong className="dc-checkout-item-price">
-                {formatRupee(row.alreadyOwned ? 0 : row.pricePaise)}
-              </strong>
-            </li>
-          ))}
-          {planUnlockRows.map((row) => (
-            <li
-              key={row.id}
-              data-checkout-subscription-plan-unlock={row.id}
-              className="dc-checkout-item"
-            >
-              <div className="dc-checkout-item-copy">
-                <h3>{row.name}</h3>
-                <p className="dc-checkout-note">Included with plan</p>
-              </div>
-              <strong className="dc-checkout-item-price">₹0</strong>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="dc-checkout-note">No products in this selection.</p>
-      )}
+        <>
+          <h3 className="mt-4" data-checkout-subscription-products-count={selectedProductRows.length}>
+            Products ({selectedProductRows.length}
+            {planUnlockRows.length ? ` + ${planUnlockRows.length} included` : ""})
+          </h3>
+          <ul>
+            {selectedProductRows.map((row) => (
+              <li
+                key={row.id}
+                data-checkout-subscription-product={row.id}
+                className="dc-checkout-item"
+              >
+                <div className="dc-checkout-item-copy">
+                  <h3>{row.name}</h3>
+                  {row.alreadyOwned ? (
+                    <p className="dc-checkout-note">Already purchased · No charge</p>
+                  ) : null}
+                </div>
+                <strong className="dc-checkout-item-price">
+                  {formatRupee(row.alreadyOwned ? 0 : row.pricePaise)}
+                </strong>
+              </li>
+            ))}
+            {planUnlockRows.map((row) => (
+              <li
+                key={row.id}
+                data-checkout-subscription-plan-unlock={row.id}
+                className="dc-checkout-item"
+              >
+                <div className="dc-checkout-item-copy">
+                  <h3>{row.name}</h3>
+                  <p className="dc-checkout-note">Included with plan</p>
+                </div>
+                <strong className="dc-checkout-item-price">₹0</strong>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {moduleRows.length ? (
         <>
           <h3 className="mt-4" data-checkout-subscription-modules-count={moduleRows.length}>

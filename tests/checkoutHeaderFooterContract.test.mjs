@@ -96,3 +96,13 @@ test("system Back from the payment step returns to the recent page, not the app 
   assert.doesNotMatch(checkoutApp, /eduvoraCheckoutPayment/);
   assert.doesNotMatch(checkoutApp, /history\.pushState\(\{ \[\s\S]*eduvoraCheckoutPayment/);
 });
+
+
+test("switching checkout steps resets the inner scroller immediately", () => {
+  // A smooth reset briefly paints the incoming step at the previous scroll
+  // offset, making its first card appear clipped behind the fixed progress rail.
+  assert.match(
+    checkoutApp,
+    /scrollRef\.current\?\.scrollTo\(\{ top: 0, behavior: "auto" \}\)/
+  );
+});

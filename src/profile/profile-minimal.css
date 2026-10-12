@@ -209,3 +209,699 @@
   [data-account-profile] .dc-account-stats button,
   [data-account-profile] .dc-account-link-list button { transition-duration: 1ms; }
 }
+
+
+/* ── Profile page polish · identity, membership and account tools ────────────
+   Presentation-only. Keep account data, membership status, entitlement counts,
+   billing, photo uploads, settings, library routes and logout logic unchanged.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-account-profile] {
+  --account-border: rgba(100, 116, 139, 0.18);
+  --account-muted: #647084;
+  --account-accent: #004ac6;
+  --account-edge: rgba(37, 99, 235, 0.22);
+  --account-edge-strong: rgba(37, 99, 235, 0.56);
+  --account-surface: rgba(255, 255, 255, 0.94);
+  --account-hover: rgba(37, 99, 235, 0.055);
+  padding: clamp(1.15rem, 3.2vw, 1.8rem) clamp(0.25rem, 1vw, 0.75rem) 1.1rem;
+  color: #172033;
+}
+
+[data-account-profile] .dc-account-header {
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.35rem;
+}
+
+[data-account-profile] .dc-account-header h1 {
+  font-size: clamp(1.85rem, 5.8vw, 2.25rem);
+  font-weight: 820;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+[data-account-profile] .dc-account-header h1::after {
+  width: 3.5rem;
+  height: 4px;
+  margin-top: 0.72rem;
+  background: linear-gradient(90deg, #60a5fa, #8b82f6);
+  box-shadow: none;
+}
+
+[data-account-profile] [data-profile-settings] {
+  min-height: 2.65rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.045);
+  color: #004ac6;
+  font-size: 0.875rem;
+  font-weight: 750;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+[data-account-profile] [data-profile-settings]:hover {
+  border-color: rgba(37, 99, 235, 0.32);
+  background: rgba(37, 99, 235, 0.09);
+  transform: translateY(-1px);
+}
+
+[data-account-profile] .dc-account-identity {
+  display: grid;
+  grid-template-columns: 5.4rem minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(0.9rem, 3vw, 1.2rem);
+  padding: clamp(1rem, 3vw, 1.35rem);
+  border: 1px solid rgba(100, 116, 139, 0.16);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px -23px rgba(15, 23, 42, 0.27), 0 2px 5px -4px rgba(15, 23, 42, 0.14);
+}
+
+[data-account-profile] .dc-account-identity::before {
+  width: 3px;
+  background: linear-gradient(180deg, #60a5fa, #8b82f6);
+}
+
+[data-account-profile] .dc-account-photo-action {
+  width: 5.4rem;
+  min-width: 5.4rem;
+  gap: 0.55rem;
+  justify-items: center;
+  color: #004ac6;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+[data-account-profile] .dc-account-photo-action img,
+[data-account-profile] .dc-account-avatar {
+  width: 5.2rem;
+  height: 5.2rem;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.06), 0 8px 18px -13px rgba(15, 23, 42, 0.28);
+}
+
+[data-account-profile] .dc-account-avatar {
+  background: linear-gradient(145deg, #eaf2ff, #d9e8ff);
+  color: #004ac6;
+  font-size: 1.65rem;
+}
+
+[data-account-profile] .dc-account-identity-copy {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  gap: 0.22rem;
+}
+
+[data-account-profile] .dc-account-identity-copy h2 {
+  color: #172033;
+  font-size: clamp(1.18rem, 4.5vw, 1.65rem);
+  font-weight: 820;
+  letter-spacing: -0.035em;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+[data-account-profile] .dc-account-email {
+  margin-top: 0.25rem;
+  color: #475569;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+[data-account-profile] .dc-account-identity-copy .dc-account-note {
+  margin-top: 0.2rem;
+  color: #647084;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+[data-account-profile] [data-profile-edit] {
+  width: fit-content;
+  min-height: 2.5rem;
+  margin-top: 0.1rem;
+  padding: 0.35rem 0;
+  color: #004ac6;
+  font-size: 0.875rem;
+  font-weight: 750;
+}
+
+[data-account-profile] .dc-account-stats {
+  overflow: hidden;
+  margin-block: 1.15rem 1.4rem;
+  padding: 0.45rem 0;
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 26px -24px rgba(15, 23, 42, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-account-profile] .dc-account-stats button {
+  min-height: 5rem;
+  gap: 0.35rem;
+  padding-inline: 0.25rem;
+  border-radius: 12px;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+[data-account-profile] .dc-account-stats button:active {
+  transform: scale(0.98);
+}
+
+[data-account-profile] .dc-account-stats button + button {
+  border-left-color: rgba(100, 116, 139, 0.18);
+  border-radius: 0;
+}
+
+[data-account-profile] .dc-account-stats strong {
+  color: #172033;
+  font-size: clamp(1.4rem, 4.4vw, 1.65rem);
+  font-weight: 820;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+[data-account-profile] .dc-account-stats span {
+  color: #647084;
+  font-size: 0.82rem;
+  font-weight: 550;
+}
+
+[data-account-profile] .dc-account-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+[data-account-profile] .dc-account-section::before {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.32), rgba(100, 116, 139, 0.14) 45%, transparent);
+}
+
+/* Membership is one primary information surface; entitlements stay data-led. */
+[data-account-profile] [data-profile-membership-card] {
+  margin-top: 0.1rem;
+  padding: 1.15rem;
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 12px 26px -24px rgba(15, 23, 42, 0.25), 0 2px 4px -4px rgba(15, 23, 42, 0.14);
+}
+
+[data-account-profile] [data-profile-membership-card]::before {
+  height: 3px;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(90deg, #60a5fa, #8b82f6 70%, rgba(139, 130, 246, 0.08));
+}
+
+[data-account-profile] [data-profile-membership-card] > .dc-account-section-header {
+  align-items: flex-start;
+  margin-bottom: 0.9rem;
+  gap: 0.75rem;
+}
+
+[data-account-profile] [data-profile-membership-card] .dc-account-section-header h2 {
+  color: #172033;
+  font-size: 1.25rem;
+  font-weight: 820;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+[data-account-profile] .dc-account-plan-name {
+  margin-top: 0.4rem;
+  color: #334155;
+  font-size: 1rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+[data-account-profile] .dc-account-status {
+  min-height: 1.85rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+[data-account-profile] .dc-account-status.is-active {
+  border-color: rgba(5, 150, 105, 0.18);
+  background: #eaf7f1;
+  color: #087451;
+}
+
+[data-account-profile] .dc-account-status.is-expired {
+  border-color: rgba(180, 83, 9, 0.2);
+  background: #fff5e8;
+  color: #92400e;
+}
+
+[data-account-profile] .dc-account-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+[data-account-profile] .dc-account-facts > div {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(100, 116, 139, 0.12);
+  border-radius: 13px;
+  background: #f7f9fc;
+}
+
+[data-account-profile] .dc-account-facts dt {
+  color: #647084;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+[data-account-profile] .dc-account-facts dd {
+  margin-top: 0.35rem;
+  color: #172033;
+  font-size: 0.95rem;
+  font-weight: 780;
+  letter-spacing: -0.015em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+[data-account-profile] [data-renewal-card] {
+  margin-top: 1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(100, 116, 139, 0.16);
+}
+
+[data-account-profile] [data-renewal-card] .dc-account-note,
+[data-account-profile] [data-renewal-card] [data-renewal-card-headline] {
+  color: #647084;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+[data-account-profile] .dc-account-actions {
+  align-items: stretch;
+  gap: 0.45rem 0.8rem;
+  margin-top: 0.85rem;
+}
+
+[data-account-profile] .dc-account-actions .dc-account-primary {
+  min-height: 3.2rem;
+  border: 1px solid rgba(0, 74, 198, 0.16);
+  border-radius: 13px;
+  background: linear-gradient(110deg, #0755d6, #3274ec);
+  box-shadow: 0 10px 22px -15px rgba(0, 74, 198, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 780;
+  transition: filter 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+[data-account-profile] .dc-account-actions .dc-account-primary:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow: 0 13px 24px -15px rgba(0, 74, 198, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+[data-account-profile] .dc-account-actions [data-member-change-plan],
+[data-account-profile] [data-renewal-reminder-toggle] {
+  width: fit-content;
+  padding-inline: 0.7rem;
+  border-radius: 10px;
+  color: #004ac6;
+  font-weight: 750;
+}
+
+[data-account-profile] [data-profile-upgrade-card] {
+  margin-top: 0.85rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(100, 116, 139, 0.14);
+}
+
+[data-account-profile] [data-profile-upgrade-card] .dc-account-note {
+  margin-top: 0;
+  color: #647084;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+[data-account-profile] [data-profile-upgrade-card] .dc-account-primary {
+  min-height: 3.2rem;
+  border: 1px solid rgba(0, 74, 198, 0.16);
+  border-radius: 13px;
+  background: linear-gradient(110deg, #0755d6, #3274ec);
+  box-shadow: 0 10px 22px -15px rgba(0, 74, 198, 0.62);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 780;
+}
+
+/* Appearance and account tools are quiet, individually tappable list rows. */
+[data-account-profile] [data-profile-appearance] {
+  margin-top: 1.2rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(100, 116, 139, 0.15);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+[data-account-profile] [data-profile-appearance]::before {
+  display: none;
+}
+
+[data-account-profile] [data-profile-appearance] .dc-account-section-header {
+  align-items: center;
+  gap: 1rem;
+}
+
+[data-account-profile] [data-profile-appearance] h2 {
+  color: #172033;
+  font-size: 1.05rem;
+  font-weight: 780;
+}
+
+[data-account-profile] [data-profile-appearance] .dc-account-note {
+  margin-top: 0.3rem;
+  color: #647084;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+[data-account-profile] [aria-label="Account tools"].dc-account-section {
+  margin-top: 0.8rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+[data-account-profile] [aria-label="Account tools"].dc-account-section::before {
+  display: none;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list li {
+  overflow: hidden;
+  border: 1px solid rgba(100, 116, 139, 0.16);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 6px 18px -18px rgba(15, 23, 42, 0.3);
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list button {
+  min-height: 4.2rem;
+  padding: 0.8rem 0.95rem;
+  gap: 0.8rem;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list button > span {
+  gap: 0.22rem;
+  color: #172033;
+  font-size: 0.9rem;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list strong {
+  font-weight: 760;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list small {
+  color: #647084;
+  font-size: 0.8rem;
+}
+
+[data-account-profile] [aria-label="Account tools"] .dc-account-link-list svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #64748b;
+}
+
+[data-account-profile] .dc-account-disclosure {
+  margin-top: 0.8rem;
+  padding-inline: 0.9rem;
+  border: 1px solid rgba(100, 116, 139, 0.17);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+[data-account-profile] .dc-account-disclosure summary {
+  color: #263449;
+  font-weight: 750;
+}
+
+[data-account-profile] .dc-account-disclosure summary > span {
+  display: inline-flex;
+  min-width: 1.4rem;
+  min-height: 1.4rem;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  padding-inline: 0.35rem;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #004ac6;
+  font-size: 0.7rem;
+}
+
+[data-account-profile] .dc-account-footer {
+  margin-top: 1.25rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgba(100, 116, 139, 0.18);
+}
+
+[data-account-profile] .dc-account-logout {
+  padding-inline: 0.85rem;
+  border: 1px solid rgba(190, 24, 93, 0.15);
+  border-radius: 11px;
+  background: rgba(190, 24, 93, 0.045);
+  color: #b4234d;
+  font-weight: 750;
+}
+
+[data-account-profile] .dc-account-legal {
+  gap: 0.4rem 0.65rem;
+  margin-top: 0.65rem;
+}
+
+[data-account-profile] .dc-account-legal > * {
+  min-height: 2.5rem;
+  padding-inline: 0.65rem;
+  border-radius: 9px;
+  color: #647084;
+  font-size: 0.8rem;
+}
+
+[data-account-profile] .dc-account-error,
+[data-account-profile] .dc-account-notice {
+  overflow-wrap: anywhere;
+}
+
+/* Let the measured footer spacer reserve the dock height. A second hard-coded
+   120–144px padding duplicated that clearance and made the profile feel empty. */
+@media (max-width: 959px) {
+  [data-profile-page] [data-profile-content] {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  [data-account-profile] .dc-account-identity {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.9rem;
+    border-radius: 19px;
+  }
+
+  [data-account-profile] .dc-account-photo-action {
+    width: 4.75rem;
+    min-width: 4.75rem;
+  }
+
+  [data-account-profile] .dc-account-photo-action img,
+  [data-account-profile] .dc-account-avatar {
+    width: 4.55rem;
+    height: 4.55rem;
+  }
+
+  [data-account-profile] .dc-account-identity-copy h2 {
+    font-size: clamp(1.05rem, 4.4vw, 1.3rem);
+  }
+
+  [data-account-profile] .dc-account-email {
+    font-size: 0.8rem;
+  }
+
+  [data-account-profile] .dc-account-identity-copy .dc-account-note {
+    font-size: 0.75rem;
+  }
+
+  [data-account-profile] [data-profile-membership-card] {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  [data-account-profile] .dc-account-facts > div {
+    padding: 0.65rem;
+  }
+}
+
+@media (max-width: 350px) {
+  [data-account-profile] .dc-account-header h1 {
+    font-size: 1.7rem;
+  }
+
+  [data-account-profile] .dc-account-identity {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  [data-account-profile] .dc-account-photo-action {
+    width: 4rem;
+    min-width: 4rem;
+    font-size: 0.68rem;
+  }
+
+  [data-account-profile] .dc-account-photo-action img,
+  [data-account-profile] .dc-account-avatar {
+    width: 3.85rem;
+    height: 3.85rem;
+  }
+
+  [data-account-profile] .dc-account-stats span {
+    font-size: 0.75rem;
+  }
+
+  [data-account-profile] .dc-account-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+html[data-theme="dark"] [data-account-profile] {
+  --account-border: rgba(148, 163, 184, 0.18);
+  --account-muted: #aab7ca;
+  --account-accent: #c1baff;
+  --account-edge: rgba(96, 165, 250, 0.28);
+  --account-edge-strong: rgba(96, 165, 250, 0.62);
+  --account-surface: rgba(17, 23, 36, 0.88);
+  --account-hover: rgba(59, 130, 246, 0.09);
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-identity,
+html[data-theme="dark"] [data-account-profile] [data-profile-membership-card],
+html[data-theme="dark"] [data-account-profile] .dc-account-stats,
+html[data-theme="dark"] [data-account-profile] [data-profile-appearance],
+html[data-theme="dark"] [data-account-profile] [aria-label="Account tools"] .dc-account-link-list li,
+html[data-theme="dark"] [data-account-profile] .dc-account-disclosure {
+  border-color: rgba(148, 163, 184, 0.19);
+  background: linear-gradient(145deg, rgba(17, 23, 36, 0.96), rgba(13, 19, 31, 0.96));
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-identity-copy h2,
+html[data-theme="dark"] [data-account-profile] [data-profile-membership-card] .dc-account-section-header h2,
+html[data-theme="dark"] [data-account-profile] .dc-account-plan-name,
+html[data-theme="dark"] [data-account-profile] .dc-account-facts dd,
+html[data-theme="dark"] [data-account-profile] [aria-label="Account tools"] .dc-account-link-list button > span {
+  color: #f3f6fb;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-email,
+html[data-theme="dark"] [data-account-profile] .dc-account-identity-copy .dc-account-note,
+html[data-theme="dark"] [data-account-profile] [data-profile-upgrade-card] .dc-account-note,
+html[data-theme="dark"] [data-account-profile] [data-renewal-card] .dc-account-note,
+html[data-theme="dark"] [data-account-profile] [data-profile-appearance] .dc-account-note,
+html[data-theme="dark"] [data-account-profile] [aria-label="Account tools"] .dc-account-link-list small {
+  color: #aab7ca;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-facts > div {
+  border-color: rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-actions [data-member-change-plan],
+html[data-theme="dark"] [data-account-profile] [data-renewal-reminder-toggle],
+html[data-theme="dark"] [data-account-profile] [data-profile-settings],
+html[data-theme="dark"] [data-account-profile] [data-profile-edit] {
+  color: #c1baff;
+}
+
+html[data-theme="dark"] [data-account-profile] [data-profile-settings],
+html[data-theme="dark"] [data-account-profile] [data-account-tools] .dc-account-link-list li {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-status.is-active {
+  border-color: rgba(74, 222, 128, 0.24);
+  background: rgba(34, 197, 94, 0.12);
+  color: #a7f3d0;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-status.is-expired {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+}
+
+html[data-theme="dark"] [data-account-profile] [data-renewal-card] {
+  border-top-color: rgba(148, 163, 184, 0.18);
+}
+
+html[data-theme="dark"] [data-account-profile] [data-profile-upgrade-card] {
+  border-top-color: rgba(148, 163, 184, 0.16);
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-footer {
+  border-top-color: rgba(148, 163, 184, 0.18);
+}
+
+@media (hover: hover) {
+  [data-account-profile] .dc-account-stats button:hover {
+    background: rgba(37, 99, 235, 0.055);
+  }
+
+  [data-account-profile] [aria-label="Account tools"] .dc-account-link-list button:hover {
+    background: rgba(37, 99, 235, 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-account-profile] .dc-account-header [data-profile-settings],
+  [data-account-profile] .dc-account-stats button,
+  [data-account-profile] .dc-account-actions .dc-account-primary {
+    transition-duration: 1ms !important;
+  }
+
+  [data-account-profile] .dc-account-header [data-profile-settings]:hover,
+  [data-account-profile] .dc-account-actions .dc-account-primary:hover {
+    transform: none;
+  }
+}
+
+
+/* Dark-mode finishing pass for roles that use the paper palette in light mode. */
+html[data-theme="dark"] [data-account-profile] [data-profile-appearance] h2 {
+  color: #f3f6fb;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-logout {
+  border-color: rgba(251, 113, 133, 0.22);
+  background: rgba(190, 24, 93, 0.12);
+  color: #fda4af;
+}
+
+html[data-theme="dark"] [data-account-profile] .dc-account-legal > * {
+  color: #aab7ca;
+}

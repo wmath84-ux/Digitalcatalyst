@@ -251,7 +251,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           <div className="min-w-0 flex-1 overflow-hidden">
             {headerVariant === "flow" ? (
               <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
-                Organize your day
+                Your day · tasks & plans
               </p>
             ) : null}
             <h1
@@ -260,7 +260,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 ? "mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight"
                 : "flex min-w-0 items-center gap-2 text-[clamp(1.25rem,5.6vw,1.75rem)] font-bold tracking-tight"}
             >
-              {headerVariant === "flow" ? "Plan Today" : (
+              {headerVariant === "flow" ? "FlowPath" : (
                 <>
                   <span className="min-w-0 truncate whitespace-nowrap" title={`Hello, ${firstName}`}>
                     Hello, <strong data-home-user-name className="font-extrabold">{firstName}</strong>
@@ -300,7 +300,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
       </div>
 
-      <div data-home-search-slot className="relative mt-5">
+      <div data-home-search-slot className={`relative mt-5 ${headerVariant === "flow" ? "hidden" : ""}`}>
         {/* Wave 14: the search pill is the pack Glass Input (websiteglass.com
             defaults — tint 0.4, radius 9999), the same component the store
             page's search bar renders; `dc-glass-toolbar` is gone from here. */}

@@ -20,7 +20,7 @@
 // now carries all of that inside the player.
 
 import { useCallback, useMemo, useState, useRef } from "react";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Plus, Search, X } from "lucide-react";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import ContentDialog from "../components/ui/ContentDialog";
@@ -191,16 +191,15 @@ export default function StudyLibraryPage() {
             <header className="dc-account-header">
               <div>
                 <h1>My Study Library</h1>
-                <p className="dc-account-note">
-                  Courses you create and manage.
+                <p className="dc-account-note dc-study-intro">
+                  Create, organize, and revisit your own courses.
                 </p>
                 {myCourses.state === "ready" || myCourses.courses.length > 0 ? (
-                  <p data-study-library-count className="dc-account-note">
-                    {totals.courses} course{totals.courses === 1 ? "" : "s"} ·{" "}
-                    {totals.modules} module{totals.modules === 1 ? "" : "s"} ·{" "}
-                    {totals.resources} resource
-                    {totals.resources === 1 ? "" : "s"}
-                  </p>
+                  <div data-study-library-count className="dc-study-summary" aria-label={`${totals.courses} courses, ${totals.modules} modules, ${totals.resources} resources`}>
+                    <span className="dc-study-summary-item"><strong>{totals.courses}</strong><span>Courses</span></span>
+                    <span className="dc-study-summary-item"><strong>{totals.modules}</strong><span>Modules</span></span>
+                    <span className="dc-study-summary-item"><strong>{totals.resources}</strong><span>Resources</span></span>
+                  </div>
                 ) : null}
               </div>
               <button
@@ -246,7 +245,7 @@ export default function StudyLibraryPage() {
                       type="search"
                       data-my-course-search
                       aria-label="Search your courses"
-                      placeholder="Search your courses"
+                      placeholder="Search by course name or topic"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                     />
@@ -262,11 +261,34 @@ export default function StudyLibraryPage() {
                   </div>
                 ) : null}
                 {myCourses.courses.length === 0 ? (
-                  <section data-my-course-empty className="dc-study-empty">
-                    <h2>No courses yet</h2>
-                    <p className="dc-account-note">
-                      Use New course to add modules, folders and resources.
-                    </p>
+                  <section data-my-course-empty className="dc-study-empty dc-study-empty--card">
+                    <div className="dc-study-empty-illustration" aria-hidden="true">
+                      <BookOpen size={28} strokeWidth={1.8} />
+                      <span><Plus size={15} strokeWidth={2.5} /></span>
+                    </div>
+                    <div className="dc-study-empty-copy">
+                      <p className="dc-study-empty-eyebrow">YOUR COURSE SPACE</p>
+                      <h2>Start your study library</h2>
+                      <p className="dc-account-note">
+                        Create a course around your goals, then organize it with modules, folders, notes and resources.
+                      </p>
+                      <div className="dc-study-empty-benefits" aria-label="Course builder features">
+                        <span>Modules &amp; folders</span>
+                        <span>Notes &amp; resources</span>
+                        <span>Practice material</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      data-my-course-create-empty
+                      onClick={() => {
+                        window.location.hash = MY_COURSE_NEW_HASH;
+                      }}
+                    >
+                      <Plus size={17} strokeWidth={2.4} />
+                      <span>Create your first course</span>
+                      <ArrowRight size={17} />
+                    </button>
                   </section>
                 ) : courses.length === 0 ? (
                   <section className="dc-study-empty">

@@ -1556,3 +1556,263 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
     transition-duration: 1ms;
   }
 }
+
+
+/* ── Home visual polish · October 2026 ───────────────────────────────────────
+   Presentation-only refinements. Keep the live catalog, test content, banner
+   artwork, metadata and navigation actions untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-home-content] {
+  --dc-home-space: clamp(24px, 4.6vw, 34px);
+  --dc-home-gutter: clamp(18px, 4.2vw, 30px);
+  padding-top: clamp(10px, 2.3vw, 18px);
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Give the featured panel a clearer surface and a calmer copy/art balance. */
+[data-home-content] .dc-home-hero-module > .dc-scene-plate {
+  border-radius: 26px;
+  box-shadow: 0 18px 42px -30px rgba(18, 38, 86, 0.5), 0 2px 8px -5px rgba(18, 38, 86, 0.28);
+  isolation: isolate;
+}
+
+[data-home-content] .dc-home-hero-slide {
+  min-height: clamp(228px, 29vw, 310px);
+  padding: clamp(20px, 3.4vw, 34px);
+}
+
+[data-home-content] .dc-home-hero-copy {
+  width: min(67%, 620px);
+}
+
+[data-home-content] .dc-home-hero-slide::after {
+  background: linear-gradient(90deg, rgba(8, 12, 27, 0.5) 0%, rgba(8, 12, 27, 0.28) 48%, rgba(8, 12, 27, 0.03) 100%);
+}
+
+html[data-theme="light"] [data-home-content] .dc-home-hero-slide::after {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 44%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+[data-home-content] .dc-home-hero-art {
+  width: 49%;
+  opacity: 0.9;
+  mix-blend-mode: normal;
+  object-position: center;
+}
+
+[data-home-content] .dc-home-hero-title {
+  letter-spacing: -0.04em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+[data-home-content] .dc-home-hero-description {
+  max-width: 40ch;
+  line-height: 1.5;
+}
+
+[data-home-content] .dc-home-hero-metadata span {
+  min-height: 27px;
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.84);
+  color: #1f2937;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="dark"] [data-home-content] .dc-home-hero-metadata span {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(12, 18, 36, 0.72);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+[data-home-content] .dc-home-hero-cta {
+  min-height: 44px;
+  margin-top: 17px;
+  padding-inline: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #165bd8 0%, #344bd4 100%);
+  box-shadow: 0 8px 18px -10px rgba(27, 78, 203, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+@media (hover: hover) {
+  [data-home-content] .dc-home-hero-slide:hover .dc-home-hero-cta {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px -12px rgba(27, 78, 203, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Make section hierarchy consistent: crisp headings, quiet metadata, readable rails. */
+[data-home-content] .dc-home-section-heading {
+  min-height: 36px;
+  gap: 14px;
+}
+
+[data-home-content] .dc-home-section-heading h2 {
+  font-size: clamp(19px, 2.1vw, 24px);
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+}
+
+[data-home-content] .dc-home-progress-summary {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-color: rgba(99, 102, 241, 0.2);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.11), rgba(59, 130, 246, 0.07));
+  color: var(--dc-home-accent-ink);
+}
+
+/* Card depth should be visible but not compete with the course artwork. */
+[data-home-content] .dc-home-card,
+[data-home-content] .dc-home-product-card {
+  border-color: var(--dc-home-card-edge);
+  border-radius: 22px;
+  box-shadow: 0 10px 28px -24px rgba(15, 23, 42, 0.52), 0 2px 8px -6px rgba(15, 23, 42, 0.2);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+@media (hover: hover) {
+  [data-home-content] .dc-home-card:hover,
+  [data-home-content] .dc-home-product-card:hover {
+    border-color: rgba(99, 140, 245, 0.34);
+    box-shadow: 0 16px 34px -25px rgba(22, 52, 110, 0.35), 0 4px 12px -8px rgba(22, 52, 110, 0.22);
+    transform: translateY(-1px);
+  }
+}
+
+[data-home-content] .dc-home-continue-action {
+  gap: 14px;
+  padding: 16px;
+}
+
+[data-home-content] .dc-home-continue-image {
+  border-radius: 15px;
+  box-shadow: 0 4px 12px -8px rgba(15, 23, 42, 0.55);
+}
+
+[data-home-content] .dc-home-progress-track {
+  height: 7px;
+  border-color: rgba(100, 116, 139, 0.16);
+  background: rgba(148, 163, 184, 0.18);
+}
+
+[data-home-content] .dc-home-progress-fill {
+  background: linear-gradient(90deg, #1859d1 0%, #5688f5 64%, #8a7cf5 100%);
+  box-shadow: 0 0 10px -5px rgba(59, 130, 246, 0.7);
+}
+
+[data-home-content] .dc-home-continue-cta,
+[data-home-content] .dc-home-section-action {
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+[data-home-content] .dc-home-continue-action:hover .dc-home-continue-cta {
+  transform: translateX(2px);
+}
+
+/* Restyle category tiles as a coherent compact control set, without changing state or labels. */
+[data-home-content] .dc-home-radio-rail {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+[data-home-content] .dc-home-radio-rail::-webkit-scrollbar {
+  display: none;
+}
+
+[data-home-content] .dc-home-radio-tile {
+  min-height: 48px;
+  border-radius: 999px;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+[data-home-content] .dc-home-radio-option input:checked + .dc-home-radio-tile {
+  box-shadow: 0 5px 16px -12px rgba(37, 99, 235, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+[data-home-content] .dc-home-radio-option:active .dc-home-radio-tile {
+  transform: scale(0.985);
+}
+
+/* Clear keyboard focus and honour reduced-motion preferences for polished controls. */
+[data-home-content] button:focus-visible,
+[data-home-content] [role="button"]:focus-visible,
+[data-home-content] input:focus-visible {
+  outline: 2px solid var(--dc-home-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  [data-home-content] {
+    --dc-home-space: 26px;
+    --dc-home-gutter: 18px;
+    padding-top: 10px;
+    padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+  }
+
+  [data-home-content] .dc-home-hero-slide {
+    min-height: 238px;
+    padding: 19px;
+  }
+
+  [data-home-content] .dc-home-hero-copy {
+    width: 72%;
+  }
+
+  [data-home-content] .dc-home-hero-art {
+    width: 52%;
+    opacity: 0.82;
+  }
+
+  [data-home-content] .dc-home-hero-title {
+    font-size: clamp(23px, 7.1vw, 30px) !important;
+    line-height: 1.04;
+  }
+
+  [data-home-content] .dc-home-hero-description {
+    font-size: 12.5px;
+  }
+
+  [data-home-content] .dc-home-hero-metadata span {
+    min-height: 24px;
+    padding-inline: 8px;
+  }
+
+  [data-home-content] .dc-home-hero-cta {
+    min-height: 40px;
+    margin-top: 13px;
+    padding-inline: 15px;
+  }
+
+  [data-home-content] .dc-home-section-heading h2 {
+    font-size: 19px;
+  }
+
+  [data-home-content] .dc-home-continue-action {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 350px) {
+  [data-home-content] .dc-home-hero-copy {
+    width: 76%;
+  }
+
+  [data-home-content] .dc-home-hero-art {
+    width: 47%;
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-home-content] .dc-home-card,
+  [data-home-content] .dc-home-product-card,
+  [data-home-content] .dc-home-hero-cta,
+  [data-home-content] .dc-home-radio-tile {
+    transition-duration: 1ms !important;
+    transform: none !important;
+  }
+}

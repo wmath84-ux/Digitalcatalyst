@@ -28,6 +28,15 @@ interface MyCourseCardProps {
   onDelete: (course: MyCourse) => void;
 }
 
+
+function makeDescriptionPreview(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  const candidate = value.slice(0, maxLength);
+  const boundary = candidate.lastIndexOf(" ");
+  const excerpt = candidate.slice(0, boundary > maxLength * 0.7 ? boundary : maxLength).trim();
+  return `${excerpt.replace(/[.,;:–-]+$/, "")}…`;
+}
+
 export default function MyCourseCard({
   course,
   onPlay,
@@ -38,6 +47,9 @@ export default function MyCourseCard({
   const [failedCover, setFailedCover] = useState("");
   const moduleCount = countModules(course.modules);
   const resourceCount = countResources(course.modules);
+  // Normalize whitespace only for display; the saved course description remains untouched.
+  const description = String(course.description || "").replace(/\s+/g, " ").trim();
+  const descriptionPreview = makeDescriptionPreview(description, 108);
   // No cover set → a stable random one from the bundled pool (never a gap).
   const cover = String(course.coverImage || "").trim() || fallbackCoverImage(course.id);
 
@@ -67,12 +79,14 @@ export default function MyCourseCard({
           )}
           <span className="dc-study-course-copy">
             <strong data-my-course-title>{course.title || "Untitled course"}</strong>
-            <small>
-              {moduleCount} module{moduleCount === 1 ? "" : "s"} · {resourceCount} resource
-              {resourceCount === 1 ? "" : "s"}
+            <small className="dc-study-course-stats">
+              <Layers3 aria-hidden="true" size={14} />
+              <span>{moduleCount} module{moduleCount === 1 ? "" : "s"}</span>
+              <span className="dc-study-meta-divider" aria-hidden="true" />
+              <span>{resourceCount} resource{resourceCount === 1 ? "" : "s"}</span>
             </small>
-            {course.description ? (
-              <small className="dc-study-course-description">{course.description}</small>
+            {description ? (
+              <small className="dc-study-course-description" title={description}>{descriptionPreview}</small>
             ) : null}
           </span>
           <ChevronRight aria-hidden="true" />

@@ -229,3 +229,10 @@ test('the free path grants the subscription with source "free"', () => {
     /grantSubscriptionFromQuote\(\{\s*quote,\s*orderId,\s*paymentId: null,\s*source: "free",\s*\}\)/
   );
 });
+
+
+test("the subscription CTA sets the right expectation for a zero-payable selection", () => {
+  const bar = read("src/subscription/components/SubscribeBar.tsx");
+  assert.match(bar, /totalPaise <= 0[\s\S]*?"Continue to free access"/);
+  assert.match(bar, /"Continue to checkout"/);
+});

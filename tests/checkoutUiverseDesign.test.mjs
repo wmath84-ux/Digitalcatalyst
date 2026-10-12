@@ -248,3 +248,14 @@ test("the review dialog keeps the accessible names the review journey is driven 
   assert.match(pdp, /<section data-pdp-reviews[\s\S]*?\{composerOpen && canReview && \(/);
   assert.doesNotMatch(reviewDialog, /createPortal/);
 });
+
+
+test("subscription summary omits the Products section when no products are selected", () => {
+  // Empty product headings waste space on feature-only subscriptions and make
+  // a valid plan look incomplete; retain the section only when it has rows.
+  assert.match(
+    review,
+    /selectedProductRows\.length \|\| planUnlockRows\.length \? \([\s\S]*?data-checkout-subscription-products-count=\{selectedProductRows\.length\}[\s\S]*?\) : null\}/
+  );
+  assert.doesNotMatch(review, /No products in this selection\./);
+});

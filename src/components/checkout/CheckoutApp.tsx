@@ -58,7 +58,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [step]);
 
   // Keep a fresh reference to the most recent `goBack` so the popstate handler

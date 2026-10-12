@@ -56,11 +56,12 @@ export function DailyGoal({ variant = "compact", className }: DailyGoalProps): J
           cardSurface("px-6 py-6 flex flex-col justify-between relative overflow-hidden group"),
           className,
         )}
+        data-revision-daily-goal
       >
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <span className={cn(typeClass["label-lg"], "text-secondary font-bold")}>
+              <span className={cn(typeClass["label-lg"], "text-primary font-bold")}>
                 {t("dailyGoal.title")}
               </span>
               <h2 className={cn(typeClass["title-lg"], "text-text-primary mt-1")}>
@@ -77,7 +78,7 @@ export function DailyGoal({ variant = "compact", className }: DailyGoalProps): J
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-1000 ease-out",
-                achieved ? "bg-review-easy" : "bg-secondary-container",
+                achieved ? "bg-review-easy" : "bg-primary-container",
               )}
               style={{ width: `${Math.round(progress * 100)}%` }}
             />

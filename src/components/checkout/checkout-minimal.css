@@ -549,3 +549,38 @@
   .dc-checkout-primary:hover:not(:disabled) { transform: none; }
   [data-checkout-app] .animate-spin { animation: none; }
 }
+
+
+/* Keep the review/access progress rail compact on phones. The header and
+   progress steps intentionally remain outside the scrolling receipt body, so
+   shrinking vertical chrome gives the buyer more room without hiding context. */
+@media (max-width: 639px) {
+  [data-checkout-app] [data-checkout-toolbar] > div:first-child {
+    padding-top: 0.4rem;
+    padding-bottom: 0.1rem;
+  }
+
+  [data-checkout-app] [data-checkout-toolbar] h1::after {
+    margin-top: 0.25rem;
+  }
+
+  [data-checkout-app] [data-checkout-stepbar] {
+    padding-bottom: 0.3rem !important;
+  }
+
+  [data-checkout-app] .dc-checkout-step-indicator ol {
+    gap: 0.5rem;
+    padding-block: 0.35rem;
+  }
+
+  [data-checkout-app] .dc-checkout-step-indicator li {
+    min-height: 2.25rem;
+    gap: 0.4rem;
+    padding-block: 0.25rem;
+    line-height: 1.25;
+  }
+}
+
+[data-checkout-app] [data-footer-nav-space] {
+  scroll-padding-block-end: calc(var(--dc-footer-nav-h, 0px) + 1rem);
+}
