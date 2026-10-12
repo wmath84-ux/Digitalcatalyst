@@ -517,7 +517,11 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
               </Suspense>
             </main>
           ) : (
-            <div data-revision-shell className="flex min-h-dvh flex-col">
+            <div
+              data-revision-shell
+              data-revision-bounded-shell={!isDesktopHost ? "true" : undefined}
+              className={isDesktopHost ? "flex min-h-dvh flex-col" : "relative flex h-dvh min-h-0 flex-col overflow-hidden"}
+            >
               {/* On mobile / tablet-portrait, render the unified app header with Recall quick actions */}
               {!isDesktopHost && !isFocused && (
                 <Header
