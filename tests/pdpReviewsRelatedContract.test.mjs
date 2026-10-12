@@ -55,7 +55,7 @@ test("related products page in two clipped rows with explicit arrows", () => {
 test("the shared Pay button rests white and reserves its accent for interaction", () => {
   const css = read("src/components/ui/payment-button.css");
   assert.match(css, /background-color: #fff/);
-  assert.match(css, /--uzp-clr: #4f46e5/);
+  assert.match(css, /--uzp-clr: var\(--dc-purchase-accent, #4f46e5\)/);
   assert.match(css, /\.uzp-pay__icon \{[\s\S]*?background-color: transparent/);
   assert.match(css, /\.uzp-pay:hover \.uzp-pay__icon \{[\s\S]*?background-color: var\(--uzp-clr\)/);
   assert.doesNotMatch(css, /--uzp-clr:\s*#00ad54/);

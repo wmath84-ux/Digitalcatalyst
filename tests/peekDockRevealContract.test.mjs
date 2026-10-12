@@ -1,21 +1,20 @@
 // tests/peekDockRevealContract.test.mjs
 //
-// THE PEEK DOCK'S ONE REVEAL/HIDE RULE — owner brief 2026-10-02:
+// THE DESKTOP PEEK DOCK'S ONE REVEAL/HIDE RULE — owner brief 2026-10-02:
 //
 //   "Line se footer navigation ki taraf pointer le jaate hi footer navigation
 //    turant hide ho jata hai, jiski wajah se footer ke kisi button par click
 //    nahi ho pata. … Footer navigation tabhi hide ho jab user actual
 //    interaction area se bahar chala jaaye."
 //
-// The rule: the line and the panel it reveals are ONE interaction area. A close
-// is only committed when the pointer's last known position is really outside
-// the union of those boxes — never because a `pointerleave` happened to arrive
-// while the pointer was crossing the seam (a touch/pen drag has no hover events
-// at all, a pointer capture suppresses enter/leave everywhere else, and a
-// fractional device-pixel ratio can open a hairline between the two boxes).
+// The rule: the desktop dock's line and the panel it reveals are ONE
+// interaction area. A close is only committed when the pointer's last known
+// position is really outside the union of those boxes — never because a
+// `pointerleave` arrived while crossing the seam.
 //
-// This file pins the rule itself (pure geometry) and the wiring of both peek
-// docks (the desktop shell's and the course player's) to it.
+// The Course Player no longer has a reveal dock; its always-visible, in-flow
+// study strip has its own layout/accessibility contracts. This file pins the
+// geometry and wiring of the desktop shell dock and guards that separation.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -69,10 +68,10 @@ test("the area rule bridges the seam the old enter/leave hand-off fell through",
 });
 
 // ---------------------------------------------------------------------------
-// 2. Both docks decide the close by the area, not by the event
+// 2. The desktop dock decides the close by the area, not by the event
 // ---------------------------------------------------------------------------
 
-for (const [name, source] of [["desktop", desktop], ["course", course]]) {
+for (const [name, source] of [["desktop", desktop]]) {
   test(`${name} peek dock: a leave schedules a close, the area decides it`, () => {
     assert.match(area, /export function isInsidePeekDockArea/);
     assert.match(source, /import \{ isInsidePeekDockArea, peekDockAreaOf \} from/);
@@ -118,25 +117,29 @@ test("desktop peek dock: click, tap and drag all reveal the same dock", () => {
   assert.match(desktop, /const navigate = useCallback\(\(id: string\) => \{[\s\S]*?close\(\)\s*window\.location\.hash = tab\.hash/);
 });
 
-test("course peek dock: the touch tap and the drag release still behave", () => {
-  assert.match(course, /const open = hover \|\| pinned/);
-  assert.match(course, /wasPinnedRef\.current/);
-  assert.match(course, /if \(wasPinnedRef\.current\) close\(\)/);
-  assert.match(course, /const id = tabAtX\(event\.clientX\)/);
-  assert.match(course, /if \(id\) handleSelect\(id\)/);
+test("Course Player study strips are direct in-flow controls, not a hover/pin reveal dock", () => {
+  assert.match(course, /data-course-strip-nav/);
+  assert.match(course, /aria-label="Course study tools"/);
+  assert.match(course, /onClick=\{\(\) => onTabChange\(item\.key\)\}/);
+  assert.match(course, /onKeyDown=\{event => moveFocus\(event, index\)\}/);
+  assert.doesNotMatch(course, /peekDockAreaOf|const open = hover \|\| pinned|wasPinnedRef/);
+  const stripCss = fs.readFileSync("src/course/course-strip-nav.css", "utf8");
+  assert.match(stripCss, /\[data-course-strip-nav\][\s\S]*?flex: 0 0 auto/);
+  assert.doesNotMatch(stripCss, /position:\s*fixed/);
 });
 
 // ---------------------------------------------------------------------------
 // 3. The look and the geometry are untouched
 // ---------------------------------------------------------------------------
 
-test("the reveal fix changes no CSS and no visual geometry", () => {
-  // The line, panel and their open states are exactly the rules that shipped.
+test("the desktop reveal geometry stays intact and the Course Player uses separate strip styling", () => {
+  // The desktop line, panel and open state are exactly the rules that shipped.
   assert.match(css, /\[data-desktop-peek-line\] \{/);
   assert.match(css, /\[data-desktop-peek-dock\]\[data-open="true"\] \[data-desktop-peek-panel\]/);
+  // Legacy Course Player selectors may remain for compatibility, but the live
+  // Course Player component is the separate in-flow strip verified above.
   assert.match(css, /\[data-course-peek-line-hit\] \{/);
-  assert.match(css, /\[data-course-peek-dock\]\[data-open="true"\] \[data-course-peek-panel\] \{/);
-  // Neither dock remounts the shared GlassDock or restyles it.
+  assert.match(course, /data-course-strip-nav/);
+  assert.doesNotMatch(course, /data-course-peek-dock|siteFooter/);
   assert.doesNotMatch(desktop, /data-site-footer/);
-  assert.doesNotMatch(course, /siteFooter/);
 });

@@ -20,11 +20,12 @@ type HeaderProps = {
    * "<AppName> Tasker".
    */
   title?: string;
-  /**
-   * Tagline override. The store shows "Premium learning store"; My Day
-   * shows "My Day Activities".
-   */
+  /** Route-specific subtitle, when the default page tagline does not fit. */
   subtitle?: string;
+  /** Let a long route subtitle wrap instead of truncating it to one line. */
+  subtitleWrap?: boolean;
+  /** Paint a flat, shadow-free chrome strip for a seamless page transition. */
+  seamless?: boolean;
   /**
    * Logo icon override. The store shows a book; the notifications page
    * shows a bell.
@@ -95,6 +96,8 @@ export default function Header({
   onNavigateToNotifications,
   title,
   subtitle = "Premium learning store",
+  subtitleWrap = false,
+  seamless = false,
   icon,
   action,
   children,
@@ -219,6 +222,7 @@ export default function Header({
   return (
     <header
       data-site-header
+      data-header-seamless={seamless ? "true" : undefined}
       /* `dc-scene-plate dc-scene-plate--bar` is the shared contrast plate from
          src/glass.css: index.css paints every app chrome strip with the pack's
          10% `--dc-chrome-glass` tint, which reads as *no material at all* over
@@ -230,7 +234,7 @@ export default function Header({
          material that `?glass=off` restores, and the gate means this rule only
          ever applies while glass is on. */
       className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
-        hideFrameBorders ? "" : "mobile-header-glow"
+        hideFrameBorders || seamless ? "" : "mobile-header-glow"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
@@ -240,7 +244,7 @@ export default function Header({
           </div>
           <div className="min-w-0 leading-tight pt-0.5">
             <h1 className="truncate text-[1.125rem] font-black tracking-tight text-white">{headerTitle}</h1>
-            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-white/55">{subtitle}</p>
+            <p className={`mt-0.5 text-white/55 ${subtitleWrap ? "line-clamp-2 whitespace-normal text-[10px] font-semibold leading-[1.15] tracking-normal" : "truncate text-[10px] font-bold uppercase tracking-widest"}`}>{subtitle}</p>
           </div>
         </div>
 

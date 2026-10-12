@@ -10,6 +10,7 @@ import Header from "../../../src/components/Header";
 import BottomNav from "../../../src/components/BottomNav";
 import LeaderboardApp from "../../../src/LeaderboardApp";
 import StorePage from "../../../src/components/StorePage";
+import GlassCommandPalette from "../../../src/components/GlassCommandPalette";
 import ModuleSelectModal from "../../../src/components/pdp/ModuleSelectModal";
 import StudyLibraryPage from "../../../src/personal-library/StudyLibraryPage";
 import MyCourseEditorPage from "../../../src/personal-library/MyCourseEditorPage";
@@ -118,6 +119,7 @@ function Fixture() {
       ) : (
         page
       )}
+      <GlassCommandPalette />
       <output
         aria-hidden="true"
         style={{ position: "fixed", bottom: 0, pointerEvents: "none" }}

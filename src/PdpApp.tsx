@@ -2,10 +2,13 @@ import { commerceContentTree } from "../utils/contentOwnership";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Expand,
   Heart,
+  Share2,
   Star,
   X,
 } from "lucide-react";
@@ -14,6 +17,8 @@ import { GlassSurface } from "./components/ui/glass";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import "./pdp-minimal.css";
 import { PopoverItem } from "./components/ui/glass-popover";
+import { SocialPlatformIcon } from "./components/ui/SocialPlatformIcon";
+import { SOCIAL_PLATFORMS } from "./utils/socialPlatform";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
@@ -424,9 +429,15 @@ function PremiumProductContent({
   const purchaseMode = order.summary.mode;
   const quoteSelection = { ...order.selection, productIds: [product.documentId || product.id] };
   const pricing = usePdpQuote({ selection: quoteSelection, uid: user?.id || null, enabled: Boolean(user) && !accessLoading && !accessError && !applyingPaidSelection && order.valid && !unavailable && (!isProductOwned || purchaseMode !== "full_product"), chargeable: order.summary.effectiveSubtotal > 0 });
-  const pricingView: PdpPricingView = { ...pricing, ...(user && (accessLoading || applyingPaidSelection) ? { status: "loading" as const, quote: null } : {}), ...(accessError ? { status: "error" as const, error: accessError } : {}), selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }) };
+  const accessStatus = accessLoading ? "loading" : accessError ? "error" : "ready";
+  const pricingView: PdpPricingView = {
+    ...pricing,
+    ...(accessStatus !== "ready" ? { status: "idle" as const, quote: null, error: "", applying: false } : {}),
+    ...(user && applyingPaidSelection ? { status: "loading" as const, quote: null } : {}),
+    selectionKey: pdpSelectionKey({ ...quoteSelection, couponCode: pricing.couponIntent }),
+  };
   const pricingBusy = pricing.status === "loading" || pricing.applying;
-  const pricingBlocked = pricingBusy || pricing.status === "error" || Boolean(user && (accessLoading || accessError || applyingPaidSelection));
+  const pricingBlocked = pricingBusy || (accessStatus === "ready" && pricing.status === "error") || Boolean(user && (accessStatus !== "ready" || applyingPaidSelection));
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
     const withCoupon = { ...selection, productIds: [product.documentId || product.id], couponCode: summary.effectiveSubtotal > 0 ? pricing.appliedCode : null };
     if (user && (!pricing.quote || pdpSelectionKey(withCoupon) !== pricingView.selectionKey)) return;
@@ -523,8 +534,13 @@ function PremiumProductContent({
   const couponEntry = canShowCouponInput ? (
     <details data-pdp-coupon className="dc-pdp-coupon">
       <summary>Have a coupon?</summary>
-      <PromoCodeInput key={pdpSelectionKey({ ...order.selection, couponCode: null })} kind="coupon" label="Coupon code" placeholder="Enter code" appliedCode={pricing.appliedCode} appliedMessage={pricing.quote?.couponDiscount ? `Verified discount: ₹${paiseToRupees(pricing.quote.couponDiscount).toLocaleString("en-IN")}` : "Coupon verified for this selection"} errorMessage={pricing.couponError || null} onApply={pricing.applyCoupon} onRemove={pricing.removeCoupon} disabled={pricingBusy} />
+      <PromoCodeInput key={pdpSelectionKey({ ...order.selection, couponCode: null })} kind="coupon" label="Coupon code" placeholder="Enter code" appliedCode={pricing.appliedCode} appliedMessage={pricing.quote?.couponDiscount ? `Verified discount: ₹${paiseToRupees(pricing.quote.couponDiscount).toLocaleString("en-IN")}` : "Coupon verified for this selection"} errorMessage={pricing.couponError || null} onApply={pricing.applyCoupon} onRemove={pricing.removeCoupon} disabled={pricingBusy || accessStatus !== "ready"} />
     </details>
+  ) : null;
+  const accessErrorNotice = accessError && activeTab !== "Paid" ? (
+    <p className="dc-pdp-access-error" role="alert" data-pdp-access-error>
+      {accessError} <button type="button" className="dc-pdp-text-action" onClick={retryAccess}>Retry access check</button>
+    </p>
   ) : null;
 
   const submitReview = async () => {
@@ -738,6 +754,7 @@ function PremiumProductContent({
             <section data-pdp-owned-access>
               {onOpenCourse ? <button type="button" data-pdp-library-primary onClick={() => onOpenCourse(product)} className="dc-pdp-library-cta">{identity.libraryAction}</button> : null}
               {paidContent.available.length ? <button type="button" data-pdp-remaining-paid className="dc-pdp-text-action" onClick={() => { setActiveTab("Paid"); document.querySelector("[data-pdp-details]")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{paidContent.available.length} paid item{paidContent.available.length === 1 ? "" : "s"} not yet owned · View Paid</button> : null}
+              {accessErrorNotice}
             </section>
           ) : (
             <section data-pdp-price-box id="pdp-purchase-review" tabIndex={-1} className="dc-pdp-purchase">
@@ -748,13 +765,13 @@ function PremiumProductContent({
                 selectionRequest={activePaidSelectionRequest}
                 returnRoute={`#/product/${encodeURIComponent(product.id)}`}
                 onPreview={handlePreview} onSelectionChange={handleSelectionChange}
-                pricing={pricingView} couponEntry={couponEntry}
+                pricing={pricingView} accessStatus={accessStatus} couponEntry={couponEntry}
               /> : <>
                 {couponEntry}
-                <PdpSelectionSummary snapshot={order} pricing={pricingView} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
+                <PdpSelectionSummary snapshot={order} pricing={pricingView} accessStatus={accessStatus} showOriginal={Number.isFinite(product.originalPrice) && product.originalPrice > 0} />
                 <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
               </>}
-              {accessError ? <p className="dc-pdp-pricing-error">{accessError} <button type="button" className="dc-pdp-text-action" onClick={retryAccess}>Retry access check</button></p> : null}
+              {accessErrorNotice}
               {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not available for purchase yet.</p> : null}
             </section>
           )}
@@ -775,7 +792,7 @@ function PremiumProductContent({
             ) : null}
             <div ref={shareRef}>
               <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" aria-expanded={shareOpen} aria-controls="product-share-menu" aria-haspopup="menu" className="dc-pdp-text-action">Share</button>
-              <div data-product-share role="menu" id="product-share-menu" aria-label="Share product" className="dc-pdp-share-menu" hidden={!shareOpen} onKeyDown={(event) => {
+              <div data-product-share data-open={shareOpen ? "true" : "false"} role="menu" id="product-share-menu" aria-label="Share product" aria-hidden={!shareOpen} className="dc-compact-glass-window dc-pdp-share-menu" onKeyDown={(event) => {
                 if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
                 event.preventDefault();
                 const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='menuitem']"));
@@ -783,10 +800,22 @@ function PremiumProductContent({
                 const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
                 items[next]?.focus({ preventScroll: true });
               }}>
-                <PopoverItem role="menuitem" onClick={() => void shareNative()}>Share via device</PopoverItem>
-                <PopoverItem role="menuitem" onClick={() => shareTo("whatsapp")}>WhatsApp</PopoverItem>
-                <PopoverItem role="menuitem" onClick={() => shareTo("telegram")}>Telegram</PopoverItem>
-                <PopoverItem role="menuitem" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</PopoverItem>
+                <PopoverItem role="menuitem" aria-label="Share via device" title="Share via device" className="dc-pdp-share-action" onClick={() => void shareNative()}>
+                  <Share2 size={18} aria-hidden="true" />
+                  <span className="dc-pdp-share-action-label" aria-hidden="true">Device</span>
+                </PopoverItem>
+                <PopoverItem role="menuitem" aria-label="WhatsApp" title="WhatsApp" className="dc-pdp-share-action" onClick={() => shareTo("whatsapp")}>
+                  <SocialPlatformIcon platform={SOCIAL_PLATFORMS.whatsapp} size={19} />
+                  <span className="dc-pdp-share-action-label" aria-hidden="true">WhatsApp</span>
+                </PopoverItem>
+                <PopoverItem role="menuitem" aria-label="Telegram" title="Telegram" className="dc-pdp-share-action" onClick={() => shareTo("telegram")}>
+                  <SocialPlatformIcon platform={SOCIAL_PLATFORMS.telegram} size={19} />
+                  <span className="dc-pdp-share-action-label" aria-hidden="true">Telegram</span>
+                </PopoverItem>
+                <PopoverItem role="menuitem" aria-label={copied ? "Link copied" : "Copy link"} title={copied ? "Link copied" : "Copy link"} className="dc-pdp-share-action" onClick={() => void copyLink()}>
+                  {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
+                  <span className="dc-pdp-share-action-label" aria-hidden="true">{copied ? "Copied" : "Copy link"}</span>
+                </PopoverItem>
               </div>
             </div>
           </div>
@@ -796,7 +825,7 @@ function PremiumProductContent({
         <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
           <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule}
             paidContent={<PdpPaidContent available={paidContent.available} owned={paidContent.owned} selection={paidSelection}
-              signedIn={Boolean(user)} loading={accessLoading} error={accessError || undefined} onRetry={retryAccess} unavailable={unavailable}
+              signedIn={Boolean(user)} loading={accessLoading} error={activeTab === "Paid" ? accessError || undefined : undefined} onRetry={retryAccess} unavailable={unavailable}
               onChoose={choosePaidContent} onReview={reviewPaidSelection} />} />
           <ReviewsCard
             mode="preview"
@@ -1141,7 +1170,12 @@ function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, 
           {visibleReviews.map((review) => (
             <article className="dc-pdp-review" key={review.id}>
               <header className="dc-pdp-review-header">
-                <div className="min-w-0"><p className="dc-pdp-review-name">{review.name}</p><p className="dc-pdp-review-date">{review.date}{review.verifiedPurchase ? <span className="dc-pdp-review-verified">Verified purchase</span> : null}</p></div>
+                <div className="dc-pdp-review-person">
+                  <span data-pdp-review-avatar="" className={`dc-pdp-review-avatar ${review.avatarColor || "bg-indigo-500"}`} aria-hidden="true">
+                    {review.initials || initials(review.name)}
+                  </span>
+                  <div className="min-w-0"><p className="dc-pdp-review-name">{review.name}</p><p className="dc-pdp-review-date">{review.date}{review.verifiedPurchase ? <span className="dc-pdp-review-verified">Verified purchase</span> : null}</p></div>
+                </div>
                 <RatingStars rating={review.rating} />
               </header>
               <p className="dc-pdp-review-comment">{review.comment}</p>

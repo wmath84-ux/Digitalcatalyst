@@ -16,7 +16,7 @@ const lines=[{id:'a',moduleId:'a',kind:'selected_modules',title:'Algebra',parent
 const snapshot={selection,summary:{mode:'selected_modules',lineItems:lines,selectedCount:2,selectedTitles:['Algebra','Geometry'],regularSubtotal:898,saleSavings:100,effectiveSubtotal:798},valid:true,rules:['Algebra is required for Geometry. Included in this selection.']};
 const view={selectionKey:'test',status:'ready',error:'',applying:false,couponIntent:'SAVE10',refresh(){}};
 const quote={quoteId:'verified',uid:'user',currency:'INR',purchaseKind:'selected_modules',verifiedLineItems:lines.map(line=>({...line,regularPrice:line.regularPrice*100,effectivePrice:line.effectivePrice*100,salePrice:line.salePrice===null?null:line.salePrice*100})),regularSubtotal:89800,saleDiscount:10000,couponDiscount:7980,cashPayable:71820,minimumPayable:0,expiresAt:Date.now()+900000,status:'active',couponCode:'SAVE10'};
-const render=(pricing)=>new JSDOM(renderToStaticMarkup(React.createElement(Summary,{snapshot,pricing}))).window.document;
+const render=(pricing,accessStatus="ready")=>new JSDOM(renderToStaticMarkup(React.createElement(Summary,{snapshot,pricing,accessStatus}))).window.document;
 
 test('selected item names, individual amounts, dependencies and access scope remain visible',()=>{
   const doc=render({...view,status:'idle',quote:null,couponIntent:null});
@@ -39,6 +39,17 @@ test('unverified estimates never invent a coupon reduction or claim a final serv
   assert.equal(doc.querySelector('.dc-pdp-current-price').textContent,'₹798');
   assert.match(doc.querySelector('[data-pdp-summary-total]').textContent,/Estimated total/);
   assert.match(doc.querySelector('[role="status"]').textContent,/Verifying coupon/);
+});
+test('access loading and failure suppress estimates even when stale quote data exists',()=>{
+  for(const accessStatus of ["loading","error"]){
+    const doc=render({...view,quote,status:"ready"},accessStatus);
+    assert.equal(doc.querySelector('[data-pdp-order-summary]').dataset.pricingStatus,`access-${accessStatus}`);
+    assert.equal(doc.querySelector('[data-pdp-summary-total]'),null);
+    assert.equal(doc.querySelector('.dc-pdp-current-price'),null);
+    assert.equal(doc.querySelector('[data-pdp-coupon-discount]'),null);
+    assert.doesNotMatch(doc.querySelector('[data-pdp-order-summary]').textContent,/₹\s*\d/);
+    assert.match(doc.querySelector('[role="status"]').textContent,/access/i);
+  }
 });
 test('zero and minimum-charge orders show numeric INR and disclose the floor',()=>{
   for(const cashPayable of [0,100]){

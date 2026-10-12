@@ -171,6 +171,7 @@ export default function MobileHeaderMenu({
               open
               remember={false}
               showToggle={false}
+              surfaceVariant="header-drawer"
               onSelect={(id) => {
                 setOpen(false);
                 onSelect(id);

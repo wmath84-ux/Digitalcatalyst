@@ -93,6 +93,10 @@
     {
       "source": "/api/subscription-gate",
       "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/course-access",
+      "destination": "/api/referral-leaderboard?route=course-access"
     }
   ]
 }

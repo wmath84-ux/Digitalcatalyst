@@ -55,6 +55,6 @@ test("only non-module extras (resources / paid updates) keep an opt-in chip row,
 test("summary, CTA and checkout selection still key off the (derived) mode", () => {
   assert.match(builder, /compact \? <PdpSelectionSummary snapshot=\{snapshot\}/);
   assert.match(builder, /: <SummaryPanel summary=\{summary\} \/>/);
-  assert.match(builder, /<CtaBar\s+compact=\{compact\}\s+pricing=\{currentPricing\}\s+mode=\{mode\}/);
+  assert.match(builder, /<CtaBar\s+compact=\{compact\}\s+accessStatus=\{accessStatus\}\s+pricing=\{currentPricing\}\s+mode=\{mode\}/);
   assert.match(builder, /mode === "selected_modules"\s*\?\s*selectedModuleIds/);
 });

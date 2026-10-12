@@ -303,6 +303,110 @@ html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-ty
   }
 }
 
+/* The phone header drawer keeps the same Uiverse-style translucent glass
+ * material as the PDP share window. This is scoped to that overlay surface so
+ * the tablet navigation rail retains its existing material and contrast. */
+[data-glass-sidebar-surface="header-drawer"] {
+  background:
+    linear-gradient(-75deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05)),
+    rgba(23, 30, 44, 0.62) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow:
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.5),
+    0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.2),
+    0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2),
+    0 16px 40px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+/* Shared compact Uiverse window used by PDP sharing and Store dropdowns.
+   Keep the 190×70 glass capsule, pointer, and stretch animation identical; a
+   taller list variant may change only its content layout, not this material. */
+.dc-compact-glass-window {
+  --dc-compact-glass-window-border: rgba(255, 255, 255, 0.2);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.375rem);
+  z-index: 50;
+  display: flex;
+  width: min(190px, 100%);
+  height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  box-sizing: border-box;
+  border: 1px solid var(--dc-compact-glass-window-border);
+  border-radius: 70px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px) scale(0.46, 0.9);
+  transform-origin: bottom right;
+  transition:
+    opacity 0.16s ease,
+    transform 0.2s cubic-bezier(0.22, 1.15, 0.36, 1.06),
+    visibility 0s linear 0.2s;
+  background:
+    linear-gradient(-75deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05)),
+    rgba(23, 30, 44, 0.62);
+  box-shadow:
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.5),
+    0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.2),
+    0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2),
+    0 12px 28px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+  -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+}
+.dc-compact-glass-window[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  animation: dc-compact-glass-window-stretch 760ms ease-out 40ms both;
+  transition-delay: 0s;
+}
+@keyframes dc-compact-glass-window-stretch {
+  0% { opacity: 0; transform: translateY(6px) scale(0.46, 0.9); }
+  10% { opacity: 1; transform: translateY(0) scale(1.1, 0.9); }
+  30% { transform: scale(0.9, 1.1); }
+  50% { transform: scale(1.05, 0.95); }
+  100% { transform: scale(1, 1); }
+}
+.dc-compact-glass-window::after {
+  position: absolute;
+  right: 1.15rem;
+  bottom: -0.48rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-right: 1px solid var(--dc-compact-glass-window-border);
+  border-bottom: 1px solid var(--dc-compact-glass-window-border);
+  border-radius: 0 0 0.18rem 0;
+  background: rgba(23, 30, 44, 0.72);
+  content: "";
+  pointer-events: none;
+  transform: rotate(45deg);
+}
+html[data-theme="light"] .dc-compact-glass-window {
+  --dc-compact-glass-window-border: rgba(15, 23, 42, 0.14);
+  background:
+    linear-gradient(-75deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05)),
+    rgba(235, 241, 248, 0.46);
+}
+html[data-theme="light"] .dc-compact-glass-window::after {
+  background: rgba(235, 241, 248, 0.7);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-compact-glass-window,
+  .dc-compact-glass-window[data-open="true"] {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
 /* ── Wave 3 · commerce ──────────────────────────────────────────────────── */
 
 /* ── CARDS ON THE WINTER BACKGROUND ─────────────────────────────────────────
@@ -431,6 +535,18 @@ html[data-glass="on"] body .dc-scene-plate--bar {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 18px 40px -22px rgba(2, 6, 16, 0.9) !important;
+}
+
+/* The Store header aligns directly with the marketplace canvas rather than
+   floating as a separate panel. Keep its seamless treatment above the bar's
+   generic plate/shadow without changing chrome on any other route. */
+html[data-glass="on"] body [data-site-header][data-header-seamless].dc-scene-plate--bar {
+  background: var(--dc-seamless-header-bg, #0a0e18) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border-bottom: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* When `--bar` lands on a GlassSurface *itself* rather than on an element that

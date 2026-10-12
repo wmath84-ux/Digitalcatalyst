@@ -333,9 +333,11 @@ test("native grids adapt to the actual content width rather than overflowing bes
 test("the store opens on the Home-ratio grid, and the skeleton matches it", () => {
   assert.match(storePage, /useState<ViewMode>\("grid"\)/);
   assert.match(storePage, /data-store-grid-loading/);
-  assert.match(storePage, /<option value="grid">Grid<\/option>/);
-  assert.match(storePage, /<option value="list">List<\/option>/);
-  assert.match(storePage, /<option value="mixed">Mixed<\/option>/);
+  assert.match(
+    storePage,
+    /const STORE_VIEW_OPTIONS: StorePopoverOption\[\] = \[[\s\S]*?\{ value: "grid", label: "Grid" \},[\s\S]*?\{ value: "list", label: "List" \},[\s\S]*?\{ value: "mixed", label: "Mixed" \}/,
+    "the accessible view popover keeps Grid, List and Mixed choices in order",
+  );
 });
 
 /* ------------------------------------------------------------------ */

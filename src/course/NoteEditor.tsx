@@ -299,14 +299,11 @@ function NoteEditorChrome({
   const floatingToolbar = !docked || !coarse;
 
   // ── Where the toolbar ends: just above the footer navigation ────────────
-  // Measured (see ./courseFooterInset.ts): the px of this shell's bottom edge
-  // the player's footer navigation covers. The bottom-centre peek dock is
-  // `position: fixed`, so it overlays the writing surface and the toolbar has
-  // to be lifted clear of it; the legacy always-visible dock sits in flow
-  // below the notes panel, where the toolbar already ends exactly at it and
-  // the lift is 0; and a footer that is hidden (the keyboard rule) or absent
-  // lifts nothing at all, so the toolbar drops back to the bottom edge with
-  // no phantom gap.
+  // Measured only for legacy overlay docks (see ./courseFooterInset.ts). The
+  // current [data-course-strip-nav] is in flow after the split stage, so the
+  // notes surface ends above it naturally and needs no inset. A legacy overlay
+  // is lifted clear; the in-pane dock, a hidden footer, and no footer at all
+  // lift nothing — so there is never a phantom strip above the divider.
   const shellRef = useRef<HTMLDivElement | null>(null);
   const footerInset = useCourseFooterInset(docked, shellRef);
   useLayoutEffect(() => {

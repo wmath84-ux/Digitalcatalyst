@@ -1039,11 +1039,10 @@
   color: #0f172a;
 }
 
-/* The gated-access form and Live Experiments intentionally remain dark islands
-   in Light Player mode. Their own inputs, menus and neutral utility classes
-   must not inherit the surrounding light remaps. */
-.course-player-shell[data-course-theme="light"] [data-course-gate-personal-access],
-.course-player-shell[data-course-theme="light"] [data-course-experiment-panel] {
+/* The gated-access form intentionally remains a dark island in Light Player
+   mode. Live Experiments now use the same readable light surface as the rest
+   of the course UI. */
+.course-player-shell[data-course-theme="light"] [data-course-gate-personal-access] {
   --course-text: #f8fafc;
   --course-muted: #cbd5e1;
   --course-border: rgba(255, 255, 255, 0.14);
@@ -1061,10 +1060,6 @@
 .course-player-shell[data-course-theme="light"] [data-course-gate-personal-access] {
   background: linear-gradient(180deg, #172033, #101827);
   border-color: rgba(255, 255, 255, 0.14);
-}
-.course-player-shell[data-course-theme="light"] [data-course-experiment-panel] {
-  background-color: #080b16;
-  background-image: radial-gradient(100% 80% at 50% 0%, rgba(56, 189, 248, 0.07), transparent 65%);
 }
 .course-player-shell[data-course-theme="light"] [data-course-brain-panel] {
   color-scheme: light;

@@ -1,27 +1,9 @@
 // tests/storeViewDropdownResponsiveContract.test.mjs
 //
-// Contract for the reported store-page bug: the view-mode popover
-// (Grid / Cards / Mixed) opened by the layout-toggle button rendered as a
-// thin, crushed sliver on tablets.
-//
-// Why it happened: the popover is anchored to the 36 px layout-toggle
-// button (`absolute right-4 top-1/2`, shrink-to-fit), so its containing
-// block is that tiny box. An absolutely-positioned child with `right: 0`
-// and auto width is capped by its containing block, and the three
-// `flex: 1 1 0%` option buttons were squeezed into ~5 px slivers — an
-// unusable "thin line" on every screen size.
-//
-// The contract: the popover sizes itself from its own content
-// (`width: max-content`, also spelled out as an unlayered CSS rule) and
-// the option buttons keep their fixed 36 px tap-target size
-// (`flex: 0 0 auto`), so the three options always render side-by-side,
-// fully visible and selectable, on every tablet width and desktop
-// viewport.
-//
-// NOTE: the popover moved from StorePage.tsx to SearchBar.tsx when the
-// controls row was extracted — this contract reads the real home now.
-// Per owner request the popover opens ABOVE the toggle (it used to drop
-// below it and collide with the sticky filter bar underneath).
+// Contract for the active Store layout selector: the original issue was a
+// view popover collapsing to the width of its small trigger on tablet/desktop.
+// StorePage now uses an accessible listbox and the shared PDP glass window;
+// these checks ensure its layout variant stays self-sized and viewport-safe.
 //
 // Pure code-shape — no React, no DOM, no browser.
 
@@ -29,51 +11,47 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const searchBar = fs.readFileSync("src/components/SearchBar.tsx", "utf8");
-const css = fs.readFileSync("src/index.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const storePage = fs.readFileSync("src/components/StorePage.tsx", "utf8");
+const storeCss = fs.readFileSync("src/components/store-marketplace.css", "utf8");
+const glassCss = fs.readFileSync("src/glass.css", "utf8");
 
-test("the view-mode popover opts out of the 36px anchor's width cap", () => {
-  // The popover carries a data attribute and an explicit max-content width
-  // (Tailwind `w-max`), so the containing block can never crush it.
-  assert.match(
-    searchBar,
-    /data-store-view-options\s*className="[^"]*\bw-max\b/,
-    "the popover must declare width: max-content (w-max)",
-  );
+test("Store sort and view controls use accessible click-open listboxes", () => {
+  assert.match(storePage, /data-store-sort=\{isSort \? "" : undefined\}/);
+  assert.match(storePage, /data-store-view-selector=\{!isSort \? "" : undefined\}/);
+  assert.match(storePage, /aria-haspopup="listbox"/);
+  assert.match(storePage, /aria-expanded=\{open\}/);
+  assert.match(storePage, /role="listbox"/);
+  assert.match(storePage, /role="option"/);
+  assert.match(storePage, /closeOnOutsidePointer/);
+  assert.match(storePage, /event\.key !== "Escape"/);
+  assert.match(storePage, /moveOptionFocus/);
 });
 
-test("the three option buttons keep their fixed tap-target size", () => {
-  // `flex-none` (flex: 0 0 auto) pins each button to h-9 w-9 regardless of
-  // how wide the popover's containing block is.
-  assert.match(
-    searchBar,
-    /className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition/,
-    "each option button must be flex-none with a fixed 36px box",
-  );
-  // The popover is a horizontal row — options must never stack. Phase A6:
-  // the row is the pack's GlassSurface (radius 16 = rounded-2xl), whose
-  // content div carries the flex row.
-  assert.match(searchBar, /contentClassName="flex w-max gap-1 p-1\.5"/);
+test("the view window sizes independently from its trigger at every viewport width", () => {
+  const view = /\.dc-marketplace-view-window\s*\{([^}]*)\}/.exec(storeCss)?.[1];
+  assert.ok(view, "expected a self-sized Store view window rule");
+  assert.match(view, /width:\s*min\(190px,\s*calc\(100vw - 2rem\)\)/);
+  assert.match(view, /min-width:\s*min\(190px,\s*calc\(100vw - 2rem\)\)/);
+  assert.match(view, /height:\s*70px/);
+
+  const option = /\.dc-marketplace-popup-option--view\s*\{([^}]*)\}/.exec(storeCss)?.[1];
+  assert.ok(option, "view choices must retain a horizontal row layout");
+  assert.match(option, /flex:\s*1 1 0/);
+  assert.match(option, /min-height:\s*2\.25rem/);
+  assert.match(option, /white-space:\s*nowrap/);
 });
 
-test("the unlayered CSS rule pins the same guarantees", () => {
-  const optionsRule = /\[data-store-view-options\]\s*\{([^}]*)\}/.exec(css)?.[1];
-  assert.ok(optionsRule, "expected a [data-store-view-options] rule in index.css");
-  assert.match(optionsRule, /width:\s*max-content/);
-  assert.match(optionsRule, /min-width:\s*max-content/);
-
-  const buttonRule = /\[data-store-view-options\]\s*>\s*button\s*\{([^}]*)\}/.exec(css)?.[1];
-  assert.ok(buttonRule, "expected a [data-store-view-options] > button rule in index.css");
-  assert.match(buttonRule, /flex:\s*0\s*0\s*auto/);
+test("sort gets a readable list variant without changing the shared glass material", () => {
+  const sort = /\.dc-compact-glass-window--menu\s*\{([^}]*)\}/.exec(storeCss)?.[1];
+  assert.ok(sort, "expected a compact list variant for sort choices");
+  assert.match(sort, /width:\s*min\(15rem,\s*calc\(100vw - 2rem\)\)/);
+  assert.match(sort, /height:\s*auto/);
+  assert.match(storePage, /className=\{`dc-compact-glass-window/);
+  assert.match(glassCss, /\.dc-compact-glass-window\s*\{[\s\S]*?background:[\s\S]*?backdrop-filter:\s*blur\(clamp\(1px,\s*0\.125em,\s*4px\)\)/);
 });
 
-test("the popover opens above the toggle, right-aligned to it", () => {
-  // Owner request: the popover rises above the button (bottom-full) and
-  // stays right-aligned (right-0) — dropping below it collided with the
-  // sticky filter bar underneath. Paint tokens (`dc-scene-plate` contrast
-  // backing, radius 16, w-max row) are unchanged.
-  assert.match(
-    searchBar,
-    /className="dc-scene-plate absolute bottom-full right-0 z-30 mb-1\.5 flex w-max text-white"\s*radius=\{16\}/,
-  );
+test("both Store windows use the PDP opening placement and exact stretch animation", () => {
+  assert.match(glassCss, /\.dc-compact-glass-window\s*\{[\s\S]*?bottom:\s*calc\(100%\s*\+\s*0\.375rem\)/);
+  assert.match(glassCss, /\.dc-compact-glass-window\[data-open="true"\][\s\S]*?animation:\s*dc-compact-glass-window-stretch 760ms ease-out 40ms both/);
+  assert.match(glassCss, /@keyframes dc-compact-glass-window-stretch[\s\S]*?10%\s*\{[^}]*scale\(1\.1,\s*0\.9\)[\s\S]*?30%\s*\{[^}]*scale\(0\.9,\s*1\.1\)/);
 });

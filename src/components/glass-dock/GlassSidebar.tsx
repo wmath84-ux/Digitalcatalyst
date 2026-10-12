@@ -200,6 +200,7 @@ export default function GlassSidebar({
   onOpenChange,
   remember = true,
   showToggle = true,
+  surfaceVariant = 'rail',
 }: {
   items: GlassSidebarItem[]
   onSelect: (id: string) => void
@@ -214,6 +215,8 @@ export default function GlassSidebar({
   remember?: boolean
   /** Hide the collapse control when this rail is used as an overlay drawer. */
   showToggle?: boolean
+  /** Select a scoped material for the phone header's portalled glass drawer. */
+  surfaceVariant?: 'rail' | 'header-drawer'
 }) {
   // EXPANDED on boot. The reference starts collapsed; that is the state the
   // owner reported as "it never expands" on a tablet.
@@ -259,6 +262,7 @@ export default function GlassSidebar({
         className="absolute inset-y-0 left-0 z-40 isolate flex flex-col gap-1 overflow-hidden rounded-3xl px-2.5 py-3 text-white"
         aria-label="Primary"
         data-glass-sidebar
+        data-glass-sidebar-surface={surfaceVariant}
       >
         {/* Separate non-animating blur layer. */}
         <div

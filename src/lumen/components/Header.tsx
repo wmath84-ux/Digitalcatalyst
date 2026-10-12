@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff, Sun } from "lucide-react";
+import { Cloud, CloudOff, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
 import { tierLte } from "../lib/tier";
 import type { AIModel, Chat, Tier } from "../lib/types";
 import { cn } from "../utils/cn";

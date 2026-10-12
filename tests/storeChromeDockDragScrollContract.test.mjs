@@ -50,6 +50,7 @@ const dock = read("src/components/glass-dock/GlassDock.tsx");
 const dockMaterial = read("src/components/glass-dock/GlassMaterial.tsx");
 const bottomNav = read("src/components/BottomNav.tsx");
 const sharedHeader = read("src/components/Header.tsx");
+const storeApp = read("src/App.tsx");
 const storePage = read("src/components/StorePage.tsx");
 const storeHero = read("src/components/Hero.tsx");
 const searchBar = read("src/components/SearchBar.tsx");
@@ -393,16 +394,36 @@ test("the store's own surfaces wear the plate", () => {
   );
 });
 
-test("native marketplace copy has its own ink floor without repainting the app chrome", () => {
+test("the Store header copy is seamless and the marketplace starts with search", () => {
   const native = read("src/components/store-marketplace.css");
-  assert.match(storePage, /dc-marketplace-heading/);
-  assert.match(storePage, /Explore the Store/);
-  assert.match(storePage, /\{appName\} · Learning marketplace/);
+  assert.match(storeApp, /title=\{activeTab === "store" \? "Explore the Store" : undefined\}/);
+  assert.match(storeApp, /subtitle=\{activeTab === "store" \? "Courses, notes and resources for your next step\." : undefined\}/);
+  assert.match(storeApp, /seamless=\{activeTab === "store"\}/);
+  assert.match(sharedHeader, /data-header-seamless=\{seamless \? "true" : undefined\}/);
+  assert.match(storePage, /data-store-search-trigger/);
+  assert.doesNotMatch(storePage, /dc-marketplace-heading|Learnbook|Learning marketplace|Explore the Store|Courses, notes and resources for your next step/);
   assert.doesNotMatch(storePage, /<Hero|<TiltedCoverflow|data-store-top-rated/);
+  assert.match(indexCss, /\[data-site-header\]\[data-header-seamless\][\s\S]*?box-shadow: none !important/);
   assert.match(native, /text-shadow: none/);
   assert.match(native, /color: #f8fafc/);
   // Existing glass consumers remain gated and their material stays unchanged.
   assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-ink\)/);
+});
+
+test("Store sort and layout popovers reuse the compact glass window and remain keyboard accessible", () => {
+  const storeControls = read("src/components/store-marketplace.css");
+  assert.match(storePage, /aria-haspopup="listbox"/);
+  assert.match(storePage, /aria-expanded=\{open\}/);
+  assert.match(storePage, /role="listbox"/);
+  assert.match(storePage, /role="option"/);
+  assert.match(storePage, /data-store-sort-options/);
+  assert.match(storePage, /data-store-view-popover/);
+  assert.match(storePage, /closeOnOutsidePointer/);
+  assert.match(storePage, /event\.key !== "Escape"/);
+  assert.match(storePage, /className=\{`dc-compact-glass-window/);
+  assert.match(storeControls, /\.dc-compact-glass-window--menu\s*\{[\s\S]*?width: min\(15rem, calc\(100vw - 2rem\)\)/);
+  assert.match(storeControls, /\.dc-marketplace-view-window\s*\{[\s\S]*?width: min\(190px, calc\(100vw - 2rem\)\)/);
+  assert.match(css, /\.dc-compact-glass-window\[data-open="true"\][\s\S]*?animation: dc-compact-glass-window-stretch 760ms ease-out 40ms both/);
 });
 
 test("the ramp lift is justified by the band the hero actually sits on", () => {

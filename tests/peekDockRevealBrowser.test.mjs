@@ -1,31 +1,19 @@
 // tests/peekDockRevealBrowser.test.mjs
 //
-// THE PEEK DOCK IN A REAL BROWSER. Owner brief 2026-10-02:
+// REAL-BROWSER coverage for the two distinct navigation controls.
 //
-//   "Line par click ya drag karne par footer navigation reveal hota hai. Abhi
-//    problem ye hai ki line se footer navigation ki taraf pointer le jaate hi
-//    footer navigation turant hide ho jata hai, jiski wajah se footer ke kisi
-//    button par click nahi ho pata. … Footer navigation tabhi hide ho jab user
-//    actual interaction area se bahar chala jaaye."
+// DesktopShell still uses a reveal dock, so its pointer/touch tests protect the
+// reported line-to-button interaction. Course Player now uses a regular,
+// in-flow CoursePeekDock study strip instead of a reveal overlay; its tests
+// assert that the strip is already visible in document flow and that pointer
+// and touch clicks select the requested tab directly.
 //
 // Two fixture pages (tests/fixtures/peekDockHarness) mount the production
 // components on the chrome production gives them:
-//   · shell.html  — the REAL DesktopShell (rail + page column + the real
-//                   DesktopPeekDock), with the Firebase-backed contexts stubbed
-//                   by Vite aliases so nothing here touches the network;
+//   · shell.html — the REAL DesktopShell (rail + page column + DesktopPeekDock),
+//     with Firebase-backed contexts stubbed so nothing touches the network;
 //   · harness.html?mode=course — the REAL CoursePeekDock inside a
-//                   `.course-player-shell` and the player's keyboard provider.
-//
-// What is proved, with real pointer / touch input:
-//   · a pointer can walk from the line to a button, open the whole way, and
-//     click the button it reaches;
-//   · a `pointerleave` that reaches the line while the pointer is over the
-//     dock does NOT hide it (the exact reported failure, reproduced
-//     synthetically);
-//   · press-drag from the line onto a button selects that button;
-//   · a touch tap on the line pins the dock open (it does not flash closed at
-//     the end of the contact) and a tap on a button selects it;
-//   · the dock DOES hide once the pointer really leaves the area.
+//     `.course-player-shell` and the player's keyboard provider.
 //
 // Needs Chromium, like tests/noteEditorBrowser.test.mjs: install Playwright's
 // (`npx playwright install chromium`) or point PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
@@ -116,10 +104,8 @@ const DESKTOP = {
 };
 const COURSE = {
   page: "/tests/fixtures/peekDockHarness/harness.html?mode=course",
-  root: "[data-course-peek-dock]",
-  line: "[data-course-peek-line-hit]",
-  panel: "[data-course-peek-panel]",
-  item: "[data-glass-dock-item]",
+  root: "[data-course-strip-nav]",
+  item: "[data-course-strip]",
 };
 
 async function openPage(dock, { width = 1440, height = 900, touch = false } = {}) {
@@ -283,46 +269,43 @@ browserTest("desktop touch: tapping the line pins the dock open, and a tap on a 
   await context.close();
 });
 
-browserTest("course: the pointer walks from the line to a tab and clicks it", async () => {
+browserTest("course: the study strip is in flow on load and a pointer click selects a tab directly", async () => {
   const { page, context, problems } = await openPage(COURSE);
-  const line = await rectOf(page, COURSE.line);
-  const lx = (line.left + line.right) / 2;
-  const ly = line.bottom - 2;
+  const layout = await page.evaluate((selector) => {
+    const nav = document.querySelector(selector);
+    const body = document.querySelector(".course-player-shell > p");
+    const rect = nav.getBoundingClientRect();
+    return {
+      position: getComputedStyle(nav).position,
+      height: rect.height,
+      top: rect.top,
+      bodyBottom: body.getBoundingClientRect().bottom,
+      legacyOverlay: Boolean(document.querySelector("[data-course-peek-dock], [data-course-peek-line-hit]")),
+    };
+  }, COURSE.root);
+  assert.equal(layout.position, "static", "the Course Player strip is a normal in-flow footer, not an overlay");
+  assert.ok(layout.height >= 44, "the strip has a usable touch target height");
+  assert.ok(layout.top >= layout.bodyBottom, "the strip follows its content instead of covering it");
+  assert.equal(layout.legacyOverlay, false, "the retired reveal dock is not mounted for Course Player");
+  assert.equal(await page.locator(COURSE.root).isVisible(), true, "the strip is visible without hovering or tapping a reveal line");
 
-  await page.mouse.move(lx, ly, { steps: 3 });
-  await page.waitForTimeout(400);
-  assert.equal(await isOpen(page, COURSE.root), true);
-
-  const items = await rectsOf(page, COURSE.item);
-  const target = items[2];
-  const tx = (target.left + target.right) / 2;
-  const ty = (target.top + target.bottom) / 2;
-  for (let y = Math.round(ly); y >= Math.round(ty); y -= 3) {
-    await page.mouse.move(lx, y);
-    assert.equal(await isOpen(page, COURSE.root), true, `the course dock hid at y=${y} while travelling to the tabs`);
-  }
-  await page.mouse.click(tx, ty);
-  await page.waitForTimeout(400);
-  const selected = await page.evaluate(() => window.__selected);
-  assert.deepEqual(selected, ["notes"], "the tab under the pointer is the one selected");
+  await page.locator('[data-course-strip="modules"]').focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-course-strip")), "brain");
+  await page.locator('[data-course-strip="notes"]').click();
+  assert.deepEqual(await page.evaluate(() => window.__selected), ["notes"], "the clicked tab is selected immediately");
+  assert.equal(await page.locator('[data-course-strip="notes"]').getAttribute("aria-pressed"), "true");
   assert.deepEqual(problems, []);
   await context.close();
 });
 
-browserTest("course touch: the tap pins the dock open and a tap on a tab selects it", async () => {
-  const { page, context } = await openPage(COURSE, { touch: true });
-  const line = await rectOf(page, COURSE.line);
-  const lx = Math.round((line.left + line.right) / 2);
-  const ly = Math.round(line.bottom - 2);
-
-  await page.touchscreen.tap(lx, ly);
-  await page.waitForTimeout(700);
-  assert.equal(await isOpen(page, COURSE.root), true, "a touch tap keeps the course dock open");
-
-  const items = await rectsOf(page, COURSE.item);
-  const target = items[2];
+browserTest("course touch: one direct tap on the visible study strip selects a tab", async () => {
+  const { page, context, problems } = await openPage(COURSE, { touch: true });
+  assert.equal(await page.locator(COURSE.root).isVisible(), true, "the touch layout needs no pin/reveal tap");
+  const target = await rectOf(page, '[data-course-strip="notes"]');
   await page.touchscreen.tap(Math.round((target.left + target.right) / 2), Math.round((target.top + target.bottom) / 2));
-  await page.waitForTimeout(400);
-  assert.ok((await page.evaluate(() => window.__selected)).includes(target.id), "tapping a tab selects it");
+  assert.deepEqual(await page.evaluate(() => window.__selected), ["notes"], "the tap selects the tab");
+  assert.equal(await page.locator('[data-course-strip="notes"]').getAttribute("aria-pressed"), "true");
+  assert.deepEqual(problems, []);
   await context.close();
 });

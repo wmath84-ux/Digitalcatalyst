@@ -502,7 +502,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
         color: "#C9A96E",
         title: update.title,
         subtitle: update.contentNames.slice(0, 3).join(" · "),
-        extra: <span className="text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span>,
+        extra: <span className="text-xs font-black text-amber-800">₹{update.price.toLocaleString("en-IN")}</span>,
         press: () => onBuyUpdate(update),
         dataAttrs: { "data-course-overlay-buy-update": update.id },
       });
@@ -516,7 +516,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
         color: "#C9A96E",
         title: module.title,
         subtitle: "Paid module",
-        extra: <span className="max-w-[90px] truncate text-[10px] font-black text-amber-200/80">{module.paidUpdateTitle || "Unlock"}</span>,
+        extra: <span className="max-w-[90px] truncate text-[10px] font-black text-amber-800">{module.paidUpdateTitle || "Unlock"}</span>,
         press: () => onBuyModule({ id: moduleId, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice }),
         dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": depth },
       });
@@ -799,7 +799,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // writing surface. Hiding (not unmounting) preserves the pane's restore.
   const dock = props.peekDock ? null : (
     <div
-      className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 ${keyboardVisible ? "hidden" : ""}`}
+      className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-0 ${keyboardVisible ? "hidden" : ""}`}
       data-course-dock
       data-orientation={orientation}
       data-in-split="true"
@@ -820,7 +820,8 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // fills it: tab body, footer dock (in that order). There is NO header row —
   // every tab starts at the very top of the pane so the content keeps every
   // pixel the header used to take.
-  const peekPad = props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : "";
+  // The compact study strip is an in-flow sibling below the Split Deck, not an
+  // overlay on its content. Do not reserve the old 16px peek-dock spacer here.
   const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read";
 
   return (
@@ -831,13 +832,13 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${hideKeyedBody ? "hidden" : ""}`}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
       >
         {studyBody}
       </motion.div>
       {props.aiPanel ? (
         <div
-          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "ai" ? "flex" : "hidden"}`}
+          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "ai" ? "flex" : "hidden"}`}
           data-course-ai-panel
           hidden={props.tab !== "ai"}
           aria-hidden={props.tab !== "ai"}
@@ -846,7 +847,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         </div>
       ) : null}
       <div
-        className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "read" ? "flex" : "hidden"}`}
+        className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "read" ? "flex" : "hidden"}`}
         data-course-read-tab
         hidden={props.tab !== "read"}
         aria-hidden={props.tab !== "read"}

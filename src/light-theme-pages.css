@@ -727,17 +727,31 @@ html[data-theme="light"] .dc-marketplace-search {
   border-color: var(--dc-line-strong);
   color: var(--dc-ink-2);
 }
-html[data-theme="light"] .dc-marketplace-search input { color: var(--dc-ink); }
+html[data-theme="light"] .dc-marketplace-search { color: var(--dc-ink-faint); }
+html[data-theme="light"] .dc-marketplace-search-placeholder { color: var(--dc-ink-faint); }
 html[data-theme="light"] .dc-marketplace-chips button { color: var(--dc-ink-2); }
 html[data-theme="light"] .dc-marketplace-chips button[aria-pressed="true"] {
   background: #004ac6;
   color: #ffffff;
 }
 html[data-theme="light"] .dc-marketplace-toolbar { color: var(--dc-ink-3); }
-html[data-theme="light"] .dc-marketplace-arrange select {
+html[data-theme="light"] .dc-marketplace-arrange select,
+html[data-theme="light"] .dc-marketplace-popup-trigger {
   background: var(--dc-bg-muted);
   color: var(--dc-ink);
   border-color: var(--dc-line-strong);
+}
+html[data-theme="light"] .dc-marketplace-popup-trigger:hover { border-color: rgba(37, 99, 235, 0.42); }
+html[data-theme="light"] .dc-marketplace-popup-option { color: var(--dc-ink); }
+html[data-theme="light"] .dc-marketplace-popup-option:hover,
+html[data-theme="light"] .dc-marketplace-popup-option:focus-visible,
+html[data-theme="light"] .dc-marketplace-popup-option[data-selected="true"] {
+  background: rgba(0, 74, 198, 0.08);
+  color: #003ea8;
+}
+html[data-theme="light"] .dc-marketplace-popup-option--view[data-selected="true"] {
+  background: rgba(0, 74, 198, 0.12);
+  color: #003ea8;
 }
 html[data-theme="light"] .dc-marketplace-card {
   background: var(--dc-bg-secondary);

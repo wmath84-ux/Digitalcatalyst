@@ -20,11 +20,14 @@ test('every available study tool remains reachable and keyboard accessible', () 
   assert.match(nav, /ArrowLeft.*ArrowRight.*Home.*End/);
   assert.match(nav, /aria-pressed=\{tab === item.key\}/);
 });
-test('keyboard hides strips and the footer occupies real layout space', () => {
+test('keyboard hides strips and the footer occupies real layout space without a top spacer', () => {
   assert.match(nav, /if \(keyboardVisible\) return null/);
   assert.match(css, /flex: 0 0 auto/);
   assert.doesNotMatch(css, /position: fixed/);
   assert.match(css, /safe-area-inset-bottom/);
+  assert.match(css, /padding:\s*0 max\(8px, env\(safe-area-inset-right\)\)/);
+  const overlay = read('src/course/CourseOverlay.tsx');
+  assert.doesNotMatch(overlay, /peekPad|pb-\[calc\(max\(env\(safe-area-inset-bottom\),10px\)\+16px\)\]/);
 });
 test('strips have readable labels, large touch targets and horizontal overflow', () => {
   assert.match(css, /font-size: 14px/);

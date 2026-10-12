@@ -104,8 +104,17 @@ async function open({ width = 1100, height = 760, touch = false, init, pagePath 
   page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
   page.on("console", (message) => { if (message.type() === "error") problems.push(`console.error: ${message.text()}`); });
   await page.goto(`${origin}${pagePath}`);
-  await page.waitForSelector(pagePath === PAGE_PATH ? "[data-course-notes-add]" : "[data-note-editor] .bn-editor");
   const press = (selector) => (touch ? page.tap(selector) : page.click(selector));
+  if (pagePath === HANDLE_PATH) {
+    await page.waitForSelector("[data-note-editor] .bn-editor");
+  } else {
+    await page.waitForSelector("[data-course-notes-panel]");
+    // The panel remembers the MASTER/SELF collection separately; always make
+    // the private notes view explicit so an Add-note test never races a stored
+    // preference or tries to compose into the read-only master collection.
+    await press('[data-course-note-collection="self"]');
+    await page.waitForSelector("[data-course-notes-add]");
+  }
   const editorReady = async () => { await page.waitForSelector("[data-note-editor] .bn-editor", { timeout: 30000 }); await page.waitForTimeout(350); };
   return { page, context, problems, press, editorReady };
 }
@@ -733,43 +742,43 @@ for (const engine of ["resize", "overlay"]) {
   });
 }
 
-// ── The toolbar vs the player's FOOTER NAVIGATION ──────────────────────────
+// ── The toolbar vs the player's in-flow FOOTER NAVIGATION ──────────────────
 //
-// With no soft keyboard — a desktop, a big tablet in desktop view, a floating
-// window — the thing at the bottom of the player is the footer navigation, and
-// the toolbar must end exactly where it begins. The harness reproduces both of
-// the footer's homes (`?footer=peek` / `?footer=pane`).
+// The current Course Player strip lives after the split stage in normal flow;
+// it does not overlay the writing surface and must not create an inset/gap.
+// `?footer=pane` still covers the legacy in-pane dock option.
 
-browserTest("peek footer: the toolbar sits just above it, and drops flush when the footer is off", async () => {
+browserTest("in-flow Course Player strip: the split-pane toolbar meets it without an extra inset", async () => {
   const { page, context, press, editorReady, problems } = await open({ width: 390, height: 844, touch: true, pagePath: `${PAGE_PATH}?footer=peek` });
   await press("[data-course-notes-add]");
   await editorReady();
   assert.equal(await page.evaluate(() => window.__kb.visible), false, "no keyboard is open — the caret alone brought the toolbar up");
-  const footer = await firstVisibleRect(page, "[data-course-peek-dock]");
-  assert.ok(footer && footer.height > 0, "the footer navigation is on screen");
+  assert.ok(await page.locator("[data-course-split-deck]").count(), "the test runs inside the real split-pane layout");
+  const footer = await firstVisibleRect(page, "[data-course-strip-nav]");
+  assert.ok(footer && footer.height > 0, "the in-flow study strip is on screen");
   const dock = await firstVisibleRect(page, "[data-note-dock]");
   assert.ok(dock, "the toolbar is up");
   assert.equal(
     await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")),
-    String(Math.round(footer.height)),
-    "lifted by exactly what the footer covers",
+    null,
+    "an in-flow course strip must not be treated as an overlay inset",
   );
-  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the toolbar ends where the footer begins (dock ${dock.bottom}, footer ${footer.top})`);
+  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the split-pane toolbar ends at the strip, with no gap (dock ${dock.bottom}, strip ${footer.top})`);
 
-  // Footer navigation OFF — this is exactly what the player's ONE keyboard rule
-  // does to it (`display: none`). The toolbar must drop flush to the bottom,
-  // not keep a gap above nothing.
-  await page.evaluate(() => { const f = document.querySelector("[data-course-peek-dock]"); if (f) f.style.display = "none"; });
-  await page.waitForFunction(() => document.querySelector(".dc-note-shell")?.getAttribute("data-note-footer-inset") === null, null, { timeout: 8000 });
+  // When the strip is hidden (as it is while the soft keyboard is open), the
+  // split stage expands and the toolbar follows the pane instead of retaining
+  // an empty band above the viewport edge.
+  await page.evaluate(() => { const strip = document.querySelector("[data-course-strip-nav]"); if (strip) strip.style.display = "none"; });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector("[data-course-strip-nav]")).display === "none");
   const dropped = await firstVisibleRect(page, "[data-note-dock]");
   const bottom = await page.evaluate(() => window.innerHeight);
-  assert.ok(dropped, "the toolbar is still there — the caret never left");
-  assert.ok(Math.abs(dropped.bottom - bottom) <= 1.5, `flush with the bottom (dock ${dropped.bottom}, bottom ${bottom})`);
+  assert.equal(await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")), null);
+  assert.ok(dropped, "the toolbar remains up while the caret is in the note");
+  assert.ok(Math.abs(dropped.bottom - bottom) <= 1.5, `the expanded split stage reaches the viewport bottom (dock ${dropped.bottom}, bottom ${bottom})`);
 
-  // …and it comes back with the footer.
-  await page.evaluate(() => { const f = document.querySelector("[data-course-peek-dock]"); if (f) f.style.display = ""; });
-  await page.waitForFunction(() => document.querySelector(".dc-note-shell")?.getAttribute("data-note-footer-inset") !== null, null, { timeout: 8000 });
-  assert.ok(Math.abs((await firstVisibleRect(page, "[data-note-dock]")).bottom - (await firstVisibleRect(page, "[data-course-peek-dock]")).top) <= 1.5, "above the footer again");
+  await page.evaluate(() => { const strip = document.querySelector("[data-course-strip-nav]"); if (strip) strip.style.display = ""; });
+  const restored = await firstVisibleRect(page, "[data-course-strip-nav]");
+  assert.ok(Math.abs((await firstVisibleRect(page, "[data-note-dock]")).bottom - restored.top) <= 1.5, "the toolbar returns to the strip without a gap");
   assert.deepEqual(problems, []);
   await context.close();
 });

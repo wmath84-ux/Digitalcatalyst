@@ -32,7 +32,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "../../firebase";
+import { auth, db } from "../../firebase";
+import { apiFetch } from "../utils/apiBase";
 import { retrySharedCollection, retrySharedDoc, subscribeShared, subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { useAuth } from "../context/AuthContext";
 import { collectLibraryProductIds } from "../../utils/libraryOwnership";
@@ -79,6 +80,61 @@ const EMPTY_PLAN: SubscriptionPlanContext = {
 };
 
 const timestampMillis = ownershipTimestamp;
+const ACCESS_UNVERIFIED_ERROR = "Your content access could not be verified. Check your connection and retry.";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value));
+const stringSet = (value: unknown) => new Set(
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
+);
+const stringRecord = (value: unknown): Record<string, string> => {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+};
+const resolutionFromServer = (value: unknown): CourseAccessResolution | null => {
+  if (!isRecord(value) || typeof value.hasFullProductAccess !== "boolean") return null;
+  return {
+    hasFullProductAccess: value.hasFullProductAccess,
+    hasPurchasedFullProduct: typeof value.hasPurchasedFullProduct === "boolean" ? value.hasPurchasedFullProduct : undefined,
+    hasSubscriptionProductAccess: typeof value.hasSubscriptionProductAccess === "boolean" ? value.hasSubscriptionProductAccess : undefined,
+    ownedModuleIds: stringSet(value.ownedModuleIds),
+    ownedResourceIds: stringSet(value.ownedResourceIds),
+    ownedUpdateIds: stringSet(value.ownedUpdateIds),
+    subscriptionGrantedModuleIds: stringSet(value.subscriptionGrantedModuleIds),
+    accessibleModuleIds: stringSet(value.accessibleModuleIds),
+    accessibleResourceIds: stringSet(value.accessibleResourceIds),
+    lockedModuleIds: stringSet(value.lockedModuleIds),
+    previewModuleIds: stringSet(value.previewModuleIds),
+    moduleAccessSources: stringRecord(value.moduleAccessSources) as CourseAccessResolution["moduleAccessSources"],
+    resourceAccessSources: stringRecord(value.resourceAccessSources) as CourseAccessResolution["resourceAccessSources"],
+    unmetDependencies: isRecord(value.unmetDependencies)
+      ? Object.fromEntries(Object.entries(value.unmetDependencies).filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].every((id) => typeof id === "string")))
+      : {},
+  };
+};
+const subscriptionFromServer = (value: unknown): SubscriptionRecordShape | null => {
+  if (!isRecord(value)) return null;
+  return {
+    uid: typeof value.uid === "string" ? value.uid : undefined,
+    planId: typeof value.planId === "string" ? value.planId : undefined,
+    cycle: value.cycle === "yearly" ? "yearly" : "monthly",
+    status: typeof value.status === "string" ? value.status : undefined,
+    expiresAt: Number.isFinite(Number(value.expiresAt)) ? Number(value.expiresAt) : undefined,
+    activatedAt: Number.isFinite(Number(value.activatedAt)) ? Number(value.activatedAt) : undefined,
+    autoRenew: Boolean(value.autoRenew),
+    includedProductIds: Array.isArray(value.includedProductIds) ? value.includedProductIds.filter((id): id is string => typeof id === "string") : [],
+    includedModuleKeys: Array.isArray(value.includedModuleKeys) ? value.includedModuleKeys.filter((id): id is string => typeof id === "string") : [],
+  };
+};
+
+type ServerAccessState = {
+  uid: string | null;
+  key: string;
+  status: "idle" | "loading" | "ready" | "error";
+  resolution: CourseAccessResolution | null;
+  subscription: SubscriptionRecordShape | null;
+  error: string | null;
+};
 
 interface UseCourseAccessArgs {
   /** The product to resolve access for. Required. */
@@ -146,24 +202,110 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = fa
   const [legacyUpdateByProduct, setLegacyUpdateByProduct] = useState<Record<string, string[]>>({});
   const [legacyPurchaseProductIds, setLegacyPurchaseProductIds] = useState<string[]>([]);
   const [sync, setSync] = useState<{ uid: string | null; ready: string[]; errors: Record<string, string> }>({ uid: null, ready: [], errors: {} });
+  const [serverAccess, setServerAccess] = useState<ServerAccessState>({ uid: null, key: "", status: "idle", resolution: null, subscription: null, error: null });
+  const [serverAccessRetry, setServerAccessRetry] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const sourceStatus = (source: string, error: unknown) => setSync((previous) => {
+  const item = product as { id?: string; documentId?: string } | null;
+  const productId = item?.id ? String(item.id) : "";
+  const documentId = item?.documentId ? String(item.documentId) : "";
+  const productKey = JSON.stringify([productId, documentId]);
+  const hasProduct = Boolean(product);
+  const sourceStatus = (source: string, failure: unknown) => setSync((previous) => {
     const current = previous.uid === uid ? previous : { uid, ready: [], errors: {} };
     const errors = { ...current.errors };
-    if (error) errors[source] = "Your content access could not be verified. Check your connection and retry.";
+    if (failure) errors[source] = ACCESS_UNVERIFIED_ERROR;
     else delete errors[source];
     return { uid, ready: [...new Set([...current.ready, source])], errors };
   });
-  const error = uid && !skip && sync.uid === uid ? Object.values(sync.errors)[0] || null : null;
-  const loading = Boolean(uid && !skip && !error && (sync.uid !== uid || sync.ready.length < 4));
+  const sourceErrors = uid && !skip && sync.uid === uid ? Object.values(sync.errors) : [];
+  const firestoreHasError = sourceErrors.length > 0;
+  const canUseServerAccess = Boolean(uid && !skip && hasProduct && firestoreHasError);
+  const serverAccessMatches = serverAccess.uid === uid && serverAccess.key === productKey;
+  const serverAccessReady = canUseServerAccess && serverAccessMatches && serverAccess.status === "ready";
+  const serverAccessFailed = canUseServerAccess && serverAccessMatches && serverAccess.status === "error";
+  const error = firestoreHasError
+    ? canUseServerAccess
+      ? serverAccessFailed ? serverAccess.error || ACCESS_UNVERIFIED_ERROR : null
+      : sourceErrors[0] || ACCESS_UNVERIFIED_ERROR
+    : null;
+  const loading = Boolean(uid && !skip && (
+    firestoreHasError
+      ? canUseServerAccess && !serverAccessReady && !serverAccessFailed
+      : sync.uid !== uid || sync.ready.length < 4
+  ));
   const retry = () => {
     if (!uid) return;
     setSync({ uid, ready: [], errors: {} });
+    setServerAccess({ uid, key: productKey, status: "idle", resolution: null, subscription: null, error: null });
+    setServerAccessRetry((value) => value + 1);
     retrySharedCollection(`entitlements:${uid}`);
     retrySharedDoc(`users/${uid}/subscription/current`);
     retrySharedDoc(`users/${uid}`);
     retrySharedCollection(`users/${uid}/purchases`);
   };
+
+  // A rules-denied client read is retried through the authenticated Admin-SDK
+  // endpoint. The browser sends product identifiers only; the server derives
+  // ownership exclusively from the verified token and canonical Firestore.
+  useEffect(() => {
+    if (!uid || skip || !hasProduct || !firestoreHasError) {
+      setServerAccess((previous) => {
+        if (previous.uid === uid && previous.key === productKey && previous.status === "idle") return previous;
+        return { uid, key: productKey, status: "idle", resolution: null, subscription: null, error: null };
+      });
+      return undefined;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    let rejectTimeout!: (failure: Error) => void;
+    const timeout = new Promise<never>((_resolve, reject) => { rejectTimeout = reject; });
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+      rejectTimeout(new Error("Server access verification timed out."));
+    }, 15_000);
+    setServerAccess({ uid, key: productKey, status: "loading", resolution: null, subscription: null, error: null });
+
+    const request = async () => {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || firebaseUser.uid !== uid) throw new Error("Sign in again to verify course access.");
+      const token = await firebaseUser.getIdToken();
+      if (!token) throw new Error("A verified sign-in is required.");
+      const response = await apiFetch("/api/course-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productId, documentId }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string; resolution?: unknown; subscription?: unknown } | null;
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Server access verification failed (${response.status}).`);
+      const resolved = resolutionFromServer(payload.resolution);
+      if (!resolved) throw new Error("Server returned an invalid access result.");
+      if (cancelled || currentUid.current !== uid || auth.currentUser?.uid !== uid) return;
+      setServerAccess({
+        uid,
+        key: productKey,
+        status: "ready",
+        resolution: resolved,
+        subscription: subscriptionFromServer(payload.subscription),
+        error: null,
+      });
+    };
+
+    void Promise.race([request(), timeout]).catch((failure: unknown) => {
+      console.warn("[useCourseAccess] server access fallback failed", failure);
+      if (cancelled || currentUid.current !== uid || auth.currentUser?.uid !== uid) return;
+      setServerAccess({ uid, key: productKey, status: "error", resolution: null, subscription: null, error: ACCESS_UNVERIFIED_ERROR });
+    }).finally(() => window.clearTimeout(timeoutId));
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [uid, skip, productKey, hasProduct, firestoreHasError, serverAccessRetry]);
+
   useEffect(() => {
     if (!uid || skip) return;
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -191,8 +333,8 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = fa
           setEntitlementDocs([]);
           return;
         }
-        const docs: EntitlementDoc[] = entries.map((item) => {
-          const data = item.data || {};
+        const docs: EntitlementDoc[] = entries.map((entry) => {
+          const data = entry.data || {};
           // The doc id is `uid__<entitlementId>`; the
           // server-authoritative shape is on the doc body.
           return {
@@ -305,14 +447,14 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = fa
           return;
         }
         const ids = new Set<string>();
-        entries.forEach((item) => {
-          const data = item.data || {};
+        entries.forEach((entry) => {
+          const data = entry.data || {};
           // Per-Part 6: the base product purchase is stored
           // at docId = productId. We also look at
           // productDocumentId for the same.
           if (data.planId || data.subscriptionPlanId || data.source === "subscription") return;
-          if (!isActiveOwnershipRecord(data) || !isFullProductPurchase({ ...data, productDocumentId: data.productDocumentId || data.productId || item.id })) return;
-          const id = String(data.productDocumentId || data.productId || item.id);
+          if (!isActiveOwnershipRecord(data) || !isFullProductPurchase({ ...data, productDocumentId: data.productDocumentId || data.productId || entry.id })) return;
+          const id = String(data.productDocumentId || data.productId || entry.id);
           if (id) ids.add(id);
         });
         setLegacyPurchaseProductIds(Array.from(ids));
@@ -339,6 +481,9 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = fa
   // inputs change.
   const resolution = useMemo<CourseAccessResolution>(() => {
     if (!uid || skip || !product || loading || error) return EMPTY_RESOLUTION;
+    if (firestoreHasError) {
+      return serverAccessReady && serverAccess.resolution ? serverAccess.resolution : EMPTY_RESOLUTION;
+    }
     const item = product as { id?: string; documentId?: string };
     const aliases = new Set([item.id, item.documentId].filter(Boolean).map(String));
     const canonical = entitlementDocs.filter((record) => record.uid === uid && record.productId && aliases.has(String(record.productId)));
@@ -358,9 +503,12 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate, skip = fa
       requireBaseCourseForUpdate,
       now,
     });
-  }, [uid, product, entitlementDocs, legacyProductIds, legacyPurchaseProductIds, legacyUpdateByProduct, planContext, requireBaseCourseForUpdate, loading, error, now, skip]);
+  }, [uid, product, entitlementDocs, legacyProductIds, legacyPurchaseProductIds, legacyUpdateByProduct, planContext, requireBaseCourseForUpdate, loading, error, now, skip, firestoreHasError, serverAccessMatches, serverAccess.status, serverAccess.resolution]);
 
-  const currentSubscription = uid && !skip && !loading && !error && subscription?.uid === uid ? subscription : null;
+  const activeSubscription = firestoreHasError
+    ? serverAccessReady ? serverAccess.subscription : null
+    : subscription?.uid === uid ? subscription : null;
+  const currentSubscription = uid && !skip && !loading && !error ? activeSubscription : null;
   const hasActiveSubscription = Boolean(currentSubscription && isSubscriptionRecordActive(currentSubscription, now));
 
   return {

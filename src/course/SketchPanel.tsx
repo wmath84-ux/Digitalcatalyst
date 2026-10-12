@@ -355,7 +355,7 @@ function SketchBoards({
           aria-label={`Delete active canvas "${activeBoardTitle}"`}
           title={`Delete active canvas "${activeBoardTitle}"`}
           data-course-sketch-delete-active
-          className="flex h-6 w-6 items-center justify-center rounded-md border border-rose-400/40 text-rose-300 transition-colors hover:bg-rose-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-300"
+          className="flex h-9 w-[5.5rem] shrink-0 items-center justify-center rounded-lg border border-rose-400/40 text-rose-300 transition-colors hover:bg-rose-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-300"
         >
           <Trash2 aria-hidden size={14} />
         </button>
@@ -366,16 +366,14 @@ function SketchBoards({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Canvas: ${activeBoardTitle}. ${boards.length} canvas${boards.length === 1 ? "" : "es"} in this module`}
+        title={`Canvas: ${activeBoardTitle}. ${boards.length} canvas${boards.length === 1 ? "" : "es"} in this module`}
         data-course-sketch-board-switch
-        className={`flex h-6 min-w-0 max-w-[9rem] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold transition-colors ${
+        className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-xs font-semibold transition-colors ${
           open ? "border-white/30 bg-white/10 text-white" : "border-white/15 text-white/80 hover:bg-white/10 hover:text-white"
         }`}
       >
         <Layers aria-hidden size={12} className="shrink-0 text-white/55" />
-        <span className="truncate" data-course-sketch-active-board={activeBoardKey}>{activeBoardTitle}</span>
-        {boards.length > 1 ? (
-          <span className="shrink-0 rounded bg-white/10 px-1 text-[9px] tabular-nums text-white/60">{boards.length}</span>
-        ) : null}
+        <span className="min-w-0 flex-1 truncate" data-course-sketch-active-board={activeBoardKey}>{activeBoardTitle}</span>
         <ChevronDown aria-hidden size={12} className="shrink-0 text-white/55" />
       </button>
       {open ? (
@@ -502,18 +500,13 @@ function SketchColourCluster({
   );
 }
 
-/** The personal-library read-out pill (shared by the save line and the Clean
- *  Look sidebar). Never a second library UI — just a count + import state. */
+/** Library account state stays in the Clean Look sidebar, not in the header. */
 function SketchLibraryPill({ library }: { library: ReturnType<typeof useSketchLibrary> }) {
   return (
     <span
       data-course-sketch-library={library.state}
       data-course-sketch-library-count={library.itemCount}
-      title={
-        library.importError ||
-        library.error ||
-        "Your personal library — saved to your account and synced to your other devices"
-      }
+      title={library.importError || library.error || "Your personal library — saved to your account and synced to your other devices"}
       className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
         library.importState === "importing"
           ? "border-white/25 text-white/70"
@@ -837,7 +830,7 @@ export default function SketchPanel({
     <button
       type="button"
       onClick={() => setMode(quickMode ? "editor" : "quick-sketch")}
-      className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+      className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-1 text-[11px] font-bold transition-colors ${
         quickMode
           ? "bg-orange-500 text-white"
           : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
@@ -853,7 +846,7 @@ export default function SketchPanel({
     <button type="button" data-course-sketch-edit-toggle
       aria-pressed={editing}
       onClick={() => setEditing(value => !value)}
-      className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+      className="flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
       {editing ? "Done" : "Edit sketch"}
     </button>
   );
@@ -909,12 +902,7 @@ export default function SketchPanel({
       >
         {editToggle}
         {modeToggle}
-        {quickMode ? null : (
-          <>
-            <SketchLibraryPill library={library} />
-            <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
-          </>
-        )}
+        {quickMode ? null : <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />}
       </SketchStatus>
       )}
 
