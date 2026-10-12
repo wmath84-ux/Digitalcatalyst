@@ -417,7 +417,7 @@ test("a note saved in the Course Player is written to Firestore and rendered", a
 
 /* ── 2. rendering + cross-device sync ─────────────────────────────────────── */
 
-test("notes already in Firestore are rendered, and a write from another device appears live", async () => {
+test("notes read the cloud once; remote edits appear only on explicit refresh", async () => {
   const target = freshWorld();
   seedCloudNote(UID, PRODUCT, {
     id: "from-the-phone",
@@ -445,7 +445,11 @@ test("notes already in Firestore are rendered, and a write from another device a
     await sleep(0);
   });
 
-  assert.equal(text("count"), "2", "the live listener did not deliver the other device's note");
+  assert.equal(text("count"), "1", "background changes must not churn the active editor");
+  assert.equal(fsx.listenerCount(), 0);
+  act(() => fixture.latest.ctl.reload());
+  await settle();
+  assert.equal(text("count"), "2", "explicit refresh retrieves the remote note");
   assert.ok(el("note-from-the-laptop"), "the new note is in Firestore but not in the Course Player");
 
   notesController.unmount();
@@ -815,7 +819,7 @@ test("auth hydration is retried instead of installing a permanent empty/no-op li
   act(() => window.dispatchEvent(new window.Event("online")));
   await settle(60);
   assert.equal(el("note-existing")?.getAttribute("data-text"), "Restored from Firebase");
-  assert.equal(fsx.listenerCount(), 1); notesController.unmount();
+  assert.equal(fsx.listenerCount(), 0); notesController.unmount();
 });
 
 test("rich formatting and plain-text projection round-trip together, including a deliberately empty edit", async () => {
@@ -838,4 +842,20 @@ test("an outgoing editor's callbacks stay bound to its original notes bucket aft
   let note; act(() => { note = outgoing.add("<p>Late outgoing draft</p>"); outgoing.flush(); }); await settle(40);
   assert.equal(fsx.noteDoc(UID, note.id).productId, PRODUCT);
   assert.equal(text("count"), "0"); assert.deepEqual(fsx.noteIds(UID, "p2"), []); notesController.unmount();
+});
+
+
+test("default saving lands on device before the batched cloud backup", async () => {
+  const notesController = fixture.mount(freshWorld(), { uid: UID, productId: PRODUCT });
+  await settle();
+  let note;
+  act(() => { note = fixture.latest.ctl.add("<p>Local first</p>"); });
+  await settle(100);
+  assert.equal(text("status"), "pending");
+  assert.equal(fsx.noteDoc(UID, note.id), undefined);
+  assert.ok(window.localStorage.getItem(fixture.notesStorageKey(UID, PRODUCT)).includes("Local first"));
+  act(() => fixture.latest.ctl.flush());
+  await settle();
+  assert.equal(fsx.noteDoc(UID, note.id).text, "Local first");
+  notesController.unmount();
 });

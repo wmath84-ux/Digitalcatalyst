@@ -76,6 +76,7 @@ export type SignupDetails = {
   email: string;
   mobile: string;
   password: string;
+  remember?: boolean;
 };
 
 interface AuthContextValue {
@@ -97,9 +98,9 @@ interface AuthContextValue {
   googleNotice: string | null;
   dismissGoogleNotice: () => void;
   refresh: () => Promise<void>;
-  login: (email: string, password: string) => Promise<AuthResult>;
+  login: (email: string, password: string, remember?: boolean) => Promise<AuthResult>;
   signup: (details: SignupDetails) => Promise<AuthResult>;
-  loginWithGoogle: () => Promise<AuthResult>;
+  loginWithGoogle: (remember?: boolean) => Promise<AuthResult>;
   loginAdmin: (email: string, password: string) => Promise<AuthResult>;
   loginAdminWithGoogle: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
@@ -377,8 +378,8 @@ const signInWithGoogleOneTap = async (): Promise<
 };
 
 /** Exchange a GIS ID token for the normal web-SDK Firebase session. */
-const signInWithGoogleIdToken = async (idToken: string) => {
-  await setPersistence(auth, browserLocalPersistence);
+const signInWithGoogleIdToken = async (idToken: string, remember = true) => {
+  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
   const credential = GoogleAuthProvider.credential(idToken);
   return signInWithCredential(auth, credential);
 };
@@ -564,11 +565,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [user?.id]);
 
-  const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+  const login = useCallback(async (email: string, password: string, remember = true): Promise<AuthResult> => {
     clearAdminSession();
     const normalizedEmail = normalizeEmail(email);
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Login successful." };
@@ -610,7 +611,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = useCallback(async (details: SignupDetails): Promise<AuthResult> => {
     clearAdminSession();
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      await setPersistence(auth, details.remember !== false ? browserLocalPersistence : browserSessionPersistence);
       const credential = await createUserWithEmailAndPassword(auth, normalizeEmail(details.email), details.password);
       await updateProfile(credential.user, { displayName: details.name.trim() });
       const appUser = await ensureUserProfile(credential.user, {
@@ -721,7 +722,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [finishAdminGoogleSignIn]);
 
-  const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
+  const loginWithGoogle = useCallback(async (remember = true): Promise<AuthResult> => {
     clearAdminSession();
     setGoogleNotice(null);
 
@@ -749,7 +750,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // even if the Plugins map isn't ready yet (early tap). Guarantees picker opens.
     if (isCapacitorNative()) {
       try {
-        await setPersistence(auth, browserLocalPersistence);
+        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
         const credential = await signInWithGoogleNatively();
         clearGoogleRedirectMarker();
         await commitFirebaseUser(credential.user);
@@ -812,7 +813,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       setGoogleNotice(null);
 
       // PATH 1 — Google's NATIVE account sheet (GIS One Tap + FedCM).
@@ -836,7 +837,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const oneTap = await signInWithGoogleOneTap();
       if (oneTap.kind === "credential") {
         clearGoogleRedirectMarker();
-        const credential = await signInWithGoogleIdToken(oneTap.idToken);
+        const credential = await signInWithGoogleIdToken(oneTap.idToken, remember);
         await commitFirebaseUser(credential.user);
         return { success: true, message: "Google login successful." };
       }

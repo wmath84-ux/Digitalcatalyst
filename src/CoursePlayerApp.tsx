@@ -1,8 +1,8 @@
+import CourseLoadingDots from "./course/CourseLoadingDots";
 import "./course/courseBrandColors.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
-import { db } from "../firebase";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
 import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
@@ -489,17 +489,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // "practice" module) is still a real deep-link target: open the set.
     return firstBrainFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
   }, [initialModuleId, modules, resolution.accessibleModuleIds]);
-  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
-  // ── Notes: Firestore-backed, device-mirrored ─────────────────────────────
+  const progressCtl = useLocalCourseProgress(user?.id ?? null, String(storageProductId));
+  const completedIds = useMemo(() => new Set(progressCtl.data.completedFileIds), [progressCtl.data.completedFileIds]);
+  // ── Notes: device-first, background-backed ─────────────────────────────
   // One document per note at `users/{uid}/notes/{noteId}`, scoped by the SAME
   // namespaced id everything else in this player uses — so a learner-authored
   // course can never share notes with an official one, and one learner can
   // never see another's. `useCourseNotes` keeps a live Firestore listener plus
   // the localStorage mirror (`notesStore`) as the offline copy, so notes save
-  // on Firebase and render on every device.
+  // locally first and are backed up to Firebase in quiet batches.
   const notesCtl = useCourseNotes({ uid: user?.id ?? null, productId: storageProductId });
   const notes = notesCtl.notes;
-  const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
+  const lastOpenedFileId = progressCtl.data.lastOpenedFileId;
+  useEffect(() => {
+    if (progressCtl.error) toast({ title: "Device storage needs attention", description: progressCtl.error, variant: "error" });
+  }, [progressCtl.error]);
   // Every file the user has opened this session stays mounted behind the
   // active one, so switching modules never tears a player down.
   const [visitedFiles, setVisitedFiles] = useState<CourseFile[]>([]);
@@ -1313,9 +1317,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   });
 
   // ── Part 17: Structural Readiness Gate ─────────────────────────────────
-  // Wait for ALL critical data before showing the player. This prevents
-  // broken UI, flickering, and race conditions between Product A → B or
-  // Module A → B transitions.
+  // Only access and local resume block the lesson. Optional study tools
+  // hydrate independently; switching modules must not unmount the player.
   const readinessStages = useMemo(() => ({
     access: !accessState.loading,
     notes: !notesCtl.loading,
@@ -1324,7 +1327,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     playback: playbackReady,
   }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
 
-  const isReady = Object.values(readinessStages).every(Boolean);
+  const isReady = readinessStages.access && readinessStages.playback;
   useEffect(() => {
     // Deep links can resolve before SplitDeck mounts; reveal the study pane
     // once it exists, even if this device previously collapsed it.
@@ -1429,22 +1432,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Progress lives under the SAME namespaced id: a learner-authored course
   // gets its own progress document, so completing a lesson they wrote can
   // never move an official course's percentage (and vice versa).
-  const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", storageProductId) : null), [storageProductId, user]);
-
-  useEffect(() => {
-    if (!user || !progressRef) return undefined;
-    const unsubscribeProgress = onSnapshot(progressRef, (snapshot) => {
-      const data = snapshot.data() || {};
-      setCompletedIds(new Set(Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : []));
-      setLastOpenedFileId(typeof data.lastOpenedFileId === "string" ? data.lastOpenedFileId : null);
-    });
-    return () => { unsubscribeProgress(); };
-  }, [progressRef, user]);
-
-  // Notes no longer live only on this device: `useCourseNotes` (mounted above)
-  // reads `users/{uid}/notes` live, mirrors every change to localStorage and
-  // pushes anything device-only back up — so an old local note migrates to
-  // Firebase on the first open after this change.
+  // Progress and resume are restored from the device immediately. The scoped
+  // outbox batches cloud backup without a live listener or server echo render.
 
   // ── Panel session reset on exit ─────────────────────────────────────────
   // While the player is open, the Notes and Mind Map panels keep their place
@@ -1499,16 +1488,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * player switches away from a module — that is what makes "come back and
    * continue from the same second" work.
    */
+  const playbackSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportPlayback = useCallback((fileId: string, patch: CoursePlaybackPatch) => {
     if (!fileId || !playbackPatchChanged(playbackRef.current[fileId], patch)) return;
     mergePlaybackEntry(playbackRef.current, fileId, patch);
-    if (user?.id) persistPlaybackStore(user.id, storageProductId, playbackRef.current);
+    if (user?.id && !playbackSaveTimer.current) {
+      const store = playbackRef.current;
+      playbackSaveTimer.current = setTimeout(() => {
+        playbackSaveTimer.current = null;
+        persistPlaybackStore(user.id, storageProductId, store);
+      }, 1500);
+    }
   }, [storageProductId, user]);
 
   // Flush the snapshot when the tab is hidden / closed so nothing is lost.
   useEffect(() => {
     if (!user?.id) return undefined;
-    const flush = () => persistPlaybackStore(user.id, storageProductId, playbackRef.current);
+    const store = playbackRef.current;
+    const flush = () => {
+      if (playbackSaveTimer.current) clearTimeout(playbackSaveTimer.current);
+      playbackSaveTimer.current = null;
+      persistPlaybackStore(user.id, storageProductId, store);
+    };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flush);
     return () => {
@@ -1588,27 +1589,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * stays an honest reflection of what has actually been finished.
    */
   const toggleComplete = async () => {
-    if (!user || !selectedFile || !progressRef) return;
+    if (!user || !selectedFile) return;
     // Personal (My Modules) content never joins official completion.
     if (String(selectedFile.source || "") === "personal") return;
     const completing = !completedIds.has(selectedFile.id);
-    // Optimistic flip — the Firestore listener confirms it a moment later.
-    setCompletedIds((current) => {
-      const next = new Set(current);
-      if (completing) next.add(selectedFile.id);
-      else next.delete(selectedFile.id);
-      return next;
-    });
+    progressCtl.store.complete(selectedFile.id, completing);
+    progressCtl.store.open(selectedFile.id);
     if (completing) playSfxComplete();
     else playSfxRemove();
-    await setDoc(progressRef, {
-      productId: storageProductId,
-      completedFileIds: completing ? arrayUnion(selectedFile.id) : arrayRemove(selectedFile.id),
-      lastOpenedFileId: selectedFile.id,
-      lastOpenedAt: serverTimestamp(),
-      accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
   };
 
   /**
@@ -1724,14 +1712,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * pass cannot duplicate the id.
    */
   const markFileComplete = useCallback(async (fileId: string) => {
-    if (!user || !progressRef) return;
-    setCompletedIds((current) => (current.has(fileId) ? current : new Set([...current, fileId])));
-    await setDoc(progressRef, {
-      productId: storageProductId,
-      completedFileIds: arrayUnion(fileId),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  }, [storageProductId, progressRef, user]);
+    if (!user) return;
+    progressCtl.store.complete(fileId, true);
+  }, [progressCtl.store, user]);
 
   const selectFile = (file: CourseFile) => {
     setMindMapModuleOverride(null);
@@ -1759,8 +1742,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // the active dock tab if they want the lesson full-size.
     // Personal content (My Modules) never touches course progress — no
     // lastOpenedFileId, no resume entry, no completion ids.
-    if (user && progressRef && String(file.source || "") !== "personal") {
-      void setDoc(progressRef, { productId: storageProductId, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
+    if (user && String(file.source || "") !== "personal") {
+      progressCtl.store.open(file.id);
     }
   };
 
@@ -2413,20 +2396,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     <CourseKeyboardProvider scopeRef={playerShellRef}>
     <>
     {/* ── Part 17: Readiness Gate ─────────────────────────────────────────
-        Show a staged loading UI until all critical data is ready. This
-        prevents broken UI, flickering, and race conditions. */}
+        Show the reference animation while access and local resume resolve.
+        Optional study tools still hydrate independently. */}
     {!isReady && (
       <div
         className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]"
         data-course-player-loading
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
         data-course-theme={playerThemeCtl.theme}
       >
         <div className="flex flex-col items-center gap-4 px-6">
-          {/* Animated loading indicator */}
-          <div className="relative h-16 w-16">
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-white/10 border-t-violet-500" />
-            <div className="absolute inset-2 animate-spin rounded-full border-4 border-white/10 border-t-sky-400" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-          </div>
+          <CourseLoadingDots />
 
           {/* Stage indicators */}
           <div className="flex flex-col items-center gap-2 text-sm text-white/70">

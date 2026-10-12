@@ -132,8 +132,9 @@ test("the app shell leaves #/auth as soon as a session exists", () => {
 test("the auth form shows the restore state and a retry instead of a dead button", () => {
   assert.match(form, /restoringSession/);
   assert.match(form, /googleNotice/);
-  assert.match(form, /Google session wapas aa रहा है…/);
-  assert.match(form, /Google से फिर कोशिश करें/);
+  assert.match(form, /googleBusy \? "Connecting…"/);
+  assert.match(form, /Please try Google again or use email/);
+  assert.match(form, /onClick=\{handleGoogleLogin\} disabled=\{busy \|\| googleBlocked\}/);
   // The Google button is disabled while the restore is in flight.
   assert.match(form, /const googleBusy = googleSubmitting \|\| restoringSession;/);
 });

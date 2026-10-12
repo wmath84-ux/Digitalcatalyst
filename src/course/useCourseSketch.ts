@@ -209,9 +209,9 @@ export interface UseCourseSketchResult {
 }
 
 /** Quiet window before the cloud write. Long enough to coalesce a stroke. */
-const DEFAULT_DEBOUNCE_MS = 1100;
+const DEFAULT_DEBOUNCE_MS = 30000;
 /** …but a continuous drawing still checkpoints this often. */
-const MAX_WAIT_MS = 6000;
+const MAX_WAIT_MS = 120000;
 /** The device mirror is cheap and local, so it lands much sooner. */
 const LOCAL_MIRROR_MS = 350;
 /** How long the editor waits for the cloud before opening the device copy. */
@@ -1397,7 +1397,7 @@ export default function useCourseSketch({
         getScene,
         sceneKey: session.scoped ? `${session.docId}#${generation}` : "sketch-unscoped",
         scoped: session.scoped,
-        loading: session.scoped && !session.loaded,
+        loading: session.scoped && !session.loaded && !session.hasLocal,
         status: session.status,
         errorMessage: session.errorMessage,
         pendingSync: session.pendingSync,

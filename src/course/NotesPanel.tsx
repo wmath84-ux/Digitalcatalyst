@@ -86,7 +86,7 @@ interface NotesPanelProps {
    * indicator only distinguishes Unsaved from Saved.
    */
   syncState?: {
-    status: "idle" | "loading" | "ready" | "saving" | "saved" | "error";
+    status: "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
     synced: boolean;
     errorMessage?: string | null;
   };
@@ -180,7 +180,8 @@ function NoteStatus({
     tone = "warn";
   } else if (editing) {
     tone = "ok";
-    if (sync?.status === "error") { label = "Saved on this device"; tone = "muted"; }
+    if (sync?.status === "error") { label = "Save needs attention"; tone = "warn"; }
+    else if (sync?.status === "pending") { label = "Saved on device · backup pending"; tone = "muted"; }
     else if (sync && (sync.status === "saving" || !sync.synced)) { label = "Saving…"; tone = "muted"; }
     else if (sync) label = "Synced";
     else label = "Saved";

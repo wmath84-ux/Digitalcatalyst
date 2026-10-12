@@ -74,7 +74,8 @@ const docToNote = (id: string, data: unknown): CoursePlayerNote | null => parseC
 /** One-shot read of a course's cloud notes (used by the fallback + tests). */
 export async function fetchCloudNotes(uid: string, productId: string): Promise<CoursePlayerNote[]> {
   const owner = cloudNotesUid(uid);
-  if (!owner || !productId) return [];
+  if (!productId) return [];
+  if (!owner) throw Object.assign(new Error("Firebase sign-in session is not ready"), { code: "unauthenticated" });
   const snapshot = await getDocs(notesQuery(owner, String(productId)));
   return snapshot.docs
     .map((entry) => docToNote(entry.id, entry.data()))

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect, useId } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { Search } from "lucide-react";
@@ -11,6 +11,7 @@ import {
   type AdvancedFilters,
 } from "./StoreAdvancedFilters";
 import "./store-marketplace.css";
+import "./store-filter-radio.css";
 import useDragScroll from "../hooks/useDragScroll";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
@@ -47,6 +48,7 @@ export default function StorePage({
   const chipDrag = useDragScroll<HTMLDivElement>();
   const [filterOpen, setFilterOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const filterGroupName = useId();
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -208,19 +210,21 @@ export default function StorePage({
           data-store-filter-bar
           ref={chipDrag.ref}
           onPointerDown={chipDrag.onPointerDown}
-          className="dc-marketplace-chips"
-          role="group"
+          className="dc-marketplace-chips dc-store-radio-filters"
+          role="radiogroup"
           aria-label="Catalog categories"
         >
           {chips.map((filter) => (
-            <button
-              type="button"
-              key={filter.id}
-              aria-pressed={activeFilter.id === filter.id}
-              onClick={() => setActiveFilterId(filter.id)}
-            >
-              {filter.label}
-            </button>
+            <label key={filter.id} className="dc-store-radio-option">
+              <input
+                type="radio"
+                name={filterGroupName}
+                value={filter.id}
+                checked={activeFilter.id === filter.id}
+                onChange={() => setActiveFilterId(filter.id)}
+              />
+              <span>{filter.label}</span>
+            </label>
           ))}
         </div>
         <div className="dc-marketplace-toolbar">

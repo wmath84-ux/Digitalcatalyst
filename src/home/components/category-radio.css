@@ -1,0 +1,80 @@
+/* MIT reference: Pankaj-Meharchandani (variation of Yaya12085)
+   https://uiverse.io/Pankaj-Meharchandani/curly-robin-81
+   Requested change: one horizontal series rather than a vertical stack. */
+.dc-home-category-scroll.dc-home-radio-rail {
+  overflow-x: auto;
+  padding: 10px 5px 14px;
+  scrollbar-width: thin;
+}
+.dc-home-radio-inputs {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  width: max-content;
+  user-select: none;
+}
+.dc-home-radio-option { position: relative; flex-shrink: 0; }
+.dc-home-radio-input {
+  clip: rect(0 0 0 0);
+  clip-path: inset(100%);
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+.dc-home-radio-tile {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: 200px;
+  min-height: 50px;
+  border-radius: 25px;
+  border: 2px solid #b5bfd9;
+  background-color: #fff;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+  transition: 0.15s ease;
+  cursor: pointer;
+  position: relative;
+  padding: 0 12px 0 50px;
+}
+.dc-home-radio-tile::before {
+  content: "";
+  position: absolute;
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #b5bfd9;
+  background-color: #fff;
+  border-radius: 50%;
+  left: 15px;
+  transition: 0.25s ease;
+}
+.dc-home-radio-input:checked + .dc-home-radio-tile,
+.dc-home-radio-tile:hover { border-color: #2260ff; }
+.dc-home-radio-input:checked + .dc-home-radio-tile { color: #2260ff; }
+.dc-home-radio-input:checked + .dc-home-radio-tile::before {
+  transform: scale(1);
+  opacity: 1;
+  background-color: #2260ff;
+  border-color: #2260ff;
+}
+.dc-home-radio-input:focus-visible + .dc-home-radio-tile {
+  border-color: #2260ff;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1), 0 0 0 4px #b5c9fc;
+}
+.dc-home-radio-icon { margin-left: 10px; color: #494949; }
+.dc-home-radio-icon svg { width: 1.5rem; height: 1.5rem; }
+.dc-home-radio-label {
+  color: #707070;
+  transition: 0.375s ease;
+  text-align: left;
+  font-size: 13px;
+  margin-left: 10px;
+}
+.dc-home-radio-input:checked + .dc-home-radio-tile :is(.dc-home-radio-icon, .dc-home-radio-label) { color: #2260ff; }
+@media (prefers-reduced-motion: reduce) {
+  .dc-home-radio-tile, .dc-home-radio-tile::before, .dc-home-radio-label { transition: none; }
+}

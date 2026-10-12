@@ -911,7 +911,8 @@ const SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
   idle: { label: "Sign in karke save hoga", tone: "text-white/60" },
   loading: { label: "Loading…", tone: "text-white/60" },
   ready: { label: "Ready", tone: "text-white/60" },
-  saving: { label: "Saving…", tone: "text-amber-300" },
+  pending: { label: "Device copy · cloud backup pending", tone: "text-slate-500" },
+  saving: { label: "Backing up…", tone: "text-amber-300" },
   saved: { label: "Cloud par saved", tone: "text-emerald-300" },
   error: { label: "Save retry ho raha hai", tone: "text-rose-300" },
 };
