@@ -26,7 +26,6 @@
     activeNoteId: null,
     filter: "all", // "all" | "notes" | "todos" | "open" | "completed"
     searchQuery: "",
-    previewMode: "split", // "editor" | "preview" | "split"
     isModalOpen: false,
     modalType: null, // "schedule" | "notebook" | "tag"
     tokenRequestCallbacks: new Map(),
@@ -405,13 +404,6 @@
     } catch (_) {}
   }
 
-  // ── Canonical Markdown → sanitized rich preview + KaTeX ──────────────────
-  // My Day note bodies stay Markdown in local storage and Firestore. Rendering
-  // happens once from that canonical representation; HTML is never saved back.
-  function parseMarkdown(md) {
-    return window.DCMyDayNoteFormatting.renderMyDayMarkdown(String(md || ""));
-  }
-
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, "&amp;")
@@ -494,8 +486,6 @@
     note.updated_time = Date.now();
     saveLocally();
     syncItemToCloud(note);
-    const preview = document.querySelector(".editor-preview");
-    if (preview) preview.innerHTML = parseMarkdown(note.body);
     const snippet = document.querySelector(`.note-card[data-note-id="${note.id}"] .note-snippet`);
     if (snippet) snippet.textContent = note.body.slice(0, 120) || "No additional text";
   }
@@ -605,8 +595,12 @@
     const activeNote = state.notes.find((n) => n.id === state.activeNoteId) || null;
 
     // Counts
-    const totalTodos = state.notes.filter((n) => n.is_todo === 1).length;
     const pendingTodos = state.notes.filter((n) => n.is_todo === 1 && !n.todo_completed).length;
+    const todayLabel = new Intl.DateTimeFormat(navigator.language || "en-IN", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    }).format(new Date());
 
     const themeIcon = state.theme === "dark" ? "☀️" : "🌙";
     const themeLabel = state.theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
@@ -614,19 +608,31 @@
       ? "To-dos"
       : state.activeView === "schedule"
         ? "Schedule"
-        : state.activeNotebookId
-          ? (state.notebooks.find((n) => n.id === state.activeNotebookId) || {}).title || "Notebook"
-          : "All notes";
+        : state.activeView === "tags"
+          ? state.activeTagId
+            ? (state.tags.find((tag) => tag.id === state.activeTagId) || {}).title || "Tag"
+            : "Tags"
+          : state.activeNotebookId
+            ? (state.notebooks.find((n) => n.id === state.activeNotebookId) || {}).title || "Notebook"
+            : "All notes";
 
     let html = `
       <div class="workspace-container ${state.sidebarOpen ? "sidebar-open" : ""}" data-pane="${state.mobilePane}" data-theme-active="${state.theme}">
         <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
         <div class="mobile-topbar" data-bar="list">
-          <button class="icon-btn" id="btn-open-sidebar" title="Notebooks" aria-label="Open notebooks">☰</button>
-          <span class="mobile-title">${escapeHtml(paneTitle)}</span>
+          <button class="icon-btn" id="btn-open-sidebar" data-open-sidebar title="Notebooks and views" aria-label="Open notebooks and views">☰</button>
+          <span class="mobile-title">My Day</span>
           <button class="theme-toggle" id="btn-theme-mobile" title="${themeLabel}" aria-label="${themeLabel}">${themeIcon}</button>
-          <button class="icon-btn" id="btn-add-notebook-mobile" title="New Notebook">📁+</button>
+          <button class="icon-btn" id="btn-add-notebook-mobile" title="New Notebook" aria-label="Create notebook">📁+</button>
         </div>
+        ${
+          activeNote
+            ? `<div class="mobile-topbar" data-bar="editor">
+                <button class="icon-btn" id="btn-open-sidebar-editor" data-open-sidebar title="Notebooks and views" aria-label="Open notebooks and views">☰</button>
+                <span class="mobile-title" title="${escapeHtml(activeNote.title || "Untitled")}">${escapeHtml(activeNote.title || "Untitled")}</span>
+              </div>`
+            : ""
+        }
         <!-- 1. Left Sidebar: Notebooks & Views -->
         <aside class="workspace-sidebar">
           <div class="sidebar-header">
@@ -688,6 +694,17 @@
         <!-- 2. Middle Pane: Note List -->
         <section class="workspace-list">
           <div class="list-header">
+            <div class="list-heading">
+              <div class="list-heading-copy">
+                <p class="list-eyebrow">YOUR DAY <span aria-hidden="true">·</span> ${escapeHtml(todayLabel)}</p>
+                <h1>${escapeHtml(paneTitle)}</h1>
+                <p class="list-heading-note">Plans, notes, and next steps — all in one calm place.</p>
+              </div>
+              <div class="list-focus-badge" role="status" aria-label="${pendingTodos} open ${pendingTodos === 1 ? "to-do" : "to-dos"}">
+                <span class="list-focus-count">${pendingTodos}</span>
+                <span class="list-focus-label">open<br />to-dos</span>
+              </div>
+            </div>
             <div class="search-box">
               <span>🔍</span>
               <input type="text" id="search-input" placeholder="Search notes and to-dos…" value="${escapeHtml(state.searchQuery)}" />
@@ -700,7 +717,7 @@
               </div>
               <div style="display: flex; gap: 4px;">
                 <button class="btn-primary" id="btn-new-note">+ Note</button>
-                <button class="btn-primary" id="btn-new-todo" style="background: #0f9d58;">+ To-do</button>
+                <button class="btn-primary btn-primary--todo" id="btn-new-todo">+ To-do</button>
               </div>
             </div>
           </div>
@@ -746,7 +763,6 @@
               ? `
             <div class="editor-toolbar" role="toolbar" aria-label="Note formatting">
               <div class="toolbar-group editor-format-tools" role="group" tabindex="0" aria-label="Formatting tools; scroll horizontally on small screens">
-                <button class="toolbar-btn editor-back" id="btn-editor-back" aria-label="Back to notes">← Back</button>
                 <button type="button" class="toolbar-btn" data-action="bold" aria-label="Bold" title="Bold"><strong>B</strong></button>
                 <button type="button" class="toolbar-btn" data-action="italic" aria-label="Italic" title="Italic"><i>I</i></button>
                 <button type="button" class="toolbar-btn" data-action="bold-italic" aria-label="Bold and italic" title="Bold and italic"><strong><i>B/I</i></strong></button>
@@ -770,8 +786,6 @@
               </div>
               <div class="toolbar-group editor-toolbar-actions">
                 <button class="toolbar-btn" id="btn-schedule-modal" style="color: var(--jp-primary);">⏰ Remind</button>
-                <button class="toolbar-btn ${state.previewMode === "preview" ? "active" : ""}" id="btn-toggle-preview" aria-pressed="${state.previewMode === "preview"}">${state.previewMode === "preview" ? "Edit" : "Preview"}</button>
-                <button class="toolbar-btn ${state.previewMode === "split" ? "active" : ""}" id="btn-toggle-split" aria-pressed="${state.previewMode === "split"}">${state.previewMode === "split" ? "Editor only" : "Split"}</button>
                 <button class="toolbar-btn" id="btn-delete-note" aria-label="Delete note" style="color: var(--jp-danger);">🗑️</button>
               </div>
             </div>
@@ -797,13 +811,8 @@
                 }
               </div>
 
-              <div class="editor-textarea-container editor-view-${state.previewMode}" data-preview-mode="${state.previewMode}">
-                <textarea class="editor-textarea" id="editor-body-input" aria-label="Markdown note body" placeholder="Type notes here in Markdown...">${escapeHtml(activeNote.body)}</textarea>
-                ${
-                  state.previewMode !== "editor"
-                    ? `<div class="editor-preview" aria-label="Rendered note preview">${parseMarkdown(activeNote.body)}</div>`
-                    : ""
-                }
+              <div class="editor-textarea-container">
+                <textarea class="editor-textarea" id="editor-body-input" aria-label="Markdown note body" placeholder="Start writing…">${escapeHtml(activeNote.body)}</textarea>
               </div>
             </div>
           `
@@ -865,13 +874,12 @@
     if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
     if (themeBtnMobile) themeBtnMobile.addEventListener("click", toggleTheme);
 
-    const openSidebar = document.getElementById("btn-open-sidebar");
-    if (openSidebar) {
-      openSidebar.addEventListener("click", () => {
+    document.querySelectorAll("[data-open-sidebar]").forEach((button) => {
+      button.addEventListener("click", () => {
         state.sidebarOpen = true;
         render();
       });
-    }
+    });
     const backdrop = document.getElementById("sidebar-backdrop");
     if (backdrop) {
       backdrop.addEventListener("click", () => {
@@ -879,14 +887,6 @@
         render();
       });
     }
-    const editorBack = document.getElementById("btn-editor-back");
-    if (editorBack) {
-      editorBack.addEventListener("click", () => {
-        state.mobilePane = "list";
-        render();
-      });
-    }
-
     // Nav Views
     document.querySelectorAll(".nav-item[data-view]").forEach((el) => {
       el.addEventListener("click", () => {
@@ -999,6 +999,11 @@
           // Update in note card list
           const cardTitle = document.querySelector(`.note-card[data-note-id="${note.id}"] .note-title`);
           if (cardTitle) cardTitle.textContent = note.title || "Untitled";
+          const mobileTitle = document.querySelector('.mobile-topbar[data-bar="editor"] .mobile-title');
+          if (mobileTitle) {
+            mobileTitle.textContent = note.title || "Untitled";
+            mobileTitle.title = note.title || "Untitled";
+          }
         }
       });
     }
@@ -1019,7 +1024,7 @@
       });
     }
 
-    // Editor Body: Markdown is the persisted form; preview HTML is transient.
+    // Editor Body: keep the user's Markdown as the only editable surface.
     const editorBody = document.getElementById("editor-body-input");
     if (editorBody) {
       editorBody.addEventListener("input", (event) => {
@@ -1060,24 +1065,6 @@
         applyFormatting(action, { headingLevel });
       });
     });
-
-    // Toggle rendered preview (including on phones and tablets).
-    const previewBtn = document.getElementById("btn-toggle-preview");
-    if (previewBtn) {
-      previewBtn.addEventListener("click", () => {
-        state.previewMode = state.previewMode === "preview" ? "editor" : "preview";
-        render();
-      });
-    }
-
-    // Toggle source/preview split view.
-    const splitBtn = document.getElementById("btn-toggle-split");
-    if (splitBtn) {
-      splitBtn.addEventListener("click", () => {
-        state.previewMode = state.previewMode === "split" ? "editor" : "split";
-        render();
-      });
-    }
 
     // Delete Note
     const deleteBtn = document.getElementById("btn-delete-note");

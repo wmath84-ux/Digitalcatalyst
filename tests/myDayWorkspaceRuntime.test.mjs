@@ -57,7 +57,8 @@ const openNote = (dom) => {
 test("shipped My Day app saves toolbar edits, converts rich paste, sanitizes and reloads the same Markdown", () => {
   const first = boot(seedNote("hello\n\n- [x] completed task"));
   const textarea = openNote(first);
-  assert.ok(first.window.document.querySelector('.editor-preview li[data-checked="true"]'), "split preview renders Markdown task structure");
+  assert.equal(first.window.document.querySelector(".editor-preview"), null, "the editor does not mount a live rendered preview");
+  assert.equal(first.window.document.querySelector("#btn-toggle-preview, #btn-toggle-split"), null, "there are no preview or split-view controls");
 
   textarea.focus();
   textarea.setSelectionRange(0, 5);
@@ -78,7 +79,7 @@ test("shipped My Day app saves toolbar edits, converts rich paste, sanitizes and
   assert.match(textarea.value, /- \[x\] done/);
   assert.doesNotMatch(textarea.value, /<script|fallback plain text/);
   assert.equal(first.window.__pwn, undefined, "untrusted pasted script did not execute");
-  assert.equal(first.window.document.querySelectorAll(".editor-preview script, .editor-preview iframe, .editor-preview [onerror]").length, 0);
+  assert.equal(first.window.document.querySelector(".editor-preview"), null, "typing and rich paste never create a live preview pane");
 
   const saved = JSON.parse(first.window.localStorage.getItem("eduvora.joplin_notes:local"))[0].body;
   assert.equal(saved, textarea.value);
@@ -87,8 +88,23 @@ test("shipped My Day app saves toolbar edits, converts rich paste, sanitizes and
   const reloaded = boot(seedNote(saved));
   const reedited = openNote(reloaded);
   assert.equal(reedited.value, saved, "reload and re-edit retain Markdown rather than migrating to HTML");
-  assert.equal(reloaded.window.document.querySelector(".editor-preview h2")?.textContent, "Pasted heading");
-  assert.equal(reloaded.window.document.querySelectorAll('.editor-preview input[type="checkbox"]').length, 2);
-  assert.deepEqual(Array.from(reloaded.window.document.querySelectorAll('.editor-preview input[type="checkbox"]')).map((input) => input.checked), [true, true]);
+  assert.equal(reloaded.window.document.querySelector(".editor-preview"), null, "reopening a note stays editor-only");
+  assert.match(reedited.value, /## Pasted heading/);
+  assert.match(reedited.value, /\*\*rich\*\*/, "rich formatting remains Markdown rather than rendered HTML");
   reloaded.window.close();
+});
+
+test("mobile note editing removes the toolbar Back button but keeps navigation in the workspace drawer", () => {
+  const dom = boot(seedNote("draft"));
+  openNote(dom);
+  const document = dom.window.document;
+
+  assert.equal(document.querySelector("#btn-editor-back, .editor-back"), null, "the mobile formatting toolbar has no Back button");
+  assert.ok(document.querySelector('.mobile-topbar[data-bar="editor"] #btn-open-sidebar-editor'), "the editor header offers workspace navigation instead");
+
+  document.querySelector("#btn-open-sidebar-editor").click();
+  assert.ok(document.querySelector(".workspace-container.sidebar-open"), "the navigation drawer opens from the editor header");
+  document.querySelector('.nav-item[data-view="all"]').click();
+  assert.equal(document.querySelector(".workspace-container").getAttribute("data-pane"), "list", "choosing a view returns to the notes list");
+  dom.window.close();
 });

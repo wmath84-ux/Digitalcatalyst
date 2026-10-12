@@ -2,9 +2,10 @@
 //
 // My Day stores note bodies as Markdown (Joplin `markup_language: 1`). This
 // module keeps that existing representation canonical: the textarea edits
-// Markdown, paste from rich HTML is converted to Markdown, and preview always
-// renders from Markdown through the Course Player's already-installed Marked,
-// sanitizer and KaTeX pipeline. No Markdown → HTML → Markdown save loop exists.
+// Markdown, rich HTML paste is converted to Markdown, and toolbar actions write
+// Markdown. Its sanitized renderer remains a standalone formatting utility; the
+// workspace itself intentionally does not mount a live preview while editing.
+// No Markdown → HTML → Markdown save loop exists.
 //
 // The shared Course Player boundary is intentional: math markers, Markdown
 // parsing, clipboard normalization and HTML allow-list rules stay compatible,
