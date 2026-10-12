@@ -32,9 +32,10 @@ test("Home and FlowPath keep their page-specific actions in the drawer beside a 
   assert.doesNotMatch(homeHeader, /id: "notifications"/, "the old duplicate notification tab is removed");
 });
 
-test("the old profile trigger becomes a glass quick-actions button, while the same-sized bell owns Notifications", () => {
+test("the side-panel trigger is a plain three-line button, while the same-sized bell owns Notifications", () => {
   assert.match(menu, /data-mobile-header-menu-button/);
-  assert.match(menu, /data-header-glass-button="quick-actions"/);
+  assert.match(menu, /dc-header-menu-trigger/);
+  assert.doesNotMatch(menu, /data-header-glass-button="quick-actions"/);
   assert.match(menu, /<Menu\b/);
   assert.doesNotMatch(menu, /data-mobile-header-avatar/);
   assert.match(notifications, /data-header-glass-button="notifications"/);

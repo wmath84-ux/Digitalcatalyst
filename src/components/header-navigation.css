@@ -1,5 +1,50 @@
-/* Header actions use a single glass button language: small, refractive and
-   highlighted from within (never a cast shadow behind the page header). */
+/* The side-panel trigger is deliberately plain: a three-line icon with no
+   circular plate, rim, blur, or exterior shadow. Its hit target stays 40px. */
+.dc-header-menu-trigger {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.96);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.dc-header-menu-trigger:hover {
+  color: #ffffff;
+  opacity: 0.82;
+}
+
+.dc-header-menu-trigger:active {
+  transform: scale(0.94);
+}
+
+.dc-header-menu-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 2px;
+}
+
+html[data-theme="light"] .dc-header-menu-trigger {
+  color: #243047;
+}
+
+html[data-theme="light"] .dc-header-menu-trigger:hover {
+  color: #004ac6;
+}
+
+html[data-theme="light"] .dc-header-menu-trigger:focus-visible {
+  outline-color: #004ac6;
+}
+
+/* Header action buttons share a glass language; the notification button uses
+   this compact refractive plate, while the menu trigger above stays plain. */
 .dc-header-glass-button {
   position: relative;
   isolation: isolate;
@@ -113,7 +158,8 @@ html[data-theme="light"] .dc-header-notifications-badge {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dc-header-glass-button {
+  .dc-header-glass-button,
+  .dc-header-menu-trigger {
     transition: none;
   }
 }

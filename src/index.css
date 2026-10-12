@@ -5271,6 +5271,27 @@ html[data-course-player-active="true"] {
    overlap a tappable element. */
 :root {
   --dc-footer-nav-h: 0px;
+  --dc-system-navigation-inset: env(safe-area-inset-bottom, 0px);
+}
+
+/* Android 15+ ignores navigationBarColor and draws edge-to-edge. Reserve at
+   least the 3-button / gesture navigation inset even on WebViews that report
+   a zero CSS safe-area value, lifting both the footer pill and its clearance. */
+html[data-android-edge-to-edge="true"] {
+  --dc-system-navigation-inset: max(env(safe-area-inset-bottom, 0px), 24px);
+}
+html[data-android-edge-to-edge="true"] [data-site-footer-nav] {
+  padding-bottom: max(var(--dc-system-navigation-inset), 10px) !important;
+}
+html[data-android-edge-to-edge="true"]::after {
+  content: "";
+  position: fixed;
+  z-index: 2147483647;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--dc-system-navigation-inset, 24px);
+  background-color: var(--dc-system-navigation-color, #ffffff);
+  pointer-events: none;
 }
 
 @media (max-width: 959px) {

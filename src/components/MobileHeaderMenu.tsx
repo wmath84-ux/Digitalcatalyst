@@ -202,12 +202,11 @@ export default function MobileHeaderMenu({
         title={open ? "Close quick actions" : "Open quick actions"}
         aria-expanded={open}
         aria-controls={drawerId}
-        className={`dc-header-glass-button dc-mobile-header-menu-button ${className}`.trim()}
+        className={`dc-header-menu-trigger dc-mobile-header-menu-button ${className}`.trim()}
         data-mobile-header-menu-button
-        data-header-glass-button="quick-actions"
         data-button-size="40"
       >
-        <Menu aria-hidden="true" size={20} strokeWidth={2.1} />
+        <Menu aria-hidden="true" size={22} strokeWidth={2.2} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>

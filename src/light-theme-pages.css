@@ -1055,6 +1055,18 @@ html[data-theme="light"] .dc-collection-card .dc-collection-watch {
 html[data-theme="light"] .dc-collection-card .dc-collection-watch:hover { background: #003ea8; }
 html[data-theme="light"] .dc-collection-card .dc-collection-watch[data-uzw-press="true"] { background: #002d76; }
 html[data-theme="light"] .dc-cart-remove { color: #ba1a1a; }
+html[data-theme="light"] .dc-cart-page-subtitle,
+html[data-theme="light"] .dc-cart-summary-muted,
+html[data-theme="light"] [data-cart-price-note],
+html[data-theme="light"] [data-cart-checkout-caption] {
+  color: var(--dc-ink-3) !important;
+}
+html[data-theme="light"] [data-cart-page-header] {
+  border-bottom-color: var(--dc-line) !important;
+}
+html[data-theme="light"] [data-cart-checkout-bar] {
+  border-top-color: var(--dc-line) !important;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    16. CHECKOUT (checkout-minimal.css + PaymentGateway)

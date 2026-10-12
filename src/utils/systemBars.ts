@@ -8,10 +8,10 @@
 // WHERE THE COLOUR COMES FROM
 //   The colour is read from the page that is actually on screen, not from a
 //   separate list of route colours that could drift from the design:
-//     · top edge    → the rendered background under the top edge of the
-//                     viewport (the page header, when a page has one);
-//     · bottom edge → the rendered background under the bottom edge (the
-//                     footer / bottom bar);
+//     · top edge → the rendered background under the top edge of the viewport
+//                  (the page header, when a page has one);
+//     · both system bars use that same colour, so Android's status and
+//       navigation bars stay a matched pair on every device;
 //     · no page background at all → the document background (theme aware).
 //   Translucent layers (glass headers, dialog scrims) are composited over the
 //   layers beneath them. A page whose edge is a gradient or an image cannot be
@@ -26,11 +26,11 @@
 //
 // WHAT IT WRITES
 //   · Android (Capacitor): AppStatusBar.setSystemBars → window status and
-//     navigation bar colours, plus the light/dark icon appearance of each bar,
-//     computed from the colour's own luminance. Native code ignores bar colours
-//     on Android 15+ (targetSdk 35 forces edge-to-edge): there the bar area shows
-//     the page's own top/bottom background, which is the same colour this module
-//     samples, so the two stay in step. Icons are honoured on every API level.
+//     navigation bar colours, plus the light/dark icon appearance computed from
+//     their luminance. Android 15+ (targetSdk 35) ignores the native bar colours
+//     and draws edge-to-edge, so the web layer also paints the bottom safe-area
+//     backdrop with the same matched navigation colour. Icons are honoured on
+//     every API level.
 //   · Browser / PWA: the `theme-color` meta tag(s).
 
 import { registerPlugin } from "@capacitor/core";
@@ -59,6 +59,16 @@ const isDarkScheme = (): boolean => {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 };
+
+function isCapacitorAndroid(): boolean {
+  if (typeof window === "undefined" || !isCapacitorNative()) return false;
+  const capacitor = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+  try {
+    return capacitor?.getPlatform?.() === "android";
+  } catch {
+    return false;
+  }
+}
 
 /** The colour painted behind everything: <body> over <html>, else the theme default. */
 function documentBackground(): Rgba {
@@ -151,7 +161,11 @@ export function computeSystemBarsPayload(): SystemBarsPayload {
     bottom = override;
   } else {
     top = sampleEdgeColor("top");
-    bottom = sampleEdgeColor("bottom");
+    // Keep the native system bars paired. On Android 15+ edge-to-edge means
+    // the navigation bar's own colour is transparent and reveals the WebView;
+    // sampling a dark footer there while the status bar is white produced the
+    // black/white mismatch reported on some devices.
+    bottom = top;
   }
   return {
     status: toHex(top),
@@ -182,10 +196,18 @@ export function applySystemBarsNow(): void {
   lastApplied = key;
 
   writeThemeColorMeta(payload.status);
+  document.documentElement.style.setProperty("--dc-system-navigation-color", payload.navigation);
   if (isCapacitorNative()) {
-    AppStatusBarPlugin.setSystemBars(payload).catch(() => {
-      // An older native shell without this method: the page still works, the bars keep their last colour.
-    });
+    AppStatusBarPlugin.setSystemBars(payload)
+      .then((result) => {
+        if (!isCapacitorAndroid() || !result || typeof result !== "object") return;
+        const edgeToEdge = (result as { edgeToEdge?: unknown }).edgeToEdge;
+        if (edgeToEdge === true) document.documentElement.dataset.androidEdgeToEdge = "true";
+        else if (edgeToEdge === false) delete document.documentElement.dataset.androidEdgeToEdge;
+      })
+      .catch(() => {
+        // An older native shell without this method: the page still works, the bars keep their last colour.
+      });
   }
 }
 
