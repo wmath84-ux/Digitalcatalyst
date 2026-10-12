@@ -48,7 +48,7 @@ export default function MyCourseCard({
   const moduleCount = countModules(course.modules);
   const resourceCount = countResources(course.modules);
   // Normalize whitespace only for display; the saved course description remains untouched.
-  const description = String(course.description || "").replace(/\\s+/g, " ").trim();
+  const description = String(course.description || "").replace(/\s+/g, " ").trim();
   const descriptionPreview = makeDescriptionPreview(description, 108);
   // No cover set → a stable random one from the bundled pool (never a gap).
   const cover = String(course.coverImage || "").trim() || fallbackCoverImage(course.id);
