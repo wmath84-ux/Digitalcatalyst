@@ -1505,3 +1505,69 @@ html[data-theme="light"] [data-store-marketplace] .dc-marketplace-popup-option:h
     transition-duration: 1ms !important;
   }
 }
+
+
+/* ── Store popovers: opaque contrast plate, no page copy bleeding through ──
+   The sort menu can be tall on phones, so the old 46%-opacity glass exposed
+   the header/search/category text underneath and made the options look doubled.
+   Keep the existing compact-glass motion and anchors, but give the menus a
+   real readable surface in both themes. */
+[data-store-marketplace] .dc-marketplace-popup-anchor .dc-compact-glass-window {
+  isolation: isolate;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  background: #111827;
+  box-shadow: 0 22px 52px -22px rgba(15, 23, 42, 0.58), 0 8px 18px -12px rgba(15, 23, 42, 0.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+[data-store-marketplace] .dc-marketplace-popup-anchor .dc-compact-glass-window::after {
+  border-color: rgba(100, 116, 139, 0.28);
+  background: #111827;
+}
+
+[data-store-marketplace] .dc-marketplace-popup-anchor .dc-marketplace-popup-option {
+  min-height: 2.65rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+[data-store-marketplace] .dc-marketplace-popup-anchor .dc-marketplace-popup-option[data-selected="true"] {
+  background: rgba(59, 130, 246, 0.2);
+  color: #bfdbfe;
+}
+
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-popup-anchor .dc-compact-glass-window {
+  border-color: rgba(100, 116, 139, 0.25);
+  background: #ffffff;
+  box-shadow: 0 24px 55px -24px rgba(15, 23, 42, 0.32), 0 6px 16px -10px rgba(15, 23, 42, 0.22);
+}
+
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-popup-anchor .dc-compact-glass-window::after {
+  border-color: rgba(100, 116, 139, 0.25);
+  background: #ffffff;
+}
+
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-popup-anchor .dc-marketplace-popup-option {
+  color: #263449;
+}
+
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-popup-anchor .dc-marketplace-popup-option:is(:hover, :focus-visible, [data-selected="true"]) {
+  background: #eaf1ff;
+  color: #174ea6;
+}
+
+@media (max-width: 639px) {
+  [data-store-marketplace] .dc-marketplace-popup-anchor .dc-compact-glass-window--menu {
+    width: min(15rem, calc(100vw - 1.5rem));
+    min-width: min(15rem, calc(100vw - 1.5rem));
+    max-height: min(58dvh, 24rem);
+    padding: 0.5rem;
+  }
+
+  [data-store-marketplace] .dc-marketplace-popup-anchor .dc-marketplace-view-window {
+    width: min(190px, calc(100vw - 1.5rem));
+    min-width: min(190px, calc(100vw - 1.5rem));
+  }
+}
