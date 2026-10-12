@@ -9,6 +9,8 @@ const storeStyles = read("src/components/store-marketplace.css");
 const purchasesStyles = read("src/components/purchases-minimal.css");
 const profileStyles = read("src/profile/profile-minimal.css");
 const usageStyles = read("src/usage/usage-minimal.css");
+const checkoutStyles = read("src/components/checkout/checkout-minimal.css");
+const subscriptionStyles = read("src/subscription/subscription-minimal.css");
 const lightStyles = read("src/light-theme-pages.css");
 
 test("Home header search has a visible blue edge with hover and keyboard focus feedback", () => {
@@ -39,8 +41,25 @@ test("Profile and Usage Limits stay scoped, readable and motion-aware", () => {
   assert.doesNotMatch(profileStyles, /<GlassCard|<GlassSurface/);
 });
 
+test("Checkout has framed review surfaces and a clear blue payment action", () => {
+  assert.match(checkoutStyles, /\[data-checkout-app\] \[data-checkout-toolbar\]/);
+  assert.match(checkoutStyles, /\.dc-checkout-section[\s\S]*?border:\s*1px solid var\(--checkout-edge\)/);
+  assert.match(checkoutStyles, /\.dc-checkout-item[\s\S]*?border-radius:\s*12px/);
+  assert.match(checkoutStyles, /\.dc-checkout-primary[\s\S]*?linear-gradient\(135deg, #dbeafe, #bfdbfe\)/);
+});
+
+test("Subscription makes plan selection and the itemised total distinct", () => {
+  assert.match(subscriptionStyles, /\[data-subscription-page\] \[data-subscription-hero\]/);
+  assert.match(subscriptionStyles, /\.dc-subscription-plan-row\[data-selected="true"\]/);
+  assert.match(subscriptionStyles, /\[data-subscription-price-summary\][\s\S]*?border-color:\s*var\(--sub-edge-strong\)/);
+  assert.match(subscriptionStyles, /\[data-subscription-price-tiers\][\s\S]*?background:\s*transparent/);
+  assert.match(subscriptionStyles, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
 test("light theme keeps the new outlines legible on paper surfaces", () => {
   assert.match(lightStyles, /html\[data-theme="light"\] \.dc-purchases-row/);
   assert.match(lightStyles, /html\[data-theme="light"\] \[data-usage-limits-page\] \.dc-usage-section/);
   assert.match(lightStyles, /html\[data-theme="light"\] \.dc-marketplace-control/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \.dc-checkout-section/);
+  assert.match(lightStyles, /html\[data-theme="light"\] \[data-subscription-page\] \.dc-subscription-plan-row/);
 });

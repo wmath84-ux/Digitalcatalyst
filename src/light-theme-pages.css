@@ -533,6 +533,110 @@ html[data-theme="light"] .dc-subscription-primary {
 }
 html[data-theme="light"] .dc-subscription-primary:hover { background: #003ea8; }
 html[data-theme="light"] .dc-subscription-terms a { color: var(--dc-brand-ink); }
+html[data-theme="light"] [data-subscription-page] {
+  --sub-edge: rgba(0, 74, 198, 0.22);
+  --sub-edge-strong: rgba(0, 74, 198, 0.48);
+  --sub-surface: rgba(255, 255, 255, 0.82);
+  --sub-surface-soft: rgba(245, 248, 252, 0.94);
+  --sub-surface-raised: rgba(255, 255, 255, 0.94);
+}
+html[data-theme="light"] [data-subscription-page] [data-subscription-hero] {
+  border-color: var(--sub-edge);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.065), #ffffff 62%);
+  box-shadow: 0 14px 30px -26px rgba(15, 23, 42, 0.18);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-section {
+  border-color: var(--dc-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 253, 0.88));
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-section h2,
+html[data-theme="light"] [data-subscription-page] [data-subscription-price-summary] h2 {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-plan-row {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-plan-row[data-selected="true"] {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(0, 74, 198, 0.04);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-plan-row strong:first-child,
+html[data-theme="light"] [data-subscription-page] .dc-subscription-plan-price strong {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-plan-row[data-selected="true"] strong:first-child {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-duration {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-duration label {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.78);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-duration label:has(input:checked) {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.075);
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-addon-actions button {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-addon-actions button:hover {
+  border-color: var(--sub-edge-strong);
+  background: rgba(37, 99, 235, 0.06);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-disclosure {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.8);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-disclosure summary {
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-compare-scroll {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.82);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-compare-scroll thead th {
+  background: rgba(37, 99, 235, 0.06);
+}
+html[data-theme="light"] [data-subscription-page] [data-subscription-price-tiers] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme="light"] [data-subscription-page] [data-subscription-price-summary] {
+  border-color: var(--sub-edge-strong);
+  background: linear-gradient(150deg, rgba(37, 99, 235, 0.06), #ffffff 58%);
+  box-shadow: var(--dc-shadow-md);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-payable {
+  border-color: var(--sub-edge);
+  background: rgba(37, 99, 235, 0.055);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-payable > strong {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-subscription-page] [data-subscription-subscribe-bar] {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.84);
+}
+html[data-theme="light"] [data-subscription-page] .dc-subscription-state {
+  border-color: var(--sub-edge);
+  background: rgba(37, 99, 235, 0.035);
+  color: var(--dc-ink-2);
+}
+html[data-theme="light"] [data-subscription-page] :is(
+  [data-subscription-addon-upgrade-note], [data-subscription-carryover-note], [data-subscription-free-note]
+) {
+  border-color: var(--sub-edge);
+  background: rgba(37, 99, 235, 0.045);
+}
 
 /* Live selection card + compare surfaces (subscription.css companions) */
 html[data-theme="light"] [data-subscription-page] .dc-compare-scroll {
@@ -891,6 +995,82 @@ html[data-theme="light"] .dc-checkout-code-form input {
 }
 html[data-theme="light"] .dc-checkout-code-form input::placeholder { color: var(--dc-ink-faint); }
 html[data-theme="light"] .dc-checkout-code-applied strong { color: var(--dc-success-ink); }
+html[data-theme="light"] [data-checkout-app] {
+  --checkout-border: var(--dc-line);
+  --checkout-muted: var(--dc-ink-3);
+  --checkout-accent: #004ac6;
+  --checkout-edge: rgba(37, 99, 235, 0.22);
+  --checkout-edge-strong: rgba(37, 99, 235, 0.46);
+  --checkout-surface: rgba(255, 255, 255, 0.82);
+  --checkout-surface-raised: rgba(255, 255, 255, 0.96);
+}
+html[data-theme="light"] [data-checkout-app] [data-checkout-toolbar] {
+  border-bottom-color: var(--checkout-edge) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 253, 0.9));
+  box-shadow: 0 10px 24px -24px rgba(15, 23, 42, 0.22);
+}
+html[data-theme="light"] [data-checkout-app] [data-checkout-toolbar] h1 {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] .dc-checkout-step-indicator li[aria-current="step"] {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .dc-checkout-section {
+  border-color: var(--dc-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 253, 0.88));
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] [data-checkout-price-section] {
+  border-color: var(--checkout-edge-strong);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.055), #ffffff 58%);
+}
+html[data-theme="light"] .dc-checkout-item {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted);
+}
+html[data-theme="light"] .dc-checkout-item:hover {
+  border-color: var(--checkout-edge-strong);
+  background: #ffffff;
+}
+html[data-theme="light"] .dc-checkout-item-price strong {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-checkout-review-head] > span {
+  border-color: var(--checkout-edge);
+  background: rgba(37, 99, 235, 0.055);
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .dc-checkout-primary {
+  border-color: #004ac6;
+  background: linear-gradient(135deg, #0757d5, #004ac6);
+  color: #ffffff;
+  box-shadow: 0 10px 22px -16px rgba(0, 74, 198, 0.52);
+}
+html[data-theme="light"] .dc-checkout-primary .uzp-pay__text {
+  color: #ffffff;
+}
+html[data-theme="light"] .dc-checkout-primary:hover:not(:disabled) {
+  border-color: #003ea8;
+  background: linear-gradient(135deg, #1268ed, #003ea8);
+}
+html[data-theme="light"] [data-payment-gateway] > header {
+  border-bottom-color: var(--checkout-edge);
+}
+html[data-theme="light"] .dc-checkout-payment-status {
+  border-color: var(--checkout-edge);
+  background: rgba(37, 99, 235, 0.035);
+}
+html[data-theme="light"] .dc-checkout-payment-status > svg {
+  color: var(--dc-brand-ink);
+}
+html[data-theme="light"] .dc-checkout-success-head {
+  border-left-color: #2563eb;
+  background: rgba(37, 99, 235, 0.045);
+}
+html[data-theme="light"] .dc-checkout-reference {
+  border-color: var(--dc-line);
+  background: rgba(255, 255, 255, 0.82);
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    17. LEADERBOARD (leaderboard-minimal.css)

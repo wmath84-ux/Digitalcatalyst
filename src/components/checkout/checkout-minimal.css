@@ -401,3 +401,151 @@
     margin-top: var(--dc-site-header-seat, 4.25rem);
   }
 }
+
+/* PDP-inspired checkout finish: a clear progress rail, bordered review cards,
+   and a blue commitment point without changing the quote/payment flow. */
+[data-checkout-app] {
+  --checkout-border: rgba(148, 163, 184, 0.18);
+  --checkout-muted: #aab6c9;
+  --checkout-accent: #7dbbff;
+  --checkout-edge: rgba(96, 165, 250, 0.3);
+  --checkout-edge-strong: rgba(96, 165, 250, 0.68);
+  --checkout-surface: rgba(17, 23, 36, 0.86);
+  --checkout-surface-raised: rgba(21, 29, 44, 0.94);
+}
+
+[data-checkout-app] [data-checkout-toolbar] {
+  position: relative;
+  border-bottom-color: var(--checkout-edge) !important;
+  background: linear-gradient(180deg, rgba(17, 23, 36, 0.92), rgba(10, 14, 24, 0.76));
+  box-shadow: 0 12px 28px -30px rgba(2, 6, 16, 0.9);
+}
+
+[data-checkout-app] [data-checkout-toolbar] h1::after {
+  display: block;
+  width: 2.75rem;
+  height: 3px;
+  margin: 0.45rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  content: "";
+}
+
+[data-checkout-stepbar] {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.dc-checkout-step-indicator li {
+  border-bottom-color: var(--checkout-border);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.dc-checkout-step-indicator li[aria-current="step"] {
+  border-bottom-color: #60a5fa;
+  color: #eaf4ff;
+}
+
+.dc-checkout-section {
+  padding: 1rem clamp(0.8rem, 2.4vw, 1.2rem);
+  border: 1px solid var(--checkout-edge);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--checkout-surface-raised), var(--checkout-surface));
+  box-shadow: 0 14px 32px -28px rgba(2, 6, 16, 0.85);
+}
+
+[data-checkout-price-section] {
+  border-color: var(--checkout-edge-strong);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.11), var(--checkout-surface) 58%);
+}
+
+.dc-checkout-total {
+  border-top-color: var(--checkout-edge);
+}
+
+.dc-checkout-total strong {
+  color: #eaf4ff;
+}
+
+.dc-checkout-item {
+  padding: 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 12px;
+  background: rgba(10, 15, 25, 0.58);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.dc-checkout-item-price strong {
+  color: #eaf4ff;
+}
+
+.dc-checkout-item:hover {
+  border-color: var(--checkout-edge);
+  background: rgba(18, 27, 41, 0.9);
+}
+
+[data-checkout-review-head] > span {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--checkout-edge);
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #cfe7ff;
+}
+
+.dc-checkout-primary {
+  border: 1px solid rgba(219, 234, 254, 0.9);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #0b1b36;
+  box-shadow: 0 10px 26px -18px rgba(96, 165, 250, 0.9);
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dc-checkout-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  box-shadow: 0 14px 28px -18px rgba(96, 165, 250, 0.78);
+}
+
+.dc-checkout-primary .uzp-pay__text {
+  color: #0b1b36;
+}
+
+[data-payment-gateway] > header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--checkout-edge);
+}
+
+.dc-checkout-payment-status {
+  padding: 0.9rem;
+  border: 1px dashed var(--checkout-edge);
+  border-radius: 12px;
+  background: var(--checkout-surface);
+}
+
+.dc-checkout-payment-status > svg {
+  color: #93c5fd;
+}
+
+.dc-checkout-success-head {
+  padding-inline: 1rem;
+  border-left: 3px solid #60a5fa;
+  border-radius: 0 12px 12px 0;
+  background: rgba(17, 23, 36, 0.62);
+}
+
+.dc-checkout-reference {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--checkout-edge);
+  border-radius: 12px;
+  background: var(--checkout-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-checkout-step-indicator li,
+  .dc-checkout-item,
+  .dc-checkout-primary { transition-duration: 1ms; }
+  .dc-checkout-primary:hover:not(:disabled) { transform: none; }
+  [data-checkout-app] .animate-spin { animation: none; }
+}
