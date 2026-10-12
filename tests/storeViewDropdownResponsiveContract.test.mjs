@@ -56,3 +56,13 @@ test("both Store windows use the PDP opening placement and exact stretch animati
   assert.match(glassCss, /\.dc-compact-glass-window\[data-open="true"\][\s\S]*?animation:\s*dc-compact-glass-window-stretch 760ms ease-out 40ms both/);
   assert.match(glassCss, /@keyframes dc-compact-glass-window-stretch[\s\S]*?10%\s*\{[^}]*scale\(1\.1,\s*0\.9\)[\s\S]*?30%\s*\{[^}]*scale\(0\.9,\s*1\.1\)/);
 });
+
+
+test("Store popovers escape the narrow trigger and clamp to the viewport", () => {
+  assert.match(storePage, /import \{ createPortal \} from "react-dom"/);
+  assert.match(storePage, /useLayoutEffect\(\(\) => \{/);
+  assert.match(storePage, /data-store-popover-portal/);
+  assert.match(storePage, /position: "fixed"/);
+  assert.match(storePage, /viewportWidth - width - gutter/);
+  assert.match(storePage, /menuRef\.current\?\.contains\(target\)/);
+});
