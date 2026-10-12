@@ -35,7 +35,7 @@
        reserve so the checkout button never flashes underneath the capsule. */
     padding-bottom: max(
       var(--dc-footer-nav-h, 0px),
-      calc(7rem + var(--dc-system-navigation-inset, env(safe-area-inset-bottom, 0px)))
+      calc(5.5rem + max(0px, var(--dc-system-navigation-inset, 0px) - 10px))
     );
   }
 }

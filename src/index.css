@@ -5283,10 +5283,6 @@ html[data-android-edge-to-edge="true"] {
 html[data-android-edge-to-edge="true"] [data-site-footer-nav] {
   padding-bottom: max(var(--dc-system-navigation-inset), 10px) !important;
 }
-/* The Uiverse reference floats 12px above the phone's bottom safe area. */
-html[data-android-edge-to-edge="true"] [data-footer-nav-design="uiverse"] {
-  padding-bottom: calc(12px + var(--dc-system-navigation-inset, 24px)) !important;
-}
 html[data-android-edge-to-edge="true"]::after {
   content: "";
   position: fixed;
