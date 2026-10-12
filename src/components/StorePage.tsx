@@ -1,7 +1,7 @@
-import { Fragment, useMemo, useState, useEffect, useId } from "react";
+import { Fragment, useMemo, useState, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
-import { Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import StoreProductCard from "./StoreProductCard";
 import { buildStoreShelves } from "../utils/storeShelves";
 import ContentDialog from "./ui/ContentDialog";
@@ -14,6 +14,7 @@ import "./store-marketplace.css";
 import "./store-filter-radio.css";
 import useDragScroll from "../hooks/useDragScroll";
 import { useStoreFilters } from "../hooks/useStoreFilters";
+import { openCommandPalette } from "../lib/commandPalette";
 import {
   ALL_STORE_FILTER,
   derivedStoreFilters,
@@ -22,6 +23,131 @@ import {
 } from "../data/storeFilters";
 
 type ViewMode = "grid" | "list" | "mixed";
+type StorePopoverOption = { value: string; label: string };
+type StorePopoverKind = "sort" | "view";
+
+const STORE_SORT_OPTIONS: StorePopoverOption[] = [
+  { value: "Recommended", label: "Recommended" },
+  { value: "Price: Low to High", label: "Price: Low to High" },
+  { value: "Price: High to Low", label: "Price: High to Low" },
+  { value: "Top Rated", label: "Top Rated" },
+  { value: "Newest", label: "Newest" },
+];
+const STORE_VIEW_OPTIONS: StorePopoverOption[] = [
+  { value: "grid", label: "Grid" },
+  { value: "list", label: "List" },
+  { value: "mixed", label: "Mixed" },
+];
+
+function StoreOptionPopover({
+  kind,
+  value,
+  options,
+  onChange,
+}: {
+  kind: StorePopoverKind;
+  value: string;
+  options: StorePopoverOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const selected = options.find((option) => option.value === value) ?? options[0];
+  const isSort = kind === "sort";
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    const frame = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>("[aria-selected='true']")?.focus({ preventScroll: true });
+    });
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  const moveOptionFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='option']"));
+    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next]?.focus({ preventScroll: true });
+  };
+
+  return (
+    <div ref={rootRef} className={`dc-marketplace-popup-anchor ${isSort ? "dc-marketplace-popup-anchor--sort" : "dc-marketplace-popup-anchor--view"}`}>
+      <button
+        ref={triggerRef}
+        id={`${id}-trigger`}
+        type="button"
+        data-store-sort={isSort ? "" : undefined}
+        data-store-view-selector={!isSort ? "" : undefined}
+        className={`dc-marketplace-popup-trigger ${isSort ? "dc-marketplace-popup-trigger--sort" : "dc-marketplace-popup-trigger--view"}`}
+        aria-label={isSort ? "Sort products" : "Product layout"}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${id}-options`}
+        title={isSort ? `Sort products: ${selected.label}` : `Product layout: ${selected.label}`}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown size={15} aria-hidden="true" />
+      </button>
+      <div
+        ref={menuRef}
+        id={`${id}-options`}
+        role="listbox"
+        aria-label={isSort ? "Sort options" : "Product layouts"}
+        aria-labelledby={`${id}-trigger`}
+        aria-hidden={!open}
+        data-open={open ? "true" : "false"}
+        data-store-sort-options={isSort ? "" : undefined}
+        data-store-view-popover={!isSort ? "" : undefined}
+        className={`dc-compact-glass-window ${isSort ? "dc-compact-glass-window--menu dc-marketplace-sort-window" : "dc-marketplace-view-window"}`}
+        onKeyDown={moveOptionFocus}
+      >
+        {options.map((option) => {
+          const isSelected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              data-selected={isSelected ? "true" : "false"}
+              className={`dc-marketplace-popup-option ${!isSort ? "dc-marketplace-popup-option--view" : ""}`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+                triggerRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              <span>{option.label}</span>
+              {isSelected ? <Check size={15} aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 type StorePageProps = {
   wishlist: Set<string>;
@@ -47,7 +173,6 @@ export default function StorePage({
   const { appName } = useBranding();
   const chipDrag = useDragScroll<HTMLDivElement>();
   const [filterOpen, setFilterOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const filterGroupName = useId();
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
@@ -87,19 +212,8 @@ export default function StorePage({
   }, [chips, activeFilterId]);
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
     let list = products.filter((p) => {
       const price = p.isFree === true ? 0 : p.price;
-      const matchesSearch =
-        !query ||
-        p.title.toLowerCase().includes(query) ||
-        p.subject.toLowerCase().includes(query) ||
-        p.instructor.toLowerCase().includes(query) ||
-        p.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-        (p.searchKeywords || []).some((keyword) =>
-          keyword.toLowerCase().includes(query)
-        );
-
       const matchesChip = productMatchesStoreFilter(p, activeFilter);
 
       // Advanced filters
@@ -140,7 +254,7 @@ export default function StorePage({
           matchesAdvanced = matchesAdvanced && !purchased.has(p.id);
       }
 
-      return matchesSearch && matchesChip && matchesAdvanced;
+      return matchesChip && matchesAdvanced;
     });
 
     list = [...list];
@@ -152,13 +266,12 @@ export default function StorePage({
     if (sort === "Newest") list.reverse();
 
     return list;
-  }, [products, search, activeFilter, sort, advancedFilters, purchased]);
+  }, [products, activeFilter, sort, advancedFilters, purchased]);
 
   const activeAdvancedCount = Object.values(advancedFilters).filter(
     (value) => value !== "all"
   ).length;
   const clearFilters = () => {
-    setSearch("");
     setActiveFilterId(ALL_STORE_FILTER.id);
     setAdvancedFilters(DEFAULT_ADVANCED_FILTERS);
   };
@@ -179,24 +292,19 @@ export default function StorePage({
   return (
     <section data-store-page data-store-marketplace>
       <div className="dc-marketplace-layout">
-        <header className="dc-marketplace-heading">
-          <p>{appName} · Learning marketplace</p>
-          <h1>Explore the Store</h1>
-          <span>Courses, notes and resources for your next step.</span>
-        </header>
         <div className="dc-marketplace-discovery">
-          <label className="dc-marketplace-search">
+          <button
+            type="button"
+            data-store-search-trigger
+            data-search-launcher
+            className="dc-marketplace-search"
+            aria-label="Search products"
+            aria-haspopup="dialog"
+            onClick={() => openCommandPalette({ scope: "products" })}
+          >
             <Search size={20} aria-hidden="true" />
-            <span className="sr-only">Search the Store</span>
-            <input
-              data-store-search-trigger
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search courses, subjects or instructors"
-              aria-label="Search the Store"
-            />
-          </label>
+            <span className="dc-marketplace-search-placeholder">Search courses, subjects or instructors</span>
+          </button>
           <button
             type="button"
             data-store-advanced-filter-trigger
@@ -237,9 +345,7 @@ export default function StorePage({
                   filtered.length === 1 ? "" : "s"
                 }`}
           </p>
-          {search.trim() ||
-          activeFilter.id !== ALL_STORE_FILTER.id ||
-          activeAdvancedCount ? (
+          {activeFilter.id !== ALL_STORE_FILTER.id || activeAdvancedCount ? (
             <button
               type="button"
               className="dc-marketplace-text-action"
@@ -249,40 +355,18 @@ export default function StorePage({
             </button>
           ) : null}
           <div className="dc-marketplace-arrange">
-            <label>
-              <span className="sr-only">Sort products</span>
-              <select
-                data-store-sort
-                aria-label="Sort products"
-                value={sort}
-                onChange={(event) => setSort(event.target.value)}
-              >
-                {[
-                  "Recommended",
-                  "Price: Low to High",
-                  "Price: High to Low",
-                  "Top Rated",
-                  "Newest",
-                ].map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="sr-only">Product layout</span>
-              <select
-                data-store-view-selector
-                aria-label="Product layout"
-                value={viewMode}
-                onChange={(event) =>
-                  setViewMode(event.target.value as ViewMode)
-                }
-              >
-                <option value="grid">Grid</option>
-                <option value="list">List</option>
-                <option value="mixed">Mixed</option>
-              </select>
-            </label>
+            <StoreOptionPopover
+              kind="sort"
+              value={sort}
+              options={STORE_SORT_OPTIONS}
+              onChange={setSort}
+            />
+            <StoreOptionPopover
+              kind="view"
+              value={viewMode}
+              options={STORE_VIEW_OPTIONS}
+              onChange={(value) => setViewMode(value as ViewMode)}
+            />
           </div>
         </div>
         {error ? (
@@ -322,7 +406,7 @@ export default function StorePage({
             </h2>
             <p>
               {products.length
-                ? "Try another search or clear the filters."
+                ? "Try a different filter or clear the filters to see all resources."
                 : "Published courses and study resources will appear here."}
             </p>
             {products.length ? (

@@ -25,10 +25,21 @@ test('long content has a bounded scroll area and expired card measurements do no
   assert.match(deck, /items.slice\(0, VISIBLE\).reduce/);
   assert.match(deck, /const contentFloor = box.height/);
 });
+test('Live Experiment and Paid use readable website surfaces and matching ink/cards', () => {
+  const css = read('src/course/courseBrandColors.css');
+  const experiment = read('src/course/ExperimentPanel.tsx');
+  assert.match(experiment, /data-course-experiment-panel=""/);
+  assert.match(experiment, /data-course-theme-surface="light"/);
+  assert.match(css, /\.course-player-shell \[data-course-experiment-panel\][\s\S]*?background-color: #ffffff/);
+  assert.match(css, /\.course-player-shell \[data-course-overlay-tab="paid"\][\s\S]*?background: var\(--dc-bg-primary/);
+  assert.match(css, /data-course-overlay-tab="paid"\] \[data-course-sheet-row\][\s\S]*?background-color: var\(--dc-bg-secondary/);
+  assert.match(css, /data-course-overlay-tab="paid"\] \[data-course-sheet-row\] \.truncate\.text-xs[\s\S]*?color: var\(--dc-ink/);
+  assert.match(css, /data-course-overlay-tab="paid"\] \[data-course-sheet-row\] \[data-row-subtitle\][\s\S]*?color: var\(--dc-ink-muted/);
+});
 test('player and body-portalled overlays use shared tokens with no layout changes', () => {
   const css = read('src/course/courseBrandColors.css');
   for (const scope of ['.course-player-shell', '[data-course-theme-portal]', '[data-course-confirm-dialog]', '[data-mindmap-json-import]', '[data-experiment-self-composer]', '[data-self-mindmap-composer]']) assert.ok(css.includes(scope));
   for (const token of ['--dc-brand', '--dc-ink', '--dc-line', '--dc-brand-soft']) assert.ok(css.includes(token));
-  postcss.parse(css).walkDecls(decl => assert.ok(decl.prop.startsWith('--') || ['color', 'background', 'background-color', 'border-color', 'outline-color'].includes(decl.prop), `Unexpected non-colour property ${decl.prop}`));
+  postcss.parse(css).walkDecls(decl => assert.ok(decl.prop.startsWith('--') || ['color', 'background', 'background-color', 'border-color', 'outline-color', 'box-shadow', 'color-scheme'].includes(decl.prop), `Unexpected non-colour property ${decl.prop}`));
   for (const protectedContent of ['.course-rich-surface *', '.excalidraw *', '[data-course-lesson-content] *', '[data-course-strip-nav] *']) assert.ok(css.includes(protectedContent));
 });

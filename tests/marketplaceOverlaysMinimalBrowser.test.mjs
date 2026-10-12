@@ -325,15 +325,23 @@ check(
     const { page, errors } = await open("page=store&adminFilters&shell", 1440);
     await page.getByRole("button", { name: "Biology", exact: true }).click();
     assert.equal(await page.locator("[data-store-product]").count(), 1);
-    await page.getByRole("button", { name: "All", exact: true }).click();
-    await page
-      .getByRole("searchbox", { name: "Search the Store" })
-      .fill("  waves  ");
+    await page.getByRole("button", { name: "Search products" }).click();
+    const productSearch = page.getByRole("searchbox", { name: "Search Store products" });
+    await productSearch.fill("  waves  ");
+    const result = page.locator('[data-command-product="alpha"]');
+    await result.waitFor();
+    assert.equal(await page.locator("[data-command-product]").count(), 1);
+    assert.match(await result.textContent(), /Waves and optics/);
+    assert.match(await result.textContent(), /₹149\.95/);
+    assert.equal(await result.locator(".dc-command-product-image img").count(), 1);
     assert.equal(await page.locator("[data-store-product]").count(), 1);
+    await page.keyboard.press("Escape");
     await page
       .getByRole("button", { name: "Clear filters", exact: true })
       .click();
-    await page.getByLabel("Sort products").selectOption("Price: Low to High");
+    assert.equal(await page.locator("[data-store-product]").count(), 9);
+    await page.getByLabel("Sort products").click();
+    await page.getByRole("option", { name: "Price: Low to High", exact: true }).click();
     assert.equal(
       await page
         .locator("[data-store-product]")
@@ -343,8 +351,23 @@ check(
       "₹0"
     );
     for (const layout of ["list", "mixed", "grid"]) {
-      await page.getByLabel("Product layout").selectOption(layout);
+      await page.getByLabel("Product layout").click();
+      const layoutLabel = layout[0].toUpperCase() + layout.slice(1);
+      await page.getByRole("option", { name: layoutLabel, exact: true }).click();
       assert.equal(await page.locator("[data-store-product]").count(), 9);
+      if (layout === "list") {
+        const row = page.locator('[data-store-product="alpha"]');
+        assert.equal(await row.evaluate((el) => el.classList.contains("dc-purchases-row")), true);
+        const dimensions = await row.locator(".dc-marketplace-cover").evaluate((el) => {
+          const rect = el.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        });
+        assert.deepEqual(dimensions, { width: 80, height: 64 });
+        assert.equal(await row.locator(".dc-marketplace-list-actions .dc-marketplace-buy").count(), 1);
+      }
+      if (layout === "mixed") {
+        assert.ok(await page.locator("[data-store-mixed-feature] .dc-marketplace-card.is-list").count() > 0);
+      }
       await bounds(page, layout);
       await page.setViewportSize({ width: 390, height: 900 });
       await bounds(page, layout + " phone");
@@ -646,7 +669,7 @@ check(
       });
       const heading = page.locator(
         target === "store"
-          ? ".dc-marketplace-heading"
+          ? ".dc-marketplace-search"
           : target === "leaderboard"
           ? ".dc-leaderboard-heading"
           : ".dc-editor-title"

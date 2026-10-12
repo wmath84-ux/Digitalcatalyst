@@ -11,30 +11,31 @@
 // so the toolbar has to know where the player's FOOTER NAVIGATION is and stop
 // just above it instead of sliding underneath it.
 //
-// The footer navigation has two homes, and neither gives a constant:
+// Legacy footer-navigation homes are not interchangeable:
 //
-//   · the bottom-centre PEEK dock (`[data-course-peek-dock]`) is
-//     `position: fixed` at the bottom of the player, so it OVERLAYS the
-//     writing surface. The toolbar must clear all of it: the 8px line, the
-//     taller invisible hit strip above the line, and the dock panel itself
-//     when the footer is open (that panel takes pointer events, so a toolbar
-//     under it would be unreachable, not merely covered).
+//   · the retired bottom-centre PEEK dock (`[data-course-peek-dock]`) is
+//     `position: fixed` and overlays the writing surface. If a legacy shell
+//     still mounts it, the toolbar clears the line, hit strip and open panel.
 //
-//   · the legacy ALWAYS-VISIBLE dock (`[data-course-dock]`) is the last child
-//     of the study pane, i.e. in flow BELOW the notes panel — the toolbar
-//     already ends exactly where it begins, so it needs no lift at all.
+//   · the legacy ALWAYS-VISIBLE dock (`[data-course-dock]`) is in flow below
+//     the notes panel, so the toolbar already ends where it begins and needs
+//     no lift.
 //
-// And the footer is not always there: the player's ONE keyboard rule hides it
-// completely while the soft keyboard is open (src/course/useCourseKeyboard.tsx),
-// and notes can render outside the player shell without a footer. So the lift
-// is measured, never assumed: how many px of the writing surface's bottom edge
-// the footer covers.
+// The current Course Player uses `[data-course-strip-nav]`, an ordinary
+// in-flow sibling after the split stage. It is deliberately NOT in
+// COURSE_FOOTER_SELECTOR: it cannot cover the notes surface, and the panel
+// naturally ends immediately above it. Counting it as an overlay would add
+// the exact unwanted strip above the footer divider.
+//
+// Legacy overlay footers can also be hidden by the player's ONE keyboard rule
+// (src/course/useCourseKeyboard.tsx); notes can render outside the player with
+// no footer. So the lift remains measured, never assumed.
 //
 //   footer overlays the bottom  →  lift by exactly the covered px
 //   footer sits below (in flow) →  0
 //   footer hidden or absent     →  0   (never a gap above nothing)
 
-/** Both homes of the player's footer navigation, in one selector. */
+/** Legacy overlays and in-pane docks only; the current in-flow study strip is not an inset. */
 export const COURSE_FOOTER_SELECTOR = "[data-course-peek-dock], [data-course-dock]";
 
 /** The custom property the measured lift is published on (CSS keys off it). */

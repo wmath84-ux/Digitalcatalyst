@@ -5,6 +5,7 @@ import { account, DEFAULT_FLAGS, grantsFor, initialUid, membershipFor, product }
 import { normalizeUserPreferences } from "../../../utils/userPreferences";
 import { normaliseCouponDoc } from "../../../utils/coupons";
 import { buildQuote } from "../../../utils/serverQuotes";
+import { collectEntitlementOwnership, resolveCourseAccess } from "../../../utils/courseAccess";
 const params = new URLSearchParams(location.search);
 const listeners = new Set<() => void>();
 const snapshots = new Map<string, Set<{ next: (value: any) => void; error: (value: any) => void }>>();
@@ -14,7 +15,7 @@ export const state: any = {
   uid: initialUid, extraGrants: new Map(), flags: new Map(), revision: new Map(), requests: [], writes: [], quoteRequests: [], setups: 0, permissionRequests: 0,
   permission: params.has("blocked") ? "denied" : params.has("permissionGranted") ? "granted" : "default",
   nativePermission: params.has("blocked") ? "denied" : params.has("permissionGranted") ? "granted" : "prompt",
-  faults: { read: params.has("readError"), save: params.has("saveError"), setup: params.has("setupError"), sync: Boolean(params.get("accessError")), quote: params.has("quoteError"), token: params.has("tokenHang") },
+  faults: { read: params.has("readError"), save: params.has("saveError"), setup: params.has("setupError"), sync: Boolean(params.get("accessError")), quote: params.has("quoteError"), courseAccess: params.has("accessServerError"), token: params.has("tokenHang") },
   deferred: [], snapshotStarts: {}, nativeListeners: new Map(), nativeRegisters: 0, nativeRequests: 0,
 };
 function prefs(uid: string) {
@@ -107,6 +108,33 @@ export async function apiFetch(url: string, options: any = {}) {
       if (params.has("lostAck")) throw Error("HTTP acknowledgement lost");
     }
     return response({ ok: true, preferences: normalizeUserPreferences(prefs(uid)), revision: state.revision.get(uid), capabilities: capabilities() });
+  }
+  if (url.startsWith("/api/course-access")) {
+    const uid = String(options.headers?.Authorization || "").slice("Bearer token:".length);
+    if (!uid || uid === "Bearer token:") return response({ ok: false, error: "Sign in required" }, 401);
+    if (state.faults.courseAccess) return response({ ok: false, error: "Server access verification unavailable" }, 503);
+    const records = [...grantsFor(uid), ...(state.extraGrants.get(uid) || [])].map((record: any) => ({ ...record, productDocumentId: product.documentId }));
+    const entitlements = collectEntitlementOwnership(records);
+    const member = membershipFor(uid);
+    const userData = rawDoc(`users/${uid}`) || {};
+    const ownedUpdateIds = [...entitlements.ownedUpdateIds, ...Object.values(userData.purchasedProductUpdateIds || {}).flatMap((ids: any) => Array.isArray(ids) ? ids.map(String) : [])];
+    const resolution = resolveCourseAccess({
+      product,
+      ownedProductIds: [...entitlements.ownedProductIds, ...(userData.purchasedProductIds || [])],
+      ownedUpdateIds,
+      ownedModuleIds: [...entitlements.ownedModuleIds],
+      ownedResourceIds: [...entitlements.ownedResourceIds],
+      subscriptionProductIds: member?.includedProductIds || [],
+      subscriptionModuleIds: (member?.includedModuleKeys || []).map((key: string) => key.slice(key.indexOf(":") + 1)),
+      subscriptionResourceIds: [],
+    });
+    const wireResolution = {
+      ...resolution,
+      ownedModuleIds: [...resolution.ownedModuleIds], ownedResourceIds: [...resolution.ownedResourceIds], ownedUpdateIds: [...resolution.ownedUpdateIds],
+      subscriptionGrantedModuleIds: [...resolution.subscriptionGrantedModuleIds], accessibleModuleIds: [...resolution.accessibleModuleIds],
+      accessibleResourceIds: [...resolution.accessibleResourceIds], lockedModuleIds: [...resolution.lockedModuleIds], previewModuleIds: [...resolution.previewModuleIds],
+    };
+    return response({ ok: true, resolution: wireResolution, subscription: member });
   }
   if (url.startsWith("/api/quotes/create")) {
     state.quoteRequests.push(structuredClone(body.selection));

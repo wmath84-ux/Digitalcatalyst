@@ -319,9 +319,11 @@ test("every footer still renders the ONE shared capsule (so the fix reaches all 
     assert.match(read(file), /<SiteFooterNav/, `${file} must keep the shared footer`);
   }
   assert.match(read("src/components/SiteFooterNav.tsx"), /<GlassDock siteFooter/);
-  // The course player's peek dock mounts the same GlassDock, so its drag gets
-  // the same transform-only wave.
-  assert.match(read("src/course/CoursePeekDock.tsx"), /<GlassDock compact items=\{items\} onSelect=\{handleSelect\} pointerX=\{pointerX\} \/>/);
+  // The Course Player intentionally uses a separate, in-flow study strip;
+  // only site footers participate in the shared capsule's drag wave.
+  const courseDock = read("src/course/CoursePeekDock.tsx");
+  assert.match(courseDock, /data-course-strip-nav/);
+  assert.doesNotMatch(courseDock, /<GlassDock/);
 });
 
 /* ------------------------------------------------------------------ */

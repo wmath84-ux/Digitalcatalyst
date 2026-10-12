@@ -22,6 +22,69 @@ html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [
 html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is([class~="text-slate-500"], [class~="text-slate-600"], [class~="text-gray-500"], [class~="text-gray-600"]):not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { color: var(--dc-ink-3, #475569) !important; }
 html[data-theme="light"] :is(.course-player-shell, [data-course-theme-portal], [data-course-confirm-dialog], [data-mindmap-json-import]) :is(button, input, textarea, select, summary, [role="menuitem"]):focus-visible:not(:where(.course-rich-surface, .course-rich-surface *, .excalidraw, .excalidraw *, [data-course-lesson-content], [data-course-lesson-content] *, [data-course-strip-nav], [data-course-strip-nav] *, [data-brain-card], [data-brain-card] *)) { outline-color: var(--dc-brand, #004ac6); }
 
+/* Live Experiments are a light UI surface in either Player palette. The cards,
+   MASTER/SELF control and empty states consume these feature-local tokens. */
+.course-player-shell [data-course-experiment-panel] {
+  --course-text: #0f172a;
+  --course-muted: #475569;
+  --course-border: #e2e8f0;
+  --dc-flat-row: #f8fafc;
+  --dc-flat-row-hover: #f1f5f9;
+  --dc-flat-row-line: #e2e8f0;
+  --dc-flat-ink: #0f172a;
+  --dc-flat-ink-sub: #475569;
+  --dc-flat-board: #ffffff;
+  --dc-flat-ink-label: #64748b;
+  --dc-flat-box: #f8fafc;
+  color: #0f172a;
+  color-scheme: light;
+  background-color: #ffffff;
+}
+
+/* Paid content follows the public site's paper, ink and card palette even if
+   the surrounding Player is using its independent dark preference. */
+.course-player-shell [data-course-overlay-tab="paid"] {
+  --dc-flat-board: var(--dc-bg-primary, #f7f9fb);
+  --dc-flat-ink: var(--dc-ink, #191c1e);
+  --dc-flat-ink-title: var(--dc-ink, #191c1e);
+  --dc-flat-ink-body: var(--dc-ink-muted, #434655);
+  --dc-flat-ink-sub: var(--dc-ink-muted, #434655);
+  --dc-flat-ink-label: var(--dc-ink-faint, #5b6679);
+  --dc-flat-row: var(--dc-bg-secondary, #ffffff);
+  --dc-flat-row-hover: var(--dc-bg-muted, #f2f4f6);
+  --dc-flat-row-line: var(--dc-line, #e0e3e5);
+  --dc-flat-row-line-hover: var(--dc-line-strong, #c3c6d7);
+  --dc-flat-violet-wash: var(--dc-brand-soft, #dbeafe);
+  --dc-flat-violet-line: rgba(0, 74, 198, 0.32);
+  --course-text: var(--dc-ink, #191c1e);
+  --course-muted: var(--dc-ink-muted, #434655);
+  --course-border: var(--dc-line, #e0e3e5);
+  color: var(--dc-ink, #191c1e);
+  color-scheme: light;
+  background: var(--dc-bg-primary, #f7f9fb);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row] {
+  background-color: var(--dc-bg-secondary, #ffffff);
+  box-shadow: inset 0 0 0 1px var(--dc-line, #e0e3e5);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row]:hover {
+  background-color: var(--dc-bg-muted, #f2f4f6);
+  box-shadow: inset 0 0 0 1px var(--dc-line-strong, #c3c6d7);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row][data-selected="true"] {
+  background-color: var(--dc-brand-soft, #dbeafe);
+  box-shadow: inset 0 0 0 1px rgba(0, 74, 198, 0.32);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row][data-locked="true"] {
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.28);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row] .truncate.text-xs {
+  color: var(--dc-ink, #191c1e);
+}
+.course-player-shell [data-course-overlay-tab="paid"] [data-course-sheet-row] [data-row-subtitle] {
+  color: var(--dc-ink-muted, #434655);
+}
+
 /* Feature-owned UI tokens, not content colours. */
 html[data-theme="light"] .course-player-shell .branched-menu {
   --bm-ink: var(--dc-ink, #191c1e);

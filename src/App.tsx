@@ -54,6 +54,10 @@ export default function App({
     <div className="dc-app-shell min-h-screen sm:py-6">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
+          title={activeTab === "store" ? "Explore the Store" : undefined}
+          subtitle={activeTab === "store" ? "Courses, notes and resources for your next step." : undefined}
+          subtitleWrap={activeTab === "store"}
+          seamless={activeTab === "store"}
           cartCount={cartCount}
           notifCount={1}
           onNavigateToSubscription={onNavigateToSubscription}

@@ -19,6 +19,7 @@ import { handlePersonalAi } from "./_lib/personalAi.js";
 import { handleStudyPacks } from "./_lib/studyPacks.js";
 import { handleGatePersonalAccess } from "./_lib/gatePersonalAccess.js";
 import { handleMyCourses } from "./_lib/myCourses.js";
+import { handleCourseAccess } from "./_lib/courseAccess.js";
 
 type SubscriberRow = {
   uid: string;
@@ -140,6 +141,7 @@ const SHARED_ROUTES = [
   "revision/data",
   "revision/generate",
   "subscription-gate",
+  "course-access",
   "embed-proxy",
 ] as const;
 
@@ -176,6 +178,7 @@ const ROUTE_LABEL: Record<SharedRoute, string> = {
   "revision/data": "the Revision Test Bank",
   "revision/generate": "the Revision AI generator",
   "subscription-gate": "the subscription gate",
+  "course-access": "course access verification",
   "embed-proxy": "the embed proxy",
 };
 
@@ -282,6 +285,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const path = incomingPath(reqWithUrl);
   // Which feature this request was addressed at, per vercel.json's rewrites.
   const route = sharedRouteAddressed(reqWithUrl);
+  if (route === "course-access") return handleCourseAccess(req, res);
   if (route === "account/preferences") return handleAccountPreferences(req, res);
   if (route === "public-profile") return handlePublicProfile(req, res);
   if (matchesApiRoute(reqWithUrl, "manifest")) {

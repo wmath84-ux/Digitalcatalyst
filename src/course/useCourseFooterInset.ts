@@ -15,10 +15,11 @@
 //   · the viewport (resize / visualViewport resize + scroll / rotation) — a
 //     `position: fixed` footer rides the viewport, and the soft keyboard
 //     moving it is also what hides the footer, which drops the lift to 0;
-//   · a ResizeObserver on the writing surface and on the footer itself — the
-//     peek dock GROWS when it opens (its panel expands) and collapses to zero
-//     height when the keyboard rule hides it, and the study pane is resized
-//     by the split divider's every drag;
+//   · a ResizeObserver on the writing surface and on any matched LEGACY
+//     overlay footer — that panel can expand when opened or collapse to zero
+//     height when the keyboard rule hides it, and the study pane is resized by
+//     the split divider's every drag. The current in-flow study strip is not
+//     observed as an overlay and requires no toolbar inset;
 //   · a MutationObserver that fires only for a change that actually touches a
 //     footer — so the learner flipping the player's "Always-visible footer
 //     dock" setting (one footer unmounts, the other mounts) is picked up,
@@ -86,8 +87,8 @@ export const useCourseFooterInset = (active: boolean, surfaceRef: RefObject<Elem
     }
 
     let frame = 0;
-    // The footers currently watched, so a footer that is swapped for the other
-    // home (the player's footer-dock setting) is picked up without a remount.
+    // The legacy footer elements currently watched, so swapping between the
+    // in-pane dock and overlay dock is picked up without a remount.
     const watched = new Set<Element>();
     let observer: ResizeObserver | null = null;
 

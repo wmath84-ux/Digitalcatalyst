@@ -7,6 +7,8 @@ const testApi = fs.readFileSync("api/push/test.ts", "utf8");
 const subscribeApi = fs.readFileSync("api/push/subscribe.ts", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 const pdp = fs.readFileSync("src/PdpApp.tsx", "utf8");
+const pdpStyles = fs.readFileSync("src/pdp-minimal.css", "utf8");
+const glassStyles = fs.readFileSync("src/glass.css", "utf8");
 const catalog = fs.readFileSync("src/context/CatalogContext.tsx", "utf8");
 const mapping = fs.readFileSync("utils/productMapping.js", "utf8");
 
@@ -57,6 +59,28 @@ test("product sharing uses the device share sheet plus copy and chat apps", () =
   assert.match(pdp, /WhatsApp/);
   assert.match(pdp, /Copy link/);
   assert.match(pdp, /#\/product\/\$\{encodeURIComponent\(product\.id\)\}/);
+});
+
+test("the PDP share menu uses the compact sweet-sloth window animation with massive-snail glass", () => {
+  const panel = glassStyles.match(/\.dc-compact-glass-window\s*\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(panel, "shared compact glass window surface rule should exist");
+  assert.match(panel, /position:\s*absolute/);
+  assert.match(panel, /bottom:\s*calc\(100%\s*\+\s*0\.375rem\)/, "the existing popup placement is retained");
+  assert.match(panel, /width:\s*min\(190px,\s*100%\)/);
+  assert.match(panel, /height:\s*70px/);
+  assert.match(panel, /border-radius:\s*70px/);
+  assert.match(panel, /transform-origin:\s*bottom right/);
+  assert.match(panel, /linear-gradient\(-75deg,[\s\S]*rgba\(255,\s*255,\s*255,\s*0\.2\)/);
+  assert.match(panel, /backdrop-filter:\s*blur\(clamp\(1px,\s*0\.125em,\s*4px\)\)/);
+  assert.match(panel, /inset 0 -0\.125em 0\.125em rgba\(255,\s*255,\s*255,\s*0\.5\)/);
+  assert.match(glassStyles, /@keyframes dc-compact-glass-window-stretch[\s\S]*?10%\s*\{[^}]*scale\(1\.1,\s*0\.9\)[\s\S]*?30%\s*\{[^}]*scale\(0\.9,\s*1\.1\)/);
+  assert.match(glassStyles, /\.dc-compact-glass-window\[data-open="true"\][\s\S]*?animation:\s*dc-compact-glass-window-stretch/);
+  assert.match(glassStyles, /html\[data-theme="light"\] \.dc-compact-glass-window/);
+  assert.match(pdpStyles, /\.dc-pdp-share-menu\s*\{\s*--dc-compact-glass-window-border:\s*var\(--pdp-border\)/);
+  assert.match(pdp, /className="dc-compact-glass-window dc-pdp-share-menu"/);
+  assert.match(pdp, /data-open=\{shareOpen \? "true" : "false"\}/);
+  assert.match(pdp, /aria-hidden=\{!shareOpen\}/);
+  assert.match(pdp, /className="dc-pdp-share-action"/);
 });
 
 test("purchase ownership matches both public id and document id", () => {

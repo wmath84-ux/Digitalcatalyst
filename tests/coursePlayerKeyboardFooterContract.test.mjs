@@ -130,16 +130,12 @@ test("the provider publishes the state on the player shell and cleans up", () =>
 test("the peek dock hides completely while the keyboard is open", () => {
   assert.match(peekDock, /import \{ useCourseKeyboard \} from '\.\/useCourseKeyboard'/);
   assert.match(peekDock, /const \{ keyboardVisible \} = useCourseKeyboard\(\)/);
-  // Hidden, not merely transparent: display:none takes the line AND the open
-  // dock out of the layout, so no strip of footer rides above the keyboard.
-  assert.match(
-    peekDock,
-    /className=\{`fixed inset-x-0 bottom-0 z-\[70\] flex flex-col items-center \$\{keyboardVisible \? 'hidden' : ''\}`\}/,
-  );
-  assert.match(peekDock, /data-keyboard-hidden=\{keyboardVisible \? 'true' : 'false'\}/);
-  // The dock's own machinery is untouched — it is a visibility rule only.
-  assert.match(peekDock, /const open = hover \|\| pinned/);
-  assert.match(peekDock, /<GlassDock compact items=\{items\} onSelect=\{handleSelect\} pointerX=\{pointerX\} \/>/);
+  // The compact study strip is unmounted while the keyboard is open, so no
+  // footer surface or spacer can remain above the keyboard.
+  assert.match(peekDock, /if \(keyboardVisible\) return null/);
+  assert.match(peekDock, /<nav ref=\{navRef\} data-course-strip-nav/);
+  assert.match(peekDock, /<div className="course-strip-track">/);
+  assert.match(peekDock, /data-course-strip=\{item\.key\}/);
 });
 
 test("the legacy in-pane dock carries the same rule", () => {
@@ -147,7 +143,7 @@ test("the legacy in-pane dock carries the same rule", () => {
   assert.match(overlay, /const \{ keyboardVisible \} = useCourseKeyboard\(\);/);
   assert.match(
     overlay,
-    /className=\{`relative z-50 shrink-0 px-3 pb-\[max\(env\(safe-area-inset-bottom\),10px\)\] pt-2 \$\{keyboardVisible \? "hidden" : ""\}`\}/,
+    /className=\{`relative z-50 shrink-0 px-3 pb-\[max\(env\(safe-area-inset-bottom\),10px\)\] pt-0 \$\{keyboardVisible \? "hidden" : ""\}`\}/,
   );
   // Both of the footer's homes, one rule, no per-feature duplication: the
   // peek dock and the in-pane dock read the SAME state.

@@ -86,7 +86,7 @@ function ExperimentCard({
       disabled={experiment.locked}
       data-experiment-card={experiment.id}
       {...(source === "self" ? { "data-experiment-self-card": "" } : { "data-experiment-master-card": "" })}
-      className="flex w-full items-start gap-3 rounded-2xl border border-white/10 bg-[var(--dc-flat-row)] p-4 text-left transition hover:border-white/20 hover:bg-[var(--dc-flat-row-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-[var(--dc-flat-row)] p-4 text-left transition hover:border-slate-300 hover:bg-[var(--dc-flat-row-hover)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <span
         className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
@@ -108,7 +108,7 @@ function ExperimentCard({
         data-experiment-source={source}
         style={
           source === "self"
-            ? { background: "rgba(255,107,245,0.16)", color: "#FF9CF9" }
+            ? { background: "rgba(255,107,245,0.16)", color: "#86198f" }
             : { background: "var(--dc-flat-row-hover)", color: "var(--dc-flat-ink-sub)" }
         }
       >
@@ -156,16 +156,16 @@ export default function ExperimentPanel({
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col px-3 py-3"
+      className="relative flex h-full min-h-0 flex-col bg-white px-3 py-3 text-slate-900"
       data-course-experiment-panel=""
-      data-course-theme-surface="dark"
+      data-course-theme-surface="light"
       data-experiment-screen="library"
     >
       {/* MASTER / SELF segmented control — the same contract as Notes, Mind Map
           and Brain. MASTER = the course's experiments from the course tree.
           SELF = the learner's own, made here or in the Study Library. */}
       <div className="flex items-center justify-between gap-2 pb-2" data-experiment-collection="">
-        <p className="text-[11px] font-black uppercase tracking-wide text-white/50">Live experiments</p>
+        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Live experiments</p>
         <div className="flex items-center gap-2">
           {/* The “+” — the owner brief asks for it ON this page (2026-10-07:
               “experiment page per plus icon add karo jis per click karne per
@@ -184,7 +184,7 @@ export default function ExperimentPanel({
               aria-expanded={menuOpen}
               title="Create your own experiment"
               data-experiment-self-add=""
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white ring-1 ring-white/20 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
             >
               <Plus size={16} />
             </button>
@@ -208,7 +208,7 @@ export default function ExperimentPanel({
             role="menu"
             aria-label="Create your own experiment"
             data-experiment-self-menu=""
-            className="absolute right-3 z-30 w-[19rem] rounded-2xl border border-white/10 bg-slate-900/95 p-2 shadow-2xl backdrop-blur"
+            className="absolute right-3 z-30 w-[19rem] rounded-2xl border border-slate-200 bg-white/95 p-2 text-slate-900 shadow-2xl backdrop-blur"
             style={{ top: 52 }}
           >
             <p className="px-2 pb-1 pt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
@@ -219,12 +219,12 @@ export default function ExperimentPanel({
               role="menuitem"
               onClick={() => openComposer()}
               data-experiment-self-menu-item="scratch"
-              className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-white/[0.07]"
+              className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-slate-100"
             >
-              <Sparkles size={14} className="mt-0.5 shrink-0 text-violet-300" />
+              <Sparkles size={14} className="mt-0.5 shrink-0 text-violet-700" />
               <span className="min-w-0">
-                <span className="block text-[12px] font-black text-white">Ask an AI for it</span>
-                <span className="block text-[10px] font-semibold leading-4 text-slate-400">
+                <span className="block text-[12px] font-black text-slate-900">Ask an AI for it</span>
+                <span className="block text-[10px] font-semibold leading-4 text-slate-600">
                   Copy the CMD, paste the HTML it replies with — or write the code yourself.
                 </span>
               </span>
@@ -238,12 +238,12 @@ export default function ExperimentPanel({
                   setMindMapOpen(true);
                 }}
                 data-experiment-self-menu-item="mind-map"
-                className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-white/[0.07]"
+                className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-slate-100"
               >
-                <Network size={14} className="mt-0.5 shrink-0 text-cyan-300" />
+                <Network size={14} className="mt-0.5 shrink-0 text-cyan-700" />
                 <span className="min-w-0">
-                  <span className="block text-[12px] font-black text-white">Mind map</span>
-                  <span className="block text-[10px] font-semibold leading-4 text-slate-400">
+                  <span className="block text-[12px] font-black text-slate-900">Mind map</span>
+                  <span className="block text-[10px] font-semibold leading-4 text-slate-600">
                     Paste the JSON your AI wrote from the copied prompt. It is checked before it is saved.
                   </span>
                 </span>
@@ -260,10 +260,10 @@ export default function ExperimentPanel({
                 onClick={() => openComposer(template.html)}
                 title={template.summary}
                 data-experiment-self-menu-item={`template:${template.id}`}
-                className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.07]"
+                className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-slate-100"
               >
-                <Hammer size={13} className="shrink-0 text-cyan-300" />
-                <span className="min-w-0 flex-1 truncate text-[11px] font-black text-slate-100">{template.label}</span>
+                <Hammer size={13} className="shrink-0 text-cyan-700" />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-black text-slate-900">{template.label}</span>
                 <span className="shrink-0 text-[10px] font-bold text-slate-500">{kilobytes(templateBytes(template))}</span>
               </button>
             ))}
@@ -278,7 +278,7 @@ export default function ExperimentPanel({
         {/* In SELF mode the learner's own experiments replace the course list. */}
         {selfMode ? (
           selfExperiments.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-[var(--dc-flat-row)] p-6 text-center" data-experiment-empty="" data-experiment-self-empty="">
+            <div className="rounded-2xl border border-slate-200 bg-[var(--dc-flat-row)] p-6 text-center" data-experiment-empty="" data-experiment-self-empty="">
               <span
                 className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl"
                 style={{ background: "rgba(255,107,245,0.16)", color: "#FF6BF5" }}
@@ -298,7 +298,7 @@ export default function ExperimentPanel({
             ))
           )
         ) : masterExperiments.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-[var(--dc-flat-row)] p-6 text-center" data-experiment-empty="" data-experiment-master-empty="">
+          <div className="rounded-2xl border border-slate-200 bg-[var(--dc-flat-row)] p-6 text-center" data-experiment-empty="" data-experiment-master-empty="">
             <span
               className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl"
               style={{ background: "rgba(255,107,245,0.16)", color: "#FF6BF5" }}

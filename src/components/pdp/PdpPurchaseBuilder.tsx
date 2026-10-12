@@ -47,7 +47,7 @@ import { PaymentButton } from "../ui/PaymentButton";
 import { SimplePanel } from "../ui/SimplePanel";
 import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
-import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./PdpSelectionSummary";
+import PdpSelectionSummary, { type PdpAccessStatus, type PdpPricingView, type PdpSelectionSnapshot } from "./PdpSelectionSummary";
 import { pdpSelectionKey } from "../../pdp/quoteSelection";
 import { isFreeProduct } from "../../../utils/couponVisibility";
 import {
@@ -84,6 +84,8 @@ export interface PdpPurchaseBuilderProps {
   /** One price and one CTA, embedded in the product decision panel. */
   compact?: boolean;
   pricing?: PdpPricingView;
+  /** Access verification is separate from quote/pricing state. */
+  accessStatus?: PdpAccessStatus;
   couponEntry?: ReactNode;
   /** Native Paid-tab selection uses this SAME verified purchase controller. */
   selectionRequest?: PdpSelectionRequest;
@@ -177,6 +179,7 @@ export default function PdpPurchaseBuilder({
   product,
   compact = false,
   pricing,
+  accessStatus = "ready",
   couponEntry,
   selectionRequest,
   onSelectionChange,
@@ -328,7 +331,9 @@ export default function PdpPurchaseBuilder({
     return { selection: checkoutSelection, summary, valid: validation.ok && summary.selectedCount > 0, rules: [...new Set(rules)] };
   }, [checkoutSelection, summary, validation.ok, mode, modules, selectedModuleIds, ownershipState]);
   const expectedPricingKey = pdpSelectionKey({ ...checkoutSelection, productIds: [product.documentId || product.id], couponCode: pricing?.couponIntent || null });
-  const currentPricing = pricing && pricing.selectionKey !== expectedPricingKey ? { ...pricing, quote: null, status: "loading" as const } : pricing;
+  const currentPricing = accessStatus !== "ready"
+    ? pricing ? { ...pricing, quote: null, status: "idle" as const, error: "", applying: false } : undefined
+    : pricing && pricing.selectionKey !== expectedPricingKey ? { ...pricing, quote: null, status: "loading" as const } : pricing;
   useEffect(() => { onSelectionChange?.(snapshot); }, [onSelectionChange, snapshot]);
 
   useEffect(() => {
@@ -494,11 +499,12 @@ export default function PdpPurchaseBuilder({
       )}
 
       {couponEntry}
-      {compact ? <PdpSelectionSummary snapshot={snapshot} pricing={currentPricing} showOriginal={mode !== "full_product" || (Number.isFinite(product.originalPrice) && product.originalPrice > 0)} /> : <SummaryPanel summary={summary} />}
+      {compact ? <PdpSelectionSummary snapshot={snapshot} pricing={currentPricing} accessStatus={accessStatus} showOriginal={mode !== "full_product" || (Number.isFinite(product.originalPrice) && product.originalPrice > 0)} /> : <SummaryPanel summary={summary} />}
       {compact && !isProductOwned && mode === "selected_modules" && summary.selectedCount > 0 && purchasableModules.filter((module) => selectedModuleIds.has(module.id)).every((module) => module.includeInBundle !== false) && summary.fullCourse.effectivePrice < summary.effectiveSubtotal ? <p className="dc-pdp-selection-note">The full product costs {formatPriceValue(summary.fullCourse.effectivePrice)}. <button type="button" className="dc-pdp-text-action" onClick={() => { setSelectedModuleIds(new Set()); setSelectedResourceIds(new Set()); setExtraMode(null); }}>Choose full product</button></p> : null}
 
       <CtaBar
         compact={compact}
+        accessStatus={accessStatus}
         pricing={currentPricing}
         mode={mode}
         summary={summary}
@@ -855,6 +861,7 @@ function SummaryPanel({
 
 function CtaBar({
   compact,
+  accessStatus,
   pricing,
   mode,
   summary,
@@ -867,6 +874,7 @@ function CtaBar({
   onClearNotice,
 }: {
   compact: boolean;
+  accessStatus: PdpAccessStatus;
   pricing?: PdpPricingView;
   mode: PdpPurchaseMode;
   summary: ReturnType<typeof computeSummary>;
@@ -944,6 +952,11 @@ function CtaBar({
   }
   if (pricing?.status === "loading" || pricing?.applying) { disabled = true; label = "Verifying price"; }
   if (pricing?.status === "error") disabled = true;
+  if (accessStatus !== "ready") {
+    disabled = true;
+    label = accessStatus === "loading" ? "Checking access" : "Access not verified";
+    helper = null;
+  }
   return (
     <div className="space-y-2" data-pdp-cta>
       {previewNotice && !validation.ok ? (

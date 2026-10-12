@@ -5595,6 +5595,18 @@ html[data-course-player-active="true"] {
   box-shadow: var(--dc-chrome-glass-rim), 0 14px 38px -18px rgba(0, 0, 0, 0.16);
 }
 
+/* Store header: keep the sticky strip on the same canvas as the catalog, with
+   no hairline, shadow or frost band that would read as a separate panel. */
+[data-site-header][data-header-seamless] {
+  --dc-seamless-header-bg: #0a0e18;
+  background: var(--dc-seamless-header-bg) !important;
+  background-image: none !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 .dc-desktop-shell [data-desktop-topbar] {
   background: var(--dc-chrome-glass) !important;
   backdrop-filter: var(--dc-chrome-glass-blur) !important;

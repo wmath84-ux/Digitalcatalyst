@@ -25,8 +25,9 @@ import { cn } from "@/lib/utils";
 interface CommandCtx {
   query: string;
   setOpen: (v: boolean) => void;
+  visibleCount: number;
 }
-const CommandContext = createContext<CommandCtx>({ query: "", setOpen: () => undefined });
+const CommandContext = createContext<CommandCtx>({ query: "", setOpen: () => undefined, visibleCount: 0 });
 
 interface GlassCommandProps {
   open?: boolean;
@@ -34,6 +35,11 @@ interface GlassCommandProps {
   onOpenChange?: (v: boolean) => void;
   /** Bind ⌘K / Ctrl-K to toggle. */
   shortcut?: boolean;
+  /** Search prompt and input name can be scoped to a particular palette use. */
+  placeholder?: string;
+  inputLabel?: string;
+  panelClassName?: string;
+  listClassName?: string;
   children?: ReactNode;
 }
 
@@ -43,6 +49,10 @@ export function GlassCommand({
   defaultOpen = false,
   onOpenChange,
   shortcut = true,
+  placeholder = "Type a command or search…",
+  inputLabel = "Search commands",
+  panelClassName,
+  listClassName,
   children,
 }: GlassCommandProps) {
   const [internal, setInternal] = useState(defaultOpen);
@@ -52,6 +62,7 @@ export function GlassCommand({
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const active = useRef(0);
+  const [visibleCount, setVisibleCount] = useState(0);
 
   const setOpen = (v: boolean) => {
     if (controlled === undefined) setInternal(v);
@@ -75,16 +86,43 @@ export function GlassCommand({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shortcut, open]);
 
-  // Escape + focus input on open
+  // Escape, focus the input on open and keep keyboard focus inside the modal.
   useEffect(() => {
     if (!open) return;
     active.current = 0;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const t = setTimeout(() => inputRef.current?.focus(), 20);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const panel = document.getElementById("dc-command-palette");
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>('input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { clearTimeout(t); document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) requestAnimationFrame(() => previousFocus.focus());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -105,6 +143,14 @@ export function GlassCommand({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const frame = requestAnimationFrame(() => {
+      setVisibleCount(listRef.current?.querySelectorAll("[data-cmd-item]").length ?? 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [children, open, query]);
+
   const onInputKey = (e: ReactKeyboardEvent) => {
     const items = visibleItems();
     if (e.key === "ArrowDown") { e.preventDefault(); active.current = Math.min(active.current + 1, items.length - 1); paintActive(); }
@@ -112,7 +158,7 @@ export function GlassCommand({
     else if (e.key === "Enter") { e.preventDefault(); items[active.current]?.click(); }
   };
 
-  const ctx = useMemo(() => ({ query, setOpen }), [query, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = useMemo(() => ({ query, setOpen, visibleCount }), [query, open, visibleCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!mounted || !open) return null;
 
@@ -127,8 +173,12 @@ export function GlassCommand({
           tint={0.6}
           radius={20}
           data-glass-command-panel
-          className="relative z-10 w-full max-w-lg animate-in fade-in-0 zoom-in-95 duration-200"
+          className={cn("relative z-10 w-full max-w-lg animate-in fade-in-0 zoom-in-95 duration-200", panelClassName)}
           contentClassName="flex flex-col"
+          id="dc-command-palette"
+          role="dialog"
+          aria-modal="true"
+          aria-label={inputLabel}
         >
           <div className="flex items-center gap-2.5 border-b border-white/10 px-4">
             <svg viewBox="0 0 16 16" fill="none" className="size-4 shrink-0 text-white/40" aria-hidden>
@@ -137,14 +187,16 @@ export function GlassCommand({
             </svg>
             <input
               ref={inputRef}
+              type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKey}
-              placeholder="Type a command or search…"
+              placeholder={placeholder}
+              aria-label={inputLabel}
               className="w-full bg-transparent py-3.5 text-sm text-white outline-none placeholder:text-white/35"
             />
           </div>
-          <div ref={listRef} className="max-h-72 overflow-auto p-1.5">
+          <div ref={listRef} className={cn("max-h-72 overflow-auto p-1.5", listClassName)}>
             {children}
           </div>
         </GlassSurface>
@@ -172,7 +224,8 @@ interface ItemProps extends Omit<ComponentProps<"button">, "onSelect"> {
 export function GlassCommandItem({ keywords = "", onSelect, className, children, ...props }: ItemProps) {
   const { query, setOpen } = useContext(CommandContext);
   const text = (typeof children === "string" ? children : "") + " " + keywords;
-  const visible = !query || text.toLowerCase().includes(query.toLowerCase());
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = !normalizedQuery || text.toLowerCase().includes(normalizedQuery);
   if (!visible) return null;
   return (
     <button
@@ -192,8 +245,7 @@ export function GlassCommandItem({ keywords = "", onSelect, className, children,
 }
 
 export function GlassCommandEmpty({ className, children }: ComponentProps<"div">) {
-  const { query } = useContext(CommandContext);
-  // Shown by the consumer when nothing matches; simple passthrough.
-  void query;
-  return <div className={cn("px-3 py-6 text-center text-sm text-white/40", className)}>{children}</div>;
+  const { visibleCount } = useContext(CommandContext);
+  if (visibleCount > 0) return null;
+  return <div role="status" className={cn("px-3 py-6 text-center text-sm text-white/40", className)}>{children}</div>;
 }

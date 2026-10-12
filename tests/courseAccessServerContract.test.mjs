@@ -29,6 +29,9 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 const resolver = readSource("utils/courseAccess.js");
 const resolverDts = readSource("utils/courseAccess.d.ts");
 const hook = readSource("src/hooks/useCourseAccess.ts");
+const serverFallback = readSource("api/_lib/courseAccess.ts");
+const sharedDispatcher = readSource("api/referral-leaderboard.ts");
+const vercelConfig = readSource("vercel.json");
 const routeGuard = readSource("src/components/CourseRouteGuard.tsx");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
@@ -125,6 +128,23 @@ test("useCourseAccess also reads the legacy users/{uid}/purchases subcollection"
 
 test("useCourseAccess calls resolveCourseAccess (single source of truth)", () => {
   assert.match(hook, /resolveCourseAccess\(/);
+});
+
+test("failed client reads retry through a verified server fallback without sending ownership claims", () => {
+  assert.match(hook, /firestoreHasError/);
+  assert.match(hook, /const token = await firebaseUser\.getIdToken\(\)/);
+  assert.match(hook, /apiFetch\("\/api\/course-access"/);
+  assert.match(hook, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(hook, /body: JSON\.stringify\(\{ productId, documentId \}\)/);
+  assert.match(hook, /serverAccessRetry/);
+  assert.match(hook, /setServerAccess\(\{ uid, key: productKey, status: "error"/);
+  assert.match(serverFallback, /requireFirebaseUser\(req\)/);
+  assert.match(serverFallback, /loadQuoteOwnership\(db, user\.uid/);
+  assert.match(serverFallback, /resolveCourseAccess\(/);
+  assert.doesNotMatch(serverFallback, /body\.(?:owned|entitlement|resolution|subscription)/);
+  assert.match(sharedDispatcher, /"course-access"/);
+  assert.match(sharedDispatcher, /route === "course-access".*handleCourseAccess/);
+  assert.match(vercelConfig, /"source": "\/api\/course-access"[\s\S]*?"destination": "\/api\/referral-leaderboard\?route=course-access"/);
 });
 
 // ---------------------------------------------------------------------------

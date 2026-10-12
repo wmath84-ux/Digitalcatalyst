@@ -266,7 +266,7 @@ test("the viewer stack opens experiments and never a URL-less type it cannot ren
   // deep-link selection, resume, and the progress denominator.
   assert.match(player, /const experimentFiles = useMemo\(\s*\n\s*\(\) => allFiles\(modules\)\.filter\(\(file\) => file\.accessLevel !== "hidden" && isExperimentFileType\(file\.type\) && Boolean\(String\(file\.interactiveHtml \|\| ""\)\.trim\(\)\)\),/);
   assert.match(player, /const playableFiles = useMemo\(\(\) => \(experimentFiles\.length \? \[\.\.\.files, \.\.\.experimentFiles\] : files\), \[files, experimentFiles\]\);/);
-  assert.match(player, /if \(selectedFile \|\| playableFiles\.length === 0\) return;/);
+  assert.match(player, /if \(selectedFile \|\| experimentOpenedRef\.current \|\| playableFiles\.length === 0\) return;/);
   assert.match(player, /const eligible = playableFiles\.filter\(\(file\) => \{/);
 
   // ResourceViewer has a first-class branch, not an embed fallback.

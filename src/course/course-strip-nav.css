@@ -2,7 +2,7 @@
 [data-course-strip-nav] {
   flex: 0 0 auto; min-width: 0; width: 100%; z-index: 80;
   container-type: inline-size;
-  padding: 4px max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  padding: 0 max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   background: #fff; border-top: 1px solid #e2e8f0;
 }
 .course-strip-track { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }

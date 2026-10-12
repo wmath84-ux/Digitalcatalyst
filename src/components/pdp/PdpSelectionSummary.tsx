@@ -10,6 +10,8 @@ export type PdpSelectionSnapshot = {
   rules: string[];
 };
 
+export type PdpAccessStatus = "ready" | "loading" | "error";
+
 export type PdpPricingView = {
   selectionKey: string;
   quote: ServerPriceQuote | null;
@@ -21,12 +23,24 @@ export type PdpPricingView = {
 };
 
 /** A plain, itemised decision summary. Never computes a coupon on the client. */
-export default function PdpSelectionSummary({ snapshot, pricing, showOriginal = true }: {
+export default function PdpSelectionSummary({ snapshot, pricing, showOriginal = true, accessStatus = "ready" }: {
   snapshot: PdpSelectionSnapshot;
   pricing?: PdpPricingView;
   showOriginal?: boolean;
+  accessStatus?: PdpAccessStatus;
 }) {
   const { summary, selection, rules } = snapshot;
+  if (accessStatus !== "ready") {
+    return (
+      <section data-pdp-order-summary data-pricing-status={`access-${accessStatus}`} className="dc-pdp-order-summary" aria-live="polite" aria-busy={accessStatus === "loading" || undefined}>
+        <p className="dc-pdp-selection-note" role="status" data-pdp-access-pricing-hold>
+          {accessStatus === "loading"
+            ? "Checking your content access before showing a total…"
+            : "Price hidden until your content access can be verified."}
+        </p>
+      </section>
+    );
+  }
   const quote = pricing?.quote || null;
   const isPartial = selection.purchaseKind !== "full_product";
   const lines: CheckoutLineItem[] = quote ? quote.verifiedLineItems : summary.lineItems.map((line) => ({

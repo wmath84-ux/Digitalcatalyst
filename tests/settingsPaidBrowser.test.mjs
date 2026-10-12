@@ -237,9 +237,38 @@ check("access waits for all real sources, not a timer; errors block quoting and 
     await page.waitForTimeout(100); assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
     await page.evaluate(() => window.fixtureState.releaseAccess()); await paid(page); await clean(page, errors);
   }
-  const { page, errors } = await open("page=pdp&accessError=entitlements"); await page.getByRole("button", { name: "Paid", exact: true }).click(); await page.locator(".dc-pdp-paid-error").waitFor(); assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
-  await page.evaluate(() => { window.fixtureState.faults.sync = false; }); await page.locator(".dc-pdp-paid-error").getByRole("button", { name: "Retry access check", exact: true }).click(); await paid(page);
+  const { page, errors } = await open("page=pdp&accessError=entitlements&accessServerError"); await page.getByRole("button", { name: "Paid", exact: true }).click(); await page.locator(".dc-pdp-paid-error").waitFor(); assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
+  await page.evaluate(() => { window.fixtureState.faults.sync = false; window.fixtureState.faults.courseAccess = false; }); await page.locator(".dc-pdp-paid-error").getByRole("button", { name: "Retry access check", exact: true }).click(); await paid(page);
   assert.equal(await page.evaluate(() => window.probe.library.loading), false); assert.equal(await page.evaluate(() => window.probe.library.error), null);
+  await clean(page, errors);
+});
+check("failed client access reads use the authenticated server resolver and keep ownership separate from pricing", async () => {
+  const { page, errors } = await open("page=pdp&accessError=entitlements&partial");
+  await accessReady(page);
+  assert.equal(await page.evaluate(() => window.probe.access.resolution.ownedModuleIds.has("advanced")), true);
+  assert.equal(await page.locator("[data-pdp-access-error]").count(), 0);
+  const request = await page.evaluate(() => {
+    const match = window.fixtureState.requests.find((item) => item.url.startsWith("/api/course-access"));
+    return match ? { method: match.method, body: JSON.parse(match.body) } : null;
+  });
+  assert.deepEqual(request, { method: "POST", body: { productId: "foundations", documentId: "foundations-doc" } });
+  assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
+  await clean(page, errors);
+});
+check("server access fallback failure hides every estimate, reports only access, and recovers through access retry", async () => {
+  const { page, errors } = await open("page=pdp&accessError=entitlements&accessServerError");
+  await page.locator("[data-pdp-access-error]").waitFor();
+  await page.waitForFunction(() => !window.probe.access.loading && Boolean(window.probe.access.error));
+  assert.equal(await page.locator("[data-pdp-access-error]").count(), 1);
+  assert.equal(await page.locator(".dc-pdp-pricing-error").count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Retry pricing", exact: true }).count(), 0);
+  assert.equal(await page.locator("[data-pdp-order-summary] [data-pdp-summary-total]").count(), 0);
+  assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
+  await page.evaluate(() => { window.fixtureState.faults.courseAccess = false; window.fixtureState.faults.sync = false; });
+  await page.locator("[data-pdp-access-error]").getByRole("button", { name: "Retry access check", exact: true }).click();
+  await accessReady(page);
+  assert.equal(await page.locator("[data-pdp-access-error]").count(), 0);
+  assert.equal(await page.evaluate(() => window.fixtureState.quoteRequests.length), 0);
   await clean(page, errors);
 });
 check("selection/ownership/subscription state cannot leak across account changes", async () => {

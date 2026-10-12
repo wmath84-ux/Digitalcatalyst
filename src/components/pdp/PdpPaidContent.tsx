@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { CheckoutSelection } from "../../types/commerce";
 import type { PaidContentRow } from "../../../utils/pdpPaidContent";
 
@@ -60,11 +61,14 @@ export default function PdpPaidContent({ available, owned, selection, signedIn, 
         <hr data-pdp-paid-divider className="dc-pdp-paid-divider" />
         <section data-pdp-paid-group="owned" aria-labelledby="paid-owned-title">
           <div className="dc-pdp-paid-heading"><h3 id="paid-owned-title">Already owned</h3><span>{owned.length} item{owned.length === 1 ? "" : "s"}</span></div>
-          <p className="dc-pdp-selection-note">Your purchased or included content. No need to buy these items again; subscription access lasts only while your plan is active.</p>
-          <ul className="dc-pdp-paid-list dc-pdp-owned-list">{owned.map((row) => <li key={row.key} data-pdp-owned-item={row.key}>
-            <div className="dc-pdp-paid-copy"><span className="dc-pdp-paid-type">{TYPE_LABEL[row.kind]}</span><h4>{row.title}</h4><p>{row.ownershipLabel}</p>{row.accessNote ? <p className="dc-pdp-paid-rule">{row.accessNote}</p> : null}
-              {row.details.length ? <details className="dc-pdp-paid-includes"><summary>Included content ({row.details.length})</summary><ul>{row.details.map((title, index) => <li key={`${title}-${index}`}>{title}</li>)}</ul></details> : null}
-            </div><span className="dc-pdp-owned-label">{row.accessSource === "subscription" ? "Included" : row.accessSource === "included" ? "Available" : "Owned"}</span>
+          <p className="dc-pdp-selection-note">Purchased and included items are already available and won’t be charged again. Plan access lasts while your subscription is active.</p>
+          <ul data-pdp-owned-summary="" aria-label="Purchased and included content" className="dc-pdp-owned-list">{owned.map((row) => <li key={row.key} data-pdp-owned-item={row.key} data-access-source={row.accessSource}>
+            <span className="dc-pdp-owned-mark" aria-hidden="true"><Check size={13} strokeWidth={2.5} /></span>
+            <div className="dc-pdp-owned-copy">
+              <div className="dc-pdp-owned-main"><span className="dc-pdp-owned-type">{TYPE_LABEL[row.kind]}</span><span className="dc-pdp-owned-title">{row.title}</span></div>
+              {row.accessNote ? <p className="dc-pdp-owned-note">{row.accessNote}</p> : null}
+            </div>
+            <span className="dc-pdp-owned-label">{row.accessSource === "subscription" ? "Subscription access" : row.accessSource === "included" || row.accessSource === "full_product" ? "Included" : row.ownershipLabel || "Purchased"}</span>
           </li>)}</ul>
         </section>
       </> : null}

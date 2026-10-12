@@ -11,6 +11,8 @@ import "../../../src/index.css";
 import NotesPanel from "../../../src/course/NotesPanel";
 import { SplitDeck } from "../../../src/course/studyPanels";
 import { CourseKeyboardProvider, useCourseKeyboard } from "../../../src/course/useCourseKeyboard";
+import CoursePeekDock from "../../../src/course/CoursePeekDock";
+import type { DockTab } from "../../../src/course/CourseOverlay";
 import { getCoursePanelSession } from "../../../src/course/coursePanelSession";
 import type { CoursePlayerNote } from "../../../src/types/course";
 
@@ -43,32 +45,15 @@ function KeyboardProbe() {
   return null;
 }
 
-// The player's footer navigation, opt-in (`?footer=peek` or `?footer=pane`), so
-// the note toolbar's "ends just above the footer" rule can be driven in a real
-// browser. Both homes are reproduced with the geometry src/index.css gives the
-// real ones: the peek dock's 30px hit strip + 8px line + 10px of padding, and
-// the always-visible dock as the study pane's last child. Without the param the
-// harness DOM is exactly what it always was — no footer at all.
+// The player's real in-flow study strip or legacy in-pane dock is opt-in
+// (`?footer=peek` / `?footer=pane`) so the note toolbar's final geometry can
+// be driven in a real browser. The default harness has no footer.
 const footerMode = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("footer");
-
-const PeekFooter = () => (
-  <div
-    data-course-peek-dock=""
-    className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center"
-    style={{ paddingBottom: 10 }}
-  >
-    <div
-      data-course-peek-line-hit=""
-      style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", width: "min(26rem, 92%)", padding: "30px 24px 0" }}
-    >
-      <div data-course-peek-line="" style={{ width: "min(22rem, 68%)", height: 8, borderRadius: 9999, background: "rgba(255,255,255,0.55)" }} />
-    </div>
-  </div>
-);
 
 function Harness() {
   const [notes, setNotes] = useState<CoursePlayerNote[]>(seed);
   const [panel, setPanel] = useState(true);
+  const [footerTab, setFooterTab] = useState<DockTab>("notes");
   const shell = useRef<HTMLDivElement | null>(null);
   window.__notes = notes;
   window.__harness = { togglePanel: () => setPanel((open) => !open), exit: () => root.unmount() };
@@ -116,7 +101,7 @@ function Harness() {
             solid
           />
         </div>
-        {footerMode === "peek" ? <PeekFooter /> : null}
+        {footerMode === "peek" ? <CoursePeekDock tab={footerTab} onTabChange={setFooterTab} /> : null}
       </div>
     </CourseKeyboardProvider>
   );
