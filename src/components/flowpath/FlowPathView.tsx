@@ -658,7 +658,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef, isDarkMode = true
   );
 
   return (
-    <div className={`relative transition-colors duration-300 ${isDarkMode ? "bg-slate-950" : "bg-white"}`}>
+    <div className={`relative transition-colors duration-300 ${isDarkMode ? "bg-slate-950" : "bg-[#f6f8fc]"}`}>
       {/* The old fixed FLOWPATH title bar is gone — its controls (theme
           toggle + flow-curve settings) now live behind the Settings gear
           in the bottom dock, so the home-style header above stays the
@@ -671,7 +671,7 @@ export function FlowPathView({ onNavigateToHome, openCurveRef, isDarkMode = true
       >
         <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} isDarkMode={isDarkMode} />
 
-        {isEmpty && <EmptyState />}
+        {isEmpty && <EmptyState isDarkMode={isDarkMode} />}
 
         <AnimatePresence>
           {pulseSegment && (
