@@ -191,16 +191,15 @@ export default function StudyLibraryPage() {
             <header className="dc-account-header">
               <div>
                 <h1>My Study Library</h1>
-                <p className="dc-account-note">
-                  Courses you create and manage.
+                <p className="dc-account-note dc-study-intro">
+                  Create, organize, and revisit your own courses.
                 </p>
                 {myCourses.state === "ready" || myCourses.courses.length > 0 ? (
-                  <p data-study-library-count className="dc-account-note">
-                    {totals.courses} course{totals.courses === 1 ? "" : "s"} ·{" "}
-                    {totals.modules} module{totals.modules === 1 ? "" : "s"} ·{" "}
-                    {totals.resources} resource
-                    {totals.resources === 1 ? "" : "s"}
-                  </p>
+                  <div data-study-library-count className="dc-study-summary" aria-label={`${totals.courses} courses, ${totals.modules} modules, ${totals.resources} resources`}>
+                    <span className="dc-study-summary-item"><strong>{totals.courses}</strong><span>Courses</span></span>
+                    <span className="dc-study-summary-item"><strong>{totals.modules}</strong><span>Modules</span></span>
+                    <span className="dc-study-summary-item"><strong>{totals.resources}</strong><span>Resources</span></span>
+                  </div>
                 ) : null}
               </div>
               <button
@@ -246,7 +245,7 @@ export default function StudyLibraryPage() {
                       type="search"
                       data-my-course-search
                       aria-label="Search your courses"
-                      placeholder="Search your courses"
+                      placeholder="Search by course name or topic"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                     />
